@@ -1,0 +1,25 @@
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# editor scratch
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+.DS_Store
+
+# measurement scripts (docs/HANDOFF.md discipline 4)
+scratch/
+
+# design history: kept locally for reference, deliberately untracked
+docs/VISION.md

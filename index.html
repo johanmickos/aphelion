@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<title>Aphelion — Phase-Clock Settle (experimental)</title>
+<style>
+  :root{
+    --bg:#000; --panel:#0c0f16; --line:#26314a; --ink:#eef3fb; --dim:#8595b0;
+    --mono:'SFMono-Regular',ui-monospace,'JetBrains Mono',Menlo,Consolas,monospace;
+    --acc:#b98cff;         /* phase-clock accent — violet, to distinguish from the teal build */
+    --hot:#ff5566; --ok:#54f39a;
+  }
+  html{background:#000;color-scheme:dark}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;width:100%;background:#000;color:var(--ink);
+    font-family:var(--mono);overflow:hidden;-webkit-user-select:none;user-select:none;
+    -webkit-tap-highlight-color:transparent;touch-action:none;position:fixed;inset:0;}
+  #wrap{position:fixed;inset:0;background:#000}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#000;z-index:1}
+
+  .hud{position:absolute;pointer-events:none;font-size:11px;line-height:1.5;letter-spacing:.02em;z-index:5}
+  #topleft{top:12px;left:14px}
+  #topleft .title{font-size:12px;letter-spacing:.12em;color:var(--ink);font-weight:600}
+  #topleft .sub{color:var(--dim);font-size:10px;letter-spacing:.05em;margin-top:2px}
+  #tag{margin-top:8px;display:inline-block;padding:3px 9px;border:1px solid rgba(185,140,255,.5);
+    border-radius:2px;font-size:10px;letter-spacing:.08em;color:var(--acc)}
+  #readout{top:12px;right:14px;text-align:right;color:var(--dim);font-size:10px;white-space:pre}
+
+  #panel{position:absolute;left:14px;bottom:14px;right:14px;display:flex;gap:8px;
+    flex-wrap:wrap;align-items:center;pointer-events:none;z-index:10}
+  .btn{pointer-events:auto;cursor:pointer;background:var(--panel);color:var(--ink);
+    border:1px solid var(--line);border-radius:3px;font-family:var(--mono);
+    font-size:11px;letter-spacing:.05em;padding:8px 12px}
+  .btn:active{background:#121a28}
+  .spacer{flex:1}
+
+  #tune{position:absolute;right:14px;bottom:64px;width:min(360px,calc(100vw - 28px));
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;
+    display:none;flex-direction:column;gap:2px;pointer-events:auto;z-index:15;
+    box-shadow:0 12px 40px rgba(0,0,0,.6)}
+  #tune.open{display:flex}
+  .tuneRow{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .tuneRow .tl{font-size:10px;letter-spacing:.08em;color:var(--acc);width:82px;flex-shrink:0}
+  .tuneRow input[type=range]{flex:1;accent-color:#b98cff;height:22px}
+  .tuneRow .tv{font-size:11px;color:var(--ink);width:40px;text-align:right;flex-shrink:0}
+  .tuneHint{font-size:9.5px;color:var(--dim);line-height:1.4;margin:2px 0 6px 92px}
+  .tuneFoot{display:flex;align-items:center;margin-top:12px;gap:8px}
+
+  #trace{position:absolute;inset:0;background:rgba(0,0,0,.96);display:none;flex-direction:column;
+    pointer-events:auto;z-index:20}
+  #trace.open{display:flex}
+  #traceHead{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  #traceHead .h{font-size:12px;letter-spacing:.12em}
+  #traceHead .meta{color:var(--dim);font-size:10px;flex:1;white-space:pre-wrap;line-height:1.5}
+  #traceBody{flex:1;overflow:auto;padding:10px 0}
+  #tt{width:100%;border-collapse:collapse;font-size:10.5px}
+  #tt th{position:sticky;top:0;background:var(--panel);color:var(--dim);text-align:right;
+    padding:6px 10px;font-weight:500;border-bottom:1px solid var(--line)}
+  #tt td{text-align:right;padding:3px 10px;border-bottom:1px solid #0f1521}
+  #tt td.ph{text-align:left;color:var(--dim)}
+  #tt tr.kink td{color:var(--hot)}
+  #tt tr.event td{background:rgba(185,140,255,.08)}
+  #traceFoot{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px}
+  .pill{font-size:9px;letter-spacing:.06em;border:1px solid var(--line);border-radius:10px;padding:2px 8px}
+  #traceText{position:absolute;inset:0;display:none;flex-direction:column}
+  #traceText.open{display:flex}
+  #traceText textarea{flex:1;width:100%;background:#070a11;color:var(--ink);border:0;
+    font-family:var(--mono);font-size:11px;padding:16px;resize:none;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+
+  <div id="readout" class="hud"></div>
+
+  <div id="panel">
+    <button class="btn" id="resetBtn">↺ RESET</button>
+    <button class="btn" id="pauseBtn">❚❚ PAUSE</button>
+    <div class="spacer"></div>
+    <button class="btn" id="tuneBtn">⚙ TUNE</button>
+    <button class="btn" id="traceBtn">▤ TRACE</button>
+  </div>
+
+  <div id="tune">
+    <div class="tuneRow"><span class="tl">PHASE RATE</span>
+      <input type="range" id="t_phase" min="0.5" max="2.5" step="0.05" value="1.0">
+      <span class="tv" id="v_phase"></span></div>
+    <div class="tuneHint">how fast the settled ship sweeps its orbit · 1.0 = physically real speed · &gt;1 = faster around the SAME orbit (decoupled)</div>
+
+    <div class="tuneRow"><span class="tl">TIGHTEN</span>
+      <input type="range" id="t_tighten" min="0" max="1" step="0.02" value="1.0">
+      <span class="tv" id="v_tighten"></span></div>
+    <div class="tuneHint">final roundness of the settled orbit · 1 = rounds to a circle after ~1 loop · lower = keeps a residual oval</div>
+
+    <div class="tuneRow"><span class="tl">SETTLE T</span>
+      <input type="range" id="t_dur" min="0.3" max="3" step="0.1" value="1.2">
+      <span class="tv" id="v_dur"></span></div>
+    <div class="tuneHint">seconds to ease from the natural ellipse into the tightened, phase-swept orbit</div>
+
+    <div class="tuneRow"><span class="tl">PHASE RAMP</span>
+      <input type="range" id="t_ramp" min="0" max="1" step="0.02" value="0.5">
+      <span class="tv" id="v_ramp"></span></div>
+    <div class="tuneHint">how quickly the phase rate reaches its target after the freeze (lower = gentler seam)</div>
+
+    <div class="tuneRow"><span class="tl">CIRC COST</span>
+      <input type="range" id="t_fcost" min="0" max="80" step="1" value="18">
+      <span class="tv" id="v_fcost"></span></div>
+    <div class="tuneHint">fuel/sec burned while circularizing · full settle costs this × settle-time · the slingshot/whip itself is always free</div>
+
+    <div class="tuneRow"><span class="tl">FLYBY COST</span>
+      <input type="range" id="t_flcost" min="0" max="120" step="1" value="54">
+      <span class="tv" id="v_flcost"></span></div>
+    <div class="tuneHint">fuel/sec burned while braking a too-fast flyby into a capture</div>
+
+    <div class="tuneRow"><span class="tl">RECOVERY</span>
+      <input type="range" id="t_regen" min="0" max="40" step="1" value="15">
+      <span class="tv" id="v_regen"></span></div>
+    <div class="tuneHint">fuel/sec replenished when not spending · lower = slower refill between captures</div>
+
+    <div class="tuneRow"><span class="tl">GAUGE BOB</span>
+      <input type="range" id="t_gfollow" min="0" max="1" step="0.02" value="0.25">
+      <span class="tv" id="v_gfollow"></span></div>
+    <div class="tuneHint">how much the compass ring bobs with the orbit · 0 = still ring · 1 = full peri/apo pump</div>
+
+    <div class="tuneFoot">
+      <button class="btn" id="tuneReset">RESET DEFAULTS</button>
+      <div class="spacer"></div>
+      <button class="btn" id="tuneClose">DONE</button>
+    </div>
+  </div>
+
+  <div id="trace">
+    <div id="traceHead"><span class="h">CAPTURE TRACE</span>
+      <span class="meta" id="traceMeta"></span><span class="pill" id="tracePill"></span></div>
+    <div id="traceBody"><table id="tt"></table></div>
+    <div id="traceFoot">
+      <button class="btn" id="traceCopy">COPY FOR CHAT</button>
+      <button class="btn" id="traceRaw">RAW TEXT</button>
+      <div class="spacer"></div>
+      <button class="btn" id="traceClose">CLOSE</button>
+    </div>
+    <div id="traceText">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center">
+        <span class="h" style="font-size:12px;letter-spacing:.12em">RAW TRACE</span>
+        <div class="spacer"></div>
+        <button class="btn" id="traceRawBack">◂ TABLE</button>
+        <button class="btn" id="traceRawClose">CLOSE</button>
+      </div>
+      <textarea id="traceTA" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   APHELION — PHASE-CLOCK SETTLE  (experimental, separate from the main build)
+   ----------------------------------------------------------------------------
+   The idea under test (user's): DECOUPLE the orbit's SHAPE from the RATE the
+   ship sweeps it. Physics defines the curve; a feel-controlled phase clock
+   advances the ship along that curve. So "faster at the same height" becomes
+   possible — you sweep the SAME ellipse quicker without adding orbital energy,
+   so it can't climb or escape.
+
+   PHASES
+     drift : no gravity, straight coast (planets only pull once grabbed).
+     clear : on press, if natural periapsis < minR, ease in the MINIMUM
+             tangential dv to lift periapsis to minR. (Same as main build.)
+     whip  : REAL softened-gravity integration -> the physical dive + slingshot.
+             Fully physical; nothing decoupled here.
+     settle: at the first periapsis we FREEZE the orbit the ship is on as a
+             geometric ellipse (its orbital elements). From here the ship is no
+             longer force-integrated — it rides P(theta), the frozen curve,
+             advanced by a PHASE CLOCK whose rate we control. Over SETTLE_T the
+             curve optionally TIGHTENS toward a circle at periapsis, and the
+             phase rate eases from "exactly the real speed at the seam" up to
+             PHASE_RATE x real. Radius stays honest; sweep speed is authored.
+     release: hand a real velocity vector back to the world = tangent(P) * the
+              current phase speed, plus any boost. Seamless because we kept the
+              geometry.
+
+   The seam (whip->settle) is gentle BY CONSTRUCTION: at the freeze instant the
+   phase speed is initialized to the ship's actual speed, and the curve passes
+   through the ship's actual position, so position and velocity are continuous.
+============================================================================ */
+
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+let DPR=1,W=0,H=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=window.innerWidth||canvas.clientWidth; H=window.innerHeight||canvas.clientHeight;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  canvas.width=Math.round(W*DPR); canvas.height=Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize',()=>{resize();layoutWorld();});
+window.addEventListener('orientationchange',()=>setTimeout(()=>{resize();layoutWorld();resetShip();},100));
+
+const CONFIG={
+  GM:5_500_000, soft:18, SUB:6, minOrbitGap:16, cruise:97,
+  // aim scoring (kept, used for boost + tighten target)
+  aimInwardW:0.55, aimProxW:0.25, aimSpeedW:0.20, aimProxRef:240,
+  // phase-clock settle
+  phaseRate:1.0,        // target sweep multiplier vs real speed (the headline knob)
+  tightenFrac:1.0,      // final roundness: 1 = circle at periapsis, lower = residual oval
+  settleDur:1.2,        // seconds to ease shape + phase rate
+  phaseRamp:0.5,        // how fast phase rate reaches target (0..1 lerp / frame-ish)
+  clearEaseFrames:5,
+  captureInboundMin:0.30,  // below this inbound fraction (and unbound) = flyby, no capture
+  flybyBrake:320,          // speed (px/s) shed per second holding a flyby — strong enough to convert DURING the inbound dive
+  flybyFuelPerSec:54,      // fuel spent per second braking a flyby
+  flybyRadialBias:0.85,    // fraction of brake spent killing radial-out motion (vs tangential) — higher = wider return arc
+  flybyOutwardEase:0.35,   // brake multiplier when already sailing outward — lower = gentler = much wider return arc
+  flybyBrakeRefSpeed:200,  // brake reaches full strength at this speed
+  flybyBrakeMinSpeed:120,  // below this speed the brake is OFF — slow grabs coast in on gravity alone (gentle wide arc)
+  whipTimeout:1.5,         // safety: if no periapsis within this many seconds, it's a flyby
+  // boost (carried over, unchanged in spirit)
+  boostThreshold:0.5, boostMax:95, boostRetainOrbit:0.5,
+  boostArmTime:0.45,    // seconds to ramp the boost from 0 to full (must hold to arm)
+  boostDecayTime:1.4,   // seconds for the boost to fade to zero after its peak
+  boostPermFrac:0.22,   // fraction of the boost that PERMANENTLY carries onward
+  boostPunch:1.8,       // the transient burst is this much bigger up front (punchy escape)
+  boostBurstDecay:1.3,  // seconds for the transient escape burst to fade away
+  releaseFlingBoost:1.0,
+  // fuel
+  fuelMax:100, fuelRegen:15, fuelPerSec:18,
+  // playfield bounds
+  fieldWidthFrac:1.20,  // field is 20% wider than the screen (safe margin on edges)
+  gaugeFollow:0.25,     // how much the compass ring tracks the live orbit radius (0=still, 1=full pump)
+  edgeMarkerRange:1300, // only show off-screen planet markers within this distance (nearby/reachable)
+  crashConeRange:70,    // how close (px beyond surface) the crash cone reaches — small = only near the planet
+  crashConeHalfAngle:0.42, // half-angle (radians) of the DRAWN crash wedge (cosmetic shape only)
+  crashDepthFrac:0.72,  // natural periapsis must dip below this fraction of planet R to count as a crash (lower = more forgiving)
+  crashPause:0.7,       // seconds to hold on the crash before respawning (so the player sees what happened)
+  crashGrazeDot:0.18,   // only near-parallel grazes survive (velocity <~10° into surface); anything steeper kills
+};
+
+// Field horizontal bounds, centered on screen. The playable field is wider than
+// the visible width so there's safe space at the edges; beyond the field edge is
+// out of bounds -> respawn.
+function fieldBounds(){
+  const fw=W*CONFIG.fieldWidthFrac;
+  const cx=W*0.5;
+  return {left:cx-fw/2, right:cx+fw/2, width:fw};
+}
+
+/* -------------------------------------------------- world */
+const planets=[];
+const ship={x:0,y:0,vx:0,vy:0,alive:true};
+const crash={active:false,t:0,x:0,y:0};
+let cam={x:0,y:0};
+function layoutWorld(){
+  planets.length=0;
+  const cx=W*0.5;
+  const defs=[
+    {dx:-6,y:0,R:46},{dx:34,y:-0.78,R:40},{dx:-40,y:-1.60,R:52},{dx:18,y:-2.44,R:34},
+    {dx:-24,y:-3.30,R:44},{dx:44,y:-4.18,R:38},{dx:-10,y:-5.08,R:56},{dx:30,y:-5.98,R:36},
+  ];
+  defs.forEach((d,i)=>planets.push({x:cx+d.dx,y:d.y*H,R:d.R,name:'P'+(i+1)}));
+}
+function resetShip(){
+  const cx=W*0.5;
+  ship.x=cx-6-84; ship.y=H*0.42; ship.vx=0; ship.vy=-CONFIG.cruise; ship.alive=true;
+  ship.burstX=0; ship.burstY=0; ship.burstT=0; trail.length=0;
+  cap.fuel=CONFIG.fuelMax;
+  cam.x=0; cam.y=ship.y-H*0.62; cap.active=false; cap.phase='drift'; held=false;
+}
+
+/* -------------------------------------------------- helpers */
+const hypot=Math.hypot;
+const circSpeed=r=>Math.sqrt(CONFIG.GM/Math.max(r,1));
+const gAccel=r=>CONFIG.GM/(r*r+CONFIG.soft*CONFIG.soft);
+function naturalPeriapsis(rx,ry,vx,vy){
+  const r=hypot(rx,ry),v2=vx*vx+vy*vy,L=Math.abs(rx*vy-ry*vx),E=0.5*v2-CONFIG.GM/r;
+  if(L<1e-6)return 0;
+  const a=E,b=CONFIG.GM,c=-0.5*L*L,disc=b*b-4*a*c;
+  if(Math.abs(a)<1e-9)return 0.5*L*L/CONFIG.GM;
+  if(disc<0)return r;
+  const s=Math.sqrt(disc),r1=(-b+s)/(2*a),r2=(-b-s)/(2*a);
+  const cs=[r1,r2].filter(x=>x>0); return cs.length?Math.min.apply(null,cs):0;
+}
+function clearanceDv(rx,ry,vx,vy,target){
+  const r=hypot(rx,ry); let tx=-ry/r,ty=rx/r; if(tx*vx+ty*vy<0){tx=-tx;ty=-ty;}
+  let lo=0,hi=circSpeed(target)*1.2,best=0;
+  for(let i=0;i<40;i++){const m=(lo+hi)/2;const p=naturalPeriapsis(rx,ry,vx+tx*m,vy+ty*m);
+    if(p<target)lo=m;else{hi=m;best=m;}}
+  return {dvx:tx*best,dvy:ty*best};
+}
+
+/* -------------------------------------------------- capture state */
+const cap={
+  active:false, phase:'drift', planet:null,
+  rx:0,ry:0,vx:0,vy:0, grabR:0,grabSpeed:0,aim:0,inboundFrac:0, minR:0,
+  prevR:0,prevDR:0,passedPeri:false,periR:0,apoR:0,
+  clearFramesLeft:0,clearDvx:0,clearDvy:0,
+  // frozen-orbit (phase clock) state
+  orbit:null,        // {a,e,argp,dir}  the frozen ellipse
+  theta:0,           // current true anomaly along the frozen orbit
+  phaseSpeed:0,      // current angular sweep rate (rad/s)
+  phaseTarget:1,     // target multiplier easing
+  settleT:0,
+  tightness:0,boost:0,settleProgress:0,
+  fuel:CONFIG.fuelMax, lastAngle:0,tStart:0, trace:[],traceMeta:null,lastBoostApplied:null,
+};
+let held=false, paused=false;
+const hasPointer=('onpointerdown' in window);
+
+/* -------------------------------------------------- begin capture */
+function nearestPlanet(){let b=null,bd=1e9;for(const p of planets){const d=hypot(ship.x-p.x,ship.y-p.y);if(d<bd){bd=d;b=p;}}return b;}
+// The "next" planet to aim for: the nearest planet ABOVE the grabbed one (smaller
+// world y = higher up the climb). Falls back to nearest other planet if none above.
+function nextPlanet(from){
+  let best=null,bd=1e9,bestAny=null,bAny=1e9;
+  for(const p of planets){
+    if(p===from) continue;
+    const d=hypot(p.x-from.x,p.y-from.y);
+    if(d<bAny){bAny=d;bestAny=p;}
+    if(p.y < from.y-1 && d<bd){bd=d;best=p;}  // above
+  }
+  return best||bestAny;
+}
+// The few nearest reachable planets (for the compass gauge), sorted by distance.
+function nearbyPlanets(from, count, maxDist){
+  const list=[];
+  for(const p of planets){
+    if(p===from) continue;
+    const d=hypot(p.x-from.x,p.y-from.y);
+    if(d<=maxDist) list.push({p,d});
+  }
+  list.sort((a,b)=>a.d-b.d);
+  return list.slice(0,count);
+}
+// "Crash cone": show only when the ship's actual heading (a ray from the ship
+// along its velocity) intersects the planet's circle AND the ship is within a
+// low distance threshold. That's a real "you're pointed into the surface and
+// close enough that it's too late" test — not just nearness. Returns 0..1.
+function crashCone(p){
+  const rx=ship.x-p.x, ry=ship.y-p.y, d=hypot(rx,ry);
+  if(d > p.R + CONFIG.crashConeRange) return 0;      // must be CLOSE
+  const spd=hypot(ship.vx,ship.vy);
+  if(spd<1) return 0;
+  const hx=ship.vx/spd, hy=ship.vy/spd;              // heading unit vector
+  // ray from ship (rx,ry rel planet) along heading: does it hit circle radius R?
+  // solve |(rx,ry) + t*(hx,hy)| = R for t>0 (t = forward distance to impact).
+  const b = rx*hx + ry*hy;                           // projection
+  const c = rx*rx + ry*ry - p.R*p.R;
+  const disc = b*b - c;
+  if(disc < 0) return 0;                             // heading misses the planet
+  const t = -b - Math.sqrt(disc);                    // nearest forward hit
+  if(t <= 0) return 0;                               // planet is behind us
+  // in the cone: severity from how close we already are (closer = more urgent)
+  const closeF = 1-(d-p.R)/Math.max(1,CONFIG.crashConeRange);
+  return Math.max(0, Math.min(1, Math.max(0.4, closeF)));
+}
+function inCrashCone(p){ return crashCone(p) > 0.35; }
+function beginCapture(){
+  // Only block a grab when the tank is fully empty. You can ALWAYS enter an orbit
+  // and slingshot off — circularizing is the optional expensive part. If fuel runs
+  // out mid-circularization you putter out, but the whip/slingshot itself is free.
+  if(cap.fuel <= 0.5){ cap._noFuelGrab=performance.now(); return; }
+  const p=nearestPlanet(); if(!p)return;
+  // Too-late-to-recover: refuse if on a near-certain crash course into this planet.
+  if(inCrashCone(p)){ cap._crashRefused=performance.now(); return; }
+  cap.active=true; cap.planet=p;
+  cap.rx=ship.x-p.x; cap.ry=ship.y-p.y; cap.vx=ship.vx; cap.vy=ship.vy;
+  cap.minR=p.R+CONFIG.minOrbitGap;
+  cap.grabR=hypot(cap.rx,cap.ry); cap.grabSpeed=hypot(cap.vx,cap.vy);
+  cap.prevR=cap.grabR; cap.prevDR=0; cap.passedPeri=false; cap.periR=cap.grabR; cap.apoR=cap.grabR;
+  cap.lastAngle=Math.atan2(cap.ry,cap.rx); cap.tStart=performance.now(); cap.trace=[];
+  cap.clearFramesLeft=0; cap.orbit=null; cap.settleT=0; cap.settleProgress=0;
+  cap.whipE=undefined; cap.whipVmax=0; cap.Lfrozen=undefined;
+  cap.boost=0; cap.tightness=0; cap.settleProgress=0; cap.lastBoostApplied=null; cap._puttered=false;
+
+  // aim
+  const r=cap.grabR,spd=cap.grabSpeed,rhx=cap.rx/r,rhy=cap.ry/r;
+  const vrad=cap.vx*rhx+cap.vy*rhy;
+  const inb=Math.max(0,-vrad/Math.max(spd,1));
+  const prox=1-Math.min(1,r/CONFIG.aimProxRef);
+  const spf=Math.min(1,spd/circSpeed(r));
+  cap.aim=Math.max(0,Math.min(1,CONFIG.aimInwardW*inb+CONFIG.aimProxW*prox+CONFIG.aimSpeedW*spf));
+  cap.inboundFrac=inb;
+
+  // Flyby detection: a grab that is too fast to be bound (speed >= escape) OR
+  // barely inbound cannot be reeled into an orbit — the ship sails past. We mark
+  // it a flyby: gravity still bends the path (real physics, a curved slingshot)
+  // but no orbit is frozen, and it's shown as a flyby, not a broken infinite whip.
+  const vEsc=Math.sqrt(2*CONFIG.GM/Math.max(r,1));
+  // A flyby is an UNBOUND grab (at/above escape speed — gravity can't hold it) or
+  // one already moving outward with no periapsis ahead. Bound inbound grabs, even
+  // glancing ones, dip to a periapsis and capture. The margin between capturable
+  // and flyby is thin and invisible to the player, so we also surface it (see the
+  // approach indicator in render): grabbing near escape speed is the risk.
+  const bound = spd < vEsc*0.98;
+  const movingOutward = vrad > 0;
+  cap.isFlyby = (!bound) || (movingOutward && inb < 0.02);
+  cap.grabVEsc = vEsc;                 // for the approach indicator
+  cap.grabBoundMargin = vEsc*0.98 - spd; // >0 = bound (with headroom), <0 = flyby
+
+  // clearance
+  const np=naturalPeriapsis(cap.rx,cap.ry,cap.vx,cap.vy); cap.natPeri=np;
+  if(np<cap.minR && !cap.isFlyby){
+    const dv=clearanceDv(cap.rx,cap.ry,cap.vx,cap.vy,cap.minR);
+    cap.clearDvx=dv.dvx/CONFIG.clearEaseFrames; cap.clearDvy=dv.dvy/CONFIG.clearEaseFrames;
+    cap.clearFramesLeft=CONFIG.clearEaseFrames;
+  }
+  cap.phase = cap.isFlyby ? 'flyby' : 'clear';
+  cap.traceMeta={grabR:cap.grabR,grabSpeed:cap.grabSpeed,aim:cap.aim,inboundFrac:inb,
+    minR:cap.minR,natPeri:cap.natPeri,circAtGrab:circSpeed(r),vEsc,flyby:cap.isFlyby};
+}
+
+/* -------------------------------------------------- freeze orbit at periapsis
+   We freeze at the periapsis event, so the ship is at its LOWEST point of the
+   dive. The frozen orbit must (a) pass exactly through the ship's position and
+   (b) treat that position AS periapsis (the ship is momentarily moving purely
+   tangentially, so this radius IS the low point). We therefore build the ellipse
+   with periapsis anchored at the ship, not reconstructed from raw velocity — the
+   raw ellipse for a hot whip is near-parabolic and huge, which is NOT what we
+   want to settle into. Eccentricity comes from how much faster than circular the
+   ship is going here (excess speed = a more eccentric hold), capped for sanity.
+   argp points at the ship (periapsis direction = current position direction). */
+function freezeOrbit(){
+  const rx=cap.rx,ry=cap.ry,vx=cap.vx,vy=cap.vy;
+  const r=hypot(rx,ry), spd=hypot(vx,vy);
+  const L=rx*vy-ry*vx;
+  const dir=Math.sign(L)||1;
+  const posAng=Math.atan2(ry,rx);
+
+  // Periapsis anchored at the ship: rPeri = r (this IS the low point).
+  const rPeri=r;
+  // Eccentricity from the TRUE energy the dive carried (captured pre-floor), not
+  // the instantaneous speed — which a floor clamp may have cratered on a head-on
+  // dive, flattening the oval to a circle. Given conserved energy E and this
+  // periapsis radius, the orbit's real speed here is v = sqrt(2(E + GM/rPeri)),
+  // and at periapsis v = vc*sqrt(1+e) -> e = (v/vc)^2 - 1.
+  const vc=circSpeed(rPeri);
+  // real speed at this periapsis implied by the dive's conserved energy:
+  let vPeriTrue = (cap.whipE!==undefined)
+      ? Math.sqrt(Math.max(0, 2*(cap.whipE + CONFIG.GM/rPeri)))
+      : spd;
+  vPeriTrue = Math.max(vPeriTrue, spd);        // never below current
+  let e=Math.max(0, (vPeriTrue*vPeriTrue)/(vc*vc) - 1);
+  e=Math.min(e, 0.6);                         // cap eccentricity of the hold
+  // ellipse with periapsis at rPeri in the direction of the ship:
+  const a=rPeri/(1-e);                        // since rPeri=a(1-e)
+  const argp=posAng;                          // periapsis points at the ship
+  cap.orbit={a,e,argp,dir, aNat:a,eNat:e};
+
+  cap.theta=posAng;                           // start at periapsis
+  cap.rPeri=rPeri;
+  // seam continuity: seed phase rate from the TRUE periapsis speed the dive
+  // earned (energy-based), so a floor-crashed velocity doesn't make the settled
+  // sweep start too slow. omega = vPeriTrue / rPeri (velocity is ~tangential at
+  // periapsis). This also matches the oval we built (both from the same energy).
+  cap.phaseSpeedReal=vPeriTrue/rPeri;
+  cap.phaseSpeed=cap.phaseSpeedReal;
+  cap.phaseMul=1;
+  cap.settleT=0;
+  // tightness + boost banked
+  const span=Math.max(1,cap.grabR-cap.minR);
+  cap.tightness=Math.max(0,Math.min(1,(cap.grabR-cap.rPeri)/span));
+  const over=Math.max(0,(cap.tightness-CONFIG.boostThreshold)/(1-CONFIG.boostThreshold));
+  cap.boostFull=CONFIG.boostMax*over;   // peak potential for this capture
+  cap.boost=0;                          // live value: RAMPS UP then decays (stepPhase)
+  cap.boostT=0;                         // seconds since banked
+  cap.traceMeta.tightness=cap.tightness; cap.traceMeta.boost=cap.boostFull;
+  cap.traceMeta.orbitA=cap.orbit.a; cap.traceMeta.orbitE=cap.orbit.e; cap.traceMeta.rPeri=cap.rPeri;
+}
+
+// radius on the (possibly tightening) frozen orbit at absolute position angle ang
+function orbitRadius(ang, tightenAmt){
+  const o=cap.orbit;
+  // natural ellipse radius at this angle
+  const rNat = o.a*(1-o.e*o.e)/(1 + o.e*Math.cos(ang - o.argp));
+  // fully-tightened target = circle at rPeri
+  const rCirc = cap.rPeri;
+  return rNat*(1-tightenAmt) + rCirc*tightenAmt;
+}
+
+/* -------------------------------------------------- step */
+function stepCapture(dt){
+  if(cap.phase==='clear' || cap.phase==='whip' || cap.phase==='flyby'){ stepPhysical(dt); }
+  else if(cap.phase==='settle' || cap.phase==='orbit'){ stepPhase(dt); }
+  recordSample();
+}
+
+function stepPhysical(dt){
+  const h=dt/CONFIG.SUB;
+  for(let s=0;s<CONFIG.SUB;s++){
+    const r=hypot(cap.rx,cap.ry),rhx=cap.rx/r,rhy=cap.ry/r;
+    let thx=-rhy,thy=rhx; if(thx*cap.vx+thy*cap.vy<0){thx=-thx;thy=-thy;}
+    if(cap.clearFramesLeft>0 && s===0){cap.vx+=cap.clearDvx;cap.vy+=cap.clearDvy;cap.clearFramesLeft--;}
+    const g=gAccel(r); let ax=-g*rhx, ay=-g*rhy;
+    cap.vx+=ax*h; cap.vy+=ay*h; cap.rx+=cap.vx*h; cap.ry+=cap.vy*h;
+    // capture TRUE orbital energy each frame BEFORE the floor can clamp it — the
+    // free whip conserves E = 1/2 v^2 - GM/r, and this is what determines the
+    // real oval. Reading speed AFTER a floor clamp underreports it (a head-on
+    // dive loses its inward speed to the clamp -> looks circular). We keep the
+    // peak specific energy seen during the dive.
+    {
+      const rr0=hypot(cap.rx,cap.ry), v0=hypot(cap.vx,cap.vy);
+      const Enow=0.5*v0*v0 - CONFIG.GM/Math.max(rr0,1);
+      cap.whipE = (cap.whipE===undefined)? Enow : Math.max(cap.whipE, Enow);
+      cap.whipVmax = Math.max(cap.whipVmax||0, v0);
+    }
+    // safety floor (grabbed planet)
+    const rr=hypot(cap.rx,cap.ry);
+    if(rr<cap.minR){const nx=cap.rx/rr,ny=cap.ry/rr;cap.rx=nx*cap.minR;cap.ry=ny*cap.minR;
+      const vr=cap.vx*nx+cap.vy*ny; if(vr<0){cap.vx-=vr*nx;cap.vy-=vr*ny;}}
+    // collision with OTHER planets during free motion (whip/flyby coast). Without
+    // this a fast flyby sails straight through the field. On contact we end the
+    // capture and let the ship carry on from the impact point (a graze), so it
+    // reads as bouncing off / skimming rather than ghosting through.
+    {
+      const wx=cap.planet.x+cap.rx, wy=cap.planet.y+cap.ry;
+      for(const p of planets){
+        if(p===cap.planet) continue;
+        const ddx=wx-p.x, ddy=wy-p.y, dd=hypot(ddx,ddy), surf=p.R+6;
+        if(dd<surf){
+          // push to the surface and reflect velocity outward (a skim, speed kept)
+          const nx=ddx/dd, ny=ddy/dd;
+          const px=p.x+nx*surf, py=p.y+ny*surf;
+          cap.rx=px-cap.planet.x; cap.ry=py-cap.planet.y;
+          const vn=cap.vx*nx+cap.vy*ny;
+          if(vn<0){ cap.vx-=1.6*vn*nx; cap.vy-=1.6*vn*ny; } // reflect, mild damp via 1.6
+          cap._hitOther=true;
+        }
+      }
+    }
+    // Holding a FLYBY burns fuel to actively shed speed (energy), pulling the
+    // unbound hyperbola down toward a bound orbit. An unbound grab never slows
+    // below escape on its own (energy is conserved), so without this, holding a
+    // flyby does nothing. Now: hold + fuel -> brake -> it can convert to capture.
+    // Run dry -> stays a flyby, you sail past. (The brief's "keep holding to
+    // capture with MORE fuel" — a hotter flyby needs more braking = more fuel.)
+    if(cap.phase==='flyby' && held && cap.fuel>0){
+      const spdF=hypot(cap.vx,cap.vy);
+      if(spdF>1){
+        const r=hypot(cap.rx,cap.ry), rhx=cap.rx/r, rhy=cap.ry/r;
+        let thx=-rhy, thy=rhx; if(thx*cap.vx+thy*cap.vy<0){thx=-thx;thy=-thy;}
+        let vr=cap.vx*rhx+cap.vy*rhy;      // radial component (+ outward)
+        let vt=cap.vx*thx+cap.vy*thy;      // tangential component (>=0)
+        // Brake strength depends on direction: if the ship has sailed PAST and is
+        // heading OUTWARD, brake gently so it coasts wide and arcs back on a big
+        // graceful loop (a hard brake would snap it into a tight U-turn). If still
+        // INBOUND, brake hard so it captures during the dive rather than sailing on.
+        const outward = vr > 0;
+        // At LOW speed, gravity itself swings the heading fast (little momentum to
+        // resist it), and braking makes it worse by shedding even more speed — a
+        // vicious cycle that spins a slow grab around sharply. A slow ship also
+        // doesn't NEED braking; gravity will reel it in on its own in a gentle
+        // wide arc. So the brake ramps from 0 below flybyBrakeMinSpeed up to full
+        // at flybyBrakeRefSpeed — slow grabs coast on pure gravity, fast ones brake.
+        const lo=CONFIG.flybyBrakeMinSpeed, hi=CONFIG.flybyBrakeRefSpeed;
+        const speedTaper = Math.max(0, Math.min(1, (spdF-lo)/Math.max(1,hi-lo)));
+        const brakeStr = (outward ? CONFIG.flybyBrake*CONFIG.flybyOutwardEase : CONFIG.flybyBrake)*speedTaper;
+        const b=brakeStr*h;
+        // bleed radial-out preferentially, preserve tangential (keeps the arc wide)
+        if(vr>0){ vr=Math.max(0, vr - b*CONFIG.flybyRadialBias); }
+        else    { vr=vr + b*0.15; }
+        vt=Math.max(0, vt - b*(1-CONFIG.flybyRadialBias));
+        cap.vx=rhx*vr + thx*vt; cap.vy=rhy*vr + thy*vt;
+        cap.fuel=Math.max(0, cap.fuel - CONFIG.flybyFuelPerSec*h);
+      }
+    }
+    // A flyby converts to a capturable whip once it's bound AND inbound (whether
+    // from the braking above or geometry).
+    if(cap.phase==='flyby' && held){
+      const rNowF=hypot(cap.rx,cap.ry), spdF=hypot(cap.vx,cap.vy);
+      const vEscF=Math.sqrt(2*CONFIG.GM/Math.max(rNowF,1));
+      const vradF=(cap.vx*cap.rx+cap.vy*cap.ry)/rNowF;
+      if(spdF < vEscF*0.98 && vradF < 0){ cap.phase='clear'; }  // now bound & inbound
+    }
+    // periapsis detection -> FREEZE and hand to phase clock (captures only)
+    const nr=hypot(cap.rx,cap.ry),dR=nr-cap.prevR;
+    if(cap.phase!=='flyby' && cap.prevDR<0 && dR>=0 && !cap.passedPeri){
+      cap.passedPeri=true; cap.periR=nr;
+      if(held){ freezeOrbit(); cap.phase='settle'; }
+    }
+    cap.prevR=nr; cap.prevDR=dR;
+  }
+  updateDefl();
+}
+
+function stepPhase(dt){
+  // advance shape ease + phase sweep, then place ship on the frozen curve.
+  cap.settleT += dt;
+  const u=Math.min(1, cap.settleT/CONFIG.settleDur);
+  const shape=u*u*u*(u*(u*6-15)+10);                 // smootherstep 0..1
+  // TIGHTEN now means "how far eccentricity has decayed toward a circle." It
+  // reaches CONFIG.tightenFrac's FULL value by end of settle so the orbit can
+  // actually round out. tightenFrac acts as the FINAL roundness: 1 = perfect
+  // circle at periapsis, lower = keeps some residual oval. The smootherstep
+  // keeps the first part of the settle oval (the visible slingshot loop) and
+  // rounds out toward the end — "oval for ~a loop, then a circle."
+  const tightenAmt = CONFIG.tightenFrac*shape;
+
+  // Sweep the curve the way a REAL orbit does: conserve angular momentum, so
+  // dtheta/dt = L / r^2  (fast at periapsis, slow at apoapsis — Kepler's 2nd
+  // law). This is coherent with whatever shape currently exists, so it does NOT
+  // oscillate the way "target the circular rate" did. The PHASE RATE knob simply
+  // scales this whole honest sweep. L is fixed from the freeze (periapsis speed
+  // x periapsis radius), so as TIGHTEN shrinks the oval the sweep stays smooth.
+  const rNow=orbitRadius(cap.theta, tightenAmt);
+  // Frozen (oval) angular momentum: L = vPeri * rPeri. Correct for the ELLIPSE.
+  if(cap.Lfrozen===undefined) cap.Lfrozen = cap.phaseSpeedReal * cap.rPeri * cap.rPeri;
+  // But as TIGHTEN rounds the orbit toward a circle at rPeri, holding the oval's
+  // L would spin that small circle at the periapsis speed forever (>>circular) —
+  // physically you must SHED energy to circularize. So ease the effective L from
+  // the oval value toward the circular value for the current radius as tightening
+  // completes. At tightenAmt=0 -> pure oval L (real Kepler sweep); at 1 -> the
+  // circular L for rNow (a real, stable circle at true circular speed).
+  const Lcirc = circSpeed(rNow) * rNow;              // circular angular momentum here
+  const Leff = cap.Lfrozen*(1-tightenAmt) + Lcirc*tightenAmt;
+  const sweepRate = (Leff / (rNow*rNow)) * CONFIG.phaseRate;
+  cap.phaseSpeed = sweepRate;
+  cap.phaseMul = CONFIG.phaseRate;                    // telemetry: the knob value
+  cap.theta += cap.orbit.dir * sweepRate * dt;
+
+  // place ship on curve
+  const rNew=orbitRadius(cap.theta, tightenAmt);
+  cap.rx=Math.cos(cap.theta)*rNew; cap.ry=Math.sin(cap.theta)*rNew;
+  // velocity = tangent * speed(sweep). tangent dir along +theta*dir:
+  const tx=-Math.sin(cap.theta)*cap.orbit.dir, ty=Math.cos(cap.theta)*cap.orbit.dir;
+  const tangentialSpeed = cap.phaseSpeed * rNew;      // v = omega * r
+  cap.vx=tx*tangentialSpeed; cap.vy=ty*tangentialSpeed;
+
+  // fuel while actively tightening/spinning up
+  if(held && (u<1 || cap.phaseMul!==1)){
+    cap.fuel=Math.max(0,cap.fuel-CONFIG.fuelPerSec*dt);
+    // Ran dry mid-circularization -> the ship putters out: it can't finish the
+    // burn, so it gives up and drifts off weakly (handled in update via _puttered).
+    if(cap.fuel<=0 && (u<1)){ cap._puttered=true; }
+  }
+  else if(!held) cap.fuel=Math.min(CONFIG.fuelMax,cap.fuel+CONFIG.fuelRegen*dt);
+
+  cap.periR=Math.min(cap.periR,rNew); cap.apoR=Math.max(cap.apoR,rNew);
+  cap.settleProgress=shape;
+  // Boost envelope: RAMP UP from 0 over boostArmTime (so a reflexive tap-through
+  // at periapsis gets almost nothing — you must hold a moment to arm it), peak,
+  // then DECAY to 0 over boostDecayTime. Releasing at the peak is the skill
+  // window. boostT counts seconds since the capture froze.
+  if(cap.boostFull>0){
+    cap.boostT=(cap.boostT||0)+dt;
+    const arm=CONFIG.boostArmTime, dec=CONFIG.boostDecayTime;
+    let f;
+    if(cap.boostT < arm){
+      f = cap.boostT/arm;                       // ramp 0 -> 1
+    } else {
+      f = Math.max(0, 1 - (cap.boostT-arm)/dec); // hold-peak then decay
+    }
+    cap.boost=cap.boostFull*f;
+  }
+  if(u>=1) cap.phase='orbit';
+  updateDefl();
+}
+
+function updateDefl(){
+  const ang=Math.atan2(cap.vy,cap.vx);
+  let d=(ang-cap.lastAngle)*180/Math.PI; while(d>180)d-=360; while(d<-180)d+=360;
+  cap._defl=Math.abs(d); cap.lastAngle=ang;
+}
+
+/* -------------------------------------------------- release */
+function releaseHeld(weak){
+  held=false;
+  if(cap.active){
+    // Normal release: boost is earned by a real capture and decays; cash it now.
+    // WEAK release (puttered out of fuel mid-capture): no boost, and the fling is
+    // damped — the ship gives up and drifts off unenthusiastically.
+    const earned = !weak && (cap.orbit && cap.passedPeri && cap.phase!=='flyby');
+    const add = earned ? (cap.boost||0) : 0;
+    const spd=hypot(cap.vx,cap.vy)||1, bx=cap.vx/spd, by=cap.vy/spd;
+    const flingScale = weak ? 0.35 : CONFIG.releaseFlingBoost;  // limp exit on fuel-out
+    finalizeTrace(); cap.lastBoostApplied=add;
+    ship.x=cap.planet.x+cap.rx; ship.y=cap.planet.y+cap.ry;
+    // Base velocity = orbital velocity at release, plus a small PERMANENT carry of
+    // the boost. The rest of the boost becomes a TRANSIENT burst that decays over
+    // ~1.5s in drift — a punchy escape kick that fades to the small carry, instead
+    // of a permanent velocity add that ratchets the ship faster and faster.
+    const permFrac=CONFIG.boostPermFrac;                 // fraction that lasts
+    const permAdd = add*permFrac;
+    const burstAdd = add*(1-permFrac)*CONFIG.boostPunch;  // punchy up-front burst
+    ship.vx=(cap.vx+bx*permAdd)*flingScale; ship.vy=(cap.vy+by*permAdd)*flingScale;
+    // arm the transient burst (applied on top of ship velocity during drift)
+    ship.burstX=bx*burstAdd; ship.burstY=by*burstAdd; ship.burstT=0;
+    cap.active=false; cap.phase='drift';
+    if(weak){ cap._puttered=false; ship.burstX=0; ship.burstY=0; flash('OUT OF FUEL — drifted off'); }
+  }
+}
+
+/* -------------------------------------------------- telemetry */
+function recordSample(){
+  const r=hypot(cap.rx,cap.ry),spd=hypot(cap.vx,cap.vy),t=(performance.now()-cap.tStart)/1000;
+  cap.trace.push({t:+t.toFixed(3),r:+r.toFixed(1),spd:+spd.toFixed(1),defl:+(cap._defl||0).toFixed(1),
+    phase:cap.phase,fuel:+cap.fuel.toFixed(0),peri:+cap.periR.toFixed(1),apo:+cap.apoR.toFixed(1),
+    pmul:+(cap.phaseMul||1).toFixed(2),kink:(cap._defl||0)>15});
+  if(cap.trace.length>5000)cap.trace.shift();
+}
+let lastTrace=null;
+function finalizeTrace(){
+  if(!cap.trace.length)return;
+  const a=cap.trace;
+  const maxDefl=a.reduce((m,s)=>Math.max(m,s.defl),0);
+  const minRr=a.reduce((m,s)=>Math.min(m,s.r),1e9), maxRr=a.reduce((m,s)=>Math.max(m,s.r),0);
+  const kinks=a.filter(s=>s.kink).length, last=a[a.length-1];
+  lastTrace={meta:cap.traceMeta,summary:{samples:a.length,maxDefl:+maxDefl.toFixed(1),
+    minR:+minRr.toFixed(1),maxR:+maxRr.toFixed(1),kinks,finalR:last?last.r:null,
+    finalPhase:last?last.phase:null,finalFuel:last?last.fuel:null},samples:a.slice()};
+}
+
+/* -------------------------------------------------- loop */
+let lastT=performance.now();
+function frame(now){const dt=Math.min(0.05,(now-lastT)/1000);lastT=now;if(!paused)update(dt);render();requestAnimationFrame(frame);}
+function update(dt){
+  // Crash pause: after a fatal impact, hold for a moment so the player sees the
+  // "Too close!" flash and understands what happened, then respawn.
+  if(crash.active){
+    crash.t+=dt;
+    if(crash.t>=CONFIG.crashPause){ crash.active=false; resetShip(); }
+    return;
+  }
+  if(cap.active){
+    stepCapture(dt);
+    // Fuel ran dry mid-circularization -> putter out: weak, boostless release.
+    if(cap._puttered){ releaseHeld(true); }
+  }
+  else if(ship.alive){
+    // Transient escape burst: decays over boostBurstDecay seconds, so a boosted
+    // release is punchy up front then fades to the small permanent carry (rather
+    // than a permanent add that keeps compounding). Effective velocity = base +
+    // current burst.
+    let bx=0,by=0;
+    if((ship.burstX||ship.burstY)){
+      ship.burstT=(ship.burstT||0)+dt;
+      const f=Math.max(0, 1 - ship.burstT/CONFIG.boostBurstDecay);
+      if(f<=0){ ship.burstX=0; ship.burstY=0; }
+      else { bx=ship.burstX*f; by=ship.burstY*f; }
+    }
+    ship.x+=(ship.vx+bx)*dt; ship.y+=(ship.vy+by)*dt;
+    // Collision during free drift: hitting a planet is a crash. A drifting ship
+    // has no business bouncing off a planet, so any real contact (moving into the
+    // surface with speed) kills -> freeze, flash, respawn. Only an essentially
+    // parallel graze (barely touching, moving along the surface) is let go, so a
+    // release that skims the planet you just left isn't an instant death.
+    for(const p of planets){
+      const dx=ship.x-p.x, dy=ship.y-p.y, d=hypot(dx,dy), surf=p.R+5;
+      if(d<surf){
+        const nx=dx/d, ny=dy/d;
+        const spd=hypot(ship.vx,ship.vy);
+        const vn=ship.vx*nx+ship.vy*ny;          // <0 = moving into the surface
+        const intoSurface = spd>1 && (-vn/spd) > CONFIG.crashGrazeDot;
+        if(intoSurface){
+          ship.x=p.x+nx*surf; ship.y=p.y+ny*surf;
+          ship.vx=0; ship.vy=0; ship.alive=false;
+          crash.active=true; crash.t=0; crash.x=ship.x; crash.y=ship.y;
+          return;
+        }
+        // essentially parallel graze -> nudge out, keep going
+        ship.x=p.x+nx*surf; ship.y=p.y+ny*surf;
+        if(vn<0){ ship.vx-=1.8*vn*nx; ship.vy-=1.8*vn*ny; }
+      }
+    }
+  }
+  const sx=cap.active?cap.planet.x+cap.rx:ship.x;
+  const sy=cap.active?cap.planet.y+cap.ry:ship.y;
+  const targetCamY=sy-H*0.58; cam.y+=(targetCamY-cam.y)*Math.min(1,dt*3);
+  // Camera follows the ship horizontally when it moves into the side margins, so
+  // the ship stays visible in the wider field instead of being hidden at an edge.
+  // We only pan enough to keep it on screen; centered field needs no pan normally.
+  const fb=fieldBounds();
+  const margin=W*0.22;                          // start panning when within this of a screen edge
+  let targetCamX=0;
+  if(sx - cam.x > W-margin) targetCamX = sx-(W-margin);
+  else if(sx - cam.x < margin) targetCamX = sx-margin;
+  // clamp camera so we never scroll past the field edges
+  targetCamX=Math.max(fb.left, Math.min(fb.right-W, targetCamX));
+  if(fb.width<=W) targetCamX=0;                 // field not wider than screen: no pan
+  cam.x+=(targetCamX-cam.x)*Math.min(1,dt*3);
+
+  // Out of bounds -> respawn. Beyond the field's left/right edge, or far off
+  // vertically. The 20% margin gives safe space before this triggers.
+  const outX = sx < fb.left-4 || sx > fb.right+4;
+  const outY = (sy-cam.y > H+400) || (sy-cam.y < -800);
+  if(outX || outY) resetShip();
+  if(!(cap.active))cap.fuel=Math.min(CONFIG.fuelMax,cap.fuel+CONFIG.fuelRegen*dt);
+}
+
+/* -------------------------------------------------- render */
+let stars=null;
+function render(){
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+  drawStars();
+  ctx.save(); ctx.translate(-cam.x,-cam.y);
+  // out-of-bounds edge zones (the danger margins beyond the field). Drawn in
+  // world space so they sit at the true field edges.
+  const fb=fieldBounds();
+  const zoneW=60;
+  for(const edge of [{x0:fb.left-zoneW, x1:fb.left, dir:1},{x0:fb.right, x1:fb.right+zoneW, dir:-1}]){
+    const g=ctx.createLinearGradient(edge.dir>0?edge.x1:edge.x0, 0, edge.dir>0?edge.x0:edge.x1, 0);
+    g.addColorStop(0,'rgba(255,70,90,0)'); g.addColorStop(1,'rgba(255,70,90,.18)');
+    ctx.fillStyle=g;
+    ctx.fillRect(edge.x0, cam.y-200, zoneW, H+400);
+    // hazard boundary line at the field edge
+    ctx.strokeStyle='rgba(255,70,90,.5)'; ctx.setLineDash([6,6]); ctx.lineWidth=1.5;
+    const ex=edge.dir>0?edge.x1:edge.x0;
+    ctx.beginPath(); ctx.moveTo(ex, cam.y-200); ctx.lineTo(ex, cam.y+H+200); ctx.stroke(); ctx.setLineDash([]);
+  }
+  for(const p of planets){
+    ctx.beginPath();ctx.arc(p.x,p.y,p.R+CONFIG.minOrbitGap,0,7);
+    ctx.strokeStyle='rgba(130,150,185,.30)';ctx.setLineDash([3,5]);ctx.lineWidth=1;ctx.stroke();ctx.setLineDash([]);
+    const g=ctx.createRadialGradient(p.x-p.R*0.32,p.y-p.R*0.32,p.R*0.15,p.x,p.y,p.R);
+    g.addColorStop(0,'#4a5b82');g.addColorStop(0.7,'#1e2740');g.addColorStop(1,'#0a0f1a');
+    ctx.beginPath();ctx.arc(p.x,p.y,p.R,0,7);ctx.fillStyle=g;ctx.fill();
+    ctx.strokeStyle='rgba(150,175,215,.55)';ctx.lineWidth=1.2;ctx.stroke();
+    ctx.fillStyle='rgba(190,205,235,.65)';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText(p.name,p.x,p.y+3);
+  }
+  // Crash cone: when drifting near a planet on a head-on approach, show the red
+  // no-grab corridor so the danger zone is visible before a grab is refused.
+  if(!cap.active && ship.alive){
+    for(const p of planets){
+      const dx=ship.x-p.x, dy=ship.y-p.y, d=hypot(dx,dy);
+      const range=p.R+CONFIG.crashConeRange;
+      if(d>range+40 || d<p.R) continue;              // only near the planet
+      const sev=crashCone(p);
+      if(sev<=0.02) continue;                        // only when actually in/near the cone
+      // Cone with its TIP at the SHIP, fanning out toward the planet — the ship is
+      // the apex, the danger widens to a base at the planet. Axis points along the
+      // ship's heading (the crash course); it's drawn up to the planet's surface.
+      const ha=CONFIG.crashConeHalfAngle;
+      const toPlanet=Math.atan2(p.y-ship.y, p.x-ship.x);
+      const reach=d - p.R;                           // ship to planet surface
+      const g=ctx.createRadialGradient(ship.x,ship.y,0,ship.x,ship.y,reach);
+      g.addColorStop(0,'rgba(255,60,80,0)');
+      g.addColorStop(1,'rgba(255,60,80,'+(0.30+0.35*sev)+')');   // brightest at the planet end
+      ctx.beginPath();ctx.moveTo(ship.x,ship.y);
+      ctx.arc(ship.x,ship.y,reach, toPlanet-ha, toPlanet+ha);
+      ctx.closePath();ctx.fillStyle=g;ctx.fill();
+      // edge lines from the ship outward
+      ctx.strokeStyle='rgba(255,80,100,'+(0.35+0.4*sev)+')';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(ship.x,ship.y);ctx.lineTo(ship.x+Math.cos(toPlanet-ha)*reach,ship.y+Math.sin(toPlanet-ha)*reach);
+      ctx.moveTo(ship.x,ship.y);ctx.lineTo(ship.x+Math.cos(toPlanet+ha)*reach,ship.y+Math.sin(toPlanet+ha)*reach);
+      ctx.stroke();ctx.setLineDash([]);
+      if(sev>0.4){
+        ctx.fillStyle='rgba(255,90,110,'+(0.5+0.5*Math.sin(performance.now()/120))+')';
+        ctx.font='600 9px monospace';ctx.textAlign='center';
+        ctx.fillText('NO GRAB', ship.x+Math.cos(toPlanet)*(reach*0.55), ship.y+Math.sin(toPlanet)*(reach*0.55));
+      }
+    }
+  }
+  if(cap.active){
+    const p=cap.planet, sx=p.x+cap.rx, sy=p.y+cap.ry;
+    // draw the frozen orbit curve when settling/orbiting
+    if(cap.orbit && (cap.phase==='settle'||cap.phase==='orbit')){
+      const u=Math.min(1,cap.settleT/CONFIG.settleDur);
+      const shape=u*u*u*(u*(u*6-15)+10), tighten=CONFIG.tightenFrac*shape;
+      ctx.beginPath();
+      for(let k=0;k<=90;k++){const ang=k/90*Math.PI*2;const rr=orbitRadius(ang,tighten);
+        const x=p.x+Math.cos(ang)*rr,y=p.y+Math.sin(ang)*rr;if(k===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
+      ctx.closePath();ctx.strokeStyle='rgba(185,140,255,.35)';ctx.setLineDash([3,5]);ctx.lineWidth=1.2;ctx.stroke();ctx.setLineDash([]);
+    }
+    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(sx,sy);
+    if(cap.phase==='flyby'){ctx.strokeStyle='rgba(255,176,32,.55)';ctx.setLineDash([4,4]);}
+    else{ctx.strokeStyle='rgba(150,170,205,.28)';ctx.setLineDash([]);}
+    ctx.lineWidth=1;ctx.stroke();ctx.setLineDash([]);
+    // boost halo
+    if((cap.boost||0)>1){
+      const charge=(cap.boost)/Math.max(1,CONFIG.boostMax), pulse=0.6+0.4*Math.sin(performance.now()/120);
+      ctx.save();ctx.translate(sx,sy);ctx.beginPath();ctx.arc(0,0,11+charge*10*pulse,0,7);
+      ctx.strokeStyle='rgba(255,210,80,'+(0.35+0.4*charge)+')';ctx.lineWidth=2;ctx.stroke();ctx.restore();
+    }
+    // ---- release compass: markers for the few nearest planets ----
+    // For each reachable planet, find the orbit angle whose tangent (release
+    // heading) points at it — that's where to release to reach it. Draw a ring
+    // around the orbit with a colored marker per planet at its release angle, so
+    // the player can see WHICH way to fling toward each target, even off-screen
+    // ones. The ship's own angle is the "you are here"; line it up with a marker.
+    if(cap.phase!=='flyby' && cap.orbit && (cap.phase==='settle'||cap.phase==='orbit'||cap.phase==='clear')){
+      const u=Math.min(1,cap.settleT/CONFIG.settleDur);
+      const shape=u*u*u*(u*(u*6-15)+10), tighten=CONFIG.tightenFrac*shape;
+      const dir=cap.orbit.dir;
+      const targets=nearbyPlanets(p, 3, Math.min(W,H)*1.6);
+      // gauge ring radius. The LIVE orbit radius swings peri<->apo as the ship
+      // sweeps, which makes the whole ring pump in and out. We anchor the ring to
+      // a STABLE reference (the orbit's mean radius, tightened toward rPeri) and
+      // let gaugeFollow control how much it tracks the live orbit: 0 = perfectly
+      // still ring, 1 = fully follows the live radius (the old pumping effect).
+      const shipAng=Math.atan2(cap.ry,cap.rx);
+      const orbitRnow=orbitRadius(shipAng,tighten);
+      // Anchor the ring to the FINAL settled radius (the tight circle the orbit
+      // ends at, = rPeri), not the natural ellipse's mean — otherwise the ring
+      // starts far out and shrinks inward during the settle, which is distracting.
+      // gaugeFollow still blends in live-radius motion on top if desired.
+      const restR=cap.rPeri;                                    // where the orbit settles
+      const gaugeR=restR*(1-CONFIG.gaugeFollow) + orbitRnow*CONFIG.gaugeFollow;
+      const ringR=gaugeR+34;
+      // faint compass ring
+      ctx.beginPath();ctx.arc(p.x,p.y,ringR,0,7);
+      ctx.strokeStyle='rgba(150,170,205,.14)';ctx.lineWidth=1;ctx.stroke();
+
+      // per-target palette (distinct hues)
+      const hues=[[120,220,150],[255,180,70],[110,180,255]]; // green, amber, blue
+      let bestAlignAny=0;
+      targets.forEach((t,ti)=>{
+        // find release angle on the orbit whose tangent aims at this planet
+        let bestAng=null,bestErr=1e9;
+        for(let k=0;k<180;k++){
+          const ang=k/180*Math.PI*2, rr=orbitRadius(ang,tighten);
+          const x=p.x+Math.cos(ang)*rr, y=p.y+Math.sin(ang)*rr;
+          const hx=-Math.sin(ang)*dir, hy=Math.cos(ang)*dir;
+          const heading=Math.atan2(hy,hx);
+          const toT=Math.atan2(t.p.y-y, t.p.x-x);
+          let d=heading-toT; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI;
+          if(Math.abs(d)<bestErr){bestErr=Math.abs(d);bestAng=ang;}
+        }
+        if(bestAng===null) return;
+        // how close the ship's current position is to this release angle
+        let da=shipAng-bestAng; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI;
+        const align=Math.max(0,1-Math.abs(da)/(Math.PI*0.5));
+        bestAlignAny=Math.max(bestAlignAny,align);
+        const col=hues[ti%hues.length];
+        // marker on the ring at the release angle
+        const mx=p.x+Math.cos(bestAng)*ringR, my=p.y+Math.sin(bestAng)*ringR;
+        const near=align>0.9;
+        const pulse=near?(0.6+0.4*Math.sin(performance.now()/90)):1;
+        // gradient wedge on the ring approaching the marker (helps aiming)
+        ctx.beginPath();
+        const wedge=0.35;
+        ctx.arc(p.x,p.y,ringR, bestAng-wedge, bestAng+wedge);
+        ctx.strokeStyle='rgba('+col[0]+','+col[1]+','+col[2]+','+(0.15+0.5*align)+')';
+        ctx.lineWidth=2+2*align; ctx.stroke();
+        // the marker dot
+        ctx.beginPath();ctx.arc(mx,my,(near?5:3.5)*pulse,0,7);
+        ctx.fillStyle='rgba('+col[0]+','+col[1]+','+col[2]+','+(0.7+0.3*align)+')';ctx.fill();
+        // a little tick pointing outward toward the planet's true bearing, and
+        // the planet label/distance so off-screen targets are identifiable
+        const bearing=Math.atan2(t.p.y-p.y, t.p.x-p.x);
+        const lx=p.x+Math.cos(bestAng)*(ringR+13), ly=p.y+Math.sin(bestAng)*(ringR+13);
+        ctx.fillStyle='rgba('+col[0]+','+col[1]+','+col[2]+',.85)';
+        ctx.font='8px monospace';ctx.textAlign='center';
+        ctx.fillText(t.p.name, lx, ly+3);
+      });
+
+      // "you are here": a bright pip on the ring at the ship's angle
+      const yx=p.x+Math.cos(shipAng)*ringR, yy=p.y+Math.sin(shipAng)*ringR;
+      ctx.beginPath();ctx.arc(yx,yy,3,0,7);ctx.fillStyle='rgba(255,255,255,.9)';ctx.fill();
+
+      cap._releaseAlign=bestAlignAny;
+      // ship glows when aligned with ANY target's release point
+      if(bestAlignAny>0.9 && held){
+        const pw=0.5+0.5*Math.sin(performance.now()/90);
+        ctx.beginPath();ctx.arc(sx,sy,13+3*pw,0,7);
+        ctx.strokeStyle='rgba(84,243,154,'+(0.6+0.4*pw)+')';ctx.lineWidth=2.5;ctx.stroke();
+      }
+    } else { cap._releaseAlign=undefined; }
+  }
+  const sx=cap.active?cap.planet.x+cap.rx:ship.x, sy=cap.active?cap.planet.y+cap.ry:ship.y;
+  const vx=cap.active?cap.vx:ship.vx, vy=cap.active?cap.vy:ship.vy, ang=Math.atan2(vy,vx);
+  // short fading trail behind the ship (all states)
+  if(!paused) pushTrail(sx,sy);
+  drawTrail();
+  ctx.save();ctx.translate(sx,sy);ctx.rotate(ang);
+  ctx.beginPath();ctx.moveTo(9,0);ctx.lineTo(-6,5);ctx.lineTo(-3,0);ctx.lineTo(-6,-5);ctx.closePath();
+  ctx.fillStyle=held?'#fff':'#cfdcf2';ctx.fill();
+  if(held){ctx.strokeStyle='rgba(185,140,255,.9)';ctx.lineWidth=1.4;ctx.stroke();}
+  ctx.restore();
+  ctx.restore();
+  drawEdgeMarkers();
+  drawFuelGauge();
+  drawHUD();
+  if(paused){ctx.save();ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#b98cff';ctx.textAlign='center';ctx.font='600 22px monospace';
+    ctx.fillText('❚❚  PAUSED',W/2,H/2);ctx.restore();}
+  // Crash flash: yellow-bordered box with faint yellow fill, "Too close!"
+  if(crash.active){
+    ctx.save();
+    // small industrial readout, localized to the crash point (like the ship's
+    // computer reporting). Convert crash world-pos -> screen-pos.
+    const csx = crash.x - cam.x, csy = crash.y - cam.y;
+    const msg='⚠ CRASHED';
+    ctx.font='700 11px monospace'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    const tw=ctx.measureText(msg).width;
+    const padX=9, padY=6, bw=tw+padX*2, bh=22;
+    // place the box just above-right of the crash, nudged on-screen
+    let bx=csx+14, by=csy-bh-14;
+    bx=Math.max(6, Math.min(W-bw-6, bx));
+    by=Math.max(6, Math.min(H-bh-6, by));
+    const p=crash.t/CONFIG.crashPause;
+    const a=Math.min(1, Math.min(p*8, (1-p)*8+0.3));
+    ctx.globalAlpha=a;
+    // faint yellow fill, sharp corners (industrial)
+    ctx.fillStyle='rgba(255,205,50,0.12)';
+    ctx.fillRect(bx,by,bw,bh);
+    // hard yellow border, thin
+    ctx.strokeStyle='rgba(255,205,50,0.9)'; ctx.lineWidth=1.5;
+    ctx.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
+    // corner ticks for a HUD/industrial feel
+    ctx.strokeStyle='rgba(255,205,50,0.95)'; ctx.lineWidth=1.5;
+    const tk=4;
+    ctx.beginPath();
+    ctx.moveTo(bx,by+tk);ctx.lineTo(bx,by);ctx.lineTo(bx+tk,by);
+    ctx.moveTo(bx+bw-tk,by);ctx.lineTo(bx+bw,by);ctx.lineTo(bx+bw,by+tk);
+    ctx.moveTo(bx,by+bh-tk);ctx.lineTo(bx,by+bh);ctx.lineTo(bx+tk,by+bh);
+    ctx.moveTo(bx+bw-tk,by+bh);ctx.lineTo(bx+bw,by+bh);ctx.lineTo(bx+bw,by+bh-tk);
+    ctx.stroke();
+    // leader line from box down to the crash point
+    ctx.strokeStyle='rgba(255,205,50,0.5)'; ctx.lineWidth=1; ctx.setLineDash([2,2]);
+    ctx.beginPath();ctx.moveTo(bx,by+bh);ctx.lineTo(csx,csy);ctx.stroke();ctx.setLineDash([]);
+    // text
+    ctx.fillStyle='#ffe27a';
+    ctx.fillText(msg, bx+padX, by+bh/2+1);
+    ctx.globalAlpha=1; ctx.textBaseline='alphabetic';
+    ctx.restore();
+  }
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
+const trail=[];
+const TRAIL_MAX=16;   // short trail: number of dots
+// Record the ship's current world position and draw a short trail of tiny
+// circles that shrink and fade toward the tail. Called every frame (drift AND
+// capture) with the ship's world position.
+function pushTrail(x,y){
+  const last=trail[trail.length-1];
+  // only add a point if we've moved a little, so the spacing stays even
+  if(!last || (x-last.x)*(x-last.x)+(y-last.y)*(y-last.y) > 9){
+    trail.push({x,y});
+    if(trail.length>TRAIL_MAX) trail.shift();
+  }
+}
+function drawTrail(){
+  // newest is at the end; head (near ship) is biggest/brightest, tail shrinks+fades
+  for(let i=0;i<trail.length;i++){
+    const t=trail[i];
+    const f=i/(trail.length-1||1);          // 0 at tail, 1 at head
+    const rad=0.6 + 2.6*f;                   // shrink toward tail
+    const alpha=0.08 + 0.5*f;                // fade toward tail
+    ctx.beginPath();ctx.arc(t.x,t.y,rad,0,7);
+    ctx.fillStyle='rgba(185,140,255,'+alpha.toFixed(3)+')';ctx.fill();
+  }
+}
+function drawStars(){
+  if(!stars){stars=[];for(let i=0;i<160;i++)stars.push({x:Math.random(),y:Math.random(),z:Math.random()});}
+  for(const s of stars){const y=((s.y*H-cam.y*0.15*(0.3+s.z))%H+H)%H;
+    ctx.globalAlpha=0.3+s.z*0.6;ctx.fillStyle=s.z>0.85?'#dfe8ff':(s.z>0.6?'#aebbd8':'#7788a8');
+    const sz=s.z>0.7?1.8:1;ctx.fillRect(s.x*W,y,sz,sz);}ctx.globalAlpha=1;
+}
+const readout=document.getElementById('readout');
+function drawEdgeMarkers(){
+  // Always-on pointers to OFF-SCREEN planets: an arrow at the screen edge aimed
+  // at each hidden planet, with its name and distance. Gives spatial awareness
+  // during fast flybys/drifts when the gauge (which needs an orbit) can't help.
+  const shipX = cap.active?cap.planet.x+cap.rx:ship.x;
+  const shipY = cap.active?cap.planet.y+cap.ry:ship.y;
+  const margin=24;                          // inset from the screen edge
+  for(const p of planets){
+    const scx=p.x-cam.x, scy=p.y-cam.y;     // planet in screen coords
+    const onScreen = scx>-p.R && scx<W+p.R && scy>-p.R && scy<H+p.R;
+    if(onScreen) continue;
+    const dist=Math.hypot(p.x-shipX, p.y-shipY);
+    if(dist > CONFIG.edgeMarkerRange) continue;   // only nearby/reachable planets
+    // direction from screen center to the planet, clamped to the screen rect
+    const cxp=W/2, cyp=H/2;
+    let dx=scx-cxp, dy=scy-cyp;
+    const len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
+    // find intersection of the ray with the inset screen rect
+    const halfW=W/2-margin, halfH=H/2-margin;
+    const tx = dx!==0 ? halfW/Math.abs(dx) : 1e9;
+    const ty = dy!==0 ? halfH/Math.abs(dy) : 1e9;
+    const t = Math.min(tx,ty);
+    const ex=cxp+dx*t, ey=cyp+dy*t;
+    // distance shown compact
+    const distTxt = dist>=1000 ? (dist/1000).toFixed(1)+'k' : Math.round(dist).toString();
+    // fade nearer planets brighter
+    const near=Math.max(0.35, Math.min(1, 1-(dist-200)/1400));
+    const ang=Math.atan2(dy,dx);
+    ctx.save();
+    // arrow head at the edge, pointing outward
+    ctx.translate(ex,ey); ctx.rotate(ang);
+    ctx.fillStyle='rgba(150,200,255,'+(0.5*near+0.2)+')';
+    ctx.beginPath();ctx.moveTo(7,0);ctx.lineTo(-4,4.5);ctx.lineTo(-4,-4.5);ctx.closePath();ctx.fill();
+    ctx.rotate(-ang);
+    // label: name + distance, nudged inward from the arrow
+    const lx=-dx*20, ly=-dy*20;
+    ctx.fillStyle='rgba(190,215,245,'+(0.55*near+0.25)+')';
+    ctx.font='8px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(p.name+' '+distTxt, lx, ly);
+    ctx.textBaseline='alphabetic';
+    ctx.restore();
+  }
+}
+function drawFuelGauge(){
+  const fuel=Math.max(0,Math.min(CONFIG.fuelMax, cap.active?cap.fuel:cap.fuel));
+  const frac=fuel/CONFIG.fuelMax;
+  // geometry: vertical bar, bottom-left (near where the thumb presses)
+  const gw=13, gh=120, gx=16, gy=H-gh-72;   // top of the bar (clears bottom button row)
+  const gbot=gy+gh;                          // bottom of the bar
+  // color by level: green -> yellow -> red as fuel drops
+  let col;
+  if(frac>0.5)      col=lerpColor([84,243,154],[255,210,60],(1-frac)/0.5);      // green->yellow
+  else              col=lerpColor([255,210,60],[255,70,90],(0.5-frac)/0.5);      // yellow->red
+  const low=frac<=0.25;
+  let flashA=1;
+  if(low){ flashA=0.55+0.45*Math.sin(performance.now()/110); }
+  ctx.save();
+  // frame + track
+  ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(gx-3,gy-3,gw+6,gh+6);
+  ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fillRect(gx,gy,gw,gh);
+  // segmented tick backdrop (horizontal ticks up the bar)
+  ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1;
+  for(let i=1;i<10;i++){const y=gy+gh*i/10; ctx.beginPath();ctx.moveTo(gx,y);ctx.lineTo(gx+gw,y);ctx.stroke();}
+  // fill grows from the BOTTOM up
+  const fillH=gh*frac;
+  ctx.globalAlpha=flashA;
+  ctx.fillStyle='rgb('+col[0]+','+col[1]+','+col[2]+')';
+  ctx.fillRect(gx, gbot-fillH, gw, fillH);
+  ctx.globalAlpha=1;
+  // outline
+  ctx.strokeStyle = low? 'rgba(255,70,90,'+(0.6+0.4*Math.sin(performance.now()/110))+')' : 'rgba(150,170,205,.5)';
+  ctx.lineWidth = low?2:1; ctx.strokeRect(gx,gy,gw,gh);
+  // label above, numeric below
+  ctx.fillStyle='rgba(190,205,235,.7)'; ctx.font='9px monospace'; ctx.textAlign='center';
+  ctx.fillText('FUEL', gx+gw/2, gy-7);
+  ctx.fillStyle = low? 'rgb(255,90,110)' : 'rgba(190,205,235,.75)';
+  ctx.fillText(Math.round(fuel).toString(), gx+gw/2, gbot+14);
+  // "LOW" warning when red
+  if(low){
+    ctx.fillStyle='rgba(255,70,90,'+flashA+')'; ctx.font='600 8px monospace'; ctx.textAlign='center';
+    ctx.fillText('LOW', gx+gw/2, gbot+26);
+  }
+  // burn indicator: when actively spending, a pip beside the bar
+  if(cap.active && (cap.phase==='flyby'||cap.phase==='settle') && held){
+    ctx.fillStyle='rgba(255,210,80,'+(0.5+0.5*Math.sin(performance.now()/80))+')';
+    ctx.font='9px monospace'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('◀ burning', gx+gw+8, gbot-fillH);
+    ctx.textBaseline='alphabetic';
+  }
+  ctx.restore();
+}
+function lerpColor(a,b,t){t=Math.max(0,Math.min(1,t));return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)];}
+
+function drawHUD(){
+  let L=[];
+  if(cap.active){
+    if(cap.phase==='flyby'){
+      L.push('⚡ TOO FAST');
+      L.push(cap.fuel>0 ? 'HOLD to brake & capture' : 'out of fuel — sailing past');
+    }
+    if(cap.boostFull>1){
+      const arming=(cap.boostT||0)<CONFIG.boostArmTime;
+      const peak=Math.abs((cap.boostT||0)-CONFIG.boostArmTime)<0.15;
+      L.push(arming?'BOOST arming…':peak?'◀ BOOST PEAK — release!':'BOOST fading');
+    }
+  } else {
+    if(cap.fuel<=0.5) L.push('⚠ NO FUEL — recovering…');
+    else if(cap._crashRefused && performance.now()-cap._crashRefused<1000) L.push('✕ TOO LATE — crash course');
+  }
+  if(performance.now()<flashUntil)L.unshift('▸ '+flashMsg);
+  readout.textContent=L.join('\n');
+}
+
+/* -------------------------------------------------- input */
+function isControl(t){return t&&t.closest&&t.closest('#panel,#trace,#tune');}
+function onDown(e){if(isControl(e.target))return;e.preventDefault();held=true;if(!cap.active)beginCapture();}
+function onUp(e){if(!held&&!cap.active)return;if(e&&e.cancelable)e.preventDefault();releaseHeld();}
+if(hasPointer){canvas.addEventListener('pointerdown',onDown);window.addEventListener('pointerup',onUp);window.addEventListener('pointercancel',onUp);}
+else{canvas.addEventListener('mousedown',onDown);window.addEventListener('mouseup',onUp);canvas.addEventListener('touchstart',onDown,{passive:false});window.addEventListener('touchend',onUp,{passive:false});}
+
+/* -------------------------------------------------- controls */
+let flashMsg='',flashUntil=0; function flash(m){flashMsg=m;flashUntil=performance.now()+900;}
+function tap(el,fn){if(!el)return;let lock=0;const h=e=>{const n=performance.now();if(n-lock<350)return;lock=n;e.preventDefault();e.stopPropagation();fn(e);};
+  if(hasPointer)el.addEventListener('pointerdown',h);else{el.addEventListener('touchstart',h,{passive:false});el.addEventListener('click',h);}}
+tap(document.getElementById('resetBtn'),()=>{resetShip();trail.length=0;flash('RESET');});
+const pauseBtn=document.getElementById('pauseBtn');
+tap(pauseBtn,()=>{paused=!paused;pauseBtn.textContent=paused?'▶ RESUME':'❚❚ PAUSE';flash(paused?'PAUSED':'RESUMED');});
+
+/* -------------------------------------------------- tune */
+const tuneEl=document.getElementById('tune');
+const TUNE=[
+  {key:'phaseRate',el:'t_phase',vel:'v_phase',fmt:v=>v.toFixed(2)},
+  {key:'tightenFrac',el:'t_tighten',vel:'v_tighten',fmt:v=>v.toFixed(2)},
+  {key:'settleDur',el:'t_dur',vel:'v_dur',fmt:v=>v.toFixed(1)},
+  {key:'phaseRamp',el:'t_ramp',vel:'v_ramp',fmt:v=>v.toFixed(2)},
+  {key:'fuelPerSec',el:'t_fcost',vel:'v_fcost',fmt:v=>v.toFixed(0)},
+  {key:'flybyFuelPerSec',el:'t_flcost',vel:'v_flcost',fmt:v=>v.toFixed(0)},
+  {key:'fuelRegen',el:'t_regen',vel:'v_regen',fmt:v=>v.toFixed(0)},
+  {key:'gaugeFollow',el:'t_gfollow',vel:'v_gfollow',fmt:v=>v.toFixed(2)},
+];
+const TUNE_DEF={}; TUNE.forEach(t=>TUNE_DEF[t.key]=CONFIG[t.key]);
+TUNE.forEach(t=>{const el=document.getElementById(t.el),vel=document.getElementById(t.vel);
+  el.value=CONFIG[t.key];vel.textContent=t.fmt(CONFIG[t.key]);
+  el.addEventListener('input',()=>{CONFIG[t.key]=parseFloat(el.value);vel.textContent=t.fmt(CONFIG[t.key]);});});
+tap(document.getElementById('tuneBtn'),()=>tuneEl.classList.toggle('open'));
+tap(document.getElementById('tuneClose'),()=>tuneEl.classList.remove('open'));
+tap(document.getElementById('tuneReset'),()=>{Object.assign(CONFIG,TUNE_DEF);
+  TUNE.forEach(t=>{const el=document.getElementById(t.el),vel=document.getElementById(t.vel);el.value=CONFIG[t.key];vel.textContent=t.fmt(CONFIG[t.key]);});flash('TUNE RESET');});
+
+/* -------------------------------------------------- trace ui */
+const traceEl=document.getElementById('trace'),traceText=document.getElementById('traceText');
+const traceMetaEl=document.getElementById('traceMeta'),tracePill=document.getElementById('tracePill');
+const tt=document.getElementById('tt'),traceTA=document.getElementById('traceTA');
+function fmtMeta(t){const m=t.meta,s=t.summary;
+  return `grabR ${m.grabR.toFixed(0)}  grabSpeed ${m.grabSpeed.toFixed(0)}  circ@grab ${m.circAtGrab.toFixed(0)}\n`+
+    `aim ${m.aim.toFixed(2)}  minR ${m.minR.toFixed(0)}  `+(m.rPeri!=null?`rPeri ${m.rPeri.toFixed(0)}  e ${(m.orbitE||0).toFixed(2)}  `:'')+
+    (m.tightness!=null?`tight ${m.tightness.toFixed(2)}  boost ${(m.boost||0).toFixed(0)}\n`:'\n')+
+    `— result — maxDefl ${s.maxDefl}°  kinks ${s.kinks}  rMin ${s.minR}  rMax ${s.maxR}  finalR ${s.finalR} (${s.finalPhase})  fuel ${s.finalFuel}`;}
+function openTrace(){
+  if(!lastTrace){traceMetaEl.textContent='No capture yet. Press & hold near a planet, then release.';tracePill.textContent='';tt.innerHTML='';}
+  else{traceMetaEl.textContent=fmtMeta(lastTrace);const s=lastTrace.summary;
+    tracePill.textContent=s.kinks?(s.kinks+' KINK'+(s.kinks>1?'S':'')):'SMOOTH';
+    tracePill.style.color=s.kinks?'var(--hot)':'var(--ok)';tracePill.style.borderColor=s.kinks?'rgba(255,85,102,.5)':'rgba(84,243,154,.5)';
+    renderTable();}
+  traceEl.classList.add('open');traceText.classList.remove('open');
+}
+function renderTable(){const rows=lastTrace.samples,step=rows.length>400?Math.ceil(rows.length/400):1;
+  let h='<tr><th>t</th><th>r</th><th>spd</th><th>defl°</th><th>pmul</th><th>peri</th><th>apo</th><th>fuel</th><th style="text-align:left">phase</th></tr>';
+  let lp=null;for(let i=0;i<rows.length;i+=step){const s=rows[i],ev=s.phase!==lp;lp=s.phase;
+    h+=`<tr class="${s.kink?'kink':''} ${ev?'event':''}"><td>${s.t.toFixed(2)}</td><td>${s.r}</td><td>${s.spd}</td><td>${s.defl}</td><td>${s.pmul}</td><td>${s.peri}</td><td>${s.apo}</td><td>${s.fuel}</td><td class="ph">${s.phase}</td></tr>`;}
+  tt.innerHTML=h;}
+function traceAsText(){if(!lastTrace)return'No capture.';const m=lastTrace.meta,s=lastTrace.summary;
+  let o='APHELION PHASE-CLOCK TRACE\n';
+  o+=`grabR=${m.grabR.toFixed(1)} grabSpeed=${m.grabSpeed.toFixed(1)} circAtGrab=${m.circAtGrab.toFixed(1)} aim=${m.aim.toFixed(3)} minR=${m.minR.toFixed(1)}`;
+  if(m.rPeri!=null)o+=` rPeri=${m.rPeri.toFixed(1)} e=${(m.orbitE||0).toFixed(3)} a=${(m.orbitA||0).toFixed(1)}`;
+  if(m.tightness!=null)o+=` tightness=${m.tightness.toFixed(3)} boostBanked=${(m.boost||0).toFixed(1)}`;
+  if(cap.lastBoostApplied!=null)o+=` boostApplied=${cap.lastBoostApplied.toFixed(1)}`;
+  o+=`\nphaseRate=${CONFIG.phaseRate} tightenFrac=${CONFIG.tightenFrac} settleDur=${CONFIG.settleDur} phaseRamp=${CONFIG.phaseRamp}\n`;
+  o+=`SUMMARY samples=${s.samples} maxDefl=${s.maxDefl} kinks=${s.kinks} rMin=${s.minR} rMax=${s.maxR} finalR=${s.finalR} finalPhase=${s.finalPhase} finalFuel=${s.finalFuel}\n`;
+  o+='t\tr\tspd\tdefl\tpmul\tperi\tapo\tfuel\tphase\n';
+  const rows=lastTrace.samples,step=rows.length>600?Math.ceil(rows.length/600):1;
+  for(let i=0;i<rows.length;i+=step){const s2=rows[i];o+=`${s2.t.toFixed(3)}\t${s2.r}\t${s2.spd}\t${s2.defl}\t${s2.pmul}\t${s2.peri}\t${s2.apo}\t${s2.fuel}\t${s2.phase}\n`;}
+  return o;}
+tap(document.getElementById('traceBtn'),openTrace);
+tap(document.getElementById('traceClose'),()=>traceEl.classList.remove('open'));
+tap(document.getElementById('traceRawClose'),()=>traceEl.classList.remove('open'));
+tap(document.getElementById('traceRaw'),()=>{traceTA.value=traceAsText();traceText.classList.add('open');});
+tap(document.getElementById('traceRawBack'),()=>traceText.classList.remove('open'));
+tap(document.getElementById('traceCopy'),async()=>{const txt=traceAsText();
+  try{await navigator.clipboard.writeText(txt);document.getElementById('traceCopy').textContent='COPIED ✓';
+    setTimeout(()=>document.getElementById('traceCopy').textContent='COPY FOR CHAT',1200);}
+  catch(e){traceTA.value=txt;traceText.classList.add('open');}});
+
+/* -------------------------------------------------- boot */
+resize();layoutWorld();resetShip();requestAnimationFrame(frame);
+window.addEventListener('load',()=>{resize();layoutWorld();resetShip();});
+setTimeout(()=>{resize();layoutWorld();},250);
+</script>
+</body>
+</html>
