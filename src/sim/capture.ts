@@ -5,11 +5,10 @@
  * `releaseHeld`. Behaviour and arithmetic are unchanged.
  */
 import type { SimConfig } from './config.ts';
-import type { Body, Capture, SimState } from './types.ts';
+import type { Body, Capture, GrabResult, SimState } from './types.ts';
 import { circSpeed, clearanceDv, escapeSpeed, hypot, naturalPeriapsis } from './orbit.ts';
 
-/** Why a grab was refused, so the presentation layer can say so. */
-export type GrabResult = 'captured' | 'refused-no-fuel' | 'refused-crash-cone' | 'refused-no-body';
+export type { GrabResult } from './types.ts';
 
 /** Index of the body nearest the ship. Returns -1 if there are none. */
 export function nearestBody(state: SimState): number {

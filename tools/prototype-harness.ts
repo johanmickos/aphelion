@@ -33,6 +33,16 @@ interface PrototypeInternals {
 
 const noop = (): void => {};
 
+/** Math with a deterministic, engine-independent `hypot`. See PORT_NOTES 16. */
+const patchedMath: Math = Object.create(Math, {
+  hypot: {
+    value: function hypot(...args: number[]): number {
+      if (args.length === 2) return Math.sqrt(args[0]! * args[0]! + args[1]! * args[1]!);
+      return Math.hypot(...args);
+    },
+  },
+}) as Math;
+
 function makeContext(): { sandbox: Record<string, unknown>; setNow: (ms: number) => void } {
   let now = 0;
   const ctxStub = new Proxy({} as Record<string, unknown>, {
@@ -79,7 +89,12 @@ function makeContext(): { sandbox: Record<string, unknown>; setNow: (ms: number)
     requestAnimationFrame: () => 0,
     setTimeout: () => 0,
     navigator: { clipboard: { writeText: async (): Promise<void> => {} } },
-    Math,
+    // `Math.hypot` is not correctly rounded and engines disagree on 36% of
+    // inputs, so the simulation uses sqrt(x*x+y*y) instead — see PORT_NOTES 16.
+    // The same substitution is applied to the prototype here, so the equality
+    // gate compares like with like and still holds at exactly zero. Everything
+    // else about Math is untouched.
+    Math: patchedMath,
     JSON,
     console,
   };
@@ -164,7 +179,7 @@ function samplePrototype(p: PrototypeInternals, tick: number): TrajectorySample 
       vy: cap.vy,
       fuel: cap.fuel,
       phase: cap.phase,
-      r: Math.hypot(cap.rx, cap.ry),
+      r: patchedMath.hypot(cap.rx, cap.ry),
     };
   }
   return {

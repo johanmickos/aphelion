@@ -138,11 +138,39 @@ export interface Capture {
   defl: number;
 }
 
-export interface CrashState {
+/** Why a run ended. Drives which notice the player is shown. */
+export type EndingReason = 'impact' | 'out-of-bounds';
+
+export interface EndingState {
   active: boolean;
   t: number;
   x: number;
   y: number;
+  reason: EndingReason;
+}
+
+// ------------------------------------------------------------------- telemetry
+
+/** Why a grab did or did not take. */
+export type GrabResult = 'captured' | 'refused-no-fuel' | 'refused-crash-cone' | 'refused-no-body';
+
+/**
+ * Observability, written by the simulation and never read by it.
+ *
+ * Nothing here may influence a trajectory — it exists so a replay can explain
+ * *why* something happened, not just what the numbers were. A refused grab, for
+ * instance, is otherwise completely invisible: the player presses, nothing
+ * happens, and the trace shows an uninterrupted drift.
+ */
+export interface Telemetry {
+  /** The most recent grab attempt and its outcome. */
+  lastGrab: { tick: number; result: GrabResult } | null;
+  /** Substeps in which the minimum-orbit floor clamped the ship, this capture. */
+  floorSubsteps: number;
+  /** Substeps clamped by the floor across the whole session. */
+  floorSubstepsTotal: number;
+  /** Captures that ran dry mid-circularisation and puttered out. */
+  putterOuts: number;
 }
 
 // ----------------------------------------------------------------------- state
@@ -156,7 +184,7 @@ export interface SimState {
   bodies: Body[];
   /** Ship fuel. Persists across captures and regenerates during drift. */
   fuel: number;
-  crash: CrashState;
+  ending: EndingState;
   /**
    * The current hold has already been resolved by the simulation (a putter-out),
    * so the pointer-up that follows must be swallowed. The prototype achieved this
@@ -164,6 +192,8 @@ export interface SimState {
    * fact is recorded in state instead. See docs/PORT_NOTES.md note 7.
    */
   holdConsumed: boolean;
+  /** Diagnostics only. Never read by physics; excluded from the fingerprint. */
+  telemetry: Telemetry;
 }
 
 // ----------------------------------------------------------------------- input

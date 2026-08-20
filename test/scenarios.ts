@@ -1,10 +1,15 @@
 /**
  * The scenario matrix the equality gate runs.
  *
- * Scenarios deliberately stay inside the playfield: the out-of-bounds test is the
- * one behaviour the port changes on purpose (the prototype evaluated it in screen
- * space against a smoothed camera), so the gate does not cover it. See
- * docs/PORT_NOTES.md note 9.
+ * Scenarios must END BEFORE leaving the playfield. Out-of-bounds is the one
+ * behaviour the port changes on purpose — the prototype evaluated it in screen
+ * space against a smoothed camera, and it now holds on the boundary rather than
+ * respawning silently — so the gate cannot cover it. See docs/PORT_NOTES.md
+ * note 9 and note 14.
+ *
+ * Two scenarios originally ran past the top boundary. That went unnoticed because
+ * both sides respawned on the same tick and cancelled out; adding the hold made
+ * it visible. `tools/check-scenarios.ts` now fails if any scenario crosses.
  *
  * P1 sits at (189, 0) with R=46, so minR = 62.
  */
@@ -21,7 +26,7 @@ export const SCENARIOS: readonly Scenario[] = [
     name: 'slow glancing grab -> settle -> release',
     pressTick: 18,
     releaseTick: 150,
-    ticks: 220,
+    ticks: 180,
   },
   {
     name: 'head-on dive (clearance engages)',
@@ -42,7 +47,7 @@ export const SCENARIOS: readonly Scenario[] = [
     ship: { x: 105, y: 354, vx: 0, vy: -400 },
     pressTick: 20,
     releaseTick: 200,
-    ticks: 240,
+    ticks: 160,
   },
   {
     name: 'fast grab, released early (flyby sails past)',

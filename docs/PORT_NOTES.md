@@ -202,6 +202,30 @@ Resize is inert. The renderer scales by `viewportHeight / 844` and letterboxes.
 Equality is unaffected because the harness pins the prototype's viewport to
 390×844, at which the frozen coordinates are exactly what `layoutWorld` produces.
 
+### 14 — Leaving the field holds, rather than respawning silently **[CHANGED]**
+
+`src/sim/step.ts` -> `endRun`, `src/render/overlays.ts`
+
+The prototype teleported the ship back to the start the instant it crossed a
+boundary, with no pause and no explanation. An impact already froze, flashed a
+readout and then respawned; crossing a line did not, so the two ways to lose a run
+were presented completely differently.
+
+Leaving the field now holds exactly as an impact does and shows a red notice —
+matching the boundary gradient that was warning you on the way out — before
+respawning. `CrashState` became `EndingState` with a `reason`, so the notice is
+chosen by cause rather than by a boolean.
+
+This sits in the path note 9 already carved out as outside the gate's coverage.
+Two scenarios _did_ cross the boundary, though, which had gone unnoticed because
+both sides respawned on the same tick and cancelled out. They are now trimmed to
+end before the boundary, and `tools/check-scenarios.ts` fails the build if any
+scenario crosses — a gate that silently stops covering something is worse than no
+gate.
+
+The trajectory sample still reports `crash` on the wire for an impact, so the
+equality comparison keeps comparing like for like.
+
 ---
 
 ## Caught by the gate
@@ -226,12 +250,115 @@ surfaced only because the gate compares fuel too. `stepDrift` now returns a
 
 ---
 
+## 15 — JavaScript engines disagree on floating-point math
+
+Not a port note in the usual sense: a property of the platform that constrains
+what the diagnostics system can promise.
+
+`Math.hypot`, `Math.atan2`, `Math.sin` and `Math.cos` are **not required to be
+correctly rounded** by the ECMAScript spec, and implementations genuinely differ.
+Measured directly, JavaScriptCore (Safari, iOS) against V8 (Node), 20,000 random
+inputs each:
+
+| function               | results that differ                              |
+| ---------------------- | ------------------------------------------------ |
+| `Math.hypot`           | **36.10%**                                       |
+| `Math.atan2`           | **17.64%**                                       |
+| `Math.sin`             | 4.21%                                            |
+| `Math.cos`             | 4.21%                                            |
+| `Math.sqrt(x*x + y*y)` | **0%** — `sqrt` is correctly rounded by IEEE-754 |
+
+Running the identical simulation in both engines with identical inputs:
+
+```
+tick   |Δposition|
+1260      0.000000   identical through drift, which touches no transcendentals
+1440      0.000004
+1620      3.575040
+1800      5.629822
+```
+
+Drift matches exactly because it is pure `+` and `*`. A capture calls `hypot` six
+times per substep, so it diverges, and the freeze at periapsis calls `atan2` and
+amplifies it.
+
+**Consequence:** a session recorded on a phone can never be replayed bit-exactly
+on a laptop. This is why diagnostics checkpoints carry raw positions alongside the
+fingerprint, and why replay fidelity is _graded_ — `exact` when the engine matches,
+`close`/`drifted` when only the numbers differ, `diverged` when the run genuinely
+took another path. Reporting a cross-engine difference as "the simulation is
+non-deterministic" was actively misleading, and cost real debugging time.
+
+**Not fixed, deliberately.** Full cross-engine determinism would mean replacing
+those four functions with polynomial implementations built from IEEE-exact
+operations. That is tractable (~200 lines) but it would break port-equality with
+`index.html`, which calls `Math.*`. The exact gate is worth more than exact
+cross-engine replay, because graded fidelity is enough to diagnose gameplay.
+Revisit if leaderboards or lockstep multiplayer ever need it.
+
+### 16 — `Math.hypot` replaced with `sqrt(x*x + y*y)` **[CHANGED]**
+
+`src/sim/orbit.ts`
+
+Note 15 established that engines disagree on `Math.hypot` for 36% of inputs, and
+that this made phone sessions unreplayable — the error compounded through orbital
+motion until, after about ten seconds, it flipped whole decisions (capture became
+flyby). Measured growth on a real session:
+
+```
+  t(s)   |Δpos|
+   1–8    0.004 px
+    10    2.130
+    12   15.070
+    13  128.584   ← flyby vs settle: a decision flipped
+```
+
+`Math.sqrt` **is** correctly rounded by IEEE-754, and `*` and `+` are exact, so
+`sqrt(x*x + y*y)` is identical on every engine. Substituting it:
+
+|                                    | Math.hypot     | sqrt(x*x+y*y)      |
+| ---------------------------------- | -------------- | ------------------ |
+| JavaScriptCore vs V8, full session | 5.630000000 px | **0.000000000 px** |
+
+Overflow is not a concern here — coordinates reach ~1e4, so squares reach ~1e8
+against a float64 ceiling of 1.8e308.
+
+**The equality gate still holds at exactly zero.** The substitution is applied to
+_both_ sides: `tools/prototype-harness.ts` gives the prototype a `Math` whose
+`hypot` is the same expression (all 29 of its call sites pass two arguments).
+So the gate compares like with like, and what it proves is now stated precisely:
+the port reproduces the prototype's algorithm under one documented substitution.
+Without that patch the divergence would be 7.169e-12 px — about 125 ulps over a
+whole session, physically meaningless but enough to break an exact comparison.
+
+A residual remains: `Math.atan2`, `sin` and `cos` still differ between engines
+(18%, 4%, 4%). In practice this now shows up as a single transient ulp that does
+not accumulate, because the phase clock re-derives position from `theta` each
+tick rather than integrating it. Left alone deliberately — deterministic
+polynomial replacements would be ~200 lines for no measurable gain.
+
+---
+
+## Tuning vs. fidelity
+
+`src/sim/config.ts` holds two parameter sets:
+
+- **`PROTOTYPE_CONFIG`** — the prototype's values, frozen forever. The equality
+  gate and the golden baseline both run against this, so the proof that the port
+  reproduces `index.html` survives any amount of game tuning.
+- **`DEFAULT_CONFIG`** — the live game. It starts from the prototype and diverges
+  deliberately; every difference is listed at its declaration with the reason.
+
+Without that split, the first balance change would have destroyed the fidelity
+proof, and the gate would have become a tax rather than an asset.
+
 ## Status
 
 ```
 port equality vs index.html   10/10 scenarios, divergence exactly 0
                               position · velocity · fuel · phase
 phases exercised              drift, clear, flyby, settle, orbit, crash
+scenario boundary guard       all 10 stay inside the playfield
 invariants                    31 tests
-golden baseline               golden/physics-v1.json, 2060 ticks
+golden baseline               golden/physics-v1.json
 ```

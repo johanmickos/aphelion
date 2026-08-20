@@ -87,7 +87,14 @@ export interface SimConfig {
   crashGrazeDot: number;
 }
 
-export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
+/**
+ * The prototype's parameter set, exactly as index.html declares it.
+ *
+ * FROZEN FOREVER. The equality gate runs against this, so the proof that
+ * src/sim reproduces the prototype survives any amount of game tuning. Never
+ * edit these to change how the game feels — edit DEFAULT_CONFIG below.
+ */
+export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   GM: 5_500_000,
   soft: 18,
   SUB: 6,
@@ -130,6 +137,42 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   crashPause: 0.7,
   crashGrazeDot: 0.18,
 } satisfies SimConfig);
+
+/**
+ * The live game tuning. Starts from the prototype and diverges deliberately.
+ *
+ * Every difference from PROTOTYPE_CONFIG is a decision, listed here so the drift
+ * is never accidental:
+ *
+ *  - minOrbitGap 16 -> 12   The ring read as too loose at 16, a touch tight at
+ *                           10. Swept 16 down to 4: the floor is never breached
+ *                           anywhere in that range, deflection moves under 1.5
+ *                           degrees and peak speed rises ~2%, so this is purely
+ *                           a feel choice. Below 8 the ship sprite would clip.
+ *  - crashConeRange 70 -> 50  Grabs were refused earlier than they needed to be,
+ *                           costing genuine last-second saves. The cone
+ *                           over-warns anyway because it tests a straight ray
+ *                           against a curved path (PORT_NOTES 1), so pulling the
+ *                           refusal in partly compensates until that is fixed.
+ *  - fieldWidthFrac 1.20 -> 1.45  The corridor felt constrictive, and a wider
+ *                           field gives more room to find a planet to curve
+ *                           away from before reaching a boundary.
+ */
+export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
+  ...PROTOTYPE_CONFIG,
+  minOrbitGap: 12,
+  crashConeRange: 50,
+  fieldWidthFrac: 1.45,
+} satisfies SimConfig);
+
+/**
+ * Bump whenever a change to `src/sim/` alters behaviour.
+ *
+ * A diagnostics report records this, so a replay can tell "you were running older
+ * code" apart from "the simulation is non-deterministic". Those look identical in
+ * the numbers and could not be more different in what they mean.
+ */
+export const SIM_VERSION = 3;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

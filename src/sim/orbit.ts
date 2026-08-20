@@ -9,7 +9,28 @@
 import type { SimConfig } from './config.ts';
 import type { Orbit } from './types.ts';
 
-export const hypot = Math.hypot;
+/**
+ * Vector length, deliberately NOT `Math.hypot`.
+ *
+ * `Math.hypot` is not required to be correctly rounded, and engines genuinely
+ * disagree: measured across 20,000 inputs, JavaScriptCore and V8 return different
+ * results 36% of the time. Since this is called six times per substep, that alone
+ * made a session recorded on a phone impossible to replay on a laptop — the error
+ * compounded through orbital motion until, after ~10 seconds, it flipped whole
+ * decisions (capture vs flyby).
+ *
+ * `sqrt` IS correctly rounded by IEEE-754, and `*` and `+` are exact operations,
+ * so this form is identical on every engine — verified at 0.000000px divergence
+ * over a full session where Math.hypot gave 5.63px.
+ *
+ * Overflow is not a concern at this scale: coordinates are ~1e4 at most, so the
+ * squares are ~1e8 against a float64 ceiling of 1.8e308.
+ *
+ * See docs/PORT_NOTES.md note 16.
+ */
+export function hypot(x: number, y: number): number {
+  return Math.sqrt(x * x + y * y);
+}
 
 /** Circular orbital speed at radius r. */
 export function circSpeed(cfg: SimConfig, r: number): number {

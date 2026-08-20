@@ -10,6 +10,13 @@
     <meta name="theme-color" content="#000000" />
     <title>Aphelion</title>
     <style>
+      /* Without this, `width: 100%` plus padding and border overflows its
+         container — which pushed the panel's controls off the right edge. */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
       html,
       body {
         height: 100%;
@@ -32,10 +39,115 @@
         height: 100%;
         display: block;
       }
+
+      .ctl {
+        background: rgba(12, 15, 22, 0.82);
+        color: #cfdcf2;
+        border: 1px solid #26314a;
+        border-radius: 4px;
+        font: 11px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+        letter-spacing: 0.06em;
+        padding: 10px 12px;
+        cursor: pointer;
+        -webkit-user-select: none;
+        user-select: none;
+        white-space: nowrap;
+      }
+      .ctl:active {
+        background: #1a2233;
+      }
+
+      /* Top-right cluster. Laid out with flex rather than absolute offsets so the
+         flag button can grow a counter without colliding with its neighbour. */
+      #controls {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 10px);
+        right: calc(env(safe-area-inset-right, 0px) + 10px);
+        z-index: 5;
+        display: flex;
+        gap: 8px;
+        /* The container is only a layout box; a tap in the gap between buttons
+           must fall through to the game rather than being swallowed. */
+        pointer-events: none;
+      }
+      #controls .ctl {
+        pointer-events: auto;
+      }
+      #flag.hit {
+        border-color: #ffcd32;
+        color: #ffe27a;
+      }
+
+      #diag {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.96);
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        padding: calc(env(safe-area-inset-top, 0px) + 14px)
+          calc(env(safe-area-inset-right, 0px) + 14px)
+          calc(env(safe-area-inset-bottom, 0px) + 14px)
+          calc(env(safe-area-inset-left, 0px) + 14px);
+      }
+      #diag.open {
+        display: flex;
+      }
+      #diag h1 {
+        font: 600 12px/1.4 ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        color: #eef3fb;
+        margin: 0;
+      }
+      #diagMeta,
+      #diagBuild {
+        font: 10px/1.6 ui-monospace, monospace;
+        color: #8595b0;
+        white-space: pre-wrap;
+      }
+      #diagBuild {
+        color: #5b6a86;
+      }
+      #diagNote,
+      #diagOut {
+        display: block;
+        width: 100%;
+        background: #070a11;
+        color: #eef3fb;
+        border: 1px solid #26314a;
+        border-radius: 3px;
+        font: 11px/1.5 ui-monospace, monospace;
+        padding: 9px;
+        resize: none;
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      #diagNote {
+        flex: 0 0 72px;
+      }
+      #diagOut {
+        flex: 1 1 0;
+        /* Flex items default to min-height:auto and refuse to shrink; without
+           this the output box pushes the buttons off the bottom. */
+        min-height: 60px;
+      }
+      #diagRow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      #diagRow .ctl {
+        flex: 1 1 auto;
+        /* Same story horizontally: min-width:auto is why the row overflowed. */
+        min-width: 0;
+        text-align: center;
+      }
+
       #note {
         position: absolute;
-        left: 10px;
-        bottom: 10px;
+        left: calc(env(safe-area-inset-left, 0px) + 10px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
         color: #55627d;
         font-size: 10px;
         letter-spacing: 0.06em;
@@ -45,7 +157,29 @@
   </head>
   <body>
     <canvas id="c"></canvas>
-    <div id="note">STAGE 0 — sim shell, no renderer yet</div>
+    <div id="controls">
+      <button class="ctl" id="diagBtn">DIAG</button>
+      <button class="ctl" id="flag">⚑</button>
+    </div>
+
+    <div id="diag">
+      <h1>DIAGNOSTICS</h1>
+      <div id="diagMeta"></div>
+      <div id="diagBuild"></div>
+      <textarea
+        id="diagNote"
+        placeholder="What felt wrong? (e.g. 'the settle jerked here', 'grab was refused but I had room')"
+      ></textarea>
+      <textarea id="diagOut" readonly spellcheck="false"></textarea>
+      <div id="diagRow">
+        <button class="ctl" id="diagSend">SEND</button>
+        <button class="ctl" id="diagCopy">COPY</button>
+        <button class="ctl" id="diagReload">RELOAD</button>
+        <button class="ctl" id="diagClose">CLOSE</button>
+      </div>
+    </div>
+
+    <div id="note">STAGE 1 — world layer · HUD and compass pending</div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

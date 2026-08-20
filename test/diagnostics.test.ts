@@ -1,0 +1,327 @@
+/**
+ * The diagnostics contract: a report must reproduce the session it describes,
+ * exactly. If it does not, every conclusion drawn from a replay is worthless, so
+ * this is the most load-bearing test in the app layer.
+ */
+import { describe, expect, it } from 'vitest';
+import { RunRecorder } from '../src/app/recorder.ts';
+import {
+  buildReport,
+  configDelta,
+  configFromReport,
+  parseReport,
+  serializeReport,
+  summarize,
+} from '../src/app/report.ts';
+import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
+import { createInitialState, stepSim } from '../src/sim/step.ts';
+import { fingerprintHex } from '../src/sim/serialize.ts';
+import { replayReport } from '../tools/replay-core.ts';
+import type { Input, SimConfig } from '../src/sim/index.ts';
+
+/** Plays a session, recording it the way the app does. */
+function play(cfg: SimConfig, ticks: number, edges: Map<number, 0 | 1>, markAt: number[] = []) {
+  const recorder = new RunRecorder();
+  const state = createInitialState(cfg);
+  let held = false;
+  for (let tick = 0; tick < ticks; tick++) {
+    const e = edges.get(tick);
+    const pressed = e === 1;
+    const released = e === 0;
+    if (pressed) held = true;
+    if (released) held = false;
+    recorder.recordInput(state.tick, pressed, released);
+    const input: Input = { held: held || pressed, pressed, released };
+    stepSim(state, cfg, input, FIXED_DT);
+    recorder.recordTick(state);
+    if (markAt.includes(state.tick)) recorder.mark(state.tick, 'felt wrong');
+  }
+  return { recorder, state };
+}
+
+/** Re-runs a report the way tools/replay.ts does. */
+function replay(text: string) {
+  const report = parseReport(text);
+  const cfg = configFromReport(report);
+  const edges = new Map(report.input);
+  const state = createInitialState(cfg);
+  const seen = new Map<number, string>();
+  let held = false;
+  for (let tick = 0; tick < report.ticks; tick++) {
+    const e = edges.get(tick);
+    const pressed = e === 1;
+    const released = e === 0;
+    if (pressed) held = true;
+    if (released) held = false;
+    stepSim(state, cfg, { held: held || pressed, pressed, released }, report.dt);
+    seen.set(state.tick, fingerprintHex(state));
+  }
+  return { report, state, seen };
+}
+
+const DEVICE = { w: 390, h: 844, dpr: 3, ua: 'test' };
+
+const SESSIONS: Array<{ name: string; ticks: number; edges: Array<[number, 0 | 1]> }> = [
+  { name: 'idle drift', ticks: 200, edges: [] },
+  {
+    name: 'single capture',
+    ticks: 300,
+    edges: [
+      [18, 1],
+      [150, 0],
+    ],
+  },
+  {
+    name: 'several grabs',
+    ticks: 700,
+    edges: [
+      [18, 1],
+      [120, 0],
+      [200, 1],
+      [280, 0],
+      [360, 1],
+      [520, 0],
+    ],
+  },
+  { name: 'held to the end', ticks: 500, edges: [[30, 1]] },
+  {
+    name: 'run past a crash and respawn',
+    ticks: 900,
+    edges: [
+      [18, 1],
+      [60, 0],
+    ],
+  },
+];
+
+describe('report round trip', () => {
+  it.each(SESSIONS)('$name: every checkpoint reproduces', (sess) => {
+    const edges = new Map(sess.edges);
+    const { recorder, state } = play(DEFAULT_CONFIG, sess.ticks, edges);
+    const text = serializeReport(
+      buildReport({
+        recorder,
+        config: DEFAULT_CONFIG,
+        seed: 1,
+        ticks: state.tick,
+        note: '',
+        device: DEVICE,
+      }),
+    );
+
+    const { report, seen } = replay(text);
+    expect(report.checks.length).toBeGreaterThan(0);
+    for (const [tick, fp] of report.checks) {
+      expect(seen.get(tick), `checkpoint at tick ${tick}`).toBe(fp);
+    }
+  });
+
+  it('final state after replay is identical, not merely similar', () => {
+    const edges = new Map<number, 0 | 1>([
+      [18, 1],
+      [120, 0],
+      [200, 1],
+      [340, 0],
+    ]);
+    const { recorder, state } = play(DEFAULT_CONFIG, 600, edges);
+    const text = serializeReport(
+      buildReport({
+        recorder,
+        config: DEFAULT_CONFIG,
+        seed: 1,
+        ticks: state.tick,
+        note: '',
+        device: DEVICE,
+      }),
+    );
+    const { state: replayed } = replay(text);
+    expect(fingerprintHex(replayed)).toBe(fingerprintHex(state));
+    expect(replayed.ship).toEqual(state.ship);
+    expect(replayed.fuel).toBe(state.fuel);
+  });
+
+  it('carries tuning changes, so a tuned session replays as tuned', () => {
+    const tuned: SimConfig = { ...DEFAULT_CONFIG, minOrbitGap: 24, phaseRate: 1.6 };
+    const edges = new Map<number, 0 | 1>([
+      [18, 1],
+      [200, 0],
+    ]);
+    const { recorder, state } = play(tuned, 400, edges);
+    const text = serializeReport(
+      buildReport({
+        recorder,
+        config: tuned,
+        seed: 1,
+        ticks: state.tick,
+        note: '',
+        device: DEVICE,
+      }),
+    );
+
+    const report = parseReport(text);
+    expect(report.config.minOrbitGap).toBe(24);
+    expect(report.config.phaseRate).toBe(1.6);
+    // and the delta against current defaults names exactly those two keys
+    expect(
+      configDelta(report.config, DEFAULT_CONFIG)
+        .map((d) => d.key)
+        .sort(),
+    ).toEqual(['minOrbitGap', 'phaseRate']);
+
+    const { seen } = replay(text);
+    for (const [tick, fp] of report.checks) expect(seen.get(tick)).toBe(fp);
+
+    // and the same inputs under default config would NOT match — proving the
+    // diff is doing real work rather than being decorative
+    const defaultRun = play(DEFAULT_CONFIG, 400, edges);
+    expect(fingerprintHex(defaultRun.state)).not.toBe(fingerprintHex(state));
+  });
+
+  it('preserves flagged moments', () => {
+    const edges = new Map<number, 0 | 1>([
+      [18, 1],
+      [150, 0],
+    ]);
+    const { recorder, state } = play(DEFAULT_CONFIG, 300, edges, [77, 201]);
+    const report = parseReport(
+      serializeReport(
+        buildReport({
+          recorder,
+          config: DEFAULT_CONFIG,
+          seed: 1,
+          ticks: state.tick,
+          note: 'n',
+          device: DEVICE,
+        }),
+      ),
+    );
+    expect(report.marks.map(([t]) => t)).toEqual([77, 201]);
+    expect(report.note).toBe('n');
+  });
+
+  it('stays small enough to paste out of a phone', () => {
+    // ten minutes of dense play
+    const edges = new Map<number, 0 | 1>();
+    for (let t = 30; t < 36000; t += 90) {
+      edges.set(t, 1);
+      edges.set(t + 45, 0);
+    }
+    const { recorder, state } = play(DEFAULT_CONFIG, 36000, edges);
+    const text = serializeReport(
+      buildReport({
+        recorder,
+        config: DEFAULT_CONFIG,
+        seed: 1,
+        ticks: state.tick,
+        note: '',
+        device: DEVICE,
+      }),
+    );
+    const kb = text.length / 1024;
+    expect(kb, `report was ${kb.toFixed(1)} KB`).toBeLessThan(40);
+    expect(summarize(parseReport(text)).seconds).toBeCloseTo(600, 0);
+  });
+
+  it('replays correctly even after DEFAULT_CONFIG has moved on', () => {
+    // The bug this guards: reports used to store a *diff* against the client's
+    // own DEFAULT_CONFIG. A session recorded while the default was X read as
+    // "no differences", so replaying it after the default became Y silently used
+    // Y and diverged — and the tool blamed the simulation for it.
+    const sessionCfg: SimConfig = { ...DEFAULT_CONFIG, minOrbitGap: 10 };
+    const edges = new Map<number, 0 | 1>([
+      [18, 1],
+      [200, 0],
+    ]);
+    const { recorder, state } = play(sessionCfg, 400, edges);
+    const text = serializeReport(
+      buildReport({
+        recorder,
+        config: sessionCfg,
+        seed: 1,
+        ticks: state.tick,
+        note: '',
+        device: DEVICE,
+      }),
+    );
+
+    const report = parseReport(text);
+    // the session's own value survives, whatever the current default is
+    expect(configFromReport(report).minOrbitGap).toBe(10);
+    expect(DEFAULT_CONFIG.minOrbitGap).not.toBe(10); // the default has since moved
+
+    const { seen } = replay(text);
+    for (const [tick, fp] of report.checks) expect(seen.get(tick)).toBe(fp);
+  });
+
+  it('carries raw values so a cross-engine replay can still be verified', () => {
+    // Engines disagree on Math.hypot/atan2/sin/cos, so a fingerprint alone cannot
+    // verify a report recorded on a phone. The raw position must travel with it.
+    const edges = new Map<number, 0 | 1>([
+      [18, 1],
+      [200, 0],
+    ]);
+    const { recorder, state } = play(DEFAULT_CONFIG, 400, edges);
+    const report = parseReport(
+      serializeReport(
+        buildReport({
+          recorder,
+          config: DEFAULT_CONFIG,
+          seed: 1,
+          ticks: state.tick,
+          note: '',
+          device: DEVICE,
+        }),
+      ),
+    );
+    for (const c of report.checks) {
+      expect(c).toHaveLength(8);
+      const [tick, fp, x, y, vx, vy, fuel, phase] = c;
+      expect(typeof tick).toBe('number');
+      expect(fp).toMatch(/^[0-9a-f]{8}$/);
+      for (const n of [x, y, vx, vy, fuel]) expect(Number.isFinite(n)).toBe(true);
+      expect(typeof phase).toBe('string');
+    }
+    // and a replay of it grades as exact, since this is the same engine
+    const analysis = replayReport(report);
+    expect(analysis.fidelity).toBe('exact');
+    // Checkpoints store 2 decimal places, so the floor on maxDelta is the
+    // rounding itself (~0.007px across both axes), not a real difference.
+    expect(analysis.maxDelta).toBeLessThan(0.01);
+  });
+
+  it('grades a nudged replay as diverged rather than silently accepting it', () => {
+    const edges = new Map<number, 0 | 1>([
+      [18, 1],
+      [200, 0],
+    ]);
+    const { recorder, state } = play(DEFAULT_CONFIG, 400, edges);
+    const report = parseReport(
+      serializeReport(
+        buildReport({
+          recorder,
+          config: DEFAULT_CONFIG,
+          seed: 1,
+          ticks: state.tick,
+          note: '',
+          device: DEVICE,
+        }),
+      ),
+    );
+    // shift every recorded position far enough to exceed the drift bound
+    report.checks = report.checks.map(([t, , x, y, vx, vy, f, p]) => [
+      t,
+      'deadbeef',
+      x + 500,
+      y,
+      vx,
+      vy,
+      f,
+      p,
+    ]);
+    expect(replayReport(report).fidelity).toBe('diverged');
+  });
+
+  it('rejects a report from a future schema rather than misreading it', () => {
+    expect(() => parseReport(JSON.stringify({ aphelion: 99 }))).toThrow(/schema/);
+  });
+});

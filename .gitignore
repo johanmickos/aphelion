@@ -30,3 +30,6 @@ dist/
 
 # scratch
 scratchpad/
+
+# playtest reports received from a device (dev only)
+diagnostics/

@@ -9,7 +9,6 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:lan": "./tools/dev.sh",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
@@ -19,9 +18,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "portable": "node tools/check-portability.ts",
+    "scenarios": "node tools/check-scenarios.ts",
+    "replay": "node tools/replay.ts",
     "golden:capture": "node tools/capture-golden.ts",
     "golden:check": "node tools/capture-golden.ts --check",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm portable && pnpm golden:check && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm portable && pnpm scenarios && pnpm golden:check && pnpm test"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",

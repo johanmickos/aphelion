@@ -12,7 +12,7 @@
  */
 import type { SimConfig } from './config.ts';
 import { DEFAULT_CONFIG } from './config.ts';
-import type { Body, Input, SimState } from './types.ts';
+import type { Body, EndingReason, Input, SimState } from './types.ts';
 import { circSpeed, escapeSpeed, gAccel, hypot, orbitRadius, smootherstep } from './orbit.ts';
 import { beginCapture, freezeOrbit, releaseCapture } from './capture.ts';
 import { contactPolicy, reflectCoefficient } from './contact.ts';
@@ -28,8 +28,9 @@ export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
     capture: null,
     bodies: createBodies(),
     fuel: cfg.fuelMax,
-    crash: { active: false, t: 0, x: 0, y: 0 },
+    ending: { active: false, t: 0, x: 0, y: 0, reason: 'impact' },
     holdConsumed: false,
+    telemetry: { lastGrab: null, floorSubsteps: 0, floorSubstepsTotal: 0, putterOuts: 0 },
   };
   respawn(state, cfg);
   state.tick = 0;
@@ -77,12 +78,31 @@ function driftAccel(_state: SimState, _x: number, _y: number): { ax: number; ay:
   return { ax: 0, ay: 0 };
 }
 
+/** Freeze the ship and start the hold before respawn. */
+function endRun(state: SimState, reason: EndingReason, x: number, y: number): void {
+  state.capture = null;
+  state.ship.x = x;
+  state.ship.y = y;
+  state.ship.vx = 0;
+  state.ship.vy = 0;
+  state.ship.alive = false;
+  state.ending.active = true;
+  state.ending.t = 0;
+  state.ending.x = x;
+  state.ending.y = y;
+  state.ending.reason = reason;
+}
+
 /** Advance one simulation tick. Mutates `state` in place. */
 export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: number): void {
   // ---- input edges, applied before the frame as the prototype's handlers were
   if (input.pressed) {
     state.holdConsumed = false;
-    if (!state.capture) beginCapture(state, cfg);
+    if (!state.capture) {
+      const result = beginCapture(state, cfg);
+      state.telemetry.lastGrab = { tick: state.tick, result };
+      if (result === 'captured') state.telemetry.floorSubsteps = 0;
+    }
   }
   if (input.released) {
     if (state.holdConsumed) state.holdConsumed = false;
@@ -90,11 +110,11 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   }
   const holding = input.held && !state.holdConsumed;
 
-  // ---- crash hold: freeze so the player sees what happened, then respawn
-  if (state.crash.active) {
-    state.crash.t += dt;
-    if (state.crash.t >= cfg.crashPause) {
-      state.crash.active = false;
+  // ---- ending hold: freeze so the player sees what happened, then respawn
+  if (state.ending.active) {
+    state.ending.t += dt;
+    if (state.ending.t >= cfg.crashPause) {
+      state.ending.active = false;
       respawn(state, cfg);
     }
     state.tick++;
@@ -104,6 +124,7 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   if (state.capture) {
     stepCapture(state, cfg, holding, dt);
     if (state.capture?.puttered) {
+      state.telemetry.putterOuts++;
       releaseCapture(state, cfg, true);
       state.holdConsumed = true;
     }
@@ -122,7 +143,13 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   const fb = fieldBounds(cfg, state.bodies);
   const outX = pos.x < fb.left - 4 || pos.x > fb.right + 4;
   const outY = pos.y > fb.bottom || pos.y < fb.top;
-  if (outX || outY) respawn(state, cfg);
+  if (outX || outY) {
+    // Hold on the boundary the way an impact does, so leaving the field reads as
+    // an event with a cause rather than a silent teleport back to the start.
+    endRun(state, 'out-of-bounds', pos.x, pos.y);
+    state.tick++;
+    return;
+  }
 
   if (!state.capture) state.fuel = regen(cfg, state.fuel, dt);
 
@@ -177,6 +204,8 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
     {
       const rr = hypot(cap.rx, cap.ry);
       if (rr < cap.minR) {
+        state.telemetry.floorSubsteps++;
+        state.telemetry.floorSubstepsTotal++;
         const nx = cap.rx / rr;
         const ny = cap.ry / rr;
         cap.rx = nx * cap.minR;
@@ -404,10 +433,7 @@ function stepDrift(state: SimState, cfg: SimConfig, dt: number): boolean {
       ship.vx = 0;
       ship.vy = 0;
       ship.alive = false;
-      state.crash.active = true;
-      state.crash.t = 0;
-      state.crash.x = ship.x;
-      state.crash.y = ship.y;
+      endRun(state, 'impact', ship.x, ship.y);
       return true;
     }
 

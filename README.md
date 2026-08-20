@@ -15,12 +15,23 @@ TypeScript, Canvas2D, **zero runtime dependencies** — the game is also the eng
 
 ```bash
 pnpm install
-pnpm dev:lan          # dev server + a QR code to open it on your phone
+pnpm dev               # dev server + a QR code to open it on your phone
 ```
 
-`pnpm dev:lan` prints a scannable QR for this machine's LAN address, so you can
-point a phone camera at the terminal and start playing. Both devices need to be
-on the same network. Plain `pnpm dev` starts the server without the QR.
+`pnpm dev` prints a scannable QR for this machine's LAN address, so you can point
+a phone camera at the terminal and start playing. Both devices need to be on the
+same network.
+
+The QR is printed by a Vite plugin (`tools/vite-plugin-qr.ts`) rather than a
+wrapper script, for two reasons: Vite clears the terminal on startup, so anything
+printed beforehand is wiped; and the plugin reads the server's _resolved_ network
+URL, so the code stays correct even when Vite picks a different port than asked.
+
+Press **`p`** in the terminal to reprint the code after HMR output scrolls it
+away, or **`P`** for a larger one if your camera struggles. The generator is
+`tools/qr.py` — dependency-free, ISO/IEC 18004, byte mode, EC level M.
+
+The dev server binds all interfaces (`server.host`) so the phone can reach it.
 
 ```bash
 pnpm check            # typecheck · lint · format · portability · golden · tests
@@ -38,7 +49,7 @@ app/                  The playable shell (Vite root).
 src/sim/              The simulation. No DOM, no dependencies, no bundler syntax.
 src/render/           Camera, letterboxing. Everything that knows about pixels.
 src/app/              The fixed-timestep loop.
-tools/                Headless harness, golden capture, QR, dev script.
+tools/                Headless harness, golden capture, QR generator + Vite plugin.
 test/                 The equality gate, invariants, scenario matrix.
 golden/               Recorded reference trajectories.
 docs/                 DESIGN.md (current), PORT_NOTES.md (the port record).
@@ -98,6 +109,65 @@ feel was built at, not on accuracy.
 depends on `dt`. It is inherited from the prototype and quarantined deliberately.
 **Do not add others** — each one silently re-tunes itself if the timestep changes,
 which is the only thing that makes the timestep hard to revisit.
+
+---
+
+## Reporting a problem you hit while playing
+
+Because the simulation is deterministic, a bug report is a **recipe, not a
+recording**: `(config, seed, inputLog)` reproduces a whole session, so a
+ten-minute run is under a kilobyte and can be pasted straight into a chat.
+
+While playing:
+
+1. Press **⚑** the moment something feels wrong. It stamps the current tick and
+   does not interrupt play, so keep going.
+2. Press **DIAG**, describe what happened, then either:
+   - **SEND TO DEV SERVER** — the report is posted straight to the running dev
+     server, replayed, and the analysis is printed in the laptop terminal
+     immediately. No copying, no clipboard permissions. Reports land in
+     `diagnostics/` (gitignored).
+   - **COPY** — for pasting somewhere else. On a LAN dev server the clipboard API
+     is unavailable (http is not a secure context), so the button selects the
+     text instead; long-press to copy.
+
+The send endpoint is **dev-only**: the plugin is `apply: 'serve'` and the client
+half sits behind `import.meta.env.DEV`, so both the endpoint and the button are
+eliminated from a production build — verified by grepping the bundle. It writes
+files on a server that is bound to all interfaces, so it is deliberately narrow:
+POST only, a hard body cap, must parse as a report of the expected schema, and the
+filename is generated server-side so a caller cannot choose a path.
+
+To analyse a report by hand:
+
+```bash
+node tools/replay.ts report.json
+pbpaste | node tools/replay.ts -
+```
+
+The replay **grades its own fidelity** first, and reports it:
+
+| grade      | meaning                                                                              |
+| ---------- | ------------------------------------------------------------------------------------ |
+| `exact`    | every checkpoint matches bit for bit (same engine)                                   |
+| `close`    | positions agree within 2px — cross-engine float rounding only; detail is trustworthy |
+| `drifted`  | same decisions, numbers diverging; phases and events reliable, late positions not    |
+| `diverged` | the run genuinely took a different path — or the report is from another build        |
+
+Phone replays are bit-exact in practice. Getting there required replacing
+`Math.hypot` with `sqrt(x*x + y*y)`: `hypot` is not correctly rounded and
+JavaScriptCore and V8 disagree on 36% of inputs, which compounded through orbital
+motion until it flipped whole decisions after ~10 seconds. See PORT_NOTES 15
+and 16.
+Every report carries state
+fingerprints at intervals, and the tool re-runs the session and compares them. If
+they all match, the replay _is_ the session you played and anything it reports can
+be trusted; if they diverge, the tool says so and names the first bad tick —
+because that means something non-deterministic got into the simulation, which is a
+more urgent finding than whatever was originally being reported.
+
+It then prints automatic findings (how runs ended, kinks, fuel starvation, floor
+contact) and a window around each moment you flagged.
 
 ---
 

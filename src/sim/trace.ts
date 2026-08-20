@@ -5,6 +5,7 @@
  * display time is derived as `tick * dt` when a trace is rendered.
  */
 import type { SimState } from './types.ts';
+import { hypot } from './orbit.ts';
 
 /** Per-sample deflection above this is a visible kink — the key smoothness metric. */
 export const KINK_THRESHOLD_DEG = 15;
@@ -49,8 +50,8 @@ export class TraceRecorder {
     if (!cap) return;
     this.samples.push({
       tick: state.tick,
-      r: Math.hypot(cap.rx, cap.ry),
-      spd: Math.hypot(cap.vx, cap.vy),
+      r: hypot(cap.rx, cap.ry),
+      spd: hypot(cap.vx, cap.vy),
       defl: cap.defl,
       phase: cap.phase,
       fuel: state.fuel,

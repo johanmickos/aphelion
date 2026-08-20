@@ -17,6 +17,12 @@ export interface LoopCallbacks {
 export interface Loop {
   start(): void;
   stop(): void;
+  /**
+   * Discard accumulated time and restart the clock. Call when resuming after the
+   * page was hidden: the elapsed wall time is real but the player was not there
+   * for it, and replaying it as catch-up ticks makes the ship jump.
+   */
+  resetClock(): void;
 }
 
 export function createLoop(dt: number, maxSteps: number, cb: LoopCallbacks): Loop {
@@ -55,6 +61,10 @@ export function createLoop(dt: number, maxSteps: number, cb: LoopCallbacks): Loo
     stop(): void {
       running = false;
       cancelAnimationFrame(raf);
+    },
+    resetClock(): void {
+      last = performance.now();
+      acc = 0;
     },
   };
 }

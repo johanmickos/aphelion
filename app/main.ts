@@ -1,39 +1,56 @@
 /**
- * Stage 0 app shell.
+ * Stage 1 app shell.
  *
- * Deliberately primitive: this exists to prove the simulation, the fixed-timestep
- * accumulator and the letterboxed camera work in a real browser. It draws bodies
- * and the ship as bare primitives and nothing else — no HUD, no compass, no crash
- * cone, no trail. The renderer proper is Stage 1.
+ * World, bodies and ship are rendered; the HUD (fuel gauge, readout, edge
+ * markers), the release compass and the run lifecycle are still to come.
  */
 import { DEFAULT_CONFIG, FIXED_DT, MAX_CATCHUP_STEPS } from '../src/sim/config.ts';
-import { createInitialState, shipVelocity, shipWorldPos, stepSim } from '../src/sim/step.ts';
+import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 import type { Input } from '../src/sim/types.ts';
 import { createLoop } from '../src/app/loop.ts';
-import {
-  createCamera,
-  fitCamera,
-  followCamera,
-  snapCamera,
-  worldToScreenX,
-  worldToScreenY,
-} from '../src/render/camera.ts';
+import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
+import { centerCamera, createCamera, fitCamera, followCamera } from '../src/render/camera.ts';
+import { Scene } from '../src/render/scene.ts';
+import { captureSnapshot, lerpSnapshot } from '../src/render/snapshot.ts';
+import { RunRecorder } from '../src/app/recorder.ts';
+import { buildReport, serializeReport, summarize } from '../src/app/report.ts';
+
+/**
+ * When this page was loaded. Shown in the diagnostics panel so a stale bundle is
+ * obvious: if the time predates your last edit, press RELOAD.
+ *
+ * A build-time constant would be more precise, but Vite's `define` is not applied
+ * by the dev server, so the identifier survives into the served module and throws.
+ * Load time answers the actual question anyway.
+ */
+const PAGE_LOADED = new Date().toTimeString().slice(0, 8);
+
+/** A single-tick position change beyond this can only be a teleport, not motion. */
+const TELEPORT_DISTANCE = 200;
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
-const cfg = DEFAULT_CONFIG;
-const state = createInitialState(cfg);
-const bounds = fieldBounds(cfg, state.bodies);
-const cam = createCamera(bounds.width);
-snapCamera(cam, shipWorldPos(state).y);
+const sim = DEFAULT_CONFIG;
+const rcfg = DEFAULT_RENDER_CONFIG;
+const state = createInitialState(sim);
+const field = fieldBounds(sim, state.bodies);
+const cam = createCamera(rcfg);
 
-// --- input: edges are what the simulation consumes
+// One seed per session, recorded so a reported frame can be reproduced.
+const seed = (Date.now() ^ 0x9e3779b9) >>> 0;
+const scene = new Scene({ sim, render: rcfg, bodies: state.bodies, field }, seed);
+
+const recorder = new RunRecorder();
+
+// --- input: the simulation consumes edges, not levels
 let held = false;
 let pressedEdge = false;
 let releasedEdge = false;
 canvas.addEventListener('pointerdown', (e) => {
+  // Controls sit above the canvas; a tap on one must not also be a grab.
+  if ((e.target as HTMLElement | null)?.closest('.ctl, #diag')) return;
   e.preventDefault();
   held = true;
   pressedEdge = true;
@@ -46,8 +63,19 @@ const up = (): void => {
 addEventListener('pointerup', up);
 addEventListener('pointercancel', up);
 
-// --- interpolation: keep the previous tick's position to lerp from
-let prev = shipWorldPos(state);
+// Backgrounding is the only pause a phone player actually needs; a button would
+// compete with the game's single input.
+let paused = false;
+addEventListener('visibilitychange', () => {
+  const wasPaused = paused;
+  paused = document.hidden;
+  // Coming back from the background leaves a stale frame timestamp, so the
+  // accumulator would otherwise cash in a burst of catch-up ticks and the ship
+  // would visibly jump. Restart the clock instead of replaying lost time.
+  if (wasPaused && !paused) loop.resetClock();
+});
+
+let prev = captureSnapshot(state, held);
 let curr = prev;
 
 function resize(): void {
@@ -62,89 +90,176 @@ function resize(): void {
 addEventListener('resize', resize);
 resize();
 
+const start = shipWorldPos(state);
+centerCamera(cam, start.x, start.y, field);
+scene.trail.sample(start.x, start.y, 0);
+
 const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
   step(dt) {
+    if (paused) return;
     const input: Input = { held, pressed: pressedEdge, released: releasedEdge };
+    recorder.recordInput(state.tick, pressedEdge, releasedEdge);
     pressedEdge = false;
     releasedEdge = false;
-    stepSim(state, cfg, input, dt);
+
+    stepSim(state, sim, input, dt);
+
     prev = curr;
-    curr = shipWorldPos(state);
+    curr = captureSnapshot(state, held);
+
+    // Any respawn teleports the ship — after a crash, or out of bounds, which
+    // sets no crash flag at all. Detecting the jump covers both, and any future
+    // teleport (a wormhole) for free. Carrying the wake across looks like a smear.
+    const jump = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+    if (jump > TELEPORT_DISTANCE) {
+      scene.trail.clear();
+      centerCamera(cam, curr.x, curr.y, field);
+    }
+
+    // Sampled on the fixed tick so trail length never depends on frame rate.
+    scene.trail.sample(curr.x, curr.y, Math.hypot(curr.vx, curr.vy));
+    recorder.recordTick(state);
   },
   render(alpha, frameDt) {
-    const x = prev.x + (curr.x - prev.x) * alpha;
-    const y = prev.y + (curr.y - prev.y) * alpha;
-    followCamera(cam, y, frameDt);
-    draw(x, y);
+    const snap = lerpSnapshot(prev, curr, alpha);
+    followCamera(cam, rcfg, snap.x, snap.y, field, frameDt);
+    scene.draw(ctx, cam, snap, {
+      timeMs: performance.now(),
+      paused,
+      viewportW: innerWidth,
+      viewportH: innerHeight,
+    });
   },
 });
 loop.start();
 
-function draw(sx: number, sy: number): void {
-  const w = innerWidth;
-  const h = innerHeight;
-  ctx.fillStyle = '#05070d';
-  ctx.fillRect(0, 0, w, h);
+// ---------------------------------------------------------------- diagnostics
+//
+// The flag button stamps the current tick without interrupting play — you press
+// it the moment something feels wrong and keep going. The panel then produces a
+// report that replays the whole session elsewhere, exactly.
+const flagBtn = document.getElementById('flag') as HTMLButtonElement;
+const diagBtn = document.getElementById('diagBtn') as HTMLButtonElement;
+const diagEl = document.getElementById('diag') as HTMLDivElement;
+const diagMeta = document.getElementById('diagMeta') as HTMLDivElement;
+const diagNote = document.getElementById('diagNote') as HTMLTextAreaElement;
+const diagOut = document.getElementById('diagOut') as HTMLTextAreaElement;
+const diagCopy = document.getElementById('diagCopy') as HTMLButtonElement;
+const diagSend = document.getElementById('diagSend') as HTMLButtonElement;
+const diagReload = document.getElementById('diagReload') as HTMLButtonElement;
+const diagBuild = document.getElementById('diagBuild') as HTMLDivElement;
 
-  // letterbox bars: everything outside the design window
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(cam.offsetX, cam.offsetY, cam.designW * cam.scale, cam.designH * cam.scale);
-  ctx.clip();
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, w, h);
+// The game swallows touch (touch-action: none, plus preventDefault on the
+// canvas), so pull-to-refresh does not work on a phone. Without this there is no
+// way to escape a stale bundle short of closing the tab.
+diagReload.addEventListener('click', (e) => {
+  e.stopPropagation();
+  location.reload();
+});
+const diagClose = document.getElementById('diagClose') as HTMLButtonElement;
 
-  // field edges
-  ctx.strokeStyle = 'rgba(255,70,90,.35)';
-  ctx.lineWidth = 1;
-  for (const edge of [bounds.left, bounds.right]) {
-    const ex = worldToScreenX(cam, edge, bounds.left);
-    ctx.beginPath();
-    ctx.moveTo(ex, 0);
-    ctx.lineTo(ex, h);
-    ctx.stroke();
+flagBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  recorder.mark(state.tick);
+  flagBtn.classList.add('hit');
+  flagBtn.textContent = `⚑ ${recorder.markers.length}`;
+  setTimeout(() => flagBtn.classList.remove('hit'), 400);
+});
+
+function refreshReport(): string {
+  const report = buildReport({
+    recorder,
+    config: sim,
+    seed,
+    ticks: state.tick,
+    note: diagNote.value,
+    device: {
+      w: innerWidth,
+      h: innerHeight,
+      dpr: Math.min(devicePixelRatio || 1, 2),
+      ua: navigator.userAgent,
+    },
+  });
+  const text = serializeReport(report);
+  const s = summarize(report);
+  diagMeta.textContent =
+    `${s.seconds.toFixed(1)}s · ${report.ticks} ticks · ${s.grabs} grabs · ` +
+    `${s.marks} flagged · ${report.checks.length} checkpoints\n` +
+    `${(text.length / 1024).toFixed(1)} KB — paste this into the conversation`;
+  diagOut.value = text;
+  // Stale-bundle check: if this timestamp is older than your last edit, the page
+  // needs RELOAD.
+  diagBuild.textContent = `page loaded ${PAGE_LOADED} — press RELOAD if that predates your last edit`;
+  return text;
+}
+
+diagBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  paused = true;
+  refreshReport();
+  diagEl.classList.add('open');
+});
+
+diagNote.addEventListener('input', refreshReport);
+
+diagClose.addEventListener('click', (e) => {
+  e.stopPropagation();
+  diagEl.classList.remove('open');
+  paused = document.hidden;
+  loop.resetClock();
+});
+
+diagCopy.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  const text = refreshReport();
+  let ok = false;
+  try {
+    // Only available in a secure context; a LAN dev server over http is not one,
+    // which is exactly where this gets used. Selecting the text is the fallback
+    // that always works: long-press gives the native Copy.
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch {
+    ok = false;
   }
-
-  for (const b of state.bodies) {
-    const bx = worldToScreenX(cam, b.x, bounds.left);
-    const by = worldToScreenY(cam, b.y);
-    const r = b.R * cam.scale;
-    if (by < -r * 3 || by > h + r * 3) continue;
-    ctx.beginPath();
-    ctx.arc(bx, by, r, 0, Math.PI * 2);
-    ctx.fillStyle = '#1e2740';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(150,175,215,.55)';
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(bx, by, (b.R + cfg.minOrbitGap) * cam.scale, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(130,150,185,.25)';
-    ctx.setLineDash([3, 5]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+  if (!ok) {
+    diagOut.focus();
+    diagOut.setSelectionRange(0, diagOut.value.length);
   }
+  diagCopy.textContent = ok ? 'COPIED ✓' : 'SELECTED — long-press to copy';
+  setTimeout(() => (diagCopy.textContent = 'COPY REPORT'), 2200);
+});
 
-  const px = worldToScreenX(cam, sx, bounds.left);
-  const py = worldToScreenY(cam, sy);
-  const v = shipVelocity(state);
-  ctx.save();
-  ctx.translate(px, py);
-  ctx.rotate(Math.atan2(v.vy, v.vx));
-  ctx.beginPath();
-  ctx.moveTo(9, 0);
-  ctx.lineTo(-6, 5);
-  ctx.lineTo(-3, 0);
-  ctx.lineTo(-6, -5);
-  ctx.closePath();
-  ctx.fillStyle = held ? '#fff' : '#cfdcf2';
-  ctx.fill();
-  ctx.restore();
-
-  ctx.restore();
-
-  // fuel, as a bare bar — the real gauge is Stage 1
-  ctx.fillStyle = 'rgba(255,255,255,.15)';
-  ctx.fillRect(12, 12, 90, 4);
-  ctx.fillStyle = '#54f39a';
-  ctx.fillRect(12, 12, 90 * (state.fuel / cfg.fuelMax), 4);
+// Sending straight to the dev server is the short feedback loop: press it on the
+// phone and the replay analysis appears in the laptop terminal immediately, with
+// no copying, no pasting, and no clipboard-permission problems.
+//
+// Dev only. `import.meta.env.DEV` is a compile-time constant, so this whole block
+// — and the button it reveals — is eliminated from a production build.
+if (import.meta.env.DEV) {
+  diagSend.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const text = refreshReport();
+    diagSend.textContent = 'SENDING…';
+    try {
+      const res = await fetch('/__diag', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: text,
+      });
+      const out = (await res.json()) as { ok: boolean; fidelity?: string; error?: string };
+      if (!out.ok) throw new Error(out.error ?? 'rejected');
+      diagSend.textContent = `SENT ✓ ${out.fidelity ?? ''}`.trim();
+      recorder.clearMarkers();
+      diagNote.value = '';
+      flagBtn.textContent = '⚑';
+    } catch (err) {
+      diagSend.textContent = 'FAILED — use COPY';
+      console.error('diagnostics send failed', err);
+    }
+    setTimeout(() => (diagSend.textContent = 'SEND'), 2600);
+  });
+} else {
+  // Not merely hidden: the button should not exist in a shipped build.
+  diagSend.remove();
 }

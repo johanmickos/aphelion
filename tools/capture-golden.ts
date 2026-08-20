@@ -18,7 +18,7 @@ import { runPrototype } from './prototype-harness.ts';
 import { runPort } from '../test/run-port.ts';
 import { SCENARIOS } from '../test/scenarios.ts';
 import { compare } from './compare.ts';
-import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
+import { PROTOTYPE_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import { DESIGN_H, DESIGN_W } from '../src/sim/world.ts';
 import type { TrajectorySample } from '../src/sim/serialize.ts';
 
@@ -30,7 +30,7 @@ interface Golden {
   capturedFrom: string;
   dt: number;
   design: { w: number; h: number };
-  config: typeof DEFAULT_CONFIG;
+  config: typeof PROTOTYPE_CONFIG;
   scenarios: Array<{ name: string; samples: TrajectorySample[] }>;
 }
 
@@ -41,7 +41,7 @@ function build(): Golden {
     capturedFrom: 'index.html (immutable prototype), driven headlessly at fixed dt',
     dt: FIXED_DT,
     design: { w: DESIGN_W, h: DESIGN_H },
-    config: DEFAULT_CONFIG,
+    config: PROTOTYPE_CONFIG,
     scenarios: SCENARIOS.map((sc) => ({ name: sc.name, samples: runPrototype(sc, FIXED_DT) })),
   };
 }
@@ -61,7 +61,7 @@ if (!check) {
     console.error(`dt changed: golden ${golden.dt} vs current ${FIXED_DT}`);
     failures++;
   }
-  for (const [key, value] of Object.entries(DEFAULT_CONFIG)) {
+  for (const [key, value] of Object.entries(PROTOTYPE_CONFIG)) {
     const was = (golden.config as Record<string, number>)[key];
     if (was !== value) {
       console.error(`config drift: ${key} golden=${was} current=${value}`);
