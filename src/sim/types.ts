@@ -1,0 +1,188 @@
+/**
+ * Simulation types.
+ *
+ * Bodies and pickups are discriminated unions: adding a `kind` makes the compiler
+ * enumerate every site that must handle it (forces, contact, targeting, render).
+ * Stage 0 has exactly one body kind; the union shape is deliberate, not premature.
+ */
+
+export interface Vec {
+  x: number;
+  y: number;
+}
+
+// --------------------------------------------------------------------- bodies
+
+export interface Planet {
+  kind: 'planet';
+  x: number;
+  y: number;
+  /** Surface radius. */
+  R: number;
+  name: string;
+}
+
+export type Body = Planet;
+
+// -------------------------------------------------------------------- contact
+
+/**
+ * How a contact resolves. Stage 0 only ever constructs `bounce`; the other
+ * variants exist so wormholes (teleport), nebulae and belts (drag) can be added
+ * without restructuring the resolver's return type.
+ */
+export type ContactResponse =
+  | { kind: 'bounce'; offset: number; restitution: number; lethal: boolean }
+  | { kind: 'teleport'; to: Vec }
+  | { kind: 'drag'; coef: number }
+  | { kind: 'pass' };
+
+// ---------------------------------------------------------------------- phase
+
+/**
+ * Capture phase.
+ *
+ * NOTE: the prototype documents a `whip` phase but never assigns it — `clear`
+ * carries the entire dive. Reproduced faithfully. See docs/PORT_NOTES.md note 4.
+ */
+export type CapturePhase = 'clear' | 'flyby' | 'settle' | 'orbit';
+
+/** A frozen orbit: the geometric ellipse the phase clock sweeps. */
+export interface Orbit {
+  /** Semi-major axis. */
+  a: number;
+  /** Eccentricity. */
+  e: number;
+  /** Argument of periapsis (absolute angle at which periapsis sits). */
+  argp: number;
+  /** Sweep direction, +1 or -1. */
+  dir: number;
+}
+
+// -------------------------------------------------------------------- entities
+
+export interface Ship {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  alive: boolean;
+  /** Transient escape burst, applied on top of velocity during drift and decaying. */
+  burstX: number;
+  burstY: number;
+  burstT: number;
+}
+
+export interface Capture {
+  phase: CapturePhase;
+  /** Index into SimState.bodies of the grabbed body. */
+  planet: number;
+
+  /** Position and velocity, in coordinates relative to the grabbed body. */
+  rx: number;
+  ry: number;
+  vx: number;
+  vy: number;
+
+  grabR: number;
+  grabSpeed: number;
+  aim: number;
+  inboundFrac: number;
+  /** Minimum permitted orbit radius: body.R + minOrbitGap. */
+  minR: number;
+  natPeri: number;
+  isFlyby: boolean;
+
+  prevR: number;
+  prevDR: number;
+  passedPeri: boolean;
+  periR: number;
+  apoR: number;
+
+  clearFramesLeft: number;
+  clearDvx: number;
+  clearDvy: number;
+
+  /** Peak specific orbital energy seen during the dive, captured before any floor clamp. */
+  whipE: number | undefined;
+  whipVmax: number;
+
+  orbit: Orbit | null;
+  /** Current true anomaly along the frozen orbit. */
+  theta: number;
+  /** Current angular sweep rate (rad/s). */
+  phaseSpeed: number;
+  /** Sweep rate implied by the dive's true periapsis speed. */
+  phaseSpeedReal: number;
+  phaseMul: number;
+  /** Frozen angular momentum of the oval. */
+  Lfrozen: number | undefined;
+  rPeri: number;
+
+  settleT: number;
+  settleProgress: number;
+  tightness: number;
+
+  /** Peak boost potential banked at periapsis. */
+  boostFull: number;
+  /** Live boost value: ramps up, then decays. */
+  boost: number;
+  /** Seconds since the orbit froze. */
+  boostT: number;
+
+  /** Ran dry mid-circularization; the ship putters out with a weak, boostless release. */
+  puttered: boolean;
+
+  /** Per-sample heading deflection, for the trace recorder. Not physics. */
+  lastAngle: number;
+  defl: number;
+}
+
+export interface CrashState {
+  active: boolean;
+  t: number;
+  x: number;
+  y: number;
+}
+
+// ----------------------------------------------------------------------- state
+
+export interface SimState {
+  /** Monotonic tick counter. All timing derives from this; never wall clock. */
+  tick: number;
+  ship: Ship;
+  /** Null while drifting. */
+  capture: Capture | null;
+  bodies: Body[];
+  /** Ship fuel. Persists across captures and regenerates during drift. */
+  fuel: number;
+  crash: CrashState;
+  /**
+   * The current hold has already been resolved by the simulation (a putter-out),
+   * so the pointer-up that follows must be swallowed. The prototype achieved this
+   * by having the sim write to its input variable; input is an input here, so the
+   * fact is recorded in state instead. See docs/PORT_NOTES.md note 7.
+   */
+  holdConsumed: boolean;
+}
+
+// ----------------------------------------------------------------------- input
+
+/** Edge-triggered input for one tick, plus the current hold level. */
+export interface Input {
+  /** Pointer is currently down. */
+  held: boolean;
+  /** Pointer went down on this tick. */
+  pressed: boolean;
+  /** Pointer came up on this tick. */
+  released: boolean;
+}
+
+export const NO_INPUT: Readonly<Input> = Object.freeze({
+  held: false,
+  pressed: false,
+  released: false,
+});
+
+/** A recorded input edge, addressed by tick so replays are exact. */
+export type InputEvent = { tick: number; kind: 'press' | 'release' };

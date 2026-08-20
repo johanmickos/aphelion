@@ -1,0 +1,8 @@
+index.html
+
+# author-owned handoff material: not ours to restyle
+docs/DESIGN.md
+docs/VISION.md
+golden/
+dist/
+pnpm-lock.yaml

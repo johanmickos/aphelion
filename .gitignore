@@ -23,3 +23,10 @@ scratch/
 
 # design history: kept locally for reference, deliberately untracked
 docs/VISION.md
+
+# build
+dist/
+.vite/
+
+# scratch
+scratchpad/

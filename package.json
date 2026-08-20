@@ -1,0 +1,37 @@
+{
+  "name": "aphelion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A zen game about swinging a spaceship through gravity",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:lan": "./tools/dev.sh",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "portable": "node tools/check-portability.ts",
+    "golden:capture": "node tools/capture-golden.ts",
+    "golden:check": "node tools/capture-golden.ts --check",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm portable && pnpm golden:check && pnpm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/node": "^22.13.0",
+    "eslint": "^9.20.0",
+    "eslint-config-prettier": "^10.0.1",
+    "prettier": "^3.5.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5"
+  }
+}
