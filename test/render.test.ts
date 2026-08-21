@@ -20,6 +20,7 @@ import { GAUGE, drawFuelGauge, drawScore, formatScore, readoutLines } from '../s
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
 import { LEVEL, SHOUT } from '../src/render/accolade.ts';
+import { FUEL_RAMP } from '../src/render/hud.ts';
 import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
 import {
   AIM_MAX_TARGETS,
@@ -1358,8 +1359,11 @@ describe('the fuel gauge pills', () => {
     return out.sort((a, b) => a.y - b.y);
   }
 
-  const rgb = (c: string): [number, number, number] =>
-    /rgb\((\d+),(\d+),(\d+)\)/.exec(c)!.slice(1).map(Number) as [number, number, number];
+  const rgb = (c: string): [number, number, number] => [
+    parseInt(c.slice(1, 3), 16),
+    parseInt(c.slice(3, 5), 16),
+    parseInt(c.slice(5, 7), 16),
+  ];
 
   it('draws one pill per graduation the ticks used to mark', () => {
     expect(pills(sim.fuelMax)).toHaveLength(GAUGE.pills);
@@ -1376,7 +1380,22 @@ describe('the fuel gauge pills', () => {
     const quarter = pills(sim.fuelMax / 4).map((p) => p.color);
     expect(full).toEqual(empty);
     expect(full).toEqual(quarter);
-    expect(new Set(full).size, 'two pills share a colour').toBe(GAUGE.pills);
+  });
+
+  it('steps through a fixed palette rather than a continuous ramp', () => {
+    // Ten pills sampling a lerp is a gradient wearing pills: ten colours a few
+    // units apart, which the eye reads as one wash. The banding only does work
+    // if there are few enough steps to count.
+    const colors = pills(sim.fuelMax).map((p) => p.color);
+    expect(new Set(colors).size).toBe(FUEL_RAMP.length);
+    for (const c of colors) expect(FUEL_RAMP).toContain(c);
+    // every step is used, and the repeats are adjacent — a colour that reappears
+    // after a gap would read as a mistake rather than as a band
+    for (const step of FUEL_RAMP) {
+      const at = colors.indexOf(step);
+      expect(at, `${step} is never drawn`).toBeGreaterThanOrEqual(0);
+      expect(colors.lastIndexOf(step) - at).toBe(colors.filter((c) => c === step).length - 1);
+    }
   });
 
   it('runs the ramp green at the top to red at the bottom', () => {
@@ -1387,7 +1406,8 @@ describe('the fuel gauge pills', () => {
     expect(bottom[0] - bottom[2], 'the bottom of the tank is not the reddest').toBeGreaterThan(
       top[0] - top[2],
     );
-    // monotone all the way down, so no pill reads as out of order
+    // monotone all the way down, so no pill reads as out of order — steps repeat
+    // but never go back up
     const greens = p.map((x) => rgb(x.color)[1]);
     for (let i = 1; i < greens.length; i++) expect(greens[i]).toBeLessThanOrEqual(greens[i - 1]!);
   });

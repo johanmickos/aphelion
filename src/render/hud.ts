@@ -39,7 +39,33 @@ export interface ReadoutLine {
 export const GAUGE = { x: 16, w: 15, h: 78, bottomGap: 44, pills: 10, gap: 2, radius: 2 } as const;
 
 /**
- * The fuel ramp: green at a full tank, amber at half, red at empty.
+ * The fuel ramp: seven steps, red at an empty tank through amber to green.
+ *
+ * A LIST, not a lerp. Ten pills sampling a continuous ramp gave ten colours a
+ * few units apart, which is a gradient wearing pills — the eye reads it as one
+ * smooth wash and the banding does no work. Seven named steps read as a ladder,
+ * and a ladder is countable: "two from the bottom" is a thing you can see
+ * without comparing anything to anything.
+ *
+ * The values are the old lerp sampled at seven even points, endpoints included,
+ * so not one hue moved — only the number of them did. They are written out
+ * rather than computed because a palette you can read is a palette you can edit,
+ * which is the same reason `LEVEL` in `accolade.ts` is a table.
+ *
+ * Ordered empty-first, so the index climbs with the tank.
+ */
+export const FUEL_RAMP: readonly string[] = Object.freeze([
+  '#FF465A', // empty
+  '#FF7550',
+  '#FFA346',
+  '#FFD23C', // half
+  '#C6DD5B',
+  '#8DE87B',
+  '#54F39A', // full
+]);
+
+/**
+ * The step a given height of the bar sits on.
  *
  * Sampled by HEIGHT rather than by level, so each pill keeps one solid colour for
  * the whole run and the red at the bottom of the stack is visible long before the
@@ -47,11 +73,14 @@ export const GAUGE = { x: 16, w: 15, h: 78, bottomGap: 44, pills: 10, gap: 2, ra
  * is what the ramp meant when the whole bar was one lerp of it — nothing is lost,
  * and the scale is now permanently on screen instead of being inferred from a
  * colour that has nothing beside it to be judged against.
+ *
+ * `floor` rather than `round`: across ten pills it lands the seven steps in a
+ * 1-2-1-2-1-2-1 pattern, which is symmetric. Rounding gives 1-1-2-2-1-2-1, which
+ * is the same seven colours arranged so that they look like a mistake.
  */
-export function fuelColor(at: number): [number, number, number] {
-  return at > 0.5
-    ? lerpColor([84, 243, 154], [255, 210, 60], (1 - at) / 0.5)
-    : lerpColor([255, 210, 60], [255, 70, 90], (0.5 - at) / 0.5);
+export function fuelColor(at: number): string {
+  const i = Math.floor(at * FUEL_RAMP.length);
+  return FUEL_RAMP[Math.max(0, Math.min(FUEL_RAMP.length - 1, i))]!;
 }
 
 /** Alpha of a pill the tank has not reached, and of one it has. */
@@ -159,13 +188,12 @@ export function drawFuelGauge(
   const slot = gh / GAUGE.pills;
   const pillH = slot - GAUGE.gap * s;
   for (let i = 0; i < GAUGE.pills; i++) {
-    const [r, g, b] = fuelColor((i + 0.5) / GAUGE.pills);
     const lit = Math.max(0, Math.min(1, frac * GAUGE.pills - i));
     const top = gbot - i * slot - pillH;
     // The flash rides on the LIT part only, so a pill can never dim below the
     // unlit floor and the stack keeps its order at every point in the pulse.
     ctx.globalAlpha = PILL_DIM + (PILL_LIT - PILL_DIM) * lit * flash;
-    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillStyle = fuelColor((i + 0.5) / GAUGE.pills);
     ctx.beginPath();
     ctx.roundRect(gx, top, gw, pillH, GAUGE.radius * s);
     ctx.fill();
