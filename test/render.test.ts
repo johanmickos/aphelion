@@ -996,6 +996,78 @@ describe('compass targets point up the climb', () => {
   });
 });
 
+describe('the compass ring settles', () => {
+  /**
+   * Reported from a real session: "the orbit circle that the planet gauges are on
+   * did a kind of bounce, shrinking inwards and then growing outwards again."
+   *
+   * Measured on that capture the ring ran 122 -> 85 through the dive, which is the
+   * part worth keeping, then 85 -> 97 -> 85 over the settle as the ship swept out
+   * to apoapsis and back. This drives a real capture through the real
+   * `drawCompass` and reads the ring radius back off the arcs it emits.
+   */
+  function ringTrace(): Array<{ tick: number; frozen: boolean; ring: number }> {
+    const sim = DEFAULT_CONFIG;
+    const state = createInitialState(sim);
+    const bodies = state.bodies;
+    const out: Array<{ tick: number; frozen: boolean; ring: number }> = [];
+    let held = false;
+
+    for (let t = 0; t < 320; t++) {
+      const pressed = t === 98;
+      const released = t === 260;
+      if (pressed) held = true;
+      if (released) held = false;
+      stepSim(state, sim, { held: held || pressed, pressed, released }, FIXED_DT);
+      const cap = state.capture;
+      if (!cap) continue;
+
+      const snap = captureSnapshot(state, held, sim);
+      const c = cam();
+      const anchor = bodies[cap.planet]!;
+      centerCamera(c, snap.x, snap.y, fieldBounds(sim, bodies));
+      const r = recordingContext();
+      drawCompass(r.ctx, c, sim, rcfg, snap, bodies, 0);
+
+      const cxs = toScreenX(c, anchor.x);
+      const cys = toScreenY(c, anchor.y);
+      const radii = (r.calls('arc') as Array<[string, number, number, number, number, number]>)
+        .filter((o) => Math.abs(o[1] - cxs) < 1e-6 && Math.abs(o[2] - cys) < 1e-6 && o[5] > 6)
+        .map((o) => o[3] / c.scale);
+      if (radii.length === 0) continue;
+      const frozen = cap.orbit !== null && (cap.phase === 'settle' || cap.phase === 'orbit');
+      out.push({ tick: t, frozen, ring: Math.min(...radii) });
+    }
+    return out;
+  }
+
+  it('stops moving once the orbit is real', () => {
+    const trace = ringTrace();
+    const settled = trace.filter((x) => x.frozen);
+    expect(settled.length, 'the capture never froze an orbit').toBeGreaterThan(30);
+    const lo = Math.min(...settled.map((x) => x.ring));
+    const hi = Math.max(...settled.map((x) => x.ring));
+    // Before the fix this spread was ~12 world units and took about a second to
+    // play out, on top of a curve the player is trying to read.
+    expect(hi - lo, `ring moved ${(hi - lo).toFixed(1)} units after freezing`).toBeLessThan(0.5);
+  });
+
+  it('still sweeps inward through the dive', () => {
+    const diving = ringTrace().filter((x) => !x.frozen);
+    expect(diving.length).toBeGreaterThan(10);
+    expect(diving[0]!.ring).toBeGreaterThan(diving[diving.length - 1]!.ring + 10);
+  });
+
+  it('does not jump at the moment it freezes', () => {
+    // The switch is continuous by construction: at periapsis the ship IS at
+    // rPeri, so both expressions agree on the tick they change over.
+    const trace = ringTrace();
+    const i = trace.findIndex((x) => x.frozen);
+    expect(i).toBeGreaterThan(0);
+    expect(Math.abs(trace[i]!.ring - trace[i - 1]!.ring)).toBeLessThan(1.5);
+  });
+});
+
 describe('compass rings encode distance', () => {
   const bodies = createBodies(DEFAULT_CONFIG);
 

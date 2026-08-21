@@ -67,7 +67,14 @@ export interface RenderConfig {
   boostPeakFrom: number;
 
   // --- capture visuals ---
-  /** Compass ring live-orbit bob: 0 = still ring, 1 = full peri/apo pump. */
+  /**
+   * How far the compass ring is drawn inward with the ship DURING THE DIVE.
+   * 0 holds it at the predicted periapsis, 1 pins it to the ship.
+   *
+   * Dive-only. Once the orbit freezes the ring is anchored to `cap.rPeri` and
+   * stops moving — see the note at its use in `compass.ts` for why following a
+   * settled orbit was unreadable.
+   */
   gaugeFollow: number;
   /** Radius of the nearest target's ring, above the settled orbit. */
   compassRingInner: number;

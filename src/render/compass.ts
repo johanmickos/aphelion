@@ -88,10 +88,26 @@ export function drawCompass(
   // Provisional while the orbit is still being flown into existence.
   const fade = frozen ? 1 : 0.45;
 
-  const orbitRnow = orbitRadius(orbit, rPeri, shipAng, tighten);
-  // Anchored to the radius the orbit settles at, so the rings do not pump in and
-  // out as the ship sweeps its orbit.
-  const gaugeR = cap.rPeri * (1 - rcfg.gaugeFollow) + orbitRnow * rcfg.gaugeFollow;
+  /**
+   * Ring height: swept while diving, fixed once the orbit is real.
+   *
+   * The follow term used to apply throughout, and it was doing two jobs with one
+   * number. Diving, it draws the ring inward with the ship, which is the part
+   * worth keeping. Frozen, it made the ring pump out and back as the ship swept
+   * periapsis to apoapsis and home again — measured on a real capture, 85 out to
+   * 97 and back over about a second, on top of a curve the player is trying to
+   * read. It only ever stopped because `tighten` rounded the orbit out from under
+   * it.
+   *
+   * `cap.rPeri` is fixed from the freeze onward, so anchoring to it there gives
+   * one number and nothing to follow. The switch is continuous by construction:
+   * at periapsis the ship IS at `rPeri`, so both expressions agree on the tick
+   * they change over.
+   */
+  const gaugeR = frozen
+    ? cap.rPeri
+    : rPeri * (1 - rcfg.gaugeFollow) +
+      orbitRadius(orbit, rPeri, shipAng, tighten) * rcfg.gaugeFollow;
   const s = cam.scale;
   const cx = toScreenX(cam, anchor.x);
   const cy = toScreenY(cam, anchor.y);
