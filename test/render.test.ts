@@ -19,7 +19,7 @@ import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture
 import { drawFuelGauge, drawScore, formatScore, readoutLines } from '../src/render/hud.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
-import { AIM, CLOSE_PX } from '../src/score/index.ts';
+import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
 import {
   AIM_MAX_TARGETS,
   AIM_RANGE,
@@ -556,11 +556,11 @@ describe('floating score popups', () => {
     const r = recordingContext();
     p.draw(r.ctx, cam());
     expect(texts(r)).toContain('+680');
-    // the word is drawn twice — a dark rim under the fill, since it sits over
-    // planets and stars
+    // Just the word — no label naming the axis, because the word names it. Each
+    // is stroked and filled, so it appears twice.
     const words = texts(r).filter((t) => !t.startsWith('+'));
     expect(words.length).toBeGreaterThan(0);
-    expect(words[0]).toMatch(/^[A-Z]+$/);
+    expect(WORDS.aim[1]).toContain(words[0]);
   });
 
   it('marks a deduction as one, and never gives it a word', () => {
@@ -608,6 +608,77 @@ describe('floating score popups', () => {
     expect(t.some((x) => x === 'WILD CHILD!')).toBe(true);
     // a shout is not about points, so nothing numeric may ride along with it
     expect(t.some((x) => /^[+-]/.test(x))).toBe(false);
+  });
+
+  it('grades by colour, and names the quality in words', () => {
+    // Colour carries HOW GOOD, never WHICH quality — six category hues read in
+    // peripheral vision over a moving starfield was past what anyone tells apart,
+    // and it had to be learned before it meant anything. The label says it
+    // outright instead.
+    const shot = (over: Partial<Parameters<Popups['spawn']>[0]>) => {
+      const p = new Popups();
+      p.spawn(award(over), 195, 0);
+      const r = recordingContext();
+      p.draw(r.ctx, cam());
+      const fills = r.ops
+        .filter((o) => o[0] === '=fillStyle')
+        .map((o) => String(o[1]))
+        .filter((v) => v.startsWith('#'));
+      return { texts: texts(r), color: fills[fills.length - 1] };
+    };
+
+    // Same rung, different quality -> same colour, and the WORD carries which.
+    const aimGreat = shot({ aim: AIM.tier2, kind: 'link' });
+    const closeGreat = shot({ kind: 'grab', clearance: CLOSE_PX.tier2, skim: 999 });
+    expect(aimGreat.color).toBe(closeGreat.color);
+    expect(aimGreat.texts.some((t) => WORDS.aim[1].includes(t))).toBe(true);
+    expect(closeGreat.texts.some((t) => WORDS.close[1].includes(t))).toBe(true);
+
+    // different level -> different colour
+    const aimGood = shot({ aim: AIM.tier1, kind: 'link' });
+    expect(aimGood.color).not.toBe(aimGreat.color);
+  });
+
+  it('climbs the ladder in size as well as colour', () => {
+    // The ordinal has to survive a player who cannot separate the hues, and a
+    // player looking at the planet rather than the ship.
+    const sizeOf = (over: Partial<Parameters<Popups['spawn']>[0]>) => {
+      const p = new Popups();
+      p.spawn(award(over), 195, 0);
+      const r = recordingContext();
+      p.draw(r.ctx, cam());
+      // `600 15px ui-monospace, ...` — the weight comes first, so match the px.
+      const fonts = r.ops
+        .filter((o) => o[0] === '=font')
+        .map((o) => Number(/([\d.]+)px/.exec(String(o[1]))?.[1] ?? 0));
+      return Math.max(...fonts);
+    };
+    const good = sizeOf({ kind: 'link', aim: AIM.tier1 });
+    const great = sizeOf({ kind: 'link', aim: AIM.tier2 });
+    const exceptional = sizeOf({ kind: 'link', aim: AIM.tier2, timing: PEAK.tier2 });
+    expect(great).toBeGreaterThan(good);
+    expect(exceptional).toBeGreaterThan(great);
+  });
+
+  it('names which event a superlative was for', () => {
+    // The one case that could not be read before: one gold word for both a
+    // superlative arrival and a superlative departure.
+    const p = new Popups();
+    p.spawn(award({ kind: 'link', aim: AIM.tier2, timing: PEAK.tier2 }), 195, 0);
+    p.spawn(award({ kind: 'grab', clearance: CLOSE_PX.tier2, skim: -30, tick: 101 }), 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    // No label says which event it was; the two word lists are disjoint, and the
+    // moment each fires is the other half of the answer.
+    const t = texts(r);
+    expect(
+      t.some((x) => WORDS.super[1].includes(x)),
+      'no release superlative',
+    ).toBe(true);
+    expect(
+      t.some((x) => WORDS.super[0].includes(x)),
+      'no grab superlative',
+    ).toBe(true);
   });
 
   it('never piles up more than a readable few', () => {
@@ -687,11 +758,49 @@ describe('the score band', () => {
     drawScore(r.ctx, cam(), sc, snapAt(110));
     const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     expect(texts.some((t) => t.includes('+1,240'))).toBe(true);
-    const detail = texts.find((t) => t.includes('CLOSE'))!;
+    // A link reports how the ship LEFT. How it arrived was reported, and paid,
+    // at the grab award — see the two tests below.
+    const detail = texts.find((t) => t.includes('PEAK'))!;
     expect(detail).toContain('P3→P4');
-    expect(detail).toContain('84');
     expect(detail).toContain('91');
     expect(detail).toContain('96');
+    expect(detail).not.toContain('CLOSE');
+  });
+
+  it('never announces a grab as a coasting penalty', () => {
+    // This is the regression: `kind` grew a third value and the band still asked
+    // `=== 'link'`, so every grab was drawn red and captioned COASTED PAST — the
+    // player told off for the capture they had just made.
+    const r = recordingContext();
+    const sc = scoreWith({
+      score: 200,
+      lastAward: award({ kind: 'grab', points: 34, body: 'P1', multiplier: 1 }),
+    });
+    drawScore(r.ctx, cam(), sc, snapAt(110));
+    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(texts.some((t) => t.includes('COASTED PAST'))).toBe(false);
+    expect(texts.some((t) => t.includes('+34'))).toBe(true);
+    expect(texts.some((t) => t.includes('GRAB'))).toBe(true);
+    // and it must not be drawn in the deduction colour
+    const reds = r.ops.filter((o) => o[0] === '=fillStyle' && String(o[1]) === '#ff5566');
+    expect(reds).toHaveLength(0);
+  });
+
+  it('reports only the qualities the event actually has', () => {
+    // A grab has no aim or peak yet; showing them as zeroes would read as a bad
+    // release rather than one that has not happened.
+    const r = recordingContext();
+    drawScore(
+      r.ctx,
+      cam(),
+      scoreWith({ lastAward: award({ kind: 'grab', aim: 0, timing: 0 }) }),
+      snapAt(110),
+    );
+    const detail = (r.calls('fillText') as Array<[string, string]>)
+      .map((o) => o[1])
+      .find((t) => t.includes('CLOSE'))!;
+    expect(detail).not.toContain('AIM');
+    expect(detail).not.toContain('PEAK');
   });
 
   it('says what a deduction was for, rather than only that one happened', () => {

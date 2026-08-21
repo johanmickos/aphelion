@@ -23,8 +23,6 @@ const LIFE = 1.15;
 const LIFE_SUPER = 1.6;
 const LIFE_SHOUT = 1.4;
 
-/** The reckless shout. Unused elsewhere in the palette, and loud on purpose. */
-const SHOUT_COLOR = '#ff45c8';
 /** World units risen over a full life. */
 const RISE = 34;
 /**
@@ -48,22 +46,7 @@ const FADE = 0.45;
  */
 const MAX_LIVE = 4;
 
-/** Colour per category. Drawn from the palette each quality already owns. */
-const COLOR: Record<Praise['category'], string> = {
-  // the compass align glow is this green, so aim praise matches the thing that
-  // was glowing while the player lined the release up
-  aim: '#54f39a',
-  // the BOOST PEAK readout is this violet
-  peak: '#b98cff',
-  close: '#ff9a3c',
-  // Unused elsewhere in the game's palette, so a nerve grab never reads as any
-  // of the other three at a glance.
-  nerve: '#3fe0ff',
-  super: '#ffe27a',
-};
-
-const ROUTINE = '#ffcd32';
-const DEDUCTION = '#ff5566';
+import { DEDUCTION, LEVEL, ROUTINE, SHOUT_COLOR } from './accolade.ts';
 
 interface Popup {
   x: number;
@@ -174,14 +157,14 @@ export class Popups {
         continue;
       }
 
+      const style = p.deduction ? DEDUCTION : p.praise ? LEVEL[p.praise.level] : ROUTINE;
+
       if (p.praise) {
-        const sup = p.praise.category === 'super';
-        // A brief overshoot on the way in. Only the superlative gets it — on an
-        // ordinary word it reads as a wobble rather than as emphasis.
-        const pop = sup ? 1 + 0.35 * Math.max(0, 1 - u * 6) : 1;
-        const size = (sup ? 17 : p.praise.tier === 2 ? 14 : 12) * pop;
-        ctx.font = `600 ${size * s}px ui-monospace, monospace`;
-        ctx.fillStyle = COLOR[p.praise.category];
+        // A brief overshoot on the way in. Only the top of the ladder gets it —
+        // on an ordinary word it reads as a wobble rather than as emphasis.
+        const pop = p.praise.level === 'exceptional' ? 1 + 0.35 * Math.max(0, 1 - u * 6) : 1;
+        ctx.font = `600 ${style.size * pop * s}px ui-monospace, monospace`;
+        ctx.fillStyle = style.color;
         // A dark rim rather than a filled plate: the word sits over planets and
         // stars, and a box that size would punch a hole in the scene.
         ctx.lineWidth = 3 * s;
@@ -192,9 +175,9 @@ export class Popups {
 
       // The number sits below the word, always, praised or not.
       if (p.points === null) continue;
-      const numY = y + (p.praise ? 14 : 0) * s;
-      ctx.font = `600 ${(p.praise ? 12 : 13) * s}px ui-monospace, monospace`;
-      ctx.fillStyle = p.deduction ? DEDUCTION : p.praise ? COLOR[p.praise.category] : ROUTINE;
+      const numY = y + (p.praise ? style.size + 2 : 0) * s;
+      ctx.font = `600 ${(p.praise ? style.size - 2 : style.size) * s}px ui-monospace, monospace`;
+      ctx.fillStyle = style.color;
       ctx.lineWidth = 3 * s;
       ctx.strokeStyle = 'rgba(0,0,0,.55)';
       const text = `${p.points >= 0 ? '+' : ''}${formatScore(p.points)}`;

@@ -34,10 +34,28 @@ import type { ScoreAward } from './types.ts';
 /** Which quality earned the word. `super` is two or more at once. */
 export type PraiseCategory = 'close' | 'aim' | 'peak' | 'nerve' | 'super';
 
+/**
+ * How good it was, on one ladder shared by every category.
+ *
+ * Separate from the category on purpose. Colour used to encode WHICH quality —
+ * six hues plus two states, read in peripheral vision over a moving starfield,
+ * which is past what anyone reliably tells apart and which has to be learned
+ * before it means anything. Meanwhile the thing a player actually asks — "how
+ * good was that?" — had no channel at all beyond a 12px/14px/17px size step you
+ * cannot judge without the other size beside it.
+ *
+ * So the ladder takes the colour, because it is ordinal and a ladder teaches
+ * itself, and the category is carried by the word.
+ */
+export type PraiseLevel = 'good' | 'great' | 'exceptional';
+
 export interface Praise {
   category: PraiseCategory;
-  /** 1 for good, 2 for excellent. `super` is always 2. */
-  tier: 1 | 2;
+  level: PraiseLevel;
+  /**
+   * The whole message. There is no separate label naming the axis, because a word
+   * that has to be told what it means is the wrong word — see `WORDS`.
+   */
   word: string;
 }
 
@@ -77,30 +95,59 @@ export const NERVE_SKIM_PX = 0;
  * while the player is deciding when to let go of the next one. Two words is a
  * sentence and a sentence is something you stop to read.
  */
+/**
+ * One list per category and rung.
+ *
+ * EVERY WORD NAMES ITS OWN AXIS. That is the whole constraint, and it replaced a
+ * dim `CLOSE ·` / `BOOST ·` prefix that said the axis out loud. The prefix worked
+ * and was the wrong fix: a vocabulary that needs a caption is a vocabulary that
+ * has not been chosen carefully enough, and the caption costs a line of text
+ * beside a moving ship every single time.
+ *
+ * So the families are drawn from four different registers, and the register is
+ * the signal:
+ *
+ *   close    proximity    — you shaved it. GRAZED, HAIRLINE, WHISKER.
+ *   nerve    composure    — you were going to hit it and you waited. BRINK, CLUTCH.
+ *   aim      marksmanship — you pointed it. BULLSEYE, THREADED, DEADEYE.
+ *   peak     launch       — you let go at the right instant. SLINGSHOT, REDLINE.
+ *
+ * The two that must never blur are `aim` and `peak`, because they are the two
+ * that can fire on the same event. Marksmanship and launch are about as far apart
+ * as English gets, so they do not.
+ *
+ * Single words, still: they are read in peripheral vision while deciding when to
+ * let go of the next planet. The reckless shout in `reckless.ts` is the one
+ * deliberate exception.
+ */
 export const WORDS: Readonly<
   Record<PraiseCategory, readonly [readonly string[], readonly string[]]>
 > = Object.freeze({
   close: [
-    ['TIGHT', 'SNUG', 'HUGGED', 'GRAZED'],
-    ['THREADED', 'HAIRLINE', 'SHAVED'],
+    ['SNUG', 'HUGGED', 'GRAZED', 'SKIMMED'],
+    ['SHAVED', 'HAIRLINE', 'WHISKER'],
   ],
-  aim: [
-    ['SHARP', 'KEYED', 'LINED', 'TRUE'],
-    ['BULLSEYE', 'PINPOINT', 'NAILED'],
-  ],
-  peak: [
-    ['PUNCHY', 'CRISP', 'SNAPPED'],
-    ['PEAKED', 'REDLINE', 'SLINGSHOT'],
-  ],
-  // One list, used at both tiers: a nerve grab is a threshold you cleared, not a
-  // quality you scored well on, so there is no "slightly braver" version of it.
   nerve: [
     ['NERVE', 'CLUTCH', 'BRINK', 'STEEL'],
     ['NERVE', 'CLUTCH', 'BRINK', 'STEEL'],
   ],
+  aim: [
+    ['TRUE', 'LINED', 'SIGHTED', 'TRACKING'],
+    ['BULLSEYE', 'PINPOINT', 'THREADED', 'DEADEYE'],
+  ],
+  peak: [
+    ['TIMED', 'SNAPPED', 'WHIPPED'],
+    ['SLINGSHOT', 'REDLINE', 'CATAPULT'],
+  ],
+  // The two slots here are the two EVENTS, not two rungs — the only entry where
+  // that is true. A superlative arrival and a superlative departure are different
+  // achievements and used to share one gold word, which made the rarest thing in
+  // the game the only one that could not say what it was for. Nothing labels them
+  // now either; the lists are disjoint and the moment they fire is the other half
+  // of the answer.
   super: [
-    ['SUBLIME', 'MASTERFUL', 'IMMACULATE', 'TEXTBOOK'],
-    ['SUBLIME', 'MASTERFUL', 'IMMACULATE', 'TEXTBOOK'],
+    ['SURGICAL', 'FLAWLESS', 'IMMACULATE'],
+    ['TEXTBOOK', 'SUBLIME', 'MASTERFUL'],
   ],
 });
 
@@ -180,15 +227,19 @@ function praiseGrab(award: ScoreAward): Praise | null {
   // The rare one on this side: a late press on a collision line that was ALSO in
   // the tightest tenth. Nerve alone only needs `CLOSE_PX.tier1`.
   if (nerve && close === 2) {
-    return { category: 'super', tier: 2, word: pick(WORDS.super[0], award.tick, 'super') };
+    return {
+      category: 'super',
+      level: 'exceptional',
+      word: pick(WORDS.super[0], award.tick, 'super'),
+    };
   }
   if (nerve) {
-    return { category: 'nerve', tier: 2, word: pick(WORDS.nerve[0], award.tick, 'nerve') };
+    return { category: 'nerve', level: 'great', word: pick(WORDS.nerve[0], award.tick, 'nerve') };
   }
   if (close === 1 || close === 2) {
     return {
       category: 'close',
-      tier: close,
+      level: close === 2 ? 'great' : 'good',
       word: pick(WORDS.close[close - 1]!, award.tick, 'close'),
     };
   }
@@ -204,7 +255,11 @@ function praiseRelease(award: ScoreAward): Praise | null {
   // time and the marker sits at a fixed angle, so landing on both means the dive
   // was shaped to bring them together.
   if (aim === 2 && peak === 2) {
-    return { category: 'super', tier: 2, word: pick(WORDS.super[0], award.tick, 'super') };
+    return {
+      category: 'super',
+      level: 'exceptional',
+      word: pick(WORDS.super[1], award.tick, 'super'),
+    };
   }
   // The boost window is the one almost nobody hits, so it is named first when
   // both fire.
@@ -214,7 +269,11 @@ function praiseRelease(award: ScoreAward): Praise | null {
   ] as const) {
     if (tier === 0) continue;
     const t: 1 | 2 = tier;
-    return { category, tier: t, word: pick(WORDS[category][t - 1]!, award.tick, category) };
+    return {
+      category,
+      level: t === 2 ? 'great' : 'good',
+      word: pick(WORDS[category][t - 1]!, award.tick, category),
+    };
   }
   return null;
 }

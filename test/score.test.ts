@@ -537,11 +537,11 @@ describe('the word a grab earns', () => {
 
   it('speaks up for an arrival in the tightest quarter', () => {
     expect(praiseFor(grab({ clearance: REAL.clearance.p25 }))?.category).toBe('close');
-    expect(praiseFor(grab({ clearance: REAL.clearance.p25 }))?.tier).toBe(1);
+    expect(praiseFor(grab({ clearance: REAL.clearance.p25 }))?.level).toBe('good');
   });
 
-  it('reserves tier 2 for the tightest tenth', () => {
-    expect(praiseFor(grab({ clearance: REAL.clearance.p10 }))?.tier).toBe(2);
+  it('reserves the higher rung for the tightest tenth', () => {
+    expect(praiseFor(grab({ clearance: REAL.clearance.p10 }))?.level).toBe('great');
   });
 
   it('stays quiet on an arrival wider than usual', () => {
@@ -604,9 +604,9 @@ describe('the word a release earns', () => {
     expect(praiseFor(link({ aim: REAL.aim.p75 }))?.category).toBe('aim');
   });
 
-  it('reserves tier 2 for the top tenth', () => {
-    expect(praiseFor(link({ timing: REAL.timing.p90 }))?.tier).toBe(2);
-    expect(praiseFor(link({ aim: REAL.aim.p90 }))?.tier).toBe(2);
+  it('reserves the higher rung for the top tenth', () => {
+    expect(praiseFor(link({ timing: REAL.timing.p90 }))?.level).toBe('great');
+    expect(praiseFor(link({ aim: REAL.aim.p90 }))?.level).toBe('great');
   });
 
   it('fires at each threshold and not a hair below', () => {
@@ -666,6 +666,36 @@ describe('the word a release earns', () => {
         WORDS[category][1]!.length,
       );
     }
+  });
+
+  it('never uses one word for two different qualities', () => {
+    /**
+     * This is what lets the word stand alone.
+     *
+     * There used to be a dim `CLOSE ·` / `BOOST ·` prefix naming the axis. It was
+     * dropped because a vocabulary that needs a caption has not been chosen
+     * carefully enough — which only holds while each word belongs to exactly one
+     * family. A word appearing in two makes it ambiguous again, silently, with
+     * nothing left to disambiguate it.
+     */
+    const owner = new Map<string, string>();
+    for (const [category, tiers] of Object.entries(WORDS)) {
+      for (const w of new Set(tiers.flat())) {
+        const held = owner.get(w);
+        expect(held, `"${w}" is used by both ${held} and ${category}`).toBeUndefined();
+        owner.set(w, category);
+      }
+    }
+  });
+
+  it('gives the two qualities that can fire together the most distant vocabularies', () => {
+    // `aim` and `peak` are the pair that can land on the same release, so they
+    // are the two that must never blur. Marksmanship against launch.
+    const aim = new Set(WORDS.aim.flat());
+    const peak = new Set(WORDS.peak.flat());
+    for (const w of aim) expect(peak.has(w), `"${w}" is in both`).toBe(false);
+    expect(aim.size).toBeGreaterThan(3);
+    expect(peak.size).toBeGreaterThan(3);
   });
 
   it('keeps every word a single word', () => {

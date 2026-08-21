@@ -259,9 +259,20 @@ built out of physics that already existed — the score only names it.
 and is useless as one: measured over 112 real releases it sits at 0.99+ for three
 quarters of them, so it paid every capture the same.
 
-A link well above the player's usual standard on one of those qualities also earns
-a **word** — `TIGHT`, `PINPOINT`, `REDLINE` — floating up beside the ship next to
-the points. Two qualities at their top tier at once earns a rare superlative
+An event well above the player's usual standard on one of those qualities also
+earns a **word** — `HAIRLINE`, `BULLSEYE`, `SLINGSHOT` — floating up beside the
+ship next to the points.
+
+Colour on those words means **how good it was, and nothing else**: grey, blue,
+green, gold, the rarity ladder every player already knows. It used to mean _which_
+quality, which is six hues read in peripheral vision over a moving starfield —
+past what anyone tells apart, and all of it learned before it meant anything,
+while "how good was that?" had no channel at all. Which quality it was is carried
+by the word instead, and every word names its own axis: proximity for the grab
+(`GRAZED`, `WHISKER`), composure for a nerve grab (`BRINK`, `CLUTCH`),
+marksmanship for aim (`PINPOINT`, `DEADEYE`), launch for the boost window
+(`SLINGSHOT`, `REDLINE`). `src/render/accolade.ts` is the single table the score
+band and the popups both read, so the two cannot drift apart. Two qualities at their top tier at once earns a rare superlative
 instead.
 
 One word is not a quality but a **conjunction**: a _nerve grab_ (`NERVE`,

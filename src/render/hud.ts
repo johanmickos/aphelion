@@ -9,7 +9,11 @@
  */
 import type { SimConfig } from '../sim/config.ts';
 import type { GrabResult } from '../sim/types.ts';
-import type { ScoreState } from '../score/types.ts';
+import type { ScoreAward, ScoreState } from '../score/types.ts';
+import type { Praise } from '../score/index.ts';
+import { praiseFor } from '../score/index.ts';
+import type { AccoladeStyle } from './accolade.ts';
+import { DEDUCTION, LEVEL, ROUTINE } from './accolade.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
@@ -34,6 +38,46 @@ const SCORE = { bestY: 15, y: 34, multY: 49, awardY: 65, detailY: 77 } as const;
 
 /** Ticks an award stays on screen. 1.6s at 60Hz. */
 const AWARD_TICKS = 96;
+
+interface BandLine {
+  style: AccoladeStyle;
+  detail: string;
+  mult: string;
+}
+
+/**
+ * How each kind of award reads in the band.
+ *
+ * Colour comes from `accolade.ts`, the same table the floating popups use, so the
+ * two can never disagree again — the band used to colour by EVENT and the popup
+ * by CATEGORY, which put the same link on screen as green in one place and violet
+ * in the other.
+ *
+ * A record rather than a ternary on `kind === 'link'`, for the reason
+ * `REFUSAL_LINE` below is one: this WAS a two-way boolean, and when a third kind
+ * arrived it fell through to the else branch and announced every grab in red as
+ * "COASTED PAST P1 — STREAK LOST" — the player told off for the capture they had
+ * just made. Adding a kind now fails to compile until it has an entry.
+ */
+const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => BandLine> = {
+  grab: (a, p) => ({
+    style: p ? LEVEL[p.level] : ROUTINE,
+    // Arrival qualities only. The release has not happened yet, and reporting its
+    // fields as zeroes would read as a bad release rather than an absent one.
+    detail: `${a.body}  GRAB · CLOSE ${pct(a.close)}`,
+    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
+  }),
+  link: (a, p) => ({
+    style: p ? LEVEL[p.level] : ROUTINE,
+    detail: `${a.body}  PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
+    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
+  }),
+  miss: (a) => ({
+    style: DEDUCTION,
+    detail: `COASTED PAST ${a.body} — STREAK LOST`,
+    mult: '',
+  }),
+};
 
 function lerpColor(
   a: readonly [number, number, number],
@@ -366,27 +410,25 @@ export function drawScore(
   }
   // Hold, then fade over the last third.
   const fade = Math.min(1, Math.max(0, (AWARD_TICKS - age) / (AWARD_TICKS / 3)));
-  const win = a.kind === 'link';
   ctx.globalAlpha = fade;
 
+  const praise = praiseFor(a);
+  const band = BAND[a.kind](a, praise);
+
   ctx.font = `600 ${15 * s}px ui-monospace, monospace`;
-  ctx.fillStyle = win ? '#54f39a' : '#ff5566';
-  const mult = win && a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '';
+  ctx.fillStyle = band.style.color;
+  // The band carries the same word as the popup beside the ship, so the two are
+  // answering the same question in the same vocabulary.
+  const named = praise ? `  ${praise.word}` : '';
   ctx.fillText(
-    `${a.points >= 0 ? '+' : ''}${formatScore(a.points)}${mult}`,
+    `${a.points >= 0 ? '+' : ''}${formatScore(a.points)}${band.mult}${named}`,
     cx,
     cam.offsetY + SCORE.awardY * s,
   );
 
   ctx.font = `${9 * s}px ui-monospace, monospace`;
-  ctx.fillStyle = win ? 'rgba(140,200,170,.85)' : 'rgba(255,140,155,.85)';
-  ctx.fillText(
-    win
-      ? `${a.body}  CLOSE ${pct(a.close)} · PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`
-      : `COASTED PAST ${a.body} — STREAK LOST`,
-    cx,
-    cam.offsetY + SCORE.detailY * s,
-  );
+  ctx.fillStyle = band.style.labelColor;
+  ctx.fillText(band.detail, cx, cam.offsetY + SCORE.detailY * s);
   ctx.globalAlpha = 1;
   ctx.restore();
 }
