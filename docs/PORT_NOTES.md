@@ -34,17 +34,22 @@ _Fix:_ integrate the natural path forward over a short horizon and test whether 
 actually enters the surface, then drive both the visual and the refusal from that
 one result so they can never disagree.
 
-### 2 — Periapsis floor bounce
+### 2 — Periapsis floor bounce **[FIXED — see 18]**
 
 `src/sim/step.ts` · the `minR` clamp in `stepPhysical`
 
-A dive that reaches the minimum-orbit floor takes one sharp deflection as the
-clamp zeroes its inward radial velocity and the settle engages.
+A dive that reaches the minimum-orbit floor took one sharp deflection as the clamp
+zeroed its inward radial velocity and the settle engaged. Measured rather than
+asserted: the `tangential grab` scenario reached the floor exactly
+(`r / minR = 1.0000`) and produced a single **46.4°** deflection in `settle`, and
+that number was pinned in `test/invariants.test.ts` so that fixing it would fail
+there loudly and specifically.
 
-Now measured rather than asserted: the `tangential grab` scenario reaches the
-floor exactly (`r / minR = 1.0000`) and produces a single **46.4°** deflection in
-`settle`. Every other scenario stays under 15°, the kink threshold. This is pinned
-in `test/invariants.test.ts` so that fixing it fails there specifically.
+It did. The clamp was never the defect — note 18 has the diagnosis: captures
+reached by the flyby-conversion path never received their clearance impulse, so
+they aimed below the surface and the floor caught them. The floor is now unreached
+by every scenario, and `test/invariants.test.ts` asserts that instead of pinning
+the kink.
 
 ### 3 — `whipTimeout` was declared but never implemented
 
@@ -442,8 +447,9 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 31 · render 48 · camera 30
-         diagnostics 13 · backtrack 11 · world 9 · tune 6
+tests    port-equality 11 · invariants 32 · render 48 · camera 30
+         diagnostics 13 · backtrack 11 · world 9 · tune 6 · clearance 6
+         166 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
