@@ -13,7 +13,7 @@ import {
   serializeReport,
   summarize,
 } from '../src/app/report.ts';
-import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
+import { DEFAULT_CONFIG, FIXED_DT, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
 import { replayReport } from '../tools/replay-core.ts';
@@ -251,6 +251,30 @@ describe('report round trip', () => {
 
     const { seen } = replay(text);
     for (const [tick, fp] of report.checks) expect(seen.get(tick)).toBe(fp);
+  });
+
+  it('fills a key added since the report from the prototype, not the defaults', () => {
+    // A report recorded before a flag existed has no opinion about it, and the
+    // two wrong ways to resolve that both fail quietly: the current default
+    // replays an old session under new behaviour and calls it faithful, and
+    // `undefined` turns every arithmetic use of the key into NaN. The prototype
+    // value is what the code did before the flag, by construction of the split.
+    const { config, ...rest } = buildReport({
+      recorder: new RunRecorder(),
+      config: DEFAULT_CONFIG,
+      seed: 1,
+      ticks: 0,
+      note: '',
+      device: DEVICE,
+    });
+    const older = { ...rest, config: { ...config } } as typeof rest & { config: SimConfig };
+    delete (older.config as unknown as Record<string, unknown>).crashConeSeverityFloor;
+
+    const resolved = configFromReport(older);
+    expect(resolved.crashConeSeverityFloor).toBe(PROTOTYPE_CONFIG.crashConeSeverityFloor);
+    expect(resolved.crashConeSeverityFloor).not.toBe(DEFAULT_CONFIG.crashConeSeverityFloor);
+    // and everything the report DID carry is still its own
+    expect(resolved.bodySpacing).toBe(DEFAULT_CONFIG.bodySpacing);
   });
 
   it('carries raw values so a cross-engine replay can still be verified', () => {

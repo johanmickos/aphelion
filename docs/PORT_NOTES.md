@@ -34,6 +34,10 @@ _Fix:_ integrate the natural path forward over a short horizon and test whether 
 actually enters the surface, then drive both the visual and the refusal from that
 one result so they can never disagree.
 
+**Partly addressed in 19**, which removed the severity floor that was suppressing
+the distance term. The ray is still a straight line; the refusal now just reaches
+a lot less far.
+
 ### 2 — Periapsis floor bounce **[FIXED — see 18]**
 
 `src/sim/step.ts` · the `minR` clamp in `stepPhysical`
@@ -443,6 +447,78 @@ polynomial replacements would be ~200 lines for no measurable gain.
 
 ---
 
+### 19 — The crash cone's severity floor sat above its own threshold **[FIXED]**
+
+`src/sim/capture.ts` · `crashCone()` · reported from two phone sessions
+
+`crashCone` returns `max(0, min(1, max(0.4, closeF)))` and `inCrashCone` refuses
+above `0.35`. The floor is higher than the threshold, so `closeF` — the entire
+"how close are you really" term — could never bring the result under the gate.
+The refusal was binary: any forward ray intersection within `crashConeRange`
+refused, at any distance within it and at any speed. Tuning `crashConeRange`
+70 → 50 moved the edge of the band but could not restore the gradient inside it.
+
+Measured by replaying every report in `diagnostics/` — 24 sessions, 322 grab
+presses:
+
+| crash-cone refusals ever recorded | 10 |
+| --- | --- |
+| distance above the surface | 28 · 34 · 38 · 41 · 41 · 43 · 46 · 46 · 48 · 50 px |
+| followed by a crash | 10 / 10, within 5–18 ticks (0.08–0.30s) |
+| survivable if the grab were allowed | 10 / 10, each bottoming out 0.0–0.1px above the minimum orbit |
+
+Every one sat in the outer half of a 50px band, and not one was unrecoverable.
+The gate has never refused a grab that could not be flown; it has converted ten
+survivable states into ten deaths, on exactly the deepest and highest-scoring
+approaches. It also contradicts what a grab does: `applyClearance` lifts periapsis
+to `minR` on every bound capture, so the cone predicts a straight-line impact for
+a ship that stops travelling in a straight line the instant it presses.
+
+_Fixed_ by making the floor configurable — `crashConeSeverityFloor`, 0.4 in
+PROTOTYPE_CONFIG and 0 in DEFAULT_CONFIG. At 0 the distance term decides and the
+refusal keeps the inner ~32px, which is a real too-late zone. Note 1 is still
+open: the ray is still straight.
+
+### 20 — A press took the nearest body, not the one it was arriving at **[FIXED]**
+
+`src/sim/capture.ts` · `nearestBody()` · reported from a phone session
+
+"Behind me and receding" and "ahead of me and closing" are the same number to a
+distance comparison. A ship at 311 px/s leaving one planet for the next pressed
+with the previous planet 120px behind it and the next 179px ahead, and was handed
+the one behind — which, being unbound and outbound, became a flyby that burned 62
+fuel over 93 ticks and captured nothing.
+
+Over the same 322 recorded presses, 28 aimed at a body the ship was receding from
+while another in range was closing.
+
+_Fixed_ with `grabLeadTime`, 0 in PROTOTYPE_CONFIG and 0.2s in DEFAULT_CONFIG:
+the distances are compared from `pos + vel·grabLeadTime` instead of `pos`. A lead
+rather than a heading test or a closing-speed rule, because those need a threshold
+and a threshold is a cliff — a body would cross from "behind" to "ahead" through an
+arbitrary line. Displacing the query point is continuous in position and velocity
+and costs nothing at rest, which is what preserves the deliberate re-grab of the
+planet behind you: it flips 7 of the 322 presses and none below 216 px/s.
+
+### 21 — A report predating a config key replayed under the new behaviour
+
+`src/app/report.ts` · `configFromReport()` · found while shipping 19 and 20
+
+A report carries its config in full, but a key added after it was recorded is
+simply absent. The function returned `r.config` verbatim, so the new key arrived
+as `undefined` — `Math.max(undefined, x)` is `NaN`, and `NaN > 0.35` is false, so
+every crash-cone refusal in every older report silently stopped happening and the
+replay still graded itself FAITHFUL.
+
+_Fixed_ by resolving missing keys from PROTOTYPE_CONFIG. That is not a guess: under
+the config split every new key is a flag that is off in the prototype and on in the
+default, so the prototype value **is** what the code did before the key existed.
+Resolving from DEFAULT_CONFIG would have been the same bug with better manners.
+The build-skew banner now prints the resolved value too, so it names what the
+session behaved as rather than `undefined`.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -466,9 +542,9 @@ scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
 tests    port-equality 11 · invariants 32 · render 75 · camera 30
-         diagnostics 17 · backtrack 11 · world 9 · tune 7 · clearance 6
-         score 52 · input 8
-         258 total
+         diagnostics 18 · backtrack 11 · world 9 · tune 7 · clearance 6
+         score 52 · input 8 · grab-target 8
+         267 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

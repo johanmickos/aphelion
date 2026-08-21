@@ -40,13 +40,29 @@ import { circSpeed, clearanceDv, escapeSpeed, hypot, naturalPeriapsis } from './
 
 export type { GrabResult } from './types.ts';
 
-/** Index of the body nearest the ship. Returns -1 if there are none. */
-export function nearestBody(state: SimState): number {
+/**
+ * Index of the body a press would take. Returns -1 if there are none.
+ *
+ * `lead` seconds of the ship's own velocity are added to its position before the
+ * distances are compared, so the question asked is "which body am I arriving at"
+ * rather than "which body am I beside". At lead 0 this is exactly nearest-body,
+ * which is what the prototype did and what PROTOTYPE_CONFIG still asks for.
+ *
+ * The lead is deliberately not a cone, a heading test, or a closing-speed rule.
+ * Those all need a threshold, and a threshold is a cliff the player falls off:
+ * a body drifts from "behind me" to "ahead of me" through an arbitrary line.
+ * Displacing the query point is continuous in both position and velocity, and it
+ * costs nothing at rest — a ship that is not moving has no next planet, and gets
+ * the nearest one.
+ */
+export function nearestBody(state: SimState, lead = 0): number {
+  const x = state.ship.x + state.ship.vx * lead;
+  const y = state.ship.y + state.ship.vy * lead;
   let best = -1;
   let bd = 1e9;
   for (let i = 0; i < state.bodies.length; i++) {
     const p = state.bodies[i]!;
-    const d = hypot(state.ship.x - p.x, state.ship.y - p.y);
+    const d = hypot(x - p.x, y - p.y);
     if (d < bd) {
       bd = d;
       best = i;
@@ -62,6 +78,11 @@ export function nearestBody(state: SimState): number {
  * NOTE: the ray is a straight line but the real path curves under gravity, so
  * this over-warns on dives that would capture cleanly. Reproduced faithfully;
  * making it gravity-aware is PORT_NOTES note 1.
+ *
+ * The severity this returns only reaches the refusal threshold below
+ * `crashConeSeverityFloor`; the prototype's floor of 0.4 sits above it and so
+ * suppresses the distance term entirely. See the note on that key in config.ts
+ * for what that measured out to.
  */
 export function crashCone(cfg: SimConfig, state: SimState, body: Body): number {
   const { ship } = state;
@@ -80,7 +101,7 @@ export function crashCone(cfg: SimConfig, state: SimState, body: Body): number {
   const t = -b - Math.sqrt(disc);
   if (t <= 0) return 0;
   const closeF = 1 - (d - body.R) / Math.max(1, cfg.crashConeRange);
-  return Math.max(0, Math.min(1, Math.max(0.4, closeF)));
+  return Math.max(0, Math.min(1, Math.max(cfg.crashConeSeverityFloor, closeF)));
 }
 
 export function inCrashCone(cfg: SimConfig, state: SimState, body: Body): boolean {
@@ -91,18 +112,18 @@ export function inCrashCone(cfg: SimConfig, state: SimState, body: Body): boolea
  * The body a grab would take right now, and why it would be refused if it would.
  *
  * Factored out of `beginCapture` so that "a grab was on offer" has exactly one
- * definition. The scorer asks this question on every drifting tick — coasting
- * past a planet costs points, and penalising a player for passing up a grab the
- * game itself would have refused is worse than not penalising at all. A second
- * copy of these four tests would drift from this one the first time either moved.
+ * definition — a second copy of these four tests would drift from this one the
+ * first time either moved. It was written for the scorer, which used to ask on
+ * every drifting tick because coasting past a planet cost points; that penalty
+ * is gone, and this is now the grab path's own answer.
  *
- * Note the nearest-body rule is part of the answer, not an implementation detail:
- * a press takes the NEAREST body, so a reachable planet that is not the nearest
- * one was never actually on offer.
+ * Note the targeting rule is part of the answer, not an implementation detail: a
+ * press takes ONE body, so a reachable planet that is not that one was never
+ * actually on offer.
  */
 export function grabTarget(state: SimState, cfg: SimConfig): { index: number; result: GrabResult } {
   if (state.fuel <= 0.5) return { index: -1, result: 'refused-no-fuel' };
-  const pi = nearestBody(state);
+  const pi = nearestBody(state, cfg.grabLeadTime);
   if (pi < 0) return { index: -1, result: 'refused-no-body' };
   const p = state.bodies[pi]!;
   if (cfg.grabRange > 0) {

@@ -117,10 +117,29 @@ export interface SimConfig {
   proceduralLayout: boolean;
   /** Vertical gap between generated bodies, in world units, before jitter. */
   bodySpacing: number;
+  /**
+   * Seconds of velocity a press looks ahead when choosing which body to take.
+   * 0 takes the body that is nearest right now.
+   *
+   * Raw nearest-distance hands a fast ship the planet it has just left, because
+   * "behind me and receding" and "ahead of me and closing" are the same number.
+   * Looking ahead scales with speed for free: a drifting ship barely moves in
+   * `grabLeadTime`, so deliberately re-grabbing the body behind you still works.
+   */
+  grabLeadTime: number;
 
   // --- crash ---
   /** How close (px beyond the surface) the crash cone reaches. Gates grab refusal. */
   crashConeRange: number;
+  /**
+   * Lower bound on crash-cone severity while the heading ray hits a surface.
+   *
+   * The prototype's 0.4 sits ABOVE the 0.35 refusal threshold, which makes the
+   * distance term inert and the gate binary: any forward intersection within
+   * `crashConeRange` refuses, at any distance and any speed. 0 lets the distance
+   * term decide, which is what it was written to do.
+   */
+  crashConeSeverityFloor: number;
   /** Seconds to hold on a crash before respawning. */
   crashPause: number;
   /** Only near-parallel grazes survive; anything steeper kills. */
@@ -174,8 +193,10 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   grabRange: 0,
   proceduralLayout: false,
   bodySpacing: 0,
+  grabLeadTime: 0,
 
   crashConeRange: 70,
+  crashConeSeverityFloor: 0.4,
   crashPause: 0.7,
   crashGrazeDot: 0.18,
 } satisfies SimConfig);
@@ -212,6 +233,29 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
  *                           over-warns anyway because it tests a straight ray
  *                           against a curved path (PORT_NOTES 1), so pulling the
  *                           refusal in partly compensates until that is fixed.
+ *  - crashConeSeverityFloor 0.4 -> 0   That compensation was not enough, because
+ *                           the floor made the range irrelevant. `crashCone`
+ *                           clamps its severity up to 0.4 and `inCrashCone`
+ *                           refuses above 0.35, so the distance term could never
+ *                           reach the threshold and the gate was binary. Measured
+ *                           over every recorded session: all ten crash-cone
+ *                           refusals sat 28-50px above the surface, all ten were
+ *                           followed by a crash within 0.30s, and forcing each
+ *                           grab through produces a clean capture that bottoms
+ *                           out 0.0-0.1px above the minimum-orbit floor. The cone
+ *                           had never once refused a grab that was unrecoverable.
+ *                           At 0 the distance term decides and the refusal keeps
+ *                           its inner ~32px, which is a real too-late zone.
+ *  - grabLeadTime 0 -> 0.2  A press took the nearest body by raw distance, so a
+ *                           ship at 300 px/s leaving one planet for the next was
+ *                           handed the one behind it — an instant flyby that
+ *                           burns the tank and captures nothing. Over 322 recorded
+ *                           presses, 28 aimed at a body the ship was receding from
+ *                           while another in range was closing; a 0.2s lead flips
+ *                           7 of them and every flip has that same signature.
+ *                           Nothing flips below 216 px/s, so a slow re-grab of the
+ *                           planet behind you is untouched, which is the point:
+ *                           the lead is a distance only when you are moving.
  *  - flybyBrake 320 -> 600   Holding a too-fast grab sheds speed nearly twice as
  *  - flybyFuelPerSec 54 -> 40  hard, for less per second. Together they make a
  *                           flyby 2.5x cheaper to convert: the fuel it costs to
@@ -265,6 +309,8 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   grabRange: 560,
   proceduralLayout: true,
   bodySpacing: 360,
+  grabLeadTime: 0.2,
+  crashConeSeverityFloor: 0,
 } satisfies SimConfig);
 
 /**
@@ -274,7 +320,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 5;
+export const SIM_VERSION = 6;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

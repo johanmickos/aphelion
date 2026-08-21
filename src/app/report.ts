@@ -6,7 +6,7 @@
  * recording of what happened — it is the recipe that produces it.
  */
 import type { SimConfig } from '../sim/config.ts';
-import { FIXED_DT, SIM_VERSION } from '../sim/config.ts';
+import { FIXED_DT, PROTOTYPE_CONFIG, SIM_VERSION } from '../sim/config.ts';
 import type { Checkpoint, InputRecord, Marker, RunRecorder } from './recorder.ts';
 
 export const REPORT_SCHEMA = 3;
@@ -113,9 +113,21 @@ export function parseReport(text: string): DiagReport {
   return r;
 }
 
-/** The exact config a session ran with — carried in full, so nothing is inferred. */
+/**
+ * The config a session ran with, carried in full so nothing is inferred.
+ *
+ * Keys added after the report was recorded are the one exception, and they are
+ * filled from PROTOTYPE_CONFIG rather than the current defaults. That is not a
+ * guess: every new key goes in as a flag that is off in PROTOTYPE_CONFIG and on
+ * in DEFAULT_CONFIG (see the config split in AGENTS.md), so the prototype value
+ * IS what the code did before the key existed. Filling from DEFAULT_CONFIG would
+ * replay an old session under new behaviour and quietly call it faithful; leaving
+ * the key `undefined` is worse still, because arithmetic on it yields NaN and a
+ * comparison against NaN fails silently in whichever direction the code happens
+ * to be written.
+ */
 export function configFromReport(r: DiagReport): SimConfig {
-  return r.config;
+  return { ...PROTOTYPE_CONFIG, ...r.config };
 }
 
 export interface ReportSummary {

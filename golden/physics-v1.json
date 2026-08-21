@@ -42,7 +42,9 @@
   "grabRange": 0,
   "proceduralLayout": false,
   "bodySpacing": 0,
+  "grabLeadTime": 0,
   "crashConeRange": 70,
+  "crashConeSeverityFloor": 0.4,
   "crashPause": 0.7,
   "crashGrazeDot": 0.18
  },

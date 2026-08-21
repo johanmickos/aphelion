@@ -107,6 +107,9 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
   let bestQ = 0;
   let holdT = 0;
   let taken = new Set<number>();
+  /** What each life was worth at the instant it was zeroed. */
+  const lives: number[] = [];
+  let prevScore = 0;
 
   for (let t = 0; t < ticks; t++) {
     let pressed = false;
@@ -154,9 +157,11 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
     const out = scoreTick(sc, state, cfg, scfg);
     awards.push(...out.awards);
     shouts.push(...out.shouts);
+    if (sc.score === 0 && prevScore > 0) lives.push(prevScore);
+    prevScore = sc.score;
     if (state.ending.active) taken = new Set();
   }
-  return { score: sc, awards, shouts, state };
+  return { score: sc, awards, shouts, state, lives };
 }
 
 /**
@@ -379,9 +384,14 @@ describe('the streak multiplier', () => {
   });
 
   it('keeps a best, so a death has something to show for what it took', () => {
-    const { score } = pilot(4000);
+    const { score, lives } = pilot(4000);
+    expect(lives.length, 'the pilot never lost a life with points on the board').toBeGreaterThan(0);
     expect(score.best).toBeGreaterThan(0);
-    expect(score.best).toBeGreaterThan(score.score);
+    // The high-water mark across every life that ended and the one still being
+    // flown. Asserting `best > score` instead would only hold while the pilot
+    // happens not to finish on its best life, which is a fact about the flight
+    // path and not about the score.
+    expect(score.best).toBe(Math.max(...lives, score.score));
   });
 
   it('starts the next life clean rather than judging it on the last one', () => {

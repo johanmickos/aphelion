@@ -329,7 +329,10 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   }
   out.push(`  device     ${report.device.w}x${report.device.h} @${report.device.dpr}x`);
   out.push(`  session    ${s.seconds.toFixed(1)}s · ${report.ticks} ticks · ${s.grabs} grabs`);
-  const delta = configDelta(report.config, DEFAULT_CONFIG);
+  // Against the resolved config, not the raw one: a key added since the report
+  // was recorded is missing from `report.config`, and printing "session ran
+  // undefined" hides the value the session actually behaved as.
+  const delta = configDelta(configFromReport(report), DEFAULT_CONFIG);
   out.push(
     `  config     ${delta.length ? `${delta.length} value(s) differ from current defaults` : 'matches current defaults'}`,
   );
