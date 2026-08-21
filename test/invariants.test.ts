@@ -95,10 +95,39 @@ describe('invariants', () => {
      * where the floor turned out to be a symptom of captures never receiving
      * their clearance impulse. The exception is gone because the cause is.
      */
-    it.each(ALL)('%s: no kinks', (name) => {
+    /**
+     * The one scenario that is not smooth, and why it is allowed to be.
+     *
+     * `flybyBrake` went 320 -> 600 to make a too-fast grab recoverable. The brake
+     * turns the heading in proportion to its strength, so the cost is a visible
+     * kink while it is biting. Swept over the braked-flyby scenario:
+     *
+     *     brake  320  400  450  500  550  600  700
+     *     defl   2.9  6.9 10.0 12.2 14.4 16.4 19.2   degrees
+     *
+     * 15 is the visible-kink line, so it crosses between 550 and 600. The fuel
+     * rate has no bearing on it — 40 and 54 both give 16.4.
+     *
+     * This is a deliberate trade, not a defect: the kink lasts a few ticks during
+     * a save that previously just failed. It is pinned rather than excused, so
+     * dropping the brake back below ~550, or ramping the brake in so it stops
+     * snapping the heading, fails here and asks for this block to go.
+     */
+    const KINKY = 'fast unbound grab -> flyby, braked';
+
+    it.each(ALL.filter((n) => n !== KINKY))('%s: no kinks', (name) => {
       const o = observe(name);
       expect(o.kinkPhases, `kinks appeared in ${o.kinkPhases.join(',')}`).toEqual([]);
       expect(o.maxDefl).toBeLessThan(KINK_THRESHOLD_DEG);
+    });
+
+    it(`${KINKY}: kinks only while the brake is biting`, () => {
+      const o = observe(KINKY);
+      // Nowhere but the flyby: a kink in the settle or the dive would be a
+      // different bug wearing this exception as cover.
+      expect([...new Set(o.kinkPhases)]).toEqual(['flyby']);
+      expect(o.maxDefl).toBeGreaterThan(KINK_THRESHOLD_DEG);
+      expect(o.maxDefl, 'the brake kink got worse — see the sweep above').toBeLessThan(18);
     });
 
     it('no scenario reaches the minimum-orbit floor any more', () => {

@@ -482,9 +482,22 @@ describe('HUD', () => {
   });
 
   it('escalates only when the brake genuinely is not winning', () => {
-    const texts = readoutLines(sim, flybyAt(0.6), true).map((l) => l.text);
+    // 0.75 rather than 0.6: `flybyBrake` 320 -> 600 moved the line where a save
+    // stops being routine from 0.28 to 0.70. Measured, a grab 65% over escape
+    // now converts in 37 ticks for 46 fuel — nothing to shout about — while 80%
+    // over costs essentially the whole tank. See FLYBY_HARD in hud.ts.
+    const texts = readoutLines(sim, flybyAt(0.75), true).map((l) => l.text);
     expect(texts.some((t) => t.includes('TOO FAST'))).toBe(true);
     expect(texts.some((t) => t.includes('costs a lot of fuel'))).toBe(true);
+  });
+
+  it('stays calm about a save that is now routine', () => {
+    // The whole point of the threshold: 0.6 used to be an alarm and is now a
+    // 46-fuel recovery. A readout that cries wolf is the thing the original
+    // measurement existed to prevent.
+    const texts = readoutLines(sim, flybyAt(0.6), true).map((l) => l.text);
+    expect(texts.some((t) => t.includes('TOO FAST'))).toBe(false);
+    expect(texts.some((t) => t.includes('BRAKING'))).toBe(true);
   });
 
   it('says the tank is empty rather than blaming speed', () => {

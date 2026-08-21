@@ -162,10 +162,26 @@ const REFUSAL_TICKS = 60;
 
 /**
  * Above this fraction over escape speed, braking a flyby is genuinely expensive
- * and often fails. Below it, holding converts quickly and cheaply. Drawn from a
- * real session: every conversion sat at 0.09-0.22, every failure at 0.31-0.82.
+ * and often fails. Below it, holding converts quickly and cheaply.
+ *
+ * Was 0.28, drawn from a real session where every conversion sat at 0.09-0.22 and
+ * every failure at 0.31-0.82. That measurement died with `flybyBrake` 320 -> 600
+ * and `flybyFuelPerSec` 54 -> 40, which made a save 2.5x cheaper per unit of
+ * speed shed. Re-measured by holding a grab across the band:
+ *
+ *     over escape   converts in   fuel spent
+ *          13%          13t           30
+ *          33%          32t           42
+ *          50%          41t           48
+ *          65%          37t           46
+ *          73%          80t           74
+ *          80%         111t           95      <- the tank, near enough
+ *
+ * So the line sits at 0.70 now. Left at 0.28 the readout shouted "TOO FAST" and
+ * "holding costs a lot of fuel" at grabs that recover in half a second for 40% of
+ * the tank, which is exactly the false alarm the 0.28 measurement existed to stop.
  */
-const FLYBY_HARD = 0.28;
+const FLYBY_HARD = 0.7;
 
 /**
  * Why a grab did nothing. A record rather than a ternary chain, so adding a way

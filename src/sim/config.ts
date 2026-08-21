@@ -212,6 +212,24 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
  *                           over-warns anyway because it tests a straight ray
  *                           against a curved path (PORT_NOTES 1), so pulling the
  *                           refusal in partly compensates until that is fixed.
+ *  - flybyBrake 320 -> 600   Holding a too-fast grab sheds speed nearly twice as
+ *  - flybyFuelPerSec 54 -> 40  hard, for less per second. Together they make a
+ *                           flyby 2.5x cheaper to convert: the fuel it costs to
+ *                           shed a given speed is rate/brake, which falls from
+ *                           0.169 to 0.067 per px/s. Deliberately a large move —
+ *                           "too fast" was the failure mode that ended runs
+ *                           without ever feeling like a decision, and the brake
+ *                           is the only thing the player can do about it.
+ *
+ *                           NOTE: `FLYBY_HARD` in src/render/hud.ts is the
+ *                           readout's line between "braking" and "TOO FAST", and
+ *                           it was measured under the OLD brake. It is now
+ *                           pessimistic — see the comment there.
+ *  - fuelRegen 15 -> 30     Twice as fast to recover a drained tank. The tank
+ *                           only empties when a flyby brake drains it, so this
+ *                           and the two above are one decision: how expensive a
+ *                           save is, and how long you wait before you can try
+ *                           again.
  *  - fieldWidthFrac 1.20 -> 1.90  The corridor felt constrictive, and a wider
  *                           field gives more room to find a planet to curve away
  *                           from before reaching a boundary.
@@ -236,6 +254,9 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   ...PROTOTYPE_CONFIG,
   minOrbitGap: 12,
   crashConeRange: 50,
+  flybyBrake: 600,
+  flybyFuelPerSec: 40,
+  fuelRegen: 30,
   fieldWidthFrac: 1.9,
   bodyCount: 32,
   backtrackLimit: 520,
