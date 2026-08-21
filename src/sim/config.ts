@@ -67,6 +67,39 @@ export interface SimConfig {
   fuelMax: number;
   fuelRegen: number;
   fuelPerSec: number;
+  /**
+   * Fuel returned by a release that earned its boost, scaled linearly by
+   * `cap.boost / cap.boostFull` at the moment of release. 0 disables the refund.
+   *
+   * WHY IT EXISTS. `fuelRegen` only runs while not captured, so the tank pays for
+   * time spent NOT playing: a fast chain starves and a pause refuels. Measured
+   * over two recorded sessions an earned capture costs a median 23-26 fuel, and a
+   * 32-grab chain ran the tank to 4.3 with 17% of the life under a quarter tank —
+   * so the resource was punishing exactly the thing the streak multiplier
+   * rewards. This is the other half of that economy: a chain that is flown well
+   * pays for itself.
+   *
+   * WHY IT IS SCALED AND NOT FLAT. A flat refund is a subsidy, not a reward. Swept
+   * against both sessions, a flat 3 per link — 13% of a capture — already erases
+   * every low-fuel moment in the 70-second chain, because a long chain collects it
+   * many times. Scaling by the boost envelope keeps the condition the point:
+   * at the measured median release (0.15) it returns about 4, at a good one (0.5)
+   * about 12, and only near the peak does a capture fully pay for itself.
+   *
+   * WHY THE BOOST ENVELOPE. It is the axis the player is already being asked to
+   * play and the one that does not currently pay: as points the peak is worth
+   * about 6% of a link while being the largest weight in the scoring file, because
+   * waiting 0.45s for it costs a link and the streak pays more for the link. Fuel
+   * is the lever that can win that argument, because it is spent, watched, and
+   * missed. Points could not, and adding more of them would not have.
+   *
+   * `earned` is `releaseCapture`'s own test — a real orbit, past periapsis, not a
+   * flyby, not a putter-out — and is the SAME quantity the scorer reads as
+   * `PendingLink.earned`. Deliberately not a second definition of "a good
+   * release": the sim cannot see the score, and two notions of success would drift
+   * apart the first time either moved.
+   */
+  linkFuelReward: number;
 
   // --- field ---
   /** Playfield is this much wider than the design viewport. */
@@ -207,6 +240,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   fuelMax: 100,
   fuelRegen: 15,
   fuelPerSec: 18,
+  linkFuelReward: 0,
 
   fieldWidthFrac: 1.2,
   bodyCount: 8,
@@ -328,6 +362,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyBrake: 600,
   flybyFuelPerSec: 40,
   fuelRegen: 30,
+  linkFuelReward: 25,
   fieldWidthFrac: 1.9,
   bodyCount: 60,
   backtrackLimit: 700,
@@ -352,7 +387,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 8;
+export const SIM_VERSION = 9;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

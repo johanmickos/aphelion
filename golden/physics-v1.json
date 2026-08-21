@@ -34,6 +34,7 @@
   "fuelMax": 100,
   "fuelRegen": 15,
   "fuelPerSec": 18,
+  "linkFuelReward": 0,
   "fieldWidthFrac": 1.2,
   "bodyCount": 8,
   "backtrackLimit": 0,

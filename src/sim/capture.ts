@@ -308,6 +308,15 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
 
   const earned = !weak && cap.orbit !== null && cap.passedPeri && cap.phase !== 'flyby';
   const add = earned ? cap.boost || 0 : 0;
+
+  // Fuel back for capturing well. Read the envelope fraction BEFORE the capture
+  // is torn down below, and pay only on `earned` — the same test the boost
+  // itself is gated on, so a putter-out, a flyby and a tap that never reached
+  // periapsis all refund nothing, exactly as they earn no boost.
+  if (earned && cfg.linkFuelReward > 0 && cap.boostFull > 0) {
+    const peakFrac = Math.max(0, Math.min(1, cap.boost / cap.boostFull));
+    state.fuel = Math.min(cfg.fuelMax, state.fuel + cfg.linkFuelReward * peakFrac);
+  }
   const spd = hypot(cap.vx, cap.vy) || 1;
   const bx = cap.vx / spd;
   const by = cap.vy / spd;
