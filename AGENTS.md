@@ -48,6 +48,57 @@ Measure a session by `score.best`, not `score.score`. The score is the current
 _life's_ and a death zeroes it, so at the last tick of a recording it is usually
 zero — which will make any weight you are testing look dead.
 
+**Thresholds are measured, never chosen.** Every praise threshold in
+`src/score/praise.ts` and `reckless.ts` is a percentile of real play, replayed out
+of `diagnostics/`. Round numbers get this wrong in both directions: gated at a
+plausible 0.90 the boost-peak word fires zero times in 112 releases, and the kink
+line at 15 degrees praised 42% of captures. Re-measure under the CURRENT config —
+recordings predate whatever was tuned last, and a threshold calibrated on a stale
+feel is worse than an unmeasured one, because it looks defensible.
+
+**A capture is two scoring events.** A `grab` is judged on how the ship arrived
+and pays when the dive swings through periapsis; a `link` is judged on how it left
+and pays at the release. Neither carries the other's qualities. The grab does not
+pay at the press, and must not be "simplified" to: beside a planet you are already
+close to the surface, so every tap would be a tight grab and tapping in place
+would be a points faucet.
+
+**Colour means how good, the word means what.** Colour is the rarity ladder in
+`src/render/accolade.ts` and encodes nothing else; the category is carried by the
+word, and every word names its own axis. Do not re-add a category colour or a
+label naming the axis — both were tried, and a vocabulary that needs a caption is
+a vocabulary that has not been chosen carefully enough. `src/render/accolade.ts`
+is the only place a colour is picked, so the score band and the popups cannot
+drift apart.
+
+## Reading a diagnostics report
+
+This is the main debugging loop, and the easiest thing in the repo to misread.
+
+1. **Check fidelity before believing anything.** `node tools/replay.ts <file>`
+   grades itself. Past the first differing checkpoint the replay is a different
+   run and nothing it says about that stretch is evidence. The tool names the last
+   bit-exact tick; everything before it IS the session that was played.
+2. **A diverged replay is almost never non-determinism.** The simulation is
+   deterministic and the suite proves it. What differs is the ENGINE: note 16
+   replaced `Math.hypot` and left `sin`, `cos` and `atan2`, which the phase clock
+   calls every tick of a settle. A capture amplifies the difference and a respawn
+   wipes it, so a long unbroken chain of captures forks while a crash-heavy
+   session four times its length replays perfectly.
+3. **The recorded checkpoints are phone truth even when the replay is not.** They
+   carry real positions, velocities and fuel every 60 ticks, and the world is pure
+   arithmetic off a fixed seed — so a body's coordinates are identical however far
+   the replay drifted. A grab can be reconstructed from the checkpoint before it
+   plus straight-line drift. Do that rather than giving up on the report.
+4. **Check `loadedAt` against when the thing being reported on shipped.**
+   `simVersion` and `config` describe the simulation and say nothing about the
+   build around it, so a session played on a stale bundle is otherwise
+   indistinguishable from one played on the current one.
+
+Known wart, not yet fixed: a config the player merely TUNED trips the
+"THIS REPORT CAME FROM A DIFFERENT BUILD" banner, and the divergence message then
+blames it. Tuned keys are the ones in `KNOBS`; build skew is everything else.
+
 ## Simulation rules
 
 - Fixed timestep. `dt` is a parameter, never a global, and nothing under
@@ -88,7 +139,10 @@ the author's files, and do not commit their in-progress edits alongside your own
 - A knob that does nothing is worse than no knob: `test/tune.test.ts` asserts
   every tune-panel slider moves the simulation. Its scenarios have blind spots —
   a knob can measure as inert because no scenario reaches the part of the run it
-  governs. Check that before concluding a knob is dead.
+  governs. Check that before concluding a knob is dead — and note that checking
+  thoroughly is not the same as checking the right mechanism. `fuelRegen` was
+  pinned as dead on the strength of several scenarios, all of which exercised the
+  grab gate (`fuel <= 0.5`) when the live one was the flyby brake (`fuel > 0`).
 - When a documented defect is fixed, the assertion that pinned it should fail
   loudly and specifically. That is the point of pinning it. Update the pin to
   assert the new truth rather than deleting it.
@@ -98,6 +152,12 @@ the author's files, and do not commit their in-progress edits alongside your own
 Batch the simple changes for review together; take the tricky ones one at a time.
 Analysis alone is not the deliverable — when a problem is identified, implement
 the fix alongside the recommendation unless asked otherwise.
+
+**Diagnose and confirm before building anything that is a design decision.** A
+bug with one right answer: fix it. A question about what the game should reward,
+how it should feel, or what the player should see: measure it, show the numbers,
+and get the call. Two features in one session were built and then rebuilt because
+that step was skipped.
 
 ## Git
 
@@ -115,5 +175,10 @@ fails on a runner by ~1 ulp for reasons that have nothing to do with the change.
 Run the full `pnpm check` locally, where the golden means something. The real
 fidelity proof is `port-equality`, which runs the prototype and the port in one
 process and is inside `pnpm test`.
+
+Splitting a session's work into themed commits usually means parking files that
+belong to a later commit. **Copy them somewhere outside the repo first.** A
+`git checkout --` over a file list destroys uncommitted work with no reflog and no
+recovery; it cost a full rebuild of one feature in the session this was written.
 
 Commit messages explain why, not what — the diff already says what.
