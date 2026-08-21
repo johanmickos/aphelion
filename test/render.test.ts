@@ -599,6 +599,17 @@ describe('floating score popups', () => {
     expect(p.count(), 'drawing alone expired a popup').toBe(1);
   });
 
+  it('draws a reckless shout with no number attached', () => {
+    const p = new Popups();
+    p.shout({ tick: 100, word: 'WILD CHILD!', streak: 3 }, 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    const t = texts(r);
+    expect(t.some((x) => x === 'WILD CHILD!')).toBe(true);
+    // a shout is not about points, so nothing numeric may ride along with it
+    expect(t.some((x) => /^[+-]/.test(x))).toBe(false);
+  });
+
   it('never piles up more than a readable few', () => {
     const p = new Popups();
     for (let i = 0; i < 12; i++) p.spawn(award({ tick: 100 + i }), 195, 0);

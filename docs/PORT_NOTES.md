@@ -143,7 +143,7 @@ lives on `SimState`, which is what it already behaved like.
 
 ### 5 — Trace timestamps are tick-indexed, not wall-clock **[CHANGED]**
 
-`src/sim/serialize.ts`, `src/sim/trace.ts`
+`src/sim/serialize.ts` (and the since-deleted `src/sim/trace.ts`)
 
 The prototype computes `t = (performance.now() - cap.tStart) / 1000`. That makes
 the trace — the reference data the gate compares — a function of real frame
@@ -465,10 +465,10 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 62 · camera 30
-         diagnostics 17 · backtrack 11 · world 9 · tune 8 · clearance 6
-         score 41 · input 8
-         235 total
+tests    port-equality 11 · invariants 32 · render 70 · camera 30
+         diagnostics 17 · backtrack 11 · world 9 · tune 7 · clearance 6
+         score 56 · input 8
+         256 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

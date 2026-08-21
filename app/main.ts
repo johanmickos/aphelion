@@ -8,6 +8,7 @@ import { DEFAULT_CONFIG, FIXED_DT, MAX_CATCHUP_STEPS } from '../src/sim/config.t
 import type { SimConfig } from '../src/sim/config.ts';
 import { createLifecycle } from '../src/app/lifecycle.ts';
 import { KNOBS } from '../src/app/tune.ts';
+import { isGrabKey, keydownAction } from '../src/app/input.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 import type { Input } from '../src/sim/types.ts';
@@ -95,6 +96,11 @@ let releasedEdge = false;
 canvas.addEventListener('pointerdown', (e) => {
   // Controls sit above the canvas; a tap on one must not also be a grab.
   if ((e.target as HTMLElement | null)?.closest('.ctl, #diag, #tune')) return;
+  // Right and middle click raise pointerdown too, and the context menu is
+  // suppressed over the canvas — so without this a right-click is a silent grab
+  // with no way to see why. Touch contact reports button 0, so the phone is
+  // unaffected.
+  if (e.button !== 0) return;
   e.preventDefault();
   // The first tap starts the run rather than grabbing, so a run never begins
   // with an input the player did not mean as gameplay.
@@ -112,6 +118,52 @@ const up = (): void => {
 };
 addEventListener('pointerup', up);
 addEventListener('pointercancel', up);
+
+/**
+ * Keyboard input, so the game is playable on a machine without a touchscreen.
+ *
+ * Space feeds the same two edge booleans the pointer does and nothing
+ * downstream can tell which device produced them. That is deliberate: a run is
+ * `(config, seed, inputLog)`, so a desktop session replays through the same
+ * tooling as a phone session, and a diagnostics report from a laptop is worth
+ * exactly as much as one from a phone.
+ *
+ * Mouse needs nothing added — `pointerdown` already covers it.
+ */
+const isTypingTarget = (t: EventTarget | null): boolean => {
+  const el = t as HTMLElement | null;
+  return el?.tagName === 'TEXTAREA' || el?.tagName === 'INPUT';
+};
+
+addEventListener('keydown', (e) => {
+  const action = keydownAction({
+    code: e.code,
+    repeat: e.repeat,
+    typing: isTypingTarget(e.target),
+    panelOpen: tuneEl.classList.contains('open') || diagEl.classList.contains('open'),
+    armed: life.phase === 'armed',
+  });
+  if (action === 'ignore') return;
+  // Only once the key is known to be gameplay: space scrolls the page by
+  // default, which would shift the canvas out from under the ship.
+  e.preventDefault();
+  if (action === 'start') {
+    startRun();
+    return;
+  }
+  held = true;
+  pressedEdge = true;
+});
+
+addEventListener('keyup', (e) => {
+  if (!isGrabKey(e.code)) return;
+  up();
+});
+
+// A hold that loses focus — alt-tab, a click on another window — never delivers
+// its matching keyup or pointerup, and the ship would hold forever. Releasing on
+// blur costs a held grab that the player has already stopped watching.
+addEventListener('blur', up);
 
 /**
  * Suppress iOS's text-selection gestures over the play area.
@@ -194,9 +246,16 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // Popups are raised here, on the tick the award lands, and read the ship's
     // position at that instant — after a release that is the point it let go
     // from, which is exactly the act being praised.
-    for (const award of scoreTick(score, state, sim)) {
+    const scored = scoreTick(score, state, sim);
+    for (const award of scored.awards) {
       const at = shipWorldPos(state);
       scene.popups.spawn(award, at.x, at.y);
+    }
+    // The shouts land where the ship was thrown around, mid-capture, rather than
+    // at a release — that moment IS the thing being reacted to.
+    for (const shout of scored.shouts) {
+      const at = shipWorldPos(state);
+      scene.popups.shout(shout, at.x, at.y);
     }
 
     prev = curr;
@@ -392,6 +451,16 @@ if (import.meta.env.DEV) {
 
 // ------------------------------------------------------------------ lifecycle
 const armedEl = document.getElementById('armed') as HTMLDivElement;
+
+// The overlay copy is written for a phone, and "tap" is the one word a desktop
+// player cannot act on. Keyed off a fine pointer rather than screen width: a
+// small window on a laptop is still a mouse, and a large tablet is still a tap.
+if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+  const hint = document.getElementById('armedHint');
+  const sub = document.getElementById('armedSub');
+  if (hint) hint.textContent = 'click or press space to start';
+  if (sub) sub.textContent = 'hold near a planet to be caught by it';
+}
 const tuneBtn = document.getElementById('tuneBtn') as HTMLButtonElement;
 const tuneEl = document.getElementById('tune') as HTMLDivElement;
 const tuneRows = document.getElementById('tuneRows') as HTMLDivElement;

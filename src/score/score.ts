@@ -40,6 +40,8 @@ import { grabTarget } from '../sim/capture.ts';
 import { hypot } from '../sim/orbit.ts';
 import { readAim } from './aim.ts';
 import { isNerveGrab } from './praise.ts';
+import { RECKLESS_DEG, RECKLESS_STREAK, shoutWord } from './reckless.ts';
+import type { Shout } from './reckless.ts';
 import type { ScoreConfig } from './config.ts';
 import { DEFAULT_SCORE_CONFIG } from './config.ts';
 import type { PendingLink, ScoreAward, ScoreState } from './types.ts';
@@ -55,6 +57,15 @@ import type { PendingLink, ScoreAward, ScoreState } from './types.ts';
  */
 const PASSED_CLEARANCE = 40;
 
+/**
+ * Ticks between periapsis and the grab award landing.
+ *
+ * Long enough that it reads as "you swung through and came out", short enough to
+ * still be the same moment. At the bottom of a dive the ship is moving fastest,
+ * so two ticks is a visible distance travelled rather than a pause.
+ */
+const GRAB_AWARD_DELAY = 2;
+
 /** Per-body bits in `ScoreState.flags`. */
 const OFFERED = 1;
 const GRABBED = 2;
@@ -66,6 +77,7 @@ export function createScoreState(): ScoreState {
     best: 0,
     streak: 0,
     multiplier: 1,
+    grabs: 0,
     links: 0,
     misses: 0,
     lastAward: null,
@@ -76,6 +88,13 @@ export function createScoreState(): ScoreState {
     lastDrift: null,
     wasCaptured: false,
     grabSkim: Infinity,
+    grabClearance: Infinity,
+    maxDefl: 0,
+    periSeen: false,
+    grabDue: -1,
+    recklessStreak: 0,
+    capKinked: false,
+    inKink: false,
     putterOuts: 0,
   };
 }
@@ -110,8 +129,25 @@ function endLife(sc: ScoreState): void {
   sc.score = 0;
   sc.pending = null;
   sc.streak = 0;
+  // A death ends a reckless run too. Flying like that into the ground is not the
+  // same as getting away with it three times.
+  sc.recklessStreak = 0;
+  sc.capKinked = false;
+  sc.inKink = false;
   sc.climbFromY = null;
   sc.flags = [];
+}
+
+/**
+ * What one tick produced, on two channels.
+ *
+ * `awards` are points changing hands. `shouts` are the game reacting to how the
+ * ship is being flown and cost nothing — see `src/score/reckless.ts` for why they
+ * are not the same thing.
+ */
+export interface ScoreTick {
+  awards: ScoreAward[];
+  shouts: Shout[];
 }
 
 /** Advance the score by one tick. Call immediately after `stepSim`. */
@@ -120,8 +156,9 @@ export function scoreTick(
   state: SimState,
   cfg: SimConfig,
   scfg: ScoreConfig = DEFAULT_SCORE_CONFIG,
-): ScoreAward[] {
+): ScoreTick {
   const awards: ScoreAward[] = [];
+  const shouts: Shout[] = [];
 
   // ---- the ending hold: nothing is scored, and the life is over
   if (state.ending.active) {
@@ -131,7 +168,7 @@ export function scoreTick(
     }
     sc.putterOuts = state.telemetry.putterOuts;
     sc.multiplier = multiplierFor(sc, scfg);
-    return awards;
+    return { awards, shouts };
   }
   sc.endingSeen = false;
   if (sc.climbFromY === null) sc.climbFromY = state.highWaterY;
@@ -155,6 +192,15 @@ export function scoreTick(
   }
 
   const cap = state.capture;
+
+  // A capture that ended without ever being thrown around breaks the run. Checked
+  // before the branch below so it sees the capture that just went away.
+  if (sc.wasCaptured && !cap) {
+    if (!sc.capKinked) sc.recklessStreak = 0;
+    sc.capKinked = false;
+    sc.inKink = false;
+  }
+
   if (cap) {
     // A body you grabbed can never be one you coasted past, however the capture
     // turns out.
@@ -162,8 +208,58 @@ export function scoreTick(
     // First tick of this capture: the drift state held from last tick is exactly
     // what `beginCapture` read, so the approach line can be measured now and
     // never again — the capture's own rx/ry/vx/vy start moving immediately.
-    if (!sc.wasCaptured) sc.grabSkim = skimClearance(sc, state, cap);
-    sc.pending = readPending(state, cfg, scfg, cap, sc.grabSkim);
+    if (!sc.wasCaptured) {
+      sc.grabSkim = skimClearance(sc, state, cap);
+      sc.grabClearance = Math.max(0, cap.grabR - cap.minR);
+      sc.maxDefl = 0;
+      sc.periSeen = false;
+      sc.grabDue = -1;
+    }
+
+    // ---- the grab award: owed once the dive swings through periapsis
+    //
+    // Not at the press. A light tap should earn nothing, and paying at the press
+    // would make one next to a planet a points faucet — you are already close to
+    // the surface, so every tap would be a tight grab. Periapsis is the moment
+    // the swing actually happened; a couple of ticks past it is when it reads as
+    // having happened, on the way back out.
+    if (!sc.periSeen && cap.passedPeri) {
+      sc.periSeen = true;
+      sc.grabDue = GRAB_AWARD_DELAY;
+    }
+    if (sc.grabDue > 0) sc.grabDue--;
+    else if (sc.grabDue === 0) {
+      sc.grabDue = -1;
+      const grab = awardGrab(sc, state, scfg, cap);
+      if (grab) awards.push(grab);
+    }
+    // Accumulated rather than sampled at release: recklessness is a property of
+    // the whole ride, and the roughest moment of it is usually the brake biting
+    // early on, long before the ship is let go of.
+    if (cap.defl > sc.maxDefl) sc.maxDefl = cap.defl;
+
+    // Rising edge only: one rough passage is one event, however many ticks the
+    // deflection stays over the line.
+    if (cap.defl >= RECKLESS_DEG) {
+      if (!sc.inKink) {
+        sc.inKink = true;
+        if (!sc.capKinked) {
+          sc.capKinked = true;
+          sc.recklessStreak++;
+        }
+        if (sc.recklessStreak >= RECKLESS_STREAK) {
+          shouts.push({
+            tick: state.tick,
+            word: shoutWord(state.tick),
+            streak: sc.recklessStreak,
+          });
+        }
+      }
+    } else {
+      sc.inKink = false;
+    }
+
+    sc.pending = readPending(state, cfg, scfg, cap, sc.grabSkim, sc.maxDefl);
   } else {
     const { ship } = state;
     sc.lastDrift = { x: ship.x, y: ship.y, vx: ship.vx, vy: ship.vy };
@@ -174,7 +270,7 @@ export function scoreTick(
   sc.multiplier = multiplierFor(sc, scfg);
   if (sc.score > sc.best) sc.best = sc.score;
   if (awards.length > 0) sc.lastAward = awards[awards.length - 1]!;
-  return awards;
+  return { awards, shouts };
 }
 
 /**
@@ -206,6 +302,7 @@ function readPending(
   scfg: ScoreConfig,
   cap: Capture,
   skim: number,
+  defl: number,
 ): PendingLink {
   // Deliberately the same test `releaseCapture` applies before paying a boost:
   // what earns speed and what earns points are the same release.
@@ -236,6 +333,7 @@ function readPending(
     close: clamp01(1 - (cap.grabR - cap.minR) / scfg.closeSpan),
     clearance: Math.max(0, cap.grabR - cap.minR),
     skim,
+    defl,
     // Where in the envelope the release landed. A dive too shallow to bank any
     // boost has no window to hit, so it scores no timing rather than full marks
     // for a division that never happened.
@@ -243,6 +341,45 @@ function readPending(
     aim,
     target,
   };
+}
+
+/**
+ * Pay for how the ship arrived.
+ *
+ * Returns null when the arrival was worth nothing — a grab from beyond
+ * `closeSpan` earns no closeness and was no kind of nerve, and a `+0` floating
+ * off the ship is worse than silence.
+ */
+function awardGrab(
+  sc: ScoreState,
+  state: SimState,
+  scfg: ScoreConfig,
+  cap: Capture,
+): ScoreAward | null {
+  const close = clamp01(1 - sc.grabClearance / scfg.closeSpan);
+  const multiplier = multiplierFor(sc, scfg);
+  const award: ScoreAward = {
+    tick: state.tick,
+    kind: 'grab',
+    points: 0,
+    multiplier,
+    body: state.bodies[cap.planet]?.name ?? '?',
+    close,
+    clearance: sc.grabClearance,
+    skim: sc.grabSkim,
+    defl: sc.maxDefl,
+    // Release qualities are not this event's business and must read as absent
+    // rather than as zero-scoring.
+    timing: 0,
+    aim: 0,
+    climb: 0,
+  };
+  const raw = close * scfg.closeBonus + (isNerveGrab(award) ? scfg.nerveBonus : 0);
+  if (raw <= 0) return null;
+  award.points = Math.round(raw * multiplier);
+  sc.score += award.points;
+  sc.grabs++;
+  return award;
 }
 
 function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: PendingLink): ScoreAward {
@@ -254,12 +391,10 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
 
   const timing = Math.pow(p.timing, scfg.timingSharpness);
   const aim = Math.pow(p.aim, scfg.aimSharpness);
+  // Closeness and nerve were paid at periapsis, by `awardGrab`. What is left here
+  // is what the release itself was worth.
   const raw =
-    scfg.linkBase +
-    climb * scfg.climbPerPx +
-    p.close * scfg.closeBonus +
-    timing * scfg.timingBonus +
-    aim * scfg.aimBonus;
+    scfg.linkBase + climb * scfg.climbPerPx + timing * scfg.timingBonus + aim * scfg.aimBonus;
 
   const multiplier = multiplierFor(sc, scfg);
   // Built once so the nerve test sees the finished award rather than a copy of
@@ -270,14 +405,17 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
     points: 0,
     multiplier,
     body: p.target ? `${p.body}→${p.target.name}` : p.body,
-    close: p.close,
-    clearance: p.clearance,
-    skim: p.skim,
+    // Arrival qualities belong to the grab award and are reported as absent here,
+    // so nothing downstream can pay or praise them twice.
+    close: 0,
+    clearance: Infinity,
+    skim: Infinity,
+    defl: p.defl,
     timing: p.timing,
     aim: p.aim,
     climb,
   };
-  award.points = Math.round((raw + (isNerveGrab(award) ? scfg.nerveBonus : 0)) * multiplier);
+  award.points = Math.round(raw * multiplier);
   sc.score += award.points;
   sc.links++;
   sc.streak++;
@@ -340,6 +478,7 @@ function judgePasses(
         close: 0,
         clearance: 0,
         skim: Infinity,
+        defl: 0,
         timing: 0,
         aim: 0,
         climb: 0,

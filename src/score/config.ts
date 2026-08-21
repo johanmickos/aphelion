@@ -31,7 +31,13 @@ export interface ScoreConfig {
   linkBase: number;
   /** Points per world pixel climbed since the previous link. */
   climbPerPx: number;
-  /** Full bonus for grabbing from right on top of a body. */
+  /**
+   * Full bonus for grabbing from right on top of a body.
+   *
+   * Paid by the GRAB award at periapsis, not by the release — how close you let
+   * the body get is settled the instant you press, and reporting it two seconds
+   * later attached it to the wrong act.
+   */
   closeBonus: number;
   /**
    * Grab clearance, in px above the minimum orbit radius, at which `close` has
@@ -45,7 +51,7 @@ export interface ScoreConfig {
   aimBonus: number;
   /**
    * Flat bonus for a nerve grab: a late press on a line that was already headed
-   * inside the minimum orbit. See `src/score/praise.ts`.
+   * inside the minimum orbit. See `src/score/praise.ts`. Paid by the GRAB award.
    *
    * Flat rather than proportional, because the thing being rewarded is a
    * threshold being crossed — you either held your nerve or you did not — and
@@ -86,7 +92,14 @@ export interface ScoreConfig {
  *
  * The shape of the model, which is the part worth arguing about:
  *
- *   link = (base + climb + close + timing + aim) x multiplier
+ *   grab = (close + nerve)                       x multiplier   at periapsis
+ *   link = (base + climb + timing + aim)         x multiplier   at the release
+ *
+ * Two events, because they are settled at different moments and describe
+ * different acts. The grab is judged on how the ship arrived and pays when the
+ * dive swings through the bottom — not at the press, so a tap that never gets
+ * there earns nothing and tapping beside a planet is not a faucet. The link is
+ * judged on how it left.
  *
  * `close` is how near you let the body get before committing to the grab.
  * `cap.tightness` was the obvious candidate and is the wrong one — it saturates

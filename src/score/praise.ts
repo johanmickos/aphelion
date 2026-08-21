@@ -154,7 +154,7 @@ function tierOf(value: number, tier1: number, tier2: number): 0 | 1 | 2 {
  * a boost the points do not reflect is worse than no word.
  */
 export function isNerveGrab(award: ScoreAward): boolean {
-  return award.kind === 'link' && award.skim <= NERVE_SKIM_PX && award.clearance <= CLOSE_PX.tier1;
+  return award.kind === 'grab' && award.skim <= NERVE_SKIM_PX && award.clearance <= CLOSE_PX.tier1;
 }
 
 /**
@@ -164,36 +164,57 @@ export function isNerveGrab(award: ScoreAward): boolean {
  * already says what went wrong.
  */
 export function praiseFor(award: ScoreAward): Praise | null {
-  if (award.kind !== 'link') return null;
+  if (award.kind === 'grab') return praiseGrab(award);
+  if (award.kind === 'link') return praiseRelease(award);
+  return null;
+}
 
-  const tiers = {
-    close: tierOf(award.clearance, CLOSE_PX.tier1, CLOSE_PX.tier2),
-    aim: tierOf(award.aim, AIM.tier1, AIM.tier2),
-    peak: tierOf(award.timing, PEAK.tier1, PEAK.tier2),
-  } as const;
+/**
+ * How the ship arrived: how close it let the body get, and whether it was
+ * already boring in when it committed.
+ */
+function praiseGrab(award: ScoreAward): Praise | null {
+  const close = tierOf(award.clearance, CLOSE_PX.tier1, CLOSE_PX.tier2);
+  const nerve = isNerveGrab(award);
 
-  // Two or more qualities at their top tier is the rare one. It has to be rare to
-  // be worth anything, which is why it takes tier 2 twice rather than any two
-  // tier 1s — those turn up together often enough to be ordinary.
-  const excellent = (['close', 'aim', 'peak'] as const).filter((k) => tiers[k] === 2);
-  if (excellent.length >= 2) {
+  // The rare one on this side: a late press on a collision line that was ALSO in
+  // the tightest tenth. Nerve alone only needs `CLOSE_PX.tier1`.
+  if (nerve && close === 2) {
     return { category: 'super', tier: 2, word: pick(WORDS.super[0], award.tick, 'super') };
   }
-
-  // A conjunction of two independent conditions, so rarer than any single tier
-  // and named ahead of them — but below the superlative, which is a conjunction
-  // of two TOP tiers.
-  if (isNerveGrab(award)) {
+  if (nerve) {
     return { category: 'nerve', tier: 2, word: pick(WORDS.nerve[0], award.tick, 'nerve') };
   }
+  if (close === 1 || close === 2) {
+    return {
+      category: 'close',
+      tier: close,
+      word: pick(WORDS.close[close - 1]!, award.tick, 'close'),
+    };
+  }
+  return null;
+}
 
-  // Hardest quality first. The boost window is the one almost nobody hits, aim is
-  // the one with the widest spread, and a close grab is the most forgiving of the
-  // three — so when several fire at once the rarest achievement is the one named.
-  for (const category of ['peak', 'aim', 'close'] as const) {
-    const tier = tiers[category];
+/** How the ship left: where in the boost window, and how near the marker. */
+function praiseRelease(award: ScoreAward): Praise | null {
+  const aim = tierOf(award.aim, AIM.tier1, AIM.tier2);
+  const peak = tierOf(award.timing, PEAK.tier1, PEAK.tier2);
+
+  // Both at their top tier is the pair that fights — the boost peaks at a fixed
+  // time and the marker sits at a fixed angle, so landing on both means the dive
+  // was shaped to bring them together.
+  if (aim === 2 && peak === 2) {
+    return { category: 'super', tier: 2, word: pick(WORDS.super[0], award.tick, 'super') };
+  }
+  // The boost window is the one almost nobody hits, so it is named first when
+  // both fire.
+  for (const [category, tier] of [
+    ['peak', peak],
+    ['aim', aim],
+  ] as const) {
     if (tier === 0) continue;
-    return { category, tier, word: pick(WORDS[category][tier - 1]!, award.tick, category) };
+    const t: 1 | 2 = tier;
+    return { category, tier: t, word: pick(WORDS[category][t - 1]!, award.tick, category) };
   }
   return null;
 }

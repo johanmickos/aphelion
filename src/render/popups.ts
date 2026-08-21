@@ -12,7 +12,7 @@
  * next to a ship that interpolates. The pause case is handled by simply not
  * advancing them — see `Scene.draw`.
  */
-import type { Praise, ScoreAward } from '../score/index.ts';
+import type { Praise, ScoreAward, Shout } from '../score/index.ts';
 import { praiseFor } from '../score/index.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
@@ -21,6 +21,10 @@ import { formatScore } from './hud.ts';
 /** Seconds a popup lives. The superlative lingers, because it is rare. */
 const LIFE = 1.15;
 const LIFE_SUPER = 1.6;
+const LIFE_SHOUT = 1.4;
+
+/** The reckless shout. Unused elsewhere in the palette, and loud on purpose. */
+const SHOUT_COLOR = '#ff45c8';
 /** World units risen over a full life. */
 const RISE = 34;
 /**
@@ -66,9 +70,11 @@ interface Popup {
   y: number;
   t: number;
   life: number;
-  points: number;
+  /** Null for a shout, which is not about points at all. */
+  points: number | null;
   praise: Praise | null;
   deduction: boolean;
+  shout: string | null;
 }
 
 export class Popups {
@@ -100,6 +106,28 @@ export class Popups {
       points: award.points,
       praise,
       deduction: award.kind === 'miss',
+      shout: null,
+    });
+    while (this.live.length > MAX_LIVE) this.live.shift();
+  }
+
+  /**
+   * Raise a reckless shout.
+   *
+   * Deliberately not routed through `spawn`: a shout has no points, no praise
+   * category and no release behind it, and giving it a fake award to travel in
+   * would be the first step toward the two channels quietly becoming one.
+   */
+  shout(shout: Shout, x: number, y: number): void {
+    this.live.push({
+      x,
+      y: y - SPAWN_LIFT,
+      t: 0,
+      life: LIFE_SHOUT,
+      points: null,
+      praise: null,
+      deduction: false,
+      shout: shout.word,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -128,6 +156,24 @@ export class Popups {
 
       ctx.globalAlpha = alpha;
 
+      if (p.shout) {
+        // Bigger than any link word and slightly askew, because it is a reaction
+        // rather than a readout. The tilt is derived from the position so it does
+        // not jitter frame to frame.
+        const pop = 1 + 0.4 * Math.max(0, 1 - u * 5);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((((p.x * 7919) % 100) / 100 - 0.5) * 0.18);
+        ctx.font = `600 ${19 * pop * s}px ui-monospace, monospace`;
+        ctx.lineWidth = 4 * s;
+        ctx.strokeStyle = 'rgba(0,0,0,.6)';
+        ctx.strokeText(p.shout, 0, 0);
+        ctx.fillStyle = SHOUT_COLOR;
+        ctx.fillText(p.shout, 0, 0);
+        ctx.restore();
+        continue;
+      }
+
       if (p.praise) {
         const sup = p.praise.category === 'super';
         // A brief overshoot on the way in. Only the superlative gets it — on an
@@ -145,6 +191,7 @@ export class Popups {
       }
 
       // The number sits below the word, always, praised or not.
+      if (p.points === null) continue;
       const numY = y + (p.praise ? 14 : 0) * s;
       ctx.font = `600 ${(p.praise ? 12 : 13) * s}px ui-monospace, monospace`;
       ctx.fillStyle = p.deduction ? DEDUCTION : p.praise ? COLOR[p.praise.category] : ROUTINE;

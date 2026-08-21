@@ -14,7 +14,7 @@ import { fingerprintHex } from '../src/sim/serialize.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 import type { GrabResult, Input, SimState } from '../src/sim/types.ts';
 import { createScoreState, praiseFor, scoreTick } from '../src/score/index.ts';
-import type { ScoreAward, ScoreState } from '../src/score/index.ts';
+import type { ScoreAward, ScoreState, Shout } from '../src/score/index.ts';
 
 export interface Frame {
   tick: number;
@@ -77,6 +77,8 @@ export interface Analysis {
    */
   score: ScoreState;
   awards: ScoreAward[];
+  /** Reckless shouts, which pay nothing and are not awards. */
+  shouts: Shout[];
 }
 
 /**
@@ -108,6 +110,7 @@ export function replayReport(report: DiagReport): Analysis {
   const field = fieldBounds(cfg, state.bodies);
   const score = createScoreState();
   const awards: ScoreAward[] = [];
+  const shouts: Shout[] = [];
   const frames: Frame[] = [];
   const events: Event[] = [];
   let held = false;
@@ -124,7 +127,9 @@ export function replayReport(report: DiagReport): Analysis {
     if (released) held = false;
     const input: Input = { held: held || pressed, pressed, released };
     stepSim(state, cfg, input, report.dt);
-    awards.push(...scoreTick(score, state, cfg));
+    const scored = scoreTick(score, state, cfg);
+    awards.push(...scored.awards);
+    shouts.push(...scored.shouts);
 
     const p = shipWorldPos(state);
     const cap = state.capture;
@@ -265,9 +270,12 @@ export function replayReport(report: DiagReport): Analysis {
       (links.reduce((n, a) => n + pick(a), 0) / links.length).toFixed(2);
     findings.push(
       `release quality, averaged over ${links.length} link(s): ` +
-        `close ${mean((a) => a.close)} · boost peak ${mean((a) => a.timing)} · ` +
-        `aim ${mean((a) => a.aim)}  (0-1 each)`,
+        `boost peak ${mean((a) => a.timing)} · aim ${mean((a) => a.aim)}  (0-1 each)`,
     );
+  }
+  if (shouts.length > 0) {
+    const deepest = Math.max(...shouts.map((x) => x.streak));
+    findings.push(`${shouts.length} reckless shout(s); longest run of rough captures: ${deepest}`);
   }
   if (state.telemetry.putterOuts > 0) {
     findings.push(
@@ -295,6 +303,7 @@ export function replayReport(report: DiagReport): Analysis {
     frames,
     score,
     awards,
+    shouts,
   };
 }
 
@@ -417,13 +426,19 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   // real session's release qualities can be read next to what they paid.
   if (a.awards.length) {
     out.push('  score');
-    out.push('    tick    what      points   mult   close   peak    aim   climb  earned');
+    out.push(
+      '    tick  ev     what      points   mult   close   peak    aim   defl   climb  earned',
+    );
     for (const w of a.awards.slice(0, 24)) {
       out.push(
-        `    ${String(w.tick).padStart(5)}  ${(w.kind === 'link' ? w.body : 'past ' + w.body).padEnd(10)}` +
+        `    ${String(w.tick).padStart(5)}  ${w.kind.padEnd(5)}  ` +
+          `${(w.kind === 'miss' ? 'past ' + w.body : w.body).padEnd(10)}` +
           `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
-          `${w.close.toFixed(2).padStart(5)}  ${w.timing.toFixed(2).padStart(5)}  ` +
-          `${w.aim.toFixed(2).padStart(5)}  ${w.climb.toFixed(0).padStart(5)}  ` +
+          `${(w.kind === 'grab' ? w.close.toFixed(2) : '  · ').padStart(5)}  ` +
+          `${(w.kind === 'link' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +
+          `${(w.kind === 'link' ? w.aim.toFixed(2) : '  · ').padStart(5)}  ` +
+          `${w.defl.toFixed(0).padStart(4)}  ` +
+          `${w.climb.toFixed(0).padStart(5)}  ` +
           // The word choice is seeded from the tick, so this is the word the
           // player actually saw, not a fresh roll of the same table.
           (praiseFor(w)?.word ?? ''),

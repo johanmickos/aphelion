@@ -8,5 +8,6 @@
 export * from './aim.ts';
 export * from './config.ts';
 export * from './praise.ts';
+export * from './reckless.ts';
 export * from './types.ts';
 export * from './score.ts';

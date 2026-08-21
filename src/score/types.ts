@@ -4,7 +4,22 @@ import type { Body } from '../sim/types.ts';
 /** One thing that happened to the score, on one tick. */
 export interface ScoreAward {
   tick: number;
-  kind: 'link' | 'miss';
+  /**
+   * `grab` and `link` are two separate scoring events on one capture.
+   *
+   * A grab is judged on how you arrived — how close you let the body get, and
+   * whether you were already boring in. Those facts are settled the instant you
+   * press, and holding them back until the release put the feedback two seconds
+   * after the act it described. A link is judged on how you left: where in the
+   * boost window, and how near the compass marker.
+   *
+   * The grab pays when the dive SWINGS THROUGH PERIAPSIS, not when the button
+   * goes down. A tap that never reaches the bottom earns nothing, which is what
+   * stops a stationary tap-tap-tap next to a planet from being a points faucet —
+   * and it means holding on into a full orbit still collects, because periapsis
+   * is already behind you.
+   */
+  kind: 'grab' | 'link' | 'miss';
   /** Points actually applied, signed. A penalty is capped by the score on hand. */
   points: number;
   /** The multiplier in force. Always 1 for a miss — penalties are never scaled. */
@@ -43,6 +58,15 @@ export interface ScoreAward {
    * the path — which is what makes this exactly computable rather than a guess.
    */
   skim: number;
+  /**
+   * Worst per-sample heading deflection anywhere in the capture, in degrees.
+   *
+   * Above `KINK_THRESHOLD_DEG` the ride visibly snapped — the brake bit hard, or
+   * the dive came in steep enough to be flung around. That used to read purely as
+   * a smoothness defect; it is also what a reckless capture feels like from the
+   * inside, and it is now scored as one.
+   */
+  defl: number;
   /** Where in the boost envelope the release landed. 0..1. Link only. */
   timing: number;
   /** Best compass alignment at release. 0..1. Link only. */
@@ -66,6 +90,7 @@ export interface PendingLink {
   close: number;
   clearance: number;
   skim: number;
+  defl: number;
   timing: number;
   aim: number;
   /** What the release was lined up with, for the readout. */
@@ -82,6 +107,7 @@ export interface ScoreState {
   /** Live multiplier, derived from the streak. */
   multiplier: number;
   /** Session totals, across every life. Diagnostics, not the score. */
+  grabs: number;
   links: number;
   misses: number;
   /** The most recent award, for the HUD to flash. */
@@ -107,6 +133,26 @@ export interface ScoreState {
   wasCaptured: boolean;
   /** Skim clearance of the grab that started the current capture. */
   grabSkim: number;
+  /** Worst deflection seen so far in the current capture. */
+  maxDefl: number;
+  /** Grab clearance of the current capture, in px above the minimum orbit. */
+  grabClearance: number;
+  /** The dive has passed periapsis; the grab award is owed. */
+  periSeen: boolean;
+  /** Ticks left before the grab award lands. -1 once it has. */
+  grabDue: number;
+  /**
+   * Consecutive captures that were flown recklessly. See `src/score/reckless.ts`.
+   *
+   * Separate from `streak`, which counts links and drives the multiplier. A run
+   * of rough captures is a different thing from a run of good releases, and
+   * conflating them would mean one could not happen without the other.
+   */
+  recklessStreak: number;
+  /** This capture has already been counted into `recklessStreak`. */
+  capKinked: boolean;
+  /** Mid-kink right now, so one rough passage does not shout every tick. */
+  inKink: boolean;
   /** Last observed `telemetry.putterOuts`, to edge-detect a dry capture. */
   putterOuts: number;
 }

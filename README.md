@@ -225,14 +225,23 @@ reads `SimState`, and the simulation never learns it exists — so a score stays
 pure function of `(config, seed, inputLog)` and `node tools/replay.ts` recomputes
 the exact score a phone session showed. `pnpm portable` enforces the boundary.
 
-A capture-and-release — a **link** — is paid on four things:
+A capture is **two scoring events**, settled at different moments and describing
+different acts:
 
-| component | what it measures                                        | where it comes from     |
-| --------- | ------------------------------------------------------- | ----------------------- |
-| climb     | ground covered since the previous link, banked not paid | `state.highWaterY`      |
-| close     | how near you let the body get before grabbing           | `cap.grabR - cap.minR`  |
-| peak      | where in the boost envelope the release landed          | `cap.boost / boostFull` |
-| aim       | how close the release was to a compass marker           | `src/score/aim.ts`      |
+- the **grab**, judged on how the ship arrived, paid when the dive swings through
+  periapsis — not at the press, so a tap that never reaches the bottom earns
+  nothing and tapping beside a planet is not a points faucet;
+- the **link**, judged on how it left, paid at the release.
+
+Between them they are paid on:
+
+| event | component | what it measures                                        | where it comes from     |
+| ----- | --------- | ------------------------------------------------------- | ----------------------- |
+| grab  | close     | how near you let the body get before grabbing           | `cap.grabR - cap.minR`  |
+| grab  | nerve     | a late press on a line already headed inside the orbit  | `src/score/praise.ts`   |
+| link  | climb     | ground covered since the previous link, banked not paid | `state.highWaterY`      |
+| link  | peak      | where in the boost envelope the release landed          | `cap.boost / boostFull` |
+| link  | aim       | how close the release was to a compass marker           | `src/score/aim.ts`      |
 
 times a streak multiplier that rises with consecutive links and is lost to a
 putter-out or to coasting past a planet you could have taken.
@@ -263,6 +272,14 @@ is in the same place as one 50px off and boring straight in. Its skim bound is
 `0` rather than a percentile, because zero is a real boundary in the simulation —
 the radius the floor clamp defends — so it needs no calibration and cannot drift
 as the feel changes. It pays a flat `nerveBonus` as well as naming itself.
+
+A **reckless shout** (`RECKLESS!`, `WILD CHILD!`) is a separate channel from all
+of that. It fires mid-capture, at the instant the ship gets thrown around, rather
+than at a release; it pays nothing; and it only starts once three captures in a
+row have been flown roughly enough to qualify. A clean capture or a death ends the
+run. The two channels answer different questions — "was that a good release?" and
+"are you doing this on purpose?" — so they are kept apart in
+`src/score/reckless.ts`.
 
 The thresholds in `src/score/praise.ts` are percentiles of real play
 rather than round numbers, because round numbers get this wrong: gated at a
