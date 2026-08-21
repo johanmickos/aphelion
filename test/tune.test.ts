@@ -92,6 +92,23 @@ describe('tunable parameters', () => {
         ],
         ticks: 900,
       },
+      // Spends the tank, drifts, then grabs again — the only shape that can see
+      // fuelRegen at all. The four above each spend fuel at most once, and a
+      // circularize costs ~21 of 100, so the tank never comes near the gate that
+      // makes refuelling matter and every regen rate measures identically.
+      // Here the flyby brake empties it by t135. With no regen the grab at t300
+      // is refused for want of fuel and the ship drifts on; with a fast regen it
+      // takes hold. That difference is the knob.
+      {
+        ship: { x: 105, y: 354, vx: 0, vy: -330 },
+        edges: [
+          [20, 1],
+          [150, 0],
+          [300, 1],
+          [450, 0],
+        ],
+        ticks: 700,
+      },
     ];
 
     const run = (cfg: SimConfig, sc: Sc) => {

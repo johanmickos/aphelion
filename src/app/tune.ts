@@ -117,6 +117,20 @@ export const KNOBS: readonly Knob[] = [
     hint: 'fuel per second while braking · the only place fuel really binds',
   },
   {
+    group: 'FUEL',
+    key: 'fuelRegen',
+    label: 'REFUEL',
+    min: 0,
+    max: 40,
+    step: 1,
+    dp: 0,
+    // Sits next to BRAKE COST because the two are one decision: how expensive a
+    // brake is, and how long you wait to afford the next one. It reads as inert
+    // in ordinary play — the tank only leaves full when a flyby brake drains it
+    // — so what this really sets is how punishing that recovery is.
+    hint: 'fuel per second recovered while drifting · 0 leaves a drained tank drained',
+  },
+  {
     group: 'WORLD',
     key: 'bodySpacing',
     label: 'SPACING',
