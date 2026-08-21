@@ -38,14 +38,6 @@ const DEFS: ReadonlyArray<{ dx: number; y: number; R: number }> = [
 ];
 
 /**
- * Seed for the generated part of the field.
- *
- * Fixed, and part of the world's definition rather than a runtime choice: every
- * player climbs the same field, and a replay must reconstruct it exactly.
- */
-const WORLD_SEED = 0x5eed_1e55;
-
-/**
  * Build the world's bodies. Deterministic and viewport-independent.
  *
  * Two layouts: the prototype's authored eight, which the equality gate compares
@@ -78,7 +70,7 @@ export function createBodies(cfg: SimConfig): Body[] {
     }));
   }
 
-  const rnd = mulberry32(WORLD_SEED);
+  const rnd = mulberry32(cfg.worldSeed);
   const placed: Array<{ x: number; y: number; R: number }> = [];
   // The opening body is the authored one: the spawn sits 84px to its left and
   // that first approach is tuned. Everything above it is generated.

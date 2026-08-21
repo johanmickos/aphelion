@@ -157,6 +157,19 @@ export interface SimConfig {
    * approach keeps its tuned geometry.
    */
   proceduralLayout: boolean;
+  /**
+   * Seed for the generated part of the field.
+   *
+   * Part of the config rather than a module constant because it is part of the
+   * recipe: a run is `(config, seed, inputLog)` and the field is the world that
+   * recipe is played in, so a report that does not carry the seed cannot be
+   * replayed once the seed can change. It rides the full config a report already
+   * stores, and `configFromReport` fills it from PROTOTYPE_CONFIG for reports
+   * recorded before it existed — which is the one field they were all played on.
+   *
+   * Unread when `proceduralLayout` is false: the prototype's eight are authored.
+   */
+  worldSeed: number;
   /** Vertical gap between generated rows, in world units, before jitter. */
   bodySpacing: number;
   /**
@@ -258,6 +271,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   clearanceOnConvert: false,
   grabRange: 0,
   proceduralLayout: false,
+  worldSeed: 0x5eed_1e55,
   bodySpacing: 0,
   holdClimbInCapture: false,
   bodyWeave: 44,

@@ -455,6 +455,8 @@ if (import.meta.env.DEV) {
 
 // ------------------------------------------------------------------ lifecycle
 const armedEl = document.getElementById('armed') as HTMLDivElement;
+const newFieldBtn = document.getElementById('newField') as HTMLButtonElement;
+const armedSeedEl = document.getElementById('armedSeed') as HTMLDivElement;
 
 // The overlay copy is written for a phone, and "tap" is the one word a desktop
 // player cannot act on. Keyed off a fine pointer rather than screen width: a
@@ -476,6 +478,35 @@ function showArmed(): void {
   tuneBtn.disabled = life.phase !== 'armed';
   tuneBtn.style.opacity = life.phase === 'armed' ? '1' : '0.35';
 }
+
+/**
+ * A new field, on demand.
+ *
+ * The seed is a config key, so this is the same act as moving a tune slider: it
+ * is legal only while armed, it goes through `rearm()`, and it is therefore
+ * fixed before the first tick and carried in the diagnostics report like every
+ * other config value. A replay of a randomised session reconstructs its field
+ * from the report alone.
+ *
+ * Session-scoped deliberately. RESET reloads the page, and a reload comes back
+ * on the default field — which keeps the fixed seed the game's canonical climb,
+ * the one the praise thresholds and the scenarios are calibrated against.
+ *
+ * `Math.random` is fine HERE and banned two directories away: the seed is chosen
+ * outside the simulation and then becomes part of its input. Nothing under
+ * `src/sim/` ever reaches for entropy.
+ */
+function showSeed(): void {
+  armedSeedEl.textContent = `seed ${sim.worldSeed.toString(16).padStart(8, '0')}`;
+}
+
+newFieldBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (life.phase !== 'armed') return;
+  sim.worldSeed = (Math.random() * 2 ** 32) >>> 0;
+  rearm();
+  showSeed();
+});
 
 function startRun(): void {
   life.phase = 'running';
@@ -561,3 +592,4 @@ tuneReset.addEventListener('click', (e) => {
 });
 
 showArmed();
+showSeed();

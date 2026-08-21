@@ -289,6 +289,24 @@
         color: #7b88a4;
       }
 
+      /* The overlay itself is pointer-transparent so a tap anywhere starts the
+         run; the one control on it has to opt back in. */
+      #armedField {
+        margin-top: 26px;
+        pointer-events: auto;
+      }
+      #armedField .ctl {
+        letter-spacing: 0.14em;
+      }
+      /* Not a control, and deliberately quiet: it answers "which field is this?"
+         for a report, and is never something to read before playing. */
+      #armedSeed {
+        margin-top: 8px;
+        font: 9px/1.4 ui-monospace, monospace;
+        letter-spacing: 0.1em;
+        color: #46516b;
+      }
+
       #note {
         position: absolute;
         right: calc(env(safe-area-inset-right, 0px) + 10px);
@@ -341,6 +359,10 @@
         <div id="armedTitle">APHELION</div>
         <div id="armedHint">tap to start</div>
         <div id="armedSub">press and hold near a planet to be caught by it</div>
+        <div id="armedField">
+          <button class="ctl" id="newField">⟳ NEW FIELD</button>
+          <div id="armedSeed"></div>
+        </div>
       </div>
     </div>
 

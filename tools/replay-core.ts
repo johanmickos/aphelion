@@ -8,6 +8,7 @@
  */
 import { configDelta, configFromReport, summarize } from '../src/app/report.ts';
 import { DEFAULT_CONFIG, SIM_VERSION } from '../src/sim/config.ts';
+import { KNOBS } from '../src/app/tune.ts';
 import type { DiagReport } from '../src/app/report.ts';
 import { KINK_THRESHOLD_DEG, createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
@@ -15,6 +16,9 @@ import { fieldBounds } from '../src/sim/world.ts';
 import type { GrabResult, Input, SimState } from '../src/sim/types.ts';
 import { createScoreState, praiseFor, scoreTick } from '../src/score/index.ts';
 import type { ScoreAward, ScoreState, Shout } from '../src/score/index.ts';
+
+/** The keys the tune panel can move. A difference in one of these is a choice. */
+const TUNED_KEYS = new Set<string>(KNOBS.map((k) => k.key));
 
 export interface Frame {
   tick: number;
@@ -395,17 +399,35 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   // was recorded is missing from `report.config`, and printing "session ran
   // undefined" hides the value the session actually behaved as.
   const delta = configDelta(configFromReport(report), DEFAULT_CONFIG);
+  // Three ways a config can differ from the defaults, and only one of them is a
+  // reason to distrust the report. A key the player TUNED is a deliberate
+  // experiment; a field the player RANDOMISED is a different world, not a
+  // different build. Everything else is skew — the session ran code that is no
+  // longer what this checkout does — and that is what the banner is for. Lumping
+  // all three together made the banner fire on ordinary play and then blame the
+  // knob for a divergence it had nothing to do with.
+  const tuned = delta.filter((d) => TUNED_KEYS.has(d.key));
+  const field = delta.find((d) => d.key === 'worldSeed');
+  const skew = delta.filter((d) => !TUNED_KEYS.has(d.key) && d.key !== 'worldSeed');
   out.push(
-    `  config     ${delta.length ? `${delta.length} value(s) differ from current defaults` : 'matches current defaults'}`,
+    `  config     ${skew.length ? `${skew.length} value(s) differ from current defaults` : 'matches current defaults'}` +
+      (tuned.length ? ` · ${tuned.length} tuned in the panel` : ''),
   );
-  const skewed = report.simVersion !== SIM_VERSION || delta.length > 0;
+  if (field) {
+    const hex = (v: number | boolean): string => Number(v).toString(16).padStart(8, '0');
+    out.push(`  field      randomised — seed ${hex(field.theirs)} (default ${hex(field.ours)})`);
+  }
+  for (const d of tuned) {
+    out.push(`  tuned      ${d.key}: ${d.theirs} (default ${d.ours})`);
+  }
+  const skewed = report.simVersion !== SIM_VERSION || skew.length > 0;
   if (skewed) {
     out.push('');
     out.push('  ⚠ THIS REPORT CAME FROM A DIFFERENT BUILD');
     if (report.simVersion !== SIM_VERSION) {
       out.push(`      simVersion ${report.simVersion} recorded, ${SIM_VERSION} here`);
     }
-    for (const d of delta) {
+    for (const d of skew) {
       out.push(`      ${d.key}: session ran ${d.theirs}, current default is ${d.ours}`);
     }
     out.push("      The replay below uses the session's own config, so it is still");

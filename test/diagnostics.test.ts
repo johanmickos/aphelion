@@ -15,6 +15,7 @@ import {
 } from '../src/app/report.ts';
 import { DEFAULT_CONFIG, FIXED_DT, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
+import { createBodies } from '../src/sim/world.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
 import { awardAgreement, recordedAwards, replayReport } from '../tools/replay-core.ts';
 import { createScoreState, scoreTick } from '../src/score/index.ts';
@@ -276,6 +277,44 @@ describe('report round trip', () => {
     expect(resolved.crashConeSeverityFloor).not.toBe(DEFAULT_CONFIG.crashConeSeverityFloor);
     // and everything the report DID carry is still its own
     expect(resolved.bodySpacing).toBe(DEFAULT_CONFIG.bodySpacing);
+  });
+
+  it('replays a report from before NEW FIELD on the field it was played on', () => {
+    // Every report already on disk was played on the one fixed field, and the
+    // seed that built it is PROTOTYPE_CONFIG's — so the fill rule above is not
+    // merely safe here, it is exactly right. Getting this wrong would silently
+    // re-run 34 recorded sessions in a world they were never flown in, and the
+    // divergence would look like a physics bug.
+    const { config, ...rest } = buildReport({
+      recorder: new RunRecorder(),
+      config: DEFAULT_CONFIG,
+      seed: 1,
+      ticks: 0,
+      note: '',
+      device: DEVICE,
+    });
+    const older = { ...rest, config: { ...config } } as typeof rest & { config: SimConfig };
+    delete (older.config as unknown as Record<string, unknown>).worldSeed;
+
+    expect(createBodies(configFromReport(older))).toEqual(createBodies(DEFAULT_CONFIG));
+  });
+
+  it('carries a randomised field, so a NEW FIELD session replays in its own world', () => {
+    // The whole reason the seed is a config key rather than a module constant.
+    const report = buildReport({
+      recorder: new RunRecorder(),
+      config: { ...DEFAULT_CONFIG, worldSeed: 0x1234_5678 },
+      seed: 1,
+      ticks: 0,
+      note: '',
+      device: DEVICE,
+    });
+    const resolved = configFromReport(parseReport(serializeReport(report)));
+    expect(resolved.worldSeed).toBe(0x1234_5678);
+    expect(createBodies(resolved)).not.toEqual(createBodies(DEFAULT_CONFIG));
+    expect(createBodies(resolved)).toEqual(
+      createBodies({ ...DEFAULT_CONFIG, worldSeed: 0x1234_5678 }),
+    );
   });
 
   it('carries raw values so a cross-engine replay can still be verified', () => {

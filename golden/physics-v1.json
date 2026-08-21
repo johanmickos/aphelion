@@ -42,6 +42,7 @@
   "clearanceOnConvert": false,
   "grabRange": 0,
   "proceduralLayout": false,
+  "worldSeed": 1592598101,
   "bodySpacing": 0,
   "holdClimbInCapture": false,
   "bodyWeave": 44,

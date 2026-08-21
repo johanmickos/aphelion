@@ -95,9 +95,13 @@ This is the main debugging loop, and the easiest thing in the repo to misread.
    build around it, so a session played on a stale bundle is otherwise
    indistinguishable from one played on the current one.
 
-Known wart, not yet fixed: a config the player merely TUNED trips the
-"THIS REPORT CAME FROM A DIFFERENT BUILD" banner, and the divergence message then
-blames it. Tuned keys are the ones in `KNOBS`; build skew is everything else.
+The header separates three ways a config can differ from the current defaults,
+because only one of them is a reason to distrust the report: keys in `KNOBS` are a
+deliberate experiment and print as `tuned`, `worldSeed` is a different world and
+prints as `field`, and everything else is build skew — which is the only case that
+raises "THIS REPORT CAME FROM A DIFFERENT BUILD". Keep that split when adding a
+key that a player can change at runtime, or the banner goes back to crying wolf on
+ordinary play and then blaming the knob for a divergence it did not cause.
 
 ## Simulation rules
 

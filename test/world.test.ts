@@ -1,21 +1,54 @@
 /**
- * The field must be the same for every player and every replay, and the
- * generated part must continue the authored pattern rather than diverge from it.
+ * The field must be reconstructible from the recipe, and the generated part must
+ * continue the authored pattern rather than diverge from it.
+ *
+ * Every playability property here is asserted across a SWEEP of seeds, not on
+ * the one the game ships with. NEW FIELD makes the seed a player choice, so a
+ * layout that only works at `0x5eed1e55` is a layout that works by luck — and the
+ * single-seed versions of these assertions could not tell the difference.
  */
 import { describe, expect, it } from 'vitest';
 import { createBodies, fieldBounds, DESIGN_W } from '../src/sim/world.ts';
 import { DEFAULT_CONFIG, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
+import { mulberry32 } from '../src/sim/rng.ts';
 import { hypot } from '../src/sim/orbit.ts';
+
+/**
+ * The seeds every geometric property is checked against.
+ *
+ * Drawn from a fixed generator rather than `Math.random`, so a failure names a
+ * seed that can be reproduced by hand. The shipped field is first, so the game's
+ * own climb is always among the cases and a regression there is not diluted by
+ * 63 others.
+ *
+ * 64 is a runtime choice, not a confidence one: the bounds asserted below were
+ * measured over 20,000 seeds and the margins are wide, so this sweep is here to
+ * catch a generator that has *changed*, not to explore the tails.
+ */
+const SEEDS: readonly number[] = (() => {
+  const rnd = mulberry32(0xa9f1_e044);
+  const out = [DEFAULT_CONFIG.worldSeed];
+  while (out.length < 64) out.push((rnd() * 2 ** 32) >>> 0);
+  return out;
+})();
+
+/** Every swept field, as `[label, config, bodies]`. */
+const FIELDS: ReadonlyArray<[string, SimConfig, ReturnType<typeof createBodies>]> = SEEDS.map(
+  (seed) => {
+    const cfg: SimConfig = { ...DEFAULT_CONFIG, worldSeed: seed };
+    return [`seed ${seed.toString(16)}`, cfg, createBodies(cfg)];
+  },
+);
 
 /**
  * The field grouped into rows. A forked row holds two bodies at nearly the same
  * height, so almost every property worth asserting is about rows rather than
  * about consecutive entries in the array.
  */
-function rows(cfg: SimConfig) {
+function rows(cfg: SimConfig, bodies = createBodies(cfg)) {
   const out: Array<ReturnType<typeof createBodies>> = [];
-  for (const b of [...createBodies(cfg)].sort((a, c) => c.y - a.y)) {
+  for (const b of [...bodies].sort((a, c) => c.y - a.y)) {
     const last = out[out.length - 1];
     if (last && Math.abs(last[0]!.y - b.y) < cfg.bodySpacing * 0.5) last.push(b);
     else out.push([b]);
@@ -39,6 +72,18 @@ describe('world generation', () => {
     expect(createBodies(DEFAULT_CONFIG)).toEqual(createBodies(DEFAULT_CONFIG));
   });
 
+  it('is a function of the seed — a different seed is a different field', () => {
+    // What NEW FIELD relies on, and what a replay relies on in the other
+    // direction: the seed is the whole difference between two fields, so a
+    // report that carries it carries the world.
+    const a = createBodies({ ...DEFAULT_CONFIG, worldSeed: 1 });
+    const b = createBodies({ ...DEFAULT_CONFIG, worldSeed: 2 });
+    expect(a).not.toEqual(b);
+    expect(createBodies({ ...DEFAULT_CONFIG, worldSeed: 1 })).toEqual(a);
+    // The opener is authored, so it is the one body the seed must NOT move.
+    expect(a[0]).toEqual(b[0]);
+  });
+
   it('leaves the prototype config with exactly the authored eight', () => {
     const proto = createBodies(PROTOTYPE_CONFIG);
     expect(proto).toHaveLength(8);
@@ -48,11 +93,20 @@ describe('world generation', () => {
     expect(Math.min(...proto.map((b) => b.y))).toBeCloseTo(-5.98 * 844, 6);
   });
 
+  it('ignores the seed entirely when the layout is authored', () => {
+    // `worldSeed` is unread under PROTOTYPE_CONFIG, which is what keeps it out of
+    // the equality gate's way: the prototype's eight are placed by hand.
+    expect(createBodies({ ...PROTOTYPE_CONFIG, worldSeed: 999 })).toEqual(
+      createBodies(PROTOTYPE_CONFIG),
+    );
+  });
+
   it('opens on the authored first body, whose approach is tuned', () => {
     // The spawn sits 84px to its left; generating this one would put a random
     // radius and offset in front of every run's first grab.
-    const game = createBodies(DEFAULT_CONFIG);
-    expect(game[0]).toEqual(createBodies(PROTOTYPE_CONFIG)[0]);
+    for (const [label, , bodies] of FIELDS) {
+      expect(bodies[0], label).toEqual(createBodies(PROTOTYPE_CONFIG)[0]);
+    }
   });
 
   it('keeps alternating sides through the single rows', () => {
@@ -60,48 +114,81 @@ describe('world generation', () => {
     // to keep weaving — a run of them on one side would walk the climb into a
     // wall while every individual gap still looked reasonable.
     const cx = DESIGN_W * 0.5;
-    const singles = rows(DEFAULT_CONFIG).filter((r) => r.length === 1);
-    for (let i = 1; i < singles.length; i++) {
-      const a = Math.sign(singles[i - 1]![0]!.x - cx);
-      const b = Math.sign(singles[i]![0]!.x - cx);
-      expect(b, `${singles[i]![0]!.name} is on the same side as ${singles[i - 1]![0]!.name}`).toBe(
-        -a,
-      );
+    for (const [label, cfg, bodies] of FIELDS) {
+      const singles = rows(cfg, bodies).filter((r) => r.length === 1);
+      for (let i = 1; i < singles.length; i++) {
+        const a = Math.sign(singles[i - 1]![0]!.x - cx);
+        const b = Math.sign(singles[i]![0]!.x - cx);
+        expect(
+          b,
+          `${label}: ${singles[i]![0]!.name} is on the same side as ${singles[i - 1]![0]!.name}`,
+        ).toBe(-a);
+      }
     }
   });
 
-  it('offers two routes on some rows and one on most', () => {
+  it('offers two routes on some rows and one on most, at every seed', () => {
     // The reason rows exist. All singles is the old field, which reads as a line
     // to be followed; all forks would be a corridor with no rhythm to it.
-    const rs = rows(DEFAULT_CONFIG);
-    const forks = rs.filter((r) => r.length === 2).length;
-    expect(forks, 'no row offers a choice').toBeGreaterThan(rs.length * 0.2);
-    expect(forks, 'every row offers a choice').toBeLessThan(rs.length * 0.6);
-    expect(Math.max(...rs.map((r) => r.length)), 'a row with three bodies').toBe(2);
+    //
+    // The band is per-seed and deliberately wide. How many rows fork is a
+    // binomial draw at `rowPairChance` over ~43 rows, so its spread is a property
+    // of the generator being random rather than a defect: measured over 20,000
+    // seeds the fraction runs 0.132 to 0.714, and 0.76% of seeds fall outside the
+    // 0.2-0.6 this test asserted when it only ever ran one field. Those seeds are
+    // legitimate climbs, not broken ones. The mean is checked separately below,
+    // which is where a real change to the fork rate would show up.
+    for (const [label, cfg, bodies] of FIELDS) {
+      const rs = rows(cfg, bodies);
+      const forks = rs.filter((r) => r.length === 2).length;
+      expect(forks / rs.length, `${label}: no row offers a choice`).toBeGreaterThan(0.05);
+      expect(forks / rs.length, `${label}: nearly every row offers a choice`).toBeLessThan(0.8);
+      expect(Math.max(...rs.map((r) => r.length)), `${label}: a row with three bodies`).toBe(2);
+    }
+  });
+
+  it('forks about as often as rowPairChance says, averaged over seeds', () => {
+    // The distribution assertion the per-seed band above cannot make. Measured
+    // mean over 20,000 seeds is 0.387 against a `rowPairChance` of 0.4 — slightly
+    // under, because a fork consumes two of a fixed body count and so ends the
+    // field in fewer rows. A change to the fork rate moves this; an unlucky seed
+    // does not.
+    const fracs = FIELDS.map(([, cfg, bodies]) => {
+      const rs = rows(cfg, bodies);
+      return rs.filter((r) => r.length === 2).length / rs.length;
+    });
+    const mean = fracs.reduce((a, b) => a + b, 0) / fracs.length;
+    expect(mean).toBeGreaterThan(DEFAULT_CONFIG.rowPairChance - 0.08);
+    expect(mean).toBeLessThan(DEFAULT_CONFIG.rowPairChance + 0.08);
   });
 
   it('separates the two lanes of a fork enough to be a choice', () => {
     const cx = DESIGN_W * 0.5;
-    for (const r of rows(DEFAULT_CONFIG).filter((x) => x.length === 2)) {
-      const [a, b] = [r[0]!, r[1]!];
-      expect(Math.sign(a.x - cx), `${a.name} and ${b.name} are on the same side`).toBe(
-        -Math.sign(b.x - cx),
-      );
-      // Far enough apart that the lookahead a press uses has an unambiguous
-      // answer, rather than the two lanes reading as one wide obstacle.
-      expect(Math.abs(a.x - b.x), `${a.name} and ${b.name} are one obstacle`).toBeGreaterThan(
-        DEFAULT_CONFIG.bodySpread,
-      );
+    for (const [label, cfg, bodies] of FIELDS) {
+      for (const r of rows(cfg, bodies).filter((x) => x.length === 2)) {
+        const [a, b] = [r[0]!, r[1]!];
+        expect(Math.sign(a.x - cx), `${label}: ${a.name} and ${b.name} are on the same side`).toBe(
+          -Math.sign(b.x - cx),
+        );
+        // Far enough apart that the lookahead a press uses has an unambiguous
+        // answer, rather than the two lanes reading as one wide obstacle.
+        expect(
+          Math.abs(a.x - b.x),
+          `${label}: ${a.name} and ${b.name} are one obstacle`,
+        ).toBeGreaterThan(cfg.bodySpread);
+      }
     }
   });
 
   it('spaces rows at the configured distance, within jitter', () => {
-    const rs = rows(DEFAULT_CONFIG);
-    const spacing = DEFAULT_CONFIG.bodySpacing;
-    for (let i = 1; i < rs.length; i++) {
-      const dy = Math.abs(rowY(rs[i]!) - rowY(rs[i - 1]!));
-      expect(dy).toBeGreaterThan(spacing * 0.85);
-      expect(dy).toBeLessThan(spacing * 1.15);
+    for (const [label, cfg, bodies] of FIELDS) {
+      const rs = rows(cfg, bodies);
+      const spacing = cfg.bodySpacing;
+      for (let i = 1; i < rs.length; i++) {
+        const dy = Math.abs(rowY(rs[i]!) - rowY(rs[i - 1]!));
+        expect(dy, label).toBeGreaterThan(spacing * 0.85);
+        expect(dy, label).toBeLessThan(spacing * 1.15);
+      }
     }
   });
 
@@ -110,40 +197,58 @@ describe('world generation', () => {
     // around 44, the next body is on screen while still in orbit around this one.
     // Measured to the NEAREST body of the next row, because that is the one the
     // release is actually aimed at when the row forks.
-    const rs = rows(DEFAULT_CONFIG);
-    for (let i = 1; i < rs.length; i++) {
-      for (const from of rs[i - 1]!) {
-        const reach = Math.min(...rs[i]!.map((to) => hypot(from.x - to.x, from.y - to.y) - to.R));
-        expect(reach, `nothing is in view from ${from.name}`).toBeLessThan(380);
+    //
+    // This is the tightest of the swept properties — the worst seed of 20,000
+    // reaches 370 against the 380 asserted here — so it is also the one most
+    // worth sweeping. Widening `bodySpacing`, `bodyWeave` or `bodySpread` will
+    // break this at some seed before it breaks at the shipped one.
+    for (const [label, cfg, bodies] of FIELDS) {
+      const rs = rows(cfg, bodies);
+      for (let i = 1; i < rs.length; i++) {
+        for (const from of rs[i - 1]!) {
+          const reach = Math.min(...rs[i]!.map((to) => hypot(from.x - to.x, from.y - to.y) - to.R));
+          expect(reach, `${label}: nothing is in view from ${from.name}`).toBeLessThan(380);
+        }
       }
     }
   });
 
   it('never overlaps two bodies', () => {
-    const bodies = createBodies(DEFAULT_CONFIG);
-    for (let i = 0; i < bodies.length; i++) {
-      for (let j = i + 1; j < bodies.length; j++) {
-        const a = bodies[i]!;
-        const b = bodies[j]!;
-        const gap = hypot(a.x - b.x, a.y - b.y) - a.R - b.R;
-        expect(gap, `${a.name} overlaps ${b.name}`).toBeGreaterThan(DEFAULT_CONFIG.minOrbitGap * 2);
+    for (const [label, cfg, bodies] of FIELDS) {
+      for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+          const a = bodies[i]!;
+          const b = bodies[j]!;
+          const gap = hypot(a.x - b.x, a.y - b.y) - a.R - b.R;
+          expect(gap, `${label}: ${a.name} overlaps ${b.name}`).toBeGreaterThan(
+            cfg.minOrbitGap * 2,
+          );
+        }
       }
     }
   });
 
   it('keeps every body inside the playfield', () => {
-    const bodies = createBodies(DEFAULT_CONFIG);
-    const fb = fieldBounds(DEFAULT_CONFIG, bodies);
-    for (const b of bodies) {
-      expect(b.x - b.R, `${b.name} crosses the left boundary`).toBeGreaterThan(fb.left);
-      expect(b.x + b.R, `${b.name} crosses the right boundary`).toBeLessThan(fb.right);
+    for (const [label, cfg, bodies] of FIELDS) {
+      const fb = fieldBounds(cfg, bodies);
+      for (const b of bodies) {
+        expect(b.x - b.R, `${label}: ${b.name} crosses the left boundary`).toBeGreaterThan(fb.left);
+        expect(b.x + b.R, `${label}: ${b.name} crosses the right boundary`).toBeLessThan(fb.right);
+      }
     }
   });
 
   it('extends the climb rather than just adding bodies', () => {
+    // How tall the field ends up is seed-dependent, because a fork spends two of
+    // the fixed `bodyCount` on a single row: measured over 20,000 seeds the climb
+    // runs 1.88x to 2.91x the prototype's height, median 2.35x. So the bound is
+    // 1.7x rather than the 2x that held when there was only one field to check —
+    // the point of the assertion is that bodies are buying HEIGHT rather than
+    // being packed into the same stretch, and every seed clears that by a margin.
     const short = createBodies(PROTOTYPE_CONFIG);
-    const long = createBodies(DEFAULT_CONFIG);
-    const top = (bs: typeof long) => Math.min(...bs.map((b) => b.y));
-    expect(top(long)).toBeLessThan(top(short) * 2);
+    const top = (bs: ReturnType<typeof createBodies>) => Math.min(...bs.map((b) => b.y));
+    for (const [label, , bodies] of FIELDS) {
+      expect(top(bodies), label).toBeLessThan(top(short) * 1.7);
+    }
   });
 });

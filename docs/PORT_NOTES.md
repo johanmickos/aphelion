@@ -642,6 +642,53 @@ and the ship visibly falls toward it, which is what is actually happening.
 because three places need it and must agree — `stepSim` ends the run at it,
 `drawBacktrackFloor` paints it, and the camera refuses to descend past it.
 
+### 26 — The field's seed was a constant, so the field could not be a choice
+
+`src/sim/world.ts` · `src/sim/config.ts` · **[CHANGED]**
+
+`WORLD_SEED` was a module constant, on the reasoning that every player should
+climb the same field and a replay must reconstruct it exactly. The second half of
+that is a real constraint; the first half was a decision, and NEW FIELD reverses
+it.
+
+The seed is now `SimConfig.worldSeed`, which is what makes the reversal cheap: a
+run is `(config, seed, inputLog)`, a report already carries the FULL config, and
+`configFromReport` fills a missing key from `PROTOTYPE_CONFIG` — so the 34 reports
+recorded before this replay on precisely the field they were played on, because
+that is the value the constant held. Nothing about the report schema moved.
+
+The equality gate is untouched at zero: `PROTOTYPE_CONFIG` sets
+`proceduralLayout: false` and the eight authored bodies are placed by hand, so the
+key is never read there. The golden was recaptured because the golden stores the
+config, not because any number in it moved.
+
+**What actually needed work was the tests.** Every playability property in
+`test/world.test.ts` was asserted against one field, which cannot distinguish a
+generator that works from a generator that got lucky. Swept over 20,000 seeds the
+geometry holds with room to spare — closest two bodies 82px against a required
+24, every body 155px inside the playfield, worst next-row reach 370px against a
+380 limit — but two assertions were statements about that one seed:
+
+- **Fork fraction.** 0.76% of seeds fall outside the asserted 0.2-0.6. How many
+  rows fork is a binomial draw over ~43 rows, so the spread is the generator being
+  random, not broken; the range runs 0.132 to 0.714. The per-seed band is now wide
+  and the mean is asserted separately, which is where a real change to the fork
+  rate shows up.
+- **Climb height.** A fork spends two of a fixed `bodyCount` on one row, so a
+  fork-heavy seed builds a shorter climb: 1.88x to 2.91x the prototype's height
+  against an asserted 2x. The bound is 1.7x now, and the assertion still says what
+  it meant — bodies buy height rather than packing the same stretch.
+
+The test file sweeps 64 fixed seeds, generated from a seeded RNG so a failure
+names a seed that can be reproduced by hand.
+
+**Known wart, fixed alongside:** a randomised field would have tripped the replay
+header's "THIS REPORT CAME FROM A DIFFERENT BUILD" banner, which fired on any
+config difference at all — the same flaw that made it fire when a player had
+merely moved a tune slider. The header now separates the three cases: keys in
+`KNOBS` are a deliberate experiment, `worldSeed` is a different world, and
+everything else is build skew, which is the only one the banner is about.
+
 ---
 
 ## Tuning vs. fidelity
@@ -667,9 +714,9 @@ scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
 tests    port-equality 11 · invariants 32 · render 79 · camera 34
-         diagnostics 18 · backtrack 15 · world 11 · tune 7 · clearance 6
-         score 60 · input 8 · grab-target 8
-         289 total
+         diagnostics 25 · backtrack 15 · world 14 · tune 7 · clearance 6
+         score 60 · input 8 · grab-target 8 · link-fuel 6
+         305 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
