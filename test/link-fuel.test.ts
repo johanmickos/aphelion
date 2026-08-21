@@ -111,12 +111,14 @@ describe('the link fuel refund', () => {
     expect(r.after).toBe(DEFAULT_CONFIG.fuelMax);
   });
 
-  it('is worth about one capture at the top of the envelope', () => {
-    // The number is sized against measured play: an earned capture costs a median
-    // 23-26 fuel across two recorded sessions, so a release at the peak roughly
-    // pays for its own capture and a median one (~0.15 of the envelope) does not.
-    // If this ever fails, the sizing rationale in config.ts is out of date.
-    expect(DEFAULT_CONFIG.linkFuelReward).toBeGreaterThanOrEqual(20);
-    expect(DEFAULT_CONFIG.linkFuelReward).toBeLessThanOrEqual(30);
+  it('recovers most of a capture at the top of the envelope, and never all of it', () => {
+    // Sized against measured play: an earned capture costs a median 23-26 fuel, so
+    // staying under that floor is what keeps even a perfect release short of fully
+    // self-fuelling — the first session played at 25 never dropped below 39 fuel,
+    // which is the constraint removed rather than conditioned. Staying well above
+    // half of it is what keeps the refund worth aiming for at all.
+    // If this fails, the sizing rationale in config.ts is out of date.
+    expect(DEFAULT_CONFIG.linkFuelReward).toBeGreaterThan(12);
+    expect(DEFAULT_CONFIG.linkFuelReward).toBeLessThan(23);
   });
 });

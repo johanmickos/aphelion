@@ -82,9 +82,18 @@ export interface SimConfig {
    * WHY IT IS SCALED AND NOT FLAT. A flat refund is a subsidy, not a reward. Swept
    * against both sessions, a flat 3 per link — 13% of a capture — already erases
    * every low-fuel moment in the 70-second chain, because a long chain collects it
-   * many times. Scaling by the boost envelope keeps the condition the point:
-   * at the measured median release (0.15) it returns about 4, at a good one (0.5)
-   * about 12, and only near the peak does a capture fully pay for itself.
+   * many times. Scaling by the boost envelope keeps the condition the point: only
+   * a release near the peak comes close to paying for its own capture.
+   *
+   * WHY 20 AND NOT 25. It shipped at 25 and came down after the first session
+   * played with it, which is also the first session that could be read properly:
+   * a 16-link chain never dropped below 39 fuel and spent none of its life under
+   * a quarter tank, against 4 and 18% before the refund existed. That is the
+   * constraint removed rather than conditioned. The same session doubled the
+   * median release from 0.15 to 0.30 of the envelope, so the refund is compounding
+   * on releases that are themselves getting better — which is the intended
+   * feedback, and the reason to leave headroom rather than pay the full cost of a
+   * capture back.
    *
    * WHY THE BOOST ENVELOPE. It is the axis the player is already being asked to
    * play and the one that does not currently pay: as points the peak is worth
@@ -362,7 +371,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyBrake: 600,
   flybyFuelPerSec: 40,
   fuelRegen: 30,
-  linkFuelReward: 25,
+  linkFuelReward: 20,
   fieldWidthFrac: 1.9,
   bodyCount: 60,
   backtrackLimit: 700,
