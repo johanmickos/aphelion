@@ -15,7 +15,7 @@ import {
 import { Starfield } from '../src/render/starfield.ts';
 import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
-import { boostColor, drawBoostHalo } from '../src/render/capture.ts';
+import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture.ts';
 import { drawFuelGauge, drawScore, formatScore, readoutLines } from '../src/render/hud.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
@@ -531,6 +531,7 @@ describe('floating score popups', () => {
       close: 0.4,
       clearance: 140,
       skim: 90,
+      defl: 3,
       timing: 0.1,
       aim: 0.2,
       climb: 400,
@@ -641,6 +642,7 @@ describe('the score band', () => {
     close: 0.84,
     clearance: 32,
     skim: 40,
+    defl: 3,
     timing: 0.91,
     aim: 0.96,
     climb: 412,
@@ -727,6 +729,60 @@ describe('the score band', () => {
   });
 });
 
+describe('the predicted capture path', () => {
+  const bodies = createBodies(DEFAULT_CONFIG);
+
+  const diving = (over = {}) => ({
+    ...captureSnapshot(createInitialState(DEFAULT_CONFIG), true, DEFAULT_CONFIG),
+    capture: captureOf({ phase: 'clear' as const, orbit: null, ...over }),
+  });
+
+  it('draws something while the grab is still unbound', () => {
+    // The old code gave up here — "a hyperbola has no ellipse to draw" — which
+    // left the first stretch of every fast grab blank. Measured on a real
+    // session: 23 ticks of nothing at the moment of commitment.
+    const r = recordingContext();
+    drawOrbitCurve(r.ctx, cam(), DEFAULT_CONFIG, diving({ vx: 900, vy: 0 }), bodies[0]!);
+    expect(r.calls('lineTo').length, 'no path drawn for an unbound grab').toBeGreaterThan(4);
+  });
+
+  it('leaves a hyperbola open and closes a bound orbit', () => {
+    const open = recordingContext();
+    drawOrbitCurve(open.ctx, cam(), DEFAULT_CONFIG, diving({ vx: 900, vy: 0 }), bodies[0]!);
+    expect(open.calls('closePath')).toHaveLength(0);
+
+    const shut = recordingContext();
+    drawOrbitCurve(
+      shut.ctx,
+      cam(),
+      DEFAULT_CONFIG,
+      {
+        ...captureSnapshot(createInitialState(DEFAULT_CONFIG), true, DEFAULT_CONFIG),
+        capture: captureOf({ phase: 'orbit', orbit: { a: 100, e: 0.2, argp: 0, dir: 1 } }),
+      },
+      bodies[0]!,
+    );
+    expect(shut.calls('closePath').length).toBeGreaterThan(0);
+  });
+
+  it('never draws inside the minimum orbit, or off to infinity', () => {
+    for (const v of [200, 500, 900, 2000]) {
+      const r = recordingContext();
+      const anchor = bodies[0]!;
+      drawOrbitCurve(r.ctx, cam(), DEFAULT_CONFIG, diving({ vx: v, vy: 0 }), anchor);
+      const c = cam();
+      for (const [, x, y] of r.calls('lineTo') as Array<[string, number, number]>) {
+        expect(Number.isFinite(x) && Number.isFinite(y), `non-finite at v=${v}`).toBe(true);
+        const wx = (x - c.offsetX) / c.scale + c.left;
+        const wy = (y - c.offsetY) / c.scale + c.centerY - c.viewH / 2;
+        const rr = Math.hypot(wx - anchor.x, wy - anchor.y);
+        expect(rr).toBeGreaterThanOrEqual(58 - 1e-6);
+        expect(rr).toBeLessThanOrEqual(901);
+      }
+    }
+  });
+});
+
 describe('release compass', () => {
   const anchor = createBodies(DEFAULT_CONFIG)[0]!;
   const orbit = { a: 90, e: 0.15, argp: 0.4, dir: 1 };
@@ -805,15 +861,79 @@ describe('release compass', () => {
     }
   });
 
-  it('draws nothing before the orbit exists', () => {
-    const c = cam();
+  /**
+   * This used to assert the compass drew NOTHING before the orbit froze, and that
+   * was the bug: measured on a real session, a grab spent 2.0 seconds diving with
+   * no gauge at all — the whole stretch in which a player is deciding where the
+   * capture is taking them. It now signposts the predicted orbit instead.
+   */
+  const diveSnap = (over = {}) => ({
+    ...captureSnapshot(createInitialState(DEFAULT_CONFIG), true, DEFAULT_CONFIG),
+    capture: captureOf({ phase: 'clear' as const, orbit: null, ...over }),
+  });
+
+  it('signposts the predicted orbit while still diving', () => {
     const r = recordingContext();
     const bodies = createBodies(DEFAULT_CONFIG);
-    const diving = {
-      ...captureSnapshot(createInitialState(DEFAULT_CONFIG), true, DEFAULT_CONFIG),
-      capture: captureOf({ phase: 'clear', orbit: null }),
+    drawCompass(r.ctx, cam(), DEFAULT_CONFIG, rcfg, diveSnap(), bodies, 0);
+    expect(r.ops.length, 'nothing drawn during the dive').toBeGreaterThan(0);
+    expect((r.calls('fillText') as Array<[string, string]>).length).toBeGreaterThan(0);
+  });
+
+  it('promises no alignment until the orbit is real', () => {
+    // A release before periapsis earns nothing, so the ship's glow — which says
+    // "let go now and it counts" — must stay dark however well lined up it looks.
+    const r = recordingContext();
+    const bodies = createBodies(DEFAULT_CONFIG);
+    const res = drawCompass(r.ctx, cam(), DEFAULT_CONFIG, rcfg, diveSnap(), bodies, 0);
+    expect(res.bestAlign).toBe(0);
+  });
+
+  it('draws the dive gauge fainter than the settled one', () => {
+    const bodies = createBodies(DEFAULT_CONFIG);
+    // Property sets are recorded as `=strokeStyle` / `=fillStyle`.
+    const alphaOf = (r: ReturnType<typeof recordingContext>): number => {
+      const alphas = r.ops
+        .filter((o) => o[0] === '=strokeStyle' || o[0] === '=fillStyle')
+        .map((o) => String(o[1]))
+        .filter((v) => v.startsWith('rgba('))
+        .map((v) => Number(v.slice(0, -1).split(',').pop()))
+        .filter((n) => Number.isFinite(n));
+      expect(alphas.length, 'no rgba styles recorded').toBeGreaterThan(0);
+      return Math.max(...alphas);
     };
-    const res = drawCompass(r.ctx, c, DEFAULT_CONFIG, rcfg, diving, bodies, 0);
+    const dive = recordingContext();
+    drawCompass(dive.ctx, cam(), DEFAULT_CONFIG, rcfg, diveSnap(), bodies, 0);
+    const settled = recordingContext();
+    drawCompass(
+      settled.ctx,
+      cam(),
+      DEFAULT_CONFIG,
+      rcfg,
+      {
+        ...captureSnapshot(createInitialState(DEFAULT_CONFIG), true, DEFAULT_CONFIG),
+        capture: captureOf({ phase: 'orbit', orbit: { a: 100, e: 0, argp: 0, dir: 1 } }),
+      },
+      bodies,
+      0,
+    );
+    expect(alphaOf(dive)).toBeLessThan(alphaOf(settled));
+  });
+
+  it('still draws nothing when the grab is too fast to have an orbit at all', () => {
+    // A hyperbola has no release point to signpost. The predicted-orbit path must
+    // not invent one.
+    const r = recordingContext();
+    const bodies = createBodies(DEFAULT_CONFIG);
+    const res = drawCompass(
+      r.ctx,
+      cam(),
+      DEFAULT_CONFIG,
+      rcfg,
+      diveSnap({ vx: 2000, vy: 0 }),
+      bodies,
+      0,
+    );
     expect(res.bestAlign).toBe(0);
     expect(r.ops).toHaveLength(0);
   });

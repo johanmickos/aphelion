@@ -4,7 +4,6 @@
 import type { Body } from '../sim/types.ts';
 import type { SimConfig } from '../sim/config.ts';
 import { orbitRadius, predictedCaptureOrbit } from '../sim/orbit.ts';
-import type { Orbit } from '../sim/types.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
@@ -28,24 +27,44 @@ export function drawOrbitCurve(
   if (!cap) return;
 
   const settled = cap.orbit !== null && (cap.phase === 'settle' || cap.phase === 'orbit');
-  const orbit = settled ? cap.orbit! : liveOrbit(sim, cap);
-  if (!orbit) return;
+  const path = settled ? null : livePath(sim, cap);
+  if (!settled && !path) return;
 
   const tighten = settled ? sim.tightenFrac * cap.settleProgress : 0;
   const rPeri = settled ? cap.rPeri : 0;
 
   ctx.beginPath();
-  for (let k = 0; k <= 90; k++) {
-    const ang = (k / 90) * Math.PI * 2;
-    // The floor is real: the simulation clamps to minR, so the drawn curve does
-    // too rather than showing a dive through the planet.
-    const rr = Math.max(cap.minR, orbitRadius(orbit, rPeri, ang, tighten));
-    const x = toScreenX(cam, anchor.x + Math.cos(ang) * rr);
-    const y = toScreenY(cam, anchor.y + Math.sin(ang) * rr);
-    if (k === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  if (settled) {
+    for (let k = 0; k <= 90; k++) {
+      const ang = (k / 90) * Math.PI * 2;
+      // The floor is real: the simulation clamps to minR, so the drawn curve does
+      // too rather than showing a dive through the planet.
+      const rr = Math.max(cap.minR, orbitRadius(cap.orbit!, rPeri, ang, tighten));
+      const x = toScreenX(cam, anchor.x + Math.cos(ang) * rr);
+      const y = toScreenY(cam, anchor.y + Math.sin(ang) * rr);
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  } else {
+    // An open arc rather than a closed loop: on a fast grab this is a hyperbola,
+    // and a hyperbola does not come back.
+    const { p, e, argp, span } = path!;
+    let started = false;
+    for (let k = 0; k <= 120; k++) {
+      const ang = argp - span + (k / 120) * span * 2;
+      const denom = 1 + e * Math.cos(ang - argp);
+      if (denom <= 1e-6) continue;
+      const rr = Math.max(cap.minR, Math.min(PREVIEW_MAX_R, p / denom));
+      const x = toScreenX(cam, anchor.x + Math.cos(ang) * rr);
+      const y = toScreenY(cam, anchor.y + Math.sin(ang) * rr);
+      if (!started) {
+        ctx.moveTo(x, y);
+        started = true;
+      } else ctx.lineTo(x, y);
+    }
+    if (!started) return;
   }
-  ctx.closePath();
   // Settled: this is the curve. Diving: this is a prediction, drawn fainter and
   // finer so it reads as provisional.
   ctx.strokeStyle = settled ? 'rgba(185,140,255,.35)' : 'rgba(185,140,255,.18)';
@@ -55,8 +74,11 @@ export function drawOrbitCurve(
   ctx.setLineDash([]);
 }
 
+/** How far out a predicted path is worth drawing, in world units. */
+const PREVIEW_MAX_R = 900;
+
 /**
- * The ellipse the ship is on right now, for the dive.
+ * The conic the ship is on right now, for the dive.
  *
  * The frozen orbit only exists from periapsis onward, so the prototype showed
  * nothing for up to half a revolution and then produced a ring already formed.
@@ -64,12 +86,30 @@ export function drawOrbitCurve(
  * as the dive proceeds — measured against the simulation, the predicted periapsis
  * lands exactly on the actual one.
  *
- * Returns null for an unbound grab: a hyperbola has no ellipse to draw.
+ * It used to give up on an unbound grab, on the reasoning that a hyperbola has no
+ * ellipse to draw. True, and the wrong conclusion: the first stretch of a fast
+ * grab is exactly when the player most wants to know where they are being taken,
+ * and it showed them nothing. Measured on a real session, a grab spent 23 ticks
+ * unbound before the brake pulled it closed — 0.4s of blank screen at the moment
+ * of commitment.
+ *
+ * Both conics are the same curve in polar form, `r = p / (1 + e cos(th - argp))`,
+ * once it is written with the semi-latus rectum instead of the semi-major axis —
+ * `a` is what goes infinite at escape speed, `p` does not. `span` is the angular
+ * half-width worth drawing: a full turn for a closed orbit, and for a hyperbola
+ * the asymptote at `acos(-1/e)`, backed off so the arms stop before they run to
+ * infinity.
  */
-function liveOrbit(sim: SimConfig, cap: NonNullable<RenderSnapshot['capture']>): Orbit | null {
+function livePath(
+  sim: SimConfig,
+  cap: NonNullable<RenderSnapshot['capture']>,
+): { p: number; e: number; argp: number; span: number } | null {
   const o = predictedCaptureOrbit(sim, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
-  if (!o.bound || !Number.isFinite(o.a)) return null;
-  return { a: o.a, e: o.e, argp: o.argp, dir: o.dir };
+  if (!Number.isFinite(o.e) || !Number.isFinite(o.periapsis) || o.periapsis <= 0) return null;
+  const p = o.periapsis * (1 + o.e);
+  if (!Number.isFinite(p) || p <= 0) return null;
+  const span = o.e < 1 ? Math.PI : Math.acos(-1 / o.e) * 0.92;
+  return { p, e: o.e, argp: o.argp, span };
 }
 
 /**

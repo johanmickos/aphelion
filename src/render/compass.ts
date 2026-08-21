@@ -10,7 +10,7 @@
 import type { Body } from '../sim/types.ts';
 import { AIM_RANGE, readAim } from '../score/aim.ts';
 import type { SimConfig } from '../sim/config.ts';
-import { orbitRadius } from '../sim/orbit.ts';
+import { orbitRadius, predictedCaptureOrbit } from '../sim/orbit.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
@@ -52,16 +52,43 @@ export function drawCompass(
   timeMs: number,
 ): CompassResult {
   const cap = snap.capture;
-  if (!cap?.orbit || (cap.phase !== 'settle' && cap.phase !== 'orbit')) return { bestAlign: 0 };
+  if (!cap) return { bestAlign: 0 };
   const anchor = bodies[cap.planet];
   if (!anchor) return { bestAlign: 0 };
 
-  const tighten = sim.tightenFrac * cap.settleProgress;
+  const frozen = cap.orbit !== null && (cap.phase === 'settle' || cap.phase === 'orbit');
+
+  /**
+   * Before periapsis there is no frozen orbit, and the compass used to show
+   * nothing at all until there was. Measured on a real session that was 2.0
+   * seconds of blank sky from the grab — the entire dive, which is precisely when
+   * a player is deciding where this capture is taking them.
+   *
+   * The predicted orbit is good enough to signpost with: it converges on the real
+   * one as the dive proceeds and its periapsis lands on the actual one. It is
+   * drawn faint, and it deliberately reports NO alignment, so the ship's release
+   * glow still means "let go now and it counts" — which before periapsis it does
+   * not, since a release that never froze an orbit earns nothing.
+   */
+  let orbit = cap.orbit;
+  let rPeri = cap.rPeri;
+  if (!frozen) {
+    const o = predictedCaptureOrbit(sim, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
+    if (!o.bound || !Number.isFinite(o.a) || o.periapsis <= 0) return { bestAlign: 0 };
+    orbit = { a: o.a, e: o.e, argp: o.argp, dir: o.dir };
+    rPeri = o.periapsis;
+  }
+  if (!orbit) return { bestAlign: 0 };
+
+  const tighten = frozen ? sim.tightenFrac * cap.settleProgress : 0;
   const shipAng = Math.atan2(cap.ry, cap.rx);
-  const aim = readAim(cap.orbit, cap.rPeri, tighten, bodies, cap.planet, shipAng);
+  const aim = readAim(orbit, rPeri, tighten, bodies, cap.planet, shipAng);
   if (aim.targets.length === 0) return { bestAlign: 0 };
 
-  const orbitRnow = orbitRadius(cap.orbit, cap.rPeri, shipAng, tighten);
+  // Provisional while the orbit is still being flown into existence.
+  const fade = frozen ? 1 : 0.45;
+
+  const orbitRnow = orbitRadius(orbit, rPeri, shipAng, tighten);
   // Anchored to the radius the orbit settles at, so the rings do not pump in and
   // out as the ship sweeps its orbit.
   const gaugeR = cap.rPeri * (1 - rcfg.gaugeFollow) + orbitRnow * rcfg.gaugeFollow;
@@ -80,7 +107,7 @@ export function drawCompass(
     outermost = Math.max(outermost, ringR);
 
     const c = HUES[ti % HUES.length]!;
-    const dim = t.blocked ? 0.3 : 1;
+    const dim = (t.blocked ? 0.3 : 1) * fade;
     const near = t.align > 0.9 && !t.blocked;
     const pulse = near ? 0.6 + 0.4 * Math.sin(timeMs / 90) : 1;
 
@@ -122,7 +149,7 @@ export function drawCompass(
   ctx.beginPath();
   ctx.moveTo(cx + ux * gaugeR * s, cy + uy * gaugeR * s);
   ctx.lineTo(cx + ux * outermost * s, cy + uy * outermost * s);
-  ctx.strokeStyle = 'rgba(255,255,255,.28)';
+  ctx.strokeStyle = `rgba(255,255,255,${(0.28 * fade).toFixed(3)})`;
   ctx.lineWidth = Math.max(1, s);
   ctx.stroke();
 
@@ -130,11 +157,12 @@ export function drawCompass(
     const ringR = ringFor(t.distance);
     ctx.beginPath();
     ctx.arc(cx + ux * ringR * s, cy + uy * ringR * s, 2.5 * s, 0, TAU);
-    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.fillStyle = `rgba(255,255,255,${(0.9 * fade).toFixed(3)})`;
     ctx.fill();
   }
 
-  return { bestAlign: aim.best };
+  // No alignment reported until the orbit is real — see the note above.
+  return { bestAlign: frozen ? aim.best : 0 };
 }
 
 /**
