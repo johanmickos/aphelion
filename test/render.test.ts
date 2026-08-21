@@ -5,7 +5,13 @@
 import { describe, expect, it } from 'vitest';
 import { recordingContext } from './canvas-stub.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
-import { createCamera, fitCamera, snapCamera, toScreenX, toScreenY } from '../src/render/camera.ts';
+import {
+  centerCamera,
+  createCamera,
+  fitCamera,
+  toScreenX,
+  toScreenY,
+} from '../src/render/camera.ts';
 import { Starfield } from '../src/render/starfield.ts';
 import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
@@ -32,7 +38,7 @@ const field = fieldBounds(DEFAULT_CONFIG, createBodies(DEFAULT_CONFIG));
 function cam() {
   const c = createCamera(rcfg);
   fitCamera(c, { w: 390, h: 844, dpr: 1 });
-  snapCamera(c, rcfg, 195, 0, field);
+  centerCamera(c, 195, 0, field);
   return c;
 }
 
@@ -250,7 +256,7 @@ describe('scene', () => {
 
       const snap = captureSnapshot(state, held, DEFAULT_CONFIG);
       scene.trail.sample(snap.x, snap.y);
-      snapCamera(c, rcfg, snap.x, snap.y, f);
+      centerCamera(c, snap.x, snap.y, f);
 
       r.reset();
       scene.draw(r.ctx, c, snap, {
@@ -284,7 +290,7 @@ describe('scene', () => {
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
     const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
-    snapCamera(c, rcfg, snap.x, snap.y, f);
+    centerCamera(c, snap.x, snap.y, f);
     const r = recordingContext();
     scene.draw(r.ctx, c, snap, {
       timeMs: 0,
@@ -705,7 +711,7 @@ describe('edge markers point up the climb', () => {
     const c = cam();
     const state = createInitialState(sim);
     const snap = { ...captureSnapshot(state, false, sim), x: 195, y: shipY };
-    snapCamera(c, rcfg, snap.x, snap.y, field);
+    centerCamera(c, snap.x, snap.y, field);
     const r = recordingContext();
     drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies);
     // each arrow is translate(ex, ey) followed by rotate
@@ -716,7 +722,7 @@ describe('edge markers point up the climb', () => {
     // partway up the field, so there are bodies both above and below
     const shipY = bodies[6]!.y;
     const c = cam();
-    snapCamera(c, rcfg, 195, shipY, field);
+    centerCamera(c, 195, shipY, field);
     const middle = c.offsetY + (c.viewH * c.scale) / 2;
     const ys = markerYs(shipY);
     expect(ys.length, 'no markers drawn at all').toBeGreaterThan(0);
@@ -824,7 +830,7 @@ describe('edge markers clear the header text', () => {
     // partway up, so several bodies are off-screen above
     const shipY = bodies[8]!.y + 200;
     const snap = { ...captureSnapshot(state, false, sim), x: 195, y: shipY };
-    snapCamera(c, rcfg, snap.x, snap.y, field);
+    centerCamera(c, snap.x, snap.y, field);
 
     const r = recordingContext();
     drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies, HEADER_BOTTOM);
@@ -844,7 +850,7 @@ describe('edge markers clear the header text', () => {
     const state = createInitialState(sim);
     // a body far off to one side, so the ray exits through a vertical edge
     const snap = { ...captureSnapshot(state, false, sim), x: -600, y: bodies[4]!.y };
-    snapCamera(c, rcfg, snap.x, snap.y, field);
+    centerCamera(c, snap.x, snap.y, field);
     const r = recordingContext();
     drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies, HEADER_BOTTOM);
     const xs = (r.calls('translate') as Array<[string, number, number]>).map((o) => o[1]);

@@ -64,8 +64,8 @@ the string is the dead branch of the dispatch guard at index.html:485. The `clea
 phase carries the entire dive, long after `clearFramesLeft` reaches zero after 5
 frames.
 
-This matters because `docs/DESIGN.md` §2 documents `whip` as a distinct state with
-its own row and description. **Anyone porting from the document rather than the
+This matters because the prototype's design document described `whip` as a
+distinct state with its own row and description. **Anyone porting from the document rather than the
 code would have built a state machine the prototype does not have.** The
 `whipE` / `whipVmax` energy tracking is live; only the label is fiction.
 
@@ -81,7 +81,7 @@ sample of every capture therefore reports the angle between the position and
 velocity vectors rather than a turn — measured at ~160° on a typical grab.
 
 Consequence: the prototype's SMOOTH/KINK pill reads "1 KINK" for _every_ capture,
-including perfectly clean ones. The metric `DESIGN.md` §3 calls "the single most
+including perfectly clean ones. The metric the design document called "the single most
 important smoothness metric" has a false positive on every run.
 
 Reproduced because it is pure telemetry and never feeds back into physics. The
@@ -254,11 +254,12 @@ surfaced only because the gate compares fuel too. `stepDrift` now returns a
 the capture. Nothing anywhere read it — confirmed by grep and by a sensitivity
 sweep, where all four weights moved a trajectory by exactly zero.
 
-`DESIGN.md` §9 describes it as a live mechanic: *"Aim sets tightness monotonically
+The prototype's design document described it as a live mechanic: *"Aim sets tightness monotonically
 — precise = tight/fast, lazy = wide."* That is not what happens. Tightness is
 derived geometrically in `freezeOrbit` from `(grabR - rPeri) / span`, which is how
 deep the dive went, not how well it was aimed. `aim` is vestigial from an earlier
 design — the same class of documentation drift as the `whip` phase in note 4.
+(That document has since been retired; what survived it is in `docs/FEEL.md`.)
 
 Removed, along with five other write-only capture fields found in the same sweep:
 `grabSpeed`, `inboundFrac`, `natPeri`, `isFlyby` and `whipVmax`. None could affect
@@ -379,6 +380,13 @@ port equality vs index.html   10/10 scenarios, divergence exactly 0
                               position · velocity · fuel · phase
 phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
-invariants                    31 tests
 golden baseline               golden/physics-v1.json
+
+tests    port-equality 11 · invariants 31 · render 48 · camera 30
+         diagnostics 13 · backtrack 11 · world 9 · tune 6
 ```
+
+What the gate proves, precisely: `src/sim` reproduces `index.html` under
+PROTOTYPE_CONFIG and one documented substitution (note 16), to zero divergence.
+It says nothing about DEFAULT_CONFIG, which has diverged deliberately — see
+"Tuning vs. fidelity" above, and the reasons recorded at each value's declaration.

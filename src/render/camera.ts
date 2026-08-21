@@ -154,18 +154,6 @@ export function followCamera(
   cam.centerY += (t.centerY - cam.centerY) * k;
 }
 
-export function snapCamera(
-  cam: Camera,
-  cfg: RenderConfig,
-  shipX: number,
-  shipY: number,
-  field: { left: number; right: number; width: number },
-): void {
-  const t = cameraTarget(cam, cfg, shipX, shipY, field);
-  cam.left = t.left;
-  cam.centerY = t.centerY;
-}
-
 export function toScreenX(cam: Camera, wx: number): number {
   return cam.offsetX + (wx - cam.left) * cam.scale;
 }

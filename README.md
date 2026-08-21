@@ -47,12 +47,13 @@ pnpm build            # production bundle into dist/
 index.html            The prototype. IMMUTABLE reference material — never edit it.
 app/                  The playable shell (Vite root).
 src/sim/              The simulation. No DOM, no dependencies, no bundler syntax.
-src/render/           Camera, letterboxing. Everything that knows about pixels.
-src/app/              The fixed-timestep loop.
-tools/                Headless harness, golden capture, QR generator + Vite plugin.
-test/                 The equality gate, invariants, scenario matrix.
+src/render/           Camera, scene, HUD, compass. Everything that knows about pixels.
+src/app/              The fixed-timestep loop, run lifecycle, tuning, diagnostics.
+tools/                Headless harness, golden capture, replay, QR + Vite plugins.
+test/                 The equality gate, invariants, scenario matrix, render guards.
 golden/               Recorded reference trajectories.
-docs/                 DESIGN.md (current), PORT_NOTES.md (the port record).
+docs/                 FEEL.md (what it should feel like, and what not to retry).
+                      PORT_NOTES.md (what the port changed and why).
 ```
 
 **`index.html` is the reference implementation and must not be modified.** It is
@@ -69,6 +70,12 @@ The simulation is a **verbatim port** of the prototype, and a test proves it:
 pnpm test → port equality vs index.html: 10 scenarios, divergence exactly 0
             (position · velocity · fuel · phase)
 ```
+
+Precisely: the port reproduces the prototype under `PROTOTYPE_CONFIG`, which is
+frozen and never edited. The game runs `DEFAULT_CONFIG`, which starts from it and
+diverges deliberately — every difference is documented at its declaration in
+`src/sim/config.ts`. That split is what lets the game be tuned without ever
+weakening the proof.
 
 `tools/prototype-harness.ts` loads `index.html` into a `node:vm` context behind a
 minimal DOM stub with an injected clock, and drives it at a fixed timestep. The
@@ -121,7 +128,8 @@ ten-minute run is under a kilobyte and can be pasted straight into a chat.
 While playing:
 
 1. Press **⚑** the moment something feels wrong. It stamps the current tick and
-   does not interrupt play, so keep going.
+   does not interrupt play, so keep going. (`RESET` will ask before discarding
+   flags you have not sent.)
 2. Press **DIAG**, describe what happened, then either:
    - **SEND TO DEV SERVER** — the report is posted straight to the running dev
      server, replayed, and the analysis is printed in the laptop terminal
@@ -173,9 +181,9 @@ contact) and a window around each moment you flagged.
 
 ## Design notes
 
-- [`docs/DESIGN.md`](docs/DESIGN.md) — the current design and the phase-clock
-  capture architecture. Note that it documents a `whip` phase the code does not
-  have; see PORT_NOTES 4. Treat the code as authoritative.
+- [`docs/FEEL.md`](docs/FEEL.md) — why the capture is built the way it is, the bar
+  any tuning change has to clear, and the approaches already tried and rejected.
+  Mechanism is documented next to the mechanism, in `src/sim/`.
 - [`docs/PORT_NOTES.md`](docs/PORT_NOTES.md) — every bug reproduced, every change
   made deliberately, and why.
 - `docs/VISION.md` — an earlier, broader design. Kept locally for reference and
@@ -185,13 +193,23 @@ contact) and a window around each moment you flagged.
 
 ## Status
 
-Stage 0 is complete: the simulation is ported and the equality gate is green.
-The app shell is deliberately primitive — bodies and ship as bare primitives, no
-HUD, compass, crash cone or trail. **The renderer is Stage 1.**
+Stages 0 and 1 are complete: the simulation is ported and provably faithful, and
+the game renders, reports, and can be tuned from the device.
 
-| Stage | Scope                                                                              |
-| ----- | ---------------------------------------------------------------------------------- |
-| 0 ✅  | Headless harness, verbatim port, equality gate green                               |
-| 1     | Renderer, run lifecycle (armed → running → ended), tune panel, diagnostics capture |
-| 2     | Fix the PORT-NOTEs one at a time, re-blessing each with a reasoned diff            |
-| 3     | Pickups, effects, new celestial bodies                                             |
+| Stage | Scope                                                                   |
+| ----- | ----------------------------------------------------------------------- |
+| 0 ✅  | Headless harness, verbatim port, equality gate green                    |
+| 1 ✅  | Renderer, HUD, compass, run lifecycle, tune panel, diagnostics          |
+| 2     | Fix the PORT-NOTEs one at a time, re-blessing each with a reasoned diff |
+| 3     | Pickups, effects, new celestial bodies                                  |
+
+### Playing
+
+A session starts **armed**: nothing is moving, `TUNE` is available, and the first
+tap starts the run. That is not decoration — a run is `(config, seed, inputLog)`,
+so the configuration has to be fixed before the first tick for a replay to
+reproduce it. `RESET` returns to armed.
+
+Press and hold near a body to be caught by it; release to fling along the tangent.
+The compass rings show where to let go to reach each body further up the climb,
+sized by distance. Falling too far below your highest point ends the run.

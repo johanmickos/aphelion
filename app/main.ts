@@ -1,8 +1,8 @@
 /**
- * Stage 1 app shell.
+ * The app shell: input, the fixed-timestep loop, and the run lifecycle.
  *
- * World, bodies and ship are rendered; the HUD (fuel gauge, readout, edge
- * markers), the release compass and the run lifecycle are still to come.
+ * Everything here is presentation and plumbing. The simulation is driven from
+ * `step` and never learns about pixels, the DOM, or wall-clock time.
  */
 import { DEFAULT_CONFIG, FIXED_DT, MAX_CATCHUP_STEPS } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
