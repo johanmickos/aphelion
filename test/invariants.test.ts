@@ -94,30 +94,31 @@ describe('invariants', () => {
   });
 
   it('a fully settled orbit runs at the true circular speed', () => {
-    const o = observe('tangential grab');
+    const o = observe('long hold (circularizes fully into orbit)');
     expect(o.settledSpeedError).not.toBeNull();
-    // Not exact: tightenFrac eases L toward the circular value over settleDur, and
-    // the orbit keeps a small residual at the moment settling completes.
     expect(o.settledSpeedError!).toBeLessThan(0.05);
   });
 
   describe('smoothness (max deflection per sample)', () => {
-    // Every scenario is smooth EXCEPT the one that lands on the periapsis floor.
-    const KNOWN_ROUGH = 'tangential grab';
-
-    it.each(ALL.filter((n) => n !== KNOWN_ROUGH))('%s: no kinks', (name) => {
+    /**
+     * Every scenario is smooth. This block used to carve out one exception and
+     * pin its 46-degree kink, so that fixing the periapsis floor bounce would
+     * fail here loudly and specifically. It did exactly that — see PORT_NOTES 18,
+     * where the floor turned out to be a symptom of captures never receiving
+     * their clearance impulse. The exception is gone because the cause is.
+     */
+    it.each(ALL)('%s: no kinks', (name) => {
       const o = observe(name);
       expect(o.kinkPhases, `kinks appeared in ${o.kinkPhases.join(',')}`).toEqual([]);
       expect(o.maxDeflAfterFirst).toBeLessThan(KINK_THRESHOLD_DEG);
     });
 
-    it('PORT-NOTE 2: the periapsis floor bounce produces one sharp deflection', () => {
-      const o = observe(KNOWN_ROUGH);
-      // Pinned so that fixing PORT-NOTE 2 fails here loudly and specifically.
-      expect(o.kinkPhases).toEqual(['settle']);
-      expect(o.maxDeflAfterFirst).toBeGreaterThan(40);
-      expect(o.maxDeflAfterFirst).toBeLessThan(50);
-      expect(o.minRadiusRatio).toBeCloseTo(1, 6); // it reached the floor exactly
+    it('no scenario reaches the minimum-orbit floor any more', () => {
+      for (const name of ALL) {
+        const o = observe(name);
+        if (o.minRadiusRatio === Infinity) continue;
+        expect(o.minRadiusRatio, `${name} bottomed out on the floor`).toBeGreaterThan(1.001);
+      }
     });
   });
 });

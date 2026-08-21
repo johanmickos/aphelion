@@ -79,6 +79,26 @@ export interface SimConfig {
    */
   backtrackLimit: number;
   /**
+   * A grab below escape speed is a capture, never a flyby.
+   *
+   * The prototype also called it a flyby when the ship was momentarily moving
+   * radially outward, regardless of speed — so passing a planet on the way up
+   * qualified even at a quarter of escape speed. Measured over the real field,
+   * that was 41% of all grabs, and every one of them then took the conversion
+   * path below.
+   */
+  boundGrabsCapture: boolean;
+  /**
+   * A flyby that converts into a capture gets its clearance impulse.
+   *
+   * Clearance was only ever computed in `beginCapture`, so anything that became a
+   * capture by conversion never got it and dived straight through the surface —
+   * to a periapsis of 6 inside a 46px planet in the case that prompted this. The
+   * floor then caught it, destroying 44% of its speed in one substep, which is
+   * what the 56-degree kink and "stuck to the surface" both were.
+   */
+  clearanceOnConvert: boolean;
+  /**
    * Furthest a grab can reach. 0 is unlimited.
    *
    * Gravity in this simulation only exists during a capture, so without a limit
@@ -149,6 +169,8 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   fieldWidthFrac: 1.2,
   bodyCount: 8,
   backtrackLimit: 0,
+  boundGrabsCapture: false,
+  clearanceOnConvert: false,
   grabRange: 0,
   proceduralLayout: false,
   bodySpacing: 0,
@@ -217,6 +239,8 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   fieldWidthFrac: 1.9,
   bodyCount: 32,
   backtrackLimit: 520,
+  boundGrabsCapture: true,
+  clearanceOnConvert: true,
   grabRange: 560,
   proceduralLayout: true,
   bodySpacing: 360,
@@ -229,7 +253,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 4;
+export const SIM_VERSION = 5;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

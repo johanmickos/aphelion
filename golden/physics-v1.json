@@ -37,6 +37,8 @@
   "fieldWidthFrac": 1.2,
   "bodyCount": 8,
   "backtrackLimit": 0,
+  "boundGrabsCapture": false,
+  "clearanceOnConvert": false,
   "grabRange": 0,
   "proceduralLayout": false,
   "bodySpacing": 0,

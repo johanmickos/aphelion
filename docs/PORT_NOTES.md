@@ -270,6 +270,65 @@ Worth being clear about what was NOT done: the mechanic the document describes i
 not implemented. Grab quality still does not influence the settled orbit. That is
 a live design question, not a cleanup.
 
+### 18 — Most captures never got their clearance impulse **[FIXED]**
+`src/sim/capture.ts` -> `applyClearance`, `src/sim/step.ts`
+
+This is the real cause of "stuck to the surface", and of the floor bounce
+recorded as note 2. That note described a symptom two steps downstream.
+
+**The chain.** A grab is classified a flyby when it is unbound *or* "moving
+outward with no periapsis ahead". The second clause has no speed term, so passing
+a planet on the way up qualifies at any speed — the case that prompted this was
+travelling at **97 px/s against an escape speed of 349**, a quarter of escape and
+unambiguously captured. Three ticks later gravity turns it inbound and it converts
+to `clear`. But clearance was only ever computed in `beginCapture`, so anything
+that became a capture by conversion never got it.
+
+That ship then dived toward a natural periapsis of **6.5** — inside a 46px planet —
+until the minimum-orbit floor caught it:
+
+```
+tick  phase   r      speed   v_radial   radial%   defl
+ 263  clear   60.6     255     -216.2      85%     2.7
+ 264  clear   58.0     142        0.0       0%    55.9   <- floor clamp
+ 266  settle  58.0     278       -0.0       0%     4.6   <- freezeOrbit restores it
+```
+
+The clamp zeroes inward radial velocity, which on a steep dive **destroys 44% of
+the ship's speed in one substep**. `freezeOrbit` then restores it from the
+conserved pre-clamp energy, so there are two discontinuities, not one. The 56
+degree kink is the first of them. The orbit then settles into a circle at exactly
+`minR`, which on a small body is what reads as being stuck to the surface.
+
+**Prevalence.** Across every grab the field allows: 45 of 109 took this path, and
+every one of them dived below the surface. There were **no genuinely unbound
+grabs at all** — so in ordinary play, every "flyby" was a misclassified bound
+grab, and every `TOO FAST` was shown to a ship that was not.
+
+**The fix**, behind two config flags so PROTOTYPE_CONFIG keeps the old behaviour
+and the equality gate stays at exactly zero:
+
+- `boundGrabsCapture` — below escape speed is a capture, whichever way the ship
+  happens to be pointing.
+- `clearanceOnConvert` — a flyby that becomes a capture gets clearance too.
+
+| across 109 grabs | kinks | worst deflection | floor substeps | seen as flyby |
+|---|---|---|---|---|
+| before | 45 | 66.4° | 208 | 43 |
+| after | **0** | **8.5°** | **0** | **0** |
+
+`boundGrabsCapture` accounts for all of it; with the classification corrected,
+nothing converts any more. `clearanceOnConvert` is kept because a capture should
+get clearance however it began, but it is currently unexercised — see below.
+
+**Found while verifying, not fixed:** holding a genuine flyby cannot realistically
+capture it. The brake's strength is split by `flybyRadialBias`, and an *inbound*
+flyby only receives `b * 0.15` on each component — about 48 px/s per second, where
+a full tank buys 89 px/s of shed speed. A 430 px/s grab against escape 220 needs
+215. The code comment at that site says inbound should "brake hard", and it does
+not. So `hold to brake & capture` is advice the physics cannot honour for
+genuinely fast grabs. That is a design question, not a port defect.
+
 ---
 
 ## 15 — JavaScript engines disagree on floating-point math

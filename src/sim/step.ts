@@ -14,7 +14,7 @@ import type { SimConfig } from './config.ts';
 import { DEFAULT_CONFIG } from './config.ts';
 import type { Body, EndingReason, Input, SimState } from './types.ts';
 import { circSpeed, escapeSpeed, gAccel, hypot, orbitRadius, smootherstep } from './orbit.ts';
-import { beginCapture, freezeOrbit, releaseCapture } from './capture.ts';
+import { applyClearance, beginCapture, freezeOrbit, releaseCapture } from './capture.ts';
 import { contactPolicy, reflectCoefficient } from './contact.ts';
 import { boostEnvelope } from './boost.ts';
 import { burn, regen } from './fuel.ts';
@@ -300,7 +300,12 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
       const spdF = hypot(cap.vx, cap.vy);
       const vEscF = escapeSpeed(cfg, rNowF);
       const vradF = (cap.vx * cap.rx + cap.vy * cap.ry) / rNowF;
-      if (spdF < vEscF * 0.98 && vradF < 0) cap.phase = 'clear';
+      if (spdF < vEscF * 0.98 && vradF < 0) {
+        cap.phase = 'clear';
+        // A capture is a capture however it began. Without this the converted
+        // path dives through the surface and is caught by the floor clamp.
+        if (cfg.clearanceOnConvert) applyClearance(cap, cfg);
+      }
     }
 
     // --- periapsis detection -> freeze and hand off to the phase clock

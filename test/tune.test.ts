@@ -78,6 +78,20 @@ describe('tunable parameters', () => {
         ],
         ticks: 1600,
       },
+      // Held long, then released mid-decay. This covers two blind spots the
+      // scenarios above share. They release ~10 ticks into a 72-tick settle,
+      // where smootherstep has only reached 0.02, so the knobs shaping the tail
+      // of the settle read as inert however far they would move a held orbit;
+      // and they release before the boost even arms, so the decay never runs.
+      // Releasing at 450 clears the settle and lands inside the decay ramp --
+      // hold much longer and every decay value has clamped to zero again.
+      {
+        edges: [
+          [240, 1],
+          [450, 0],
+        ],
+        ticks: 900,
+      },
     ];
 
     const run = (cfg: SimConfig, sc: Sc) => {

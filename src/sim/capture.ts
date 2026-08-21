@@ -130,9 +130,9 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
   const vEsc = escapeSpeed(cfg, r);
   const bound = spd < vEsc * 0.98;
   const movingOutward = vrad > 0;
-  const isFlyby = !bound || (movingOutward && inb < 0.02);
-
-  const natPeri = naturalPeriapsis(cfg, rx, ry, vx, vy);
+  // A bound ship is coming back whatever direction it happens to be pointing, so
+  // being momentarily outbound does not make it a flyby.
+  const isFlyby = cfg.boundGrabsCapture ? !bound : !bound || (movingOutward && inb < 0.02);
 
   const cap: Capture = {
     phase: isFlyby ? 'flyby' : 'clear',
@@ -170,17 +170,26 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     defl: 0,
   };
 
-  // Clearance: the minimum tangential nudge that lifts the natural periapsis to
-  // minR, eased in over `clearEaseFrames` frames so it never reads as a snap.
-  if (natPeri < minR && !isFlyby) {
-    const dv = clearanceDv(cfg, rx, ry, vx, vy, minR);
-    cap.clearDvx = dv.dvx / cfg.clearEaseFrames;
-    cap.clearDvy = dv.dvy / cfg.clearEaseFrames;
-    cap.clearFramesLeft = cfg.clearEaseFrames;
-  }
+  if (!isFlyby) applyClearance(cap, cfg);
 
   state.capture = cap;
   return 'captured';
+}
+
+/**
+ * The clearance impulse: the minimum tangential nudge that lifts the natural
+ * periapsis clear of the surface, spread over `clearEaseFrames` so it never reads
+ * as a snap.
+ *
+ * Separated out because a capture can begin two ways — directly, or by a flyby
+ * being braked into one — and both need it. Only the first had it.
+ */
+export function applyClearance(cap: Capture, cfg: SimConfig): void {
+  if (naturalPeriapsis(cfg, cap.rx, cap.ry, cap.vx, cap.vy) >= cap.minR) return;
+  const dv = clearanceDv(cfg, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
+  cap.clearDvx = dv.dvx / cfg.clearEaseFrames;
+  cap.clearDvy = dv.dvy / cfg.clearEaseFrames;
+  cap.clearFramesLeft = cfg.clearEaseFrames;
 }
 
 /**
