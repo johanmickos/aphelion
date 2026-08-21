@@ -285,6 +285,14 @@ Worth being clear about what was NOT done: the mechanic the document describes i
 not implemented. Grab quality still does not influence the settled orbit. That is
 a live design question, not a cleanup.
 
+**Answered since, and not the way the document proposed.** Grab quality now has a
+consumer — `src/score/`, which pays points for how close a release came to a
+compass marker and to the peak of the boost envelope. Aim was given a reader
+rather than a lever: making it move the ship is what the retired document
+described, and it would have failed the equality gate for a mechanic nobody has
+played. `test/score.test.ts` pins both halves, so a future attempt to make aim
+physical fails there first, by name, before it reaches the gate.
+
 ### 18 — Most captures never got their clearance impulse **[FIXED]**
 `src/sim/capture.ts` -> `applyClearance`, `src/sim/step.ts`
 
@@ -459,7 +467,8 @@ golden baseline               golden/physics-v1.json
 
 tests    port-equality 11 · invariants 32 · render 48 · camera 30
          diagnostics 13 · backtrack 11 · world 9 · tune 6 · clearance 6
-         166 total
+         score 19
+         191 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

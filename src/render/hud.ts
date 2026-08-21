@@ -9,6 +9,7 @@
  */
 import type { SimConfig } from '../sim/config.ts';
 import type { GrabResult } from '../sim/types.ts';
+import type { ScoreState } from '../score/types.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
@@ -21,6 +22,18 @@ export interface ReadoutLine {
 
 /** Design-space geometry, in the 390x844 window. */
 const GAUGE = { x: 16, w: 19, h: 78, bottomGap: 44 } as const;
+
+/**
+ * The score band, top-centre.
+ *
+ * It is the only permanently visible number besides fuel, so it gets the middle
+ * of the header and the readout was moved below it. A transient message yields to
+ * a standing one, not the other way around.
+ */
+const SCORE = { bestY: 15, y: 34, multY: 49, awardY: 65, detailY: 77 } as const;
+
+/** Ticks an award stays on screen. 1.6s at 60Hz. */
+const AWARD_TICKS = 96;
 
 function lerpColor(
   a: readonly [number, number, number],
@@ -227,6 +240,11 @@ export function readoutLines(
   return out;
 }
 
+/**
+ * Top of the readout stack, below the score band. Design units.
+ */
+const READOUT_TOP = 92;
+
 export function drawReadout(
   ctx: CanvasRenderingContext2D,
   cam: Camera,
@@ -236,7 +254,7 @@ export function drawReadout(
   if (lines.length === 0) return;
   const s = cam.scale;
   const x = cam.offsetX + 14 * s;
-  let y = cam.offsetY + 22 * s;
+  let y = cam.offsetY + READOUT_TOP * s;
 
   ctx.save();
   ctx.textAlign = 'left';
@@ -254,4 +272,109 @@ export function drawReadout(
   }
   ctx.globalAlpha = 1;
   ctx.restore();
+}
+
+/**
+ * Group digits without `toLocaleString`, whose output depends on the device's
+ * locale — a score should read the same on every phone, and a render test should
+ * not depend on where it is run.
+ */
+export function formatScore(n: number): string {
+  const sign = n < 0 ? '-' : '';
+  const digits = String(Math.abs(Math.round(n)));
+  let out = '';
+  for (let i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 === 0) out += ',';
+    out += digits[i];
+  }
+  return sign + out;
+}
+
+/**
+ * The score band: this life's total, the multiplier, and what the last thing you
+ * did was worth.
+ *
+ * The award line is the part that has to earn its place. A number that silently
+ * ticks up teaches nothing, so it names the three things a link is scored on —
+ * how deep the dive committed, where in the boost window the release landed, and
+ * how close it was to a compass marker. That doubles as the tuning readout while
+ * the weights are being calibrated by playing, which is what they still need.
+ *
+ * Ages by simulation tick, not wall clock: a paused game must not quietly expire
+ * the award it is showing.
+ */
+export function drawScore(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  score: ScoreState,
+  snap: RenderSnapshot,
+): void {
+  const s = cam.scale;
+  const cx = cam.offsetX + cam.designW * 0.5 * s;
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+
+  // The score is the current life's. Showing what a death took, as the number to
+  // beat, is the whole reason the reset reads as a cost rather than as a bug.
+  if (score.best > score.score) {
+    ctx.font = `${9 * s}px ui-monospace, monospace`;
+    ctx.fillStyle = 'rgba(120,140,175,.75)';
+    ctx.fillText(`BEST ${formatScore(score.best)}`, cx, cam.offsetY + SCORE.bestY * s);
+  }
+
+  ctx.font = `600 ${24 * s}px ui-monospace, monospace`;
+  ctx.fillStyle = 'rgba(214,228,250,.92)';
+  ctx.fillText(formatScore(score.score), cx, cam.offsetY + SCORE.y * s);
+
+  if (score.multiplier > 1) {
+    // Warms toward the ceiling, so a streak reads as heat rather than as a number
+    // you have to compare against a maximum you cannot see.
+    const heat = Math.min(1, (score.multiplier - 1) / 4);
+    const col = lerpColor([120, 210, 255], [255, 170, 60], heat);
+    ctx.font = `600 ${12 * s}px ui-monospace, monospace`;
+    ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+    ctx.fillText(`x${score.multiplier.toFixed(2)}`, cx, cam.offsetY + SCORE.multY * s);
+  }
+
+  const a = score.lastAward;
+  if (!a) {
+    ctx.restore();
+    return;
+  }
+  const age = snap.tick - a.tick;
+  if (age < 0 || age > AWARD_TICKS) {
+    ctx.restore();
+    return;
+  }
+  // Hold, then fade over the last third.
+  const fade = Math.min(1, Math.max(0, (AWARD_TICKS - age) / (AWARD_TICKS / 3)));
+  const win = a.kind === 'link';
+  ctx.globalAlpha = fade;
+
+  ctx.font = `600 ${15 * s}px ui-monospace, monospace`;
+  ctx.fillStyle = win ? '#54f39a' : '#ff5566';
+  const mult = win && a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '';
+  ctx.fillText(
+    `${a.points >= 0 ? '+' : ''}${formatScore(a.points)}${mult}`,
+    cx,
+    cam.offsetY + SCORE.awardY * s,
+  );
+
+  ctx.font = `${9 * s}px ui-monospace, monospace`;
+  ctx.fillStyle = win ? 'rgba(140,200,170,.85)' : 'rgba(255,140,155,.85)';
+  ctx.fillText(
+    win
+      ? `${a.body}  DEPTH ${pct(a.depth)} · PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`
+      : `COASTED PAST ${a.body} — STREAK LOST`,
+    cx,
+    cam.offsetY + SCORE.detailY * s,
+  );
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function pct(v: number): string {
+  return String(Math.round(v * 100)).padStart(2, ' ');
 }

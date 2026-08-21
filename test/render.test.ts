@@ -16,13 +16,16 @@ import { Starfield } from '../src/render/starfield.ts';
 import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { boostColor, drawBoostHalo } from '../src/render/capture.ts';
-import { drawFuelGauge, readoutLines } from '../src/render/hud.ts';
+import { drawFuelGauge, drawScore, formatScore, readoutLines } from '../src/render/hud.ts';
+import { drawCompass } from '../src/render/compass.ts';
 import {
-  compassTargets,
-  drawCompass,
+  AIM_MAX_TARGETS,
+  AIM_RANGE,
+  aimTargets,
   pathBlocked,
   releaseAngleFor,
-} from '../src/render/compass.ts';
+} from '../src/score/aim.ts';
+import { createScoreState } from '../src/score/score.ts';
 import { orbitRadius } from '../src/sim/orbit.ts';
 import { Trail } from '../src/render/ship.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
@@ -265,6 +268,7 @@ describe('scene', () => {
         viewportW: 390,
         viewportH: 844,
         headerBottom: 0,
+        score: createScoreState(),
       });
       drawn++;
 
@@ -298,6 +302,7 @@ describe('scene', () => {
       viewportW: 390,
       viewportH: 844,
       headerBottom: 0,
+      score: createScoreState(),
     });
 
     expect(r.calls('arc').length).toBeGreaterThan(0); // bodies + rings
@@ -498,6 +503,111 @@ describe('HUD', () => {
   });
 });
 
+describe('the score band', () => {
+  const sim = DEFAULT_CONFIG;
+
+  function snapAt(tick: number) {
+    const base = captureSnapshot(createInitialState(sim), false, sim);
+    return { ...base, tick };
+  }
+
+  function scoreWith(over: Partial<ReturnType<typeof createScoreState>>) {
+    return { ...createScoreState(), ...over };
+  }
+
+  const award = (over: Partial<NonNullable<ReturnType<typeof createScoreState>['lastAward']>>) => ({
+    tick: 100,
+    kind: 'link' as const,
+    points: 1240,
+    multiplier: 2.25,
+    body: 'P3→P4',
+    depth: 0.84,
+    timing: 0.91,
+    aim: 0.96,
+    climb: 412,
+    ...over,
+  });
+
+  it('groups digits without depending on the device locale', () => {
+    expect(formatScore(0)).toBe('0');
+    expect(formatScore(999)).toBe('999');
+    expect(formatScore(1240)).toBe('1,240');
+    expect(formatScore(1234567)).toBe('1,234,567');
+    expect(formatScore(-150)).toBe('-150');
+  });
+
+  it('always shows the total, and the multiplier only once it is above 1', () => {
+    const r = recordingContext();
+    drawScore(r.ctx, cam(), scoreWith({ score: 1240 }), snapAt(0));
+    let texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(texts).toContain('1,240');
+    expect(texts.some((t) => t.startsWith('x'))).toBe(false);
+
+    r.reset();
+    drawScore(r.ctx, cam(), scoreWith({ score: 1240, multiplier: 2.25 }), snapAt(0));
+    texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(texts).toContain('x2.25');
+  });
+
+  it('names what a link was paid for, so the weights can be read while playing', () => {
+    const r = recordingContext();
+    const sc = scoreWith({ score: 1240, multiplier: 2.25, lastAward: award({}) });
+    drawScore(r.ctx, cam(), sc, snapAt(110));
+    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(texts.some((t) => t.includes('+1,240'))).toBe(true);
+    const detail = texts.find((t) => t.includes('DEPTH'))!;
+    expect(detail).toContain('P3→P4');
+    expect(detail).toContain('84');
+    expect(detail).toContain('91');
+    expect(detail).toContain('96');
+  });
+
+  it('says what a deduction was for, rather than only that one happened', () => {
+    const r = recordingContext();
+    const sc = scoreWith({
+      lastAward: award({ kind: 'miss', points: -150, multiplier: 1, body: 'P5' }),
+    });
+    drawScore(r.ctx, cam(), sc, snapAt(110));
+    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(texts.some((t) => t.includes('-150'))).toBe(true);
+    expect(texts.some((t) => t.includes('COASTED PAST P5'))).toBe(true);
+  });
+
+  it('ages the award by simulation tick, so a pause cannot expire it', () => {
+    const sc = scoreWith({ lastAward: award({}) });
+    const fresh = recordingContext();
+    drawScore(fresh.ctx, cam(), sc, snapAt(101));
+    const stale = recordingContext();
+    drawScore(stale.ctx, cam(), sc, snapAt(100 + 200));
+    const has = (r: typeof fresh) =>
+      (r.calls('fillText') as Array<[string, string]>).some((o) => o[1].includes('+1,240'));
+    expect(has(fresh)).toBe(true);
+    expect(has(stale)).toBe(false);
+  });
+
+  it('stays inside the design window and never emits a non-finite coordinate', () => {
+    const c = cam();
+    const r = recordingContext();
+    drawScore(
+      r.ctx,
+      c,
+      scoreWith({ score: 1234567, multiplier: 5, lastAward: award({}) }),
+      snapAt(110),
+    );
+    expect(r.ops.length).toBeGreaterThan(0);
+    for (const op of r.ops) {
+      for (const arg of op.slice(1)) {
+        if (typeof arg === 'number') expect(Number.isFinite(arg)).toBe(true);
+      }
+    }
+    for (const [, , x, y] of r.calls('fillText') as Array<[string, string, number, number]>) {
+      expect(x).toBeGreaterThan(c.offsetX);
+      expect(x).toBeLessThan(c.offsetX + c.designW * c.scale);
+      expect(y).toBeGreaterThan(c.offsetY);
+    }
+  });
+});
+
 describe('release compass', () => {
   const anchor = createBodies(DEFAULT_CONFIG)[0]!;
   const orbit = { a: 90, e: 0.15, argp: 0.4, dir: 1 };
@@ -568,7 +678,7 @@ describe('release compass', () => {
 
   it('offers the nearest bodies first, and never the anchor', () => {
     const bodies = createBodies(DEFAULT_CONFIG);
-    const targets = compassTargets(bodies, 0, 1e9, 3);
+    const targets = aimTargets(bodies, 0, 1e9, 3);
     expect(targets).toHaveLength(3);
     expect(targets.map((t) => t.index)).not.toContain(0);
     for (let i = 1; i < targets.length; i++) {
@@ -596,14 +706,14 @@ describe('compass targets point up the climb', () => {
   it('never offers a body at or below the anchor', () => {
     for (let i = 0; i < bodies.length; i++) {
       const anchor = bodies[i]!;
-      for (const t of compassTargets(bodies, i, 1e9, 8)) {
+      for (const t of aimTargets(bodies, i, 1e9, 8)) {
         expect(t.body.y, `${t.body.name} is not above ${anchor.name}`).toBeLessThan(anchor.y);
       }
     }
   });
 
   it('always points at the next step of the climb', () => {
-    const counts = bodies.map((_, i) => compassTargets(bodies, i, rcfg.compassRange, 3).length);
+    const counts = bodies.map((_, i) => aimTargets(bodies, i, AIM_RANGE, 3).length);
     // the top body has nothing above it; everywhere else has somewhere to go
     expect(counts[counts.length - 1]).toBe(0);
     expect(
@@ -616,23 +726,23 @@ describe('compass targets point up the climb', () => {
     // The range shows the next step of the climb, not a target several hops away
     // that would be a featureless drift to reach.
     for (let i = 0; i < bodies.length; i++) {
-      for (const t of compassTargets(bodies, i, rcfg.compassRange, 3)) {
-        expect(t.distance).toBeLessThanOrEqual(rcfg.compassRange);
+      for (const t of aimTargets(bodies, i, AIM_RANGE, 3)) {
+        expect(t.distance).toBeLessThanOrEqual(AIM_RANGE);
       }
     }
   });
 
   it('drops anything beyond the range', () => {
     for (let i = 0; i < bodies.length; i++) {
-      for (const t of compassTargets(bodies, i, rcfg.compassRange, 8)) {
-        expect(t.distance).toBeLessThanOrEqual(rcfg.compassRange);
+      for (const t of aimTargets(bodies, i, AIM_RANGE, 8)) {
+        expect(t.distance).toBeLessThanOrEqual(AIM_RANGE);
       }
     }
   });
 
   it('shows nothing at the top of the field rather than pointing back down', () => {
     const topIndex = bodies.reduce((best, b, i) => (b.y < bodies[best]!.y ? i : best), 0);
-    expect(compassTargets(bodies, topIndex, 1e9, 3)).toEqual([]);
+    expect(aimTargets(bodies, topIndex, 1e9, 3)).toEqual([]);
   });
 });
 
@@ -669,7 +779,7 @@ describe('compass rings encode distance', () => {
 
   it('gives each target its own ring, wider for the further body', () => {
     const radii = [...new Set(ringRadii(0).map((r) => +r.toFixed(4)))].sort((a, b) => a - b);
-    const targets = compassTargets(bodies, 0, rcfg.compassRange, rcfg.compassMaxTargets);
+    const targets = aimTargets(bodies, 0, AIM_RANGE, AIM_MAX_TARGETS);
     expect(targets.length).toBeGreaterThan(1);
     expect(radii.length, 'one ring per target').toBe(targets.length);
     // rings are strictly increasing, and in the same order as target distance
@@ -679,22 +789,22 @@ describe('compass rings encode distance', () => {
   it('never signposts more than the configured maximum', () => {
     // even with the whole field in range
     for (let i = 0; i < bodies.length; i++) {
-      expect(compassTargets(bodies, i, 1e9, rcfg.compassMaxTargets).length).toBeLessThanOrEqual(
-        rcfg.compassMaxTargets,
+      expect(aimTargets(bodies, i, 1e9, AIM_MAX_TARGETS).length).toBeLessThanOrEqual(
+        AIM_MAX_TARGETS,
       );
     }
   });
 
   it('scales ring size with distance rather than merely with rank', () => {
     const sim = DEFAULT_CONFIG;
-    const near = compassTargets(bodies, 0, rcfg.compassRange, 3);
+    const near = aimTargets(bodies, 0, AIM_RANGE, 3);
     const radii = [...new Set(ringRadii(0).map((r) => +r.toFixed(4)))].sort((a, b) => a - b);
     // the gap between rings should track the gap between target distances
     const distRatio = near[1]!.distance / near[0]!.distance;
     const inner = rcfg.compassRingInner;
     const spread = rcfg.compassRingSpread;
-    const expected0 = inner + (near[0]!.distance / rcfg.compassRange) * spread;
-    const expected1 = inner + (near[1]!.distance / rcfg.compassRange) * spread;
+    const expected0 = inner + (near[0]!.distance / AIM_RANGE) * spread;
+    const expected1 = inner + (near[1]!.distance / AIM_RANGE) * spread;
     // 3 decimals: ringRadii() rounds to 4 when de-duplicating
     expect(radii[1]! - radii[0]!).toBeCloseTo(expected1 - expected0, 3);
     expect(distRatio).toBeGreaterThan(1);

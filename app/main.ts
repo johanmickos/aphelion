@@ -17,6 +17,7 @@ import { centerCamera, createCamera, fitCamera, followCamera } from '../src/rend
 import { Scene } from '../src/render/scene.ts';
 import { captureSnapshot, lerpSnapshot } from '../src/render/snapshot.ts';
 import { RunRecorder } from '../src/app/recorder.ts';
+import { createScoreState, scoreTick } from '../src/score/index.ts';
 import { buildReport, serializeReport, summarize } from '../src/app/report.ts';
 
 /**
@@ -54,10 +55,20 @@ let field = fieldBounds(sim, state.bodies);
 let scene = new Scene({ sim, render: rcfg, bodies: state.bodies, field }, seed);
 const life = createLifecycle();
 
+/**
+ * The score.
+ *
+ * Advanced by `scoreTick` immediately after `stepSim` and never read by the
+ * simulation, so it stays a pure function of (config, seed, inputLog) — which is
+ * what lets `tools/replay.ts` reproduce the score a phone session showed.
+ */
+let score = createScoreState();
+
 /** Rebuild the world from the current config. Only legal while armed. */
 function rearm(): void {
   sim = { ...sim };
   state = createInitialState(sim);
+  score = createScoreState();
   field = fieldBounds(sim, state.bodies);
   scene = new Scene({ sim, render: rcfg, bodies: state.bodies, field }, seed);
   const p = shipWorldPos(state);
@@ -179,6 +190,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     releasedEdge = false;
 
     stepSim(state, sim, input, dt);
+    scoreTick(score, state, sim);
 
     prev = curr;
     curr = captureSnapshot(state, held, sim);
@@ -205,6 +217,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       viewportW: innerWidth,
       viewportH: innerHeight,
       headerBottom,
+      score,
     });
   },
 });

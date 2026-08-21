@@ -28,6 +28,22 @@ the gate stayed at zero.
 
 Adding a key means adding it to both objects and re-running `pnpm golden:capture`.
 
+## Scoring is not `SimConfig`
+
+`src/score/` is an observer: it runs after `stepSim`, reads `SimState`, and the
+simulation never learns it exists. Keep it that way — that is what makes a score
+a pure function of `(config, seed, inputLog)` and lets a replay recompute the
+score a phone session showed. `pnpm portable` checks `src/score/` too: it may
+import from `src/sim/` and nothing else.
+
+Score weights live in `src/score/config.ts`, never in `SimConfig`. Putting one in
+`SimConfig` drags it into the equality gate's config compare, forces a golden
+recapture, and — if it also reaches the tune panel — fails `test/tune.test.ts`,
+which measures a knob by how far it moves the ship. `test/score.test.ts` keeps the
+equivalent promise for score weights: every key in `ScoreConfig` must change some
+session's score. A value that only defines _when_ something is judged, never what
+it costs, is a constant next to its code, not a weight.
+
 ## Simulation rules
 
 - Fixed timestep. `dt` is a parameter, never a global, and nothing under

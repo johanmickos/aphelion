@@ -14,6 +14,8 @@ import { fingerprintHex } from '../src/sim/serialize.ts';
 import { KINK_THRESHOLD_DEG } from '../src/sim/trace.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 import type { GrabResult, Input, SimState } from '../src/sim/types.ts';
+import { createScoreState, scoreTick } from '../src/score/index.ts';
+import type { ScoreAward, ScoreState } from '../src/score/index.ts';
 
 export interface Frame {
   tick: number;
@@ -55,6 +57,15 @@ export interface Analysis {
   findings: string[];
   events: Event[];
   frames: Frame[];
+  /**
+   * The score this session earned, recomputed here.
+   *
+   * A score is a pure function of (config, seed, inputLog), which is exactly what
+   * a report carries — so this IS the score the phone showed, not an estimate of
+   * it. When the fidelity above says `exact`, that is proof rather than a claim.
+   */
+  score: ScoreState;
+  awards: ScoreAward[];
 }
 
 /**
@@ -84,6 +95,8 @@ export function replayReport(report: DiagReport): Analysis {
   const edges = new Map(report.input);
   const state: SimState = createInitialState(cfg);
   const field = fieldBounds(cfg, state.bodies);
+  const score = createScoreState();
+  const awards: ScoreAward[] = [];
   const frames: Frame[] = [];
   const events: Event[] = [];
   let held = false;
@@ -100,6 +113,7 @@ export function replayReport(report: DiagReport): Analysis {
     if (released) held = false;
     const input: Input = { held: held || pressed, pressed, released };
     stepSim(state, cfg, input, report.dt);
+    awards.push(...scoreTick(score, state, cfg));
 
     const p = shipWorldPos(state);
     const cap = state.capture;
@@ -215,6 +229,23 @@ export function replayReport(report: DiagReport): Analysis {
       `${minClear === Infinity ? 'n/a (never captured)' : minClear.toFixed(1) + 'px'}`,
   );
 
+  // `best`, not `score`: the score is the current LIFE's and resets on every
+  // death, so at the final tick of a recording it is usually zero and says
+  // nothing about how the session went.
+  findings.push(
+    `best life scored ${score.best} (${score.score} standing at the end) — ${score.links} link(s), ` +
+      `${score.misses} coasted past, best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,
+  );
+  if (score.links > 0) {
+    const links = awards.filter((a) => a.kind === 'link');
+    const mean = (pick: (a: ScoreAward) => number): string =>
+      (links.reduce((n, a) => n + pick(a), 0) / links.length).toFixed(2);
+    findings.push(
+      `release quality, averaged over ${links.length} link(s): ` +
+        `depth ${mean((a) => a.depth)} · boost peak ${mean((a) => a.timing)} · ` +
+        `aim ${mean((a) => a.aim)}  (0-1 each)`,
+    );
+  }
   if (state.telemetry.putterOuts > 0) {
     findings.push(
       `${state.telemetry.putterOuts} capture(s) ran dry mid-circularisation and puttered out`,
@@ -236,6 +267,8 @@ export function replayReport(report: DiagReport): Analysis {
     findings,
     events,
     frames,
+    score,
+    awards,
   };
 }
 
@@ -313,6 +346,25 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   out.push('  findings');
   for (const f of a.findings) out.push(`    · ${f}`);
   out.push('');
+
+  // The score, tick by tick. Worth printing in full rather than summarised: the
+  // weights are still being calibrated by playing, and this is the only place a
+  // real session's release qualities can be read next to what they paid.
+  if (a.awards.length) {
+    out.push('  score');
+    out.push('    tick    what      points   mult   depth   peak    aim   climb');
+    for (const w of a.awards.slice(0, 24)) {
+      out.push(
+        `    ${String(w.tick).padStart(5)}  ${(w.kind === 'link' ? w.body : 'coasted past ' + w.body).padEnd(10)}` +
+          `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
+          `${w.depth.toFixed(2).padStart(5)}  ${w.timing.toFixed(2).padStart(5)}  ` +
+          `${w.aim.toFixed(2).padStart(5)}  ${w.climb.toFixed(0).padStart(5)}`,
+      );
+    }
+    if (a.awards.length > 24) out.push(`    ... and ${a.awards.length - 24} more`);
+    out.push(`    best life ${a.score.best}`);
+    out.push('');
+  }
 
   if (a.events.length) {
     out.push('  events (things that happened but were never shown on screen)');

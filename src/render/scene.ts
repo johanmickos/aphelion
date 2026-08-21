@@ -15,11 +15,12 @@ import { BodyRenderer, drawBacktrackFloor, drawHazardZones } from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
-import { drawFuelGauge, drawReadout, readoutLines } from './hud.ts';
+import { drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
 import { drawEdgeMarkers } from './edge-markers.ts';
 import { canAffordCircularise } from './capture.ts';
 import type { RenderSnapshot } from './snapshot.ts';
+import type { ScoreState } from '../score/types.ts';
 
 export interface SceneDeps {
   sim: SimConfig;
@@ -52,6 +53,12 @@ export class Scene {
       viewportH: number;
       /** Bottom of the header text, in design units. */
       headerBottom: number;
+      /**
+       * The live score. Passed in rather than carried on the snapshot: the
+       * snapshot is derived from `SimState`, and the score deliberately is not
+       * part of it — see `src/score/score.ts`.
+       */
+      score: ScoreState;
     },
   ): void {
     const { sim, render, bodies, field } = this.deps;
@@ -94,6 +101,7 @@ export class Scene {
     // HUD sits inside the clip too: it is laid out in design space, so it must
     // never be drawn over a letterbox bar.
     drawFuelGauge(ctx, cam, sim, snap, opts.timeMs);
+    drawScore(ctx, cam, opts.score, snap);
     drawReadout(ctx, cam, readoutLines(sim, snap, canAffordCircularise(sim, snap)), opts.timeMs);
 
     ctx.restore();

@@ -1,6 +1,12 @@
 /**
  * Render-only tuning. Deliberately separate from SimConfig: nothing here can
  * affect a trajectory, so none of it belongs in the frozen run config.
+ *
+ * Which bodies the compass signposts, and how far off a release may be, used to
+ * live here as `compassRange` and `compassMaxTargets`. They moved to
+ * `src/score/aim.ts` when the score started paying for alignment: those two are
+ * now game rules, and a render-only value that silently re-tunes the score would
+ * be the worst of both. What is left here is the drawing — ring sizes and hues.
  */
 export interface RenderConfig {
   // --- camera ---
@@ -65,27 +71,14 @@ export interface RenderConfig {
   gaugeFollow: number;
   /** Radius of the nearest target's ring, above the settled orbit. */
   compassRingInner: number;
-  /** Extra radius at the far end of compassRange, so ring size reads as distance. */
+  /** Extra radius at the far end of AIM_RANGE, so ring size reads as distance. */
   compassRingSpread: number;
-  /** Never signpost more than this many targets. */
-  compassMaxTargets: number;
   /** Off-screen planet markers are shown within this distance. */
   edgeMarkerRange: number;
   /** Inset of the arrow ring from the sides and bottom of the window. */
   edgeMarkerInset: number;
   /** Gap left between the header text and the first arrow. */
   edgeMarkerHeaderGap: number;
-  /**
-   * Bodies within this distance of the anchor get a compass marker.
-   *
-   * About two body-spacings: the next step of the climb and the one after, no
-   * further. Anything beyond that is a long, featureless coast, and signposting
-   * it invites the player to aim past the interesting part of the field.
-   *
-   * This tracks `bodySpacing` — retuning the field's density changes how many
-   * bodies a fixed distance covers, so revisit this alongside it.
-   */
-  compassRange: number;
   /** Half-angle of the drawn crash wedge (cosmetic only). */
   crashConeHalfAngle: number;
 }
@@ -118,10 +111,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   gaugeFollow: 0.25,
   compassRingInner: 26,
   compassRingSpread: 62,
-  compassMaxTargets: 3,
   edgeMarkerRange: 1300,
   edgeMarkerInset: 24,
   edgeMarkerHeaderGap: 6,
-  compassRange: 800,
   crashConeHalfAngle: 0.42,
 } satisfies RenderConfig);

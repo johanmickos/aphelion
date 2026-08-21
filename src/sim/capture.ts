@@ -88,6 +88,32 @@ export function inCrashCone(cfg: SimConfig, state: SimState, body: Body): boolea
 }
 
 /**
+ * The body a grab would take right now, and why it would be refused if it would.
+ *
+ * Factored out of `beginCapture` so that "a grab was on offer" has exactly one
+ * definition. The scorer asks this question on every drifting tick — coasting
+ * past a planet costs points, and penalising a player for passing up a grab the
+ * game itself would have refused is worse than not penalising at all. A second
+ * copy of these four tests would drift from this one the first time either moved.
+ *
+ * Note the nearest-body rule is part of the answer, not an implementation detail:
+ * a press takes the NEAREST body, so a reachable planet that is not the nearest
+ * one was never actually on offer.
+ */
+export function grabTarget(state: SimState, cfg: SimConfig): { index: number; result: GrabResult } {
+  if (state.fuel <= 0.5) return { index: -1, result: 'refused-no-fuel' };
+  const pi = nearestBody(state);
+  if (pi < 0) return { index: -1, result: 'refused-no-body' };
+  const p = state.bodies[pi]!;
+  if (cfg.grabRange > 0) {
+    const reach = hypot(state.ship.x - p.x, state.ship.y - p.y);
+    if (reach > cfg.grabRange) return { index: -1, result: 'refused-out-of-range' };
+  }
+  if (inCrashCone(cfg, state, p)) return { index: -1, result: 'refused-crash-cone' };
+  return { index: pi, result: 'captured' };
+}
+
+/**
  * Attempt a grab.
  *
  * A grab is blocked only when the tank is truly empty: entering an orbit and
@@ -100,15 +126,9 @@ export function inCrashCone(cfg: SimConfig, state: SimState, body: Body): boolea
  * dead grabs drift past instead.
  */
 export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
-  if (state.fuel <= 0.5) return 'refused-no-fuel';
-  const pi = nearestBody(state);
-  if (pi < 0) return 'refused-no-body';
+  const { index: pi, result } = grabTarget(state, cfg);
+  if (pi < 0) return result;
   const p = state.bodies[pi]!;
-  if (cfg.grabRange > 0) {
-    const reach = hypot(state.ship.x - p.x, state.ship.y - p.y);
-    if (reach > cfg.grabRange) return 'refused-out-of-range';
-  }
-  if (inCrashCone(cfg, state, p)) return 'refused-crash-cone';
 
   const { ship } = state;
   const rx = ship.x - p.x;

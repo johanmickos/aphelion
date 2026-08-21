@@ -1,0 +1,69 @@
+/** Scoring types. Nothing here is ever read by the simulation. */
+import type { Body } from '../sim/types.ts';
+
+/** One thing that happened to the score, on one tick. */
+export interface ScoreAward {
+  tick: number;
+  kind: 'link' | 'miss';
+  /** Points actually applied, signed. A penalty is capped by the score on hand. */
+  points: number;
+  /** The multiplier in force. Always 1 for a miss — penalties are never scaled. */
+  multiplier: number;
+  /** The body this is about. */
+  body: string;
+  /** `cap.tightness` at release: how far the dive committed. 0..1. Link only. */
+  depth: number;
+  /** Where in the boost envelope the release landed. 0..1. Link only. */
+  timing: number;
+  /** Best compass alignment at release. 0..1. Link only. */
+  aim: number;
+  /** World pixels of climb banked into this link. */
+  climb: number;
+}
+
+/**
+ * A capture as it stood at the end of the previous tick.
+ *
+ * The release is resolved from the input edge at the START of a tick, before any
+ * physics runs, so the capture as of the end of the previous tick is EXACTLY what
+ * `releaseCapture` saw. Holding a copy is what lets the score read a release
+ * without the simulation having to announce one.
+ */
+export interface PendingLink {
+  /** The same test `releaseCapture` uses to decide a release earned its boost. */
+  earned: boolean;
+  body: string;
+  depth: number;
+  timing: number;
+  aim: number;
+  /** What the release was lined up with, for the readout. */
+  target: Body | null;
+}
+
+export interface ScoreState {
+  /** Points banked in the CURRENT life. A death takes them. */
+  score: number;
+  /** The highest any life reached this session. Never reset by a death. */
+  best: number;
+  /** Consecutive earned links, unbroken by a miss, a putter-out or a death. */
+  streak: number;
+  /** Live multiplier, derived from the streak. */
+  multiplier: number;
+  /** Session totals, across every life. Diagnostics, not the score. */
+  links: number;
+  misses: number;
+  /** The most recent award, for the HUD to flash. */
+  lastAward: ScoreAward | null;
+
+  // --------------------------------------------------- observer bookkeeping
+  /** The capture as of last tick. See `PendingLink`. */
+  pending: PendingLink | null;
+  /** `highWaterY` the current climb banks from. Null between lives. */
+  climbFromY: number | null;
+  /** Per body, one of the OFFERED / GRABBED / JUDGED bits. Cleared each life. */
+  flags: number[];
+  /** Edge-detects the start of an ending hold. */
+  endingSeen: boolean;
+  /** Last observed `telemetry.putterOuts`, to edge-detect a dry capture. */
+  putterOuts: number;
+}

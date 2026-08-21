@@ -3,6 +3,13 @@
  * nothing outside itself, use no bundler-specific syntax, and touch no DOM — so
  * it runs under plain node, under Vitest, and under any future bundler.
  *
+ * `src/score/` is held to the same bans, and may additionally import from
+ * `src/sim/` — but never from `src/render/`. That is what enforces the scoring
+ * rule that matters: a score must be a pure function of (config, seed, inputLog).
+ * A scorer that could read the renderer, the clock or `Math.random` would make a
+ * diagnostics replay unable to reproduce the score a phone session showed, and
+ * that replay is the only tool that reaches what the author actually felt.
+ *
  * Run with plain `node`, deliberately: if this file executes at all, the sim
  * loaded without a bundler.
  */
@@ -15,6 +22,7 @@ import { join } from 'node:path';
 // surface as a raw ReferenceError instead of this tool's own diagnosis.
 
 const SIM_DIR = fileURLToPath(new URL('../src/sim', import.meta.url));
+const SCORE_DIR = fileURLToPath(new URL('../src/score', import.meta.url));
 const SRC_DIR = fileURLToPath(new URL('../src', import.meta.url));
 
 /**
@@ -49,28 +57,38 @@ const BANNED: ReadonlyArray<[RegExp, string]> = [
 
 let failures = 0;
 
-for (const file of readdirSync(SIM_DIR).filter((f) => f.endsWith('.ts'))) {
-  const src = readFileSync(join(SIM_DIR, file), 'utf8');
-  // strip comments so prose about `document` or `performance.now` is not a hit
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+/**
+ * `label` names the directory in messages; `allowOutside` is the one relative
+ * prefix a module there may reach through. Empty means "nothing outside".
+ */
+function checkDir(dir: string, label: string, allowOutside: readonly string[]): void {
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.ts'))) {
+    const src = readFileSync(join(dir, file), 'utf8');
+    // strip comments so prose about `document` or `performance.now` is not a hit
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const where = `${label}/${file}`;
 
-  for (const m of code.matchAll(/from\s+'([^']+)'/g)) {
-    const spec = m[1]!;
-    if (!spec.startsWith('.')) {
-      console.error(`${file}: imports package "${spec}" — src/sim must be dependency-free`);
-      failures++;
-    } else if (spec.includes('../')) {
-      console.error(`${file}: imports "${spec}" outside src/sim`);
-      failures++;
+    for (const m of code.matchAll(/from\s+'([^']+)'/g)) {
+      const spec = m[1]!;
+      if (!spec.startsWith('.')) {
+        console.error(`${where}: imports package "${spec}" — ${label} must be dependency-free`);
+        failures++;
+      } else if (spec.includes('../') && !allowOutside.some((p) => spec.startsWith(p))) {
+        console.error(`${where}: imports "${spec}" outside ${label}`);
+        failures++;
+      }
     }
-  }
-  for (const [re, why] of BANNED) {
-    if (re.test(code)) {
-      console.error(`${file}: ${why}`);
-      failures++;
+    for (const [re, why] of BANNED) {
+      if (re.test(code)) {
+        console.error(`${where}: ${why}`);
+        failures++;
+      }
     }
   }
 }
+
+checkDir(SIM_DIR, 'src/sim', []);
+checkDir(SCORE_DIR, 'src/score', ['../sim/']);
 
 if (failures) {
   console.error(`\n${failures} portability violation(s) — not attempting to load the sim.`);
@@ -93,8 +111,14 @@ const { createInitialState, stepSim } = await import('../src/sim/step.ts');
 const { DEFAULT_CONFIG, FIXED_DT } = await import('../src/sim/config.ts');
 const { NO_INPUT } = await import('../src/sim/types.ts');
 
+const { createScoreState, scoreTick } = await import('../src/score/index.ts');
+
 const state = createInitialState(DEFAULT_CONFIG);
-for (let i = 0; i < 120; i++) stepSim(state, DEFAULT_CONFIG, NO_INPUT, FIXED_DT);
+const score = createScoreState();
+for (let i = 0; i < 120; i++) {
+  stepSim(state, DEFAULT_CONFIG, NO_INPUT, FIXED_DT);
+  scoreTick(score, state, DEFAULT_CONFIG);
+}
 if (state.tick !== 120) {
   console.error(`smoke run: expected tick 120, got ${state.tick}`);
   failures++;
@@ -108,4 +132,6 @@ if (failures) {
   console.error(`\n${failures} portability violation(s).`);
   process.exit(1);
 }
-console.log(`src/sim is portable — ran ${state.tick} ticks under plain node, no bundler`);
+console.log(
+  `src/sim and src/score are portable — ran ${state.tick} ticks under plain node, no bundler`,
+);

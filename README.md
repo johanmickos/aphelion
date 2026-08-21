@@ -204,10 +204,41 @@ the game renders, reports, and can be tuned from the device.
 | 2     | Fix the PORT-NOTEs one at a time, re-blessing each with a reasoned diff |
 | 3     | Pickups, effects, new celestial bodies                                  |
 
-There is still no score, goal or progression. `docs/VISION.md` had momentum
-scoring, multipliers and named trick shots; the prototype dropped all of it. What
-scoring rewards determines what a pickup should do, so it is worth settling before
-Stage 3.
+Scoring landed ahead of Stage 3 on purpose: what scoring rewards determines what a
+pickup should do.
+
+### Scoring
+
+`src/score/` scores a session. It is an **observer**: it runs after `stepSim`,
+reads `SimState`, and the simulation never learns it exists — so a score stays a
+pure function of `(config, seed, inputLog)` and `node tools/replay.ts` recomputes
+the exact score a phone session showed. `pnpm portable` enforces the boundary.
+
+A capture-and-release — a **link** — is paid on four things:
+
+| component | what it measures                                        | where it comes from     |
+| --------- | ------------------------------------------------------- | ----------------------- |
+| climb     | ground covered since the previous link, banked not paid | `state.highWaterY`      |
+| depth     | how far the dive committed                              | `cap.tightness`         |
+| peak      | where in the boost envelope the release landed          | `cap.boost / boostFull` |
+| aim       | how close the release was to a compass marker           | `src/score/aim.ts`      |
+
+times a streak multiplier that rises with consecutive links and is lost to a
+putter-out or to coasting past a planet you could have taken.
+
+The score is the **current life's**: a death takes the points as well as the
+multiplier, and `best` keeps the number you are trying to beat. `RESET` reloads,
+so it clears everything.
+
+Peak and aim are the pair worth playing for, because they **fight**: the boost
+peaks a fixed 0.45s after the orbit freezes and the marker sits at a fixed angle,
+so hitting both means shaping the dive to bring them together. That is entirely
+built out of physics that already existed — the score only names it.
+
+The weights in `src/score/config.ts` are a first cut and want playtesting; every
+replay prints the release qualities a session actually achieved, which is the
+intended way to calibrate them. They are deliberately **not** in `SimConfig`: see
+the header of that file for the three reasons.
 
 ### Playing
 

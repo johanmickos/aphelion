@@ -1,0 +1,105 @@
+/**
+ * Scoring weights.
+ *
+ * DELIBERATELY NOT IN `SimConfig`, for three reasons that are each on their own
+ * sufficient:
+ *
+ *   - `test/tune.test.ts` asserts every tune-panel knob moves the ship by more
+ *     than half a pixel. A score weight moves no pixel, so it would read as a
+ *     dead knob and fail a test that exists to catch dead knobs.
+ *   - `SimConfig` is compared field by field by the equality gate and recorded in
+ *     the golden baseline. Adding keys there forces a golden recapture every time
+ *     a number is retuned, for a value physics never reads.
+ *   - A run freezes its `SimConfig` and a diagnostics report carries it. Score
+ *     weights are code, not run parameters: two players on the same build are
+ *     scored the same way, and a replay of an older report is scored by today's
+ *     rules, which is what you want when you are balancing.
+ *
+ * The scoring equivalent of the tune-panel guarantee lives in `test/score.test.ts`:
+ * every key here must change the score of some session, or it is not a weight,
+ * it is decoration.
+ *
+ * THESE NUMBERS ARE A FIRST CUT AND HAVE NOT BEEN PLAYTESTED. They were chosen
+ * for legible relative size — a perfect link is worth about eight ordinary drift
+ * seconds and about five times a sloppy one — not by playing. Capture feel moved
+ * with the clearance fix (PORT_NOTES 18); calibrate against how the game plays
+ * now, not against the numbers here.
+ */
+export interface ScoreConfig {
+  // --- what one capture-and-release is worth ---
+  /** Paid for any release that earned its boost, before bonuses. */
+  linkBase: number;
+  /** Points per world pixel climbed since the previous link. */
+  climbPerPx: number;
+  /** Full bonus for a dive that committed all the way (`tightness` 1). */
+  depthBonus: number;
+  /** Full bonus for releasing at the peak of the boost envelope. */
+  timingBonus: number;
+  /** Full bonus for releasing exactly on a compass marker. */
+  aimBonus: number;
+  /**
+   * Shaping exponents. The underlying measures are generous ramps — alignment is
+   * linear over a full 90 degrees, the boost envelope over ~1.8 seconds — which
+   * is right for a gauge you read at a glance and far too soft for a reward.
+   * Raising them concentrates the points near the tip, so "close enough" reads on
+   * the compass but only precise pays.
+   */
+  aimSharpness: number;
+  timingSharpness: number;
+
+  // --- the streak ---
+  /** Each link after the first adds this much to the multiplier. */
+  streakStep: number;
+  /** Multiplier ceiling. */
+  streakMax: number;
+
+  // --- coasting past ---
+  /** Deducted for rising past a body that was in reach and never grabbed. */
+  missPenalty: number;
+  /**
+   * How close a grabbable body must come before passing it up reads as a choice.
+   *
+   * This narrows `grabTarget`, which has already answered whether a grab would
+   * have been accepted at all — see `judgePasses`.
+   */
+  missRange: number;
+}
+
+/**
+ * The live scoring rules.
+ *
+ * The shape of the model, which is the part worth arguing about:
+ *
+ *   link = (base + climb + depth + timing + aim) x multiplier
+ *
+ * `depth` is how hard you committed to the dive, and it already exists —
+ * `cap.tightness`, geometric, `(grabR - rPeri) / span`. `timing` is the boost
+ * window, which is the skill mechanic the player is already playing. `aim` is the
+ * compass, which until now was advice with nothing behind it.
+ *
+ * Timing and aim are the interesting pair because they FIGHT. The boost peaks a
+ * fixed 0.45s after the orbit freezes, and the ship is wherever its sweep has
+ * carried it by then; the marker is at a fixed angle. Getting both means shaping
+ * the dive so the peak lands on the marker, and that is a real skill with a real
+ * ceiling — built entirely out of physics that already exists.
+ *
+ * `climb` is banked rather than paid continuously: altitude gained since the last
+ * link is only cashed at the next one. Coasting therefore earns nothing until you
+ * engage again, which is the same pressure `missPenalty` applies from the other
+ * side.
+ */
+export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
+  linkBase: 100,
+  climbPerPx: 0.25,
+  depthBonus: 150,
+  timingBonus: 250,
+  aimBonus: 200,
+  aimSharpness: 3,
+  timingSharpness: 2,
+
+  streakStep: 0.25,
+  streakMax: 5,
+
+  missPenalty: 150,
+  missRange: 420,
+} satisfies ScoreConfig);
