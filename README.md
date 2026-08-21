@@ -244,7 +244,13 @@ Between them they are paid on:
 | link  | aim       | how close the release was to a compass marker           | `src/score/aim.ts`      |
 
 times a streak multiplier that rises with consecutive links and is lost to a
-putter-out or to coasting past a planet you could have taken.
+putter-out or a death.
+
+**Nothing takes points away.** There was a penalty for rising past a planet you
+could have taken, and it was removed for being too punitive. The pressure to keep
+engaging is still there and comes from `climb` being banked rather than paid:
+altitude only cashes at the next link, so coasting earns nothing until you engage
+again. Withholding a reward and confiscating one are different in the hand.
 
 The score is the **current life's**: a death takes the points as well as the
 multiplier, and `best` keeps the number you are trying to beat. `RESET` reloads,

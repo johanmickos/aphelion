@@ -19,10 +19,10 @@ export interface ScoreAward {
    * and it means holding on into a full orbit still collects, because periapsis
    * is already behind you.
    */
-  kind: 'grab' | 'link' | 'miss';
-  /** Points actually applied, signed. A penalty is capped by the score on hand. */
+  kind: 'grab' | 'link';
+  /** Points actually applied. Never negative — nothing takes points away. */
   points: number;
-  /** The multiplier in force. Always 1 for a miss — penalties are never scaled. */
+  /** The multiplier in force. */
   multiplier: number;
   /** The body this is about. */
   body: string;
@@ -102,14 +102,13 @@ export interface ScoreState {
   score: number;
   /** The highest any life reached this session. Never reset by a death. */
   best: number;
-  /** Consecutive earned links, unbroken by a miss, a putter-out or a death. */
+  /** Consecutive earned links, unbroken by a putter-out or a death. */
   streak: number;
   /** Live multiplier, derived from the streak. */
   multiplier: number;
   /** Session totals, across every life. Diagnostics, not the score. */
   grabs: number;
   links: number;
-  misses: number;
   /** The most recent award, for the HUD to flash. */
   lastAward: ScoreAward | null;
 
@@ -118,8 +117,6 @@ export interface ScoreState {
   pending: PendingLink | null;
   /** `highWaterY` the current climb banks from. Null between lives. */
   climbFromY: number | null;
-  /** Per body, one of the OFFERED / GRABBED / JUDGED bits. Cleared each life. */
-  flags: number[];
   /** Edge-detects the start of an ending hold. */
   endingSeen: boolean;
   /**

@@ -2,9 +2,9 @@
  * How an award looks — the one table the score band and the floating popup both
  * read from.
  *
- * They used to disagree: the band coloured by EVENT (grab yellow, link green,
- * miss red) and the popup by CATEGORY, so the same link was green in one place
- * and violet in the other, a few hundred pixels apart. One table, two consumers.
+ * They used to disagree: the band coloured by EVENT and the popup by CATEGORY, so
+ * the same link was green in one place and violet in the other, a few hundred
+ * pixels apart. One table, two consumers.
  *
  * WHAT COLOUR MEANS HERE
  *
@@ -51,13 +51,6 @@ export const LEVEL: Record<PraiseLevel, AccoladeStyle> = {
 export const ROUTINE: AccoladeStyle = {
   color: '#5f6673',
   labelColor: 'rgba(95,102,115,.85)',
-  size: 13,
-};
-
-/** Off the ladder: not a grade, a different thing that happened. */
-export const DEDUCTION: AccoladeStyle = {
-  color: '#ff5566',
-  labelColor: 'rgba(255,140,155,.85)',
   size: 13,
 };
 

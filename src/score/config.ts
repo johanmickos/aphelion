@@ -74,17 +74,6 @@ export interface ScoreConfig {
   streakStep: number;
   /** Multiplier ceiling. */
   streakMax: number;
-
-  // --- coasting past ---
-  /** Deducted for rising past a body that was in reach and never grabbed. */
-  missPenalty: number;
-  /**
-   * How close a grabbable body must come before passing it up reads as a choice.
-   *
-   * This narrows `grabTarget`, which has already answered whether a grab would
-   * have been accepted at all — see `judgePasses`.
-   */
-  missRange: number;
 }
 
 /**
@@ -117,8 +106,10 @@ export interface ScoreConfig {
  *
  * `climb` is banked rather than paid continuously: altitude gained since the last
  * link is only cashed at the next one. Coasting therefore earns nothing until you
- * engage again, which is the same pressure `missPenalty` applies from the other
- * side.
+ * engage again — which is now the ONLY pressure to keep engaging. There was a
+ * penalty for rising past a body you could have taken, and it was removed for
+ * being too punitive: banking the climb withholds a reward, which is a different
+ * thing from taking points off someone who was already having a bad run.
  */
 export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   linkBase: 100,
@@ -133,7 +124,4 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
 
   streakStep: 0.25,
   streakMax: 5,
-
-  missPenalty: 150,
-  missRange: 420,
 } satisfies ScoreConfig);

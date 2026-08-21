@@ -27,8 +27,6 @@
  *
  *   release   a capture was here last tick and is gone this tick, the ship is
  *             alive, and no putter-out was recorded — see `PendingLink`
- *   miss      the drifting ship has risen clear of a body it came within reach
- *             of and never grabbed
  *   death     `ending.active` went true
  *
  * Reading `telemetry.putterOuts` is fair game: telemetry is written by the
@@ -36,7 +34,6 @@
  */
 import type { SimConfig } from '../sim/config.ts';
 import type { Capture, SimState } from '../sim/types.ts';
-import { grabTarget } from '../sim/capture.ts';
 import { hypot } from '../sim/orbit.ts';
 import { readAim } from './aim.ts';
 import { isNerveGrab } from './praise.ts';
@@ -47,17 +44,6 @@ import { DEFAULT_SCORE_CONFIG } from './config.ts';
 import type { PendingLink, ScoreAward, ScoreState } from './types.ts';
 
 /**
- * How far clear of a body's surface the ship must rise before it counts as having
- * passed it.
- *
- * Not a weight, and deliberately not in `ScoreConfig`: it defines *when* a pass is
- * judged, never *what* one costs, and it measured as unable to change any score —
- * which is exactly what a definition should do. `test/score.test.ts` requires
- * every key in `ScoreConfig` to move some score, and it is right to.
- */
-const PASSED_CLEARANCE = 40;
-
-/**
  * Ticks between periapsis and the grab award landing.
  *
  * Long enough that it reads as "you swung through and came out", short enough to
@@ -65,11 +51,6 @@ const PASSED_CLEARANCE = 40;
  * so two ticks is a visible distance travelled rather than a pause.
  */
 const GRAB_AWARD_DELAY = 2;
-
-/** Per-body bits in `ScoreState.flags`. */
-const OFFERED = 1;
-const GRABBED = 2;
-const JUDGED = 4;
 
 export function createScoreState(): ScoreState {
   return {
@@ -79,11 +60,9 @@ export function createScoreState(): ScoreState {
     multiplier: 1,
     grabs: 0,
     links: 0,
-    misses: 0,
     lastAward: null,
     pending: null,
     climbFromY: null,
-    flags: [],
     endingSeen: false,
     lastDrift: null,
     wasCaptured: false,
@@ -135,7 +114,6 @@ function endLife(sc: ScoreState): void {
   sc.capKinked = false;
   sc.inKink = false;
   sc.climbFromY = null;
-  sc.flags = [];
 }
 
 /**
@@ -202,9 +180,6 @@ export function scoreTick(
   }
 
   if (cap) {
-    // A body you grabbed can never be one you coasted past, however the capture
-    // turns out.
-    sc.flags[cap.planet] = (sc.flags[cap.planet] ?? 0) | GRABBED;
     // First tick of this capture: the drift state held from last tick is exactly
     // what `beginCapture` read, so the approach line can be measured now and
     // never again — the capture's own rx/ry/vx/vy start moving immediately.
@@ -261,9 +236,10 @@ export function scoreTick(
 
     sc.pending = readPending(state, cfg, scfg, cap, sc.grabSkim, sc.maxDefl);
   } else {
+    // Held so the next grab can measure the line it came in on — see
+    // `skimClearance`. Nothing else happens while drifting.
     const { ship } = state;
     sc.lastDrift = { x: ship.x, y: ship.y, vx: ship.vx, vy: ship.vy };
-    judgePasses(sc, state, cfg, scfg, awards);
   }
   sc.wasCaptured = cap !== null;
 
@@ -420,69 +396,4 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
   sc.links++;
   sc.streak++;
   return award;
-}
-
-/**
- * Coasting past a planet you could have taken.
- *
- * A body becomes "offered" on any drifting tick where pressing would actually
- * have grabbed it, and is judged once the ship has risen clear of it. Take it at
- * any point in between and it is settled; sail by and it costs.
- *
- * "Would actually have grabbed it" is `grabTarget`, the simulation's own answer,
- * rather than a distance test written a second time here. It matters: a body can
- * be a hundred pixels away and still not be on offer, because the tank is empty,
- * because it is not the nearest body, or because the ship is already committed
- * inside its crash cone. Charging the player for skipping a grab the game would
- * have refused is worse than not charging them at all.
- *
- * `missRange` then narrows that further, to bodies close enough that passing one
- * up reads as a decision rather than as a planet going by in the distance.
- */
-function judgePasses(
-  sc: ScoreState,
-  state: SimState,
-  cfg: SimConfig,
-  scfg: ScoreConfig,
-  out: ScoreAward[],
-): void {
-  const { y } = state.ship;
-
-  // Exactly one body can be on offer at a time — the nearest one.
-  const offer = grabTarget(state, cfg);
-  if (offer.index >= 0) {
-    const b = state.bodies[offer.index]!;
-    if (hypot(state.ship.x - b.x, y - b.y) <= scfg.missRange) {
-      sc.flags[offer.index] = (sc.flags[offer.index] ?? 0) | OFFERED;
-    }
-  }
-
-  for (let i = 0; i < state.bodies.length; i++) {
-    const flags = sc.flags[i] ?? 0;
-    if (flags & (GRABBED | JUDGED) || !(flags & OFFERED)) continue;
-    const b = state.bodies[i]!;
-
-    // Smaller y is up: the ship has passed the body once it is clear above it.
-    if (y < b.y - b.R - PASSED_CLEARANCE) {
-      sc.flags[i] = flags | JUDGED;
-      const points = -Math.min(sc.score, scfg.missPenalty);
-      sc.score += points;
-      sc.misses++;
-      sc.streak = 0;
-      out.push({
-        tick: state.tick,
-        kind: 'miss',
-        points,
-        multiplier: 1,
-        body: b.name,
-        close: 0,
-        clearance: 0,
-        skim: Infinity,
-        defl: 0,
-        timing: 0,
-        aim: 0,
-        climb: 0,
-      });
-    }
-  }
 }

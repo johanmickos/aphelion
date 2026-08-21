@@ -46,7 +46,7 @@ const FADE = 0.45;
  */
 const MAX_LIVE = 4;
 
-import { DEDUCTION, LEVEL, ROUTINE, SHOUT_COLOR } from './accolade.ts';
+import { LEVEL, ROUTINE, SHOUT_COLOR } from './accolade.ts';
 
 interface Popup {
   x: number;
@@ -56,7 +56,6 @@ interface Popup {
   /** Null for a shout, which is not about points at all. */
   points: number | null;
   praise: Praise | null;
-  deduction: boolean;
   shout: string | null;
 }
 
@@ -88,7 +87,6 @@ export class Popups {
       life: praise?.category === 'super' ? LIFE_SUPER : LIFE,
       points: award.points,
       praise,
-      deduction: award.kind === 'miss',
       shout: null,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
@@ -109,7 +107,6 @@ export class Popups {
       life: LIFE_SHOUT,
       points: null,
       praise: null,
-      deduction: false,
       shout: shout.word,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
@@ -157,7 +154,7 @@ export class Popups {
         continue;
       }
 
-      const style = p.deduction ? DEDUCTION : p.praise ? LEVEL[p.praise.level] : ROUTINE;
+      const style = p.praise ? LEVEL[p.praise.level] : ROUTINE;
 
       if (p.praise) {
         // A brief overshoot on the way in. Only the top of the ladder gets it —
@@ -180,7 +177,8 @@ export class Popups {
       ctx.fillStyle = style.color;
       ctx.lineWidth = 3 * s;
       ctx.strokeStyle = 'rgba(0,0,0,.55)';
-      const text = `${p.points >= 0 ? '+' : ''}${formatScore(p.points)}`;
+      // Always a gain: nothing takes points away.
+      const text = `+${formatScore(p.points)}`;
       ctx.strokeText(text, x, numY);
       ctx.fillText(text, x, numY);
     }

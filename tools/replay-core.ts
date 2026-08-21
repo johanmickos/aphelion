@@ -261,8 +261,9 @@ export function replayReport(report: DiagReport): Analysis {
   // death, so at the final tick of a recording it is usually zero and says
   // nothing about how the session went.
   findings.push(
-    `best life scored ${score.best} (${score.score} standing at the end) — ${score.links} link(s), ` +
-      `${score.misses} coasted past, best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,
+    `best life scored ${score.best} (${score.score} standing at the end) — ` +
+      `${score.grabs} grab(s), ${score.links} link(s), ` +
+      `best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,
   );
   if (score.links > 0) {
     const links = awards.filter((a) => a.kind === 'link');
@@ -432,7 +433,7 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
     for (const w of a.awards.slice(0, 24)) {
       out.push(
         `    ${String(w.tick).padStart(5)}  ${w.kind.padEnd(5)}  ` +
-          `${(w.kind === 'miss' ? 'past ' + w.body : w.body).padEnd(10)}` +
+          `${w.body.padEnd(10)}` +
           `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
           `${(w.kind === 'grab' ? w.close.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +

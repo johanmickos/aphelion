@@ -563,15 +563,6 @@ describe('floating score popups', () => {
     expect(WORDS.aim[1]).toContain(words[0]);
   });
 
-  it('marks a deduction as one, and never gives it a word', () => {
-    const p = new Popups();
-    p.spawn(award({ kind: 'miss', points: -150, aim: 1, timing: 1, clearance: 0 }), 195, 0);
-    const r = recordingContext();
-    p.draw(r.ctx, cam());
-    expect(texts(r)).toContain('-150');
-    expect(texts(r).every((t) => t.startsWith('-'))).toBe(true);
-  });
-
   it('rises and then expires', () => {
     const p = new Popups();
     p.spawn(award(), 195, 0);
@@ -769,8 +760,9 @@ describe('the score band', () => {
 
   it('never announces a grab as a coasting penalty', () => {
     // This is the regression: `kind` grew a third value and the band still asked
-    // `=== 'link'`, so every grab was drawn red and captioned COASTED PAST — the
-    // player told off for the capture they had just made.
+    // `=== 'link'`, so every grab fell through to the deduction arm — the player
+    // told off for the capture they had just made. The penalty itself is gone
+    // now; what this still pins is that a grab reads as a gain.
     const r = recordingContext();
     const sc = scoreWith({
       score: 200,
@@ -778,12 +770,9 @@ describe('the score band', () => {
     });
     drawScore(r.ctx, cam(), sc, snapAt(110));
     const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
-    expect(texts.some((t) => t.includes('COASTED PAST'))).toBe(false);
     expect(texts.some((t) => t.includes('+34'))).toBe(true);
     expect(texts.some((t) => t.includes('GRAB'))).toBe(true);
-    // and it must not be drawn in the deduction colour
-    const reds = r.ops.filter((o) => o[0] === '=fillStyle' && String(o[1]) === '#ff5566');
-    expect(reds).toHaveLength(0);
+    expect(texts.every((t) => !t.includes('-'))).toBe(true);
   });
 
   it('reports only the qualities the event actually has', () => {
@@ -801,17 +790,6 @@ describe('the score band', () => {
       .find((t) => t.includes('CLOSE'))!;
     expect(detail).not.toContain('AIM');
     expect(detail).not.toContain('PEAK');
-  });
-
-  it('says what a deduction was for, rather than only that one happened', () => {
-    const r = recordingContext();
-    const sc = scoreWith({
-      lastAward: award({ kind: 'miss', points: -150, multiplier: 1, body: 'P5' }),
-    });
-    drawScore(r.ctx, cam(), sc, snapAt(110));
-    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
-    expect(texts.some((t) => t.includes('-150'))).toBe(true);
-    expect(texts.some((t) => t.includes('COASTED PAST P5'))).toBe(true);
   });
 
   it('ages the award by simulation tick, so a pause cannot expire it', () => {

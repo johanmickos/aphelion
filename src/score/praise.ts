@@ -26,7 +26,7 @@
  * A word costs nothing and pays nothing — it names a release, it does not price
  * one. `test/score.test.ts` requires every key in `ScoreConfig` to change some
  * session's outcome, and it is right to, so a threshold that moves no points does
- * not belong there. Same reasoning as `PASSED_CLEARANCE`.
+ * not belong there — the same reasoning that keeps `RECKLESS_DEG` out of it.
  */
 import { mulberry32 } from '../sim/rng.ts';
 import type { ScoreAward } from './types.ts';

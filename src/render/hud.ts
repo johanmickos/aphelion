@@ -13,7 +13,7 @@ import type { ScoreAward, ScoreState } from '../score/types.ts';
 import type { Praise } from '../score/index.ts';
 import { praiseFor } from '../score/index.ts';
 import type { AccoladeStyle } from './accolade.ts';
-import { DEDUCTION, LEVEL, ROUTINE } from './accolade.ts';
+import { LEVEL, ROUTINE } from './accolade.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
@@ -55,9 +55,9 @@ interface BandLine {
  *
  * A record rather than a ternary on `kind === 'link'`, for the reason
  * `REFUSAL_LINE` below is one: this WAS a two-way boolean, and when a third kind
- * arrived it fell through to the else branch and announced every grab in red as
- * "COASTED PAST P1 — STREAK LOST" — the player told off for the capture they had
- * just made. Adding a kind now fails to compile until it has an entry.
+ * arrived it fell through to the else branch and announced every grab in the
+ * deduction colour, captioned as a penalty — the player told off for the capture
+ * they had just made. Adding a kind now fails to compile until it has an entry.
  */
 const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => BandLine> = {
   grab: (a, p) => ({
@@ -71,11 +71,6 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     style: p ? LEVEL[p.level] : ROUTINE,
     detail: `${a.body}  PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
-  }),
-  miss: (a) => ({
-    style: DEDUCTION,
-    detail: `COASTED PAST ${a.body} — STREAK LOST`,
-    mult: '',
   }),
 };
 
@@ -420,11 +415,7 @@ export function drawScore(
   // The band carries the same word as the popup beside the ship, so the two are
   // answering the same question in the same vocabulary.
   const named = praise ? `  ${praise.word}` : '';
-  ctx.fillText(
-    `${a.points >= 0 ? '+' : ''}${formatScore(a.points)}${band.mult}${named}`,
-    cx,
-    cam.offsetY + SCORE.awardY * s,
-  );
+  ctx.fillText(`+${formatScore(a.points)}${band.mult}${named}`, cx, cam.offsetY + SCORE.awardY * s);
 
   ctx.font = `${9 * s}px ui-monospace, monospace`;
   ctx.fillStyle = band.style.labelColor;

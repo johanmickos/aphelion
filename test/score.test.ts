@@ -94,9 +94,9 @@ function play(
  * A greedy pilot, played rather than recorded: grab whatever is on offer and let
  * go as the combined boost-and-aim quality turns over.
  *
- * It exists because the interesting properties — streaks, multipliers, misses —
- * only appear across a chain of captures, and hand-written press/release ticks
- * that chain reliably are brittle to any retune. This one finds its own way.
+ * It exists because the interesting properties — streaks and multipliers — only
+ * appear across a chain of captures, and hand-written press/release ticks that
+ * chain reliably are brittle to any retune. This one finds its own way.
  */
 function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SCORE_CONFIG) {
   const state = createInitialState(cfg);
@@ -162,9 +162,9 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
 /**
  * The sessions every weight is measured against.
  *
- * One is not enough, for the same reason `test/tune.test.ts` needs four: a
- * session that never coasts past anything cannot show a miss weight doing
- * something, and one that never chains cannot show a multiplier.
+ * One is not enough, for the same reason `test/tune.test.ts` needs several: a
+ * session that never chains cannot show a multiplier, and one that never reaches
+ * periapsis cannot show anything the grab is paid for.
  */
 const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?: Ship }> = [
   /**
@@ -196,7 +196,7 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
     ],
     ticks: 900,
   },
-  // grabs once, then sails past everything above it
+  // grabs once, then coasts the rest of the way
   {
     name: 'one grab then coasting',
     edges: [
@@ -205,7 +205,7 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
     ],
     ticks: 3000,
   },
-  // never presses at all: pure coasting, all penalty
+  // never presses at all
   { name: 'never engages', edges: [], ticks: 3000 },
 ];
 
@@ -214,14 +214,9 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
  *
  * `score` alone will not do — it is the current life's, and every session here
  * ends after at least one death, so it is almost always zero at the final tick.
- * `best` alone will not do either: it is a PEAK, so a deduction can only move it
- * when a link follows the deduction inside the same life. In these sessions the
- * coasting all happens after the last capture, which would leave `missPenalty`
- * measuring as inert when it plainly is not — the author's own recorded sessions
- * interleave six deductions with twenty-nine links.
- *
- * The pair is the honest signature: the best life, and everything the session was
- * ever paid, deductions included.
+ * `best` alone will not do either: it is a PEAK, and a weight that only moves a
+ * late link cannot move it. The pair is the honest signature: the best life, and
+ * everything the session was ever paid.
  */
 function outcomeOf(scfg: ScoreConfig): number[] {
   const out: number[] = [];
@@ -267,7 +262,7 @@ describe('a score is a pure function of (config, seed, inputLog)', () => {
     expect(awards.length).toBeGreaterThan(0);
     expect(awards.reduce((n, a) => n + a.points, 0)).toBe(score.score);
     expect(awards.filter((a) => a.kind === 'link')).toHaveLength(score.links);
-    expect(awards.filter((a) => a.kind === 'miss')).toHaveLength(score.misses);
+    expect(awards.filter((a) => a.kind === 'grab')).toHaveLength(score.grabs);
   });
 
   it('cannot influence the simulation, at any tick', () => {
@@ -391,8 +386,8 @@ describe('the streak multiplier', () => {
 
   it('starts the next life clean rather than judging it on the last one', () => {
     // After a respawn the field is re-flown from the bottom. Without clearing the
-    // per-body flags, every planet would already be marked judged or grabbed and
-    // the second pass would score nothing at all.
+    // climb baseline, the next link would bank from a high-water mark the ship is
+    // now far below.
     const { awards } = pilot(4000);
     const links = awards.filter((a) => a.kind === 'link');
     const firstOfLife = links.map((a) => a.multiplier).lastIndexOf(1);
@@ -401,58 +396,6 @@ describe('the streak multiplier', () => {
   });
 });
 
-describe('coasting past a planet', () => {
-  it('deducts, and breaks the streak', () => {
-    const { score, awards } = play(
-      [
-        [240, 1],
-        [340, 0],
-      ],
-      3000,
-    );
-    const misses = awards.filter((a) => a.kind === 'miss');
-    expect(misses.length).toBeGreaterThan(0);
-    expect(score.misses).toBe(misses.length);
-    expect(score.streak).toBe(0);
-  });
-
-  it('never charges for a body the game would have refused to let you grab', () => {
-    // Nothing is ever on offer with an empty tank, so nothing can be missed.
-    const dry: SimConfig = { ...DEFAULT_CONFIG, fuelMax: 0.5, fuelRegen: 0 };
-    const { awards } = play([], 3000, dry);
-    expect(awards.filter((a) => a.kind === 'miss')).toHaveLength(0);
-  });
-
-  it('never charges for a body that was never within reach', () => {
-    const far: SimConfig = { ...DEFAULT_CONFIG, grabRange: 1 };
-    const { awards } = play([], 3000, far);
-    expect(awards.filter((a) => a.kind === 'miss')).toHaveLength(0);
-  });
-
-  it('charges for each body at most once', () => {
-    const { awards } = play([], 3000);
-    const names = awards.filter((a) => a.kind === 'miss').map((a) => a.body);
-    expect(new Set(names).size).toBe(names.length);
-  });
-
-  it('never drives the score below zero', () => {
-    const { score, awards } = play([], 3000);
-    expect(awards.filter((a) => a.kind === 'miss').length).toBeGreaterThan(0);
-    expect(score.score).toBeGreaterThanOrEqual(0);
-    expect(score.best).toBeGreaterThanOrEqual(0);
-  });
-});
-
-/**
- * PORT_NOTES 17 pinned "grab quality influences nothing": `aim` was computed on
- * every grab, read by nobody, and removed. The note closed by saying the mechanic
- * the prototype's design document described was still not implemented and that it
- * was a live design question.
- *
- * It has been answered — but NOT by making aim move the ship, which is what that
- * document proposed and what would have broken the equality gate. Aim is paid in
- * points instead. Both halves are pinned here, because half of it is still true.
- */
 describe('grab quality (PORT_NOTES 17)', () => {
   it('now has a consumer: the score reads the release alignment', () => {
     const links = pilot(4000).awards.filter((a) => a.kind === 'link');
@@ -635,10 +578,6 @@ describe('the word a release earns', () => {
 
   it('never names an arrival quality — that event has already been paid', () => {
     expect(praiseFor(link({ clearance: 10, skim: -50 }))).toBeNull();
-  });
-
-  it('never scolds a deduction — the words are a reward channel', () => {
-    expect(praiseFor(link({ kind: 'miss', points: -150, aim: 1, timing: 1 }))).toBe(null);
   });
 
   it('picks the same word every time, so a replay shows what the player saw', () => {
