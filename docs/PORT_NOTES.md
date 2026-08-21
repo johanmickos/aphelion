@@ -648,7 +648,7 @@ because three places need it and must agree — `stepSim` ends the run at it,
 
 `WORLD_SEED` was a module constant, on the reasoning that every player should
 climb the same field and a replay must reconstruct it exactly. The second half of
-that is a real constraint; the first half was a decision, and NEW FIELD reverses
+that is a real constraint; the first half was a decision, and NEW MAP reverses
 it.
 
 The seed is now `SimConfig.worldSeed`, which is what makes the reversal cheap: a

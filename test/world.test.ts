@@ -3,7 +3,7 @@
  * continue the authored pattern rather than diverge from it.
  *
  * Every playability property here is asserted across a SWEEP of seeds, not on
- * the one the game ships with. NEW FIELD makes the seed a player choice, so a
+ * the one the game ships with. NEW MAP makes the seed a player choice, so a
  * layout that only works at `0x5eed1e55` is a layout that works by luck — and the
  * single-seed versions of these assertions could not tell the difference.
  */
@@ -73,7 +73,7 @@ describe('world generation', () => {
   });
 
   it('is a function of the seed — a different seed is a different field', () => {
-    // What NEW FIELD relies on, and what a replay relies on in the other
+    // What NEW MAP relies on, and what a replay relies on in the other
     // direction: the seed is the whole difference between two fields, so a
     // report that carries it carries the world.
     const a = createBodies({ ...DEFAULT_CONFIG, worldSeed: 1 });

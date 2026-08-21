@@ -279,7 +279,7 @@ describe('report round trip', () => {
     expect(resolved.bodySpacing).toBe(DEFAULT_CONFIG.bodySpacing);
   });
 
-  it('replays a report from before NEW FIELD on the field it was played on', () => {
+  it('replays a report from before NEW MAP on the field it was played on', () => {
     // Every report already on disk was played on the one fixed field, and the
     // seed that built it is PROTOTYPE_CONFIG's — so the fill rule above is not
     // merely safe here, it is exactly right. Getting this wrong would silently
@@ -299,7 +299,7 @@ describe('report round trip', () => {
     expect(createBodies(configFromReport(older))).toEqual(createBodies(DEFAULT_CONFIG));
   });
 
-  it('carries a randomised field, so a NEW FIELD session replays in its own world', () => {
+  it('carries a randomised field, so a NEW MAP session replays in its own world', () => {
     // The whole reason the seed is a config key rather than a module constant.
     const report = buildReport({
       recorder: new RunRecorder(),

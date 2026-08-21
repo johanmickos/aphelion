@@ -455,7 +455,7 @@ if (import.meta.env.DEV) {
 
 // ------------------------------------------------------------------ lifecycle
 const armedEl = document.getElementById('armed') as HTMLDivElement;
-const newFieldBtn = document.getElementById('newField') as HTMLButtonElement;
+const newMapBtn = document.getElementById('newMap') as HTMLButtonElement;
 const armedSeedEl = document.getElementById('armedSeed') as HTMLDivElement;
 
 // The overlay copy is written for a phone, and "tap" is the one word a desktop
@@ -480,7 +480,10 @@ function showArmed(): void {
 }
 
 /**
- * A new field, on demand.
+ * NEW MAP — a new field, on demand.
+ *
+ * "Map" is the player's word for it and "field" is the code's; the seed builds a
+ * field, and the button offers a map.
  *
  * The seed is a config key, so this is the same act as moving a tune slider: it
  * is legal only while armed, it goes through `rearm()`, and it is therefore
@@ -500,7 +503,7 @@ function showSeed(): void {
   armedSeedEl.textContent = `seed ${sim.worldSeed.toString(16).padStart(8, '0')}`;
 }
 
-newFieldBtn.addEventListener('click', (e) => {
+newMapBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   if (life.phase !== 'armed') return;
   sim.worldSeed = (Math.random() * 2 ** 32) >>> 0;
