@@ -54,6 +54,18 @@ export interface Analysis {
   maxDelta: number;
   /** Tick where the phase disagreed, if any — the loudest kind of divergence. */
   phaseMismatch: { tick: number; want: string; got: string } | null;
+  /**
+   * The last checkpoint that still matched bit for bit, and the first that did
+   * not.
+   *
+   * A diverged replay is not worthless, and saying only "diverged" throws away
+   * the half of it that is perfectly good. Everything up to `lastExactTick` IS
+   * the session that was played.
+   */
+  lastExactTick: number | null;
+  firstDivergedTick: number | null;
+  /** Phase at the first checkpoint that stopped matching. */
+  firstDivergedPhase: string | null;
   findings: string[];
   events: Event[];
   frames: Frame[];
@@ -163,10 +175,22 @@ export function replayReport(report: DiagReport): Analysis {
   let exactMatches = 0;
   let maxDelta = 0;
   let phaseMismatch: Analysis['phaseMismatch'] = null;
+  let lastExactTick: number | null = null;
+  let firstDivergedTick: number | null = null;
+  let firstDivergedPhase: string | null = null;
   for (const [tick, fp, x, y, , , , phase] of report.checks) {
     const f = byTick.get(tick);
     if (!f) continue;
-    if (f.fp === fp) exactMatches++;
+    if (f.fp === fp) {
+      exactMatches++;
+      // Only while the run has never yet parted company: a state that matches
+      // again after diverging is a coincidence or a respawn resetting both sides
+      // to the same constants, not evidence the run in between was reproduced.
+      if (firstDivergedTick === null) lastExactTick = tick;
+    } else if (firstDivergedTick === null) {
+      firstDivergedTick = tick;
+      firstDivergedPhase = phase;
+    }
     maxDelta = Math.max(maxDelta, Math.hypot(f.x - x, f.y - y));
     if (f.phase !== phase && !phaseMismatch) {
       phaseMismatch = { tick, want: phase, got: f.phase };
@@ -264,6 +288,9 @@ export function replayReport(report: DiagReport): Analysis {
     total: report.checks.length,
     maxDelta,
     phaseMismatch,
+    lastExactTick,
+    firstDivergedTick,
+    firstDivergedPhase,
     findings,
     events,
     frames,
@@ -280,6 +307,17 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   out.push('  APHELION — replay');
   out.push('  ' + '─'.repeat(72));
   out.push(`  recorded   ${report.at}`);
+  // The bundle the session was played on. A feature that shipped after this
+  // moment was not on screen, however current the config and simVersion look.
+  if (report.loadedAt) {
+    const mins = (Date.parse(report.at) - Date.parse(report.loadedAt)) / 60000;
+    out.push(
+      `  page load  ${report.loadedAt}` +
+        (Number.isFinite(mins) ? `  (${mins.toFixed(0)} min before the report)` : ''),
+    );
+  } else {
+    out.push('  page load  not recorded — this report predates the field');
+  }
   out.push(`  device     ${report.device.w}x${report.device.h} @${report.device.dpr}x`);
   out.push(`  session    ${s.seconds.toFixed(1)}s · ${report.ticks} ticks · ${s.grabs} grabs`);
   const delta = configDelta(report.config, DEFAULT_CONFIG);
@@ -334,12 +372,40 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
             `recorded "${a.phaseMismatch.want}", replay "${a.phaseMismatch.got}"`,
         );
       }
-      if (skewed)
+      if (skewed) {
         out.push(
           '      The report is from a different build (see above) — that is the likely cause.',
         );
-      else out.push('      Same build and config, so this is real: the run took a different path.');
+      } else {
+        // Saying only "this is real" points the reader at non-determinism, which
+        // is almost never what this is. The simulation is deterministic and the
+        // test suite proves it; what differs is the ENGINE. PORT_NOTES 16 fixed
+        // Math.hypot, but sin, cos and atan2 are still implementation-
+        // approximated and JavaScriptCore and V8 disagree on them.
+        out.push('      Same build and config. Before suspecting non-determinism, note that');
+        out.push('      sin/cos/atan2 remain implementation-approximated and differ between');
+        out.push('      the phone and this machine (PORT_NOTES 16 fixed only Math.hypot).');
+        out.push('      The phase clock uses them, a capture amplifies the difference, and a');
+        out.push('      respawn resets it — so a long unbroken chain of captures diverges');
+        out.push('      where a crash-heavy session does not.');
+      }
       break;
+  }
+  // A diverged replay is not a worthless one. Everything up to the last matching
+  // checkpoint IS the session that was played, and saying so is the difference
+  // between a useless report and half a useful one.
+  if (a.firstDivergedTick !== null && a.fidelity !== 'close' && a.fidelity !== 'exact') {
+    const upto =
+      a.lastExactTick === null
+        ? '      Nothing in this replay is bit-exact — treat all of it as suspect.'
+        : `      Trustworthy up to tick ${a.lastExactTick} (t=${(a.lastExactTick * report.dt).toFixed(1)}s).`;
+    out.push('');
+    out.push(upto);
+    out.push(
+      `      First checkpoint that differs: ${a.firstDivergedTick}` +
+        (a.firstDivergedPhase ? ` (in ${a.firstDivergedPhase})` : '') +
+        '. Read nothing after it.',
+    );
   }
   if (report.checksTruncated) out.push('      (early checkpoints were dropped by the recorder)');
   out.push('');

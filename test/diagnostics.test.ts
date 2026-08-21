@@ -321,6 +321,108 @@ describe('report round trip', () => {
     expect(replayReport(report).fidelity).toBe('diverged');
   });
 
+  it('names the last tick that was still bit-exact, so half a report is not wasted', () => {
+    const edges = new Map<number, 0 | 1>([
+      [40, 1],
+      [200, 0],
+    ]);
+    const { recorder, state } = play(DEFAULT_CONFIG, 400, edges);
+    const report = parseReport(
+      serializeReport(
+        buildReport({
+          recorder,
+          config: DEFAULT_CONFIG,
+          seed: 1,
+          ticks: state.tick,
+          note: '',
+          device: DEVICE,
+        }),
+      ),
+    );
+    // Break every checkpoint from the fourth on, leaving the first three intact:
+    // the shape of a real divergence, which starts somewhere in the middle.
+    const breakFrom = report.checks[3]![0];
+    report.checks = report.checks.map(([t, fp, x, y, vx, vy, f, p]) =>
+      t >= breakFrom ? [t, 'deadbeef', x + 500, y, vx, vy, f, p] : [t, fp, x, y, vx, vy, f, p],
+    );
+    const a = replayReport(report);
+    expect(a.fidelity).toBe('diverged');
+    expect(a.firstDivergedTick).toBe(breakFrom);
+    expect(a.lastExactTick).toBe(report.checks[2]![0]);
+    expect(a.firstDivergedPhase).toBe(report.checks[3]![7]);
+  });
+
+  it('does not call a run trustworthy again just because a later state re-matched', () => {
+    // A respawn resets both sides to the same constants, so checkpoints can agree
+    // again after the run has genuinely parted company. That is not evidence the
+    // stretch in between was reproduced.
+    const edges = new Map<number, 0 | 1>([
+      [40, 1],
+      [200, 0],
+    ]);
+    const { recorder, state } = play(DEFAULT_CONFIG, 400, edges);
+    const report = parseReport(
+      serializeReport(
+        buildReport({
+          recorder,
+          config: DEFAULT_CONFIG,
+          seed: 1,
+          ticks: state.tick,
+          note: '',
+          device: DEVICE,
+        }),
+      ),
+    );
+    const broken = report.checks[2]![0];
+    report.checks = report.checks.map(([t, fp, x, y, vx, vy, f, p]) =>
+      t === broken ? [t, 'deadbeef', x + 500, y, vx, vy, f, p] : [t, fp, x, y, vx, vy, f, p],
+    );
+    const a = replayReport(report);
+    // later checkpoints match again, but the trustworthy prefix still stops here
+    expect(a.lastExactTick).toBe(report.checks[1]![0]);
+    expect(a.firstDivergedTick).toBe(broken);
+  });
+
+  it('carries the page-load time, so a stale bundle is not invisible', () => {
+    // simVersion and config describe the simulation and nothing else. Without
+    // this, a session played before a HUD change and one played after it are the
+    // same report.
+    const { recorder, state } = play(DEFAULT_CONFIG, 120, new Map());
+    const loadedAt = '2026-08-20T03:00:00.000Z';
+    const report = parseReport(
+      serializeReport(
+        buildReport({
+          recorder,
+          config: DEFAULT_CONFIG,
+          seed: 1,
+          ticks: state.tick,
+          note: '',
+          device: DEVICE,
+          loadedAt,
+        }),
+      ),
+    );
+    expect(report.loadedAt).toBe(loadedAt);
+  });
+
+  it('still reads a report written before the page-load field existed', () => {
+    // Adding a field is not a reason to make every report already on disk
+    // unreadable, which is why it is optional rather than a schema bump.
+    const { recorder, state } = play(DEFAULT_CONFIG, 120, new Map());
+    const report = buildReport({
+      recorder,
+      config: DEFAULT_CONFIG,
+      seed: 1,
+      ticks: state.tick,
+      note: '',
+      device: DEVICE,
+    });
+    expect(report.loadedAt).toBeUndefined();
+    const round = parseReport(serializeReport(report));
+    expect(round.loadedAt).toBeUndefined();
+    expect(replayReport(round).fidelity).toBe('exact');
+  });
+
   it('rejects a report from a future schema rather than misreading it', () => {
     expect(() => parseReport(JSON.stringify({ aphelion: 99 }))).toThrow(/schema/);
   });

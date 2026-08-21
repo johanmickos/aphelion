@@ -29,6 +29,20 @@ export interface DiagReport {
   config: SimConfig;
   /** Simulation behaviour version, for detecting skew the config cannot show. */
   simVersion: number;
+  /**
+   * When the page was loaded, ISO.
+   *
+   * `simVersion` and `config` describe the SIMULATION the session ran, and say
+   * nothing about the build around it. A session played on a bundle from before
+   * a HUD or scoring change is indistinguishable in a report from one played
+   * after it — which turned "the praise word never appeared" into a question no
+   * report could answer. This one is answerable: compare it against when the
+   * feature shipped.
+   *
+   * Optional, because adding it is not a reason to make every report already on
+   * disk unreadable. Absent means the report predates the field.
+   */
+  loadedAt?: string;
   ticks: number;
   input: InputRecord[];
   marks: Marker[];
@@ -58,10 +72,13 @@ export function buildReport(args: {
   ticks: number;
   note: string;
   device: { w: number; h: number; dpr: number; ua: string };
+  /** When the page was loaded. See `DiagReport.loadedAt`. */
+  loadedAt?: string;
 }): DiagReport {
   return {
     aphelion: REPORT_SCHEMA,
     at: new Date().toISOString(),
+    ...(args.loadedAt ? { loadedAt: args.loadedAt } : {}),
     dt: FIXED_DT,
     seed: args.seed,
     device: args.device,

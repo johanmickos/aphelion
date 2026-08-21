@@ -161,11 +161,22 @@ The replay **grades its own fidelity** first, and reports it:
 | `drifted`  | same decisions, numbers diverging; phases and events reliable, late positions not    |
 | `diverged` | the run genuinely took a different path — or the report is from another build        |
 
-Phone replays are bit-exact in practice. Getting there required replacing
+Most phone replays are bit-exact, and getting there required replacing
 `Math.hypot` with `sqrt(x*x + y*y)`: `hypot` is not correctly rounded and
 JavaScriptCore and V8 disagree on 36% of inputs, which compounded through orbital
 motion until it flipped whole decisions after ~10 seconds. See PORT_NOTES 15
 and 16.
+
+**`sin`, `cos` and `atan2` were not replaced and are the same class of hazard.**
+The phase clock calls them every tick of a settle, so a difference appears there,
+each subsequent capture amplifies it, and a respawn wipes it — which means a long
+unbroken chain of captures can fork the run while a crash-heavy session of four
+times the length replays perfectly. Measured across eleven recorded sessions: one
+262-second, 61-grab run stayed within 0.37px, and one 57-second, 19-grab run with
+a single death diverged completely from about tick 1900. When that happens the
+tool now names the last tick that was still bit-exact, because everything before
+it is still the session you played.
+
 Every report carries state
 fingerprints at intervals, and the tool re-runs the session and compares them. If
 they all match, the replay _is_ the session you played and anything it reports can

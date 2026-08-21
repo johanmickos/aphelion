@@ -28,7 +28,8 @@ import { buildReport, serializeReport, summarize } from '../src/app/report.ts';
  * by the dev server, so the identifier survives into the served module and throws.
  * Load time answers the actual question anyway.
  */
-const PAGE_LOADED = new Date().toTimeString().slice(0, 8);
+const PAGE_LOADED_AT = new Date();
+const PAGE_LOADED = PAGE_LOADED_AT.toTimeString().slice(0, 8);
 
 /** A single-tick position change beyond this can only be a teleport, not motion. */
 const TELEPORT_DISTANCE = 200;
@@ -295,6 +296,9 @@ function refreshReport(): string {
     seed,
     ticks: state.tick,
     note: diagNote.value,
+    // Carried so a replay can tell a session played on this build from one
+    // played on the bundle that was open ten minutes ago.
+    loadedAt: PAGE_LOADED_AT.toISOString(),
     device: {
       w: innerWidth,
       h: innerHeight,
