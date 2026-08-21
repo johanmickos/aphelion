@@ -103,6 +103,84 @@
         color: #ff9aa8;
       }
 
+      #tune {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.96);
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        padding: calc(env(safe-area-inset-top, 0px) + 14px)
+          calc(env(safe-area-inset-right, 0px) + 14px)
+          calc(env(safe-area-inset-bottom, 0px) + 14px)
+          calc(env(safe-area-inset-left, 0px) + 14px);
+      }
+      #tune.open {
+        display: flex;
+      }
+      #tune h1 {
+        font: 600 12px/1.4 ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        color: #eef3fb;
+        margin: 0;
+      }
+      #tuneNote {
+        font: 10px/1.5 ui-monospace, monospace;
+        color: #8595b0;
+      }
+      #tuneRows {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .tuneGroup {
+        font: 600 9px/1 ui-monospace, monospace;
+        letter-spacing: 0.16em;
+        color: #6d7c9b;
+        margin: 12px 0 6px;
+      }
+      .tuneRow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .tuneRow .tl {
+        font: 10px/1 ui-monospace, monospace;
+        letter-spacing: 0.06em;
+        color: #b98cff;
+        width: 84px;
+        flex: 0 0 auto;
+      }
+      .tuneRow input[type='range'] {
+        flex: 1 1 0;
+        min-width: 0;
+        accent-color: #b98cff;
+        height: 26px;
+      }
+      .tuneRow .tv {
+        font: 11px/1 ui-monospace, monospace;
+        color: #eef3fb;
+        width: 46px;
+        text-align: right;
+        flex: 0 0 auto;
+      }
+      .tuneHint {
+        font: 9px/1.4 ui-monospace, monospace;
+        color: #55627d;
+        margin: 2px 0 8px 94px;
+      }
+      #tuneFoot {
+        display: flex;
+        gap: 8px;
+      }
+      #tuneFoot .ctl {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-align: center;
+      }
+
       #diag {
         position: absolute;
         inset: 0;
@@ -175,6 +253,42 @@
 
       /* Moved to the top right: the bottom left is the fuel gauge's, and the
          bottom right is now the controls'. */
+      /* The armed overlay: shown before a run begins, so there is somewhere to
+         change the tuning and each run starts from a decision rather than from
+         wherever the last one left off. */
+      #armed {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.55);
+        text-align: center;
+        pointer-events: none;
+      }
+      #armed.hidden {
+        display: none;
+      }
+      #armedTitle {
+        font: 600 26px/1.2 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+        letter-spacing: 0.3em;
+        color: #cfc0ff;
+        text-indent: 0.3em;
+      }
+      #armedHint {
+        margin-top: 14px;
+        font: 12px/1.4 ui-monospace, monospace;
+        letter-spacing: 0.18em;
+        color: #eef3fb;
+      }
+      #armedSub {
+        margin-top: 8px;
+        font: 10px/1.5 ui-monospace, monospace;
+        letter-spacing: 0.06em;
+        color: #7b88a4;
+      }
+
       #note {
         position: absolute;
         right: calc(env(safe-area-inset-right, 0px) + 10px);
@@ -190,9 +304,20 @@
   <body>
     <canvas id="c"></canvas>
     <div id="controls">
+      <button class="ctl" id="tuneBtn">TUNE</button>
       <button class="ctl" id="reset">RESET</button>
       <button class="ctl" id="diagBtn">DIAG</button>
       <button class="ctl" id="flag">⚑</button>
+    </div>
+
+    <div id="tune">
+      <h1>TUNE</h1>
+      <div id="tuneNote">Changes apply to the next run. Start a run to lock them in.</div>
+      <div id="tuneRows"></div>
+      <div id="tuneFoot">
+        <button class="ctl" id="tuneReset">DEFAULTS</button>
+        <button class="ctl" id="tuneClose">CLOSE</button>
+      </div>
     </div>
 
     <div id="diag">
@@ -208,6 +333,14 @@
         <button class="ctl" id="diagSend">SEND</button>
         <button class="ctl" id="diagCopy">COPY</button>
         <button class="ctl" id="diagClose">CLOSE</button>
+      </div>
+    </div>
+
+    <div id="armed">
+      <div id="armedInner">
+        <div id="armedTitle">APHELION</div>
+        <div id="armedHint">tap to start</div>
+        <div id="armedSub">press and hold near a planet to be caught by it</div>
       </div>
     </div>
 

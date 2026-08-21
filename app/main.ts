@@ -5,6 +5,9 @@
  * markers), the release compass and the run lifecycle are still to come.
  */
 import { DEFAULT_CONFIG, FIXED_DT, MAX_CATCHUP_STEPS } from '../src/sim/config.ts';
+import type { SimConfig } from '../src/sim/config.ts';
+import { createLifecycle } from '../src/app/lifecycle.ts';
+import { KNOBS } from '../src/app/tune.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 import type { Input } from '../src/sim/types.ts';
@@ -32,15 +35,38 @@ const TELEPORT_DISTANCE = 200;
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
-const sim = DEFAULT_CONFIG;
 const rcfg = DEFAULT_RENDER_CONFIG;
-const state = createInitialState(sim);
-const field = fieldBounds(sim, state.bodies);
 const cam = createCamera(rcfg);
 
 // One seed per session, recorded so a reported frame can be reproduced.
 const seed = (Date.now() ^ 0x9e3779b9) >>> 0;
-const scene = new Scene({ sim, render: rcfg, bodies: state.bodies, field }, seed);
+
+/**
+ * The live configuration.
+ *
+ * Editable only while armed. Once a run starts it is fixed, because a run is
+ * `(config, seed, inputLog)` and a replay cannot reproduce a config that moved
+ * underneath it.
+ */
+let sim: SimConfig = { ...DEFAULT_CONFIG };
+let state = createInitialState(sim);
+let field = fieldBounds(sim, state.bodies);
+let scene = new Scene({ sim, render: rcfg, bodies: state.bodies, field }, seed);
+const life = createLifecycle();
+
+/** Rebuild the world from the current config. Only legal while armed. */
+function rearm(): void {
+  sim = { ...sim };
+  state = createInitialState(sim);
+  field = fieldBounds(sim, state.bodies);
+  scene = new Scene({ sim, render: rcfg, bodies: state.bodies, field }, seed);
+  const p = shipWorldPos(state);
+  centerCamera(cam, p.x, p.y, field);
+  prev = captureSnapshot(state, false, sim);
+  curr = prev;
+  scene.trail.clear();
+  scene.trail.sample(p.x, p.y, 0);
+}
 
 const recorder = new RunRecorder();
 
@@ -50,8 +76,14 @@ let pressedEdge = false;
 let releasedEdge = false;
 canvas.addEventListener('pointerdown', (e) => {
   // Controls sit above the canvas; a tap on one must not also be a grab.
-  if ((e.target as HTMLElement | null)?.closest('.ctl, #diag')) return;
+  if ((e.target as HTMLElement | null)?.closest('.ctl, #diag, #tune')) return;
   e.preventDefault();
+  // The first tap starts the run rather than grabbing, so a run never begins
+  // with an input the player did not mean as gameplay.
+  if (life.phase === 'armed') {
+    startRun();
+    return;
+  }
   held = true;
   pressedEdge = true;
 });
@@ -103,7 +135,7 @@ addEventListener('visibilitychange', () => {
   if (wasPaused && !paused) loop.resetClock();
 });
 
-let prev = captureSnapshot(state, held, sim);
+let prev = captureSnapshot(state, false, sim);
 let curr = prev;
 
 /**
@@ -130,13 +162,11 @@ function resize(): void {
 addEventListener('resize', resize);
 resize();
 
-const start = shipWorldPos(state);
-centerCamera(cam, start.x, start.y, field);
-scene.trail.sample(start.x, start.y, 0);
+rearm();
 
 const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
   step(dt) {
-    if (paused) return;
+    if (paused || life.phase !== 'running') return;
     const input: Input = { held, pressed: pressedEdge, released: releasedEdge };
     recorder.recordInput(state.tick, pressedEdge, releasedEdge);
     pressedEdge = false;
@@ -329,3 +359,102 @@ if (import.meta.env.DEV) {
   // Not merely hidden: the button should not exist in a shipped build.
   diagSend.remove();
 }
+
+// ------------------------------------------------------------------ lifecycle
+const armedEl = document.getElementById('armed') as HTMLDivElement;
+const tuneBtn = document.getElementById('tuneBtn') as HTMLButtonElement;
+const tuneEl = document.getElementById('tune') as HTMLDivElement;
+const tuneRows = document.getElementById('tuneRows') as HTMLDivElement;
+const tuneReset = document.getElementById('tuneReset') as HTMLButtonElement;
+const tuneClose = document.getElementById('tuneClose') as HTMLButtonElement;
+
+function showArmed(): void {
+  armedEl.classList.toggle('hidden', life.phase !== 'armed');
+  tuneBtn.disabled = life.phase !== 'armed';
+  tuneBtn.style.opacity = life.phase === 'armed' ? '1' : '0.35';
+}
+
+function startRun(): void {
+  life.phase = 'running';
+  life.startedAtTick = state.tick;
+  loop.resetClock();
+  showArmed();
+}
+
+// ----------------------------------------------------------------- tune panel
+//
+// Editing is only possible while armed, which is what makes a run reproducible:
+// the config is fixed before the first tick, so (config, seed, inputLog) really
+// does describe everything that happened.
+function buildTuneRows(): void {
+  tuneRows.innerHTML = '';
+  let group = '';
+  for (const knob of KNOBS) {
+    if (knob.group !== group) {
+      group = knob.group;
+      const h = document.createElement('div');
+      h.className = 'tuneGroup';
+      h.textContent = group;
+      tuneRows.appendChild(h);
+    }
+    const row = document.createElement('div');
+    row.className = 'tuneRow';
+
+    const label = document.createElement('span');
+    label.className = 'tl';
+    label.textContent = knob.label;
+
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = String(knob.min);
+    input.max = String(knob.max);
+    input.step = String(knob.step);
+    input.value = String(sim[knob.key]);
+
+    const value = document.createElement('span');
+    value.className = 'tv';
+    const show = (): void => {
+      value.textContent = (sim[knob.key] as number).toFixed(knob.dp);
+    };
+    show();
+
+    input.addEventListener('input', () => {
+      (sim as unknown as Record<string, number>)[knob.key] = Number(input.value);
+      show();
+      // Rebuilding on every change means the armed screen is a live preview:
+      // move SPACING and the field behind the panel is already the new one.
+      rearm();
+    });
+
+    row.append(label, input, value);
+    tuneRows.appendChild(row);
+
+    const hint = document.createElement('div');
+    hint.className = 'tuneHint';
+    hint.textContent = knob.hint;
+    tuneRows.appendChild(hint);
+  }
+}
+
+tuneBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (life.phase !== 'armed') return;
+  buildTuneRows();
+  tuneEl.classList.add('open');
+});
+
+tuneClose.addEventListener('click', (e) => {
+  e.stopPropagation();
+  tuneEl.classList.remove('open');
+});
+
+tuneReset.addEventListener('click', (e) => {
+  e.stopPropagation();
+  for (const knob of KNOBS) {
+    (sim as unknown as Record<string, number>)[knob.key] = DEFAULT_CONFIG[knob.key] as number;
+  }
+  rearm();
+  buildTuneRows();
+});
+
+showArmed();

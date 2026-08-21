@@ -248,6 +248,26 @@ surfaced only because the gate compares fuel too. `stepDrift` now returns a
 
 **Lesson:** compare every field, not just the ones that look like physics.
 
+### 17 — `aim` was computed on every grab and never read **[REMOVED]**
+
+`beginCapture` derived an `aim` score from four weighted terms and stored it on
+the capture. Nothing anywhere read it — confirmed by grep and by a sensitivity
+sweep, where all four weights moved a trajectory by exactly zero.
+
+`DESIGN.md` §9 describes it as a live mechanic: *"Aim sets tightness monotonically
+— precise = tight/fast, lazy = wide."* That is not what happens. Tightness is
+derived geometrically in `freezeOrbit` from `(grabR - rPeri) / span`, which is how
+deep the dive went, not how well it was aimed. `aim` is vestigial from an earlier
+design — the same class of documentation drift as the `whip` phase in note 4.
+
+Removed, along with five other write-only capture fields found in the same sweep:
+`grabSpeed`, `inboundFrac`, `natPeri`, `isFlyby` and `whipVmax`. None could affect
+a trajectory, and the equality gate stayed at exactly zero across the change.
+
+Worth being clear about what was NOT done: the mechanic the document describes is
+not implemented. Grab quality still does not influence the settled orbit. That is
+a live design question, not a cleanup.
+
 ---
 
 ## 15 — JavaScript engines disagree on floating-point math

@@ -82,21 +82,12 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
   const vy = ship.vy;
   const minR = p.R + cfg.minOrbitGap;
   const grabR = hypot(rx, ry);
-  const grabSpeed = hypot(vx, vy);
-
-  // --- aim scoring (feeds the boost and the tighten target) ---
   const r = grabR;
-  const spd = grabSpeed;
+  const spd = hypot(vx, vy);
   const rhx = rx / r;
   const rhy = ry / r;
   const vrad = vx * rhx + vy * rhy;
   const inb = Math.max(0, -vrad / Math.max(spd, 1));
-  const prox = 1 - Math.min(1, r / cfg.aimProxRef);
-  const spf = Math.min(1, spd / circSpeed(cfg, r));
-  const aim = Math.max(
-    0,
-    Math.min(1, cfg.aimInwardW * inb + cfg.aimProxW * prox + cfg.aimSpeedW * spf),
-  );
 
   // A flyby is an unbound grab (at or above escape speed, so gravity cannot hold
   // it) or one already moving outward with no periapsis ahead. Gravity still
@@ -116,12 +107,7 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     vx,
     vy,
     grabR,
-    grabSpeed,
-    aim,
-    inboundFrac: inb,
     minR,
-    natPeri,
-    isFlyby,
     prevR: grabR,
     prevDR: 0,
     passedPeri: false,
@@ -131,7 +117,6 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     clearDvx: 0,
     clearDvy: 0,
     whipE: undefined,
-    whipVmax: 0,
     orbit: null,
     theta: 0,
     phaseSpeed: 0,

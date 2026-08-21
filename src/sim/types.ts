@@ -85,13 +85,8 @@ export interface Capture {
   vy: number;
 
   grabR: number;
-  grabSpeed: number;
-  aim: number;
-  inboundFrac: number;
   /** Minimum permitted orbit radius: body.R + minOrbitGap. */
   minR: number;
-  natPeri: number;
-  isFlyby: boolean;
 
   prevR: number;
   prevDR: number;
@@ -105,7 +100,6 @@ export interface Capture {
 
   /** Peak specific orbital energy seen during the dive, captured before any floor clamp. */
   whipE: number | undefined;
-  whipVmax: number;
 
   orbit: Orbit | null;
   /** Current true anomaly along the frozen orbit. */

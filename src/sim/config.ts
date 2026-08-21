@@ -20,12 +20,6 @@ export interface SimConfig {
   /** Baseline drift speed the ship spawns with. */
   cruise: number;
 
-  // --- aim scoring (feeds the boost and the tighten target) ---
-  aimInwardW: number;
-  aimProxW: number;
-  aimSpeedW: number;
-  aimProxRef: number;
-
   // --- phase-clock settle ---
   /** Sweep rate vs. real orbital speed. The headline feel knob. */
   phaseRate: number;
@@ -126,11 +120,6 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   SUB: 6,
   minOrbitGap: 16,
   cruise: 97,
-
-  aimInwardW: 0.55,
-  aimProxW: 0.25,
-  aimSpeedW: 0.2,
-  aimProxRef: 240,
 
   phaseRate: 1.0,
   tightenFrac: 1.0,

@@ -209,7 +209,6 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
       const v0 = hypot(cap.vx, cap.vy);
       const Enow = 0.5 * v0 * v0 - cfg.GM / Math.max(rr0, 1);
       cap.whipE = cap.whipE === undefined ? Enow : Math.max(cap.whipE, Enow);
-      cap.whipVmax = Math.max(cap.whipVmax || 0, v0);
     }
 
     // --- contact with the anchor: the minimum-orbit floor
