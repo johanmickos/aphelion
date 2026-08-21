@@ -70,9 +70,43 @@ export interface ScoreConfig {
   timingSharpness: number;
 
   // --- the streak ---
-  /** Each link after the first adds this much to the multiplier. */
+  /**
+   * Each link after the first adds this much to the multiplier.
+   *
+   * This — not `streakMax` — is the lever that decides what a chain is worth. The
+   * ceiling only ever bites at the very top; the step is what every link past the
+   * first is paid. Measured over one recorded 10-link session, raising it from
+   * 0.25 to 0.4 is a 23% larger session score and a 60% larger marginal reward
+   * for one more link.
+   *
+   * DELIBERATELY LEFT AT 0.25 pending a decision on the boost-timing axis. The
+   * step is the incentive to chain FAST, and the reason `timing` pays around 6%
+   * of link points is that waiting 0.45s at the boost peak costs a link and the
+   * streak already pays more for the link than the peak pays for the wait.
+   * Raising the step deepens exactly that arbitrage. Settle whether the peak is
+   * worth waiting for, then tune this — in that order, or this gets tuned twice.
+   */
   streakStep: number;
-  /** Multiplier ceiling. */
+  /**
+   * Multiplier ceiling. At `streakStep` 0.25 it binds on the 17th consecutive
+   * link.
+   *
+   * KEPT AT 5, and briefly changed to 3 on the strength of two sessions before
+   * the next one showed why that was wrong. The evidence for "unreachable" was a
+   * cohort of short lives — a build without `grabLeadTime`, without the crash-cone
+   * fix, and with half the flyby brake — where the best chain was 4 links. On the
+   * current build a single life has chained 32 grabs across 69 seconds and 88% of
+   * the field, which reaches this ceiling and then some.
+   *
+   * That is the property wanted: a top a great run touches and an ordinary one
+   * does not. A ceiling low enough to bind early is worse than one that never
+   * binds, because a 21-link chain is harder than a 9-link chain and paying them
+   * the same rate is the reward failing to track the difficulty.
+   *
+   * The lesson is about sample size, not about this number. Two sessions cannot
+   * establish the shape of a distribution whose interesting end is rare by
+   * construction.
+   */
   streakMax: number;
 }
 
