@@ -41,8 +41,12 @@ Score weights live in `src/score/config.ts`, never in `SimConfig`. Putting one i
 recapture, and — if it also reaches the tune panel — fails `test/tune.test.ts`,
 which measures a knob by how far it moves the ship. `test/score.test.ts` keeps the
 equivalent promise for score weights: every key in `ScoreConfig` must change some
-session's score. A value that only defines _when_ something is judged, never what
-it costs, is a constant next to its code, not a weight.
+session's outcome. A value that only defines _when_ something is judged, never
+what it costs, is a constant next to its code, not a weight.
+
+Measure a session by `score.best`, not `score.score`. The score is the current
+_life's_ and a death zeroes it, so at the last tick of a recording it is usually
+zero — which will make any weight you are testing look dead.
 
 ## Simulation rules
 
@@ -97,5 +101,19 @@ the fix alongside the recommendation unless asked otherwise.
 
 ## Git
 
-Work happens on `prototype`; `main` is the default branch. Commit messages explain
-why, not what — the diff already says what.
+Work happens on `main`. The `prototype` branch is gone: the port is finished and
+proved, and what is being built now is the game.
+
+**A push to `main` publishes.** `.github/workflows/deploy.yml` builds and deploys
+to GitHub Pages on every push, so pushing is shipping. Commit freely; push
+deliberately, and only when asked.
+
+CI runs `pnpm check:ci` — `pnpm check` minus `golden:check`. That is deliberate,
+not a gap: the golden baseline holds numbers captured on the author's arm64
+machine, and V8 approximates `Math.sin`/`cos`/`atan2` differently on x64, so it
+fails on a runner by ~1 ulp for reasons that have nothing to do with the change.
+Run the full `pnpm check` locally, where the golden means something. The real
+fidelity proof is `port-equality`, which runs the prototype and the port in one
+process and is inside `pnpm test`.
+
+Commit messages explain why, not what — the diff already says what.
