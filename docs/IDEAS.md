@@ -1,7 +1,10 @@
 # Ideas
 
 ## Gameplay
+- Death trails: like in Super Meat Boy, show all ship lines/attemps overlaid
+- If doing realy well (high speed, multiple fly-bys, etc.), let user enter lightspeed where they now get placed in the middle of the screen and the "press+hold" input is now for magenticially pulling coins/points towards them. A reward and breathing room.
 - "No fuel" warning -- flash a brief icon next to ship when runnign out of fuel or tapping w/ no fuel
+    - Yeah let's have an empty fuel gauge flash next to the ship 3x
 - Sharing and replay: imagine a user does a really cool sequence, capturing multiple planets and bouses. They might want to share the ~5s around the moment maybe as a shareable GIF or as a full replay.
 - Rewind: it's easy to mess up and rash, or spend all fuel. I think a rewind mechanism would be useful, where the user could have a separate rewind budget/gauge to go back with if they mess up timing. There might be a point deduction as well.
 - Ship profiles: let the user unlock different ship profiles with different speeds, shields, autopilot, etc.
@@ -25,7 +28,7 @@ Sometimes the user gets lazy and may need to be punished. If they coast past pla
 
 ## Powerups
 - Infinite fuel for 5s
-- Fuel boost
+- Fuel boost (nitrous on top of fuel stack?)
 - Points boost (plain, stacking rings to fly through)
 - Magnet/attraction to auto-pull powerups
 - Shield (lets you bounce 1x off edge/planet)
@@ -43,4 +46,4 @@ Sometimes the user gets lazy and may need to be punished. If they coast past pla
 
 ## Easter Eggs
 - Award for most orbits around single planet (award: 10 or more)
--
+- Award for bumping into planet (i.e. bumpy orbits due to coming straight on)
