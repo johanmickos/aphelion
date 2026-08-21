@@ -54,5 +54,21 @@ export const ROUTINE: AccoladeStyle = {
   size: 13,
 };
 
-/** Off the ladder too, and on its own channel — see `src/score/reckless.ts`. */
-export const SHOUT_COLOR = '#ff45c8';
+/**
+ * The shout: off the ladder too, and on its own channel — see
+ * `src/score/reckless.ts`.
+ *
+ * It gets a style rather than a bare colour because it is drawn exactly like a
+ * praise word — same weight, same rim, same rise, no tilt and no oversized pop.
+ * It was none of those things at first: 19px, rotated, and punching to 1.4x on
+ * arrival, which made the one channel that pays nothing the loudest thing on the
+ * screen. The colour is already the whole of what makes it a separate channel.
+ *
+ * The size is `great`'s, which is where it sits in frequency too — measured, a
+ * capture crosses the hard line about one time in eight.
+ */
+export const SHOUT: AccoladeStyle = {
+  color: '#ff45c8',
+  labelColor: 'rgba(220,130,190,.8)',
+  size: 15,
+};

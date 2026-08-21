@@ -19,6 +19,7 @@ import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture
 import { GAUGE, drawFuelGauge, drawScore, formatScore, readoutLines } from '../src/render/hud.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
+import { LEVEL, SHOUT } from '../src/render/accolade.ts';
 import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
 import {
   AIM_MAX_TARGETS,
@@ -670,6 +671,43 @@ describe('floating score popups', () => {
       t.some((x) => WORDS.super[0].includes(x)),
       'no grab superlative',
     ).toBe(true);
+  });
+
+  it('draws a shout no louder than a praised release', () => {
+    // It pays nothing. It had been the biggest, tilted, and punching to 1.4x on
+    // arrival, which is not what "off the ladder" should look like.
+    const p = new Popups();
+    p.shout({ tick: 100, word: 'RECKLESS!', kind: 'reckless', streak: 3 }, 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    const px = (r.ops.filter((o) => o[0] === '=font') as Array<[string, string]>).map((o) =>
+      Number(/([\d.]+)px/.exec(o[1])?.[1] ?? 0),
+    );
+    expect(Math.max(...px)).toBe(SHOUT.size * cam().scale);
+    expect(SHOUT.size, 'a shout outgrew the top of the ladder').toBeLessThanOrEqual(
+      LEVEL.exceptional.size,
+    );
+    // and it is upright: a rotation would show up as a transform
+    expect(r.ops.some((o) => o[0] === 'rotate')).toBe(false);
+  });
+
+  it('stacks a shout clear of an award raised at the same moment', () => {
+    // Reported: the two were drawn through each other and neither could be read.
+    // Everything rises the same distance, so landing them on one spot means they
+    // stay on it for the whole of both lives.
+    const p = new Popups();
+    p.spawn(award({ kind: 'grab', clearance: CLOSE_PX.tier2, skim: 999 }), 195, 0);
+    p.shout({ tick: 100, word: 'RECKLESS!', kind: 'reckless', streak: 3 }, 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    const ys = (r.ops.filter((o) => o[0] === 'fillText') as Array<[string, string, number, number]>)
+      .map((o) => o[3])
+      .sort((a, b) => a - b);
+    const gaps = ys.slice(1).map((y, i) => y - ys[i]!);
+    // every pair of lines is either the word-and-its-number pair or a clear slot
+    // apart; nothing sits on top of anything
+    for (const g of gaps) expect(g, 'two popups drawn on the same line').toBeGreaterThan(0);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(10 * cam().scale);
   });
 
   it('never piles up more than a readable few', () => {

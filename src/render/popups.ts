@@ -46,7 +46,29 @@ const FADE = 0.45;
  */
 const MAX_LIVE = 4;
 
-import { LEVEL, ROUTINE, SHOUT_COLOR } from './accolade.ts';
+/**
+ * World units between two popups that would otherwise be raised on the same spot.
+ *
+ * Capping the count was not enough: a grab award and a shout can land within a
+ * few ticks of each other, and since every popup rises the same distance over its
+ * life they then sat on top of each other for the whole of it — two legible lines
+ * of text drawn through one another, which is worse than either alone.
+ *
+ * Bigger than the tallest word so the two lines cannot touch. Chosen at spawn
+ * rather than maintained per frame, because the older popup is always further
+ * along the same rise: the gap opens, it does not close.
+ */
+const STACK_GAP = 20;
+
+/**
+ * How near two popups have to be horizontally to count as the same spot.
+ *
+ * Everything is raised at the ship, so in practice this only separates popups
+ * left over from a body the ship has since flown away from.
+ */
+const STACK_X = 80;
+
+import { LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 interface Popup {
   x: number;
@@ -82,7 +104,7 @@ export class Popups {
     const praise = praiseFor(award);
     this.live.push({
       x,
-      y: y - SPAWN_LIFT,
+      y: this.freeY(x, y),
       t: 0,
       life: praise?.category === 'super' ? LIFE_SUPER : LIFE,
       points: award.points,
@@ -90,6 +112,22 @@ export class Popups {
       shout: null,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
+  }
+
+  /**
+   * The height to raise a new popup from: the ship, or a clear slot above it if
+   * something raised a moment ago is still sitting there.
+   */
+  private freeY(x: number, y: number): number {
+    let cy = y - SPAWN_LIFT;
+    for (let i = 0; i < MAX_LIVE; i++) {
+      const taken = this.live.some(
+        (p) => Math.abs(p.x - x) < STACK_X && Math.abs(p.y - cy) < STACK_GAP,
+      );
+      if (!taken) break;
+      cy -= STACK_GAP;
+    }
+    return cy;
   }
 
   /**
@@ -102,7 +140,7 @@ export class Popups {
   shout(shout: Shout, x: number, y: number): void {
     this.live.push({
       x,
-      y: y - SPAWN_LIFT,
+      y: this.freeY(x, y),
       t: 0,
       life: LIFE_SHOUT,
       points: null,
@@ -137,20 +175,18 @@ export class Popups {
       ctx.globalAlpha = alpha;
 
       if (p.shout) {
-        // Bigger than any link word and slightly askew, because it is a reaction
-        // rather than a readout. The tilt is derived from the position so it does
-        // not jitter frame to frame.
-        const pop = 1 + 0.4 * Math.max(0, 1 - u * 5);
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate((((p.x * 7919) % 100) / 100 - 0.5) * 0.18);
-        ctx.font = `600 ${19 * pop * s}px ui-monospace, monospace`;
-        ctx.lineWidth = 4 * s;
-        ctx.strokeStyle = 'rgba(0,0,0,.6)';
-        ctx.strokeText(p.shout, 0, 0);
-        ctx.fillStyle = SHOUT_COLOR;
-        ctx.fillText(p.shout, 0, 0);
-        ctx.restore();
+        // Drawn exactly as a praise word is: same weight, same rim, same rise.
+        // Only the colour marks it as a different channel, and only the word
+        // says what happened. It used to be 19px, rotated, and punching to 1.4x
+        // on arrival — which made the one channel that pays nothing the loudest
+        // thing on screen and, at that size, the hardest to read over anything
+        // else in the air.
+        ctx.font = `600 ${SHOUT.size * s}px ui-monospace, monospace`;
+        ctx.lineWidth = 3 * s;
+        ctx.strokeStyle = 'rgba(0,0,0,.55)';
+        ctx.strokeText(p.shout, x, y);
+        ctx.fillStyle = SHOUT.color;
+        ctx.fillText(p.shout, x, y);
         continue;
       }
 
