@@ -76,7 +76,7 @@ code would have built a state machine the prototype does not have.** The
 
 `CapturePhase` therefore has four members, not five.
 
-### 6 — Every capture reports one spurious kink
+### 6 — Every capture reports one spurious kink **[FIXED]**
 
 `src/sim/step.ts` · `updateDefl`, seeded by `beginCapture`
 
@@ -89,8 +89,18 @@ Consequence: the prototype's SMOOTH/KINK pill reads "1 KINK" for _every_ capture
 including perfectly clean ones. The metric the design document called "the single most
 important smoothness metric" has a false positive on every run.
 
-Reproduced because it is pure telemetry and never feeds back into physics. The
-invariant tests skip the first sample of each capture explicitly.
+Reproduced first because it is pure telemetry and never feeds back into physics,
+and the invariant tests skipped the first sample of each capture explicitly.
+
+Fixed by seeding `lastAngle` from the velocity angle, which is what `updateDefl`
+actually compares against. First-sample deflection across a four-grab spread went
+from ~160° to **1.4°–6.9°**, so a clean capture now reads SMOOTH. The invariant
+tests no longer exempt the first sample: all ten scenarios stay under the 15° kink
+threshold on **every** sample.
+
+This is a deliberate divergence in a displayed value — `index.html` still shows
+"1 KINK" on a clean capture. No config flag guards it because the equality gate
+compares position, velocity, fuel and phase, and `defl` feeds none of them.
 
 ### 8 — `clearEaseFrames` is frame-denominated
 

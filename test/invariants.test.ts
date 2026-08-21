@@ -13,7 +13,7 @@ import { KINK_THRESHOLD_DEG } from '../src/sim/trace.ts';
 import type { Input, SimState } from '../src/sim/types.ts';
 
 interface Observed {
-  maxDeflAfterFirst: number;
+  maxDefl: number;
   kinkPhases: string[];
   minRadiusRatio: number;
   minFuel: number;
@@ -28,7 +28,7 @@ function observe(scName: string): Observed {
   if (sc.ship) Object.assign(state.ship, sc.ship);
 
   const o: Observed = {
-    maxDeflAfterFirst: 0,
+    maxDefl: 0,
     kinkPhases: [],
     minRadiusRatio: Infinity,
     minFuel: Infinity,
@@ -36,7 +36,6 @@ function observe(scName: string): Observed {
     settledSpeedError: null,
   };
   let held = false;
-  let firstSampleOfCapture = true;
 
   for (let i = 0; i < sc.ticks; i++) {
     const pressed = i === sc.pressTick;
@@ -50,19 +49,8 @@ function observe(scName: string): Observed {
     o.maxFuel = Math.max(o.maxFuel, state.fuel);
 
     const cap = state.capture;
-    if (!cap) {
-      firstSampleOfCapture = true;
-      continue;
-    }
-    // The first sample of a capture reports a spurious deflection: beginCapture
-    // seeds lastAngle from the POSITION angle while updateDefl compares VELOCITY
-    // angles. Telemetry only, never fed back into physics. PORT_NOTES note 6.
-    if (firstSampleOfCapture) {
-      firstSampleOfCapture = false;
-      continue;
-    }
-
-    if (cap.defl > o.maxDeflAfterFirst) o.maxDeflAfterFirst = cap.defl;
+    if (!cap) continue;
+    if (cap.defl > o.maxDefl) o.maxDefl = cap.defl;
     if (cap.defl > KINK_THRESHOLD_DEG && !o.kinkPhases.includes(cap.phase))
       o.kinkPhases.push(cap.phase);
 
@@ -110,7 +98,7 @@ describe('invariants', () => {
     it.each(ALL)('%s: no kinks', (name) => {
       const o = observe(name);
       expect(o.kinkPhases, `kinks appeared in ${o.kinkPhases.join(',')}`).toEqual([]);
-      expect(o.maxDeflAfterFirst).toBeLessThan(KINK_THRESHOLD_DEG);
+      expect(o.maxDefl).toBeLessThan(KINK_THRESHOLD_DEG);
     });
 
     it('no scenario reaches the minimum-orbit floor any more', () => {

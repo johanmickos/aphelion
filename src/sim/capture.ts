@@ -166,7 +166,13 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     boost: 0,
     boostT: 0,
     puttered: false,
-    lastAngle: Math.atan2(ry, rx),
+    // Seeded from the VELOCITY angle, which is what updateDefl compares against.
+    // index.html seeded it from the position angle, so the first sample of every
+    // capture reported the angle between position and velocity — ~160° on a
+    // typical grab — and the SMOOTH/KINK pill read "1 KINK" on every run
+    // including perfectly clean ones. PORT_NOTES note 6. Telemetry only, so the
+    // equality gate (position · velocity · fuel · phase) does not observe it.
+    lastAngle: Math.atan2(vy, vx),
     defl: 0,
   };
 
