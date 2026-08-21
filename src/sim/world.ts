@@ -148,6 +148,20 @@ export interface FieldBounds {
 }
 
 /**
+ * The trailing floor: the world y at which a climb has been lost.
+ *
+ * Defined once, because three places need the same line and they must agree —
+ * `stepSim` ends the run at it, `drawBacktrackFloor` paints it, and the camera
+ * refuses to descend past it. Two of those drifting apart would mean a player
+ * dying to a line that was drawn somewhere else.
+ *
+ * Null when there is no floor at all, which is the prototype's config.
+ */
+export function backtrackFloorY(cfg: SimConfig, highWaterY: number): number | null {
+  return cfg.backtrackLimit > 0 ? highWaterY + cfg.backtrackLimit : null;
+}
+
+/**
  * Playfield bounds in world units.
  *
  * Horizontal bounds are the prototype's exactly, evaluated at the design width.

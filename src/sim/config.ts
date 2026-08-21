@@ -117,6 +117,15 @@ export interface SimConfig {
   proceduralLayout: boolean;
   /** Vertical gap between generated rows, in world units, before jitter. */
   bodySpacing: number;
+  /**
+   * Hold the climb's high-water mark still while a capture is running.
+   *
+   * The mark is what the trailing floor hangs from, and an orbit is a round
+   * trip: letting it advance sets the floor at the orbit's apex, and the far
+   * side of the same orbit then descends into it. Any settled orbit wider than
+   * half `backtrackLimit` is fatal by construction with this off.
+   */
+  holdClimbInCapture: boolean;
   /** Furthest a lone body in a row sits from the centre column. */
   bodyWeave: number;
   /**
@@ -207,6 +216,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   grabRange: 0,
   proceduralLayout: false,
   bodySpacing: 0,
+  holdClimbInCapture: false,
   bodyWeave: 44,
   bodySpread: 44,
   rowPairChance: 0,
@@ -320,7 +330,8 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   fuelRegen: 30,
   fieldWidthFrac: 1.9,
   bodyCount: 60,
-  backtrackLimit: 520,
+  backtrackLimit: 700,
+  holdClimbInCapture: true,
   boundGrabsCapture: true,
   clearanceOnConvert: true,
   grabRange: 560,
@@ -341,7 +352,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 7;
+export const SIM_VERSION = 8;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

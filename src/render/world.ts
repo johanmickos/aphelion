@@ -4,6 +4,7 @@
 import type { Body } from '../sim/types.ts';
 import type { SimConfig } from '../sim/config.ts';
 import type { FieldBounds } from '../sim/world.ts';
+import { backtrackFloorY } from '../sim/world.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY, visibleWorldY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
@@ -71,8 +72,8 @@ export function drawBacktrackFloor(
   rcfg: RenderConfig,
   highWaterY: number,
 ): void {
-  if (sim.backtrackLimit <= 0) return;
-  const floorY = highWaterY + sim.backtrackLimit;
+  const floorY = backtrackFloorY(sim, highWaterY);
+  if (floorY === null) return;
   const view = visibleWorldY(cam);
   const band = rcfg.hazardZoneWidth;
   if (floorY - band > view.bottom) return; // still well below the screen

@@ -11,8 +11,10 @@ import {
   centerCamera,
   createCamera,
   fitCamera,
+  followCamera,
   toScreenX,
   toScreenY,
+  visibleWorldY,
 } from '../src/render/camera.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { SPAWN, createBodies, fieldBounds } from '../src/sim/world.ts';
@@ -103,7 +105,7 @@ describe('horizontal panning', () => {
     const cam = createCamera(rcfg);
     fitCamera(cam, { w: 390, h: 844, dpr: 1 });
     for (let x = field.left - 200; x <= field.right + 200; x += 7) {
-      centerCamera(cam, x, 0, field);
+      centerCamera(cam, x, 0, field, null);
       expect(cam.left).toBeGreaterThanOrEqual(field.left - 1e-9);
       expect(cam.left + cam.designW).toBeLessThanOrEqual(field.right + 1e-9);
     }
@@ -115,7 +117,7 @@ describe('horizontal panning', () => {
     let min = Infinity;
     let max = -Infinity;
     for (let x = field.left; x <= field.right; x += 3) {
-      centerCamera(cam, x, 0, field);
+      centerCamera(cam, x, 0, field, null);
       min = Math.min(min, cam.left);
       max = Math.max(max, cam.left);
     }
@@ -128,10 +130,10 @@ describe('horizontal panning', () => {
     const centred = field.left + (field.width - cam.designW) / 2;
     cam.left = centred;
     const margin = cam.designW * rcfg.cameraMarginFrac;
-    const t = cameraTarget(cam, rcfg, centred + cam.designW / 2, 0, field);
+    const t = cameraTarget(cam, rcfg, centred + cam.designW / 2, 0, field, null);
     expect(t.left).toBeCloseTo(centred, 9);
     // and it does pan once the ship crosses a margin
-    const past = cameraTarget(cam, rcfg, centred + cam.designW - margin + 10, 0, field);
+    const past = cameraTarget(cam, rcfg, centred + cam.designW - margin + 10, 0, field, null);
     expect(past.left).toBeGreaterThan(centred);
   });
 
@@ -139,7 +141,7 @@ describe('horizontal panning', () => {
     const cam = createCamera(rcfg);
     fitCamera(cam, { w: 390, h: 844, dpr: 1 });
     for (const x of [field.left + 1, field.right - 1]) {
-      centerCamera(cam, x, 0, field);
+      centerCamera(cam, x, 0, field, null);
       const sx = toScreenX(cam, x);
       expect(sx).toBeGreaterThanOrEqual(cam.offsetX - 1e-9);
       expect(sx).toBeLessThanOrEqual(cam.offsetX + cam.designW * cam.scale + 1e-9);
@@ -152,10 +154,10 @@ describe('deadzone (no wobble)', () => {
   function fly(path: number[], startAt = path[0]!): number[] {
     const cam = createCamera(rcfg);
     fitCamera(cam, { w: 390, h: 844, dpr: 1 });
-    centerCamera(cam, startAt, 0, field);
+    centerCamera(cam, startAt, 0, field, null);
     const seen: number[] = [];
     for (const x of path) {
-      const t = cameraTarget(cam, rcfg, x, 0, field);
+      const t = cameraTarget(cam, rcfg, x, 0, field, null);
       cam.left += (t.left - cam.left) * Math.min(1, (1 / 60) * rcfg.cameraFollow);
       seen.push(cam.left);
     }
@@ -187,14 +189,14 @@ describe('deadzone (no wobble)', () => {
 
     const cam = createCamera(rcfg);
     fitCamera(cam, { w: 390, h: 844, dpr: 1 });
-    centerCamera(cam, path[0]!, 0, field);
+    centerCamera(cam, path[0]!, 0, field, null);
 
     let travel = 0;
     let reversals = 0;
     let prevD = 0;
     for (const x of path) {
       const before = cam.left;
-      const t = cameraTarget(cam, rcfg, x, 0, field);
+      const t = cameraTarget(cam, rcfg, x, 0, field, null);
       cam.left += (t.left - cam.left) * Math.min(1, (1 / 60) * rcfg.cameraFollow);
       const d = cam.left - before;
       travel += Math.abs(d);
@@ -238,7 +240,7 @@ describe('deadzone (no wobble)', () => {
   it('holds completely still while the ship moves inside the margins', () => {
     const cam = createCamera(rcfg);
     fitCamera(cam, { w: 390, h: 844, dpr: 1 });
-    centerCamera(cam, 195, 0, field);
+    centerCamera(cam, 195, 0, field, null);
     const before = cam.left;
     const margin = cam.designW * rcfg.cameraMarginFrac;
     for (const x of [
@@ -246,7 +248,7 @@ describe('deadzone (no wobble)', () => {
       before + cam.designW - margin - 1,
       before + cam.designW / 2,
     ]) {
-      expect(cameraTarget(cam, rcfg, x, 0, field).left).toBe(before);
+      expect(cameraTarget(cam, rcfg, x, 0, field, null).left).toBe(before);
     }
   });
 });
@@ -263,7 +265,7 @@ describe('opening frame', () => {
   it('shows neither field boundary when the run starts', () => {
     const cam = createCamera(rcfg);
     fitCamera(cam, { w: 393, h: 651, dpr: 1 });
-    centerCamera(cam, SPAWN.x, SPAWN.y, field);
+    centerCamera(cam, SPAWN.x, SPAWN.y, field, null);
 
     const winL = cam.offsetX;
     const winR = cam.offsetX + cam.designW * cam.scale;
@@ -277,7 +279,7 @@ describe('opening frame', () => {
   it('keeps the hazard gradient off screen too, not just the line', () => {
     const cam = createCamera(rcfg);
     fitCamera(cam, { w: 393, h: 651, dpr: 1 });
-    centerCamera(cam, SPAWN.x, SPAWN.y, field);
+    centerCamera(cam, SPAWN.x, SPAWN.y, field, null);
     // the gradient builds inward from the edge, so its inner lip is what matters
     const innerLip = toScreenX(cam, field.left + rcfg.hazardZoneWidth);
     expect(innerLip).toBeLessThan(cam.offsetX);
@@ -286,5 +288,60 @@ describe('opening frame', () => {
   it('the ship does not start on a collision course with P1', () => {
     const p1 = createBodies(DEFAULT_CONFIG)[0]!;
     expect(Math.abs(SPAWN.x - p1.x)).toBeGreaterThan(p1.R + DEFAULT_CONFIG.minOrbitGap);
+  });
+});
+
+/**
+ * Reported from a real session: "I don't think we should ever see past the
+ * dashed line. The camera should just stop panning when we approach it."
+ *
+ * The vertical axis had no clamp at all — `centerY` was simply the ship's y — so
+ * the view followed the ship down into a region where the run is already over.
+ * Worse, with the ship held centred it is the LINE that appears to move, which
+ * reads as the floor rising rather than as the ship falling.
+ */
+describe('the view stops at the trailing floor', () => {
+  function camAt(shipY: number, floorY: number | null) {
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, 195, shipY, field, floorY);
+    return c;
+  }
+
+  it('never shows anything below the line', () => {
+    const floorY = 1000;
+    // ship well clear: ordinary framing, the line is off screen below
+    const clear = camAt(0, floorY);
+    expect(clear.centerY).toBe(0);
+    expect(visibleWorldY(clear).bottom).toBeLessThan(floorY);
+
+    // ship right up against it: the view has stopped, and the line sits exactly
+    // on the bottom edge rather than somewhere up the frame
+    const near = camAt(floorY - 40, floorY);
+    expect(visibleWorldY(near).bottom).toBeCloseTo(floorY, 6);
+    expect(near.centerY).toBeLessThan(floorY - 40);
+  });
+
+  it('holds the line still, so it is the ship that visibly falls', () => {
+    const floorY = 1000;
+    const a = camAt(floorY - 200, floorY);
+    const b = camAt(floorY - 60, floorY);
+    // the ship dropped 140px and the line did not move on screen at all
+    expect(toScreenY(b, floorY)).toBeCloseTo(toScreenY(a, floorY), 6);
+    expect(toScreenY(b, floorY - 60)).toBeGreaterThan(toScreenY(a, floorY - 200));
+  });
+
+  it('does not clamp when there is no floor', () => {
+    // the prototype has no trailing floor at all
+    expect(camAt(5000, null).centerY).toBe(5000);
+  });
+
+  it('eases to the clamped target rather than the ship', () => {
+    const floorY = 1000;
+    const c = camAt(0, floorY);
+    for (let i = 0; i < 200; i++) followCamera(c, rcfg, 195, floorY - 20, field, floorY, 1 / 60);
+    // exponential easing only asymptotes, so this settles at the line rather
+    // than landing exactly on it
+    expect(visibleWorldY(c).bottom).toBeCloseTo(floorY, 1);
   });
 });

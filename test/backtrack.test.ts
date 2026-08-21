@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, FIXED_DT, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
+import { hypot } from '../src/sim/orbit.ts';
 import { beginCapture } from '../src/sim/capture.ts';
 import { NO_INPUT } from '../src/sim/types.ts';
 import type { SimConfig } from '../src/sim/config.ts';
@@ -92,6 +93,104 @@ describe('falling behind the climb', () => {
     expect(PROTOTYPE_CONFIG.backtrackLimit).toBe(0);
     const r = drift(PROTOTYPE_CONFIG, 97, 900);
     expect(r.state.ending.reason).not.toBe('fell-behind');
+  });
+});
+
+/**
+ * Reported from a real session: "I grabbed a SUPER WIDE orbit around a larger
+ * planet, circularized, and my orbit took me out of bounds."
+ *
+ * The ship never left the orbit and never lost a pixel of ground. A settled
+ * circular orbit of radius r sets the high-water mark at its own APEX, and then
+ * carries the ship 2r down the far side — so with the mark free to advance, any
+ * orbit with 2r > backtrackLimit is fatal the moment it settles. The session's
+ * was r=290 against a limit of 520: sixty pixels too tall.
+ */
+describe('an orbit is a round trip, not a climb', () => {
+  /** Grab, hold long enough to settle, and report the widest orbit and the fate. */
+  function orbit(cfg: SimConfig, pressAt: number, ticks: number) {
+    const state = createInitialState(cfg);
+    let held = false;
+    let widest = 0;
+    let markAtGrab: number | null = null;
+    let deepest = 0;
+    for (let i = 0; i < ticks; i++) {
+      const pressed = i === pressAt;
+      if (pressed) held = true;
+      stepSim(state, cfg, { held: held || pressed, pressed, released: false }, FIXED_DT);
+      const cap = state.capture;
+      if (cap) {
+        if (markAtGrab === null) markAtGrab = state.highWaterY;
+        widest = Math.max(widest, hypot(cap.rx, cap.ry));
+      }
+      deepest = Math.max(deepest, shipWorldPos(state).y - state.highWaterY);
+      if (state.ending.active) break;
+    }
+    return { state, widest, markAtGrab, deepest, reason: state.ending.reason };
+  }
+
+  it('holds the high-water mark still while a capture runs', () => {
+    const cfg = DEFAULT_CONFIG;
+    const state = createInitialState(cfg);
+    let held = false;
+    let markWhenGrabbed: number | null = null;
+    let climbedInOrbit = 0;
+    for (let i = 0; i < 500; i++) {
+      const pressed = i === 120;
+      if (pressed) held = true;
+      stepSim(state, cfg, { held: held || pressed, pressed, released: false }, FIXED_DT);
+      if (!state.capture) continue;
+      if (markWhenGrabbed === null) markWhenGrabbed = state.highWaterY;
+      // how far above the mark the orbit has carried the ship
+      climbedInOrbit = Math.max(climbedInOrbit, markWhenGrabbed - shipWorldPos(state).y);
+      expect(state.highWaterY, 'the orbit banked height it had not kept').toBe(markWhenGrabbed);
+    }
+    expect(
+      climbedInOrbit,
+      'the orbit never lifted the ship, so this proves nothing',
+    ).toBeGreaterThan(50);
+  });
+
+  it('banks the release height, so letting go still counts', () => {
+    const cfg = DEFAULT_CONFIG;
+    const state = createInitialState(cfg);
+    let held = false;
+    let markInOrbit = 0;
+    for (let i = 0; i < 400; i++) {
+      const pressed = i === 120;
+      const released = i === 260;
+      if (pressed) held = true;
+      if (released) held = false;
+      stepSim(state, cfg, { held: held || pressed, pressed, released }, FIXED_DT);
+      if (state.capture) markInOrbit = state.highWaterY;
+    }
+    // the ship climbed away after release, so the mark must have moved on
+    expect(state.highWaterY).toBeLessThan(markInOrbit);
+  });
+
+  it('lets a wide orbit complete, where a free mark would kill it', () => {
+    // The same grab under both rules. Held, the drop is measured from where the
+    // ship arrived; free, it is measured from the apex the orbit itself reached.
+    const free = { ...DEFAULT_CONFIG, holdClimbInCapture: false };
+    const wide = orbit(DEFAULT_CONFIG, 150, 1400);
+    const wideFree = orbit(free, 150, 1400);
+    expect(wide.widest, 'this grab does not make a wide enough orbit to test with').toBeGreaterThan(
+      100,
+    );
+    expect(wide.deepest, 'the held mark still measured the drop from the apex').toBeLessThan(
+      wideFree.deepest,
+    );
+    expect(wide.reason).not.toBe('fell-behind');
+  });
+
+  it('leaves room for an orbit wider than any yet recorded', () => {
+    // Widest settled orbit over every session in diagnostics/ is r=294, and the
+    // limit has to clear 2r or the orbit is fatal by construction. 700 covers
+    // r=350. Ordinary play drops p90 222 and p99 396 below its best, so the
+    // floor is still nowhere near what happens by accident.
+    expect(DEFAULT_CONFIG.backtrackLimit).toBeGreaterThan(2 * 294);
+    expect(DEFAULT_CONFIG.holdClimbInCapture).toBe(true);
+    expect(PROTOTYPE_CONFIG.holdClimbInCapture, 'the gate would move').toBe(false);
   });
 });
 

@@ -45,7 +45,7 @@ const field = fieldBounds(DEFAULT_CONFIG, createBodies(DEFAULT_CONFIG));
 function cam() {
   const c = createCamera(rcfg);
   fitCamera(c, { w: 390, h: 844, dpr: 1 });
-  centerCamera(c, 195, 0, field);
+  centerCamera(c, 195, 0, field, null);
   return c;
 }
 
@@ -263,7 +263,7 @@ describe('scene', () => {
 
       const snap = captureSnapshot(state, held, DEFAULT_CONFIG);
       scene.trail.sample(snap.x, snap.y);
-      centerCamera(c, snap.x, snap.y, f);
+      centerCamera(c, snap.x, snap.y, f, null);
 
       r.reset();
       scene.draw(r.ctx, c, snap, {
@@ -299,7 +299,7 @@ describe('scene', () => {
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
     const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
-    centerCamera(c, snap.x, snap.y, f);
+    centerCamera(c, snap.x, snap.y, f, null);
     const r = recordingContext();
     scene.draw(r.ctx, c, snap, {
       timeMs: 0,
@@ -1163,7 +1163,7 @@ describe('the compass ring settles', () => {
       const snap = captureSnapshot(state, held, sim);
       const c = cam();
       const anchor = bodies[cap.planet]!;
-      centerCamera(c, snap.x, snap.y, fieldBounds(sim, bodies));
+      centerCamera(c, snap.x, snap.y, fieldBounds(sim, bodies), null);
       const r = recordingContext();
       drawCompass(r.ctx, c, sim, rcfg, snap, bodies, 0);
 
@@ -1281,7 +1281,7 @@ describe('edge markers point up the climb', () => {
     const c = cam();
     const state = createInitialState(sim);
     const snap = { ...captureSnapshot(state, false, sim), x: 195, y: shipY };
-    centerCamera(c, snap.x, snap.y, field);
+    centerCamera(c, snap.x, snap.y, field, null);
     const r = recordingContext();
     drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies);
     // each arrow is translate(ex, ey) followed by rotate
@@ -1292,7 +1292,7 @@ describe('edge markers point up the climb', () => {
     // partway up the field, so there are bodies both above and below
     const shipY = bodies[6]!.y;
     const c = cam();
-    centerCamera(c, 195, shipY, field);
+    centerCamera(c, 195, shipY, field, null);
     const middle = c.offsetY + (c.viewH * c.scale) / 2;
     const ys = markerYs(shipY);
     expect(ys.length, 'no markers drawn at all').toBeGreaterThan(0);
@@ -1454,7 +1454,7 @@ describe('edge markers clear the header text', () => {
     // partway up, so several bodies are off-screen above
     const shipY = bodies[8]!.y + 200;
     const snap = { ...captureSnapshot(state, false, sim), x: 195, y: shipY };
-    centerCamera(c, snap.x, snap.y, field);
+    centerCamera(c, snap.x, snap.y, field, null);
 
     const r = recordingContext();
     drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies, HEADER_BOTTOM);
@@ -1474,7 +1474,7 @@ describe('edge markers clear the header text', () => {
     const state = createInitialState(sim);
     // a body far off to one side, so the ray exits through a vertical edge
     const snap = { ...captureSnapshot(state, false, sim), x: -600, y: bodies[4]!.y };
-    centerCamera(c, snap.x, snap.y, field);
+    centerCamera(c, snap.x, snap.y, field, null);
     const r = recordingContext();
     drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies, HEADER_BOTTOM);
     const xs = (r.calls('translate') as Array<[string, number, number]>).map((o) => o[1]);

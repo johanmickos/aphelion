@@ -18,7 +18,7 @@ import { applyClearance, beginCapture, freezeOrbit, releaseCapture } from './cap
 import { contactPolicy, reflectCoefficient } from './contact.ts';
 import { boostEnvelope } from './boost.ts';
 import { burn, regen } from './fuel.ts';
-import { createBodies, fieldBounds, SPAWN } from './world.ts';
+import { backtrackFloorY, createBodies, fieldBounds, SPAWN } from './world.ts';
 
 /** A fresh run. Deterministic: same config in, same state out. */
 export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
@@ -143,11 +143,19 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // ---- bounds: leaving the field ends the run
   const pos = shipWorldPos(state);
   const fb = fieldBounds(cfg, state.bodies);
-  if (pos.y < state.highWaterY) state.highWaterY = pos.y;
+  // An orbit is a round trip. The height gained going round its near side is not
+  // ground gained, and counting it puts the trailing floor at the orbit's APEX —
+  // which the far side of that same orbit then flies straight into. Measured on
+  // the session that reported it: a settled r=290 orbit set the floor 520px
+  // above its own nadir and killed a ship that had not lost a pixel. Held here,
+  // the mark resumes at the release point, which is the height actually kept.
+  const banking = !(cfg.holdClimbInCapture && state.capture);
+  if (banking && pos.y < state.highWaterY) state.highWaterY = pos.y;
 
   // Falling too far behind the high-water mark ends the run. The floor trails the
   // climb, so it is pressure to keep going rather than a wall you meet once.
-  if (cfg.backtrackLimit > 0 && pos.y > state.highWaterY + cfg.backtrackLimit) {
+  const floorY = backtrackFloorY(cfg, state.highWaterY);
+  if (floorY !== null && pos.y > floorY) {
     endRun(state, 'fell-behind', pos.x, pos.y);
     state.tick++;
     return;

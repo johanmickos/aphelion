@@ -107,6 +107,7 @@ export function cameraTarget(
   shipX: number,
   shipY: number,
   field: { left: number; right: number; width: number },
+  floorY: number | null,
 ): { left: number; centerY: number } {
   const W = cam.designW;
   const margin = W * cfg.cameraMarginFrac;
@@ -117,7 +118,23 @@ export function cameraTarget(
   left = Math.max(field.left, Math.min(field.right - W, left));
   if (field.width <= W) left = field.left;
 
-  return { left, centerY: shipY };
+  return { left, centerY: clampToFloor(cam, shipY, floorY) };
+}
+
+/**
+ * Stop the view descending past the trailing floor.
+ *
+ * Everything below that line is dead space — a ship there has already lost the
+ * run — so panning down to show it spends screen on nothing and, worse, lets the
+ * line drift up the frame while the ship stays centred, which reads as the floor
+ * rising rather than as the ship falling. Held at the bottom edge, the line stays
+ * put and the ship visibly falls toward it, which is what is actually happening.
+ *
+ * The vertical axis had no clamp at all before this; `centerY` was the ship's y.
+ */
+function clampToFloor(cam: Camera, shipY: number, floorY: number | null): number {
+  if (floorY === null) return shipY;
+  return Math.min(shipY, floorY - cam.viewH / 2);
 }
 
 /**
@@ -130,13 +147,14 @@ export function centerCamera(
   shipX: number,
   shipY: number,
   field: { left: number; right: number; width: number },
+  floorY: number | null,
 ): void {
   const wanted = shipX - cam.designW / 2;
   cam.left =
     field.width <= cam.designW
       ? field.left
       : Math.max(field.left, Math.min(field.right - cam.designW, wanted));
-  cam.centerY = shipY;
+  cam.centerY = clampToFloor(cam, shipY, floorY);
 }
 
 /** Ease the camera toward its target. Render-only; never observed by the sim. */
@@ -146,9 +164,10 @@ export function followCamera(
   shipX: number,
   shipY: number,
   field: { left: number; right: number; width: number },
+  floorY: number | null,
   dt: number,
 ): void {
-  const t = cameraTarget(cam, cfg, shipX, shipY, field);
+  const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY);
   const k = Math.min(1, dt * cfg.cameraFollow);
   cam.left += (t.left - cam.left) * k;
   cam.centerY += (t.centerY - cam.centerY) * k;

@@ -585,6 +585,65 @@ graze that lived. Every collision in the corpus is fatal.
 
 ---
 
+### 24 — A settled orbit set the floor at its own apex, then flew into it **[FIXED]**
+
+`src/sim/step.ts` · the `highWaterY` update · reported from two phone sessions
+
+The trailing floor hangs from `state.highWaterY`, which advanced on every tick,
+capture included. A settled circular orbit therefore raised the floor as it
+passed through its own apex, and then carried the ship `2r` down the far side
+into it. **Any settled orbit with `2r > backtrackLimit` was fatal by
+construction** — at 520 that is every orbit wider than r=260. The session that
+reported it:
+
+```
+tick  phase   shipY  highWater  floorY  drop  orbitR
+1040  drift   -2796    -2796    -2276     0      -     grab
+1260  orbit   -3185    -3186    -2666     0    290     apex: the floor moves here
+1560  orbit   -2677    -3186    -2666   509    290
+1568  fell-behind      -3186    -2666   520      -     dead, still in orbit
+```
+
+r=290, diameter 580, limit 520: sixty pixels too tall. The ship never left the
+orbit and never lost a pixel of ground.
+
+Measured over every session in `diagnostics/`, settled orbit radius runs p50 106,
+p90 116, p99 281, max 294 — so 4 of 179 settled orbits were already in the
+un-survivable band, and the ceiling is not 294 but `grabRange`, which is 560.
+
+The second report, "the bottom red dead zone came upon me a bit too quickly", is
+the same mechanism seen from the other side: none of that session's deaths were
+`fell-behind` at all, but the 390px the ship gained rounding the near side of an
+orbit lifted the floor 390px, so the zone appeared to rush upward.
+
+_Fixed_ with `holdClimbInCapture` — false in PROTOTYPE_CONFIG, true in
+DEFAULT_CONFIG — which stops the mark advancing while a capture runs. An orbit is
+a round trip and the height reached going round is not height kept; the mark
+resumes at the release point, which is. Note this **cannot change a trajectory**:
+`highWaterY` is read only by the death check and the renderer, so a session
+replays position-for-position either way and only the floor's verdict differs.
+`backtrackLimit` went 520 -> 700 alongside, covering r=350 even for a grab made
+at the top of a climb. Measured on the two reports: the fatal `fell-behind`
+disappears, and the deepest drop falls 519 -> 233 and 396 -> 247.
+
+### 25 — The camera had no vertical clamp at all
+
+`src/render/camera.ts` · `cameraTarget()` · reported in the same session
+
+`centerY` was the ship's y, full stop, so the view followed the ship down past
+the dashed line into a region where the run is already over. Worse, with the ship
+held centred it is the LINE that appears to travel, which reads as the floor
+rising rather than as the ship falling.
+
+The view now stops with the floor on its bottom edge. The line then holds still
+and the ship visibly falls toward it, which is what is actually happening.
+
+`backtrackFloorY()` in `src/sim/world.ts` is the single definition of that line,
+because three places need it and must agree — `stepSim` ends the run at it,
+`drawBacktrackFloor` paints it, and the camera refuses to descend past it.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -607,10 +666,10 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 75 · camera 30
-         diagnostics 18 · backtrack 11 · world 11 · tune 7 · clearance 6
+tests    port-equality 11 · invariants 32 · render 79 · camera 34
+         diagnostics 18 · backtrack 15 · world 11 · tune 7 · clearance 6
          score 60 · input 8 · grab-target 8
-         277 total
+         289 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

@@ -10,7 +10,7 @@ import { createLifecycle } from '../src/app/lifecycle.ts';
 import { KNOBS } from '../src/app/tune.ts';
 import { isGrabKey, keydownAction } from '../src/app/input.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
-import { fieldBounds } from '../src/sim/world.ts';
+import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
 import type { Input } from '../src/sim/types.ts';
 import { createLoop } from '../src/app/loop.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
@@ -74,7 +74,7 @@ function rearm(): void {
   field = fieldBounds(sim, state.bodies);
   scene = new Scene({ sim, render: rcfg, bodies: state.bodies, field }, seed);
   const p = shipWorldPos(state);
-  centerCamera(cam, p.x, p.y, field);
+  centerCamera(cam, p.x, p.y, field, backtrackFloorY(sim, state.highWaterY));
   prev = captureSnapshot(state, false, sim);
   curr = prev;
   scene.trail.clear();
@@ -267,7 +267,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     const jump = Math.hypot(curr.x - prev.x, curr.y - prev.y);
     if (jump > TELEPORT_DISTANCE) {
       scene.trail.clear();
-      centerCamera(cam, curr.x, curr.y, field);
+      centerCamera(cam, curr.x, curr.y, field, backtrackFloorY(sim, curr.highWaterY));
     }
 
     // Sampled on the fixed tick so trail length never depends on frame rate.
@@ -276,7 +276,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
   },
   render(alpha, frameDt) {
     const snap = lerpSnapshot(prev, curr, alpha);
-    followCamera(cam, rcfg, snap.x, snap.y, field, frameDt);
+    followCamera(cam, rcfg, snap.x, snap.y, field, backtrackFloorY(sim, snap.highWaterY), frameDt);
     scene.draw(ctx, cam, snap, {
       timeMs: performance.now(),
       paused,
