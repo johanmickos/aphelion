@@ -4,7 +4,6 @@ index.html
 # the author unless it is a document this codebase generates and maintains.
 docs/
 !docs/PORT_NOTES.md
-!docs/FEEL.md
 golden/
 dist/
 pnpm-lock.yaml
