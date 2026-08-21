@@ -386,6 +386,15 @@ function stepPhase(state: SimState, cfg: SimConfig, holding: boolean, dt: number
   updateDefl(state);
 }
 
+/**
+ * Per-sample heading deflection above this is a visible kink.
+ *
+ * Lived in `src/sim/trace.ts` alongside a `TraceRecorder` that nothing ever
+ * instantiated — the diagnostics replay superseded it — so it moved here, next to
+ * the code that produces the value it thresholds.
+ */
+export const KINK_THRESHOLD_DEG = 15;
+
 /** Per-sample heading deflection. Telemetry only; never feeds back into physics. */
 function updateDefl(state: SimState): void {
   const cap = state.capture!;

@@ -48,15 +48,6 @@ export function sampleTrajectory(state: SimState): TrajectorySample {
   };
 }
 
-/** A complete state snapshot, for rewind and for diagnostics. */
-export function serialize(state: SimState): string {
-  return JSON.stringify(state);
-}
-
-export function deserialize(json: string): SimState {
-  return JSON.parse(json) as SimState;
-}
-
 /**
  * A 32-bit fingerprint of the exact simulation state.
  *

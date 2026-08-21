@@ -141,6 +141,3 @@ export const KNOBS: readonly Knob[] = [
     hint: 'gap between planets · under ~370 the next one is visible while you orbit',
   },
 ];
-
-/** Keys the panel can change, for validating a restored set. */
-export const TUNABLE = new Set<string>(KNOBS.map((k) => k.key as string));

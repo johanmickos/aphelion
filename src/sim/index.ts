@@ -15,4 +15,3 @@ export * from './boost.ts';
 export * from './fuel.ts';
 export * from './step.ts';
 export * from './serialize.ts';
-export * from './trace.ts';

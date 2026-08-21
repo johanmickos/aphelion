@@ -7,9 +7,8 @@
 import { describe, expect, it } from 'vitest';
 import { SCENARIOS } from './scenarios.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
-import { createInitialState, stepSim } from '../src/sim/step.ts';
+import { KINK_THRESHOLD_DEG, createInitialState, stepSim } from '../src/sim/step.ts';
 import { circSpeed } from '../src/sim/orbit.ts';
-import { KINK_THRESHOLD_DEG } from '../src/sim/trace.ts';
 import type { Input, SimState } from '../src/sim/types.ts';
 
 interface Observed {

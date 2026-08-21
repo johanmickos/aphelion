@@ -9,9 +9,8 @@
 import { configDelta, configFromReport, summarize } from '../src/app/report.ts';
 import { DEFAULT_CONFIG, SIM_VERSION } from '../src/sim/config.ts';
 import type { DiagReport } from '../src/app/report.ts';
-import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
+import { KINK_THRESHOLD_DEG, createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
-import { KINK_THRESHOLD_DEG } from '../src/sim/trace.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 import type { GrabResult, Input, SimState } from '../src/sim/types.ts';
 import { createScoreState, praiseFor, scoreTick } from '../src/score/index.ts';

@@ -6,7 +6,7 @@
  * recording of what happened — it is the recipe that produces it.
  */
 import type { SimConfig } from '../sim/config.ts';
-import { DEFAULT_CONFIG, FIXED_DT, SIM_VERSION } from '../sim/config.ts';
+import { FIXED_DT, SIM_VERSION } from '../sim/config.ts';
 import type { Checkpoint, InputRecord, Marker, RunRecorder } from './recorder.ts';
 
 export const REPORT_SCHEMA = 3;
@@ -116,11 +116,6 @@ export function parseReport(text: string): DiagReport {
 /** The exact config a session ran with — carried in full, so nothing is inferred. */
 export function configFromReport(r: DiagReport): SimConfig {
   return r.config;
-}
-
-/** True when the report was produced by a different build of the simulation. */
-export function isStale(r: DiagReport): boolean {
-  return r.simVersion !== SIM_VERSION || configDelta(r.config, DEFAULT_CONFIG).length > 0;
 }
 
 export interface ReportSummary {
