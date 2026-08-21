@@ -29,9 +29,34 @@ export interface ReadoutLine {
  *
  * The bar is narrower than the 'FUEL' caption under it on purpose: the caption
  * and the number set the column's width, and the bar only has to be wide enough
- * for ten graduations to read as a scale.
+ * for its pills to read as a scale.
+ *
+ * Ten pills, because ten is what the graduations they replace already marked —
+ * the gaps between pills ARE those graduations now, which is why the old
+ * two-pass tick drawing is gone. At h 78 with 2-unit gaps a pill is exactly 6
+ * units tall.
  */
-export const GAUGE = { x: 16, w: 15, h: 78, bottomGap: 44 } as const;
+export const GAUGE = { x: 16, w: 15, h: 78, bottomGap: 44, pills: 10, gap: 2, radius: 2 } as const;
+
+/**
+ * The fuel ramp: green at a full tank, amber at half, red at empty.
+ *
+ * Sampled by HEIGHT rather than by level, so each pill keeps one solid colour for
+ * the whole run and the red at the bottom of the stack is visible long before the
+ * ship gets there. The topmost lit pill still shows the level's own colour, which
+ * is what the ramp meant when the whole bar was one lerp of it — nothing is lost,
+ * and the scale is now permanently on screen instead of being inferred from a
+ * colour that has nothing beside it to be judged against.
+ */
+export function fuelColor(at: number): [number, number, number] {
+  return at > 0.5
+    ? lerpColor([84, 243, 154], [255, 210, 60], (1 - at) / 0.5)
+    : lerpColor([255, 210, 60], [255, 70, 90], (0.5 - at) / 0.5);
+}
+
+/** Alpha of a pill the tank has not reached, and of one it has. */
+const PILL_DIM = 0.14;
+const PILL_LIT = 1;
 
 /**
  * The score band, top-centre.
@@ -116,51 +141,36 @@ export function drawFuelGauge(
   const gbot = cam.offsetY + (cam.viewH - GAUGE.bottomGap) * s;
   const gy = gbot - gh;
 
-  const col =
-    frac > 0.5
-      ? lerpColor([84, 243, 154], [255, 210, 60], (1 - frac) / 0.5)
-      : lerpColor([255, 210, 60], [255, 70, 90], (0.5 - frac) / 0.5);
   const low = frac <= 0.25;
   const flash = low ? 0.55 + 0.45 * Math.sin(timeMs / 110) : 1;
 
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,.55)';
   ctx.fillRect(gx - 3 * s, gy - 3 * s, gw + 6 * s, gh + 6 * s);
-  ctx.fillStyle = 'rgba(255,255,255,.06)';
-  ctx.fillRect(gx, gy, gw, gh);
 
-  const fillTop = gbot - gh * frac;
-  ctx.globalAlpha = flash;
-  ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
-  ctx.fillRect(gx, fillTop, gw, gh * frac);
-  ctx.globalAlpha = 1;
-
-  // Graduations: full-width lines every 10%, drawn over the fill as well as the
-  // empty track so the level reads against a scale rather than only as a bar.
+  // The pills. Each one's colour is fixed by where it sits; what the level
+  // changes is how brightly it burns.
   //
-  // Two passes with opposite polarity, because a single colour cannot work for
-  // both: light marks vanish against a bright fill, dark ones against the dark
-  // track. The pass over the fill is deliberately faint — it should suggest the
-  // scale continuing, not draw stripes across the colour.
-  const drawTicks = (color: string, clipY: number, clipH: number): void => {
-    if (clipH <= 0) return;
-    ctx.save();
+  // The topmost pill the level lands inside FADES rather than filling part-way.
+  // A pill drawn half-height would be a smaller pill, which reads as a different
+  // thing rather than as a partial one — and fading keeps the gauge moving
+  // continuously as fuel drains and regenerates, which a stack that only ever
+  // steps in tenths would not.
+  const slot = gh / GAUGE.pills;
+  const pillH = slot - GAUGE.gap * s;
+  for (let i = 0; i < GAUGE.pills; i++) {
+    const [r, g, b] = fuelColor((i + 0.5) / GAUGE.pills);
+    const lit = Math.max(0, Math.min(1, frac * GAUGE.pills - i));
+    const top = gbot - i * slot - pillH;
+    // The flash rides on the LIT part only, so a pill can never dim below the
+    // unlit floor and the stack keeps its order at every point in the pulse.
+    ctx.globalAlpha = PILL_DIM + (PILL_LIT - PILL_DIM) * lit * flash;
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
     ctx.beginPath();
-    ctx.rect(gx, clipY, gw, clipH);
-    ctx.clip();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(1, s);
-    ctx.beginPath();
-    for (let i = 1; i < 10; i++) {
-      const y = gy + (gh * i) / 10;
-      ctx.moveTo(gx, y);
-      ctx.lineTo(gx + gw, y);
-    }
-    ctx.stroke();
-    ctx.restore();
-  };
-  drawTicks('rgba(255,255,255,.08)', gy, fillTop - gy);
-  drawTicks('rgba(0,0,0,.14)', fillTop, gbot - fillTop);
+    ctx.roundRect(gx, top, gw, pillH, GAUGE.radius * s);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 
   ctx.strokeStyle = low ? `rgba(255,70,90,${flash})` : 'rgba(150,170,205,.5)';
   ctx.lineWidth = (low ? 2 : 1) * s;

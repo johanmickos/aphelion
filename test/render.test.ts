@@ -513,7 +513,11 @@ describe('HUD', () => {
     drawFuelGauge(r.ctx, c, sim, snapWith({ fuel: 42 }), 0);
     const winL = c.offsetX;
     const winR = c.offsetX + c.designW * c.scale;
-    for (const [, x, , w] of r.calls('fillRect') as Array<[string, number, number, number]>) {
+    const boxes = [...r.calls('fillRect'), ...r.calls('roundRect')] as Array<
+      [string, number, number, number]
+    >;
+    expect(boxes.length, 'the gauge drew nothing').toBeGreaterThan(0);
+    for (const [, x, , w] of boxes) {
       expect(x).toBeGreaterThanOrEqual(winL - 1e-6);
       expect(x + w).toBeLessThanOrEqual(winR + 1e-6);
     }
@@ -1328,7 +1332,7 @@ describe('the captured body is highlighted', () => {
   });
 });
 
-describe('fuel gauge graduations', () => {
+describe('the fuel gauge pills', () => {
   const sim = DEFAULT_CONFIG;
 
   function gaugeOps(fuel: number) {
@@ -1339,48 +1343,81 @@ describe('fuel gauge graduations', () => {
     return r;
   }
 
-  it('marks the scale over the filled part, not just the empty part', () => {
-    // The graduations used to be painted before the fill, so they vanished as the
-    // tank filled and the bar could only be read as a bare level.
-    const half = gaugeOps(sim.fuelMax / 2);
-    const clips = half.calls('clip').length;
-    expect(clips, 'ticks are not drawn in two clipped passes').toBe(2);
-    // both passes stroke, and with different colours so each reads on its region
-    const strokeColors = (half.calls('=strokeStyle') as Array<[string, string]>).map((o) => o[1]);
-    expect(strokeColors.some((c) => c.startsWith('rgba(255,255,255'))).toBe(true);
-    expect(strokeColors.some((c) => c.startsWith('rgba(0,0,0'))).toBe(true);
+  /** Each pill as drawn: its y, its colour, and how brightly it is burning. */
+  function pills(fuel: number) {
+    const r = gaugeOps(fuel);
+    const out: Array<{ y: number; color: string; alpha: number }> = [];
+    let color = '';
+    let alpha = 1;
+    for (const op of r.ops) {
+      if (op[0] === '=fillStyle') color = String(op[1]);
+      else if (op[0] === '=globalAlpha') alpha = Number(op[1]);
+      else if (op[0] === 'roundRect') out.push({ y: Number(op[2]), color, alpha });
+    }
+    // top of the bar first, so index 0 is the last pill to light
+    return out.sort((a, b) => a.y - b.y);
+  }
+
+  const rgb = (c: string): [number, number, number] =>
+    /rgb\((\d+),(\d+),(\d+)\)/.exec(c)!.slice(1).map(Number) as [number, number, number];
+
+  it('draws one pill per graduation the ticks used to mark', () => {
+    expect(pills(sim.fuelMax)).toHaveLength(GAUGE.pills);
+    // and the empty tank still draws all of them: the scale is permanent, which
+    // is the point of colouring by height rather than by level
+    expect(pills(0)).toHaveLength(GAUGE.pills);
   });
 
-  it('skips a pass that would have nothing to draw in', () => {
-    // full tank: no empty region, so only the dark-on-fill pass runs
-    expect(gaugeOps(sim.fuelMax).calls('clip').length).toBe(1);
-    // empty tank: no fill, so only the light-on-track pass runs
-    expect(gaugeOps(0).calls('clip').length).toBe(1);
+  it('gives every pill one colour, fixed by where it sits', () => {
+    // The whole reason for the change. A pill's colour must not depend on the
+    // level, or the stack goes back to being a single lerp cut into pieces.
+    const full = pills(sim.fuelMax).map((p) => p.color);
+    const empty = pills(0).map((p) => p.color);
+    const quarter = pills(sim.fuelMax / 4).map((p) => p.color);
+    expect(full).toEqual(empty);
+    expect(full).toEqual(quarter);
+    expect(new Set(full).size, 'two pills share a colour').toBe(GAUGE.pills);
   });
 
-  it('runs the marks across the full width of the gauge', () => {
-    const c = cam();
-    const r = gaugeOps(sim.fuelMax / 2);
-    // Read from the geometry rather than restating it: the bar's width is a
-    // look, and a test that hardcodes it fails for a reason that is not a bug.
-    const gx = c.offsetX + GAUGE.x * c.scale;
-    const gw = GAUGE.w * c.scale;
-    const starts = (r.calls('moveTo') as Array<[string, number, number]>).map((o) => o[1]);
-    const ends = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[1]);
-    expect(starts.length).toBeGreaterThan(0);
-    for (const x of starts) expect(x).toBeCloseTo(gx, 6);
-    for (const x of ends) expect(x).toBeCloseTo(gx + gw, 6);
+  it('runs the ramp green at the top to red at the bottom', () => {
+    const p = pills(sim.fuelMax);
+    const top = rgb(p[0]!.color);
+    const bottom = rgb(p[p.length - 1]!.color);
+    expect(top[1], 'the top of the tank is not the greenest').toBeGreaterThan(bottom[1]);
+    expect(bottom[0] - bottom[2], 'the bottom of the tank is not the reddest').toBeGreaterThan(
+      top[0] - top[2],
+    );
+    // monotone all the way down, so no pill reads as out of order
+    const greens = p.map((x) => rgb(x.color)[1]);
+    for (let i = 1; i < greens.length; i++) expect(greens[i]).toBeLessThanOrEqual(greens[i - 1]!);
   });
 
-  it('is fainter over the fill than over the empty track', () => {
-    // Over the colour the scale should read as a suggestion, not as stripes.
-    const r = gaugeOps(sim.fuelMax / 2);
-    const colors = (r.calls('=strokeStyle') as Array<[string, string]>).map((o) => o[1]);
-    const overTrack = colors.find((c) => c.startsWith('rgba(255,255,255'))!;
-    const overFill = colors.find((c) => c.startsWith('rgba(0,0,0'))!;
-    const alpha = (c: string): number => Number(c.slice(c.lastIndexOf(',') + 1, -1));
-    expect(alpha(overFill)).toBeLessThan(0.2);
-    expect(alpha(overTrack)).toBeLessThan(0.2);
+  it('burns the pills below the level and leaves the rest showing faintly', () => {
+    const p = pills(sim.fuelMax * 0.6);
+    // 6 lit at the bottom, 4 dim at the top, and the dim ones are still drawn —
+    // that is how the red you are heading toward stays visible.
+    const lit = p.filter((x) => x.alpha > 0.5);
+    const dim = p.filter((x) => x.alpha <= 0.5);
+    expect(lit).toHaveLength(6);
+    expect(dim).toHaveLength(4);
+    for (const d of dim) expect(d.alpha).toBeGreaterThan(0);
+    // the dim ones are the top ones
+    expect(Math.max(...dim.map((x) => x.y))).toBeLessThan(Math.min(...lit.map((x) => x.y)));
+  });
+
+  it('fades the pill the level lands inside, rather than shrinking it', () => {
+    // So the gauge still moves while fuel drains within one pill. A part-height
+    // pill would read as a smaller pill, not as a partial one.
+    const p = pills(sim.fuelMax * 0.55);
+    const partial = p.find((x) => x.alpha > 0.2 && x.alpha < 0.9);
+    expect(partial, 'no pill is part-lit at 55%').toBeDefined();
+    // every pill is drawn at the same height whatever the level
+    const heights = new Set(
+      (gaugeOps(sim.fuelMax * 0.55).calls('roundRect') as Array<[string, ...number[]]>).map(
+        (o) => o[4],
+      ),
+    );
+    expect(heights.size, 'a pill was drawn shorter than the others').toBe(1);
   });
 });
 
