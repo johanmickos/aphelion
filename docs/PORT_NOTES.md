@@ -465,10 +465,10 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 48 · camera 30
+tests    port-equality 11 · invariants 32 · render 61 · camera 30
          diagnostics 13 · backtrack 11 · world 9 · tune 6 · clearance 6
-         score 19
-         191 total
+         score 33 · input 8
+         220 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

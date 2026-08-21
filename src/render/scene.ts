@@ -14,6 +14,7 @@ import { Starfield } from './starfield.ts';
 import { BodyRenderer, drawBacktrackFloor, drawHazardZones } from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
+import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
 import { drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
@@ -31,6 +32,7 @@ export interface SceneDeps {
 
 export class Scene {
   readonly trail: Trail;
+  readonly popups = new Popups();
   private readonly stars: Starfield;
   private readonly bodyRenderer = new BodyRenderer();
 
@@ -53,6 +55,8 @@ export class Scene {
       viewportH: number;
       /** Bottom of the header text, in design units. */
       headerBottom: number;
+      /** Seconds since the last frame, for animation that is not tick-locked. */
+      frameDt: number;
       /**
        * The live score. Passed in rather than carried on the snapshot: the
        * snapshot is derived from `SimState`, and the score deliberately is not
@@ -90,9 +94,16 @@ export class Scene {
 
     const compass = drawCompass(ctx, cam, sim, render, snap, bodies, opts.timeMs);
 
+    // Paused means paused: a popup must not age out behind the overlay.
+    if (!opts.paused) this.popups.update(opts.frameDt);
+
     this.trail.draw(ctx, cam, snap.x, snap.y);
     drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
     drawShip(ctx, cam, snap);
+
+    // Above the ship and its wake, below the HUD: it belongs to the world, but
+    // nothing in the world should ever cover it.
+    this.popups.draw(ctx, cam);
 
     drawEdgeMarkers(ctx, cam, render, snap, bodies, opts.headerBottom);
 

@@ -18,6 +18,8 @@ import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { boostColor, drawBoostHalo } from '../src/render/capture.ts';
 import { drawFuelGauge, drawScore, formatScore, readoutLines } from '../src/render/hud.ts';
 import { drawCompass } from '../src/render/compass.ts';
+import { Popups } from '../src/render/popups.ts';
+import { AIM, CLOSE_PX } from '../src/score/index.ts';
 import {
   AIM_MAX_TARGETS,
   AIM_RANGE,
@@ -268,6 +270,7 @@ describe('scene', () => {
         viewportW: 390,
         viewportH: 844,
         headerBottom: 0,
+        frameDt: 1 / 60,
         score: createScoreState(),
       });
       drawn++;
@@ -302,6 +305,7 @@ describe('scene', () => {
       viewportW: 390,
       viewportH: 844,
       headerBottom: 0,
+      frameDt: 1 / 60,
       score: createScoreState(),
     });
 
@@ -503,6 +507,105 @@ describe('HUD', () => {
   });
 });
 
+describe('floating score popups', () => {
+  const award = (over: Partial<Parameters<Popups['spawn']>[0]> = {}) =>
+    ({
+      tick: 100,
+      kind: 'link' as const,
+      points: 240,
+      multiplier: 1,
+      body: 'P3→P4',
+      close: 0.4,
+      clearance: 140,
+      timing: 0.1,
+      aim: 0.2,
+      climb: 400,
+      ...over,
+    }) as Parameters<Popups['spawn']>[0];
+
+  const texts = (r: ReturnType<typeof recordingContext>) =>
+    (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+
+  it('shows the points for a routine link, with no word', () => {
+    const p = new Popups();
+    p.spawn(award(), 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    expect(texts(r)).toContain('+240');
+    expect(texts(r)).toHaveLength(1);
+  });
+
+  it('adds the word a praised link earned', () => {
+    const p = new Popups();
+    p.spawn(award({ aim: AIM.tier2, points: 680 }), 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    expect(texts(r)).toContain('+680');
+    // the word is drawn twice — a dark rim under the fill, since it sits over
+    // planets and stars
+    const words = texts(r).filter((t) => !t.startsWith('+'));
+    expect(words.length).toBeGreaterThan(0);
+    expect(words[0]).toMatch(/^[A-Z]+$/);
+  });
+
+  it('marks a deduction as one, and never gives it a word', () => {
+    const p = new Popups();
+    p.spawn(award({ kind: 'miss', points: -150, aim: 1, timing: 1, clearance: 0 }), 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    expect(texts(r)).toContain('-150');
+    expect(texts(r).every((t) => t.startsWith('-'))).toBe(true);
+  });
+
+  it('rises and then expires', () => {
+    const p = new Popups();
+    p.spawn(award(), 195, 0);
+    const yAt = (): number => {
+      const r = recordingContext();
+      p.draw(r.ctx, cam());
+      return (r.calls('fillText') as Array<[string, string, number, number]>)[0]?.[3] ?? NaN;
+    };
+    const first = yAt();
+    p.update(0.3);
+    const later = yAt();
+    expect(later, 'the popup did not rise').toBeLessThan(first);
+
+    p.update(2);
+    expect(p.count()).toBe(0);
+    const gone = recordingContext();
+    p.draw(gone.ctx, cam());
+    expect(gone.ops).toHaveLength(0);
+  });
+
+  it('does not age while the game is not advancing it', () => {
+    const p = new Popups();
+    p.spawn(award(), 195, 0);
+    for (let i = 0; i < 100; i++) p.draw(recordingContext().ctx, cam());
+    expect(p.count(), 'drawing alone expired a popup').toBe(1);
+  });
+
+  it('never piles up more than a readable few', () => {
+    const p = new Popups();
+    for (let i = 0; i < 12; i++) p.spawn(award({ tick: 100 + i }), 195, 0);
+    expect(p.count()).toBeLessThanOrEqual(4);
+  });
+
+  it('emits no non-finite coordinate at any point in a popup life', () => {
+    const p = new Popups();
+    p.spawn(award({ clearance: CLOSE_PX.tier2, aim: AIM.tier2, points: 1240 }), 195, 0);
+    for (let i = 0; i < 120; i++) {
+      const r = recordingContext();
+      p.draw(r.ctx, cam());
+      for (const op of r.ops) {
+        for (const arg of op.slice(1)) {
+          if (typeof arg === 'number') expect(Number.isFinite(arg), `${op[0]} at ${i}`).toBe(true);
+        }
+      }
+      p.update(1 / 60);
+    }
+  });
+});
+
 describe('the score band', () => {
   const sim = DEFAULT_CONFIG;
 
@@ -521,7 +624,8 @@ describe('the score band', () => {
     points: 1240,
     multiplier: 2.25,
     body: 'P3→P4',
-    depth: 0.84,
+    close: 0.84,
+    clearance: 32,
     timing: 0.91,
     aim: 0.96,
     climb: 412,
@@ -555,7 +659,7 @@ describe('the score band', () => {
     drawScore(r.ctx, cam(), sc, snapAt(110));
     const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     expect(texts.some((t) => t.includes('+1,240'))).toBe(true);
-    const detail = texts.find((t) => t.includes('DEPTH'))!;
+    const detail = texts.find((t) => t.includes('CLOSE'))!;
     expect(detail).toContain('P3→P4');
     expect(detail).toContain('84');
     expect(detail).toContain('91');

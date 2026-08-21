@@ -190,7 +190,13 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     releasedEdge = false;
 
     stepSim(state, sim, input, dt);
-    scoreTick(score, state, sim);
+    // Popups are raised here, on the tick the award lands, and read the ship's
+    // position at that instant — after a release that is the point it let go
+    // from, which is exactly the act being praised.
+    for (const award of scoreTick(score, state, sim)) {
+      const at = shipWorldPos(state);
+      scene.popups.spawn(award, at.x, at.y);
+    }
 
     prev = curr;
     curr = captureSnapshot(state, held, sim);
@@ -217,6 +223,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       viewportW: innerWidth,
       viewportH: innerHeight,
       headerBottom,
+      frameDt,
       score,
     });
   },

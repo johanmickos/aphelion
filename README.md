@@ -219,7 +219,7 @@ A capture-and-release — a **link** — is paid on four things:
 | component | what it measures                                        | where it comes from     |
 | --------- | ------------------------------------------------------- | ----------------------- |
 | climb     | ground covered since the previous link, banked not paid | `state.highWaterY`      |
-| depth     | how far the dive committed                              | `cap.tightness`         |
+| close     | how near you let the body get before grabbing           | `cap.grabR - cap.minR`  |
 | peak      | where in the boost envelope the release landed          | `cap.boost / boostFull` |
 | aim       | how close the release was to a compass marker           | `src/score/aim.ts`      |
 
@@ -235,10 +235,24 @@ peaks a fixed 0.45s after the orbit freezes and the marker sits at a fixed angle
 so hitting both means shaping the dive to bring them together. That is entirely
 built out of physics that already existed — the score only names it.
 
+`close` is grab clearance and not `cap.tightness`, which reads as the same idea
+and is useless as one: measured over 112 real releases it sits at 0.99+ for three
+quarters of them, so it paid every capture the same.
+
+A link well above the player's usual standard on one of those qualities also earns
+a **word** — `TIGHT`, `PINPOINT`, `REDLINE` — floating up beside the ship next to
+the points. Two qualities at their top tier at once earns a rare superlative
+instead. The thresholds in `src/score/praise.ts` are percentiles of real play
+rather than round numbers, because round numbers get this wrong: gated at a
+plausible 0.90, the boost-peak word would have fired zero times in those 112
+releases. Word choice is seeded from the tick, so a replay shows the words the
+player actually saw.
+
 The weights in `src/score/config.ts` are a first cut and want playtesting; every
-replay prints the release qualities a session actually achieved, which is the
-intended way to calibrate them. They are deliberately **not** in `SimConfig`: see
-the header of that file for the three reasons.
+replay prints the release qualities a session actually achieved — and the word
+each one earned — which is the intended way to calibrate them. They are
+deliberately **not** in `SimConfig`: see the header of that file for the three
+reasons.
 
 ### Playing
 

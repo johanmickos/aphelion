@@ -366,7 +366,7 @@ export function drawScore(
   ctx.fillStyle = win ? 'rgba(140,200,170,.85)' : 'rgba(255,140,155,.85)';
   ctx.fillText(
     win
-      ? `${a.body}  DEPTH ${pct(a.depth)} · PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`
+      ? `${a.body}  CLOSE ${pct(a.close)} · PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`
       : `COASTED PAST ${a.body} — STREAK LOST`,
     cx,
     cam.offsetY + SCORE.detailY * s,

@@ -14,7 +14,7 @@ import { fingerprintHex } from '../src/sim/serialize.ts';
 import { KINK_THRESHOLD_DEG } from '../src/sim/trace.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 import type { GrabResult, Input, SimState } from '../src/sim/types.ts';
-import { createScoreState, scoreTick } from '../src/score/index.ts';
+import { createScoreState, praiseFor, scoreTick } from '../src/score/index.ts';
 import type { ScoreAward, ScoreState } from '../src/score/index.ts';
 
 export interface Frame {
@@ -242,7 +242,7 @@ export function replayReport(report: DiagReport): Analysis {
       (links.reduce((n, a) => n + pick(a), 0) / links.length).toFixed(2);
     findings.push(
       `release quality, averaged over ${links.length} link(s): ` +
-        `depth ${mean((a) => a.depth)} · boost peak ${mean((a) => a.timing)} · ` +
+        `close ${mean((a) => a.close)} · boost peak ${mean((a) => a.timing)} · ` +
         `aim ${mean((a) => a.aim)}  (0-1 each)`,
     );
   }
@@ -352,13 +352,16 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   // real session's release qualities can be read next to what they paid.
   if (a.awards.length) {
     out.push('  score');
-    out.push('    tick    what      points   mult   depth   peak    aim   climb');
+    out.push('    tick    what      points   mult   close   peak    aim   climb  earned');
     for (const w of a.awards.slice(0, 24)) {
       out.push(
-        `    ${String(w.tick).padStart(5)}  ${(w.kind === 'link' ? w.body : 'coasted past ' + w.body).padEnd(10)}` +
+        `    ${String(w.tick).padStart(5)}  ${(w.kind === 'link' ? w.body : 'past ' + w.body).padEnd(10)}` +
           `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
-          `${w.depth.toFixed(2).padStart(5)}  ${w.timing.toFixed(2).padStart(5)}  ` +
-          `${w.aim.toFixed(2).padStart(5)}  ${w.climb.toFixed(0).padStart(5)}`,
+          `${w.close.toFixed(2).padStart(5)}  ${w.timing.toFixed(2).padStart(5)}  ` +
+          `${w.aim.toFixed(2).padStart(5)}  ${w.climb.toFixed(0).padStart(5)}  ` +
+          // The word choice is seeded from the tick, so this is the word the
+          // player actually saw, not a fresh roll of the same table.
+          (praiseFor(w)?.word ?? ''),
       );
     }
     if (a.awards.length > 24) out.push(`    ... and ${a.awards.length - 24} more`);

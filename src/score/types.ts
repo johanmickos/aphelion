@@ -11,8 +11,26 @@ export interface ScoreAward {
   multiplier: number;
   /** The body this is about. */
   body: string;
-  /** `cap.tightness` at release: how far the dive committed. 0..1. Link only. */
-  depth: number;
+  /**
+   * How close the ship let the body get before grabbing. 0..1, 1 = surface.
+   *
+   * NOT `cap.tightness`, which reads as the same idea and is useless as one:
+   * measured over 112 real releases it sits at 0.99 or above for three quarters
+   * of them, because the dive almost always reaches the minimum-orbit floor.
+   * Grab clearance is the quantity with actual spread — 25px to 268px in the
+   * same 112 — and it is the thing a player chooses.
+   */
+  close: number;
+  /**
+   * The same measurement in raw pixels above the minimum orbit radius.
+   *
+   * Carried alongside the normalised `close` rather than derived from it, because
+   * deriving it needs `closeSpan` and `src/score/praise.ts` deliberately does not
+   * see `ScoreConfig` — its thresholds are percentiles of measured play and move
+   * no points. Two numbers meaning the same thing is how they start disagreeing;
+   * one measurement carried twice in different units does not.
+   */
+  clearance: number;
   /** Where in the boost envelope the release landed. 0..1. Link only. */
   timing: number;
   /** Best compass alignment at release. 0..1. Link only. */
@@ -33,7 +51,8 @@ export interface PendingLink {
   /** The same test `releaseCapture` uses to decide a release earned its boost. */
   earned: boolean;
   body: string;
-  depth: number;
+  close: number;
+  clearance: number;
   timing: number;
   aim: number;
   /** What the release was lined up with, for the readout. */

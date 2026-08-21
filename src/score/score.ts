@@ -155,7 +155,7 @@ export function scoreTick(
     // A body you grabbed can never be one you coasted past, however the capture
     // turns out.
     sc.flags[cap.planet] = (sc.flags[cap.planet] ?? 0) | GRABBED;
-    sc.pending = readPending(state, cfg, cap);
+    sc.pending = readPending(state, cfg, scfg, cap);
   } else {
     judgePasses(sc, state, cfg, scfg, awards);
   }
@@ -167,7 +167,12 @@ export function scoreTick(
 }
 
 /** Snapshot the live capture as the release it would be if let go of now. */
-function readPending(state: SimState, cfg: SimConfig, cap: Capture): PendingLink {
+function readPending(
+  state: SimState,
+  cfg: SimConfig,
+  scfg: ScoreConfig,
+  cap: Capture,
+): PendingLink {
   // Deliberately the same test `releaseCapture` applies before paying a boost:
   // what earns speed and what earns points are the same release.
   const earned = cap.orbit !== null && cap.passedPeri && cap.phase !== 'flyby';
@@ -192,7 +197,10 @@ function readPending(state: SimState, cfg: SimConfig, cap: Capture): PendingLink
   return {
     earned,
     body: state.bodies[cap.planet]?.name ?? '?',
-    depth: clamp01(cap.tightness),
+    // Clearance above the minimum orbit at the moment of the grab: 0px away is a
+    // grab off the surface, `closeSpan` away scores nothing.
+    close: clamp01(1 - (cap.grabR - cap.minR) / scfg.closeSpan),
+    clearance: Math.max(0, cap.grabR - cap.minR),
     // Where in the envelope the release landed. A dive too shallow to bank any
     // boost has no window to hit, so it scores no timing rather than full marks
     // for a division that never happened.
@@ -214,7 +222,7 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
   const raw =
     scfg.linkBase +
     climb * scfg.climbPerPx +
-    p.depth * scfg.depthBonus +
+    p.close * scfg.closeBonus +
     timing * scfg.timingBonus +
     aim * scfg.aimBonus;
 
@@ -230,7 +238,8 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
     points,
     multiplier,
     body: p.target ? `${p.body}→${p.target.name}` : p.body,
-    depth: p.depth,
+    close: p.close,
+    clearance: p.clearance,
     timing: p.timing,
     aim: p.aim,
     climb,
@@ -290,7 +299,8 @@ function judgePasses(
         points,
         multiplier: 1,
         body: b.name,
-        depth: 0,
+        close: 0,
+        clearance: 0,
         timing: 0,
         aim: 0,
         climb: 0,

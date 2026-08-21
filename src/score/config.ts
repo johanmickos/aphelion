@@ -31,8 +31,14 @@ export interface ScoreConfig {
   linkBase: number;
   /** Points per world pixel climbed since the previous link. */
   climbPerPx: number;
-  /** Full bonus for a dive that committed all the way (`tightness` 1). */
-  depthBonus: number;
+  /** Full bonus for grabbing from right on top of a body. */
+  closeBonus: number;
+  /**
+   * Grab clearance, in px above the minimum orbit radius, at which `close` has
+   * decayed to zero. 200 spans real play: the closest grab on record cleared the
+   * floor by 25px and the furthest by 268.
+   */
+  closeSpan: number;
   /** Full bonus for releasing at the peak of the boost envelope. */
   timingBonus: number;
   /** Full bonus for releasing exactly on a compass marker. */
@@ -70,12 +76,15 @@ export interface ScoreConfig {
  *
  * The shape of the model, which is the part worth arguing about:
  *
- *   link = (base + climb + depth + timing + aim) x multiplier
+ *   link = (base + climb + close + timing + aim) x multiplier
  *
- * `depth` is how hard you committed to the dive, and it already exists —
- * `cap.tightness`, geometric, `(grabR - rPeri) / span`. `timing` is the boost
- * window, which is the skill mechanic the player is already playing. `aim` is the
- * compass, which until now was advice with nothing behind it.
+ * `close` is how near you let the body get before committing to the grab.
+ * `cap.tightness` was the obvious candidate and is the wrong one — it saturates
+ * at 0.99+ across three quarters of real releases, so it paid every capture the
+ * same and discriminated nothing. Grab clearance has real spread and is a choice
+ * the player makes. `timing` is the boost window, which is the skill mechanic the
+ * player is already playing. `aim` is the compass, which until now was advice
+ * with nothing behind it.
  *
  * Timing and aim are the interesting pair because they FIGHT. The boost peaks a
  * fixed 0.45s after the orbit freezes, and the ship is wherever its sweep has
@@ -91,7 +100,8 @@ export interface ScoreConfig {
 export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   linkBase: 100,
   climbPerPx: 0.25,
-  depthBonus: 150,
+  closeBonus: 150,
+  closeSpan: 200,
   timingBonus: 250,
   aimBonus: 200,
   aimSharpness: 3,
