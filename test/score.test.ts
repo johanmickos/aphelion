@@ -22,6 +22,7 @@ import type { Input, SimState } from '../src/sim/types.ts';
 import {
   AIM,
   CLOSE_PX,
+  NERVE_SKIM_PX,
   DEFAULT_SCORE_CONFIG,
   PEAK,
   WORDS,
@@ -43,6 +44,13 @@ interface Session {
   fingerprints: number[];
 }
 
+interface Ship {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
 /** Drive a recorded input log and score it. */
 function play(
   edges: Edges,
@@ -50,8 +58,10 @@ function play(
   cfg: SimConfig = DEFAULT_CONFIG,
   scfg: ScoreConfig = DEFAULT_SCORE_CONFIG,
   score = true,
+  ship?: Ship,
 ): Session {
   const state = createInitialState(cfg);
+  if (ship) Object.assign(state.ship, ship);
   const sc = createScoreState();
   const awards: ScoreAward[] = [];
   const fingerprints: number[] = [];
@@ -144,7 +154,27 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
  * session that never coasts past anything cannot show a miss weight doing
  * something, and one that never chains cannot show a multiplier.
  */
-const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number }> = [
+const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?: Ship }> = [
+  /**
+   * A nerve grab: bearing straight down on P1 and pressing late.
+   *
+   * None of the sessions below can produce one, and the default spawn cannot
+   * either — its line misses P1 by 26px of clearance, so the ship is never
+   * actually headed inside the minimum orbit. Without this scenario `nerveBonus`
+   * measures as inert, which is a blind spot in the fixture rather than a dead
+   * weight. P1 is at (189, 0) with R=46, so minR is 58 and a line through its
+   * centre skims at -58. Pressing at tick 179 is 110px out — 52px of clearance,
+   * inside the late threshold, and still clear of the crash cone at 96px.
+   */
+  {
+    name: 'head-on, pressed late',
+    ship: { x: 189, y: 400, vx: 0, vy: -97 },
+    edges: [
+      [179, 1],
+      [260, 0],
+    ],
+    ticks: 420,
+  },
   // holds through the settle and releases mid-decay
   {
     name: 'held long, released in the decay',
@@ -190,7 +220,7 @@ function outcomeOf(scfg: ScoreConfig): number[] {
     );
   };
   add(pilot(4000, DEFAULT_CONFIG, scfg));
-  for (const s of SESSIONS) add(play(s.edges, s.ticks, DEFAULT_CONFIG, scfg));
+  for (const s of SESSIONS) add(play(s.edges, s.ticks, DEFAULT_CONFIG, scfg, true, s.ship));
   return out;
 }
 
@@ -446,6 +476,7 @@ describe('the word a release earns', () => {
     body: 'P3→P4',
     close: 0.5,
     clearance: 120,
+    skim: 90,
     timing: 0.1,
     aim: 0.2,
     climb: 400,
@@ -586,5 +617,93 @@ describe('the word a release earns', () => {
 
   it('stays quiet on a release worse than usual', () => {
     expect(praiseFor(typical({ clearance: REAL.clearance.p75 }))).toBeNull();
+  });
+
+  describe('the nerve grab', () => {
+    // Already boring in, and you waited. Both halves are required, and that is
+    // the whole point: neither one alone is the move.
+    const nerve = (over: Partial<ScoreAward> = {}) =>
+      typical({ skim: -27, clearance: 57, ...over });
+
+    it('names a late press on a line already headed inside the minimum orbit', () => {
+      const p = praiseFor(nerve());
+      expect(p?.category).toBe('nerve');
+      expect(WORDS.nerve[0]).toContain(p!.word);
+    });
+
+    it('is not earned by a late press on a line that was going to miss', () => {
+      // 50px off a planet on the way past is the same PLACE as 50px off and
+      // boring in, and only the second is nerve.
+      expect(praiseFor(nerve({ skim: 26 }))?.category).not.toBe('nerve');
+    });
+
+    it('is not earned by an early press on a collision line', () => {
+      // Reaching for it from a safe distance is not holding your nerve.
+      expect(praiseFor(nerve({ clearance: CLOSE_PX.tier1 + 1 }))?.category).not.toBe('nerve');
+    });
+
+    it('ignores a body that was already behind the ship', () => {
+      // `skimClearance` reports Infinity when the closest approach is in the
+      // past — a planet you have passed is not one you were bearing down on.
+      expect(praiseFor(nerve({ skim: Infinity }))?.category).not.toBe('nerve');
+    });
+
+    it('yields to the superlative, which is the rarer achievement', () => {
+      const both = nerve({ aim: AIM.tier2, timing: PEAK.tier2 });
+      expect(praiseFor(both)?.category).toBe('super');
+    });
+
+    it('outranks any single quality, being a conjunction of two', () => {
+      expect(praiseFor(nerve({ timing: PEAK.tier2 }))?.category).toBe('nerve');
+    });
+
+    it('pays as well as names, so the word is not writing cheques', () => {
+      const link = play(
+        [
+          [179, 1],
+          [260, 0],
+        ],
+        420,
+        DEFAULT_CONFIG,
+        DEFAULT_SCORE_CONFIG,
+        true,
+        { x: 189, y: 400, vx: 0, vy: -97 },
+      );
+      const earned = link.awards.filter((a) => a.kind === 'link');
+      expect(earned.length).toBeGreaterThan(0);
+      expect(earned[0]!.skim).toBeLessThanOrEqual(NERVE_SKIM_PX);
+      expect(praiseFor(earned[0]!)?.category).toBe('nerve');
+
+      const unpaid = play(
+        [
+          [179, 1],
+          [260, 0],
+        ],
+        420,
+        DEFAULT_CONFIG,
+        { ...DEFAULT_SCORE_CONFIG, nerveBonus: 0 },
+        true,
+        { x: 189, y: 400, vx: 0, vy: -97 },
+      );
+      expect(unpaid.score.best).toBeLessThan(link.score.best);
+    });
+
+    it('measures the approach line the simulation actually flew', () => {
+      // The drift ray is exact: the escape burst is parallel to the release
+      // velocity, so it scales speed and never bends the path. A head-on run at
+      // P1 (centre line, minR 58) must therefore read -58, not an approximation.
+      const { awards } = play(
+        [
+          [179, 1],
+          [260, 0],
+        ],
+        420,
+        DEFAULT_CONFIG,
+        DEFAULT_SCORE_CONFIG,
+        true,
+        { x: 189, y: 400, vx: 0, vy: -97 },
+      );
+      expect(awards[0]!.skim).toBeCloseTo(-58, 0);
+    });
   });
 });

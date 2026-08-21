@@ -52,6 +52,9 @@ const COLOR: Record<Praise['category'], string> = {
   // the BOOST PEAK readout is this violet
   peak: '#b98cff',
   close: '#ff9a3c',
+  // Unused elsewhere in the game's palette, so a nerve grab never reads as any
+  // of the other three at a glance.
+  nerve: '#3fe0ff',
   super: '#ffe27a',
 };
 

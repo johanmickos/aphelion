@@ -44,6 +44,16 @@ export interface ScoreConfig {
   /** Full bonus for releasing exactly on a compass marker. */
   aimBonus: number;
   /**
+   * Flat bonus for a nerve grab: a late press on a line that was already headed
+   * inside the minimum orbit. See `src/score/praise.ts`.
+   *
+   * Flat rather than proportional, because the thing being rewarded is a
+   * threshold being crossed — you either held your nerve or you did not — and
+   * because a word that promises a boost the points do not reflect is worse than
+   * no word. Set it to 0 to keep the word and drop the points.
+   */
+  nerveBonus: number;
+  /**
    * Shaping exponents. The underlying measures are generous ramps — alignment is
    * linear over a full 90 degrees, the boost envelope over ~1.8 seconds — which
    * is right for a gauge you read at a glance and far too soft for a reward.
@@ -104,6 +114,7 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   closeSpan: 200,
   timingBonus: 250,
   aimBonus: 200,
+  nerveBonus: 200,
   aimSharpness: 3,
   timingSharpness: 2,
 

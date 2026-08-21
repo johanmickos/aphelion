@@ -31,6 +31,18 @@ export interface ScoreAward {
    * one measurement carried twice in different units does not.
    */
   clearance: number;
+  /**
+   * Closest approach the pre-grab drift line would have made, in px above the
+   * minimum orbit radius. Negative means the ship was on a line INTO the
+   * minimum-orbit zone — it was going to hug the planet whether or not it grabbed.
+   *
+   * This is what `clearance` alone cannot say. A ship 50px off a planet on its way
+   * past is in the same place as one 50px off and boring straight in, and only the
+   * second one is a nerve grab. Drift is a straight ray — the escape burst is
+   * exactly parallel to the release velocity, so it scales speed and never bends
+   * the path — which is what makes this exactly computable rather than a guess.
+   */
+  skim: number;
   /** Where in the boost envelope the release landed. 0..1. Link only. */
   timing: number;
   /** Best compass alignment at release. 0..1. Link only. */
@@ -53,6 +65,7 @@ export interface PendingLink {
   body: string;
   close: number;
   clearance: number;
+  skim: number;
   timing: number;
   aim: number;
   /** What the release was lined up with, for the readout. */
@@ -83,6 +96,17 @@ export interface ScoreState {
   flags: number[];
   /** Edge-detects the start of an ending hold. */
   endingSeen: boolean;
+  /**
+   * The drifting ship as of the end of last tick, and whether it was captured.
+   *
+   * A grab resolves from the input edge at the START of a tick, before physics,
+   * so this is EXACTLY the state `beginCapture` read — which is what lets the
+   * skim line be reconstructed without the simulation storing it.
+   */
+  lastDrift: { x: number; y: number; vx: number; vy: number } | null;
+  wasCaptured: boolean;
+  /** Skim clearance of the grab that started the current capture. */
+  grabSkim: number;
   /** Last observed `telemetry.putterOuts`, to edge-detect a dry capture. */
   putterOuts: number;
 }

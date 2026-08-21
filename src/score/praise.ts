@@ -32,7 +32,7 @@ import { mulberry32 } from '../sim/rng.ts';
 import type { ScoreAward } from './types.ts';
 
 /** Which quality earned the word. `super` is two or more at once. */
-export type PraiseCategory = 'close' | 'aim' | 'peak' | 'super';
+export type PraiseCategory = 'close' | 'aim' | 'peak' | 'nerve' | 'super';
 
 export interface Praise {
   category: PraiseCategory;
@@ -50,6 +50,25 @@ export interface Praise {
 export const CLOSE_PX = Object.freeze({ tier1: 59, tier2: 48 });
 export const AIM = Object.freeze({ tier1: 0.94, tier2: 0.98 });
 export const PEAK = Object.freeze({ tier1: 0.44, tier2: 0.52 });
+
+/**
+ * The nerve grab: already boring in, and you waited.
+ *
+ * Two conditions, and the pair is the point. `close` on its own cannot tell a
+ * ship 50px off a planet on its way past from one 50px off and headed straight
+ * in; only the second is nerve. So:
+ *
+ *   skim <= 0     the drift line, extended, passes INSIDE the minimum orbit —
+ *                 you were going to hug the planet whether you grabbed or not
+ *   clearance     you were already inside the late-press threshold when you
+ *     <= tier1    committed, rather than reaching for it from a safe distance
+ *
+ * The skim bound is deliberately NOT a percentile like the others. Zero is a real
+ * boundary in the simulation — it is the radius the floor clamp defends — so it
+ * needs no calibration and cannot drift as the feel changes. The lateness bound
+ * reuses `CLOSE_PX.tier1` rather than inventing a second definition of "late".
+ */
+export const NERVE_SKIM_PX = 0;
 
 /**
  * One list per category and tier.
@@ -73,13 +92,25 @@ export const WORDS: Readonly<
     ['PUNCHY', 'CRISP', 'SNAPPED'],
     ['PEAKED', 'REDLINE', 'SLINGSHOT'],
   ],
+  // One list, used at both tiers: a nerve grab is a threshold you cleared, not a
+  // quality you scored well on, so there is no "slightly braver" version of it.
+  nerve: [
+    ['NERVE', 'CLUTCH', 'BRINK', 'STEEL'],
+    ['NERVE', 'CLUTCH', 'BRINK', 'STEEL'],
+  ],
   super: [
     ['SUBLIME', 'MASTERFUL', 'IMMACULATE', 'TEXTBOOK'],
     ['SUBLIME', 'MASTERFUL', 'IMMACULATE', 'TEXTBOOK'],
   ],
 });
 
-const ORDINAL: Record<PraiseCategory, number> = { close: 1, aim: 2, peak: 3, super: 4 };
+const ORDINAL: Record<PraiseCategory, number> = {
+  close: 1,
+  aim: 2,
+  peak: 3,
+  nerve: 4,
+  super: 5,
+};
 
 /**
  * Pick a word without a wall clock and without `Math.random`.
@@ -117,6 +148,16 @@ function tierOf(value: number, tier1: number, tier2: number): 0 | 1 | 2 {
 }
 
 /**
+ * Was this a late press on a line already headed inside the minimum orbit?
+ *
+ * Exported because the scorer pays for it as well as naming it: a word promising
+ * a boost the points do not reflect is worse than no word.
+ */
+export function isNerveGrab(award: ScoreAward): boolean {
+  return award.kind === 'link' && award.skim <= NERVE_SKIM_PX && award.clearance <= CLOSE_PX.tier1;
+}
+
+/**
  * The word a link earned, or null for a routine one.
  *
  * Deductions earn nothing: the words are a reward channel, and the readout
@@ -137,6 +178,13 @@ export function praiseFor(award: ScoreAward): Praise | null {
   const excellent = (['close', 'aim', 'peak'] as const).filter((k) => tiers[k] === 2);
   if (excellent.length >= 2) {
     return { category: 'super', tier: 2, word: pick(WORDS.super[0], award.tick, 'super') };
+  }
+
+  // A conjunction of two independent conditions, so rarer than any single tier
+  // and named ahead of them — but below the superlative, which is a conjunction
+  // of two TOP tiers.
+  if (isNerveGrab(award)) {
+    return { category: 'nerve', tier: 2, word: pick(WORDS.nerve[0], award.tick, 'nerve') };
   }
 
   // Hardest quality first. The boost window is the one almost nobody hits, aim is

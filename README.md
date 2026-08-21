@@ -253,7 +253,18 @@ quarters of them, so it paid every capture the same.
 A link well above the player's usual standard on one of those qualities also earns
 a **word** — `TIGHT`, `PINPOINT`, `REDLINE` — floating up beside the ship next to
 the points. Two qualities at their top tier at once earns a rare superlative
-instead. The thresholds in `src/score/praise.ts` are percentiles of real play
+instead.
+
+One word is not a quality but a **conjunction**: a _nerve grab_ (`NERVE`,
+`CLUTCH`, `STEEL`) is a late press on a line that was already headed inside the
+minimum orbit — you were going to hug the planet whether you grabbed or not, and
+you waited. `close` alone cannot see it: a ship 50px off a planet on its way past
+is in the same place as one 50px off and boring straight in. Its skim bound is
+`0` rather than a percentile, because zero is a real boundary in the simulation —
+the radius the floor clamp defends — so it needs no calibration and cannot drift
+as the feel changes. It pays a flat `nerveBonus` as well as naming itself.
+
+The thresholds in `src/score/praise.ts` are percentiles of real play
 rather than round numbers, because round numbers get this wrong: gated at a
 plausible 0.90, the boost-peak word would have fired zero times in those 112
 releases. Word choice is seeded from the tick, so a replay shows the words the

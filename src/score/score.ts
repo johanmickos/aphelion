@@ -39,6 +39,7 @@ import type { Capture, SimState } from '../sim/types.ts';
 import { grabTarget } from '../sim/capture.ts';
 import { hypot } from '../sim/orbit.ts';
 import { readAim } from './aim.ts';
+import { isNerveGrab } from './praise.ts';
 import type { ScoreConfig } from './config.ts';
 import { DEFAULT_SCORE_CONFIG } from './config.ts';
 import type { PendingLink, ScoreAward, ScoreState } from './types.ts';
@@ -72,6 +73,9 @@ export function createScoreState(): ScoreState {
     climbFromY: null,
     flags: [],
     endingSeen: false,
+    lastDrift: null,
+    wasCaptured: false,
+    grabSkim: Infinity,
     putterOuts: 0,
   };
 }
@@ -155,15 +159,44 @@ export function scoreTick(
     // A body you grabbed can never be one you coasted past, however the capture
     // turns out.
     sc.flags[cap.planet] = (sc.flags[cap.planet] ?? 0) | GRABBED;
-    sc.pending = readPending(state, cfg, scfg, cap);
+    // First tick of this capture: the drift state held from last tick is exactly
+    // what `beginCapture` read, so the approach line can be measured now and
+    // never again — the capture's own rx/ry/vx/vy start moving immediately.
+    if (!sc.wasCaptured) sc.grabSkim = skimClearance(sc, state, cap);
+    sc.pending = readPending(state, cfg, scfg, cap, sc.grabSkim);
   } else {
+    const { ship } = state;
+    sc.lastDrift = { x: ship.x, y: ship.y, vx: ship.vx, vy: ship.vy };
     judgePasses(sc, state, cfg, scfg, awards);
   }
+  sc.wasCaptured = cap !== null;
 
   sc.multiplier = multiplierFor(sc, scfg);
   if (sc.score > sc.best) sc.best = sc.score;
   if (awards.length > 0) sc.lastAward = awards[awards.length - 1]!;
   return awards;
+}
+
+/**
+ * How close the drift line was going to come, in px above the minimum orbit.
+ *
+ * Positive is a miss, negative means the ship was already headed inside the
+ * minimum-orbit zone. Infinity when the body is behind the ship — a body you
+ * have already passed is not one you were bearing down on.
+ */
+function skimClearance(sc: ScoreState, state: SimState, cap: Capture): number {
+  const d = sc.lastDrift;
+  const body = state.bodies[cap.planet];
+  if (!d || !body) return Infinity;
+  const sp = hypot(d.vx, d.vy);
+  if (sp < 1) return Infinity;
+  const ux = d.vx / sp;
+  const uy = d.vy / sp;
+  const rx = d.x - body.x;
+  const ry = d.y - body.y;
+  // Behind us: the closest approach is in the past.
+  if (-(rx * ux + ry * uy) <= 0) return Infinity;
+  return Math.abs(rx * uy - ry * ux) - cap.minR;
 }
 
 /** Snapshot the live capture as the release it would be if let go of now. */
@@ -172,6 +205,7 @@ function readPending(
   cfg: SimConfig,
   scfg: ScoreConfig,
   cap: Capture,
+  skim: number,
 ): PendingLink {
   // Deliberately the same test `releaseCapture` applies before paying a boost:
   // what earns speed and what earns points are the same release.
@@ -201,6 +235,7 @@ function readPending(
     // grab off the surface, `closeSpan` away scores nothing.
     close: clamp01(1 - (cap.grabR - cap.minR) / scfg.closeSpan),
     clearance: Math.max(0, cap.grabR - cap.minR),
+    skim,
     // Where in the envelope the release landed. A dive too shallow to bank any
     // boost has no window to hit, so it scores no timing rather than full marks
     // for a division that never happened.
@@ -227,23 +262,26 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
     aim * scfg.aimBonus;
 
   const multiplier = multiplierFor(sc, scfg);
-  const points = Math.round(raw * multiplier);
-  sc.score += points;
-  sc.links++;
-  sc.streak++;
-
-  return {
+  // Built once so the nerve test sees the finished award rather than a copy of
+  // its own inputs — one definition of what a nerve grab is, in praise.ts.
+  const award: ScoreAward = {
     tick: state.tick,
     kind: 'link',
-    points,
+    points: 0,
     multiplier,
     body: p.target ? `${p.body}→${p.target.name}` : p.body,
     close: p.close,
     clearance: p.clearance,
+    skim: p.skim,
     timing: p.timing,
     aim: p.aim,
     climb,
   };
+  award.points = Math.round((raw + (isNerveGrab(award) ? scfg.nerveBonus : 0)) * multiplier);
+  sc.score += award.points;
+  sc.links++;
+  sc.streak++;
+  return award;
 }
 
 /**
@@ -301,6 +339,7 @@ function judgePasses(
         body: b.name,
         close: 0,
         clearance: 0,
+        skim: Infinity,
         timing: 0,
         aim: 0,
         climb: 0,
