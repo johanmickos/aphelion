@@ -71,6 +71,12 @@ function rearm(): void {
 const recorder = new RunRecorder();
 
 // --- input: the simulation consumes edges, not levels
+//
+// Press and release is the whole vocabulary. Touch pressure was investigated as a
+// second axis and declined: `Touch.force` and pointer `pressure` are unreliable
+// across devices — iOS dropped 3D Touch, most Android reports a constant. If an
+// intensity axis is ever wanted, hold duration or a small drag during the hold are
+// the reliable alternatives.
 let held = false;
 let pressedEdge = false;
 let releasedEdge = false;

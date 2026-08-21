@@ -52,8 +52,7 @@ src/app/              The fixed-timestep loop, run lifecycle, tuning, diagnostic
 tools/                Headless harness, golden capture, replay, QR + Vite plugins.
 test/                 The equality gate, invariants, scenario matrix, render guards.
 golden/               Recorded reference trajectories.
-docs/                 FEEL.md (what it should feel like, and what not to retry).
-                      PORT_NOTES.md (what the port changed and why).
+docs/                 PORT_NOTES.md — what the port changed, and why.
 ```
 
 **`index.html` is the reference implementation and must not be modified.** It is
@@ -181,9 +180,11 @@ contact) and a window around each moment you flagged.
 
 ## Design notes
 
-- [`docs/FEEL.md`](docs/FEEL.md) — why the capture is built the way it is, the bar
-  any tuning change has to clear, and the approaches already tried and rejected.
-  Mechanism is documented next to the mechanism, in `src/sim/`.
+Design rationale lives next to the code it explains, not in a separate document
+that drifts: why the capture is shaped the way it is heads `src/sim/capture.ts`,
+the bar any tuning change has to clear sits above `DEFAULT_CONFIG`, and each
+rejected approach is recorded at the site that would tempt you to retry it.
+
 - [`docs/PORT_NOTES.md`](docs/PORT_NOTES.md) — every bug reproduced, every change
   made deliberately, and why.
 - `docs/VISION.md` — an earlier, broader design. Kept locally for reference and
@@ -202,6 +203,11 @@ the game renders, reports, and can be tuned from the device.
 | 1 ✅  | Renderer, HUD, compass, run lifecycle, tune panel, diagnostics          |
 | 2     | Fix the PORT-NOTEs one at a time, re-blessing each with a reasoned diff |
 | 3     | Pickups, effects, new celestial bodies                                  |
+
+There is still no score, goal or progression. `docs/VISION.md` had momentum
+scoring, multipliers and named trick shots; the prototype dropped all of it. What
+scoring rewards determines what a pickup should do, so it is worth settling before
+Stage 3.
 
 ### Playing
 

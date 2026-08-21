@@ -3,6 +3,36 @@
  *
  * Ported verbatim from the prototype's `beginCapture`, `freezeOrbit` and
  * `releaseHeld`. Behaviour and arithmetic are unchanged.
+ *
+ * WHY IT IS SHAPED THIS WAY
+ *
+ * The capture took 16+ failed attempts. The tension: gravity has to catch and
+ * reel you in so it feels physical, let you whip around into an eccentric oval,
+ * then optionally circularise — with the tightness of that final orbit
+ * controllable, and without the motion ever looking rigid, snapping, or clipping
+ * the surface.
+ *
+ * What finally worked was refusing to author any of it as one quantity. Three
+ * separate concerns:
+ *
+ *   clearance  do not hit the surface — one minimal early nudge lifting periapsis
+ *              to the minimum orbit radius, and nothing else
+ *   shape      the oval, which is pure gravity. The dive is simulated and nothing
+ *              authors it
+ *   tightness  how tight the settled orbit ends up, applied at the SETTLE and
+ *              never at the approach
+ *
+ * Nothing touches the approach. That decoupling is why `freezeOrbit` exists at
+ * all: the dive is real, and only once it reaches periapsis does anything
+ * authored take over.
+ *
+ * Rejected, and expensive to rediscover: rigid or snapped orbit insertion. That
+ * was the entire 16-failure saga. Keep it simulated.
+ *
+ * Note that tightness therefore follows the DEPTH of the dive —
+ * `(grabR - rPeri) / span` — not the quality of the aim. The prototype's design
+ * document claimed the opposite; that mechanic was never implemented. See
+ * docs/PORT_NOTES.md note 17.
  */
 import type { SimConfig } from './config.ts';
 import type { Body, Capture, GrabResult, SimState } from './types.ts';
@@ -63,6 +93,11 @@ export function inCrashCone(cfg: SimConfig, state: SimState, body: Body): boolea
  * A grab is blocked only when the tank is truly empty: entering an orbit and
  * slingshotting off must always be possible, because that is the core loop.
  * Only circularizing costs fuel.
+ *
+ * Still open: a near-stationary grab from a distance is still reeled in. That is
+ * physically correct but can feel like the ship crawled over to the planet rather
+ * than being caught by it. A minimum-approach-energy gate would let genuinely
+ * dead grabs drift past instead.
  */
 export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
   if (state.fuel <= 0.5) return 'refused-no-fuel';

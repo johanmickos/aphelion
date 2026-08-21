@@ -259,7 +259,8 @@ The prototype's design document described it as a live mechanic: *"Aim sets tigh
 derived geometrically in `freezeOrbit` from `(grabR - rPeri) / span`, which is how
 deep the dive went, not how well it was aimed. `aim` is vestigial from an earlier
 design — the same class of documentation drift as the `whip` phase in note 4.
-(That document has since been retired; what survived it is in `docs/FEEL.md`.)
+(That document has since been retired; what survived it was moved to the code it
+describes — the capture's rationale now heads `src/sim/capture.ts`.)
 
 Removed, along with five other write-only capture fields found in the same sweep:
 `grabSpeed`, `inboundFrac`, `natPeri`, `isFlyby` and `whipVmax`. None could affect

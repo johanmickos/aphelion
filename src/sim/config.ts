@@ -161,6 +161,22 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
 /**
  * The live game tuning. Starts from the prototype and diverges deliberately.
  *
+ * The bar any change to these has to clear:
+ *
+ *   - Gravity catches and reels — physical, never snapped.
+ *   - Fast whip, eccentric oval first, optional circle if held.
+ *   - Tightness follows the depth of the dive: commit harder, hold tighter.
+ *   - Never settle wider than the grab radius. Never clip the surface.
+ *   - Slow approaches fall inward gently, not in a sharp spin.
+ *   - Release flings along the tangent. Boost is punchy, then fades.
+ *   - The slingshot is free; circularising costs.
+ *   - Too fast means bend the path — hold to capture, and pay fuel for it.
+ *   - You can always recover before the crash cone. Inside it, too late.
+ *
+ * Per-sample deflection above 15 degrees is a visible kink, and is the single most
+ * important smoothness metric; `tools/replay.ts` reports kinks on every recorded
+ * session.
+ *
  * Every difference from PROTOTYPE_CONFIG is a decision, listed here so the drift
  * is never accidental:
  *
