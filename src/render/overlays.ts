@@ -64,7 +64,7 @@ export function drawEndingNotice(
   const winL = cam.offsetX;
   const winT = cam.offsetY;
   const winR = cam.offsetX + cam.designW * s;
-  const winB = cam.offsetY + cam.designH * s;
+  const winB = cam.offsetY + cam.viewH * s;
   let bx = csx + 14 * s;
   let by = csy - bh - 14 * s;
   bx = Math.max(winL + 6 * s, Math.min(winR - bw - 6 * s, bx));
@@ -119,14 +119,14 @@ export function drawPaused(ctx: CanvasRenderingContext2D, cam: Camera): void {
   const s = cam.scale;
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,.45)';
-  ctx.fillRect(cam.offsetX, cam.offsetY, cam.designW * s, cam.designH * s);
+  ctx.fillRect(cam.offsetX, cam.offsetY, cam.designW * s, cam.viewH * s);
   ctx.fillStyle = '#b98cff';
   ctx.textAlign = 'center';
   ctx.font = `600 ${22 * s}px ui-monospace, monospace`;
   ctx.fillText(
     '❚❚  PAUSED',
     cam.offsetX + (cam.designW * s) / 2,
-    cam.offsetY + (cam.designH * s) / 2,
+    cam.offsetY + (cam.viewH * s) / 2,
   );
   ctx.restore();
 }

@@ -154,15 +154,31 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
  *                           over-warns anyway because it tests a straight ray
  *                           against a curved path (PORT_NOTES 1), so pulling the
  *                           refusal in partly compensates until that is fixed.
- *  - fieldWidthFrac 1.20 -> 1.45  The corridor felt constrictive, and a wider
- *                           field gives more room to find a planet to curve
- *                           away from before reaching a boundary.
+ *  - fieldWidthFrac 1.20 -> 1.90  The corridor felt constrictive, and a wider
+ *                           field gives more room to find a planet to curve away
+ *                           from before reaching a boundary.
+ *
+ *                           1.90 specifically, because a run should not open on a
+ *                           red warning stripe. The ship spawns 90px left of the
+ *                           field's centre (inherited from the prototype), so the
+ *                           camera clamps against the left boundary at t=0. It is
+ *                           not enough to push the hard line off screen: the
+ *                           hazard gradient reaches 60px INWARD from it, and that
+ *                           faint red is what you actually notice. Clearing the
+ *                           gradient needs field.left + 60 < -90, i.e. 1.77+;
+ *                           1.90 leaves 25px of margin so smaller phones are safe
+ *                           too.
+ *
+ *                           Spawning at the literal field centre would be the
+ *                           obvious alternative and is not viable: the centre is
+ *                           x=195 and P1 sits at x=189 with R=46, which is a
+ *                           collision course drifting straight up.
  */
 export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   ...PROTOTYPE_CONFIG,
   minOrbitGap: 12,
   crashConeRange: 50,
-  fieldWidthFrac: 1.45,
+  fieldWidthFrac: 1.9,
 } satisfies SimConfig);
 
 /**

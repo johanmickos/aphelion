@@ -9,6 +9,7 @@ import { createCamera, fitCamera, snapCamera, toScreenX } from '../src/render/ca
 import { Starfield } from '../src/render/starfield.ts';
 import { drawHazardZones } from '../src/render/world.ts';
 import { boostColor, drawBoostHalo } from '../src/render/capture.ts';
+import { drawFuelGauge, readoutLines } from '../src/render/hud.ts';
 import { Trail } from '../src/render/ship.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import { createBodies, fieldBounds } from '../src/sim/world.ts';
@@ -187,7 +188,7 @@ describe('scene', () => {
       if (released) held = false;
       stepSim(state, DEFAULT_CONFIG, { held: held || pressed, pressed, released }, FIXED_DT);
 
-      const snap = captureSnapshot(state, held);
+      const snap = captureSnapshot(state, held, DEFAULT_CONFIG);
       scene.trail.sample(snap.x, snap.y);
       snapCamera(c, rcfg, snap.x, snap.y, f);
 
@@ -221,7 +222,7 @@ describe('scene', () => {
     );
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
-    const snap = captureSnapshot(state, false);
+    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
     snapCamera(c, rcfg, snap.x, snap.y, f);
     const r = recordingContext();
     scene.draw(r.ctx, c, snap, { timeMs: 0, paused: false, viewportW: 390, viewportH: 844 });
@@ -275,7 +276,7 @@ describe('boost halo', () => {
         sim,
         rcfg,
         {
-          ...captureSnapshot(createInitialState(sim), true),
+          ...captureSnapshot(createInitialState(sim), true, sim),
           capture: {
             phase: 'settle',
             planet: 0,
@@ -286,6 +287,7 @@ describe('boost halo', () => {
             boost: charge * 90,
             boostFull: 90,
             boostT,
+            overEscape: 0,
           },
         },
         boostT * 1000,
@@ -302,5 +304,152 @@ describe('boost halo', () => {
     const peak = Math.max(...radii);
     const low = Math.min(...radii);
     expect(peak).toBeGreaterThan(low * 1.5);
+  });
+});
+
+describe('HUD', () => {
+  const sim = DEFAULT_CONFIG;
+
+  function snapWith(over: Partial<ReturnType<typeof captureSnapshot>>) {
+    const base = captureSnapshot(createInitialState(sim), false, sim);
+    return { ...base, ...over };
+  }
+
+  it('says nothing while simply drifting with a full tank', () => {
+    expect(readoutLines(sim, snapWith({}), true)).toEqual([]);
+  });
+
+  it('explains a refused grab, and only briefly', () => {
+    const refused = snapWith({
+      tick: 100,
+      lastGrab: { tick: 90, result: 'refused-crash-cone' as const },
+    });
+    expect(readoutLines(sim, refused, true)[0]?.text).toContain('TOO LATE');
+
+    // and it ages out rather than lingering forever
+    const later = snapWith({
+      tick: 400,
+      lastGrab: { tick: 90, result: 'refused-crash-cone' as const },
+    });
+    expect(readoutLines(sim, later, true)).toEqual([]);
+  });
+
+  it('names an empty tank as the reason a grab did nothing', () => {
+    const dry = snapWith({
+      tick: 100,
+      fuel: 0,
+      lastGrab: { tick: 95, result: 'refused-no-fuel' as const },
+    });
+    const texts = readoutLines(sim, dry, true).map((l) => l.text);
+    expect(texts.some((t) => t.includes('NO FUEL'))).toBe(true);
+    expect(texts.some((t) => t.includes('TANK EMPTY'))).toBe(true);
+  });
+
+  it('calls the boost peak, and distinguishes it from arming and fading', () => {
+    const at = (boostT: number) =>
+      readoutLines(
+        sim,
+        snapWith({
+          capture: {
+            phase: 'settle',
+            planet: 0,
+            settleProgress: 0.5,
+            settleT: 0.6,
+            orbit: null,
+            rPeri: 100,
+            boost: 50,
+            boostFull: 90,
+            boostT,
+            overEscape: 0,
+          },
+        }),
+        true,
+      ).map((l) => l.text);
+
+    expect(at(0.2).some((t) => t.includes('arming'))).toBe(true);
+    expect(at(sim.boostArmTime).some((t) => t.includes('PEAK'))).toBe(true);
+    expect(at(1.2).some((t) => t.includes('fading'))).toBe(true);
+  });
+
+  it('warns before a capture runs dry rather than after', () => {
+    const poor = snapWith({
+      fuel: 4,
+      capture: {
+        phase: 'settle',
+        planet: 0,
+        settleProgress: 0.1,
+        settleT: 0.1,
+        orbit: null,
+        rPeri: 100,
+        boost: 0,
+        boostFull: 0,
+        boostT: 0,
+        overEscape: 0,
+      },
+    });
+    const texts = readoutLines(sim, poor, false).map((l) => l.text);
+    expect(texts.some((t) => t.includes('will not round out'))).toBe(true);
+  });
+
+  /**
+   * A flyby is not automatically trouble. Measured over a real 82-second session:
+   * conversions sat at 1.09-1.22x escape speed and cost under 20 fuel; failures
+   * sat at 1.31-1.82x and cost the whole tank. Showing the same alarm for both
+   * was the complaint that prompted this.
+   */
+  function flybyAt(overEscape: number, fuel = 99) {
+    return snapWith({
+      fuel,
+      capture: {
+        phase: 'flyby',
+        planet: 0,
+        settleProgress: 0,
+        settleT: 0,
+        orbit: null,
+        rPeri: 0,
+        boost: 0,
+        boostFull: 0,
+        boostT: 0,
+        overEscape,
+      },
+    });
+  }
+
+  it('reports progress, not alarm, on a flyby that will convert cheaply', () => {
+    const texts = readoutLines(sim, flybyAt(0.12), true).map((l) => l.text);
+    expect(texts.some((t) => t.includes('BRAKING'))).toBe(true);
+    expect(texts.some((t) => t.includes('TOO FAST'))).toBe(false);
+  });
+
+  it('shows how far over escape it still is, counting down', () => {
+    const far = readoutLines(sim, flybyAt(0.2), true)[0]!.text;
+    const near = readoutLines(sim, flybyAt(0.05), true)[0]!.text;
+    expect(far).toContain('20%');
+    expect(near).toContain('5%');
+  });
+
+  it('escalates only when the brake genuinely is not winning', () => {
+    const texts = readoutLines(sim, flybyAt(0.6), true).map((l) => l.text);
+    expect(texts.some((t) => t.includes('TOO FAST'))).toBe(true);
+    expect(texts.some((t) => t.includes('costs a lot of fuel'))).toBe(true);
+  });
+
+  it('says the tank is empty rather than blaming speed', () => {
+    const texts = readoutLines(sim, flybyAt(0.6, 0), true).map((l) => l.text);
+    expect(texts.some((t) => t.includes('OUT OF FUEL'))).toBe(true);
+    expect(texts.some((t) => t.includes('TOO FAST'))).toBe(false);
+  });
+
+  it('draws the gauge and its numeric readout inside the design window', () => {
+    const c = cam();
+    const r = recordingContext();
+    drawFuelGauge(r.ctx, c, sim, snapWith({ fuel: 42 }), 0);
+    const winL = c.offsetX;
+    const winR = c.offsetX + c.designW * c.scale;
+    for (const [, x, , w] of r.calls('fillRect') as Array<[string, number, number, number]>) {
+      expect(x).toBeGreaterThanOrEqual(winL - 1e-6);
+      expect(x + w).toBeLessThanOrEqual(winR + 1e-6);
+    }
+    expect((r.calls('fillText') as Array<[string, string]>).some((o) => o[1] === '42')).toBe(true);
   });
 });

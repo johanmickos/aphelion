@@ -13,8 +13,19 @@
  * The window is scaled to fit and centred, with bars filling any excess, so every
  * device sees exactly the same slice of world. Portrait-only by design.
  */
-import { DESIGN_H } from '../sim/world.ts';
 import type { RenderConfig } from './config.ts';
+
+/**
+ * The visible world height is allowed to float between these, so the window can
+ * fill the screen width on any portrait phone without bars.
+ *
+ * A vertical climb cares about horizontal framing — field width, planet spacing,
+ * where the boundaries sit — far more than about how far ahead you can see. So
+ * width is fixed and height flexes. The bounds stop a tablet or a landscape
+ * screen from zooming in so far that you fly blind.
+ */
+export const MIN_VIEW_H = 620;
+export const MAX_VIEW_H = 1000;
 
 export interface Viewport {
   /** CSS pixels. */
@@ -33,8 +44,10 @@ export interface Camera {
   left: number;
   /** World y mapped to the design window's vertical centre. */
   centerY: number;
+  /** Fixed world width of the window. Never varies — framing depends on it. */
   designW: number;
-  designH: number;
+  /** Visible world height. Flexes with the viewport's aspect ratio. */
+  viewH: number;
 }
 
 export function createCamera(cfg: RenderConfig): Camera {
@@ -45,15 +58,35 @@ export function createCamera(cfg: RenderConfig): Camera {
     left: 0,
     centerY: 0,
     designW: cfg.designW,
-    designH: DESIGN_H,
+    viewH: MIN_VIEW_H,
   };
 }
 
-/** Recompute the letterbox fit for a viewport. */
+/**
+ * Fit the window to a viewport.
+ *
+ * Fills the width exactly, so a portrait phone gets no bars at all — previously
+ * a 393x651 viewport was pillarboxed by ~46px a side, because a fixed 390x844
+ * window is a taller aspect than a browser with visible chrome.
+ *
+ * The visible world height then follows from the aspect ratio, clamped so an
+ * unusual screen cannot zoom in until nothing is visible ahead. Only when the
+ * clamp engages do bars appear.
+ */
 export function fitCamera(cam: Camera, vp: Viewport): void {
-  cam.scale = Math.min(vp.w / cam.designW, vp.h / cam.designH);
-  cam.offsetX = (vp.w - cam.designW * cam.scale) / 2;
-  cam.offsetY = (vp.h - cam.designH * cam.scale) / 2;
+  let scale = vp.w / cam.designW;
+  let viewH = vp.h / scale;
+  if (viewH < MIN_VIEW_H) {
+    viewH = MIN_VIEW_H;
+    scale = vp.h / viewH;
+  } else if (viewH > MAX_VIEW_H) {
+    viewH = MAX_VIEW_H;
+    scale = vp.h / viewH;
+  }
+  cam.scale = scale;
+  cam.viewH = viewH;
+  cam.offsetX = (vp.w - cam.designW * scale) / 2;
+  cam.offsetY = (vp.h - viewH * scale) / 2;
 }
 
 /**
@@ -138,18 +171,18 @@ export function toScreenX(cam: Camera, wx: number): number {
 }
 
 export function toScreenY(cam: Camera, wy: number): number {
-  return cam.offsetY + (wy - cam.centerY) * cam.scale + (cam.designH * cam.scale) / 2;
+  return cam.offsetY + (wy - cam.centerY) * cam.scale + (cam.viewH * cam.scale) / 2;
 }
 
 /** World y at the top and bottom edges of the design window — for culling. */
 export function visibleWorldY(cam: Camera): { top: number; bottom: number } {
-  const half = cam.designH / 2;
+  const half = cam.viewH / 2;
   return { top: cam.centerY - half, bottom: cam.centerY + half };
 }
 
 /** Clip to the design window, so nothing can spill onto the letterbox bars. */
 export function clipToWindow(ctx: CanvasRenderingContext2D, cam: Camera): void {
   ctx.beginPath();
-  ctx.rect(cam.offsetX, cam.offsetY, cam.designW * cam.scale, cam.designH * cam.scale);
+  ctx.rect(cam.offsetX, cam.offsetY, cam.designW * cam.scale, cam.viewH * cam.scale);
   ctx.clip();
 }

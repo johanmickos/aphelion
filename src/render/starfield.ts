@@ -42,7 +42,7 @@ export class Starfield {
   draw(ctx: CanvasRenderingContext2D, cam: Camera, cfg: RenderConfig): void {
     const { starParallaxMin: lo, starParallaxMax: hi, starParallaxHorizFrac: hf } = cfg;
     const w = cam.designW * cam.scale;
-    const h = cam.designH * cam.scale;
+    const h = cam.viewH * cam.scale;
 
     for (let t = 0; t < TIERS.length; t++) {
       const tier = TIERS[t]!;

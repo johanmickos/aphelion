@@ -75,7 +75,7 @@ addEventListener('visibilitychange', () => {
   if (wasPaused && !paused) loop.resetClock();
 });
 
-let prev = captureSnapshot(state, held);
+let prev = captureSnapshot(state, held, sim);
 let curr = prev;
 
 function resize(): void {
@@ -105,7 +105,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     stepSim(state, sim, input, dt);
 
     prev = curr;
-    curr = captureSnapshot(state, held);
+    curr = captureSnapshot(state, held, sim);
 
     // Any respawn teleports the ship — after a crash, or out of bounds, which
     // sets no crash flag at all. Detecting the jump covers both, and any future

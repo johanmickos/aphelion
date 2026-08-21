@@ -15,6 +15,8 @@ import { BodyRenderer, drawHazardZones } from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
+import { drawFuelGauge, drawReadout, readoutLines } from './hud.ts';
+import { canAffordCircularise } from './capture.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
 export interface SceneDeps {
@@ -73,6 +75,11 @@ export class Scene {
     drawShip(ctx, cam, snap);
 
     drawEndingNotice(ctx, cam, sim, snap);
+
+    // HUD sits inside the clip too: it is laid out in design space, so it must
+    // never be drawn over a letterbox bar.
+    drawFuelGauge(ctx, cam, sim, snap, opts.timeMs);
+    drawReadout(ctx, cam, readoutLines(sim, snap, canAffordCircularise(sim, snap)), opts.timeMs);
 
     ctx.restore();
 

@@ -5,6 +5,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_VIEW_H,
+  MIN_VIEW_H,
   cameraTarget,
   centerCamera,
   createCamera,
@@ -13,58 +15,86 @@ import {
   toScreenY,
 } from '../src/render/camera.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
-import { DESIGN_H, createBodies, fieldBounds } from '../src/sim/world.ts';
+import { SPAWN, createBodies, fieldBounds } from '../src/sim/world.ts';
 import { DEFAULT_CONFIG } from '../src/sim/config.ts';
 
 const rcfg = DEFAULT_RENDER_CONFIG;
 const field = fieldBounds(DEFAULT_CONFIG, createBodies());
 
-const VIEWPORTS = [
-  { name: 'iPhone portrait', w: 390, h: 844 },
-  { name: 'tall narrow', w: 360, h: 900 },
-  { name: 'Pro Max', w: 430, h: 932 },
-  { name: 'tablet', w: 768, h: 1024 },
-  { name: 'square', w: 600, h: 600 },
-];
+describe('fitting the viewport', () => {
+  const PHONES = [
+    { name: 'iPhone 15, Firefox chrome', w: 393, h: 651 },
+    { name: 'iPhone 15, Safari', w: 393, h: 852 },
+    { name: 'iPhone Pro Max', w: 430, h: 932 },
+    { name: 'small phone', w: 360, h: 640 },
+    { name: 'tall narrow', w: 360, h: 900 },
+  ];
 
-describe('letterboxing', () => {
-  it.each(VIEWPORTS)('$name: the whole design window fits on screen', (vp) => {
+  it.each(PHONES)('$name: fills the width exactly, with no bars at all', (vp) => {
     const cam = createCamera(rcfg);
     fitCamera(cam, { w: vp.w, h: vp.h, dpr: 1 });
-    const drawnW = cam.designW * cam.scale;
-    const drawnH = cam.designH * cam.scale;
-    expect(drawnW).toBeLessThanOrEqual(vp.w + 1e-9);
-    expect(drawnH).toBeLessThanOrEqual(vp.h + 1e-9);
-    expect(Math.abs(drawnW - vp.w) < 1e-9 || Math.abs(drawnH - vp.h) < 1e-9).toBe(true);
+    expect(cam.offsetX, 'horizontal bars on a portrait phone').toBeCloseTo(0, 6);
+    expect(cam.offsetY, 'vertical bars on a portrait phone').toBeCloseTo(0, 6);
+    expect(cam.designW * cam.scale).toBeCloseTo(vp.w, 6);
+    expect(cam.viewH * cam.scale).toBeCloseTo(vp.h, 6);
   });
 
-  it.each(VIEWPORTS)('$name: the design window is centred', (vp) => {
+  it.each(PHONES)('$name: horizontal framing is identical everywhere', (vp) => {
     const cam = createCamera(rcfg);
     fitCamera(cam, { w: vp.w, h: vp.h, dpr: 1 });
-    expect(cam.offsetX * 2 + cam.designW * cam.scale).toBeCloseTo(vp.w, 9);
-    expect(cam.offsetY * 2 + cam.designH * cam.scale).toBeCloseTo(vp.h, 9);
+    // The world width spanned by the screen is the same on every device — this is
+    // the property that matters for a vertical climb, and it is why width is
+    // fixed and height flexes rather than the other way round.
+    expect(cam.designW).toBe(rcfg.designW);
+    expect(vp.w / cam.scale).toBeCloseTo(rcfg.designW, 6);
   });
 
-  it('phones get no letterbox waste at the 390 design width', () => {
+  it.each(PHONES)('$name: how much world you see ahead stays sane', (vp) => {
+    const cam = createCamera(rcfg);
+    fitCamera(cam, { w: vp.w, h: vp.h, dpr: 1 });
+    expect(cam.viewH).toBeGreaterThanOrEqual(MIN_VIEW_H - 1e-6);
+    expect(cam.viewH).toBeLessThanOrEqual(MAX_VIEW_H + 1e-6);
+  });
+
+  it('clamps rather than zooming in blindly on a wide screen', () => {
+    // A tablet would otherwise scale to ~2x and show barely any world ahead.
+    const cam = createCamera(rcfg);
+    fitCamera(cam, { w: 768, h: 1024, dpr: 1 });
+    expect(cam.viewH).toBeCloseTo(MIN_VIEW_H, 6);
+    expect(cam.offsetX).toBeGreaterThan(0); // bars, deliberately
+    expect(cam.offsetX * 2 + cam.designW * cam.scale).toBeCloseTo(768, 6);
+  });
+
+  it('keeps the window centred whenever bars do appear', () => {
     for (const vp of [
-      { w: 390, h: 844 },
-      { w: 430, h: 932 },
+      { w: 768, h: 1024 },
+      { w: 844, h: 390 },
     ]) {
       const cam = createCamera(rcfg);
       fitCamera(cam, { ...vp, dpr: 1 });
-      const bars = vp.h - cam.designH * cam.scale;
-      expect(bars).toBeLessThan(2);
+      expect(cam.offsetX * 2 + cam.designW * cam.scale).toBeCloseTo(vp.w, 6);
+      expect(cam.offsetY * 2 + cam.viewH * cam.scale).toBeCloseTo(vp.h, 6);
     }
   });
 
-  it('shows the same amount of world regardless of viewport', () => {
-    for (const vp of VIEWPORTS) {
+  it('never draws outside the viewport', () => {
+    for (const vp of [
+      ...PHONES,
+      { name: 'tablet', w: 768, h: 1024 },
+      { name: 'landscape', w: 844, h: 390 },
+    ]) {
       const cam = createCamera(rcfg);
       fitCamera(cam, { w: vp.w, h: vp.h, dpr: 1 });
-      const top = toScreenY(cam, cam.centerY - DESIGN_H / 2);
-      const bottom = toScreenY(cam, cam.centerY + DESIGN_H / 2);
-      expect((bottom - top) / cam.scale).toBeCloseTo(DESIGN_H, 9);
+      expect(cam.designW * cam.scale).toBeLessThanOrEqual(vp.w + 1e-6);
+      expect(cam.viewH * cam.scale).toBeLessThanOrEqual(vp.h + 1e-6);
     }
+  });
+
+  it('places the camera centre at the middle of the window', () => {
+    const cam = createCamera(rcfg);
+    fitCamera(cam, { w: 393, h: 651, dpr: 1 });
+    cam.centerY = -1000;
+    expect(toScreenY(cam, -1000)).toBeCloseTo(cam.offsetY + (cam.viewH * cam.scale) / 2, 9);
   });
 });
 
@@ -218,5 +248,43 @@ describe('deadzone (no wobble)', () => {
     ]) {
       expect(cameraTarget(cam, rcfg, x, 0, field).left).toBe(before);
     }
+  });
+});
+
+describe('opening frame', () => {
+  /**
+   * The run used to open on a red boundary stripe. The ship spawns 90px left of
+   * the field's centre, so a 1.45-wide field left the camera clamped hard against
+   * that edge — the boundary landed at exactly screen x = 0, a 2.25px shortfall.
+   *
+   * Spawning at the field centre instead is not the fix: the centre is x=195 and
+   * P1 sits at x=189 with R=46, which is a collision course drifting straight up.
+   */
+  it('shows neither field boundary when the run starts', () => {
+    const cam = createCamera(rcfg);
+    fitCamera(cam, { w: 393, h: 651, dpr: 1 });
+    centerCamera(cam, SPAWN.x, SPAWN.y, field);
+
+    const winL = cam.offsetX;
+    const winR = cam.offsetX + cam.designW * cam.scale;
+    const leftEdge = toScreenX(cam, field.left);
+    const rightEdge = toScreenX(cam, field.right);
+
+    expect(leftEdge, 'left boundary is on screen at spawn').toBeLessThan(winL);
+    expect(rightEdge, 'right boundary is on screen at spawn').toBeGreaterThan(winR);
+  });
+
+  it('keeps the hazard gradient off screen too, not just the line', () => {
+    const cam = createCamera(rcfg);
+    fitCamera(cam, { w: 393, h: 651, dpr: 1 });
+    centerCamera(cam, SPAWN.x, SPAWN.y, field);
+    // the gradient builds inward from the edge, so its inner lip is what matters
+    const innerLip = toScreenX(cam, field.left + rcfg.hazardZoneWidth);
+    expect(innerLip).toBeLessThan(cam.offsetX);
+  });
+
+  it('the ship does not start on a collision course with P1', () => {
+    const p1 = createBodies()[0]!;
+    expect(Math.abs(SPAWN.x - p1.x)).toBeGreaterThan(p1.R + DEFAULT_CONFIG.minOrbitGap);
   });
 });

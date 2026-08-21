@@ -3,9 +3,13 @@
  * per frame. Keeping this narrow is what stops rendering from reaching into sim
  * internals and re-deriving things the sim already computed.
  */
-import type { CapturePhase, EndingReason, SimState } from '../sim/types.ts';
+import type { CapturePhase, EndingReason, GrabResult, SimState } from '../sim/types.ts';
+import type { SimConfig } from '../sim/config.ts';
+import { escapeSpeed, hypot } from '../sim/orbit.ts';
 
 export interface RenderSnapshot {
+  /** Simulation tick, so the HUD can age transient messages without a wall clock. */
+  tick: number;
   x: number;
   y: number;
   vx: number;
@@ -24,16 +28,34 @@ export interface RenderSnapshot {
     boostFull: number;
     /** Seconds since the orbit froze — tells rising from falling. */
     boostT: number;
+    /**
+     * How far above the capture threshold this grab still is, as a fraction:
+     * 0 means bound (about to convert), 0.3 means 30% too fast.
+     *
+     * Braking a flyby sheds this toward zero. Showing it turns "TOO FAST" from
+     * an alarm into a progress readout, which matters because most flybys
+     * convert in a fraction of a second for a fraction of the tank.
+     */
+    overEscape: number;
   } | null;
   fuel: number;
   held: boolean;
+  /** The most recent grab attempt and its outcome, for the readout. */
+  lastGrab: { tick: number; result: GrabResult } | null;
   ending: { active: boolean; t: number; x: number; y: number; reason: EndingReason };
 }
 
-export function captureSnapshot(state: SimState, held: boolean): RenderSnapshot {
+export function captureSnapshot(state: SimState, held: boolean, cfg: SimConfig): RenderSnapshot {
   const cap = state.capture;
   const b = cap ? state.bodies[cap.planet]! : null;
+  let overEscape = 0;
+  if (cap) {
+    const r = hypot(cap.rx, cap.ry);
+    const threshold = escapeSpeed(cfg, r) * 0.98;
+    overEscape = threshold > 0 ? hypot(cap.vx, cap.vy) / threshold - 1 : 0;
+  }
   return {
+    tick: state.tick,
     x: b && cap ? b.x + cap.rx : state.ship.x,
     y: b && cap ? b.y + cap.ry : state.ship.y,
     vx: cap ? cap.vx : state.ship.vx,
@@ -49,10 +71,12 @@ export function captureSnapshot(state: SimState, held: boolean): RenderSnapshot 
           boost: cap.boost,
           boostFull: cap.boostFull,
           boostT: cap.boostT,
+          overEscape,
         }
       : null,
     fuel: state.fuel,
     held,
+    lastGrab: state.telemetry.lastGrab ? { ...state.telemetry.lastGrab } : null,
     ending: { ...state.ending },
   };
 }

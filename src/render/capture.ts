@@ -74,19 +74,18 @@ export function drawAnchorLine(
   ctx.beginPath();
   ctx.moveTo(toScreenX(cam, rimX), toScreenY(cam, rimY));
   ctx.lineTo(toScreenX(cam, snap.x), toScreenY(cam, snap.y));
+  // Solid in every state. Dashing read as a weaker or intermittent connection,
+  // when in fact the pull is continuous — colour alone carries the meaning:
+  // amber while braking a flyby, red when the tank cannot finish the job.
   if (cap.phase === 'flyby') {
-    ctx.strokeStyle = 'rgba(255,176,32,.55)';
-    ctx.setLineDash([4 * cam.scale, 4 * cam.scale]);
+    ctx.strokeStyle = 'rgba(255,176,32,.7)';
   } else if (!canAffordCircularise(sim, snap)) {
-    ctx.strokeStyle = 'rgba(255,90,110,.5)';
-    ctx.setLineDash([2 * cam.scale, 4 * cam.scale]);
+    ctx.strokeStyle = 'rgba(255,90,110,.6)';
   } else {
-    ctx.strokeStyle = 'rgba(150,170,205,.28)';
-    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(150,170,205,.32)';
   }
   ctx.lineWidth = Math.max(1, cam.scale);
   ctx.stroke();
-  ctx.setLineDash([]);
 }
 
 /**

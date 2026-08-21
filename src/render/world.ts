@@ -26,7 +26,7 @@ export function drawHazardZones(
 ): void {
   const zone = cfg.hazardZoneWidth;
   const top = cam.offsetY;
-  const height = cam.designH * cam.scale;
+  const height = cam.viewH * cam.scale;
 
   for (const side of [-1, 1] as const) {
     const edge = side < 0 ? field.left : field.right;
