@@ -1,6 +1,7 @@
 # Ideas
 
 ## Gameplay
+- "No fuel" warning -- flash a brief icon next to ship when runnign out of fuel or tapping w/ no fuel
 - Sharing and replay: imagine a user does a really cool sequence, capturing multiple planets and bouses. They might want to share the ~5s around the moment maybe as a shareable GIF or as a full replay.
 - Rewind: it's easy to mess up and rash, or spend all fuel. I think a rewind mechanism would be useful, where the user could have a separate rewind budget/gauge to go back with if they mess up timing. There might be a point deduction as well.
 - Ship profiles: let the user unlock different ship profiles with different speeds, shields, autopilot, etc.
