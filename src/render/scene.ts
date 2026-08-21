@@ -16,6 +16,8 @@ import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
 import { drawFuelGauge, drawReadout, readoutLines } from './hud.ts';
+import { drawAlignGlow, drawCompass } from './compass.ts';
+import { drawEdgeMarkers } from './edge-markers.ts';
 import { canAffordCircularise } from './capture.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
@@ -71,8 +73,13 @@ export class Scene {
       drawBoostHalo(ctx, cam, sim, render, snap, opts.timeMs);
     }
 
-    this.trail.draw(ctx, cam);
+    const compass = drawCompass(ctx, cam, sim, render, snap, bodies, opts.timeMs);
+
+    this.trail.draw(ctx, cam, snap.x, snap.y);
+    drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
     drawShip(ctx, cam, snap);
+
+    drawEdgeMarkers(ctx, cam, render, snap, bodies);
 
     drawEndingNotice(ctx, cam, sim, snap);
 

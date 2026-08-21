@@ -91,14 +91,14 @@ export class BodyRenderer {
     const y = toScreenY(cam, p.y);
     const r = p.R * cam.scale;
 
-    // minimum-orbit ring
+    // Minimum-orbit ring. Solid: it is a hard limit the simulation clamps to,
+    // not a suggestion, and dashing made it read as advisory. Alpha is pulled
+    // down a little because a solid line at the old opacity reads much heavier.
     ctx.beginPath();
     ctx.arc(x, y, (p.R + sim.minOrbitGap) * cam.scale, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(130,150,185,.30)';
-    ctx.setLineDash([3 * cam.scale, 5 * cam.scale]);
+    ctx.strokeStyle = 'rgba(130,150,185,.24)';
     ctx.lineWidth = Math.max(1, cam.scale);
     ctx.stroke();
-    ctx.setLineDash([]);
 
     // lit sphere; light from the upper left, consistent across the field
     let g = this.cache.get(p.R);

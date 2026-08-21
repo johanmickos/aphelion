@@ -12,12 +12,20 @@
  */
 import type { Body } from './types.ts';
 import type { SimConfig } from './config.ts';
+import { mulberry32 } from './rng.ts';
 
 /** Design viewport the world coordinates were frozen from. */
 export const DESIGN_W = 390;
 export const DESIGN_H = 844;
 
-/** Planet definitions exactly as the prototype declared them. */
+/**
+ * The prototype's hand-authored planets. The field continues procedurally beyond
+ * these; see `generatedDef`.
+ *
+ * `dx` is the offset from the field's centre column and `y` is in screen-heights.
+ * The pattern is deliberate: sides strictly alternate, |dx| runs 6..44, radii run
+ * 34..56, and vertical spacing grows 0.78 -> 0.90 before plateauing.
+ */
 const DEFS: ReadonlyArray<{ dx: number; y: number; R: number }> = [
   { dx: -6, y: 0, R: 46 },
   { dx: 34, y: -0.78, R: 40 },
@@ -29,16 +37,53 @@ const DEFS: ReadonlyArray<{ dx: number; y: number; R: number }> = [
   { dx: 30, y: -5.98, R: 36 },
 ];
 
-/** Build the world's bodies. Deterministic and viewport-independent. */
-export function createBodies(): Body[] {
+/**
+ * Seed for the generated part of the field.
+ *
+ * Fixed, and part of the world's definition rather than a runtime choice: every
+ * player climbs the same field, and a replay must reconstruct it exactly.
+ */
+const WORLD_SEED = 0x5eed_1e55;
+
+/**
+ * Build the world's bodies. Deterministic and viewport-independent.
+ *
+ * Two layouts: the prototype's authored eight, which the equality gate compares
+ * against and which must never change; and the game's own field, generated from
+ * a fixed seed so every player climbs the same route and a replay reconstructs
+ * it exactly.
+ */
+export function createBodies(cfg: SimConfig): Body[] {
   const cx = DESIGN_W * 0.5;
-  return DEFS.map((d, i) => ({
-    kind: 'planet' as const,
-    x: cx + d.dx,
-    y: d.y * DESIGN_H,
-    R: d.R,
-    name: 'P' + (i + 1),
-  }));
+  if (!cfg.proceduralLayout) {
+    return DEFS.slice(0, cfg.bodyCount).map((d, i) => ({
+      kind: 'planet' as const,
+      x: cx + d.dx,
+      y: d.y * DESIGN_H,
+      R: d.R,
+      name: 'P' + (i + 1),
+    }));
+  }
+
+  const rnd = mulberry32(WORLD_SEED);
+  const out: Body[] = [];
+  // The opening body is the authored one: the spawn sits 84px to its left and
+  // that first approach is tuned. Everything above it is generated.
+  const first = DEFS[0]!;
+  let x = cx + first.dx;
+  let y = first.y * DESIGN_H;
+  let R = first.R;
+
+  for (let i = 0; i < cfg.bodyCount; i++) {
+    out.push({ kind: 'planet', x, y, R, name: 'P' + (i + 1) });
+    // Sides alternate so the climb weaves rather than drifting to one wall, and
+    // the gap jitters +/-10% so the rhythm does not become metronomic.
+    const side = i % 2 === 0 ? 1 : -1;
+    x = cx + side * (8 + rnd() * 36); // |dx| 8..44, the authored range
+    y -= cfg.bodySpacing * (0.9 + rnd() * 0.2);
+    R = 34 + rnd() * 22; // 34..56, the authored range
+  }
+  return out;
 }
 
 /** Ship spawn, frozen from the prototype's `resetShip` at the design viewport. */

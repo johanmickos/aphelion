@@ -124,3 +124,82 @@ export function orbitRadius(orbit: Orbit, rPeri: number, ang: number, tightenAmt
 export function smootherstep(u: number): number {
   return u * u * u * (u * (u * 6 - 15) + 10);
 }
+
+/** The two-body orbit a ship is instantaneously on, derived from its state. */
+export interface Osculating {
+  a: number;
+  e: number;
+  argp: number;
+  dir: number;
+  /** Closed orbit. A grab above escape speed is hyperbolic and has no ellipse. */
+  bound: boolean;
+  periapsis: number;
+}
+
+/**
+ * The orbit implied by a position and velocity right now.
+ *
+ * The frozen orbit only exists once the ship reaches periapsis, so until then
+ * there is nothing to draw — which is why the prototype showed no ring for up to
+ * half a revolution of the dive and then produced one already formed. This
+ * derives the ellipse the ship is *currently* on, so the shape can be previewed
+ * from the instant of the grab.
+ *
+ * It is a prediction, not a promise, and should be drawn as one: it uses
+ * unsoftened gravity where the simulation softens it, the clearance impulse has
+ * not been applied yet, and `freezeOrbit` will anchor periapsis at the ship's
+ * actual position with eccentricity capped at 0.6. Close enough to read the
+ * shape and the direction; not close enough to measure.
+ */
+export function osculatingOrbit(
+  cfg: { GM: number },
+  rx: number,
+  ry: number,
+  vx: number,
+  vy: number,
+): Osculating {
+  const r = hypot(rx, ry);
+  const v2 = vx * vx + vy * vy;
+  const L = rx * vy - ry * vx;
+  const dir = Math.sign(L) || 1;
+  const E = 0.5 * v2 - cfg.GM / r;
+
+  // eccentricity vector: points at periapsis, magnitude is the eccentricity
+  const rv = rx * vx + ry * vy;
+  const k = v2 - cfg.GM / r;
+  const ex = (k * rx - rv * vx) / cfg.GM;
+  const ey = (k * ry - rv * vy) / cfg.GM;
+  const e = hypot(ex, ey);
+
+  return {
+    a: E < 0 ? -cfg.GM / (2 * E) : Infinity,
+    e,
+    argp: Math.atan2(ey, ex),
+    dir,
+    bound: E < 0,
+    periapsis: (L * L) / cfg.GM / (1 + e),
+  };
+}
+
+/**
+ * The orbit a grab will actually follow, including the clearance correction.
+ *
+ * The raw osculating orbit is not what to show a player: on a steep grab it dips
+ * far inside the planet, because the simulation has not yet applied the impulse
+ * that lifts periapsis clear of the surface. Applying the same correction first
+ * gives the curve the ship will really fly.
+ */
+export function predictedCaptureOrbit(
+  cfg: SimConfig,
+  rx: number,
+  ry: number,
+  vx: number,
+  vy: number,
+  minR: number,
+): Osculating {
+  if (naturalPeriapsis(cfg, rx, ry, vx, vy) < minR) {
+    const dv = clearanceDv(cfg, rx, ry, vx, vy, minR);
+    return osculatingOrbit(cfg, rx, ry, vx + dv.dvx, vy + dv.dvy);
+  }
+  return osculatingOrbit(cfg, rx, ry, vx, vy);
+}

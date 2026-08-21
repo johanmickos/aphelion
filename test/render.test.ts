@@ -5,26 +5,60 @@
 import { describe, expect, it } from 'vitest';
 import { recordingContext } from './canvas-stub.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
-import { createCamera, fitCamera, snapCamera, toScreenX } from '../src/render/camera.ts';
+import { createCamera, fitCamera, snapCamera, toScreenX, toScreenY } from '../src/render/camera.ts';
 import { Starfield } from '../src/render/starfield.ts';
 import { drawHazardZones } from '../src/render/world.ts';
 import { boostColor, drawBoostHalo } from '../src/render/capture.ts';
 import { drawFuelGauge, readoutLines } from '../src/render/hud.ts';
+import {
+  compassTargets,
+  drawCompass,
+  pathBlocked,
+  releaseAngleFor,
+} from '../src/render/compass.ts';
+import { orbitRadius } from '../src/sim/orbit.ts';
 import { Trail } from '../src/render/ship.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import { createBodies, fieldBounds } from '../src/sim/world.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { Scene } from '../src/render/scene.ts';
 import { captureSnapshot } from '../src/render/snapshot.ts';
+import type { RenderSnapshot } from '../src/render/snapshot.ts';
 
 const rcfg = DEFAULT_RENDER_CONFIG;
-const field = fieldBounds(DEFAULT_CONFIG, createBodies());
+const field = fieldBounds(DEFAULT_CONFIG, createBodies(DEFAULT_CONFIG));
 
 function cam() {
   const c = createCamera(rcfg);
   fitCamera(c, { w: 390, h: 844, dpr: 1 });
   snapCamera(c, rcfg, 195, 0, field);
   return c;
+}
+
+/**
+ * A capture snapshot with sensible defaults, so a test can name only the fields
+ * it cares about. Added after the third round of every literal needing updating
+ * whenever RenderSnapshot grew a field.
+ */
+function captureOf(over: Partial<NonNullable<RenderSnapshot['capture']>> = {}) {
+  return {
+    phase: 'settle' as const,
+    planet: 0,
+    settleProgress: 1,
+    settleT: 1.2,
+    orbit: null,
+    rPeri: 100,
+    boost: 0,
+    boostFull: 0,
+    boostT: 0,
+    overEscape: 0,
+    rx: 0,
+    ry: -100,
+    vx: 200,
+    vy: 0,
+    minR: 58,
+    ...over,
+  };
 }
 
 describe('starfield', () => {
@@ -104,20 +138,20 @@ describe('trail', () => {
 
     for (const p of path) {
       slow.sample(p.x, p.y);
-      slow.draw(sink.ctx, c); // 1 render per tick
+      slow.draw(sink.ctx, c, 1e6, 1e6); // 1 render per tick
     }
     for (const p of path) {
       fast.sample(p.x, p.y);
-      fast.draw(sink.ctx, c); // 4 renders per tick
-      fast.draw(sink.ctx, c);
-      fast.draw(sink.ctx, c);
-      fast.draw(sink.ctx, c);
+      fast.draw(sink.ctx, c, 1e6, 1e6); // 4 renders per tick
+      fast.draw(sink.ctx, c, 1e6, 1e6);
+      fast.draw(sink.ctx, c, 1e6, 1e6);
+      fast.draw(sink.ctx, c, 1e6, 1e6);
     }
 
     const a = recordingContext();
     const b = recordingContext();
-    slow.draw(a.ctx, c);
-    fast.draw(b.ctx, c);
+    slow.draw(a.ctx, c, 1e6, 1e6);
+    fast.draw(b.ctx, c, 1e6, 1e6);
     expect(a.calls('arc')).toEqual(b.calls('arc'));
   });
 
@@ -125,7 +159,7 @@ describe('trail', () => {
     const t = new Trail(rcfg);
     for (let i = 0; i < 500; i++) t.sample(i * 0.5, 0); // finer than trailSpacing
     const r = recordingContext();
-    t.draw(r.ctx, cam());
+    t.draw(r.ctx, cam(), 1e6, 1e6);
     const arcs = r.calls('arc') as Array<[string, number, number]>;
     expect(arcs.length).toBeLessThanOrEqual(rcfg.trailMax);
     for (let i = 1; i < arcs.length; i++) {
@@ -135,13 +169,38 @@ describe('trail', () => {
     }
   });
 
+  it('keeps the wake clear of the ship sprite', () => {
+    // The head circle used to poke through the ship's tail notch at speed: the
+    // newest sample sits 3-10px back and grows to ~4.8px across, against a
+    // silhouette only 6px deep.
+    const t = new Trail(rcfg);
+    for (let i = 0; i < 40; i++) t.sample(i * 4, 0, 400);
+    const shipX = 39 * 4; // where the ship is now: right on top of the newest point
+    const r = recordingContext();
+    const c = cam();
+    t.draw(r.ctx, c, shipX, 0);
+
+    const arcs = r.calls('arc') as Array<[string, number, number, number]>;
+    expect(arcs.length).toBeGreaterThan(0);
+    for (const [, x, y, radius] of arcs) {
+      const wx = (x - c.offsetX) / c.scale + c.left;
+      const wy = (y - c.offsetY - (c.viewH * c.scale) / 2) / c.scale + c.centerY;
+      const d = Math.hypot(wx - shipX, wy - 0);
+      expect(d, 'a wake dot was drawn inside the head gap').toBeGreaterThanOrEqual(
+        rcfg.trailHeadGap - 1e-6,
+      );
+      // and its nearest edge clears the ship's 6px tail
+      expect(d - radius / c.scale).toBeGreaterThan(6);
+    }
+  });
+
   it('draw does not mutate the trail', () => {
     const t = new Trail(rcfg);
     for (let i = 0; i < 40; i++) t.sample(i * 10, 0);
     const a = recordingContext();
     const b = recordingContext();
-    t.draw(a.ctx, cam());
-    t.draw(b.ctx, cam());
+    t.draw(a.ctx, cam(), 1e6, 1e6);
+    t.draw(b.ctx, cam(), 1e6, 1e6);
     expect(a.ops).toEqual(b.ops);
   });
 });
@@ -277,18 +336,7 @@ describe('boost halo', () => {
         rcfg,
         {
           ...captureSnapshot(createInitialState(sim), true, sim),
-          capture: {
-            phase: 'settle',
-            planet: 0,
-            settleProgress: 1,
-            settleT: 1.2,
-            orbit: null,
-            rPeri: 100,
-            boost: charge * 90,
-            boostFull: 90,
-            boostT,
-            overEscape: 0,
-          },
+          capture: captureOf({ boost: charge * 90, boostFull: 90, boostT }),
         },
         boostT * 1000,
       );
@@ -350,18 +398,13 @@ describe('HUD', () => {
       readoutLines(
         sim,
         snapWith({
-          capture: {
-            phase: 'settle',
-            planet: 0,
+          capture: captureOf({
             settleProgress: 0.5,
             settleT: 0.6,
-            orbit: null,
-            rPeri: 100,
             boost: 50,
             boostFull: 90,
             boostT,
-            overEscape: 0,
-          },
+          }),
         }),
         true,
       ).map((l) => l.text);
@@ -374,18 +417,16 @@ describe('HUD', () => {
   it('warns before a capture runs dry rather than after', () => {
     const poor = snapWith({
       fuel: 4,
-      capture: {
+      capture: captureOf({
         phase: 'settle',
-        planet: 0,
         settleProgress: 0.1,
         settleT: 0.1,
-        orbit: null,
         rPeri: 100,
         boost: 0,
         boostFull: 0,
         boostT: 0,
         overEscape: 0,
-      },
+      }),
     });
     const texts = readoutLines(sim, poor, false).map((l) => l.text);
     expect(texts.some((t) => t.includes('will not round out'))).toBe(true);
@@ -400,18 +441,7 @@ describe('HUD', () => {
   function flybyAt(overEscape: number, fuel = 99) {
     return snapWith({
       fuel,
-      capture: {
-        phase: 'flyby',
-        planet: 0,
-        settleProgress: 0,
-        settleT: 0,
-        orbit: null,
-        rPeri: 0,
-        boost: 0,
-        boostFull: 0,
-        boostT: 0,
-        overEscape,
-      },
+      capture: captureOf({ phase: 'flyby', settleProgress: 0, settleT: 0, rPeri: 0, overEscape }),
     });
   }
 
@@ -451,5 +481,209 @@ describe('HUD', () => {
       expect(x + w).toBeLessThanOrEqual(winR + 1e-6);
     }
     expect((r.calls('fillText') as Array<[string, string]>).some((o) => o[1] === '42')).toBe(true);
+  });
+});
+
+describe('release compass', () => {
+  const anchor = createBodies(DEFAULT_CONFIG)[0]!;
+  const orbit = { a: 90, e: 0.15, argp: 0.4, dir: 1 };
+
+  /** Where the ship ends up if it releases at `angle` and drifts straight. */
+  function releaseRay(angle: number, tighten: number) {
+    const rr = orbitRadius(orbit, 80, angle, tighten);
+    return {
+      x: anchor.x + Math.cos(angle) * rr,
+      y: anchor.y + Math.sin(angle) * rr,
+      hx: -Math.sin(angle) * orbit.dir,
+      hy: Math.cos(angle) * orbit.dir,
+    };
+  }
+
+  it('finds an angle whose tangent actually points at the target', () => {
+    for (const target of [
+      { x: 400, y: -600 },
+      { x: -200, y: -900 },
+      { x: 189, y: -1350 },
+      { x: 500, y: 200 },
+    ]) {
+      const { angle, error } = releaseAngleFor(orbit, 80, 0.5, anchor, target);
+      expect(error, 'no aiming solution found').toBeLessThan(0.01);
+
+      // verify independently: the release ray must pass close to the target
+      const r = releaseRay(angle, 0.5);
+      const dx = target.x - r.x;
+      const dy = target.y - r.y;
+      const len = Math.hypot(dx, dy);
+      const cross = Math.abs(r.hx * dy - r.hy * dx); // perpendicular miss distance
+      expect(cross / len, 'release ray does not aim at the target').toBeLessThan(0.02);
+    }
+  });
+
+  it('matches a brute-force search at a fraction of the cost', () => {
+    const target = { x: 420, y: -700 };
+    let calls = 0;
+    const counted = new Proxy(anchor, { get: (t, k) => (calls++, (t as never)[k]) });
+    releaseAngleFor(orbit, 80, 0.5, counted as typeof anchor, target);
+    const cheap = calls;
+
+    calls = 0;
+    releaseAngleFor(orbit, 80, 0.5, counted as typeof anchor, target, 180, 0);
+    const brute = calls;
+
+    expect(cheap).toBeLessThan(brute);
+    // and the cheap one is MORE accurate, because it refines rather than sampling
+    const a = releaseAngleFor(orbit, 80, 0.5, anchor, target);
+    const b = releaseAngleFor(orbit, 80, 0.5, anchor, target, 180, 0);
+    expect(a.error).toBeLessThan(b.error);
+  });
+
+  it('knows when another body is in the way', () => {
+    const bodies = createBodies(DEFAULT_CONFIG);
+    const from = { x: bodies[0]!.x, y: bodies[0]!.y - 200 };
+    // straight through the middle of a body sitting between us and the target
+    const blocker = bodies[1]!;
+    const beyond = {
+      ...blocker,
+      x: blocker.x + (blocker.x - from.x),
+      y: blocker.y + (blocker.y - from.y),
+    };
+    expect(pathBlocked(from, beyond, [...bodies, beyond], [bodies[0]!])).toBe(true);
+    // and a clear line is not reported as blocked
+    expect(pathBlocked({ x: -400, y: 0 }, bodies[0]!, bodies, [])).toBe(false);
+  });
+
+  it('offers the nearest bodies first, and never the anchor', () => {
+    const bodies = createBodies(DEFAULT_CONFIG);
+    const targets = compassTargets(bodies, 0, 1e9, 3);
+    expect(targets).toHaveLength(3);
+    expect(targets.map((t) => t.index)).not.toContain(0);
+    for (let i = 1; i < targets.length; i++) {
+      expect(targets[i]!.distance).toBeGreaterThanOrEqual(targets[i - 1]!.distance);
+    }
+  });
+
+  it('draws nothing before the orbit exists', () => {
+    const c = cam();
+    const r = recordingContext();
+    const bodies = createBodies(DEFAULT_CONFIG);
+    const diving = {
+      ...captureSnapshot(createInitialState(DEFAULT_CONFIG), true, DEFAULT_CONFIG),
+      capture: captureOf({ phase: 'clear', orbit: null }),
+    };
+    const res = drawCompass(r.ctx, c, DEFAULT_CONFIG, rcfg, diving, bodies, 0);
+    expect(res.bestAlign).toBe(0);
+    expect(r.ops).toHaveLength(0);
+  });
+});
+
+describe('compass targets point up the climb', () => {
+  const bodies = createBodies(DEFAULT_CONFIG);
+
+  it('never offers a body at or below the anchor', () => {
+    for (let i = 0; i < bodies.length; i++) {
+      const anchor = bodies[i]!;
+      for (const t of compassTargets(bodies, i, 1e9, 8)) {
+        expect(t.body.y, `${t.body.name} is not above ${anchor.name}`).toBeLessThan(anchor.y);
+      }
+    }
+  });
+
+  it('always points at the next step of the climb', () => {
+    const counts = bodies.map((_, i) => compassTargets(bodies, i, rcfg.compassRange, 3).length);
+    // the top body has nothing above it; everywhere else has somewhere to go
+    expect(counts[counts.length - 1]).toBe(0);
+    expect(
+      counts.slice(0, -1).every((n) => n >= 1),
+      'a body with nowhere to aim',
+    ).toBe(true);
+  });
+
+  it('keeps the gauge to the near field rather than signposting a long coast', () => {
+    // The range shows the next step of the climb, not a target several hops away
+    // that would be a featureless drift to reach.
+    for (let i = 0; i < bodies.length; i++) {
+      for (const t of compassTargets(bodies, i, rcfg.compassRange, 3)) {
+        expect(t.distance).toBeLessThanOrEqual(rcfg.compassRange);
+      }
+    }
+  });
+
+  it('drops anything beyond the range', () => {
+    for (let i = 0; i < bodies.length; i++) {
+      for (const t of compassTargets(bodies, i, rcfg.compassRange, 8)) {
+        expect(t.distance).toBeLessThanOrEqual(rcfg.compassRange);
+      }
+    }
+  });
+
+  it('shows nothing at the top of the field rather than pointing back down', () => {
+    const topIndex = bodies.reduce((best, b, i) => (b.y < bodies[best]!.y ? i : best), 0);
+    expect(compassTargets(bodies, topIndex, 1e9, 3)).toEqual([]);
+  });
+});
+
+describe('compass rings encode distance', () => {
+  const bodies = createBodies(DEFAULT_CONFIG);
+
+  /** Radii of the arcs drawn centred on the anchor, in world units. */
+  function ringRadii(anchorIndex: number) {
+    const sim = DEFAULT_CONFIG;
+    const state = createInitialState(sim);
+    const c = cam();
+    const anchor = bodies[anchorIndex]!;
+    // sit the ship in a settled circular orbit around the anchor
+    const snap = {
+      ...captureSnapshot(state, true, sim),
+      x: anchor.x,
+      y: anchor.y - 80,
+      capture: captureOf({
+        phase: 'orbit',
+        orbit: { a: 80, e: 0, argp: 0, dir: 1 },
+        rPeri: 80,
+        planet: anchorIndex,
+      }),
+    };
+    const r = recordingContext();
+    drawCompass(r.ctx, c, sim, rcfg, snap, bodies, 0);
+    const cxs = toScreenX(c, anchor.x);
+    const cys = toScreenY(c, anchor.y);
+    // full circles only: [x, y, radius, 0, TAU]
+    return (r.calls('arc') as Array<[string, number, number, number, number, number]>)
+      .filter((o) => Math.abs(o[1] - cxs) < 1e-6 && Math.abs(o[2] - cys) < 1e-6 && o[5] > 6)
+      .map((o) => o[3] / c.scale);
+  }
+
+  it('gives each target its own ring, wider for the further body', () => {
+    const radii = [...new Set(ringRadii(0).map((r) => +r.toFixed(4)))].sort((a, b) => a - b);
+    const targets = compassTargets(bodies, 0, rcfg.compassRange, rcfg.compassMaxTargets);
+    expect(targets.length).toBeGreaterThan(1);
+    expect(radii.length, 'one ring per target').toBe(targets.length);
+    // rings are strictly increasing, and in the same order as target distance
+    for (let i = 1; i < radii.length; i++) expect(radii[i]!).toBeGreaterThan(radii[i - 1]!);
+  });
+
+  it('never signposts more than the configured maximum', () => {
+    // even with the whole field in range
+    for (let i = 0; i < bodies.length; i++) {
+      expect(compassTargets(bodies, i, 1e9, rcfg.compassMaxTargets).length).toBeLessThanOrEqual(
+        rcfg.compassMaxTargets,
+      );
+    }
+  });
+
+  it('scales ring size with distance rather than merely with rank', () => {
+    const sim = DEFAULT_CONFIG;
+    const near = compassTargets(bodies, 0, rcfg.compassRange, 3);
+    const radii = [...new Set(ringRadii(0).map((r) => +r.toFixed(4)))].sort((a, b) => a - b);
+    // the gap between rings should track the gap between target distances
+    const distRatio = near[1]!.distance / near[0]!.distance;
+    const inner = rcfg.compassRingInner;
+    const spread = rcfg.compassRingSpread;
+    const expected0 = inner + (near[0]!.distance / rcfg.compassRange) * spread;
+    const expected1 = inner + (near[1]!.distance / rcfg.compassRange) * spread;
+    // 3 decimals: ringRadii() rounds to 4 when de-duplicating
+    expect(radii[1]! - radii[0]!).toBeCloseTo(expected1 - expected0, 3);
+    expect(distRatio).toBeGreaterThan(1);
+    void sim;
   });
 });

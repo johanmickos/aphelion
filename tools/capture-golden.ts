@@ -62,7 +62,7 @@ if (!check) {
     failures++;
   }
   for (const [key, value] of Object.entries(PROTOTYPE_CONFIG)) {
-    const was = (golden.config as Record<string, number>)[key];
+    const was = (golden.config as unknown as Record<string, number | boolean>)[key];
     if (was !== value) {
       console.error(`config drift: ${key} golden=${was} current=${value}`);
       failures++;

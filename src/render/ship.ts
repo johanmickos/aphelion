@@ -37,11 +37,17 @@ export class Trail {
     }
   }
 
-  draw(ctx: CanvasRenderingContext2D, cam: Camera): void {
+  draw(ctx: CanvasRenderingContext2D, cam: Camera, shipX: number, shipY: number): void {
     const n = this.pts.length;
-    const { trailSpeedCalm: calm, trailSpeedHot: hot } = this.cfg;
+    const { trailSpeedCalm: calm, trailSpeedHot: hot, trailHeadGap: gap } = this.cfg;
+    const gap2 = gap * gap;
     for (let i = 0; i < n; i++) {
       const p = this.pts[i]!;
+      // Keep the wake clear of the ship. Distance-based rather than "skip the
+      // newest point", because how far back that point sits varies with speed.
+      const dx = p.x - shipX;
+      const dy = p.y - shipY;
+      if (dx * dx + dy * dy < gap2) continue;
       const f = i / (n - 1 || 1); // 0 at the tail, 1 at the head
       // Each point keeps the speed it was laid down at, so a boosted exit leaves
       // a visibly hot streak that cools as the ship settles — the wake records

@@ -26,7 +26,7 @@ export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
     tick: 0,
     ship: { x: 0, y: 0, vx: 0, vy: 0, alive: true, burstX: 0, burstY: 0, burstT: 0 },
     capture: null,
-    bodies: createBodies(),
+    bodies: createBodies(cfg),
     fuel: cfg.fuelMax,
     ending: { active: false, t: 0, x: 0, y: 0, reason: 'impact' },
     holdConsumed: false,

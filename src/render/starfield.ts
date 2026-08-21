@@ -11,7 +11,7 @@
  */
 import type { Camera } from './camera.ts';
 import type { RenderConfig } from './config.ts';
-import { mulberry32 } from './rng.ts';
+import { mulberry32 } from '../sim/rng.ts';
 
 interface Star {
   x: number;

@@ -77,6 +77,12 @@
         border-color: #ffcd32;
         color: #ffe27a;
       }
+      /* Warned state: a second tap will discard flagged moments that were never
+         sent, so it says so rather than silently throwing them away. */
+      #reset.armed {
+        border-color: #ff5566;
+        color: #ff9aa8;
+      }
 
       #diag {
         position: absolute;
@@ -158,6 +164,7 @@
   <body>
     <canvas id="c"></canvas>
     <div id="controls">
+      <button class="ctl" id="reset">RESET</button>
       <button class="ctl" id="diagBtn">DIAG</button>
       <button class="ctl" id="flag">⚑</button>
     </div>
@@ -174,12 +181,11 @@
       <div id="diagRow">
         <button class="ctl" id="diagSend">SEND</button>
         <button class="ctl" id="diagCopy">COPY</button>
-        <button class="ctl" id="diagReload">RELOAD</button>
         <button class="ctl" id="diagClose">CLOSE</button>
       </div>
     </div>
 
-    <div id="note">STAGE 1 — compass · edge markers · lifecycle pending</div>
+    <div id="note">STAGE 1 — run lifecycle · TUNE pending</div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

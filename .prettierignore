@@ -1,8 +1,9 @@
 index.html
 
-# author-owned handoff material: not ours to restyle
-docs/DESIGN.md
-docs/VISION.md
+# Author-owned material: not ours to restyle. Anything under docs/ belongs to
+# the author unless it is a document this codebase generates and maintains.
+docs/
+!docs/PORT_NOTES.md
 golden/
 dist/
 pnpm-lock.yaml

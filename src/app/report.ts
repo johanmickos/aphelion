@@ -41,10 +41,10 @@ export interface DiagReport {
 export function configDelta(
   a: SimConfig,
   b: SimConfig,
-): Array<{ key: string; theirs: number; ours: number }> {
-  const out: Array<{ key: string; theirs: number; ours: number }> = [];
-  const ar = a as unknown as Record<string, number>;
-  const br = b as unknown as Record<string, number>;
+): Array<{ key: string; theirs: number | boolean; ours: number | boolean }> {
+  const out: Array<{ key: string; theirs: number | boolean; ours: number | boolean }> = [];
+  const ar = a as unknown as Record<string, number | boolean>;
+  const br = b as unknown as Record<string, number | boolean>;
   for (const k of new Set([...Object.keys(ar), ...Object.keys(br)])) {
     if (ar[k] !== br[k]) out.push({ key: k, theirs: ar[k]!, ours: br[k]! });
   }

@@ -19,7 +19,7 @@ import { SPAWN, createBodies, fieldBounds } from '../src/sim/world.ts';
 import { DEFAULT_CONFIG } from '../src/sim/config.ts';
 
 const rcfg = DEFAULT_RENDER_CONFIG;
-const field = fieldBounds(DEFAULT_CONFIG, createBodies());
+const field = fieldBounds(DEFAULT_CONFIG, createBodies(DEFAULT_CONFIG));
 
 describe('fitting the viewport', () => {
   const PHONES = [
@@ -284,7 +284,7 @@ describe('opening frame', () => {
   });
 
   it('the ship does not start on a collision course with P1', () => {
-    const p1 = createBodies()[0]!;
+    const p1 = createBodies(DEFAULT_CONFIG)[0]!;
     expect(Math.abs(SPAWN.x - p1.x)).toBeGreaterThan(p1.R + DEFAULT_CONFIG.minOrbitGap);
   });
 });

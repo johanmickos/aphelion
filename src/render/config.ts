@@ -28,6 +28,15 @@ export interface RenderConfig {
   trailSpeedCalm: number;
   /** Speed at or above which the trail is fully hot. */
   trailSpeedHot: number;
+  /**
+   * World-space gap kept between the ship and the visible head of its wake.
+   *
+   * A wake starts behind a ship, not under it. Without this the newest sample —
+   * which sits 3-10px back depending on speed — draws a dot up to 4.8px across
+   * that pokes through the tail notch of a sprite only 6px deep. 12 puts the
+   * nearest edge 7.2px behind the centre, clear of the silhouette.
+   */
+  trailHeadGap: number;
 
   // --- hazard zones ---
   /** Width of the danger gradient, measured INWARD from the field edge. */
@@ -48,8 +57,25 @@ export interface RenderConfig {
   // --- capture visuals ---
   /** Compass ring live-orbit bob: 0 = still ring, 1 = full peri/apo pump. */
   gaugeFollow: number;
+  /** Radius of the nearest target's ring, above the settled orbit. */
+  compassRingInner: number;
+  /** Extra radius at the far end of compassRange, so ring size reads as distance. */
+  compassRingSpread: number;
+  /** Never signpost more than this many targets. */
+  compassMaxTargets: number;
   /** Off-screen planet markers are shown within this distance. */
   edgeMarkerRange: number;
+  /**
+   * Bodies within this distance of the anchor get a compass marker.
+   *
+   * About two body-spacings: the next step of the climb and the one after, no
+   * further. Anything beyond that is a long, featureless coast, and signposting
+   * it invites the player to aim past the interesting part of the field.
+   *
+   * This tracks `bodySpacing` — retuning the field's density changes how many
+   * bodies a fixed distance covers, so revisit this alongside it.
+   */
+  compassRange: number;
   /** Half-angle of the drawn crash wedge (cosmetic only). */
   crashConeHalfAngle: number;
 }
@@ -68,6 +94,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   trailSpacing: 3,
   trailSpeedCalm: 110,
   trailSpeedHot: 420,
+  trailHeadGap: 12,
 
   hazardZoneWidth: 60,
 
@@ -79,6 +106,10 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   boostPeakFrom: 0.82,
 
   gaugeFollow: 0.25,
+  compassRingInner: 26,
+  compassRingSpread: 62,
+  compassMaxTargets: 3,
   edgeMarkerRange: 1300,
+  compassRange: 800,
   crashConeHalfAngle: 0.42,
 } satisfies RenderConfig);

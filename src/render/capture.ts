@@ -3,7 +3,8 @@
  */
 import type { Body } from '../sim/types.ts';
 import type { SimConfig } from '../sim/config.ts';
-import { orbitRadius } from '../sim/orbit.ts';
+import { orbitRadius, predictedCaptureOrbit } from '../sim/orbit.ts';
+import type { Orbit } from '../sim/types.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
@@ -24,25 +25,51 @@ export function drawOrbitCurve(
   anchor: Body,
 ): void {
   const cap = snap.capture;
-  if (!cap?.orbit) return;
-  if (cap.phase !== 'settle' && cap.phase !== 'orbit') return;
+  if (!cap) return;
 
-  const tighten = sim.tightenFrac * cap.settleProgress;
+  const settled = cap.orbit !== null && (cap.phase === 'settle' || cap.phase === 'orbit');
+  const orbit = settled ? cap.orbit! : liveOrbit(sim, cap);
+  if (!orbit) return;
+
+  const tighten = settled ? sim.tightenFrac * cap.settleProgress : 0;
+  const rPeri = settled ? cap.rPeri : 0;
+
   ctx.beginPath();
   for (let k = 0; k <= 90; k++) {
     const ang = (k / 90) * Math.PI * 2;
-    const rr = orbitRadius(cap.orbit, cap.rPeri, ang, tighten);
+    // The floor is real: the simulation clamps to minR, so the drawn curve does
+    // too rather than showing a dive through the planet.
+    const rr = Math.max(cap.minR, orbitRadius(orbit, rPeri, ang, tighten));
     const x = toScreenX(cam, anchor.x + Math.cos(ang) * rr);
     const y = toScreenY(cam, anchor.y + Math.sin(ang) * rr);
     if (k === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
   ctx.closePath();
-  ctx.strokeStyle = 'rgba(185,140,255,.35)';
-  ctx.setLineDash([3 * cam.scale, 5 * cam.scale]);
-  ctx.lineWidth = 1.2 * cam.scale;
+  // Settled: this is the curve. Diving: this is a prediction, drawn fainter and
+  // finer so it reads as provisional.
+  ctx.strokeStyle = settled ? 'rgba(185,140,255,.35)' : 'rgba(185,140,255,.18)';
+  ctx.setLineDash(settled ? [3 * cam.scale, 5 * cam.scale] : [2 * cam.scale, 6 * cam.scale]);
+  ctx.lineWidth = (settled ? 1.2 : 1) * cam.scale;
   ctx.stroke();
   ctx.setLineDash([]);
+}
+
+/**
+ * The ellipse the ship is on right now, for the dive.
+ *
+ * The frozen orbit only exists from periapsis onward, so the prototype showed
+ * nothing for up to half a revolution and then produced a ring already formed.
+ * Recomputed every frame from the live state, this converges on the real orbit
+ * as the dive proceeds — measured against the simulation, the predicted periapsis
+ * lands exactly on the actual one.
+ *
+ * Returns null for an unbound grab: a hyperbola has no ellipse to draw.
+ */
+function liveOrbit(sim: SimConfig, cap: NonNullable<RenderSnapshot['capture']>): Orbit | null {
+  const o = predictedCaptureOrbit(sim, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
+  if (!o.bound || !Number.isFinite(o.a)) return null;
+  return { a: o.a, e: o.e, argp: o.argp, dir: o.dir };
 }
 
 /**

@@ -37,6 +37,13 @@ export interface RenderSnapshot {
      * convert in a fraction of a second for a fraction of the tank.
      */
     overEscape: number;
+    /** Planet-relative state, so the renderer can derive the live orbit. */
+    rx: number;
+    ry: number;
+    vx: number;
+    vy: number;
+    /** Minimum orbit radius for this body. */
+    minR: number;
   } | null;
   fuel: number;
   held: boolean;
@@ -72,6 +79,11 @@ export function captureSnapshot(state: SimState, held: boolean, cfg: SimConfig):
           boostFull: cap.boostFull,
           boostT: cap.boostT,
           overEscape,
+          rx: cap.rx,
+          ry: cap.ry,
+          vx: cap.vx,
+          vy: cap.vy,
+          minR: cap.minR,
         }
       : null,
     fuel: state.fuel,

@@ -77,6 +77,19 @@ export interface SimConfig {
   // --- field ---
   /** Playfield is this much wider than the design viewport. */
   fieldWidthFrac: number;
+  /** How many bodies the field holds. */
+  bodyCount: number;
+  /**
+   * Generate the field instead of using the prototype's hand-authored eight.
+   *
+   * The authored layout is the *prototype's* world and cannot be retuned without
+   * breaking the equality gate, so PROTOTYPE_CONFIG keeps it and the game builds
+   * its own. The opening body is still the authored one either way, so the first
+   * approach keeps its tuned geometry.
+   */
+  proceduralLayout: boolean;
+  /** Vertical gap between generated bodies, in world units, before jitter. */
+  bodySpacing: number;
 
   // --- crash ---
   /** How close (px beyond the surface) the crash cone reaches. Gates grab refusal. */
@@ -132,6 +145,9 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   fuelPerSec: 18,
 
   fieldWidthFrac: 1.2,
+  bodyCount: 8,
+  proceduralLayout: false,
+  bodySpacing: 0,
 
   crashConeRange: 70,
   crashPause: 0.7,
@@ -179,6 +195,9 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   minOrbitGap: 12,
   crashConeRange: 50,
   fieldWidthFrac: 1.9,
+  bodyCount: 32,
+  proceduralLayout: true,
+  bodySpacing: 360,
 } satisfies SimConfig);
 
 /**

@@ -146,14 +146,39 @@ const diagNote = document.getElementById('diagNote') as HTMLTextAreaElement;
 const diagOut = document.getElementById('diagOut') as HTMLTextAreaElement;
 const diagCopy = document.getElementById('diagCopy') as HTMLButtonElement;
 const diagSend = document.getElementById('diagSend') as HTMLButtonElement;
-const diagReload = document.getElementById('diagReload') as HTMLButtonElement;
 const diagBuild = document.getElementById('diagBuild') as HTMLDivElement;
+const resetBtn = document.getElementById('reset') as HTMLButtonElement;
 
-// The game swallows touch (touch-action: none, plus preventDefault on the
-// canvas), so pull-to-refresh does not work on a phone. Without this there is no
-// way to escape a stale bundle short of closing the tab.
-diagReload.addEventListener('click', (e) => {
+/**
+ * RESET reloads the page.
+ *
+ * It lives on the main view because the game swallows touch (touch-action: none,
+ * plus preventDefault on the canvas), so pull-to-refresh does not work on a phone
+ * and there would otherwise be no way to escape a stale bundle short of closing
+ * the tab. Reloading also picks up code changes, which is why it is worth one tap
+ * rather than three.
+ *
+ * A reload discards the diagnostics recording. That is invisible and free in the
+ * normal case, but throwing away moments you flagged and never sent would be a
+ * real loss, so when there are unsent flags it asks first.
+ */
+let resetArmed = false;
+let resetTimer: ReturnType<typeof setTimeout> | undefined;
+resetBtn.addEventListener('click', (e) => {
   e.stopPropagation();
+  const unsent = recorder.markers.length;
+  if (unsent > 0 && !resetArmed) {
+    resetArmed = true;
+    resetBtn.classList.add('armed');
+    resetBtn.textContent = `DISCARD ${unsent}?`;
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => {
+      resetArmed = false;
+      resetBtn.classList.remove('armed');
+      resetBtn.textContent = 'RESET';
+    }, 3000);
+    return;
+  }
   location.reload();
 });
 const diagClose = document.getElementById('diagClose') as HTMLButtonElement;
