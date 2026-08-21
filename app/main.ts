@@ -247,6 +247,10 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // position at that instant — after a release that is the point it let go
     // from, which is exactly the act being praised.
     const scored = scoreTick(score, state, sim);
+    // Recorded as well as shown. A replay recomputes these, but only while it is
+    // still reproducing the run — and past a divergence it recomputes a different
+    // session's. These are what the player was actually paid.
+    recorder.recordAwards(scored.awards);
     for (const award of scored.awards) {
       const at = shipWorldPos(state);
       scene.popups.spawn(award, at.x, at.y);

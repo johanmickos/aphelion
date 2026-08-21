@@ -7,7 +7,7 @@
  */
 import type { SimConfig } from '../sim/config.ts';
 import { FIXED_DT, PROTOTYPE_CONFIG, SIM_VERSION } from '../sim/config.ts';
-import type { Checkpoint, InputRecord, Marker, RunRecorder } from './recorder.ts';
+import type { AwardRecord, Checkpoint, InputRecord, Marker, RunRecorder } from './recorder.ts';
 
 export const REPORT_SCHEMA = 3;
 
@@ -48,6 +48,19 @@ export interface DiagReport {
   marks: Marker[];
   checks: Checkpoint[];
   checksTruncated: boolean;
+  /**
+   * Every scoring event exactly as the phone paid it.
+   *
+   * Optional, for the same reason `loadedAt` is: adding a field is not a reason
+   * to make every report already on disk unreadable. Absent means the report
+   * predates it, and a replay falls back to recomputing — which is what it always
+   * did.
+   *
+   * Present, it is the score TRUTH: a diverged replay recomputes a different
+   * session's awards, and this list is the one the player actually saw. See
+   * `AwardRecord`.
+   */
+  awards?: AwardRecord[];
   note: string;
 }
 
@@ -88,6 +101,7 @@ export function buildReport(args: {
     input: args.recorder.input,
     marks: args.recorder.markers,
     checks: args.recorder.checkpoints,
+    awards: args.recorder.awards,
     checksTruncated: args.recorder.checkpointsTruncated,
     note: args.note,
   };

@@ -309,6 +309,68 @@ export function replayReport(report: DiagReport): Analysis {
 }
 
 /** Human-readable analysis, for a terminal. */
+/**
+ * The awards the PHONE paid, rebuilt from the report.
+ *
+ * A recomputed award is only as good as the trajectory it was recomputed on, and
+ * past a divergence that trajectory belongs to a different session. These do not
+ * have that problem: they were written down as they were paid. Reports recorded
+ * before the field existed return null and the caller falls back to recomputing,
+ * which is what it always did.
+ */
+export function recordedAwards(report: DiagReport): ScoreAward[] | null {
+  if (!report.awards?.length) return null;
+  return report.awards.map(
+    ([tick, kind, points, multiplier, close, clearance, skim, defl, timing, aim, climb, body]) => ({
+      tick,
+      kind: kind === 'g' ? ('grab' as const) : ('link' as const),
+      points,
+      multiplier,
+      body,
+      close,
+      clearance,
+      skim,
+      defl,
+      timing,
+      aim,
+      climb,
+    }),
+  );
+}
+
+/**
+ * How far the recomputed awards tracked the recorded ones.
+ *
+ * A finer fidelity signal than checkpoints, because an award lands at every grab
+ * and release rather than on a fixed interval: it names the capture where the
+ * two accounts of the session part company.
+ */
+export function awardAgreement(
+  recorded: readonly ScoreAward[],
+  replayed: readonly ScoreAward[],
+): { matched: number; firstDisagreement: number | null } {
+  let matched = 0;
+  for (let i = 0; i < Math.min(recorded.length, replayed.length); i++) {
+    const r = recorded[i]!;
+    const p = replayed[i]!;
+    // Points are integers and the qualities are rounded to two places on the way
+    // in, so the comparison is against the recorded precision, not exact floats.
+    const same =
+      r.tick === p.tick &&
+      r.kind === p.kind &&
+      r.points === Math.round(p.points) &&
+      Math.abs(r.timing - Math.round(p.timing * 100) / 100) < 1e-9 &&
+      Math.abs(r.aim - Math.round(p.aim * 100) / 100) < 1e-9;
+    if (!same) return { matched, firstDisagreement: r.tick };
+    matched++;
+  }
+  return {
+    matched,
+    firstDisagreement:
+      recorded.length === replayed.length ? null : (recorded[matched]?.tick ?? null),
+  };
+}
+
 export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   const s = summarize(report);
   const out: string[] = [];
@@ -428,12 +490,30 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   // The score, tick by tick. Worth printing in full rather than summarised: the
   // weights are still being calibrated by playing, and this is the only place a
   // real session's release qualities can be read next to what they paid.
-  if (a.awards.length) {
-    out.push('  score');
+  const recorded = recordedAwards(report);
+  const shown = recorded ?? a.awards;
+  if (shown.length) {
+    if (recorded) {
+      const agree = awardAgreement(recorded, a.awards);
+      out.push(
+        `  score — AS THE PHONE PAID IT (${recorded.length} events, recorded not recomputed)`,
+      );
+      if (agree.matched === recorded.length && agree.firstDisagreement === null) {
+        out.push('    the replay recomputed every one of these identically');
+      } else {
+        out.push(
+          `    the replay agreed on the first ${agree.matched} and then parted company` +
+            (agree.firstDisagreement !== null ? ` at tick ${agree.firstDisagreement}` : '') +
+            ` — these are the session, its recomputed ones are not`,
+        );
+      }
+    } else {
+      out.push('  score — RECOMPUTED (this report predates recorded awards)');
+    }
     out.push(
       '    tick  ev     what      points   mult   close   peak    aim   defl   climb  earned',
     );
-    for (const w of a.awards.slice(0, 24)) {
+    for (const w of shown.slice(0, 24)) {
       out.push(
         `    ${String(w.tick).padStart(5)}  ${w.kind.padEnd(5)}  ` +
           `${w.body.padEnd(10)}` +
@@ -448,8 +528,16 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
           (praiseFor(w)?.word ?? ''),
       );
     }
-    if (a.awards.length > 24) out.push(`    ... and ${a.awards.length - 24} more`);
-    out.push(`    best life ${a.score.best}`);
+    if (shown.length > 24) out.push(`    ... and ${shown.length - 24} more`);
+    // `best` comes from the replay's own scoring pass, so it is only the session's
+    // number while the replay still is. With recorded awards present, sum them
+    // instead — that total is the session's whatever the trajectory did.
+    if (recorded) {
+      const paid = recorded.reduce((n, w) => n + w.points, 0);
+      out.push(`    total paid across the session ${paid} (recorded)`);
+    } else {
+      out.push(`    best life ${a.score.best}`);
+    }
     out.push('');
   }
 

@@ -11,11 +11,50 @@
  * plausible-looking different one.
  */
 import type { SimState } from '../sim/types.ts';
+import type { ScoreAward } from '../score/types.ts';
 import { fingerprintHex } from '../sim/serialize.ts';
 import { shipVelocity, shipWorldPos } from '../sim/step.ts';
 
 /** [tick, 1 = press, 0 = release] */
 export type InputRecord = [number, 0 | 1];
+
+/**
+ * One scoring event exactly as the phone paid it.
+ *
+ * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body]`
+ * with `kind` 'g' for a grab and 'l' for a link.
+ *
+ * WHY THIS IS RECORDED AT ALL, when a score is a pure function of
+ * (config, seed, inputLog) and a replay can recompute it: because in practice
+ * the replay increasingly cannot. `sin`, `cos` and `atan2` are still
+ * implementation-approximated (PORT_NOTES 15-16 replaced only `Math.hypot`), the
+ * phase clock calls them every tick of a settle, and a capture amplifies the
+ * difference — so a long unbroken chain forks. Measured across five sessions on
+ * one build, the trustworthy prefix fell to 2.0s of a 41.7s run, and past it the
+ * replay does not merely go quiet: it reports deaths that never happened.
+ *
+ * Recomputed awards are therefore evidence about the REPLAY. These are evidence
+ * about the SESSION, and they stay true however far the trajectory drifted —
+ * which is what lets the scoring be calibrated while the trig is still wrong.
+ *
+ * They are also a much finer fidelity signal than checkpoints: an award lands at
+ * every grab and every release rather than on a fixed interval, so comparing the
+ * two lists localises a divergence to the capture that caused it.
+ */
+export type AwardRecord = [
+  number,
+  'g' | 'l',
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  string,
+];
 /**
  * [tick, fingerprint, x, y, vx, vy, fuel, phase]
  *
@@ -36,18 +75,45 @@ export interface RecorderOptions {
   /** Keep at most this many checkpoints (the most recent ones). */
   maxCheckpoints: number;
   maxMarkers: number;
+  /** Keep at most this many awards (the most recent ones). */
+  maxAwards: number;
 }
 
+/**
+ * 20 ticks, not 60.
+ *
+ * Checkpoints began as a way to PROVE a replay reproduced the run, and at that
+ * job one per second is ample. They are now also the only trustworthy account of
+ * a session whose replay diverged, and at that job one per second is not: a death
+ * holds for `crashPause` 0.7s = 42 ticks, which is less than a 60-tick gap, so a
+ * whole death and respawn could pass between two samples and leave no trace. That
+ * is not hypothetical — one recorded session showed a single unbroken life at 1Hz
+ * while its replay claimed three deaths, and only a fuel jump to 100 and a
+ * 5,153px position jump gave away that a real one had happened at all.
+ *
+ * 20 rather than 30 — 30 would already guarantee a death is sampled at least once
+ * — because the fuel and phase traces are read as traces, and at 3Hz a capture is
+ * legible in them rather than merely present.
+ *
+ * `maxCheckpoints` is then set by the size budget, not by taste: checkpoints cost
+ * about 57 bytes each and `test/diagnostics.test.ts` holds a ten-minute report
+ * under 40KB so it can still be pasted out of a phone. 320 lands that worst case
+ * at 35KB, and covers 107 seconds before the oldest start being dropped — longer
+ * than any session recorded so far, and the ones dropped are the oldest, which is
+ * the right bias when the interesting part is where the run ended.
+ */
 export const DEFAULT_RECORDER_OPTIONS: RecorderOptions = {
-  checkpointEvery: 60,
-  maxCheckpoints: 300,
+  checkpointEvery: 20,
+  maxCheckpoints: 320,
   maxMarkers: 40,
+  maxAwards: 300,
 };
 
 export class RunRecorder {
   readonly input: InputRecord[] = [];
   readonly checkpoints: Checkpoint[] = [];
   readonly markers: Marker[] = [];
+  readonly awards: AwardRecord[] = [];
   private readonly opts: RecorderOptions;
   /** True once checkpoints have been dropped, so a report can say so. */
   private truncated = false;
@@ -60,6 +126,34 @@ export class RunRecorder {
   recordInput(tick: number, pressed: boolean, released: boolean): void {
     if (pressed) this.input.push([tick, 1]);
     if (released) this.input.push([tick, 0]);
+  }
+
+  /** Call with whatever `scoreTick` paid on this tick. */
+  recordAwards(awards: readonly ScoreAward[]): void {
+    // Two decimals on the 0..1 qualities and whole numbers elsewhere: these are
+    // read as distributions across a session, and the digits below that are
+    // report size rather than information.
+    const q = (n: number): number => Math.round(n * 100) / 100;
+    for (const a of awards) {
+      this.awards.push([
+        a.tick,
+        a.kind === 'grab' ? 'g' : 'l',
+        Math.round(a.points),
+        q(a.multiplier),
+        q(a.close),
+        Math.round(a.clearance),
+        Math.round(a.skim),
+        Math.round(a.defl),
+        q(a.timing),
+        q(a.aim),
+        Math.round(a.climb),
+        a.body,
+      ]);
+      if (this.awards.length > this.opts.maxAwards) {
+        this.awards.shift();
+        this.truncated = true;
+      }
+    }
   }
 
   /** Call after stepping. */

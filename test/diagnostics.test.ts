@@ -4,7 +4,7 @@
  * this is the most load-bearing test in the app layer.
  */
 import { describe, expect, it } from 'vitest';
-import { RunRecorder } from '../src/app/recorder.ts';
+import { DEFAULT_RECORDER_OPTIONS, RunRecorder } from '../src/app/recorder.ts';
 import {
   buildReport,
   configDelta,
@@ -16,7 +16,8 @@ import {
 import { DEFAULT_CONFIG, FIXED_DT, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
-import { replayReport } from '../tools/replay-core.ts';
+import { awardAgreement, recordedAwards, replayReport } from '../tools/replay-core.ts';
+import { createScoreState, scoreTick } from '../src/score/index.ts';
 import type { Input, SimConfig } from '../src/sim/index.ts';
 
 /** Plays a session, recording it the way the app does. */
@@ -449,5 +450,102 @@ describe('report round trip', () => {
 
   it('rejects a report from a future schema rather than misreading it', () => {
     expect(() => parseReport(JSON.stringify({ aphelion: 99 }))).toThrow(/schema/);
+  });
+});
+
+/**
+ * Recorded awards, and the sampling rate that makes a diverged report readable.
+ *
+ * Both exist for the same reason: a replay is only the session while it is still
+ * reproducing it, and on long chains it increasingly is not. What the report
+ * carries in its own right is what survives that.
+ */
+describe('a report that survives its own replay diverging', () => {
+  /** Plays a session the way the app does, scoring included. */
+  function playScored(cfg: SimConfig, ticks: number, edges: Map<number, 0 | 1>) {
+    const recorder = new RunRecorder();
+    const state = createInitialState(cfg);
+    const score = createScoreState();
+    let held = false;
+    for (let tick = 0; tick < ticks; tick++) {
+      const e = edges.get(tick);
+      const pressed = e === 1;
+      const released = e === 0;
+      if (pressed) held = true;
+      if (released) held = false;
+      recorder.recordInput(state.tick, pressed, released);
+      stepSim(state, cfg, { held: held || pressed, pressed, released }, FIXED_DT);
+      recorder.recordAwards(scoreTick(score, state, cfg).awards);
+      recorder.recordTick(state);
+    }
+    return { recorder, state, score };
+  }
+
+  const CHAIN = new Map<number, 0 | 1>([
+    [18, 1],
+    [150, 0],
+    [400, 1],
+    [520, 0],
+  ]);
+
+  function report(ticks = 700) {
+    const { recorder, state } = playScored(DEFAULT_CONFIG, ticks, CHAIN);
+    return serializeReport(
+      buildReport({
+        recorder,
+        config: DEFAULT_CONFIG,
+        seed: 1,
+        ticks: state.tick,
+        note: '',
+        device: DEVICE,
+      }),
+    );
+  }
+
+  it('carries every award the session paid, through a round trip', () => {
+    const parsed = parseReport(report());
+    const awards = recordedAwards(parsed);
+    expect(awards).not.toBeNull();
+    expect(awards!.length).toBeGreaterThan(0);
+    // The same events the scorer produced, in the same order, with the points
+    // the player was actually shown.
+    const live = replayReport(parsed).awards;
+    expect(awards!.map((w) => [w.tick, w.kind])).toEqual(live.map((w) => [w.tick, w.kind]));
+    expect(awards!.map((w) => w.points)).toEqual(live.map((w) => Math.round(w.points)));
+  });
+
+  it('agrees with the recomputed awards while the replay is still faithful', () => {
+    const parsed = parseReport(report());
+    const agree = awardAgreement(recordedAwards(parsed)!, replayReport(parsed).awards);
+    expect(agree.firstDisagreement).toBeNull();
+    expect(agree.matched).toBe(recordedAwards(parsed)!.length);
+  });
+
+  it('names the award where a recomputed run parts company, not merely that it did', () => {
+    // The point of comparing award lists at all: an award lands at every grab and
+    // release, so it localises a divergence far better than a fixed interval can.
+    const recorded = recordedAwards(parseReport(report()))!;
+    const nudged = recorded.map((w, i) => (i < 2 ? w : { ...w, points: w.points + 1 }));
+    const agree = awardAgreement(recorded, nudged);
+    expect(agree.matched).toBe(2);
+    expect(agree.firstDisagreement).toBe(recorded[2]!.tick);
+  });
+
+  it('still reads a report written before awards were recorded', () => {
+    // Optional for the same reason `loadedAt` is. Every report already on disk
+    // lacks this field and must stay readable.
+    const parsed = parseReport(report());
+    delete parsed.awards;
+    expect(recordedAwards(parsed)).toBeNull();
+    expect(() => replayReport(parsed)).not.toThrow();
+  });
+
+  it('samples often enough that a death cannot fall between two checkpoints', () => {
+    // A death holds for `crashPause` before respawning. Sample more slowly than
+    // that and a whole death and respawn can pass unrecorded — which is exactly
+    // how a replay came to report three deaths a session never had, with the
+    // checkpoints unable to contradict it.
+    const crashPauseTicks = DEFAULT_CONFIG.crashPause / FIXED_DT;
+    expect(DEFAULT_RECORDER_OPTIONS.checkpointEvery).toBeLessThan(crashPauseTicks);
   });
 });
