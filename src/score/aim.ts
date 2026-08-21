@@ -25,9 +25,17 @@ const TAU = Math.PI * 2;
  * Bodies within this distance of the anchor are signposted, and are the only ones
  * a release can be scored against.
  *
- * About two body-spacings: the next step of the climb and the one after, no
- * further. Anything beyond that is a long, featureless coast, and signposting it
- * invites the player to aim past the interesting part of the field.
+ * Originally about two body-spacings: the next step of the climb and the one
+ * after, no further. Anything beyond that is a long, featureless coast, and
+ * signposting it invites the player to aim past the interesting part of the
+ * field.
+ *
+ * At the current 280 spacing it is nearer three, and it is left at 800 anyway
+ * because `AIM_MAX_TARGETS` is what actually binds in a field this dense —
+ * measured over the generated field, dropping the range to 620 moves the mean
+ * number of targets offered from 2.6 to 2.5. Narrowing it would re-scale every
+ * aim score for that, and the aim thresholds in `praise.ts` are percentiles of
+ * measured aim scores.
  *
  * This tracks `SimConfig.bodySpacing` — retuning the field's density changes how
  * many bodies a fixed distance covers, so revisit it alongside.

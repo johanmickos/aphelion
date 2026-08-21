@@ -21,9 +21,13 @@ import { fingerprint } from '../src/sim/serialize.ts';
 import type { Input, SimState } from '../src/sim/types.ts';
 import {
   AIM,
+  BONKS,
+  BONK_SPEED,
   RECKLESS_DEG,
+  RECKLESS_HARD_DEG,
   RECKLESS_STREAK,
   SHOUTS,
+  bonkWord,
   shoutWord,
   CLOSE_PX,
   DEFAULT_SCORE_CONFIG,
@@ -683,48 +687,48 @@ describe('the reckless shout', () => {
     const shouts: Shout[] = [];
     let tick = 0;
 
-    /**
-     * Fly one capture whose worst deflection is `defl`, then release it.
-     * `roughTicks` holds it over the line for that many consecutive ticks.
-     */
-    const capture = (defl: number, roughTicks = 1): void => {
-      for (let i = 0; i < 4; i++) {
-        state.capture = {
-          phase: 'orbit',
-          planet: 0,
-          rx: 80,
-          ry: 0,
-          vx: 0,
-          vy: 200,
-          grabR: 120,
-          minR: 58,
-          prevR: 80,
-          prevDR: 0,
-          passedPeri: true,
-          periR: 80,
-          apoR: 120,
-          clearFramesLeft: 0,
-          clearDvx: 0,
-          clearDvy: 0,
-          whipE: undefined,
-          orbit: { a: 80, e: 0, argp: 0, dir: 1 },
-          theta: 0,
-          phaseSpeed: 1,
-          phaseSpeedReal: 1,
-          phaseMul: 1,
-          Lfrozen: undefined,
-          rPeri: 80,
-          settleT: 1.2,
-          settleProgress: 1,
-          tightness: 1,
-          boostFull: 0,
-          boost: 0,
-          boostT: 0,
-          puttered: false,
-          lastAngle: 0,
-          // the rough passage starts on the second tick and lasts `roughTicks`
-          defl: i >= 1 && i < 1 + roughTicks ? defl : 0,
-        };
+    /** One tick of a settled capture, deflected by `defl`. */
+    const capAt = (defl: number): NonNullable<SimState['capture']> =>
+      ({
+        phase: 'orbit',
+        planet: 0,
+        rx: 80,
+        ry: 0,
+        vx: 0,
+        vy: 200,
+        grabR: 120,
+        minR: 58,
+        prevR: 80,
+        prevDR: 0,
+        passedPeri: true,
+        periR: 80,
+        apoR: 120,
+        clearFramesLeft: 0,
+        clearDvx: 0,
+        clearDvy: 0,
+        whipE: undefined,
+        orbit: { a: 80, e: 0, argp: 0, dir: 1 },
+        theta: 0,
+        phaseSpeed: 1,
+        phaseSpeedReal: 1,
+        phaseMul: 1,
+        Lfrozen: undefined,
+        rPeri: 80,
+        settleT: 1.2,
+        settleProgress: 1,
+        tightness: 1,
+        boostFull: 0,
+        boost: 0,
+        boostT: 0,
+        puttered: false,
+        lastAngle: 0,
+        defl,
+      }) as NonNullable<SimState['capture']>;
+
+    /** Fly one capture through `deflections`, a tick each, then release it. */
+    const fly = (deflections: readonly number[]): void => {
+      for (const d of deflections) {
+        state.capture = capAt(d);
         state.tick = tick++;
         shouts.push(...scoreTick(sc, state, cfg).shouts);
       }
@@ -733,14 +737,39 @@ describe('the reckless shout', () => {
       shouts.push(...scoreTick(sc, state, cfg).shouts);
     };
 
-    const die = (): void => {
-      state.ending.active = true;
+    /**
+     * Fly one capture whose worst deflection is `defl`, then release it.
+     * `roughTicks` holds it over the line for that many consecutive ticks.
+     */
+    const capture = (defl: number, roughTicks = 1): void => {
+      // the rough passage starts on the second tick and lasts `roughTicks`
+      fly([0, 1, 2, 3].map((i) => (i >= 1 && i < 1 + roughTicks ? defl : 0)));
+    };
+
+    /** One capture that crosses `first` and then, a few ticks later, `then`. */
+    const ramp = (first: number, then: number): void => {
+      fly([0, first, first, 0, then, then]);
+    };
+
+    /**
+     * End the life. `speed` is the drift speed carried into it, which is what a
+     * bonk is judged on — the ship's own velocity is zeroed by a fatal contact
+     * before the scorer ever sees it.
+     */
+    const die = (reason: SimState['ending']['reason'] = 'fell-behind', speed = 0): void => {
+      state.capture = null;
+      state.ship.vx = speed;
+      state.ship.vy = 0;
       state.tick = tick++;
-      scoreTick(sc, state, cfg);
+      scoreTick(sc, state, cfg); // a drift tick, so `lastDrift` carries the speed
+      state.ending.active = true;
+      state.ending.reason = reason;
+      state.tick = tick++;
+      shouts.push(...scoreTick(sc, state, cfg).shouts);
       state.ending.active = false;
     };
 
-    return { sc, shouts, capture, die };
+    return { sc, shouts, capture, ramp, die };
   }
 
   const ROUGH = RECKLESS_DEG + 5;
@@ -809,6 +838,79 @@ describe('the reckless shout', () => {
     const seen = new Set<string>();
     for (let t = 0; t < 400; t++) seen.add(shoutWord(t));
     expect(seen.size, 'the shout never varies').toBe(SHOUTS.length);
+  });
+
+  describe('one violent capture, with no history behind it', () => {
+    const HARD = RECKLESS_HARD_DEG + 5;
+
+    it('shouts on its own, without waiting for a streak', () => {
+      const h = harness();
+      h.capture(HARD);
+      expect(h.shouts, 'a capture thrown past the hard line said nothing').toHaveLength(1);
+      expect(h.shouts[0]!.kind).toBe('reckless');
+      expect(h.shouts[0]!.streak).toBe(1);
+    });
+
+    it('is seen even when the capture ramps into it', () => {
+      // The rough line is crossed first and the violent one a few ticks later.
+      // A single shared edge would see 32 degrees, mark the capture as counted,
+      // and never look again — missing the 65 that followed, which is how a
+      // capture actually gets thrown around.
+      const h = harness();
+      h.ramp(ROUGH, HARD);
+      expect(h.shouts, 'the violent passage went unremarked').toHaveLength(1);
+      expect(h.shouts[0]!.kind).toBe('reckless');
+      // one capture, so the streak is 1 — the shout came from the hard line
+      expect(h.shouts[0]!.streak).toBe(1);
+    });
+
+    it('still only shouts once when both gates open at the same time', () => {
+      const h = harness();
+      for (let i = 0; i < RECKLESS_STREAK - 1; i++) h.capture(ROUGH);
+      h.capture(HARD);
+      expect(h.shouts, 'the streak and the hard line each pushed a shout').toHaveLength(1);
+    });
+
+    it('leaves a smooth capture alone', () => {
+      const h = harness();
+      h.capture(RECKLESS_HARD_DEG - 1);
+      expect(h.shouts).toHaveLength(0);
+    });
+  });
+
+  describe('the bonk', () => {
+    it('fires when the ship arrives fast', () => {
+      const h = harness();
+      h.die('impact', BONK_SPEED + 50);
+      expect(h.shouts).toHaveLength(1);
+      expect(h.shouts[0]!.kind).toBe('bonk');
+      expect(BONKS).toContain(h.shouts[0]!.word);
+      // it is an impact, not an achievement: no streak rides along with it
+      expect(h.shouts[0]!.streak).toBe(0);
+    });
+
+    it('says nothing about a slow drift into a surface', () => {
+      const h = harness();
+      h.die('impact', BONK_SPEED - 50);
+      expect(h.shouts).toHaveLength(0);
+    });
+
+    it('is about hitting something, not about the run ending', () => {
+      // Falling behind and leaving the field end a life just as hard and are not
+      // collisions. Nothing was hit, so there is nothing to shout about.
+      for (const reason of ['fell-behind', 'out-of-bounds'] as const) {
+        const h = harness();
+        h.die(reason, BONK_SPEED + 200);
+        expect(h.shouts, `${reason} bonked`).toHaveLength(0);
+      }
+    });
+
+    it('picks its word deterministically too', () => {
+      expect(bonkWord(99)).toBe(bonkWord(99));
+      const seen = new Set<string>();
+      for (let t = 0; t < 400; t++) seen.add(bonkWord(t));
+      expect(seen.size).toBe(BONKS.length);
+    });
   });
 });
 

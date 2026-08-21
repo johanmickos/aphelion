@@ -150,6 +150,8 @@ export interface ScoreState {
   capKinked: boolean;
   /** Mid-kink right now, so one rough passage does not shout every tick. */
   inKink: boolean;
+  /** Same rising edge, for the harder threshold that shouts on its own. */
+  inHardKink: boolean;
   /** Last observed `telemetry.putterOuts`, to edge-detect a dry capture. */
   putterOuts: number;
 }

@@ -519,6 +519,72 @@ session behaved as rather than `undefined`.
 
 ---
 
+### 22 — The field was a line, not a route
+
+`src/sim/world.ts` · `createBodies()` · asked for directly
+
+Every generated body sat within 44px of the centre column, in a playfield 741px
+wide. The climb was a single column of planets 88px across with 650px of unused
+field either side of it, and the only decision it ever offered was when to press,
+never where to go.
+
+The generated field is now a sequence of ROWS. Most hold one body and alternate
+sides, which is the authored weave; `rowPairChance` of them fork into two lanes
+`bodySpread` out on each side, and those are the rows where a release has a
+choice. Measured over the generated field at the shipped values (280 spacing, 60
+bodies, weave 72, spread 160, fork chance 0.4):
+
+| rows | 42, of which 18 fork |
+| --- | --- |
+| lateral span | x 38..352, from 151..239 before |
+| margin to the nearest wall | 159px |
+| closest two bodies | 125px of surface gap |
+| reach from a body to the nearest in the next row | 193px min, 242 median, 290 max |
+
+The 380px "is the next body in view" bound is what keeps a fork from becoming two
+unreachable options; nothing in the field exceeds 290. `bodyCount` went 32 -> 60
+so that the climb stays the length it was (11246px, against 11150 before) despite
+rows now costing 280 rather than 360.
+
+Two things in the generator are load-bearing and look arbitrary:
+
+- **The fork decision short-circuits before its RNG draw** when `rowPairChance`
+  is 0, and the single-body path draws x, then the gap, then the radius, in that
+  order. Together with note 21's back-fill, that means every report recorded
+  before these keys existed rebuilds a bit-identical field — checked against the
+  previous generator over all 24 replayable reports.
+- **A forked row leans its lanes equally and oppositely**, and the row's own
+  height is carried separately from the height a body is emitted at. Folding the
+  lean back into the running height would make each next row's gap the configured
+  one plus a lean, compounding all the way up the field.
+
+### 23 — The reckless shout could not fire in practice **[FIXED]**
+
+`src/score/reckless.ts` · reported as "do we still have the reckless logic?"
+
+It was implemented, wired, and rendered, and the author had never seen it. The
+only way in was `RECKLESS_STREAK` — three consecutive captures each crossing 27
+degrees — which over every recorded session fired a handful of times in 322
+grabs. A channel that rare is indistinguishable from one that is broken, which is
+exactly how it was reported.
+
+Two ways in now. The streak stays, because "are you doing this on purpose?" is a
+fair question that needs three captures to ask. Beside it, `RECKLESS_HARD_DEG`
+fires on one capture with no history behind it, and `BONK_SPEED` fires on a fast
+impact. Both are measured; the numbers and the distributions they came from are
+recorded at their declarations.
+
+The edges are tracked separately for the two deflection thresholds. A single
+shared edge would mark a capture as counted when it crossed 27 and never look
+again — missing the 80 that followed, which is how a capture actually gets thrown
+around.
+
+Note the more obvious home for a bonk, a survived surface graze, is not one:
+`crashGrazeDot` is shallow enough that not one session on record has ever had a
+graze that lived. Every collision in the corpus is fatal.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -542,9 +608,9 @@ scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
 tests    port-equality 11 · invariants 32 · render 75 · camera 30
-         diagnostics 18 · backtrack 11 · world 9 · tune 7 · clearance 6
-         score 52 · input 8 · grab-target 8
-         267 total
+         diagnostics 18 · backtrack 11 · world 11 · tune 7 · clearance 6
+         score 60 · input 8 · grab-target 8
+         277 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

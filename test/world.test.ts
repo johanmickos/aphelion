@@ -5,7 +5,34 @@
 import { describe, expect, it } from 'vitest';
 import { createBodies, fieldBounds, DESIGN_W } from '../src/sim/world.ts';
 import { DEFAULT_CONFIG, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
+import type { SimConfig } from '../src/sim/config.ts';
 import { hypot } from '../src/sim/orbit.ts';
+
+/**
+ * The field grouped into rows. A forked row holds two bodies at nearly the same
+ * height, so almost every property worth asserting is about rows rather than
+ * about consecutive entries in the array.
+ */
+function rows(cfg: SimConfig) {
+  const out: Array<ReturnType<typeof createBodies>> = [];
+  for (const b of [...createBodies(cfg)].sort((a, c) => c.y - a.y)) {
+    const last = out[out.length - 1];
+    if (last && Math.abs(last[0]!.y - b.y) < cfg.bodySpacing * 0.5) last.push(b);
+    else out.push([b]);
+  }
+  return out;
+}
+
+/**
+ * A row's height: the mean of its bodies.
+ *
+ * A fork leans its two lanes equally and oppositely off the row, so the mean is
+ * the row's own height exactly, and row-to-row spacing can be asserted without
+ * the lean smearing it.
+ */
+function rowY(r: ReturnType<typeof createBodies>): number {
+  return r.reduce((n, b) => n + b.y, 0) / r.length;
+}
 
 describe('world generation', () => {
   it('is deterministic — the same config always builds the same field', () => {
@@ -28,36 +55,67 @@ describe('world generation', () => {
     expect(game[0]).toEqual(createBodies(PROTOTYPE_CONFIG)[0]);
   });
 
-  it('keeps alternating sides all the way up', () => {
-    const bodies = createBodies(DEFAULT_CONFIG);
+  it('keeps alternating sides through the single rows', () => {
+    // A forked row covers both sides at once, so it is the SINGLE rows that have
+    // to keep weaving — a run of them on one side would walk the climb into a
+    // wall while every individual gap still looked reasonable.
     const cx = DESIGN_W * 0.5;
-    for (let i = 1; i < bodies.length; i++) {
-      const a = Math.sign(bodies[i - 1]!.x - cx);
-      const b = Math.sign(bodies[i]!.x - cx);
-      expect(b, `${bodies[i]!.name} is on the same side as ${bodies[i - 1]!.name}`).toBe(-a);
+    const singles = rows(DEFAULT_CONFIG).filter((r) => r.length === 1);
+    for (let i = 1; i < singles.length; i++) {
+      const a = Math.sign(singles[i - 1]![0]!.x - cx);
+      const b = Math.sign(singles[i]![0]!.x - cx);
+      expect(b, `${singles[i]![0]!.name} is on the same side as ${singles[i - 1]![0]!.name}`).toBe(
+        -a,
+      );
     }
   });
 
-  it('spaces bodies at the configured distance, within jitter', () => {
-    const bodies = createBodies(DEFAULT_CONFIG);
+  it('offers two routes on some rows and one on most', () => {
+    // The reason rows exist. All singles is the old field, which reads as a line
+    // to be followed; all forks would be a corridor with no rhythm to it.
+    const rs = rows(DEFAULT_CONFIG);
+    const forks = rs.filter((r) => r.length === 2).length;
+    expect(forks, 'no row offers a choice').toBeGreaterThan(rs.length * 0.2);
+    expect(forks, 'every row offers a choice').toBeLessThan(rs.length * 0.6);
+    expect(Math.max(...rs.map((r) => r.length)), 'a row with three bodies').toBe(2);
+  });
+
+  it('separates the two lanes of a fork enough to be a choice', () => {
+    const cx = DESIGN_W * 0.5;
+    for (const r of rows(DEFAULT_CONFIG).filter((x) => x.length === 2)) {
+      const [a, b] = [r[0]!, r[1]!];
+      expect(Math.sign(a.x - cx), `${a.name} and ${b.name} are on the same side`).toBe(
+        -Math.sign(b.x - cx),
+      );
+      // Far enough apart that the lookahead a press uses has an unambiguous
+      // answer, rather than the two lanes reading as one wide obstacle.
+      expect(Math.abs(a.x - b.x), `${a.name} and ${b.name} are one obstacle`).toBeGreaterThan(
+        DEFAULT_CONFIG.bodySpread,
+      );
+    }
+  });
+
+  it('spaces rows at the configured distance, within jitter', () => {
+    const rs = rows(DEFAULT_CONFIG);
     const spacing = DEFAULT_CONFIG.bodySpacing;
-    for (let i = 1; i < bodies.length; i++) {
-      const dy = Math.abs(bodies[i]!.y - bodies[i - 1]!.y);
+    for (let i = 1; i < rs.length; i++) {
+      const dy = Math.abs(rowY(rs[i]!) - rowY(rs[i - 1]!));
       expect(dy).toBeGreaterThan(spacing * 0.85);
       expect(dy).toBeLessThan(spacing * 1.15);
     }
   });
 
-  it('puts the next body inside the visible window, so a release can be aimed at it', () => {
-    // The point of the spacing: at 360 with a ~323 visible half-height and radii
+  it('puts the next row inside the visible window, so a release can be aimed at it', () => {
+    // The point of the spacing: at 280 with a ~323 visible half-height and radii
     // around 44, the next body is on screen while still in orbit around this one.
-    const bodies = createBodies(DEFAULT_CONFIG);
-    for (let i = 1; i < bodies.length; i++) {
-      const dy = Math.abs(bodies[i]!.y - bodies[i - 1]!.y);
-      expect(
-        dy - bodies[i]!.R,
-        `${bodies[i]!.name} is not in view from ${bodies[i - 1]!.name}`,
-      ).toBeLessThan(380);
+    // Measured to the NEAREST body of the next row, because that is the one the
+    // release is actually aimed at when the row forks.
+    const rs = rows(DEFAULT_CONFIG);
+    for (let i = 1; i < rs.length; i++) {
+      for (const from of rs[i - 1]!) {
+        const reach = Math.min(...rs[i]!.map((to) => hypot(from.x - to.x, from.y - to.y) - to.R));
+        expect(reach, `nothing is in view from ${from.name}`).toBeLessThan(380);
+      }
     }
   });
 

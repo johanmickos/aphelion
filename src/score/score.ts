@@ -37,7 +37,14 @@ import type { Capture, SimState } from '../sim/types.ts';
 import { hypot } from '../sim/orbit.ts';
 import { readAim } from './aim.ts';
 import { isNerveGrab } from './praise.ts';
-import { RECKLESS_DEG, RECKLESS_STREAK, shoutWord } from './reckless.ts';
+import {
+  BONK_SPEED,
+  RECKLESS_DEG,
+  RECKLESS_HARD_DEG,
+  RECKLESS_STREAK,
+  bonkWord,
+  shoutWord,
+} from './reckless.ts';
 import type { Shout } from './reckless.ts';
 import type { ScoreConfig } from './config.ts';
 import { DEFAULT_SCORE_CONFIG } from './config.ts';
@@ -74,6 +81,7 @@ export function createScoreState(): ScoreState {
     recklessStreak: 0,
     capKinked: false,
     inKink: false,
+    inHardKink: false,
     putterOuts: 0,
   };
 }
@@ -113,6 +121,7 @@ function endLife(sc: ScoreState): void {
   sc.recklessStreak = 0;
   sc.capKinked = false;
   sc.inKink = false;
+  sc.inHardKink = false;
   sc.climbFromY = null;
 }
 
@@ -142,6 +151,17 @@ export function scoreTick(
   if (state.ending.active) {
     if (!sc.endingSeen) {
       sc.endingSeen = true;
+      // The impact itself, before the life is wound up. Read from `lastDrift`
+      // rather than the ship, because a fatal contact zeroes the velocity it is
+      // being judged on — and the scorer is an observer, so the simulation is
+      // not going to start carrying a field for it.
+      const hit = sc.lastDrift;
+      if (state.ending.reason === 'impact' && hit) {
+        const speed = hypot(hit.vx, hit.vy);
+        if (speed >= BONK_SPEED) {
+          shouts.push({ tick: state.tick, word: bonkWord(state.tick), kind: 'bonk', streak: 0 });
+        }
+      }
       endLife(sc);
     }
     sc.putterOuts = state.telemetry.putterOuts;
@@ -177,6 +197,7 @@ export function scoreTick(
     if (!sc.capKinked) sc.recklessStreak = 0;
     sc.capKinked = false;
     sc.inKink = false;
+    sc.inHardKink = false;
   }
 
   if (cap) {
@@ -213,25 +234,32 @@ export function scoreTick(
     // early on, long before the ship is let go of.
     if (cap.defl > sc.maxDefl) sc.maxDefl = cap.defl;
 
-    // Rising edge only: one rough passage is one event, however many ticks the
-    // deflection stays over the line.
-    if (cap.defl >= RECKLESS_DEG) {
-      if (!sc.inKink) {
-        sc.inKink = true;
-        if (!sc.capKinked) {
-          sc.capKinked = true;
-          sc.recklessStreak++;
-        }
-        if (sc.recklessStreak >= RECKLESS_STREAK) {
-          shouts.push({
-            tick: state.tick,
-            word: shoutWord(state.tick),
-            streak: sc.recklessStreak,
-          });
-        }
-      }
-    } else {
-      sc.inKink = false;
+    // Rising edges only: one rough passage is one event, however many ticks the
+    // deflection stays over the line. Two edges because there are two questions —
+    // `RECKLESS_DEG` is "was that rough", which only means something as a run of
+    // three, and `RECKLESS_HARD_DEG` is "was that violent", which is complete on
+    // its own. They are tracked separately because a capture ramps into its worst
+    // sample: watching only the first edge would see a 30-degree crossing and
+    // miss the 80 degrees that followed it.
+    const rough = cap.defl >= RECKLESS_DEG;
+    const hard = cap.defl >= RECKLESS_HARD_DEG;
+    const roughEdge = rough && !sc.inKink;
+    const hardEdge = hard && !sc.inHardKink;
+    sc.inKink = rough;
+    sc.inHardKink = hard;
+
+    if (roughEdge && !sc.capKinked) {
+      sc.capKinked = true;
+      sc.recklessStreak++;
+    }
+    // At most one shout a tick, however both gates opened.
+    if (hardEdge || (roughEdge && sc.recklessStreak >= RECKLESS_STREAK)) {
+      shouts.push({
+        tick: state.tick,
+        word: shoutWord(state.tick),
+        kind: 'reckless',
+        streak: sc.recklessStreak,
+      });
     }
 
     sc.pending = readPending(state, cfg, scfg, cap, sc.grabSkim, sc.maxDefl);

@@ -24,8 +24,14 @@ export interface ReadoutLine {
   pulse?: number;
 }
 
-/** Design-space geometry, in the 390x844 window. */
-const GAUGE = { x: 16, w: 19, h: 78, bottomGap: 44 } as const;
+/**
+ * Design-space geometry, in the 390x844 window.
+ *
+ * The bar is narrower than the 'FUEL' caption under it on purpose: the caption
+ * and the number set the column's width, and the bar only has to be wide enough
+ * for ten graduations to read as a scale.
+ */
+export const GAUGE = { x: 16, w: 15, h: 78, bottomGap: 44 } as const;
 
 /**
  * The score band, top-centre.

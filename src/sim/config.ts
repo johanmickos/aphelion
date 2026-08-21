@@ -115,8 +115,22 @@ export interface SimConfig {
    * approach keeps its tuned geometry.
    */
   proceduralLayout: boolean;
-  /** Vertical gap between generated bodies, in world units, before jitter. */
+  /** Vertical gap between generated rows, in world units, before jitter. */
   bodySpacing: number;
+  /** Furthest a lone body in a row sits from the centre column. */
+  bodyWeave: number;
+  /**
+   * How far out the two lanes of a forked row sit.
+   *
+   * Kept separate from `bodyWeave` because they answer different questions. The
+   * weave is how much a single body wanders; the spread is how far apart two
+   * bodies have to be before a row reads as a choice rather than as one wide
+   * obstacle. Tying them together would mean widening the weave to widen a fork,
+   * which walks every single body toward a wall.
+   */
+  bodySpread: number;
+  /** Chance a generated row holds two bodies instead of one. 0 disables forks. */
+  rowPairChance: number;
   /**
    * Seconds of velocity a press looks ahead when choosing which body to take.
    * 0 takes the body that is nearest right now.
@@ -193,6 +207,9 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   grabRange: 0,
   proceduralLayout: false,
   bodySpacing: 0,
+  bodyWeave: 44,
+  bodySpread: 44,
+  rowPairChance: 0,
   grabLeadTime: 0,
 
   crashConeRange: 70,
@@ -302,13 +319,17 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyFuelPerSec: 40,
   fuelRegen: 30,
   fieldWidthFrac: 1.9,
-  bodyCount: 32,
+  bodyCount: 60,
   backtrackLimit: 520,
   boundGrabsCapture: true,
   clearanceOnConvert: true,
   grabRange: 560,
   proceduralLayout: true,
-  bodySpacing: 360,
+  bodySpacing: 280,
+  bodyWeave: 72,
+  bodySpread: 160,
+  rowPairChance: 0.4,
+  boostMax: 60,
   grabLeadTime: 0.2,
   crashConeSeverityFloor: 0,
 } satisfies SimConfig);
@@ -320,7 +341,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 6;
+export const SIM_VERSION = 7;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

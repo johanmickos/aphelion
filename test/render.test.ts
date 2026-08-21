@@ -16,7 +16,7 @@ import { Starfield } from '../src/render/starfield.ts';
 import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture.ts';
-import { drawFuelGauge, drawScore, formatScore, readoutLines } from '../src/render/hud.ts';
+import { GAUGE, drawFuelGauge, drawScore, formatScore, readoutLines } from '../src/render/hud.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
 import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
@@ -592,7 +592,7 @@ describe('floating score popups', () => {
 
   it('draws a reckless shout with no number attached', () => {
     const p = new Popups();
-    p.shout({ tick: 100, word: 'WILD CHILD!', streak: 3 }, 195, 0);
+    p.shout({ tick: 100, word: 'WILD CHILD!', kind: 'reckless', streak: 3 }, 195, 0);
     const r = recordingContext();
     p.draw(r.ctx, cam());
     const t = texts(r);
@@ -1051,12 +1051,20 @@ describe('compass targets point up the climb', () => {
 
   it('always points at the next step of the climb', () => {
     const counts = bodies.map((_, i) => aimTargets(bodies, i, AIM_RANGE, 3).length);
-    // the top body has nothing above it; everywhere else has somewhere to go
-    expect(counts[counts.length - 1]).toBe(0);
-    expect(
-      counts.slice(0, -1).every((n) => n >= 1),
-      'a body with nowhere to aim',
-    ).toBe(true);
+    // Everything above the top ROW, not above the top body: a forked row holds
+    // two bodies at nearly the same height, so the higher of the two also has
+    // nothing above it, and that is the field ending rather than a dead end.
+    const top = Math.min(...bodies.map((b) => b.y));
+    for (let i = 0; i < bodies.length; i++) {
+      const inTopRow = bodies[i]!.y - top < DEFAULT_CONFIG.bodySpacing * 0.5;
+      if (inTopRow) continue;
+      expect(counts[i], `${bodies[i]!.name} has nowhere to aim`).toBeGreaterThanOrEqual(1);
+    }
+    // and the very top of the field genuinely runs out. Not `counts.at(-1)`:
+    // a forked row emits its two lanes in lane order, not height order, so the
+    // last body in the array is not necessarily the highest one.
+    const highest = bodies.indexOf(bodies.reduce((a, b) => (b.y < a.y ? b : a)));
+    expect(counts[highest]).toBe(0);
   });
 
   it('keeps the gauge to the near field rather than signposting a long coast', () => {
@@ -1315,8 +1323,10 @@ describe('fuel gauge graduations', () => {
   it('runs the marks across the full width of the gauge', () => {
     const c = cam();
     const r = gaugeOps(sim.fuelMax / 2);
-    const gx = c.offsetX + 16 * c.scale;
-    const gw = 19 * c.scale;
+    // Read from the geometry rather than restating it: the bar's width is a
+    // look, and a test that hardcodes it fails for a reason that is not a bug.
+    const gx = c.offsetX + GAUGE.x * c.scale;
+    const gw = GAUGE.w * c.scale;
     const starts = (r.calls('moveTo') as Array<[string, number, number]>).map((o) => o[1]);
     const ends = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[1]);
     expect(starts.length).toBeGreaterThan(0);

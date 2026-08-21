@@ -20,7 +20,7 @@ export const DESIGN_H = 844;
 
 /**
  * The prototype's hand-authored planets. The field continues procedurally beyond
- * these; see `generatedDef`.
+ * these; see `createBodies`.
  *
  * `dx` is the offset from the field's centre column and `y` is in screen-heights.
  * The pattern is deliberate: sides strictly alternate, |dx| runs 6..44, radii run
@@ -52,6 +52,19 @@ const WORLD_SEED = 0x5eed_1e55;
  * against and which must never change; and the game's own field, generated from
  * a fixed seed so every player climbs the same route and a replay reconstructs
  * it exactly.
+ *
+ * The generated field is a sequence of ROWS, not a sequence of bodies. Most rows
+ * hold one body and the sides alternate, which is the authored weave. Some hold
+ * two, one in each outer lane, and those are the point: a row with two bodies is
+ * a row where the release has a choice, and the climb stops being a single line
+ * that is merely followed.
+ *
+ * DRAW ORDER IS PART OF THE FIELD. The single-body path draws x, then the
+ * vertical gap, then the radius, exactly as it did before rows existed, and the
+ * fork decision above it short-circuits before its draw when `rowPairChance` is
+ * 0. Together those mean a report recorded before any of these keys existed
+ * still reconstructs its own field: `configFromReport` fills the missing keys
+ * from PROTOTYPE_CONFIG, and at those values this function is the old one.
  */
 export function createBodies(cfg: SimConfig): Body[] {
   const cx = DESIGN_W * 0.5;
@@ -66,24 +79,56 @@ export function createBodies(cfg: SimConfig): Body[] {
   }
 
   const rnd = mulberry32(WORLD_SEED);
-  const out: Body[] = [];
+  const placed: Array<{ x: number; y: number; R: number }> = [];
   // The opening body is the authored one: the spawn sits 84px to its left and
   // that first approach is tuned. Everything above it is generated.
   const first = DEFS[0]!;
   let x = cx + first.dx;
   let y = first.y * DESIGN_H;
   let R = first.R;
+  // The row's own height, carried separately from the height a body is emitted
+  // at. A fork leans its two lanes off the row, and folding that lean back into
+  // the running height would make the NEXT row's gap the configured one plus a
+  // lean — a drift that compounds all the way up the field.
+  let rowY = y;
+  // The opener sits left of centre, so the weave resumes to the right.
+  let side = 1;
 
-  for (let i = 0; i < cfg.bodyCount; i++) {
-    out.push({ kind: 'planet', x, y, R, name: 'P' + (i + 1) });
+  while (placed.length < cfg.bodyCount) {
+    placed.push({ x, y, R });
+    if (placed.length >= cfg.bodyCount) break;
+
+    const fork =
+      cfg.rowPairChance > 0 && placed.length + 1 < cfg.bodyCount && rnd() < cfg.rowPairChance;
+
+    if (fork) {
+      // Both lanes pushed well out, so the row reads as two routes rather than
+      // as one wide planet, and leaned off each other so it is never a straight
+      // line of two. `side` is left alone: the fork covered both sides, so the
+      // weave resumes where the last single row left it.
+      rowY -= cfg.bodySpacing * (0.9 + rnd() * 0.2);
+      // Equal and opposite, so the row's two lanes tilt off each other while the
+      // row itself still sits exactly where the spacing put it.
+      const lean = cfg.bodySpacing * 0.12 * (rnd() * 2 - 1);
+      const left = cx - cfg.bodySpread * (0.6 + rnd() * 0.4);
+      const right = cx + cfg.bodySpread * (0.6 + rnd() * 0.4);
+      placed.push({ x: left, y: rowY - lean, R: 34 + rnd() * 22 });
+      x = right;
+      y = rowY + lean;
+      R = 34 + rnd() * 22;
+      continue;
+    }
+
     // Sides alternate so the climb weaves rather than drifting to one wall, and
     // the gap jitters +/-10% so the rhythm does not become metronomic.
-    const side = i % 2 === 0 ? 1 : -1;
-    x = cx + side * (8 + rnd() * 36); // |dx| 8..44, the authored range
-    y -= cfg.bodySpacing * (0.9 + rnd() * 0.2);
+    x = cx + side * (8 + rnd() * (cfg.bodyWeave - 8));
+    rowY -= cfg.bodySpacing * (0.9 + rnd() * 0.2);
+    y = rowY;
     R = 34 + rnd() * 22; // 34..56, the authored range
+    side = -side;
   }
-  return out;
+
+  return placed.map((b, i) => ({ kind: 'planet' as const, ...b, name: 'P' + (i + 1) }));
 }
 
 /** Ship spawn, frozen from the prototype's `resetShip` at the design viewport. */
