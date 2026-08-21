@@ -11,6 +11,20 @@
  *
  * Everything is addressed by integer tick and stored at full precision. No
  * rounding, no wall-clock times.
+ *
+ * PLATFORM-BOUND. This baseline stores numbers computed on one machine and
+ * compares them against numbers computed now, so it only holds on the platform
+ * that captured it. The capture path calls `Math.sin`, `Math.cos` and
+ * `Math.atan2` (step.ts, orbit.ts, capture.ts); none of the three is required to
+ * be correctly rounded, and V8 answers them differently on x64 than on arm64 —
+ * the same reason `Math.hypot` is banned (note 16). One ulp is enough to fail
+ * this check.
+ *
+ * That is not true of the equality gate. `port-equality.test.ts` and
+ * `diff-report.ts` run the prototype and the port in the *same* process, so a
+ * libm quirk lands on both sides and cancels: they read exactly zero on any
+ * platform. The equality gate is the portable proof; this is a local baseline.
+ * CI therefore runs `pnpm check:ci` and leaves this to the capturing machine.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -83,6 +97,25 @@ if (!check) {
           `Δvel=${r.maxVelocityDelta.toExponential(3)} phase≠=${r.phaseMismatches}` +
           (r.first ? ` first at tick ${r.first.tick} (${r.first.field})` : ''),
       );
+      // Drift of a few ulp is the signature of running on a platform other than
+      // the one that captured the baseline, not of a behaviour change. Say so
+      // here rather than let the next reader chase a real regression that isn't.
+      if (r.phaseMismatches === 0 && r.maxPositionDelta > 0 && typeof r.first?.proto === 'number') {
+        const scale = Math.max(Math.abs(r.first.proto), 1);
+        const ulp = 2 ** (Math.floor(Math.log2(scale)) - 52);
+        const ulps = r.maxPositionDelta / ulp;
+        if (ulps <= 8) {
+          console.error(
+            `  that is ${ulps.toFixed(1)} ulp at this magnitude, on ${process.platform}/${process.arch} ` +
+              `running node ${process.versions.node}.\n` +
+              `  A baseline captured on another platform cannot match: the capture path uses\n` +
+              `  Math.sin/cos/atan2, which V8 approximates differently per architecture.\n` +
+              `  The portable gate is \`pnpm test\` (port-equality) and \`node tools/diff-report.ts\`;\n` +
+              `  both compare prototype against port in one process and hold at exactly zero.\n` +
+              `  Recapture with \`pnpm golden:capture\` only on the machine that owns the baseline.`,
+          );
+        }
+      }
       failures++;
     }
   }
