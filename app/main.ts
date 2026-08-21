@@ -63,6 +63,34 @@ const up = (): void => {
 addEventListener('pointerup', up);
 addEventListener('pointercancel', up);
 
+/**
+ * Suppress iOS's text-selection gestures over the play area.
+ *
+ * A quick double tap otherwise raises the magnifier and the Look Up / Search
+ * menu, which is unusable in a game whose entire input is tapping. CSS is not
+ * sufficient on its own: `preventDefault()` on `pointerdown` does not suppress
+ * the underlying touch default, so the gesture has to be cancelled on the touch
+ * events themselves.
+ *
+ * These listeners only call preventDefault — gameplay still runs off pointer
+ * events, which are unaffected by cancelling a touch default.
+ *
+ * The diagnostics panel is exempt throughout: selecting and copying the report is
+ * the fallback when the clipboard API is unavailable, which is exactly the case
+ * on a LAN dev server.
+ */
+const inPanel = (t: EventTarget | null): boolean => !!(t as HTMLElement | null)?.closest?.('#diag');
+
+const suppressGesture = (e: Event): void => {
+  if (inPanel(e.target)) return;
+  e.preventDefault();
+};
+canvas.addEventListener('touchstart', suppressGesture, { passive: false });
+canvas.addEventListener('touchend', suppressGesture, { passive: false });
+canvas.addEventListener('dblclick', suppressGesture);
+document.addEventListener('selectstart', suppressGesture);
+document.addEventListener('contextmenu', suppressGesture);
+
 // Backgrounding is the only pause a phone player actually needs; a button would
 // compete with the game's single input.
 let paused = false;
@@ -78,6 +106,14 @@ addEventListener('visibilitychange', () => {
 let prev = captureSnapshot(state, held, sim);
 let curr = prev;
 
+/**
+ * How far down the header text reaches, in design units.
+ *
+ * Measured from the element rather than hard-coded, so the edge-marker arrows
+ * keep clearing it through safe-area insets and any change to the label.
+ */
+let headerBottom = 0;
+
 function resize(): void {
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const w = innerWidth;
@@ -86,6 +122,10 @@ function resize(): void {
   canvas.height = Math.round(h * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   fitCamera(cam, { w, h, dpr });
+
+  const note = document.getElementById('note');
+  const rect = note?.getBoundingClientRect();
+  headerBottom = rect && rect.height > 0 ? Math.max(0, (rect.bottom - cam.offsetY) / cam.scale) : 0;
 }
 addEventListener('resize', resize);
 resize();
@@ -128,6 +168,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       paused,
       viewportW: innerWidth,
       viewportH: innerHeight,
+      headerBottom,
     });
   },
 });

@@ -8,8 +8,16 @@
  * letterboxed window.
  */
 import type { SimConfig } from '../sim/config.ts';
+import type { GrabResult } from '../sim/types.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
+
+export interface ReadoutLine {
+  text: string;
+  color: string;
+  /** 0..1, for pulsing the urgent ones. */
+  pulse?: number;
+}
 
 /** Design-space geometry, in the 390x844 window. */
 const GAUGE = { x: 16, w: 19, h: 78, bottomGap: 44 } as const;
@@ -63,20 +71,38 @@ export function drawFuelGauge(
   ctx.fillStyle = 'rgba(255,255,255,.06)';
   ctx.fillRect(gx, gy, gw, gh);
 
-  ctx.strokeStyle = 'rgba(255,255,255,.08)';
-  ctx.lineWidth = Math.max(1, s);
-  for (let i = 1; i < 10; i++) {
-    const y = gy + (gh * i) / 10;
-    ctx.beginPath();
-    ctx.moveTo(gx, y);
-    ctx.lineTo(gx + gw, y);
-    ctx.stroke();
-  }
-
+  const fillTop = gbot - gh * frac;
   ctx.globalAlpha = flash;
   ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
-  ctx.fillRect(gx, gbot - gh * frac, gw, gh * frac);
+  ctx.fillRect(gx, fillTop, gw, gh * frac);
   ctx.globalAlpha = 1;
+
+  // Graduations: full-width lines every 10%, drawn over the fill as well as the
+  // empty track so the level reads against a scale rather than only as a bar.
+  //
+  // Two passes with opposite polarity, because a single colour cannot work for
+  // both: light marks vanish against a bright fill, dark ones against the dark
+  // track. The pass over the fill is deliberately faint — it should suggest the
+  // scale continuing, not draw stripes across the colour.
+  const drawTicks = (color: string, clipY: number, clipH: number): void => {
+    if (clipH <= 0) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(gx, clipY, gw, clipH);
+    ctx.clip();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1, s);
+    ctx.beginPath();
+    for (let i = 1; i < 10; i++) {
+      const y = gy + (gh * i) / 10;
+      ctx.moveTo(gx, y);
+      ctx.lineTo(gx + gw, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  };
+  drawTicks('rgba(255,255,255,.08)', gy, fillTop - gy);
+  drawTicks('rgba(0,0,0,.14)', fillTop, gbot - fillTop);
 
   ctx.strokeStyle = low ? `rgba(255,70,90,${flash})` : 'rgba(150,170,205,.5)';
   ctx.lineWidth = (low ? 2 : 1) * s;
@@ -118,13 +144,6 @@ export function drawFuelGauge(
  * Transient messages age by simulation tick, not wall clock — a paused game
  * should not quietly expire the message explaining why it paused.
  */
-export interface ReadoutLine {
-  text: string;
-  color: string;
-  /** 0..1, for pulsing the urgent ones. */
-  pulse?: number;
-}
-
 /** How long a refusal notice stays up, in ticks (1 second at 60Hz). */
 const REFUSAL_TICKS = 60;
 
@@ -134,6 +153,18 @@ const REFUSAL_TICKS = 60;
  * real session: every conversion sat at 0.09-0.22, every failure at 0.31-0.82.
  */
 const FLYBY_HARD = 0.28;
+
+/**
+ * Why a grab did nothing. A record rather than a ternary chain, so adding a way
+ * to refuse a grab makes the compiler ask for its message instead of quietly
+ * falling through to the wrong one.
+ */
+const REFUSAL_LINE: Record<Exclude<GrabResult, 'captured'>, ReadoutLine> = {
+  'refused-crash-cone': { text: '✕ TOO LATE — crash course', color: '#ff5566', pulse: 1 },
+  'refused-no-fuel': { text: '✕ TANK EMPTY — cannot grab', color: '#ff5566', pulse: 1 },
+  'refused-out-of-range': { text: '✕ TOO FAR — get closer', color: '#8fb8e8' },
+  'refused-no-body': { text: '✕ nothing in range', color: '#8595b0' },
+};
 
 export function readoutLines(
   sim: SimConfig,
@@ -181,13 +212,7 @@ export function readoutLines(
     }
     const g = snap.lastGrab;
     if (g && g.result !== 'captured' && snap.tick - g.tick < REFUSAL_TICKS) {
-      out.push(
-        g.result === 'refused-crash-cone'
-          ? { text: '✕ TOO LATE — crash course', color: '#ff5566', pulse: 1 }
-          : g.result === 'refused-no-fuel'
-            ? { text: '✕ TANK EMPTY — cannot grab', color: '#ff5566', pulse: 1 }
-            : { text: '✕ nothing in range', color: '#8595b0' },
-      );
+      out.push(REFUSAL_LINE[g.result]);
     }
   }
 

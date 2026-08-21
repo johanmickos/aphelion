@@ -13,7 +13,7 @@ import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
 import { KINK_THRESHOLD_DEG } from '../src/sim/trace.ts';
 import { fieldBounds } from '../src/sim/world.ts';
-import type { Input, SimState } from '../src/sim/types.ts';
+import type { GrabResult, Input, SimState } from '../src/sim/types.ts';
 
 export interface Frame {
   tick: number;
@@ -69,6 +69,14 @@ export interface Analysis {
  * qualitative behaviour is the same run; above it, treat detail with suspicion.
  */
 export const CLOSE_PX = 2;
+
+/** Exhaustive, so a new way to refuse a grab cannot go unreported. */
+const REFUSAL_TEXT: Record<Exclude<GrabResult, 'captured'>, string> = {
+  'refused-crash-cone': 'GRAB REFUSED — inside the crash cone (too late to recover)',
+  'refused-no-fuel': 'GRAB REFUSED — tank empty',
+  'refused-out-of-range': 'GRAB REFUSED — out of reach',
+  'refused-no-body': 'GRAB REFUSED — no body in range',
+};
 export const DRIFT_PX = 40;
 
 export function replayReport(report: DiagReport): Analysis {
@@ -103,15 +111,7 @@ export function replayReport(report: DiagReport): Analysis {
     if (g && g.tick !== lastGrabTick) {
       lastGrabTick = g.tick;
       if (g.result !== 'captured') {
-        events.push({
-          tick: g.tick,
-          text:
-            g.result === 'refused-crash-cone'
-              ? 'GRAB REFUSED — inside the crash cone (too late to recover)'
-              : g.result === 'refused-no-fuel'
-                ? 'GRAB REFUSED — tank empty'
-                : 'GRAB REFUSED — no body in range',
-        });
+        events.push({ tick: g.tick, text: REFUSAL_TEXT[g.result] });
       }
     }
     const touchingFloor = state.telemetry.floorSubstepsTotal > prevFloorTotal;

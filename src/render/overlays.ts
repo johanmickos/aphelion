@@ -36,6 +36,12 @@ const NOTICE: Record<EndingReason, NoticeStyle> = {
     border: 'rgba(255,70,90,0.9)',
     text: '#ff9aa8',
   },
+  'fell-behind': {
+    msg: '⚠ FELL BEHIND',
+    fill: 'rgba(255,70,90,0.14)',
+    border: 'rgba(255,70,90,0.9)',
+    text: '#ff9aa8',
+  },
 };
 
 export function drawEndingNotice(

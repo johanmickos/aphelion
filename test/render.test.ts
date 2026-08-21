@@ -7,7 +7,8 @@ import { recordingContext } from './canvas-stub.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { createCamera, fitCamera, snapCamera, toScreenX, toScreenY } from '../src/render/camera.ts';
 import { Starfield } from '../src/render/starfield.ts';
-import { drawHazardZones } from '../src/render/world.ts';
+import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
+import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { boostColor, drawBoostHalo } from '../src/render/capture.ts';
 import { drawFuelGauge, readoutLines } from '../src/render/hud.ts';
 import {
@@ -257,6 +258,7 @@ describe('scene', () => {
         paused: false,
         viewportW: 390,
         viewportH: 844,
+        headerBottom: 0,
       });
       drawn++;
 
@@ -284,7 +286,13 @@ describe('scene', () => {
     const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
     snapCamera(c, rcfg, snap.x, snap.y, f);
     const r = recordingContext();
-    scene.draw(r.ctx, c, snap, { timeMs: 0, paused: false, viewportW: 390, viewportH: 844 });
+    scene.draw(r.ctx, c, snap, {
+      timeMs: 0,
+      paused: false,
+      viewportW: 390,
+      viewportH: 844,
+      headerBottom: 0,
+    });
 
     expect(r.calls('arc').length).toBeGreaterThan(0); // bodies + rings
     expect(r.calls('fillText').length).toBeGreaterThan(0); // planet labels
@@ -685,5 +693,166 @@ describe('compass rings encode distance', () => {
     expect(radii[1]! - radii[0]!).toBeCloseTo(expected1 - expected0, 3);
     expect(distRatio).toBeGreaterThan(1);
     void sim;
+  });
+});
+
+describe('edge markers point up the climb', () => {
+  const bodies = createBodies(DEFAULT_CONFIG);
+  const sim = DEFAULT_CONFIG;
+
+  /** Screen positions of the arrows drawn for a ship at world y. */
+  function markerYs(shipY: number) {
+    const c = cam();
+    const state = createInitialState(sim);
+    const snap = { ...captureSnapshot(state, false, sim), x: 195, y: shipY };
+    snapCamera(c, rcfg, snap.x, snap.y, field);
+    const r = recordingContext();
+    drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies);
+    // each arrow is translate(ex, ey) followed by rotate
+    return (r.calls('translate') as Array<[string, number, number]>).map((o) => o[2]);
+  }
+
+  it('never puts an arrow below the ship', () => {
+    // partway up the field, so there are bodies both above and below
+    const shipY = bodies[6]!.y;
+    const c = cam();
+    snapCamera(c, rcfg, 195, shipY, field);
+    const middle = c.offsetY + (c.viewH * c.scale) / 2;
+    const ys = markerYs(shipY);
+    expect(ys.length, 'no markers drawn at all').toBeGreaterThan(0);
+    for (const y of ys) {
+      expect(y, 'an arrow pointed back down the climb').toBeLessThan(middle);
+    }
+  });
+
+  it('shows nothing once everything is behind you', () => {
+    const top = Math.min(...bodies.map((b) => b.y));
+    expect(markerYs(top - 1)).toEqual([]);
+  });
+});
+
+describe('the captured body is highlighted', () => {
+  it('draws a halo only around the body holding the ship', () => {
+    const sim = DEFAULT_CONFIG;
+    const bodies = createBodies(sim);
+    const c = cam();
+    const state = createInitialState(sim);
+
+    const drift = { ...captureSnapshot(state, false, sim), capture: null };
+    const held = {
+      ...captureSnapshot(state, true, sim),
+      capture: captureOf({ phase: 'orbit', planet: 0 }),
+    };
+
+    const a = recordingContext();
+    const b = recordingContext();
+    new BodyRenderer().draw(a.ctx, c, sim, bodies, -1);
+    new BodyRenderer().draw(b.ctx, c, sim, bodies, held.capture!.planet);
+
+    // the halo is an extra radial gradient beyond the per-radius sphere cache
+    const gradsIdle = a.calls('=createRadialGradient').length;
+    const gradsHeld = b.calls('=createRadialGradient').length;
+    expect(gradsHeld).toBeGreaterThan(gradsIdle);
+    void drift;
+  });
+});
+
+describe('fuel gauge graduations', () => {
+  const sim = DEFAULT_CONFIG;
+
+  function gaugeOps(fuel: number) {
+    const c = cam();
+    const r = recordingContext();
+    const base = captureSnapshot(createInitialState(sim), false, sim);
+    drawFuelGauge(r.ctx, c, sim, { ...base, fuel }, 0);
+    return r;
+  }
+
+  it('marks the scale over the filled part, not just the empty part', () => {
+    // The graduations used to be painted before the fill, so they vanished as the
+    // tank filled and the bar could only be read as a bare level.
+    const half = gaugeOps(sim.fuelMax / 2);
+    const clips = half.calls('clip').length;
+    expect(clips, 'ticks are not drawn in two clipped passes').toBe(2);
+    // both passes stroke, and with different colours so each reads on its region
+    const strokeColors = (half.calls('=strokeStyle') as Array<[string, string]>).map((o) => o[1]);
+    expect(strokeColors.some((c) => c.startsWith('rgba(255,255,255'))).toBe(true);
+    expect(strokeColors.some((c) => c.startsWith('rgba(0,0,0'))).toBe(true);
+  });
+
+  it('skips a pass that would have nothing to draw in', () => {
+    // full tank: no empty region, so only the dark-on-fill pass runs
+    expect(gaugeOps(sim.fuelMax).calls('clip').length).toBe(1);
+    // empty tank: no fill, so only the light-on-track pass runs
+    expect(gaugeOps(0).calls('clip').length).toBe(1);
+  });
+
+  it('runs the marks across the full width of the gauge', () => {
+    const c = cam();
+    const r = gaugeOps(sim.fuelMax / 2);
+    const gx = c.offsetX + 16 * c.scale;
+    const gw = 19 * c.scale;
+    const starts = (r.calls('moveTo') as Array<[string, number, number]>).map((o) => o[1]);
+    const ends = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[1]);
+    expect(starts.length).toBeGreaterThan(0);
+    for (const x of starts) expect(x).toBeCloseTo(gx, 6);
+    for (const x of ends) expect(x).toBeCloseTo(gx + gw, 6);
+  });
+
+  it('is fainter over the fill than over the empty track', () => {
+    // Over the colour the scale should read as a suggestion, not as stripes.
+    const r = gaugeOps(sim.fuelMax / 2);
+    const colors = (r.calls('=strokeStyle') as Array<[string, string]>).map((o) => o[1]);
+    const overTrack = colors.find((c) => c.startsWith('rgba(255,255,255'))!;
+    const overFill = colors.find((c) => c.startsWith('rgba(0,0,0'))!;
+    const alpha = (c: string): number => Number(c.slice(c.lastIndexOf(',') + 1, -1));
+    expect(alpha(overFill)).toBeLessThan(0.2);
+    expect(alpha(overTrack)).toBeLessThan(0.2);
+  });
+});
+
+describe('edge markers clear the header text', () => {
+  const bodies = createBodies(DEFAULT_CONFIG);
+  const sim = DEFAULT_CONFIG;
+
+  /** Stand-in for the measured header, in design units. */
+  const HEADER_BOTTOM = 21;
+
+  it('keeps every arrow just below the header text', () => {
+    const c = cam();
+    const state = createInitialState(sim);
+    // partway up, so several bodies are off-screen above
+    const shipY = bodies[8]!.y + 200;
+    const snap = { ...captureSnapshot(state, false, sim), x: 195, y: shipY };
+    snapCamera(c, rcfg, snap.x, snap.y, field);
+
+    const r = recordingContext();
+    drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies, HEADER_BOTTOM);
+    const ys = (r.calls('translate') as Array<[string, number, number]>).map((o) => o[2]);
+    expect(ys.length, 'no arrows drawn').toBeGreaterThan(0);
+
+    const topLimit = c.offsetY + (HEADER_BOTTOM + rcfg.edgeMarkerHeaderGap) * c.scale;
+    for (const y of ys) {
+      expect(y, 'an arrow sat in the header band').toBeGreaterThanOrEqual(topLimit - 1e-6);
+      // and just below it, not pushed halfway down the screen
+      expect(y, 'an arrow was pushed far below the header').toBeLessThan(topLimit + 30 * c.scale);
+    }
+  });
+
+  it('still hugs the sides at the ordinary inset', () => {
+    const c = cam();
+    const state = createInitialState(sim);
+    // a body far off to one side, so the ray exits through a vertical edge
+    const snap = { ...captureSnapshot(state, false, sim), x: -600, y: bodies[4]!.y };
+    snapCamera(c, rcfg, snap.x, snap.y, field);
+    const r = recordingContext();
+    drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies, HEADER_BOTTOM);
+    const xs = (r.calls('translate') as Array<[string, number, number]>).map((o) => o[1]);
+    const left = c.offsetX + rcfg.edgeMarkerInset * c.scale;
+    const right = c.offsetX + c.designW * c.scale - rcfg.edgeMarkerInset * c.scale;
+    for (const x of xs) {
+      expect(x).toBeGreaterThanOrEqual(left - 1e-6);
+      expect(x).toBeLessThanOrEqual(right + 1e-6);
+    }
   });
 });

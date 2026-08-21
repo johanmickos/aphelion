@@ -40,6 +40,8 @@
   "fuelPerSec": 18,
   "fieldWidthFrac": 1.2,
   "bodyCount": 8,
+  "backtrackLimit": 0,
+  "grabRange": 0,
   "proceduralLayout": false,
   "bodySpacing": 0,
   "crashConeRange": 70,

@@ -11,7 +11,7 @@ import type { Camera } from './camera.ts';
 import { clipToWindow } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import { Starfield } from './starfield.ts';
-import { BodyRenderer, drawHazardZones } from './world.ts';
+import { BodyRenderer, drawBacktrackFloor, drawHazardZones } from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
@@ -45,7 +45,14 @@ export class Scene {
     ctx: CanvasRenderingContext2D,
     cam: Camera,
     snap: RenderSnapshot,
-    opts: { timeMs: number; paused: boolean; viewportW: number; viewportH: number },
+    opts: {
+      timeMs: number;
+      paused: boolean;
+      viewportW: number;
+      viewportH: number;
+      /** Bottom of the header text, in design units. */
+      headerBottom: number;
+    },
   ): void {
     const { sim, render, bodies, field } = this.deps;
 
@@ -61,7 +68,8 @@ export class Scene {
 
     this.stars.draw(ctx, cam, render);
     drawHazardZones(ctx, cam, render, field);
-    this.bodyRenderer.draw(ctx, cam, sim, bodies);
+    drawBacktrackFloor(ctx, cam, sim, render, snap.highWaterY);
+    this.bodyRenderer.draw(ctx, cam, sim, bodies, snap.capture ? snap.capture.planet : -1);
 
     const cap = snap.capture;
     if (cap) {
@@ -79,7 +87,7 @@ export class Scene {
     drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
     drawShip(ctx, cam, snap);
 
-    drawEdgeMarkers(ctx, cam, render, snap, bodies);
+    drawEdgeMarkers(ctx, cam, render, snap, bodies, opts.headerBottom);
 
     drawEndingNotice(ctx, cam, sim, snap);
 

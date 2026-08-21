@@ -139,7 +139,7 @@ export interface Capture {
 }
 
 /** Why a run ended. Drives which notice the player is shown. */
-export type EndingReason = 'impact' | 'out-of-bounds';
+export type EndingReason = 'impact' | 'out-of-bounds' | 'fell-behind';
 
 export interface EndingState {
   active: boolean;
@@ -152,7 +152,12 @@ export interface EndingState {
 // ------------------------------------------------------------------- telemetry
 
 /** Why a grab did or did not take. */
-export type GrabResult = 'captured' | 'refused-no-fuel' | 'refused-crash-cone' | 'refused-no-body';
+export type GrabResult =
+  | 'captured'
+  | 'refused-no-fuel'
+  | 'refused-crash-cone'
+  | 'refused-out-of-range'
+  | 'refused-no-body';
 
 /**
  * Observability, written by the simulation and never read by it.
@@ -184,6 +189,14 @@ export interface SimState {
   bodies: Body[];
   /** Ship fuel. Persists across captures and regenerates during drift. */
   fuel: number;
+  /**
+   * The highest point reached this run (smallest y). Only ever ratchets up.
+   *
+   * The floor that ends a run for falling behind trails this rather than sitting
+   * at a fixed depth, so the pressure follows the player up the climb instead of
+   * being something you outrun once and never meet again.
+   */
+  highWaterY: number;
   ending: EndingState;
   /**
    * The current hold has already been resolved by the simulation (a putter-out),

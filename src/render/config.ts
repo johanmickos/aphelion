@@ -46,7 +46,13 @@ export interface RenderConfig {
   /** Glow radius at zero charge / at full charge, in design units. */
   boostGlowMin: number;
   boostGlowMax: number;
-  /** Breathing period at zero / full charge, in ms. Shorter = more urgent. */
+  /**
+   * Breathing period at zero / full charge, in ms. Shorter = more urgent.
+   *
+   * Both are deliberately slow. At 300ms the peak read as a flicker rather than a
+   * pulse, which is agitating in a game whose whole register is calm — and the
+   * hue already says "now", so the rhythm does not have to shout it.
+   */
   boostPulseSlow: number;
   boostPulseFast: number;
   /** How much the pulse modulates size and brightness (0 = none, 1 = full). */
@@ -65,6 +71,10 @@ export interface RenderConfig {
   compassMaxTargets: number;
   /** Off-screen planet markers are shown within this distance. */
   edgeMarkerRange: number;
+  /** Inset of the arrow ring from the sides and bottom of the window. */
+  edgeMarkerInset: number;
+  /** Gap left between the header text and the first arrow. */
+  edgeMarkerHeaderGap: number;
   /**
    * Bodies within this distance of the anchor get a compass marker.
    *
@@ -100,8 +110,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
 
   boostGlowMin: 13,
   boostGlowMax: 42,
-  boostPulseSlow: 560,
-  boostPulseFast: 300,
+  boostPulseSlow: 1000,
+  boostPulseFast: 620,
   boostPulseDepth: 0.14,
   boostPeakFrom: 0.82,
 
@@ -110,6 +120,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   compassRingSpread: 62,
   compassMaxTargets: 3,
   edgeMarkerRange: 1300,
+  edgeMarkerInset: 24,
+  edgeMarkerHeaderGap: 6,
   compassRange: 800,
   crashConeHalfAngle: 0.42,
 } satisfies RenderConfig);

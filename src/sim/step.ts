@@ -28,6 +28,7 @@ export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
     capture: null,
     bodies: createBodies(cfg),
     fuel: cfg.fuelMax,
+    highWaterY: 0,
     ending: { active: false, t: 0, x: 0, y: 0, reason: 'impact' },
     holdConsumed: false,
     telemetry: { lastGrab: null, floorSubsteps: 0, floorSubstepsTotal: 0, putterOuts: 0 },
@@ -49,6 +50,7 @@ export function respawn(state: SimState, cfg: SimConfig): void {
   ship.burstY = 0;
   ship.burstT = 0;
   state.fuel = cfg.fuelMax;
+  state.highWaterY = ship.y;
   state.capture = null;
   // The prototype cleared its input flag here; input is an input, so the
   // equivalent fact is recorded in state. See docs/PORT_NOTES.md note 7.
@@ -141,6 +143,16 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // ---- bounds: leaving the field ends the run
   const pos = shipWorldPos(state);
   const fb = fieldBounds(cfg, state.bodies);
+  if (pos.y < state.highWaterY) state.highWaterY = pos.y;
+
+  // Falling too far behind the high-water mark ends the run. The floor trails the
+  // climb, so it is pressure to keep going rather than a wall you meet once.
+  if (cfg.backtrackLimit > 0 && pos.y > state.highWaterY + cfg.backtrackLimit) {
+    endRun(state, 'fell-behind', pos.x, pos.y);
+    state.tick++;
+    return;
+  }
+
   const outX = pos.x < fb.left - 4 || pos.x > fb.right + 4;
   const outY = pos.y > fb.bottom || pos.y < fb.top;
   if (outX || outY) {

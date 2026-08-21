@@ -76,6 +76,7 @@ export function fingerprint(state: SimState): number {
     state.ship.burstX,
     state.ship.burstY,
     state.fuel,
+    state.highWaterY,
     state.ending.active ? 1 : 0,
     state.ending.t,
     cap ? 1 : 0,

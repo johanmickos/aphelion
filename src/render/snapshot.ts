@@ -46,6 +46,8 @@ export interface RenderSnapshot {
     minR: number;
   } | null;
   fuel: number;
+  /** Highest point reached this run — the trailing floor hangs below it. */
+  highWaterY: number;
   held: boolean;
   /** The most recent grab attempt and its outcome, for the readout. */
   lastGrab: { tick: number; result: GrabResult } | null;
@@ -87,6 +89,7 @@ export function captureSnapshot(state: SimState, held: boolean, cfg: SimConfig):
         }
       : null,
     fuel: state.fuel,
+    highWaterY: state.highWaterY,
     held,
     lastGrab: state.telemetry.lastGrab ? { ...state.telemetry.lastGrab } : null,
     ending: { ...state.ending },

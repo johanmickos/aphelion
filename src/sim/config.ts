@@ -80,6 +80,19 @@ export interface SimConfig {
   /** How many bodies the field holds. */
   bodyCount: number;
   /**
+   * How far below the highest point reached a run may fall before it ends.
+   * 0 disables it entirely.
+   */
+  backtrackLimit: number;
+  /**
+   * Furthest a grab can reach. 0 is unlimited.
+   *
+   * Gravity in this simulation only exists during a capture, so without a limit
+   * the ship can seize a body it cannot see — which reads as the game reaching
+   * out for you rather than you reaching for it.
+   */
+  grabRange: number;
+  /**
    * Generate the field instead of using the prototype's hand-authored eight.
    *
    * The authored layout is the *prototype's* world and cannot be retuned without
@@ -146,6 +159,8 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
 
   fieldWidthFrac: 1.2,
   bodyCount: 8,
+  backtrackLimit: 0,
+  grabRange: 0,
   proceduralLayout: false,
   bodySpacing: 0,
 
@@ -196,6 +211,8 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   crashConeRange: 50,
   fieldWidthFrac: 1.9,
   bodyCount: 32,
+  backtrackLimit: 520,
+  grabRange: 560,
   proceduralLayout: true,
   bodySpacing: 360,
 } satisfies SimConfig);
@@ -207,7 +224,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 3;
+export const SIM_VERSION = 4;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

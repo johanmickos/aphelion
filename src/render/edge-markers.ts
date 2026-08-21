@@ -5,6 +5,10 @@
  * always on, which is what gives you any spatial sense at all during a long
  * drift or a fast flyby — the moments when you most need to know where anything
  * is and the compass cannot help.
+ *
+ * Upward only, like the compass. An arrow at the bottom of the screen points back
+ * down the climb at somewhere you have already been, which is both clutter and a
+ * suggestion to turn around.
  */
 import type { Body } from '../sim/types.ts';
 import { hypot } from '../sim/orbit.ts';
@@ -19,15 +23,32 @@ export function drawEdgeMarkers(
   rcfg: RenderConfig,
   snap: RenderSnapshot,
   bodies: readonly Body[],
+  /**
+   * How far down the header text reaches, in design units — measured by the app
+   * rather than assumed here, so this follows the real element through safe-area
+   * insets, font changes and label edits instead of being a magic number that
+   * quietly stops matching.
+   */
+  headerBottom = 0,
 ): void {
   const s = cam.scale;
   const winL = cam.offsetX;
   const winT = cam.offsetY;
   const winW = cam.designW * s;
   const winH = cam.viewH * s;
-  const inset = 24 * s;
   const cx = winL + winW / 2;
   const cy = winT + winH / 2;
+  // The arrow ring is inset asymmetrically — more at the top, where the readout
+  // and stage label sit — so it is a plain rectangle rather than one centred on
+  // the ray origin, and needs a proper slab intersection rather than a symmetric
+  // half-width shortcut.
+  const boxL = winL + rcfg.edgeMarkerInset * s;
+  const boxR = winL + winW - rcfg.edgeMarkerInset * s;
+  // Every arrow points up the climb, so they all cluster along the top edge —
+  // exactly where the readout and the stage label live. Sit them just under it.
+  const topInset = Math.max(rcfg.edgeMarkerInset, headerBottom + rcfg.edgeMarkerHeaderGap);
+  const boxT = winT + topInset * s;
+  const boxB = winT + winH - rcfg.edgeMarkerInset * s;
 
   ctx.save();
   for (const b of bodies) {
@@ -37,6 +58,7 @@ export function drawEdgeMarkers(
     const onScreen = bx > winL - r && bx < winL + winW + r && by > winT - r && by < winT + winH + r;
     if (onScreen) continue;
 
+    if (b.y >= snap.y) continue; // behind us, down the climb
     const dist = hypot(b.x - snap.x, b.y - snap.y);
     if (dist > rcfg.edgeMarkerRange) continue;
 
@@ -46,12 +68,11 @@ export function drawEdgeMarkers(
     dx /= len;
     dy /= len;
 
-    // where the ray from the centre meets the inset window rectangle
-    const halfW = winW / 2 - inset;
-    const halfH = winH / 2 - inset;
-    const tx = dx !== 0 ? halfW / Math.abs(dx) : 1e9;
-    const ty = dy !== 0 ? halfH / Math.abs(dy) : 1e9;
+    // where the ray from the centre first leaves the inset rectangle
+    const tx = dx > 0 ? (boxR - cx) / dx : dx < 0 ? (boxL - cx) / dx : Infinity;
+    const ty = dy > 0 ? (boxB - cy) / dy : dy < 0 ? (boxT - cy) / dy : Infinity;
     const t = Math.min(tx, ty);
+    if (!Number.isFinite(t) || t <= 0) continue;
     const ex = cx + dx * t;
     const ey = cy + dy * t;
 

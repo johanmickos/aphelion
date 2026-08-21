@@ -69,6 +69,10 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
   const pi = nearestBody(state);
   if (pi < 0) return 'refused-no-body';
   const p = state.bodies[pi]!;
+  if (cfg.grabRange > 0) {
+    const reach = hypot(state.ship.x - p.x, state.ship.y - p.y);
+    if (reach > cfg.grabRange) return 'refused-out-of-range';
+  }
   if (inCrashCone(cfg, state, p)) return 'refused-crash-cone';
 
   const { ship } = state;
