@@ -276,11 +276,17 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     const jump = Math.hypot(curr.x - prev.x, curr.y - prev.y);
     if (jump > TELEPORT_DISTANCE) {
       scene.trail.clear();
+      // A full tank came with the new ship; a warning about the old one's is a
+      // message about a run that is over.
+      scene.fuelWarning.clear();
       centerCamera(cam, curr.x, curr.y, field, backtrackFloorY(sim, curr.highWaterY));
     }
 
     // Sampled on the fixed tick so trail length never depends on frame rate.
     scene.trail.sample(curr.x, curr.y, Math.hypot(curr.vx, curr.vy));
+    // Fed on the tick for the same reason: a dip below the low line and back can
+    // fit entirely between two frames, and that dip is the whole warning.
+    scene.fuelWarning.observe(curr, sim);
     recorder.recordTick(state);
   },
   render(alpha, frameDt) {

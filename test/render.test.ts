@@ -17,7 +17,15 @@ import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
 import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture.ts';
-import { GAUGE, drawFuelGauge, drawScore, formatScore, readoutLines } from '../src/render/hud.ts';
+import {
+  FUEL_LOW_FRAC,
+  GAUGE,
+  drawFuelGauge,
+  drawScore,
+  formatScore,
+  readoutLines,
+} from '../src/render/hud.ts';
+import { FUEL_WARNING, FuelWarning, pulseAlpha } from '../src/render/fuel-warning.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
 import { LEVEL, SHOUT } from '../src/render/accolade.ts';
@@ -1488,5 +1496,187 @@ describe('edge markers clear the header text', () => {
       expect(x).toBeGreaterThanOrEqual(left - 1e-6);
       expect(x).toBeLessThanOrEqual(right + 1e-6);
     }
+  });
+});
+
+/**
+ * The fuel warning beside the ship.
+ *
+ * Every one of these pins a transition, not a state: the badge exists precisely
+ * because a standing indicator is not a warning. The gauge in the corner already
+ * says what the level IS.
+ */
+describe('the fuel warning beside the ship', () => {
+  const sim = DEFAULT_CONFIG;
+  const base = captureSnapshot(createInitialState(sim), false, sim);
+  const snap = (over: Partial<RenderSnapshot> = {}): RenderSnapshot => ({ ...base, ...over });
+
+  const full = sim.fuelMax;
+  const lowAt = FUEL_LOW_FRAC * full;
+
+  /**
+   * Feed a series of fuel levels, one per tick, letting each flash lapse before
+   * the next level arrives. Reports the flashes in the order they fired.
+   */
+  function feed(levels: number[]): string[] {
+    const w = new FuelWarning();
+    const fired: string[] = [];
+    for (const fuel of levels) {
+      w.observe(snap({ fuel }), sim);
+      const now = w.live();
+      if (now !== null) fired.push(now);
+      w.update(FUEL_WARNING.PULSES * FUEL_WARNING.PULSE_SEC);
+    }
+    return fired;
+  }
+
+  it('flashes yellow on the way down through the gauge’s own low line', () => {
+    expect(feed([full, lowAt + 1, lowAt - 1])).toEqual(['low']);
+  });
+
+  it('says nothing while the tank is merely low, only when it becomes low', () => {
+    // Sitting below the line is not an event. It is 4.7% of a session.
+    expect(feed([lowAt - 1, lowAt - 2, lowAt - 3, lowAt - 4])).toEqual([]);
+  });
+
+  it('does not re-fire while the tank hovers on the line', () => {
+    expect(feed([full, lowAt - 1, lowAt + 1, lowAt - 1, lowAt + 1, lowAt - 1])).toEqual(['low']);
+  });
+
+  it('re-arms once a real refill has come back', () => {
+    const refilled = FUEL_WARNING.LOW_REARM_FRAC * full + 1;
+    expect(feed([full, lowAt - 1, refilled, lowAt - 1])).toEqual(['low', 'low']);
+  });
+
+  it('flashes red when the tank runs dry — the reason the ship stopped', () => {
+    expect(feed([full, lowAt - 1, 4, 0])).toEqual(['low', 'empty']);
+  });
+
+  it('lets the worse warning interrupt the better one', () => {
+    const w = new FuelWarning();
+    w.observe(snap({ fuel: full }), sim);
+    w.observe(snap({ fuel: lowAt - 1 }), sim);
+    expect(w.live()).toBe('low');
+    w.update(0.2);
+    w.observe(snap({ fuel: 0 }), sim);
+    expect(w.live()).toBe('empty');
+    // and it restarts rather than inheriting what was left of the low flash
+    w.update(FUEL_WARNING.PULSES * FUEL_WARNING.PULSE_SEC - 0.21);
+    expect(w.live()).toBe('empty');
+  });
+
+  it('flashes red when a grab is refused for an empty tank', () => {
+    const w = new FuelWarning();
+    w.observe(snap({ tick: 10, fuel: 0.4 }), sim);
+    w.observe(
+      snap({ tick: 11, fuel: 0.4, lastGrab: { tick: 11, result: 'refused-no-fuel' } }),
+      sim,
+    );
+    expect(w.live()).toBe('empty');
+  });
+
+  it('ignores a grab refused for any other reason', () => {
+    const w = new FuelWarning();
+    w.observe(snap({ tick: 10, fuel: full }), sim);
+    w.observe(
+      snap({ tick: 11, fuel: full, lastGrab: { tick: 11, result: 'refused-crash-cone' } }),
+      sim,
+    );
+    expect(w.live()).toBe(null);
+  });
+
+  it('keeps quiet during the crash freeze — the crash is its own message', () => {
+    const w = new FuelWarning();
+    const ending = { active: true, t: 0, x: 0, y: 0, reason: 'impact' as const };
+    w.observe(snap({ fuel: full }), sim);
+    w.observe(snap({ fuel: 0, ending }), sim);
+    expect(w.live()).toBe(null);
+  });
+
+  it('does not flash on the refill a respawn brings', () => {
+    const w = new FuelWarning();
+    w.observe(snap({ fuel: 2 }), sim);
+    w.observe(snap({ fuel: full }), sim);
+    expect(w.live()).toBe(null);
+  });
+
+  it('is three flashes, and then it is gone', () => {
+    const step = 0.005;
+    let flashes = 0;
+    let on = false;
+    for (let t = 0; t < FUEL_WARNING.PULSES * FUEL_WARNING.PULSE_SEC + 0.5; t += step) {
+      const lit = pulseAlpha(t) > 0;
+      if (lit && !on) flashes++;
+      on = lit;
+    }
+    expect(flashes).toBe(FUEL_WARNING.PULSES);
+    expect(pulseAlpha(FUEL_WARNING.PULSES * FUEL_WARNING.PULSE_SEC)).toBe(0);
+
+    const w = new FuelWarning();
+    w.observe(snap({ fuel: full }), sim);
+    w.observe(snap({ fuel: 0 }), sim);
+    w.update(FUEL_WARNING.PULSES * FUEL_WARNING.PULSE_SEC - 0.01);
+    expect(w.live()).toBe('empty');
+    w.update(0.02);
+    expect(w.live()).toBe(null);
+  });
+
+  it('sits below the ship, clear of the lane the score popups rise through', () => {
+    const w = new FuelWarning();
+    const c = cam();
+    const at = snap({ x: 195, y: 0, fuel: 0 });
+    w.observe(snap({ fuel: full }), sim);
+    w.observe(at, sim);
+    w.update(FUEL_WARNING.PULSE_SEC / 4); // past the attack ramp, which starts at zero
+    const r = recordingContext();
+    w.draw(r.ctx, c, at);
+    const shipY = toScreenY(c, at.y);
+    const ys = (r.calls('fillText') as Array<[string, string, number, number]>).map((o) => o[3]);
+    expect(ys.length).toBeGreaterThan(0);
+    for (const y of ys) expect(y).toBeGreaterThan(shipY);
+  });
+
+  it('takes both colours from the gauge’s own ramp, so the two cannot drift', () => {
+    const drawn = (fuels: number[]): string[] => {
+      const w = new FuelWarning();
+      for (const f of fuels) w.observe(snap({ fuel: f }), sim);
+      w.update(FUEL_WARNING.PULSE_SEC / 4);
+      const r = recordingContext();
+      w.draw(r.ctx, cam(), snap({ x: 195, y: 0 }));
+      return (r.calls('=strokeStyle') as Array<[string, string]>).map((o) => o[1]);
+    };
+    expect(drawn([full, lowAt - 1])).toContain(FUEL_RAMP[3]);
+    expect(drawn([full, 0])).toContain(FUEL_RAMP[0]);
+  });
+
+  it('draws nothing at all when there is no warning', () => {
+    const r = recordingContext();
+    new FuelWarning().draw(r.ctx, cam(), snap());
+    expect(r.ops).toEqual([]);
+  });
+
+  it('fires once, in order, over a real fuel-burning flyby', () => {
+    // The braked flyby from test/flyby-fuel.test.ts, started on a third of a
+    // tank: the brake burns through the low line and then through the bottom.
+    // On a FULL tank this same flyby converts with 43 left, which is the point —
+    // the badge fires on the transitions, not on the manoeuvre.
+    const state = createInitialState(sim);
+    state.ship.x = 105;
+    state.ship.y = 354;
+    state.ship.vx = 0;
+    state.ship.vy = -400;
+    state.fuel = 0.33 * sim.fuelMax;
+    const w = new FuelWarning();
+    const fired: string[] = [];
+    let prev: string | null = null;
+    for (let i = 0; i < 300; i++) {
+      stepSim(state, sim, { held: i >= 20, pressed: i === 20, released: false }, FIXED_DT);
+      w.observe(captureSnapshot(state, i >= 20, sim), sim);
+      const now = w.live();
+      if (now !== null && now !== prev) fired.push(now);
+      prev = now;
+      w.update(FIXED_DT);
+    }
+    expect(fired).toEqual(['low', 'empty']);
   });
 });

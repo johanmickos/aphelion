@@ -178,9 +178,15 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
   const vEsc = escapeSpeed(cfg, r);
   const bound = spd < vEsc * 0.98;
   const movingOutward = vrad > 0;
-  // A bound ship is coming back whatever direction it happens to be pointing, so
-  // being momentarily outbound does not make it a flyby.
-  const isFlyby = cfg.boundGrabsCapture ? !bound : !bound || (movingOutward && inb < 0.02);
+  // A bound ship is coming back whatever direction it happens to be pointing —
+  // but "coming back" can mean ten seconds and half a field away, and a capture
+  // that cannot reach its own periapsis before the wall is not a capture. Above
+  // `outboundFlybyFrac` of escape speed an outbound grab is a flyby, so holding
+  // brakes it round instead of coasting free and silent. See the key's own note.
+  const unreachable = movingOutward && spd > cfg.outboundFlybyFrac * vEsc;
+  const isFlyby = cfg.boundGrabsCapture
+    ? !bound || unreachable
+    : !bound || (movingOutward && inb < 0.02);
 
   const cap: Capture = {
     phase: isFlyby ? 'flyby' : 'clear',

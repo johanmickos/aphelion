@@ -11,3 +11,6 @@ pnpm-lock.yaml
 # Claude Code's own state, including git worktrees — those are full checkouts of
 # this repo and are formatted on their own branch, not from this working tree.
 .claude
+
+# Throwaway measurement scripts, gitignored. Not ours to keep tidy.
+scratch

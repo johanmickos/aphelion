@@ -1507,6 +1507,170 @@ answers neither side of it. `rcfg` is a copy of the defaults now so the toggle c
 take effect mid-run — render config cannot reach the simulation, which `pnpm
 portable` enforces, so nothing a replay reproduces can move.
 
+### 39 — Every fuel cue lived where nobody was looking
+
+`src/render/fuel-warning.ts` · `src/render/hud.ts` · **[ADDED]** · from
+`docs/IDEAS.md`, "flash a brief icon next to ship when running out of fuel"
+
+Fuel is the only resource in the game, and everything that reported on it sat in
+the bottom-left corner (the gauge, its flashing LOW badge) or under the score (the
+readout's `⚠ LOW FUEL`, `⚠ OUT OF FUEL`). The one moment those matter is the
+moment the ship stopped doing what the player asked — the circularisation puttered
+out, the flyby brake quit — and at that moment the player is looking at the ship.
+The answer was two hundred pixels away, in the periphery, competing with a
+starfield.
+
+So the corner gauge is now also drawn beside the ship, miniaturised and empty, for
+three flashes on the transition. Deliberately the same object rather than a new
+symbol: the shape says "fuel", the colour says how bad, the word says which. Both
+colours are `FUEL_RAMP` entries — the ramp's red for empty and its yellow for low
+— so the badge and the gauge cannot come to disagree about what red means, the
+same reason `accolade.ts` is one table with two consumers.
+
+**A transition, never a state.** Replayed over 54 recordings, 60 minutes of play:
+
+```
+                                        fires   per min   sessions
+  crossed DOWN through LOW (0.25)          71     1.18      25/54
+  crossed DOWN through 0.15                54     0.89      23/54
+  ran the tank dry                         36     0.60      15/54
+  grab refused for an empty tank            0     0.00       0/54
+  re-pressed with an empty tank             0     0.00       0/54
+
+  time spent below LOW: 4.7% of ticks     at zero: 1.1%
+```
+
+The tank sits below LOW for 4.7% of a session, so a standing badge beside the ship
+would be part of the ship's silhouette for a twentieth of the run and would stop
+being a warning. One flash per crossing, at 1.18/min, is roughly one every fifty
+seconds.
+
+The threshold is `FUEL_LOW_FRAC`, extracted from the literal `0.25` inside
+`drawFuelGauge` and now shared. Measuring 0.15 as an alternative is what settled
+it: it only removes a quarter of the firings, which is not worth two cues that
+disagree about when the tank is low.
+
+**The re-arm is what makes it a warning and not a tic.** Fuel regenerates during
+drift, so a tank parked on the line re-crosses it every second or so. The low
+badge re-arms only above 40% of the tank, the empty badge only above 0.5 fuel —
+which is `beginCapture`'s own refusal threshold, so it re-arms exactly when a grab
+becomes possible again.
+
+**The refused grab has never happened.** Zero times in 60 minutes: the drift you
+would be tapping from regenerates enough fuel to grab with before you arrive. It
+is wired up anyway, because it is the one case where the game genuinely ignores an
+input and the player has no other cue at all, and because `GrabResult` is a union
+— a new way to refuse a grab makes the compiler ask whether it belongs here. The
+other measured-at-zero trigger, re-pressing mid-capture on an empty tank, was
+dropped: running dry already fires while the player is holding.
+
+**It changes nothing under `src/sim/`.** The badge is an observer of
+`RenderSnapshot` — fuel, `lastGrab`, `ending` — fed on the fixed tick like `Trail`
+(a dip below the line and back can fit between two frames, and that dip is the
+whole warning) and aged on the frame delta like `Popups` (three flashes should
+look like three flashes at 120Hz). No new snapshot field, no config key, no
+`SIM_VERSION` bump; the equality gate stays at exactly zero and the golden did not
+move.
+
+It draws BELOW the ship. Score popups rise from `SPAWN_LIFT` above it and keep
+rising, and the capture that runs the tank dry is exactly the capture also raising
+a word — two channels, two sides. The crash freeze suppresses it entirely: a tank
+that ran dry on the way into a planet does not get to explain the planet.
+
+### 40 — A capture you cannot reach is not a capture **[FIXED]**
+
+`src/sim/capture.ts` · `beginCapture()` · **[CHANGED]** · reported as "here my
+last capture attempt spent no fuel. Why is that?"
+
+It had not spent any, and nothing was wrong with the fuel. The grab took, entered
+`clear`, and `clear` is the free phase — only the settle (`fuelPerSec`) and the
+flyby brake (`flybyFuelPerSec`) ever spend. A capture converts to a settle at
+**periapsis**, and that grab had none ahead of it.
+
+The press at tick 777 re-grabbed the planet it had released from eleven ticks
+earlier:
+
+```
+  r = 100      speed 311      escape speed there 331   ->  BOUND (94% of it)
+  radial velocity +223                                 ->  already leaving
+```
+
+`boundGrabsCapture: true` says a grab below escape speed is a capture, so: phase
+`clear`, waiting for a periapsis on the far side of an orbit roughly ten seconds
+wide. The checkpoints — phone truth, though that session's replay diverged at tick
+200 — show the whole hold in one column:
+
+```
+  tick 780   r=100   speed 311   fuel 77.2   clear
+  tick 840   r=284   speed 180   fuel 77.2   clear
+  tick 900   r=425   speed 140   fuel 77.2   clear
+  tick 920   r=467               fuel 81.2   drift   <- released, regen resumes
+```
+
+Re-flown from the tick-780 checkpoint: out of bounds against the left wall at
+**t=2.78s**. The field was three seconds away and periapsis was ten. Two seconds
+of holding the button, no fuel, no burn indicator, and no readout — `clear` is the
+one phase with nothing to say, while a flyby gets `BRAKING — n% over`.
+
+**`boundGrabsCapture` had traded one failure for its mirror.** The prototype
+called any outbound grab a flyby regardless of speed (41% of grabs, note at the
+key); the replacement rule says bound is always a capture, which says nothing
+about whether the capture is REACHABLE. Measured over 55 recordings, 60 minutes,
+694 grabs that began in `clear`:
+
+```
+  OUTBOUND grabs        n   reached periapsis   run ended still holding
+    below 0.65         31        12 (39%)              3 (10%)
+    0.65 and above     78         4 ( 5%)             16 (21%)
+  INBOUND, 0.80+      136       124 (91%)              1 ( 1%)
+```
+
+Above 0.65 of escape speed an outbound grab converts four times in seventy-eight
+and ends the run one time in five. Below it, it behaves like an ordinary slow
+grab. So `outboundFlybyFrac` is 0.65 — the resolution the data supports, not a
+rounder number that would look more deliberate. It reclassifies 78 of 694 grabs
+(11%), against the 41% the prototype's rule caught.
+
+**A flyby is the right answer for them, not a refusal.** The brake is the
+mechanism that fixes this exact shape: it sheds radial speed first
+(`flybyRadialBias`), it already knows the case (`flybyOutwardEase` — "brake gently
+so the ship coasts wide and arcs back"), and conversion needs bound AND inbound,
+so a braked outbound grab converts when it has actually turned around rather than
+the instant it is classified. The same re-flight, under the new rule:
+
+```
+  t=0.02  flyby   fuel 76.5      the brake fires
+  t=1.02  flyby   fuel 59.3      radial speed shed
+  t=2.02  clear   fuel 68.2      bound AND inbound -> converted, refund paid
+  t=4.02  settle  fuel 63.1      periapsis reached
+  t=4.93  orbit   fuel 46.9      settled
+```
+
+Out-of-bounds death becomes a stable orbit for 30 fuel — and holding costs fuel,
+which is what the report was asking for.
+
+**The prototype holds 1, not 0.** The key is inert under
+`boundGrabsCapture: false`, so the prototype cannot tell the difference and the
+gate stays at exactly zero — the golden recapture moved one line of recorded
+config and not one number. But `configFromReport` resolves a missing key from
+PROTOTYPE_CONFIG, and a report recorded before this key existed ran with bound
+grabs as captures. 1 is what those sessions did; 0 would replay every one of their
+outbound grabs as a flyby and still grade itself faithful. That is note 21, and it
+is why the prototype value is chosen by what older reports did rather than by what
+looks inert.
+
+**It is a knob**, `CATCH` in the tune panel's FLYBY group, because it changes how
+the game feels and the only way to judge that is to fly it. It sits at the top of
+that group rather than in CAPTURE: what it moves is which grabs REACH the brake,
+so it is the door into the group, not a property of the dive. 1 is the old rule, 0
+is the prototype's.
+
+**Fixed alongside:** `pnpm check` failed on a measurement script. `scratch/` is
+gitignored for exactly those (AGENTS, "thresholds are measured"), but ESLint and
+Prettier were still walking it, so a throwaway file blocked the gate — the third
+time a directory that is deliberately not part of the build has done this, after
+`dist` and `.claude`. Both ignore `scratch` now.
+
 ---
 
 ## Tuning vs. fidelity
@@ -1531,11 +1695,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 79 · camera 34
-         diagnostics 25 · backtrack 15 · world 14 · tune 7 · clearance 6
+tests    port-equality 11 · invariants 32 · render 94 · camera 48
+         diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 10
          score 60 · input 8 · grab-target 8 · link-fuel 6
-         boost-envelope 6 · flyby-fuel 10 · anomaly 14
-         358 total
+         boost-envelope 6 · flyby-fuel 10 · anomaly 14 · outbound-grab 6
+         380 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
