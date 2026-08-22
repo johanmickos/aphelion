@@ -50,6 +50,7 @@
   "backtrackLimit": 0,
   "boundGrabsCapture": false,
   "clearanceOnConvert": false,
+  "clearanceEnergyNeutral": false,
   "grabRange": 0,
   "proceduralLayout": false,
   "worldSeed": 1592598101,

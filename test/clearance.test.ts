@@ -8,7 +8,13 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, FIXED_DT, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
-import { hypot } from '../src/sim/orbit.ts';
+import {
+  clearanceDelta,
+  clearanceDv,
+  escapeSpeed,
+  hypot,
+  naturalPeriapsis,
+} from '../src/sim/orbit.ts';
 import type { Input } from '../src/sim/types.ts';
 
 /** Sweep every grab the field allows and report how the dives went. */
@@ -120,5 +126,77 @@ describe('every capture gets clearance', () => {
     expect(cap.phase).not.toBe('flyby');
     expect(cap.clearFramesLeft, 'clearance was not applied to this capture').toBeGreaterThan(0);
     expect(hypot(cap.rx, cap.ry)).toBeGreaterThanOrEqual(cap.minR);
+  });
+});
+
+/**
+ * Clearance may not eject the ship it was invoked to hold.
+ *
+ * `clearanceDv` finds the smallest TANGENTIAL delta-v that lifts periapsis clear.
+ * It is minimal for that goal and says nothing about energy — so on a near-radial
+ * dive it hands the ship a large free impulse, and can push a bound ship above
+ * escape speed. The capture then never reaches periapsis, coasts, and leaves the
+ * field. Reported as "I kind of shot off the planet at super speed", with the
+ * nearest body 349px behind the wreck.
+ */
+describe('clearance never unbinds the ship', () => {
+  /** Bound dives that need clearing, across radius, speed and how head-on they are. */
+  function dives(): Array<{ r: number; vx: number; vy: number; vEsc: number }> {
+    const out: Array<{ r: number; vx: number; vy: number; vEsc: number }> = [];
+    for (const r of [110, 140, 180, 220, 280, 360]) {
+      const vEsc = escapeSpeed(DEFAULT_CONFIG, r);
+      for (const frac of [0.4, 0.55, 0.7, 0.85, 0.95]) {
+        const spd = vEsc * frac;
+        for (const radial of [0.999, 0.99, 0.95, 0.85, 0.7]) {
+          const vx = spd * Math.sqrt(1 - radial * radial);
+          const vy = spd * radial;
+          if (naturalPeriapsis(DEFAULT_CONFIG, 0, -r, vx, vy) >= 99) continue;
+          out.push({ r, vx, vy, vEsc });
+        }
+      }
+    }
+    return out;
+  }
+
+  it('is the defect it was, without the fix', () => {
+    // The pin. If this ever stops failing, the reason the flag exists has changed.
+    let ejected = 0;
+    for (const d of dives()) {
+      const dv = clearanceDv(DEFAULT_CONFIG, 0, -d.r, d.vx, d.vy, 99);
+      if (hypot(d.vx + dv.dvx, d.vy + dv.dvy) >= d.vEsc) ejected++;
+    }
+    expect(ejected).toBeGreaterThan(20);
+  });
+
+  it('leaves every bound dive bound', () => {
+    for (const d of dives()) {
+      const dv = clearanceDelta(DEFAULT_CONFIG, 0, -d.r, d.vx, d.vy, 99, d.vEsc * 0.98);
+      const after = hypot(d.vx + dv.dvx, d.vy + dv.dvy);
+      expect(after, `r=${d.r} was ejected`).toBeLessThan(d.vEsc);
+    }
+  });
+
+  it('changes nothing where the old impulse was already safe', () => {
+    // Minimal deviation, and it is load-bearing. Turning the heading everywhere
+    // was tried and put a kink into a scenario that had none — a turn is a sharper
+    // heading change than adding along it, and `clearEaseFrames` is the one
+    // frame-denominated constant in the simulation and may not be lengthened to
+    // hide that. So ordinary dives must come out bit-identical.
+    let identical = 0;
+    let total = 0;
+    for (const d of dives()) {
+      const a = clearanceDv(DEFAULT_CONFIG, 0, -d.r, d.vx, d.vy, 99);
+      if (hypot(d.vx + a.dvx, d.vy + a.dvy) >= d.vEsc * 0.98) continue;
+      total++;
+      const b = clearanceDelta(DEFAULT_CONFIG, 0, -d.r, d.vx, d.vy, 99, d.vEsc * 0.98);
+      if (a.dvx === b.dvx && a.dvy === b.dvy) identical++;
+    }
+    expect(total).toBeGreaterThan(30);
+    expect(identical).toBe(total);
+  });
+
+  it('is off in the prototype config, which keeps the gate at zero', () => {
+    expect(PROTOTYPE_CONFIG.clearanceEnergyNeutral).toBe(false);
+    expect(DEFAULT_CONFIG.clearanceEnergyNeutral).toBe(true);
   });
 });

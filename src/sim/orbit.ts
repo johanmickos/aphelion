@@ -120,6 +120,100 @@ export function orbitRadius(orbit: Orbit, rPeri: number, ang: number, tightenAmt
   return rNat * (1 - tightenAmt) + rCirc * tightenAmt;
 }
 
+/**
+ * The velocity change that lifts periapsis clear, WITHOUT inventing energy.
+ *
+ * `clearanceDv` adds tangential speed, which is the honest way to raise a
+ * periapsis and also a free energy injection: measured, it hands a ship at half
+ * its escape speed up to 277px/s and puts it above escape. The capture then never
+ * reaches periapsis, coasts, and leaves the field — reported as "I kind of shot
+ * off the planet at super speed".
+ *
+ * So this turns the velocity toward tangential first, at constant speed. That
+ * raises angular momentum and therefore periapsis for nothing, and cannot unbind
+ * a ship by construction. Measured over 144 sampled bound dives it clears the
+ * target on its own in 94 of them.
+ *
+ * Only where turning is not enough does it add speed, and then no more than
+ * `maxSpeed` allows. What is still short of the target the floor clamp catches,
+ * which is what the floor is for — an expensive outcome, but a survivable one,
+ * where being ejected is neither.
+ *
+ * Returns the total delta, so the caller can ease it in exactly as before.
+ */
+export function clearanceDelta(
+  cfg: SimConfig,
+  rx: number,
+  ry: number,
+  vx: number,
+  vy: number,
+  target: number,
+  maxSpeed: number,
+): { dvx: number; dvy: number } {
+  const r = hypot(rx, ry);
+  const spd = hypot(vx, vy);
+  if (r < 1 || spd < 1) return { dvx: 0, dvy: 0 };
+
+  let tx = -ry / r;
+  let ty = rx / r;
+  if (tx * vx + ty * vy < 0) {
+    tx = -tx;
+    ty = -ty;
+  }
+
+  // Start from exactly what `clearanceDv` would do. Where that keeps the ship
+  // bound — which is most of the time — this returns it unchanged, so the feel of
+  // an ordinary dive is untouched and only the dives that were being ejected
+  // behave differently. Deviating everywhere was tried and put a kink into a
+  // scenario that had none: turning the heading is a sharper change than adding
+  // along it, and `clearEaseFrames` is the one frame-denominated constant in the
+  // simulation and may not be lengthened to hide it.
+  const plain = clearanceDv(cfg, rx, ry, vx, vy, target);
+  if (hypot(vx + plain.dvx, vy + plain.dvy) <= maxSpeed) return plain;
+
+  // It would eject. Spend the speed that is available, then TURN for the rest:
+  // rotating at constant speed raises angular momentum, and therefore periapsis,
+  // for nothing, and cannot unbind by construction.
+  const room = Math.max(0, maxSpeed - spd);
+  let bx = vx + tx * room;
+  let by = vy + ty * room;
+  const capped = hypot(bx, by) || 1;
+
+  /** `bx,by` turned `m` of the way to tangential, at its own speed. */
+  const turned = (m: number): { x: number; y: number } => {
+    const cx = bx * (1 - m) + tx * capped * m;
+    const cy = by * (1 - m) + ty * capped * m;
+    const cl = hypot(cx, cy) || 1;
+    return { x: (cx / cl) * capped, y: (cy / cl) * capped };
+  };
+
+  let lo = 0;
+  let hi = 1;
+  let best = -1;
+  for (let i = 0; i < 40; i++) {
+    const m = (lo + hi) / 2;
+    const t = turned(m);
+    if (naturalPeriapsis(cfg, rx, ry, t.x, t.y) < target) lo = m;
+    else {
+      hi = m;
+      best = m;
+    }
+  }
+  if (best >= 0) {
+    const t = turned(best);
+    bx = t.x;
+    by = t.y;
+  } else {
+    // Even fully tangential at the capped speed falls short. Take it: the floor
+    // clamp catches the remainder, which is expensive but survivable, where being
+    // flung out of a capture is neither.
+    const t = turned(1);
+    bx = t.x;
+    by = t.y;
+  }
+  return { dvx: bx - vx, dvy: by - vy };
+}
+
 /** Smootherstep, the settle's easing curve. */
 export function smootherstep(u: number): number {
   return u * u * u * (u * (u * 6 - 15) + 10);

@@ -36,7 +36,14 @@
  */
 import type { SimConfig } from './config.ts';
 import type { Anomaly, Body, Capture, GrabResult, SimState } from './types.ts';
-import { circSpeed, clearanceDv, escapeSpeed, hypot, naturalPeriapsis } from './orbit.ts';
+import {
+  circSpeed,
+  clearanceDelta,
+  clearanceDv,
+  escapeSpeed,
+  hypot,
+  naturalPeriapsis,
+} from './orbit.ts';
 
 export type { GrabResult } from './types.ts';
 
@@ -237,7 +244,20 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
  */
 export function applyClearance(cap: Capture, cfg: SimConfig): void {
   if (naturalPeriapsis(cfg, cap.rx, cap.ry, cap.vx, cap.vy) >= cap.minR) return;
-  const dv = clearanceDv(cfg, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
+  // The cap matches the test that decided this was a capture in the first place.
+  // A nudge that pushes the ship back over that line has undone the classification
+  // it was invoked to serve.
+  const dv = cfg.clearanceEnergyNeutral
+    ? clearanceDelta(
+        cfg,
+        cap.rx,
+        cap.ry,
+        cap.vx,
+        cap.vy,
+        cap.minR,
+        escapeSpeed(cfg, hypot(cap.rx, cap.ry)) * 0.98,
+      )
+    : clearanceDv(cfg, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
   cap.clearDvx = dv.dvx / cfg.clearEaseFrames;
   cap.clearDvy = dv.dvy / cfg.clearEaseFrames;
   cap.clearFramesLeft = cfg.clearEaseFrames;
