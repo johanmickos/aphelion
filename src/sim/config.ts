@@ -396,6 +396,31 @@ export interface SimConfig {
    * standstill is simplest and leaves the stall in place, trading "I got stuck"
    * for "I died for no visible reason".
    */
+  /**
+   * Seconds a spent `zip` charge takes to glide the ship onto its orbit, or 0 to
+   * disable the charge entirely.
+   *
+   * A `zip` replaces a capture's dive with the authored glide an anomaly already
+   * uses (note 43): the press is the arrival, and a boundary-matched curve carries
+   * the ship onto its orbit in this long however far away it pressed. What it
+   * glides TO is not authored by anything — it is the orbit the dive would have
+   * reached, so aim still decides where the ship ends up. Measured across 248
+   * captures that lands at 0.29-0.96 of the press distance, median 0.45.
+   *
+   * WHY IT EXISTS. The zip out to an anomaly reads as the best moment in the game,
+   * and the ride home is the flattest: median 3.42s from press to parked, of which
+   * 2.22 is a dive the player has already earned the right to skip. One charge is
+   * granted by leaving an anomaly and spent by the next capture.
+   *
+   * Its own key rather than `anomalySettleDur`, because a charge is not an
+   * anomaly. The two happen to be equal today and have no reason to stay so — the
+   * first powerup that grants a zip will want to tune this without moving the rest
+   * stop's own feel.
+   *
+   * Inert in the prototype config, which has no anomalies and therefore no source
+   * of a charge; set to 0 anyway so the intent survives a future source.
+   */
+  zipDur: number;
   clearanceOnFlyby: boolean;
   clearanceOnConvert: boolean;
   /**
@@ -559,6 +584,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   boundGrabsCapture: false,
   // Inert here — but it is also what an older report replays under. See the key.
   outboundFlybyFrac: 1,
+  zipDur: 0,
   clearanceOnFlyby: false,
   clearanceOnConvert: false,
   clearanceEnergyNeutral: false,
@@ -689,6 +715,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   holdClimbInCapture: true,
   boundGrabsCapture: true,
   outboundFlybyFrac: 0.65,
+  zipDur: 0.45,
   clearanceOnFlyby: true,
   clearanceOnConvert: true,
   clearanceEnergyNeutral: true,
@@ -711,7 +738,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 18;
+export const SIM_VERSION = 19;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

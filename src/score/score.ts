@@ -251,6 +251,20 @@ export function scoreTick(
     // never again — the capture's own rx/ry/vx/vy start moving immediately.
     if (!sc.wasCaptured) {
       sc.grabSkim = skimClearance(sc, state, cap);
+      // The press distance, for a zipped capture exactly as for a flown one, and
+      // that is a correction to what this was nearly changed to.
+      //
+      // Judging a zip on the ORBIT it reaches sounds fairer — the zip does the
+      // closing, so score the closing — and was measured to be the opposite.
+      // `predictedCaptureOrbit` applies the clearance correction, so almost
+      // anything aimed near a body zips to a periapsis at `minR`: scoring that
+      // paid a zipped grab 1.35x what the same approach earned by flying, p90
+      // 7.6x, worst 14.6x, and it paid MOST for the lazy point-blank press it was
+      // supposed to discourage. On `grabR` the ratio is 1.00 across all 446 pairs.
+      //
+      // Which is the right answer for a reason better than the numbers: a zip is
+      // a shortcut, not a discount or a bonus. It buys back the three seconds of
+      // flying, and what the capture is worth is left alone.
       sc.grabClearance = Math.max(0, cap.grabR - cap.minR);
       sc.maxDefl = 0;
       sc.periSeen = false;
@@ -264,7 +278,12 @@ export function scoreTick(
     // the surface, so every tap would be a tight grab. Periapsis is the moment
     // the swing actually happened; a couple of ticks past it is when it reads as
     // having happened, on the way back out.
-    if (!sc.periSeen && cap.passedPeri) {
+    // The arrival has happened. For a dive that is periapsis — the moment the
+    // swing actually occurred. For a zip it is the end of the glide, which is the
+    // same moment wearing different clothes: the point at which the ship is where
+    // it was going. Paying either at the press would be paying for the intention.
+    const arrived = cap.zipped ? cap.phase === 'orbit' : cap.passedPeri;
+    if (!sc.periSeen && arrived) {
       sc.periSeen = true;
       sc.grabDue = GRAB_AWARD_DELAY;
     }

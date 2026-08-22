@@ -198,6 +198,17 @@ export interface Capture {
   /** Seconds this capture takes to settle. `SimConfig.settleDur` unless authored. */
   settleDur: number;
 
+  /**
+   * This capture's arrival was bought with a `zip` charge rather than flown.
+   *
+   * Physics never reads it — the authored glide is already described by
+   * `settleSweep` and friends. It exists for the SCORER, and for one thing only:
+   * WHEN the grab award is owed. A flown capture owes it at periapsis, the moment
+   * the swing happened; a zipped one has no periapsis to swing through, so it owes
+   * it when the glide ends and the ship is where it was going. What the award is
+   * worth is deliberately identical either way — see `score.ts`.
+   */
+  zipped: boolean;
   /** Ran dry mid-circularization; the ship putters out with a weak, boostless release. */
   puttered: boolean;
 
@@ -280,8 +291,54 @@ export interface SimState {
    * fact is recorded in state instead. See docs/PORT_NOTES.md note 7.
    */
   holdConsumed: boolean;
+  /**
+   * Earned effects the ship is carrying, each spent by a later action.
+   *
+   * A ledger rather than a flag, and deliberately not named after where it came
+   * from: today the only charge is `zip` and the only source is leaving an
+   * anomaly, but a charge is a thing the ship HAS, not a fact about its history.
+   * A pickup, a streak reward or a stage bonus granting one later needs no new
+   * state and no new spending path — only a call to `grantCharge`.
+   *
+   * Part of the simulation, so it survives a replay: `(config, seed, inputLog)`
+   * still determines the run. Deliberately NOT in `fingerprint()` — a charge that
+   * differs changes the trajectory the moment it is spent, and the position and
+   * velocity already there catch that. Adding a field to the hash would make every
+   * report recorded before it read as diverged from its first checkpoint.
+   */
+  charges: Charges;
   /** Diagnostics only. Never read by physics; excluded from the fingerprint. */
   telemetry: Telemetry;
+}
+
+/**
+ * What a charge does when spent.
+ *
+ * `zip` replaces a capture's dive with the authored glide an anomaly already
+ * uses — see `AuthoredOrbit` and `SimConfig.zipDur`.
+ */
+export type ChargeKind = 'zip';
+
+export type Charges = Record<ChargeKind, number>;
+
+/**
+ * An orbit a capture is told to settle into, instead of inheriting one from a
+ * dive.
+ *
+ * An anomaly satisfies this structurally, which is how the rest stop authors its
+ * own orbit; a spent `zip` charge synthesises one from the orbit the dive WOULD
+ * have flown to, so the ship arrives where it was heading without flying there.
+ * Anything else that wants to author an arrival implements these four numbers.
+ */
+export interface AuthoredOrbit {
+  /** Radius of the circle the settle glides onto. */
+  orbitR: number;
+  /** Seconds per lap once parked. */
+  orbitPeriod: number;
+  /** Fuel per second restored while parked. 0 for most things. */
+  refuel: number;
+  /** Seconds the glide takes, whatever the distance. */
+  settleDur: number;
 }
 
 // ----------------------------------------------------------------------- input

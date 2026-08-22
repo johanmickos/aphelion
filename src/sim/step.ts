@@ -31,6 +31,7 @@ export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
     highWaterY: 0,
     ending: { active: false, t: 0, x: 0, y: 0, reason: 'impact' },
     holdConsumed: false,
+    charges: { zip: 0 },
     telemetry: { lastGrab: null, floorSubsteps: 0, floorSubstepsTotal: 0, putterOuts: 0 },
   };
   respawn(state, cfg);
@@ -55,6 +56,9 @@ export function respawn(state: SimState, cfg: SimConfig): void {
   // The prototype cleared its input flag here; input is an input, so the
   // equivalent fact is recorded in state. See docs/PORT_NOTES.md note 7.
   state.holdConsumed = true;
+  // Charges die with the ship. They are earned by flying, and carrying one across
+  // a death would pay the next run for the last one's work.
+  state.charges.zip = 0;
 }
 
 /** The ship's world position, wherever it currently lives. */

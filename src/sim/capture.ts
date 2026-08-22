@@ -35,7 +35,7 @@
  * docs/PORT_NOTES.md note 17.
  */
 import type { SimConfig } from './config.ts';
-import type { Anomaly, Body, Capture, GrabResult, SimState } from './types.ts';
+import type { AuthoredOrbit, Body, Capture, GrabResult, SimState } from './types.ts';
 import {
   circSpeed,
   clearanceDelta,
@@ -43,7 +43,9 @@ import {
   escapeSpeed,
   hypot,
   naturalPeriapsis,
+  predictedCaptureOrbit,
 } from './orbit.ts';
+import { grantCharge, spendCharge } from './charges.ts';
 
 export type { GrabResult } from './types.ts';
 
@@ -225,6 +227,7 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     boostFull: 0,
     boost: 0,
     boostT: 0,
+    zipped: false,
     puttered: false,
     // Seeded from the VELOCITY angle, which is what updateDefl compares against.
     // index.html seeded it from the position angle, so the first sample of every
@@ -258,8 +261,15 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
   // no periapsis to reach — the press is the conversion — so the failure it
   // guards against cannot happen here, at any speed or heading. It still governs
   // every planet, which is every body the rule was measured on.
-  if (p.kind === 'anomaly') {
-    freezeOrbit(cap, cfg, p);
+  // An authored arrival: the anomaly's own, or one a `zip` charge buys.
+  //
+  // The charge is spent here and nowhere else, so every future source of one —
+  // a pickup, a streak reward — gets this behaviour for free. An anomaly does not
+  // spend a charge: it authors its own arrival and always has.
+  const authored: AuthoredOrbit | null = p.kind === 'anomaly' ? p : zipOrbit(state, cfg, cap, p);
+  if (authored) {
+    freezeOrbit(cap, cfg, authored);
+    cap.zipped = p.kind !== 'anomaly';
     cap.phase = 'settle';
     // The swing has happened, as far as anything downstream is concerned: the
     // grab award is owed, and a release from here is a release from a real orbit.
@@ -278,6 +288,40 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
 
   state.capture = cap;
   return 'captured';
+}
+
+/**
+ * The orbit a spent `zip` charge glides onto, or null if there is no charge.
+ *
+ * Not authored by anything: it is the orbit the DIVE would have reached, which is
+ * the curve the compass already previews while diving. So a zip is a shortcut to
+ * where the ship was going rather than a different destination — aim still decides
+ * how tight the orbit is, and the end state is the one an ordinary capture
+ * converges to anyway.
+ *
+ * The period is the true circular one at that radius, so what the ship is left in
+ * is a physically correct orbit and not an authored pace. `settleSweep` then
+ * carries exactly what `stepPhase` would have eased toward on its own.
+ *
+ * Spends the charge as a side effect, and only once it is certain the zip will
+ * happen — a charge burned on a grab that was refused would be a charge stolen.
+ */
+function zipOrbit(state: SimState, cfg: SimConfig, cap: Capture, body: Body): AuthoredOrbit | null {
+  if (cfg.zipDur <= 0 || state.charges.zip <= 0) return null;
+  const predicted = predictedCaptureOrbit(cfg, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
+  // A hyperbola still has a periapsis and it is still where the ship was headed,
+  // so a zip rescues a flyby as readily as it shortcuts a dive. What it must not
+  // do is aim inside the surface.
+  const r = Math.max(cap.minR, predicted.periapsis);
+  if (!Number.isFinite(r) || r <= 0) return null;
+  if (!spendCharge(state, 'zip')) return null;
+  void body;
+  return {
+    orbitR: r,
+    orbitPeriod: (Math.PI * 2 * r) / Math.max(1e-6, circSpeed(cfg, r)),
+    refuel: 0,
+    settleDur: cfg.zipDur,
+  };
 }
 
 /**
@@ -318,7 +362,7 @@ export function applyClearance(cap: Capture, cfg: SimConfig): void {
  * instantaneous speed, because a floor clamp on a head-on dive craters the latter
  * and would flatten the oval into a circle.
  */
-export function freezeOrbit(cap: Capture, cfg: SimConfig, authored?: Anomaly | null): void {
+export function freezeOrbit(cap: Capture, cfg: SimConfig, authored?: AuthoredOrbit | null): void {
   const { rx, ry, vx, vy } = cap;
   const r = hypot(rx, ry);
   const spd = hypot(vx, vy);
@@ -438,6 +482,17 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
     const peakFrac = Math.max(0, Math.min(1, cap.boost / cap.boostFull));
     state.fuel = Math.min(cfg.fuelMax, state.fuel + cfg.linkFuelReward * peakFrac);
   }
+  // Leaving a rest stop pays for the ride home.
+  //
+  // Granted at the RELEASE, not at the grab, for the same reason the score's
+  // anomaly window is: the achievement is arriving, and the charge is for what
+  // comes next. Granted even on a weak release — a player who fumbles the exit of
+  // the hardest thing in the game has been punished by the link they did not get.
+  //
+  // This is a source, and it knows nothing about what a zip does. See
+  // `src/sim/charges.ts`.
+  if (cfg.zipDur > 0 && body.kind === 'anomaly') grantCharge(state, 'zip');
+
   const spd = hypot(cap.vx, cap.vy) || 1;
   const bx = cap.vx / spd;
   const by = cap.vy / spd;

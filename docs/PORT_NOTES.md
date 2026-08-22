@@ -1949,6 +1949,60 @@ trading "I got stuck" for "I died for no visible reason".
 
 ---
 
+### 47 — The zip is a charge, not an anomaly feature
+
+`src/sim/charges.ts` · `src/sim/capture.ts` · `src/sim/types.ts` ·
+`src/score/score.ts` · **[CHANGED]** · asked for as "I LOVE the zip to anomaly
+feel — can we have that same ZIP when I press again to capture a planet after
+coming home?"
+
+Note 43 made the press the arrival at an anomaly and it reads as the best moment
+in the game. The ride home is the flattest: measured over 248 planet captures,
+**3.42s median from press to parked**, p90 6.45 — of which 2.22s is a dive the
+player has already earned the right to skip.
+
+So leaving an anomaly grants one `zip` charge, and the next capture spends it.
+
+**Built as a ledger rather than a flag, on request**, because the zip is a good
+powerup and this is the shape that lets it become one. `SimState.charges` is a
+record keyed by `ChargeKind`; `grantCharge` and `spendCharge` live in their own
+leaf module so a source knows nothing about what the charge does and the site that
+spends it knows nothing about where it came from. A second source — a pickup, a
+streak reward — is a one-line call. `freezeOrbit` now takes a structural
+`AuthoredOrbit` rather than an `Anomaly`, which is what lets a charge author an
+arrival at a body that authors nothing.
+
+**What it glides to is not authored.** It is `predictedCaptureOrbit().periapsis` —
+the orbit the dive was heading for, the same curve the compass already previews
+while diving — so aim still decides how tight the orbit is, and the parked radius
+lands within 15% of the flown one in 86% of approaches. The period is the true
+circular one at that radius, so what the ship is left in is physically correct
+rather than an authored pace. A zip is a shortcut, not a different destination.
+
+**The scoring call was measured and it reversed the answer.** Judging a zipped
+grab on the ORBIT it reaches sounds fairer — the zip does the closing, so score the
+closing — and it pays 1.35x the flown award, p90 7.6x, worst **14.6x**. It is most
+generous exactly to the lazy point-blank press it was supposed to discourage,
+because `predictedCaptureOrbit` applies the clearance correction and lands almost
+any near aim at `minR`. On `grabR`, the way every other grab is judged, the ratio
+is **1.00 across all 446 pairs**. So the award is untouched and only its TIMING
+moves: a flown capture owes it at periapsis, a zipped one when the glide ends,
+since there is no periapsis to swing through. `Capture.zipped` exists for that one
+question and nothing else.
+
+No flag beyond `zipDur`, and no gate risk: the prototype config has no anomalies,
+so it has no source of a charge. `zipDur` is its own key rather than
+`anomalySettleDur` because a charge is not an anomaly — the first powerup that
+grants one will want to tune it without moving the rest stop's feel.
+
+**Noticed while measuring, not fixed:** a press during the death hold begins a
+capture on a dead ship, because input edges are handled before the ending check in
+`stepSim`. Harmless today — `respawn` clears the capture and the charges — but it
+is why a probe that put `highWaterY` below the ship saw a capture frozen at tick 1
+with `settleT` never advancing.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -1975,7 +2029,7 @@ tests    port-equality 11 · invariants 32 · render 97 · camera 53
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         401 total
+         zip-charge 8 · 409 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
