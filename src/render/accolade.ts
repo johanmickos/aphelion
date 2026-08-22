@@ -55,6 +55,30 @@ export const ROUTINE: AccoladeStyle = {
 };
 
 /**
+ * A hop inside a charged window — see `SimConfig.chargedSecs`.
+ *
+ * Off the ladder, like `SHOUT`, and for the same structural reason: it is not an
+ * answer to "how good was that?". Every hop pays the same flat `hopBonus`, so
+ * there is no quality for a rarity colour to report, and putting one on it would
+ * be inventing a distinction the award does not have.
+ *
+ * What the colour says instead is WHICH MODE the game is in, which is legitimate
+ * where a category colour was not: a category has to be learned before it means
+ * anything, whereas the player is already looking at an electrified ship and a
+ * draining purple bar. The hue is the anomaly's own — `rgba(168,92,255)`, the
+ * centre of the bubble it projects — so the popup is visibly the same substance
+ * that infected the ship.
+ *
+ * Measured, as the ladder was: dE 45.8 to its nearest neighbour (`SHOUT`), which
+ * clears this set's existing closest pair at dE 41.0 (`ROUTINE` vs `good`).
+ */
+export const HOP: AccoladeStyle = {
+  color: '#a85cff',
+  labelColor: 'rgba(168,124,220,.85)',
+  size: 15,
+};
+
+/**
  * The shout: off the ladder too, and on its own channel — see
  * `src/score/reckless.ts`.
  *

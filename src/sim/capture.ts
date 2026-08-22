@@ -45,7 +45,6 @@ import {
   naturalPeriapsis,
   predictedCaptureOrbit,
 } from './orbit.ts';
-import { grantCharge, spendCharge } from './charges.ts';
 
 export type { GrabResult } from './types.ts';
 
@@ -303,18 +302,18 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
  * is a physically correct orbit and not an authored pace. `settleSweep` then
  * carries exactly what `stepPhase` would have eased toward on its own.
  *
- * Spends the charge as a side effect, and only once it is certain the zip will
- * happen — a charge burned on a grab that was refused would be a charge stolen.
+ * Gated on the charged window rather than on a resource. There is nothing to
+ * spend and nothing to run out of: inside the window every grab zips, and how
+ * many you get is a question about how fast you fly, not about a counter.
  */
 function zipOrbit(state: SimState, cfg: SimConfig, cap: Capture, body: Body): AuthoredOrbit | null {
-  if (cfg.zipDur <= 0 || state.charges.zip <= 0) return null;
+  if (cfg.zipDur <= 0 || state.chargedT <= 0) return null;
   const predicted = predictedCaptureOrbit(cfg, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
   // A hyperbola still has a periapsis and it is still where the ship was headed,
   // so a zip rescues a flyby as readily as it shortcuts a dive. What it must not
   // do is aim inside the surface.
   const r = Math.max(cap.minR, predicted.periapsis);
   if (!Number.isFinite(r) || r <= 0) return null;
-  if (!spendCharge(state, 'zip')) return null;
   void body;
   return {
     orbitR: r,
@@ -482,16 +481,17 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
     const peakFrac = Math.max(0, Math.min(1, cap.boost / cap.boostFull));
     state.fuel = Math.min(cfg.fuelMax, state.fuel + cfg.linkFuelReward * peakFrac);
   }
-  // Leaving a rest stop pays for the ride home.
+  // Leaving a rest stop leaves you charged.
   //
-  // Granted at the RELEASE, not at the grab, for the same reason the score's
-  // anomaly window is: the achievement is arriving, and the charge is for what
-  // comes next. Granted even on a weak release — a player who fumbles the exit of
-  // the hardest thing in the game has been punished by the link they did not get.
+  // Opened at the RELEASE, not at the grab: converting the flyby, settling and
+  // waiting for a release angle costs 1.5-2s that would otherwise burn a third of
+  // the window inside an orbit going nowhere — and would mean holding a tighter,
+  // better orbit actively cost you window. Starting here makes `chargedSecs` the
+  // number the player experiences.
   //
-  // This is a source, and it knows nothing about what a zip does. See
-  // `src/sim/charges.ts`.
-  if (cfg.zipDur > 0 && body.kind === 'anomaly') grantCharge(state, 'zip');
+  // Opened even on a weak release. A player who fumbles the exit of the hardest
+  // thing in the game has already been punished by the link they did not get.
+  if (cfg.chargedSecs > 0 && body.kind === 'anomaly') state.chargedT = cfg.chargedSecs;
 
   const spd = hypot(cap.vx, cap.vy) || 1;
   const bx = cap.vx / spd;

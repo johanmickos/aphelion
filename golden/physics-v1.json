@@ -52,6 +52,7 @@
   "boundGrabsCapture": false,
   "outboundFlybyFrac": 1,
   "zipDur": 0,
+  "chargedSecs": 0,
   "clearanceOnFlyby": false,
   "clearanceOnConvert": false,
   "clearanceEnergyNeutral": false,

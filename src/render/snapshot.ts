@@ -65,6 +65,16 @@ export interface RenderSnapshot {
    */
   grabOffer: number;
   ending: { active: boolean; t: number; x: number; y: number; reason: EndingReason };
+  /**
+   * How much of the charged window is left, 1 at the release and 0 at the end.
+   * 0 when none is running.
+   *
+   * A fraction rather than the raw seconds, because the consumers are a gauge and
+   * a crackle: a gauge that had to know the window's configured length in order to
+   * draw itself would be a second place for that length to live. Derived here, in
+   * the one place that can see both the state and the config.
+   */
+  chargedFrac: number;
 }
 
 export function captureSnapshot(state: SimState, held: boolean, cfg: SimConfig): RenderSnapshot {
@@ -107,6 +117,8 @@ export function captureSnapshot(state: SimState, held: boolean, cfg: SimConfig):
     lastGrab: state.telemetry.lastGrab ? { ...state.telemetry.lastGrab } : null,
     grabOffer: state.capture ? -1 : grabTarget(state, cfg).index,
     ending: { ...state.ending },
+    chargedFrac:
+      cfg.chargedSecs > 0 ? Math.max(0, Math.min(1, state.chargedT / cfg.chargedSecs)) : 0,
   };
 }
 

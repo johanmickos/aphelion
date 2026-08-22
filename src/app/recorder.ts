@@ -22,7 +22,7 @@ export type InputRecord = [number, 0 | 1];
  * One scoring event exactly as the phone paid it.
  *
  * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body]`
- * with `kind` 'g' for a grab and 'l' for a link.
+ * with `kind` 'g' for a grab, 'l' for a link and 'h' for a hop.
  *
  * WHY THIS IS RECORDED AT ALL, when a score is a pure function of
  * (config, seed, inputLog) and a replay can recompute it: because in practice
@@ -43,7 +43,7 @@ export type InputRecord = [number, 0 | 1];
  */
 export type AwardRecord = [
   number,
-  'g' | 'l',
+  'g' | 'l' | 'h',
   number,
   number,
   number,
@@ -137,7 +137,7 @@ export class RunRecorder {
     for (const a of awards) {
       this.awards.push([
         a.tick,
-        a.kind === 'grab' ? 'g' : 'l',
+        a.kind === 'grab' ? 'g' : a.kind === 'link' ? 'l' : 'h',
         Math.round(a.points),
         q(a.multiplier),
         q(a.close),

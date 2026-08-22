@@ -19,7 +19,7 @@ export interface ScoreAward {
    * and it means holding on into a full orbit still collects, because periapsis
    * is already behind you.
    */
-  kind: 'grab' | 'link';
+  kind: 'grab' | 'link' | 'hop';
   /** Points actually applied. Never negative — nothing takes points away. */
   points: number;
   /** The multiplier in force. */
@@ -106,23 +106,6 @@ export interface ScoreState {
   streak: number;
   /** Live multiplier: the streak ladder, plus any anomaly bonus on top. */
   multiplier: number;
-  /**
-   * An anomaly bonus is running right now.
-   *
-   * Kept alongside `multiplier` rather than left for the HUD to infer, because
-   * the only thing it could infer from is the number — and a boosted x5 and an
-   * unboosted x7 are indistinguishable there.
-   */
-  bonusActive: boolean;
-  /**
-   * How much of the anomaly bonus window is left, 1 at the release and 0 at the
-   * end. 0 when none is running.
-   *
-   * A fraction rather than ticks, because the only consumer is a gauge and a
-   * gauge that has to know the window's configured length in order to draw itself
-   * is a second place for that length to live.
-   */
-  bonusFrac: number;
   /** Session totals, across every life. Diagnostics, not the score. */
   grabs: number;
   links: number;
@@ -155,21 +138,21 @@ export interface ScoreState {
   periSeen: boolean;
   /** Ticks left before the grab award lands. -1 once it has. */
   grabDue: number;
-  /**
-   * Tick the anomaly bonus expires on, or -1 when none is running.
-   *
-   * A tick and not a countdown, because `stepSim` may be called more than once
-   * per frame and a countdown would drain at the frame rate rather than the
-   * simulation's. `state.tick` is the only clock anything here may read.
-   */
-  bonusUntil: number;
-  /**
-   * Anomaly the current capture is of, once its grab has been paid. Held so the
-   * bonus can start at the RELEASE rather than at the grab, and cleared there.
-   */
-  bonusArmed: boolean;
   /** Names of anomalies already claimed this life. Cleared by `endLife`. */
   claimed: string[];
+  /**
+   * Bodies already hopped to in the CURRENT charged window.
+   *
+   * Cleared on the rising edge of the window, not on its close, so the log always
+   * describes the window in progress. Without it the optimal line inside a frenzy
+   * is to bounce on one planet: a press-glide-release cycle is about 1.2s, so the
+   * same body would pay three times without the ship going anywhere — in a game
+   * whose whole subject is climbing. The zip itself is never refused; it simply
+   * stops paying, which keeps the ability honest and the points earned.
+   */
+  hopped: string[];
+  /** Last observed `chargedT`, to edge-detect a window opening. */
+  wasCharged: boolean;
   /**
    * Consecutive captures that were flown recklessly. See `src/score/reckless.ts`.
    *

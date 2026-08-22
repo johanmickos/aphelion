@@ -2052,6 +2052,107 @@ worse, not better, because the subject then snaps back toward the ship: at 2x,
 3x, 5x, 8x the ease the press-tick movement runs 1325, 1705, 2426, 3412px/s
 against 933 at the plain rate.
 
+
+### 49 — The anomaly's reward was received, not spent
+
+`src/sim/types.ts` · `src/sim/capture.ts` · `src/sim/step.ts` ·
+`src/sim/config.ts` · `src/score/` · `src/render/` · **[CHANGED]** · asked for as
+"a 5s timer during which the player can zip to the next planet… each hop should
+provide a purple point boost… the ship electrified, as if infected by the purple
+anomaly"
+
+Leaving an anomaly used to grant two things, and neither of them asked anything of
+the player once earned:
+
+- **one `zip` charge** (note 47), with no expiry, spent whenever you next felt
+  like it;
+- **a ten-second x2 scoring window**, which paid out simply for continuing to fly
+  the way you already were.
+
+Both are replaced by one thing that has to be **spent under a clock**:
+`SimConfig.chargedSecs`, five seconds during which *every* grab zips. What a
+window is worth is now a question about how fast you can fly it.
+
+**The window is simulation, not score, and that was forced.** `bonusUntil` was
+legal in `ScoreState` because it only ever multiplied points. A window that
+decides whether a grab dives or glides changes what the ship can physically do,
+and `pnpm portable` forbids `src/sim/` from importing `src/score/` — a simulation
+that asked the scorer for permission would stop being a pure function of
+`(config, seed, inputLog)` and diagnostics replay would go with it. So it moved:
+`SimState.chargedT`, seconds drained by `dt`, which is how every other duration in
+the simulation is kept (`ending.t`, `boostT`, `settleT`). The scorer's windows are
+tick deadlines instead, because a scorer must not assume how often it is called;
+nothing inside `stepSim` has that problem.
+
+**The drain runs at the top of the tick, before the input edges.** Both halves of
+that matter. A grab arriving exactly as the window runs out dives rather than
+zipping, and a release that opens a window does not immediately lose a slice of it
+to the tick it was born in — measured, `chargedT` reads exactly 5.00 the tick
+after the release, and the window closes 300 ticks later.
+
+**A hop is read off `cap.zipped`, never off the live window.** A zip is committed
+at the press, and the 0.45s glide it buys can outlast the countdown. Re-checking
+at the arrival would mean a hop begun legally inside the window silently paid
+nothing because it landed a tick late — punishing the player for the one thing the
+window is asking of them, which is to hurry.
+
+**`hopBonus` is flat, and it is the only award in the game that is.** Every other
+one ends in `raw * multiplier`. Reaching an anomaly is hard and usually costs the
+streak on the way out to it, so a reward that shrank exactly when it was hardest
+to earn would be the wrong shape. It also *replaces* the grab award rather than
+adding to it — one clean number at the busiest moment in the game. Nothing about
+flying well is lost: the link at the release is untouched and still scores aim,
+timing and climb with the full multiplier, so the skill is still paid, at the
+other end of the same capture.
+
+**Once per body per window**, cleared on the rising edge of the window. Without
+it, the optimal line inside a frenzy is to bounce on one planet: a
+press-glide-release cycle is about 1.2s, so the same body would pay three times
+without the ship going anywhere, in a game whose whole subject is climbing. The
+zip is never refused — it simply stops minting.
+
+**An anomaly is never a hop, even when zipped to.** Arriving at one is what
+`anomalyBonus` exists to pay for, and it opens the next window; calling that a hop
+would replace the largest award in the game with a flat 500 and quietly make
+chaining anomalies worth less than chaining planets.
+
+**The purple is a fourth channel in `accolade.ts`, not a category colour.** The
+ladder means how good, and re-adding a category hue is banned for reasons recorded
+at that file. A hop is not an answer to "how good was that?" — every hop pays the
+same — so there is no quality for a rarity colour to report. What the colour says
+is which MODE the game is in, which is legitimate where a category is not: a
+category has to be learned, whereas the player is already looking at an
+electrified ship and a draining purple bar. `SHOUT` established the precedent of
+an off-ladder channel; this is the second. The hue is the anomaly's own
+`rgba(168,92,255)`, and it was measured like the ladder was — **dE 45.8** to its
+nearest neighbour, against this set's existing closest pair at **dE 41.0**
+(`ROUTINE` vs `good`).
+
+**The arcs are drawn outside the silhouette**, and that is the whole reason they
+read: the hull is nine design pixels long and both markings it already carries
+live on its outline — amber for a braking flyby, purple for a held grab. A third
+treatment there would have to compete with those; the space around the ship is
+empty and free. They are seeded from the tick rather than `Math.random`, so a
+replay shows the crackle the player saw.
+
+**Numbers.** 500 a hop, about three hops in five seconds — a hop cycle is the
+0.45s glide, plus `boostArmTime` before a release earns its boost, plus the
+crossing to the next body. So ~1500 a window, against the ~2500-3000 the x2 window
+was reckoned at, and an anomaly is deliberately worth somewhat less than it was.
+The difference is made up where the hops leave you: four planets of altitude is
+~280 raw climb banked into the next link, paid by machinery that already existed.
+
+**The charge system is gone.** `src/sim/charges.ts`, `ChargeKind`,
+`SimState.charges` and `test/zip-charge.test.ts` all went with it — the window is
+the only gate now, so the ledger had neither a source nor a consumer. Keeping it
+dormant against a future pickup was considered and declined: speculative
+infrastructure for something that does not exist is the same bet as a knob that
+does nothing. Git remembers note 47 if a pickup ever wants it, and it should be
+rebuilt against whatever the paradigms are then.
+
+`SIM_VERSION` 19 → 20, goldens recaptured. `chargedSecs` is 0 in
+`PROTOTYPE_CONFIG`, so the equality gate stayed at exactly zero throughout.
+
 ---
 
 ## Tuning vs. fidelity

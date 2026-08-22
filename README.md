@@ -246,6 +246,32 @@ Between them they are paid on:
 times a streak multiplier that rises with consecutive links and is lost to a
 putter-out or a death.
 
+### The charged window
+
+Releasing from an anomaly's orbit leaves the ship **charged** for
+`chargedSecs` — five seconds during which _every_ grab zips: the press is the
+arrival, and a glide carries you onto the destination orbit instead of diving to
+it. The ship arcs with the anomaly's own purple for the duration, and a bar drains
+under the score.
+
+Each **hop** onto a fresh body pays a flat `hopBonus`. Flat is deliberate and it
+is the only award in the game that ignores the multiplier: reaching an anomaly is
+hard and usually costs the streak on the way out to it, so a reward that shrank
+exactly when it was hardest to earn would be the wrong shape. A hop replaces the
+grab award rather than stacking on it — one number at the busiest moment in the
+game — and nothing about flying well is lost, because the link at the release is
+untouched and still scores aim, timing and climb at full multiplier.
+
+A body pays **once per window**. Bouncing on one planet is still legal; it just
+stops paying, because a press-glide-release cycle is about 1.2s and otherwise the
+best line inside a frenzy would be to stand still. And a hop is judged on
+`cap.zipped`, not on the live clock, so a glide begun inside the window still pays
+when it lands after it — the press is the commitment.
+
+The window lives in `SimState`, not in the scorer, and it had to: it grants an
+ability rather than points, and `src/sim/` may not import `src/score/`. See
+PORT_NOTES 49.
+
 **Nothing takes points away.** There was a penalty for rising past a planet you
 could have taken, and it was removed for being too punitive. The pressure to keep
 engaging is still there and comes from `climb` being banked rather than paid:

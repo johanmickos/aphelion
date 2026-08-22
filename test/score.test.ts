@@ -86,7 +86,7 @@ function play(
     if (released) held = false;
     stepSim(state, cfg, { held: held || pressed, pressed, released } as Input, FIXED_DT);
     if (score) {
-      const out = scoreTick(sc, state, cfg, FIXED_DT, scfg);
+      const out = scoreTick(sc, state, cfg, scfg);
       awards.push(...out.awards);
       shouts.push(...out.shouts);
     }
@@ -159,7 +159,7 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
     }
 
     stepSim(state, cfg, { held: held || pressed, pressed, released }, FIXED_DT);
-    const out = scoreTick(sc, state, cfg, FIXED_DT, scfg);
+    const out = scoreTick(sc, state, cfg, scfg);
     awards.push(...out.awards);
     shouts.push(...out.shouts);
     if (sc.score === 0 && prevScore > 0) lives.push(prevScore);
@@ -816,11 +816,11 @@ describe('the reckless shout', () => {
       for (const d of deflections) {
         state.capture = capAt(d);
         state.tick = tick++;
-        shouts.push(...scoreTick(sc, state, cfg, FIXED_DT).shouts);
+        shouts.push(...scoreTick(sc, state, cfg).shouts);
       }
       state.capture = null;
       state.tick = tick++;
-      shouts.push(...scoreTick(sc, state, cfg, FIXED_DT).shouts);
+      shouts.push(...scoreTick(sc, state, cfg).shouts);
     };
 
     /**
@@ -847,11 +847,11 @@ describe('the reckless shout', () => {
       state.ship.vx = speed;
       state.ship.vy = 0;
       state.tick = tick++;
-      scoreTick(sc, state, cfg, FIXED_DT); // a drift tick, so `lastDrift` carries the speed
+      scoreTick(sc, state, cfg); // a drift tick, so `lastDrift` carries the speed
       state.ending.active = true;
       state.ending.reason = reason;
       state.tick = tick++;
-      shouts.push(...scoreTick(sc, state, cfg, FIXED_DT).shouts);
+      shouts.push(...scoreTick(sc, state, cfg).shouts);
       state.ending.active = false;
     };
 
@@ -1046,7 +1046,7 @@ describe('the grab award lands at periapsis, not at the press', () => {
       if (released) held = false;
       stepSim(st, cfg, { held: held || pressed, pressed, released } as Input, FIXED_DT);
       if (freeze < 0 && st.capture?.passedPeri) freeze = t;
-      for (const a of scoreTick(sc, st, cfg, FIXED_DT).awards)
+      for (const a of scoreTick(sc, st, cfg).awards)
         if (a.kind === 'grab' && paid < 0) paid = a.tick;
     }
     expect(freeze, 'the capture never reached periapsis').toBeGreaterThan(240);

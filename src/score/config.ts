@@ -120,28 +120,27 @@ export interface ScoreConfig {
    */
   anomalyBonus: number;
   /**
-   * Added to the multiplier while an anomaly bonus is running, ON TOP of
-   * `streakMax` — see `multiplierFor`.
+   * What one hop inside a charged window pays. See `SimConfig.chargedSecs`.
    *
-   * At a maxed streak this is x5 -> x7 for the window's duration, worth roughly
-   * 2500-3000 across the four links it covers. Set against dying and losing a
-   * 16-link streak, that is the arithmetic that has to make going worth it.
+   * FLAT, and the only award in the game that is. Every other one ends in
+   * `raw * multiplier`; this one does not, so an anomaly found on a cold run pays
+   * exactly what one found at x5 pays. That is deliberate: reaching an anomaly is
+   * hard and usually costs the streak on the way out to it, and a reward that
+   * shrank precisely when it was hardest to earn would be the wrong shape.
+   *
+   * It also REPLACES the grab award for the capture it lands on, rather than
+   * adding to it — a hop is one clean number. Nothing about flying well is lost:
+   * the link at the release is untouched and still scores aim, timing and climb
+   * with the full multiplier, so the skill is still paid, just at the other end of
+   * the capture.
+   *
+   * 500 against three hops in a five-second window is ~1500 a frenzy. Sized
+   * against the x2 window this replaced, which was reckoned at 2500-3000 — so an
+   * anomaly is worth somewhat less than it was, and the difference is made up by
+   * where the hops leave you: four planets of altitude is ~280 raw climb banked
+   * into the next link, and climb is paid by the mechanism that already exists.
    */
-  anomalyBonusMult: number;
-  /**
-   * Seconds the bonus runs, starting at the RELEASE from the anomaly.
-   *
-   * From the release and not the grab because converting the flyby, settling and
-   * waiting for a release angle costs 1.5-2s that would otherwise burn a fifth of
-   * the window inside an orbit going nowhere — and would mean holding a tighter,
-   * better orbit actively cost bonus time. Starting at the release makes the
-   * number here the number the player experiences.
-   *
-   * This is a weight, not a constant: it multiplies how many links the bonus is
-   * paid on, so it changes what the bonus is worth and belongs with the rest of
-   * them. See the note on `ScoreConfig` about what does and does not live here.
-   */
-  anomalyBonusSecs: number;
+  hopBonus: number;
 }
 
 /**
@@ -193,6 +192,5 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   streakStep: 0.25,
   streakMax: 5,
   anomalyBonus: 800,
-  anomalyBonusMult: 2,
-  anomalyBonusSecs: 10,
+  hopBonus: 500,
 } satisfies ScoreConfig);

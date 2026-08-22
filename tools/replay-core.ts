@@ -131,7 +131,7 @@ export function replayReport(report: DiagReport): Analysis {
     if (released) held = false;
     const input: Input = { held: held || pressed, pressed, released };
     stepSim(state, cfg, input, report.dt);
-    const scored = scoreTick(score, state, cfg, report.dt);
+    const scored = scoreTick(score, state, cfg);
     awards.push(...scored.awards);
     shouts.push(...scored.shouts);
 
@@ -278,6 +278,23 @@ export function replayReport(report: DiagReport): Analysis {
         `boost peak ${mean((a) => a.timing)} · aim ${mean((a) => a.aim)}  (0-1 each)`,
     );
   }
+  const hopAwards = awards.filter((a) => a.kind === 'hop');
+  if (hopAwards.length > 0) {
+    // Windows are counted by gaps between hops: two hops more than `chargedSecs`
+    // apart cannot have come from one window. Approximate on purpose — the exact
+    // count would mean recording window openings, and this is a finding, not a
+    // fingerprint.
+    const gap = Math.round(cfg.chargedSecs / report.dt);
+    let windows = hopAwards.length > 0 ? 1 : 0;
+    for (let i = 1; i < hopAwards.length; i++) {
+      if (hopAwards[i]!.tick - hopAwards[i - 1]!.tick > gap) windows++;
+    }
+    findings.push(
+      `${hopAwards.length} hop(s) across ~${windows} charged window(s), ` +
+        `${(hopAwards.length / windows).toFixed(1)} per window on average — ` +
+        `worth ${hopAwards.reduce((n, a) => n + a.points, 0)} flat`,
+    );
+  }
   if (shouts.length > 0) {
     const deepest = Math.max(...shouts.map((x) => x.streak));
     findings.push(`${shouts.length} reckless shout(s); longest run of rough captures: ${deepest}`);
@@ -327,7 +344,7 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
   return report.awards.map(
     ([tick, kind, points, multiplier, close, clearance, skim, defl, timing, aim, climb, body]) => ({
       tick,
-      kind: kind === 'g' ? ('grab' as const) : ('link' as const),
+      kind: kind === 'g' ? ('grab' as const) : kind === 'l' ? ('link' as const) : ('hop' as const),
       points,
       multiplier,
       body,

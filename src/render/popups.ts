@@ -68,7 +68,7 @@ const STACK_GAP = 20;
  */
 const STACK_X = 80;
 
-import { LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+import { HOP, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 interface Popup {
   x: number;
@@ -79,6 +79,8 @@ interface Popup {
   points: number | null;
   praise: Praise | null;
   shout: string | null;
+  /** A hop inside a charged window: off the rarity ladder, purple. */
+  hop: boolean;
 }
 
 export class Popups {
@@ -110,6 +112,7 @@ export class Popups {
       points: award.points,
       praise,
       shout: null,
+      hop: award.kind === 'hop',
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -145,6 +148,7 @@ export class Popups {
       life: LIFE_SHOUT,
       points: null,
       praise: null,
+      hop: false,
       shout: shout.word,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
@@ -190,7 +194,9 @@ export class Popups {
         continue;
       }
 
-      const style = p.praise ? LEVEL[p.praise.level] : ROUTINE;
+      // A hop is off the ladder: it pays flat, so there is no quality for a
+      // rarity colour to report. See `HOP` in `accolade.ts`.
+      const style = p.hop ? HOP : p.praise ? LEVEL[p.praise.level] : ROUTINE;
 
       if (p.praise) {
         // A brief overshoot on the way in. Only the top of the ladder gets it —

@@ -292,43 +292,42 @@ export interface SimState {
    */
   holdConsumed: boolean;
   /**
-   * Earned effects the ship is carrying, each spent by a later action.
+   * Seconds left on the charged window. 0 when none is running.
    *
-   * A ledger rather than a flag, and deliberately not named after where it came
-   * from: today the only charge is `zip` and the only source is leaving an
-   * anomaly, but a charge is a thing the ship HAS, not a fact about its history.
-   * A pickup, a streak reward or a stage bonus granting one later needs no new
-   * state and no new spending path — only a call to `grantCharge`.
+   * Opened by releasing from an anomaly's orbit; while it runs, EVERY grab zips
+   * (see `zipOrbit`). This is the anomaly's whole reward now — it replaced both a
+   * single `zip` charge and a ten-second scoring multiplier, neither of which
+   * asked anything of the player once earned.
    *
-   * Part of the simulation, so it survives a replay: `(config, seed, inputLog)`
-   * still determines the run. Deliberately NOT in `fingerprint()` — a charge that
-   * differs changes the trajectory the moment it is spent, and the position and
-   * velocity already there catch that. Adding a field to the hash would make every
-   * report recorded before it read as diverged from its first checkpoint.
+   * Seconds drained by `dt` inside `stepSim`, which is how every other duration in
+   * the simulation is kept — `ending.t`, `boostT`, `settleT`. The scorer's windows
+   * are tick deadlines instead, because the scorer is an observer that must not
+   * assume how often it is called; nothing in here has that problem.
+   *
+   * IT LIVES HERE AND NOT IN THE SCORER because it changes what the ship can
+   * physically do. A window that only multiplied points was legal in `ScoreState`;
+   * one that decides whether a grab dives or glides is simulation, and a
+   * simulation that asked the scorer for permission would stop being a pure
+   * function of (config, seed, inputLog).
+   *
+   * Deliberately NOT in `fingerprint()` — the window changes the trajectory the
+   * moment a grab takes it, and the position and velocity already hashed catch
+   * that. Adding a field would make every report recorded before it read as
+   * diverged from its first checkpoint.
    */
-  charges: Charges;
+  chargedT: number;
   /** Diagnostics only. Never read by physics; excluded from the fingerprint. */
   telemetry: Telemetry;
 }
-
-/**
- * What a charge does when spent.
- *
- * `zip` replaces a capture's dive with the authored glide an anomaly already
- * uses — see `AuthoredOrbit` and `SimConfig.zipDur`.
- */
-export type ChargeKind = 'zip';
-
-export type Charges = Record<ChargeKind, number>;
 
 /**
  * An orbit a capture is told to settle into, instead of inheriting one from a
  * dive.
  *
  * An anomaly satisfies this structurally, which is how the rest stop authors its
- * own orbit; a spent `zip` charge synthesises one from the orbit the dive WOULD
- * have flown to, so the ship arrives where it was heading without flying there.
- * Anything else that wants to author an arrival implements these four numbers.
+ * own orbit; a zip synthesises one from the orbit the dive WOULD have flown to,
+ * so the ship arrives where it was heading without flying there. Anything else
+ * that wants to author an arrival implements these four numbers.
  */
 export interface AuthoredOrbit {
   /** Radius of the circle the settle glides onto. */

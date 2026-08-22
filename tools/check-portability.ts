@@ -117,7 +117,7 @@ const state = createInitialState(DEFAULT_CONFIG);
 const score = createScoreState();
 for (let i = 0; i < 120; i++) {
   stepSim(state, DEFAULT_CONFIG, NO_INPUT, FIXED_DT);
-  scoreTick(score, state, DEFAULT_CONFIG, FIXED_DT);
+  scoreTick(score, state, DEFAULT_CONFIG);
 }
 if (state.tick !== 120) {
   console.error(`smoke run: expected tick 120, got ${state.tick}`);

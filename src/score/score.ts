@@ -65,8 +65,6 @@ export function createScoreState(): ScoreState {
     best: 0,
     streak: 0,
     multiplier: 1,
-    bonusActive: false,
-    bonusFrac: 0,
     grabs: 0,
     links: 0,
     lastAward: null,
@@ -85,9 +83,9 @@ export function createScoreState(): ScoreState {
     inKink: false,
     inHardKink: false,
     putterOuts: 0,
-    bonusUntil: -1,
-    bonusArmed: false,
     claimed: [],
+    hopped: [],
+    wasCharged: false,
   };
 }
 
@@ -96,18 +94,15 @@ function clamp01(v: number): number {
 }
 
 /**
- * The live multiplier: the streak ladder, plus any anomaly bonus ON TOP of the
- * ceiling.
+ * The live multiplier: the streak ladder, and nothing else.
  *
- * Deliberately outside the `min`. Inside it — `min(streakMax, 1 + step*streak +
- * bonus)` — the bonus does literally nothing to a maxed streak, which is exactly
- * the player who earned the right to go and fetch it. The ceiling being
- * breakable is the whole reward: a strong run otherwise spends its last third at
- * x5 with nothing left to climb toward.
+ * An anomaly used to raise the ceiling here for ten seconds. It no longer does —
+ * the anomaly's reward is the charged window, which is spent rather than
+ * received, and a hop pays flat outside this function entirely. See
+ * `ScoreConfig.hopBonus`.
  */
-function multiplierFor(sc: ScoreState, scfg: ScoreConfig, tick: number): number {
-  const streak = Math.min(scfg.streakMax, 1 + scfg.streakStep * sc.streak);
-  return streak + (sc.bonusUntil >= tick ? scfg.anomalyBonusMult : 0);
+function multiplierFor(sc: ScoreState, scfg: ScoreConfig): number {
+  return Math.min(scfg.streakMax, 1 + scfg.streakStep * sc.streak);
 }
 
 /**
@@ -139,13 +134,11 @@ function endLife(sc: ScoreState): void {
   sc.inKink = false;
   sc.inHardKink = false;
   sc.climbFromY = null;
-  // A death takes the bonus with the points. The claim log clears too, so a new
-  // life may take an anomaly it already took in the last one — the once-only rule
-  // exists to stop a bonus being refreshed by re-grabbing the same body in one
-  // flight, not to retire it from the field.
-  sc.bonusUntil = -1;
-  sc.bonusArmed = false;
+  // The claim log clears, so a new life may take an anomaly it already took in
+  // the last one — the once-only rule exists to stop a window being refreshed by
+  // re-grabbing the same body in one flight, not to retire it from the field.
   sc.claimed.length = 0;
+  sc.hopped.length = 0;
 }
 
 /**
@@ -161,19 +154,19 @@ export interface ScoreTick {
 }
 
 /**
- * Advance the score by one tick. Call immediately after `stepSim`, with the SAME
- * `dt`.
+ * Advance the score by one tick. Call immediately after `stepSim`.
  *
- * `dt` is threaded rather than read from `FIXED_DT` for the reason that constant
- * states itself: it is passed as a parameter, never read globally. The scorer now
- * owns a duration — the anomaly bonus window — and a duration that assumed the
- * timestep would silently re-tune itself if the timestep ever moved.
+ * It used to take `dt`, because it owned a duration: the ten-second anomaly bonus
+ * window, which would have silently re-tuned itself if the timestep ever moved.
+ * That window is now the simulation's — it grants an ability, not points, so it
+ * had to be — and the scorer owns no duration at all again. A parameter kept
+ * against a future need is a parameter every caller has to be told to ignore, so
+ * it is gone; `state.tick` remains the only clock anything here reads.
  */
 export function scoreTick(
   sc: ScoreState,
   state: SimState,
   cfg: SimConfig,
-  dt: number,
   scfg: ScoreConfig = DEFAULT_SCORE_CONFIG,
 ): ScoreTick {
   const awards: ScoreAward[] = [];
@@ -197,16 +190,20 @@ export function scoreTick(
       endLife(sc);
     }
     sc.putterOuts = state.telemetry.putterOuts;
-    sc.multiplier = multiplierFor(sc, scfg, state.tick);
-    sc.bonusActive = sc.bonusUntil >= state.tick;
-    const span = Math.max(1, Math.round(scfg.anomalyBonusSecs / dt));
-    sc.bonusFrac = sc.bonusActive
-      ? Math.max(0, Math.min(1, (sc.bonusUntil - state.tick) / span))
-      : 0;
+    sc.multiplier = multiplierFor(sc, scfg);
     return { awards, shouts };
   }
   sc.endingSeen = false;
   if (sc.climbFromY === null) sc.climbFromY = state.highWaterY;
+
+  // ---- a charged window opened: the hop log describes the window in progress
+  //
+  // Edge-detected off the simulation's own countdown rather than off the release
+  // that opened it, so there is one definition of "a window is running" and the
+  // scorer is reading it rather than keeping a second copy in step.
+  const charged = state.chargedT > 0;
+  if (charged && !sc.wasCharged) sc.hopped.length = 0;
+  sc.wasCharged = charged;
 
   // ---- ran dry mid-circularisation: a failure, not a release
   if (state.telemetry.putterOuts > sc.putterOuts) {
@@ -224,14 +221,6 @@ export function scoreTick(
     const p = sc.pending;
     sc.pending = null;
     if (p.earned) awards.push(awardLink(sc, state, scfg, p));
-    // The anomaly bonus starts HERE, as the ship leaves — not at the grab. It
-    // starts whether or not the release earned a link, because the achievement it
-    // pays for was arriving, and a player who fumbles the exit of the hardest
-    // thing in the game has already been punished by the link they did not get.
-    if (sc.bonusArmed) {
-      sc.bonusArmed = false;
-      sc.bonusUntil = state.tick + Math.round(scfg.anomalyBonusSecs / dt);
-    }
   }
 
   const cap = state.capture;
@@ -335,10 +324,7 @@ export function scoreTick(
   }
   sc.wasCaptured = cap !== null;
 
-  sc.multiplier = multiplierFor(sc, scfg, state.tick);
-  sc.bonusActive = sc.bonusUntil >= state.tick;
-  const span = Math.max(1, Math.round(scfg.anomalyBonusSecs / dt));
-  sc.bonusFrac = sc.bonusActive ? Math.max(0, Math.min(1, (sc.bonusUntil - state.tick) / span)) : 0;
+  sc.multiplier = multiplierFor(sc, scfg);
   if (sc.score > sc.best) sc.best = sc.score;
   if (awards.length > 0) sc.lastAward = awards[awards.length - 1]!;
   return { awards, shouts };
@@ -428,7 +414,7 @@ function awardGrab(
   cap: Capture,
 ): ScoreAward | null {
   const close = clamp01(1 - sc.grabClearance / scfg.closeSpan);
-  const multiplier = multiplierFor(sc, scfg, state.tick);
+  const multiplier = multiplierFor(sc, scfg);
   const award: ScoreAward = {
     tick: state.tick,
     kind: 'grab',
@@ -445,16 +431,40 @@ function awardGrab(
     aim: 0,
     climb: 0,
   };
-  // An anomaly pays its own flat award on top of whatever the arrival was worth,
-  // and arms the bonus window for the release. Once per life: without the claim
-  // log a player could orbit out and back to refresh the window indefinitely,
-  // which is the same faucet the grab award already refuses to open by paying at
-  // the press.
   const body = state.bodies[cap.planet];
+
+  // ---- a hop: a zipped arrival at a planet, inside a charged window
+  //
+  // Read off `cap.zipped` and NOT off the live window, and that difference is the
+  // rule: a zip is committed at the press, and the 0.45s glide it buys can easily
+  // outlast the countdown. Re-checking here would mean a hop begun legally inside
+  // the window silently paid nothing because it landed a tick late — punishing the
+  // player for the one thing the window is asking them to do, which is hurry.
+  //
+  // An anomaly is never a hop even when zipped to. Arriving at one is the thing
+  // `anomalyBonus` exists to pay for, and it opens the next window; calling that a
+  // hop would replace the largest award in the game with a flat 500 and quietly
+  // make chaining anomalies worth less than chaining planets.
+  if (cap.zipped && body && body.kind !== 'anomaly' && !sc.hopped.includes(body.name)) {
+    sc.hopped.push(body.name);
+    award.kind = 'hop';
+    // Flat. The only award in the game that does not take the multiplier — see
+    // `ScoreConfig.hopBonus` — so it carries the multiplier it was actually paid
+    // at rather than the one in force, which the popup would otherwise print.
+    award.multiplier = 1;
+    award.points = scfg.hopBonus;
+    sc.score += award.points;
+    sc.grabs++;
+    return award;
+  }
+
+  // An anomaly pays its own flat award on top of whatever the arrival was worth.
+  // Once per life: without the claim log a player could orbit out and back to
+  // refresh the window indefinitely, which is the same faucet the grab award
+  // already refuses to open by paying at the press.
   let anomaly = 0;
   if (body?.kind === 'anomaly' && !sc.claimed.includes(body.name)) {
     sc.claimed.push(body.name);
-    sc.bonusArmed = true;
     anomaly = scfg.anomalyBonus;
   }
 
@@ -480,7 +490,7 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
   const raw =
     scfg.linkBase + climb * scfg.climbPerPx + timing * scfg.timingBonus + aim * scfg.aimBonus;
 
-  const multiplier = multiplierFor(sc, scfg, state.tick);
+  const multiplier = multiplierFor(sc, scfg);
   // Built once so the nerve test sees the finished award rather than a copy of
   // its own inputs — one definition of what a nerve grab is, in praise.ts.
   const award: ScoreAward = {
