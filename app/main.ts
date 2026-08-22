@@ -63,6 +63,10 @@ const stillOnly = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let attractT = stillOnly ? attract.stillT : 0;
 let attractW = 0;
 let attractH = 0;
+// Driven from the figure's own bounding box rather than repeated in the
+// stylesheet, so retuning a radius cannot leave the element the wrong shape and
+// the drawing quietly letterboxed inside it.
+attractCanvas.style.aspectRatio = String(attract.box.w / attract.box.h);
 
 // Mutable so the camera toggle can take effect mid-run. Render config never
 // reaches the simulation — `pnpm portable` enforces that src/sim imports nothing

@@ -40,7 +40,11 @@
         -webkit-tap-highlight-color: transparent;
         font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
       }
-      canvas {
+      /* Scoped to the game canvas by id, NOT to `canvas`. There are two canvases
+         now, and a bare element rule put `position: absolute; inset: 0` on the
+         title-screen one too — which made a 160px animation cover the entire
+         overlay, title and instructions included. */
+      #c {
         position: absolute;
         inset: 0;
         width: 100%;
@@ -282,9 +286,16 @@
          the run rather than being swallowed. */
       #attract {
         display: block;
-        margin: 0 auto 24px;
-        width: min(100%, calc(clamp(90px, 20vh, 176px) * 450 / 220));
-        aspect-ratio: 450 / 220;
+        position: static;
+        margin: 0 auto 20px;
+        /* Height-driven: vertical room above the title is what is scarce, and a
+           definite height keeps the width (from aspect-ratio) out of the
+           shrink-to-fit loop the flex parent would otherwise create. Small on
+           purpose — it is a hint at the game, not a viewport onto it.
+           `aspect-ratio` is set from the loop's own bounding box in main.ts. */
+        height: clamp(52px, 11vh, 88px);
+        width: auto;
+        max-width: 100%;
       }
 
       #armedTitle {

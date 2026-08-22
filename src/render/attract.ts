@@ -43,11 +43,18 @@ export const ORBIT_BIG = 110;
 /** Orbit radius at the smaller body. */
 export const ORBIT_SMALL = 80;
 /**
- * Distance between the two centres. Must exceed `ORBIT_BIG + ORBIT_SMALL`, or
- * the orbits overlap and the internal tangents do not exist — `Math.acos` of a
- * ratio above 1 is NaN, and the whole figure would quietly become nothing.
+ * Distance between the two centres.
+ *
+ * HARD FLOOR AT `ORBIT_BIG + ORBIT_SMALL` = 190. Below that the orbits overlap,
+ * the internal tangents do not exist, `Math.acos` of a ratio above 1 is NaN, and
+ * the whole figure quietly becomes nothing. 215 is as close as the bodies can be
+ * drawn together while the crossing is still long enough to read as a transfer
+ * rather than as a kink — the gap between the two orbit CIRCLES is 25 units here
+ * against 70 at the original 260, so they look far closer than the centres moved.
+ * Bringing the centres nearer than this means tightening the orbits too, which
+ * speeds the whole loop up: `circSpeed` goes as 1/sqrt(r).
  */
-const GAP = 260;
+const GAP = 215;
 /** Body radii. Both sit well inside their orbit, `minOrbitGap` included. */
 const R_BIG = 52;
 const R_SMALL = 34;
@@ -67,10 +74,14 @@ export const ATTRACT = {
   planetFill: 'rgba(255,255,255,.04)',
   planetLine: 'rgba(200,210,230,.35)',
   ship: '#cfdcf2',
-  /** The box shrinks with the viewport; below this the ship stops shrinking. */
-  minShipScale: 0.55,
+  /**
+   * The box shrinks with the viewport; below this the ship stops shrinking. Set
+   * against the smallest canvas the layout produces — the ship has to stay a
+   * recognisable arrowhead there without becoming the biggest thing on screen.
+   */
+  minShipScale: 0.45,
   /** Breathing room inside the canvas, in CSS pixels. */
-  pad: 6,
+  pad: 4,
 } as const;
 
 export interface Pose {
