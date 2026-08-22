@@ -13,7 +13,9 @@ import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { createScoreState, scoreTick } from '../src/score/score.ts';
 import type { ScoreAward } from '../src/score/types.ts';
-import { createBodies, fieldBounds } from '../src/sim/world.ts';
+import { DESIGN_W, createBodies, fieldBounds } from '../src/sim/world.ts';
+import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
+import { hypot } from '../src/sim/orbit.ts';
 import type { Anomaly } from '../src/sim/types.ts';
 
 function rightAnomaly(cfg: SimConfig): Anomaly {
@@ -165,5 +167,145 @@ describe('the anomaly bonus', () => {
     scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
     expect(sc.bonusArmed).toBe(false);
     expect(first.points).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The rest stop: an anomaly authors the orbit a capture there settles into.
+ *
+ * All of this is carried on the BODY rather than read from config at the point of
+ * use, the way `bubble` already was, so anomalies of different kinds can differ
+ * later without any of the sim moving.
+ */
+describe('an anomaly authors its own orbit', () => {
+  /** Fly at the right-hand anomaly, press at `press`, and hold. */
+  function park(cfg: SimConfig, press: number, startFuel = 40) {
+    const state = createInitialState(cfg);
+    const a = rightAnomaly(cfg);
+    Object.assign(state.ship, { x: a.x - 520, y: a.y - 70, vx: 320, vy: 0 });
+    state.highWaterY = a.y;
+    state.fuel = startFuel;
+    const radii: number[] = [];
+    let tightness = 0;
+    let boostFull = 0;
+    let lap = 0;
+    let fuelAtOrbit = -1;
+    let fuelEnd = 0;
+    let worstJump = 0;
+    let prevR = -1;
+    for (let i = 0; i < 700; i++) {
+      stepSim(state, cfg, { held: i >= press, pressed: i === press, released: false }, FIXED_DT);
+      const cap = state.capture;
+      if (!cap) continue;
+      const r = hypot(cap.rx, cap.ry);
+      if (prevR > 0 && cap.phase !== 'clear' && cap.phase !== 'flyby') {
+        worstJump = Math.max(worstJump, Math.abs(r - prevR) * 60);
+      }
+      prevR = r;
+      if (!tightness && cap.tightness) {
+        tightness = cap.tightness;
+        boostFull = cap.boostFull;
+      }
+      if (cap.phase === 'orbit') {
+        radii.push(r);
+        lap = (Math.PI * 2) / (cap.phaseSpeed || 1);
+        if (fuelAtOrbit < 0) fuelAtOrbit = state.fuel;
+        fuelEnd = state.fuel;
+      }
+    }
+    return { radii, tightness, boostFull, lap, fuelAtOrbit, fuelEnd, worstJump };
+  }
+
+  it('settles to the configured radius and pace whatever the dive did', () => {
+    // Measured before this: 62-69px at 1.3-1.5s a lap, inherited from whatever
+    // the approach happened to produce, and indistinguishable from a planet.
+    for (const press of [88, 92, 96, 100]) {
+      const r = park(DEFAULT_CONFIG, press);
+      expect(r.radii.length, `press ${press} never settled`).toBeGreaterThan(30);
+      expect(Math.min(...r.radii)).toBeCloseTo(DEFAULT_CONFIG.anomalyOrbitR, 0);
+      expect(Math.max(...r.radii)).toBeCloseTo(DEFAULT_CONFIG.anomalyOrbitR, 0);
+      expect(r.lap).toBeCloseTo(DEFAULT_CONFIG.anomalyOrbitPeriod, 2);
+    }
+  });
+
+  it('stays inside the radius the camera can hold still for', () => {
+    // Not a taste bound. Beyond about half a window less the backstop's edge the
+    // view has to pan to keep the ship, which is what an over-wide anomaly orbit
+    // was reported as. Asserted here because the number lives in the sim config
+    // and the constraint lives in the renderer, so nothing else connects them.
+    const halfWindow = DESIGN_W / 2 - DEFAULT_RENDER_CONFIG.cameraBackstopEdge;
+    expect(DEFAULT_CONFIG.anomalyOrbitR).toBeLessThan(halfWindow);
+  });
+
+  it('pays full boost however late the press was', () => {
+    // The lottery this removes: measured, an arrival four ticks late took
+    // tightness from 1.00 to 0.20 and boostFull from 60 to 0 — the entire payoff
+    // of the game's hardest commitment, decided at the very end of it.
+    for (const press of [88, 92, 96, 100]) {
+      const r = park(DEFAULT_CONFIG, press);
+      expect(r.tightness, `press ${press}`).toBe(1);
+      expect(r.boostFull, `press ${press}`).toBeCloseTo(DEFAULT_CONFIG.boostMax, 6);
+    }
+  });
+
+  it('refuels while parked, which nothing else in a capture does', () => {
+    const r = park(DEFAULT_CONFIG, 88, 40);
+    expect(r.fuelEnd).toBeGreaterThan(r.fuelAtOrbit + 20);
+    expect(r.fuelEnd).toBeLessThanOrEqual(DEFAULT_CONFIG.fuelMax);
+    // And a planet still does not: the rest stop is the anomaly's rule, not a
+    // change to what a capture costs everywhere.
+    const state = createInitialState(DEFAULT_CONFIG);
+    state.fuel = 40;
+    let planetOrbitFuel = -1;
+    for (let i = 0; i < 700; i++) {
+      stepSim(
+        state,
+        DEFAULT_CONFIG,
+        { held: i >= 18, pressed: i === 18, released: false },
+        FIXED_DT,
+      );
+      if (state.capture?.phase === 'orbit') {
+        if (planetOrbitFuel < 0) planetOrbitFuel = state.fuel;
+        else expect(state.fuel).toBeLessThanOrEqual(planetOrbitFuel + 1e-9);
+      }
+    }
+    expect(planetOrbitFuel, 'the planet run never settled').toBeGreaterThan(0);
+  });
+
+  it('settles far faster than a planet, because the arrival is not the point', () => {
+    // Reported as "I spent a second or so waiting to stabilize which felt wasted
+    // — the screen with just the purple orb is really powerful and I don't want
+    // to delay that effect". The settle is the delay between committing and
+    // getting the thing you committed for.
+    expect(DEFAULT_CONFIG.anomalySettleDur).toBeLessThan(DEFAULT_CONFIG.settleDur / 2);
+    const state = createInitialState(DEFAULT_CONFIG);
+    const a = rightAnomaly(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: a.x - 520, y: a.y - 70, vx: 320, vy: 0 });
+    state.highWaterY = a.y;
+    state.fuel = 100;
+    let frozeAt = -1;
+    let orbitAt = -1;
+    for (let i = 0; i < 500; i++) {
+      stepSim(
+        state,
+        DEFAULT_CONFIG,
+        { held: i >= 88, pressed: i === 88, released: false },
+        FIXED_DT,
+      );
+      const cap = state.capture;
+      if (cap && frozeAt < 0 && cap.rPeri) frozeAt = i;
+      if (cap?.phase === 'orbit' && orbitAt < 0) orbitAt = i;
+    }
+    expect(frozeAt).toBeGreaterThan(-1);
+    expect(orbitAt).toBeGreaterThan(-1);
+    expect((orbitAt - frozeAt) / 60).toBeCloseTo(DEFAULT_CONFIG.anomalySettleDur, 1);
+  });
+
+  it('expands to the authored orbit without a snap', () => {
+    // `rPeri` is overridden but the frozen ellipse is left honest, still passing
+    // through the ship's real position, so the handover has nothing to jump. What
+    // is left is the settle carrying the ship out over `settleDur`, smootherstep'd.
+    const r = park(DEFAULT_CONFIG, 88);
+    expect(r.worstJump).toBeLessThan(400);
   });
 });

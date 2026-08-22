@@ -13,7 +13,7 @@ import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
 import type { Input } from '../src/sim/types.ts';
 import { createLoop } from '../src/app/loop.ts';
-import { frozenOrbit, orbitLock } from '../src/render/camera.ts';
+import { barrierRelax, frozenOrbit, orbitLock } from '../src/render/camera.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { centerCamera, createCamera, fitCamera, followCamera } from '../src/render/camera.ts';
 import { Scene } from '../src/render/scene.ts';
@@ -300,6 +300,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       focus,
       snap.vx,
       frozenOrbit(cap?.phase),
+      barrierRelax(state.bodies, snap.x, snap.y, rcfg),
     );
     scene.draw(ctx, cam, snap, {
       timeMs: performance.now(),

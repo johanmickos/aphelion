@@ -1271,6 +1271,186 @@ whatever it points at. Seeing further needs a wider view, not a different subjec
 It is recorded here because the idea is a natural one to have again, and because
 `ANOMALY_FRAME` looked entirely reasonable sitting in the file doing nothing.
 
+---
+
+### 35 — A framing preference is not a bound
+
+`src/render/camera.ts` · **[CHANGED]** · reported as "the camera still oscillates
+left/right as I orbit the anomaly — it should be fixed in the center — and a
+pretty jagged transition crossing the red zone"
+
+Two symptoms, one mistake made twice: a rule about where the ship should SIT
+written as a hard constraint, so it outranked whatever was deciding the shot.
+
+**The anomaly would not stay centred**, measured at 83px of swing with the lock
+weight at exactly 1 — the lock was working and its answer was being thrown away.
+The author's guess was that the orbit's radius varied; it does not, it is a
+constant 62px. Two separate leaks of `shipX` into a target that was supposed to be
+the anchor's:
+
+- The backstop clamped `cam.left` into `[shipX - (W - margin), shipX - margin]`.
+  Those bounds ORBIT with the ship, so they kept catching a camera whose target
+  never moved. A backstop must guarantee the WINDOW; where the ship sits inside it
+  is the deadzone's business. It now uses `cameraBackstopEdge` (18px), and locked
+  to an anchor the ship is supposed to move around the frame — that is the point.
+- `cameraTarget` clamped the target into the field and then rebuilt it from
+  `shipX` to put the ship back on screen. Out at an anomaly the anchor is
+  legitimately outside the field, so a correct anchor-locked target was being
+  discarded and replaced with a ship-following one every frame.
+
+The field rule and the framing rule are now written as an intersection with an
+explicit precedence — inside the corridor the field wins and no dead space is ever
+shown; outside, framing wins, because a view missing the ship is worse than a view
+with some black in it. **A locked orbit is now still to 0.00px with the body at
+the exact centre of the window**, which also needed the deadzone to yield: it
+parks a subject at the margin, and its reason for existing — that centring
+oscillates — is an argument about a subject that MOVES. A locked anchor does not,
+so centring on it converges.
+
+**The jagged crossing was the field rule letting go all at once.** Pinned against
+the barrier while the ship approached, the camera had to go from stationary to the
+ship's speed in a single tick: 1247px/s against a ship doing 228. Two attempts
+that did not work are worth recording. Switching the clamp off when the ship is
+outside is the discontinuity itself. Ramping the framing edge from zero fixes the
+dead-space problem but completes in 18px — 0.08s at that speed — so the jerk
+returns intact.
+
+What works is `barrierRelax`: an anomaly's bubble opens the barrier for the CAMERA
+over the 150px of bubble that sits inside the corridor, so the view is already
+moving when the ship crosses. **1247 -> 382px/s at 228, 1401 -> 430 at 352** — 1.7x
+and 1.2x the ship's own speed, which is a catch-up rather than a discontinuity.
+Shaped like the bubble rather than like a distance to the wall, because the
+allowance exists because of the anomaly and should appear and vanish with it.
+
+The backstop no longer gives up when the field rule and the edge conflict — a ship
+crossing a barrier hit that case and sat 5.9px off screen for a tick at 500px/s.
+It falls back to the bare window: the ship may touch the edge, never leave it.
+
+**A hole behind the same report, found while measuring it.** The reported orbit
+was radius 62 and is still to 0.00px, but at 120 the view panned 55px and at 180,
+174px — the field rule was still binding out at the anomaly. Centring a body that
+sits `anomalyOffset` beyond the barrier puts the view about 445px past the field
+edge, well past anything `relax` opens, so the bound hauled the view back toward
+the corridor on every swing that way and let it settle again on the far side. The
+field rule now yields to framing the SUBJECT, conditioned on the subject being
+outside rather than the ship — inside the corridor the subject is the ship and
+`subjX - W/2` would license half a window of dead space permanently. Radius 120 is
+now 0.0px and 180 is 6.0px; 240 still pans, because a 240px orbit cannot fit a
+centred 390px window and the ship has to win.
+
+---
+
+### 36 — An anomaly is a rest stop, so it authors its own orbit
+
+`src/sim/capture.ts` · `src/sim/types.ts` · **[CHANGED]** · asked for as "these
+anomalies should be a bit easier to deal with ... breathing room for the user to
+learn about the anomaly, catch their breath, load up on boosts, and continue"
+
+Measured, a capture at an anomaly was indistinguishable from one at a planet, and
+in one respect worse:
+
+```
+             settled radius   lap     tightness -> boostFull
+ press 88        62           1.31s     1.00        60
+ press 96        69           1.53s     0.20         0
+```
+
+Four ticks late took the entire payoff of the hardest commitment in the game to
+zero. Not a skill gradient — a lottery at the end of a blind four-second coast,
+and the exact opposite of "load up on boosts". An anomaly now settles to a fixed
+130px at a fixed 3s lap with tightness credited in full, at every press timing.
+
+**It needed no plumbing, and the reason is worth recording.** `cap.rPeri` is only
+a physical periapsis to ONE consumer — `Lfrozen`. To every other reader, the
+compass, the release solver and the renderer included, it is the circle the settle
+tightens toward. So overriding it after the freeze authors the radius everywhere
+at once with nothing to keep in step, and the frozen ellipse is left honest,
+passing through the ship's real position, so the handover has nothing to jump.
+`Lfrozen` is computed in `freezeOrbit` from the true radius instead of lazily from
+the overridden one. What remains is the settle carrying the ship from 62 out to
+130 over `settleDur`, smootherstep'd, peaking at 162px/s.
+
+The pace rides the same seam: `stepPhase` already eased angular momentum toward
+the circular value, and now eases it toward the authored rate where there is one.
+Easing the same quantity either way is what keeps the settle seamless — the sweep
+matches whatever shape currently exists, authored or not.
+
+**Refuel is the first thing in the game that restores fuel inside a capture.**
+`fuelRegen` runs only while drifting, so before this, resting anywhere cost the
+tank and "catch your breath" was not something the economy could express. Gated on
+`u >= 1` so the settled orbit pays and the circularization on the way in does not.
+A planet still pays nothing, which `test/anomaly.test.ts` asserts alongside — this
+is the anomaly's rule, not a change to what a capture costs everywhere.
+
+**The rules live on the BODY, not on the kind.** `orbitR`, `orbitPeriod` and
+`refuel` sit on `Anomaly` beside `bubble`, filled from config at generation. Every
+anomaly is identical today; putting them on the instance means anomalies that
+differ cost nothing later, and it is the shape `bubble` already established.
+
+**130 is not a taste number.** Twice a planet's 62 so it reads as somewhere else
+on arrival, and inside the 177px the camera can hold perfectly still for — that
+bound lives in the renderer while the radius lives in `SimConfig`, and nothing
+else connects them, so a test asserts the relationship directly.
+
+**The settle is a third of a planet's, for the same reason.** Reported as "I spent
+a second or so waiting to stabilize which felt wasted — the screen with just the
+purple orb is really powerful and I don't want to delay that effect": the settle
+is dead time between committing and getting the thing that was committed to.
+`settleDur` joins the other three on the body, at 0.45s against a planet's 1.2s.
+`stepPhase` reads `cap.settleDur`, which `freezeOrbit` fills from config for every
+ordinary capture, so nothing else changed. Measured end to end, the orbit is
+reached at 0.47s instead of 1.20s and **the anomaly is fully centred on screen at
+0.72s instead of 2.63s** — the camera gains twice, starting sooner and having less
+to travel. The radial glide steepens from 162 to 269px/s, still a glide.
+
+**KNOWN-OPEN, and it undercuts the whole idea.** The boost envelope reaches zero
+2.6s after the freeze, and a measured park lasts 8.8s:
+
+```
+  rest after settling    boost on departure
+        0.0s                 100% of peak
+        0.7s                  52%
+        1.3s                   5%
+        2.0s and beyond        0%
+```
+
+So "load up on boosts, catch your breath, and continue" cannot both halves be
+true: the fuel gained while resting is paid for with the boost lost. Shortening
+the settle makes it marginally worse. Not resolved here because the resolution is
+a design choice — hold the envelope open while parked, which removes the release
+timing that note 27 just made matter; re-arm it on departure; or accept that
+resting and boosting are alternatives. Recorded rather than guessed at.
+
+---
+
+### 37 — Two clamps that both knew the field rule
+
+`src/render/camera.ts` · **[CHANGED]** · reported as "the jagged camera jump on
+anomaly departure and return to field"
+
+Measured at **9496px/s on the exact tick the ship re-entered the corridor**. Two
+causes, both from the previous two notes.
+
+`subjOut` was a boolean, so the relaxation that lets the view frame a subject
+outside the field switched off in a single tick on the way back in. It ramps with
+how far outside the subject is now, over half a window.
+
+The larger one: the backstop in `followCamera` ALSO applied the field rule, and
+switched it at the boundary, against `cameraTarget`'s own copy of the same rule.
+Two clamps that both knew about the field, disagreeing at the crossing, and the
+backstop yanked the view 107px. It has one job — the ship stays in the window —
+and the field rule belongs to the target, which the ease can only move toward.
+Removed. The round trip is 278-484px/s at every release timing tried, with the
+settled orbit still at 0.00px and the ship never off screen.
+
+**That invalidated a pin written the same afternoon.** `test/camera.test.ts`
+asserted the unrelaxed crossing was harsher than 900px/s, because `barrierRelax`
+had looked like the whole of the fix. Removing the duplicate field rule took the
+unrelaxed crossing to about 430px/s on its own, so most of that jerk had never
+been what note 35 said it was. `barrierRelax` is now worth 13% outbound and 30% on
+the way back, and the assertion says that instead — and fails if it ever stops
+helping, which is when it should be deleted rather than kept.
+
 **It is on a toggle**, in the tune panel footer, because this changes how the game
 feels and the only way to judge that is to fly the same field both ways.
 `cameraOrbitLock` 0 is exactly the old camera. Two positions and not a slider: the
@@ -1306,8 +1486,8 @@ golden baseline               golden/physics-v1.json
 tests    port-equality 11 · invariants 32 · render 79 · camera 34
          diagnostics 25 · backtrack 15 · world 14 · tune 7 · clearance 6
          score 60 · input 8 · grab-target 8 · link-fuel 6
-         boost-envelope 6 · flyby-fuel 10 · anomaly 8
-         345 total
+         boost-envelope 6 · flyby-fuel 10 · anomaly 14
+         354 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

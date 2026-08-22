@@ -11,6 +11,7 @@ import {
   centerCamera,
   createCamera,
   fitCamera,
+  barrierRelax,
   followCamera,
   frozenOrbit,
   orbitLock,
@@ -22,6 +23,7 @@ import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { SPAWN, createBodies, fieldBounds } from '../src/sim/world.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { Camera } from '../src/render/camera.ts';
+import type { Anomaly } from '../src/sim/types.ts';
 import { backtrackFloorY } from '../src/sim/world.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 
@@ -458,8 +460,8 @@ describe('what the camera watches', () => {
       cam.anchorW = w;
       cam.anchorX = 200;
       cam.anchorY = -1000;
-      const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, 300, true);
-      const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, -300, true);
+      const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, 300, 0, true);
+      const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, -300, 0, true);
       expect(a.left, `anchorW ${w} leaned on a frozen orbit`).toBe(b.left);
     }
   });
@@ -476,8 +478,8 @@ describe('what the camera watches', () => {
     // move at all and the lean has nothing to show.
     const cam = cam390();
     cam.left = 0;
-    const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 330, -1000, field, null, 300, false);
-    const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 330, -1000, field, null, -300, false);
+    const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 330, -1000, field, null, 300, 0, false);
+    const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 330, -1000, field, null, -300, 0, false);
     expect(a.left).not.toBe(b.left);
   });
 
@@ -618,5 +620,130 @@ describe('the orbit lock', () => {
     const off = { ...DEFAULT_RENDER_CONFIG, cameraOrbitLock: 0 };
     followCamera(cam, off, 200, -1000, field, null, FIXED_DT, { x: 900, y: -2000, lock: 1 }, 0);
     expect(cam.anchorW).toBe(0);
+  });
+});
+
+/**
+ * Out at an anomaly: the two things a player reported seeing there.
+ *
+ * Both were the same mistake in different clothes — a rule about FRAMING being
+ * expressed as a hard bound, so it fought whatever was above it.
+ */
+describe('the view around an anomaly', () => {
+  const anomaly = createBodies(DEFAULT_CONFIG).find(
+    (b): b is Anomaly => b.kind === 'anomaly' && b.x < 0,
+  )!;
+
+  it('holds the orbited anomaly dead centre and perfectly still', () => {
+    // Reported as "the camera oscillates left/right as I orbit the anomaly. The
+    // anomaly should be fixed in the center." It was not: measured at 83px of
+    // swing with the lock weight at exactly 1. Two causes, both about the ship's
+    // position leaking into a target that was supposed to be the anchor's — the
+    // backstop clamping on the deadzone MARGINS, which orbit with the ship, and
+    // `cameraTarget` clamping an out-of-field target back into the field and then
+    // rebuilding it from `shipX`.
+    const cam = cam390();
+    const r = 62;
+    cam.left = anomaly.x - 390 / 2;
+    cam.centerY = anomaly.y;
+    cam.anchorW = 1;
+    cam.anchorX = anomaly.x;
+    cam.anchorY = anomaly.y;
+    const lefts: number[] = [];
+    const centres: number[] = [];
+    for (let i = 0; i < 400; i++) {
+      const th = i * 0.105;
+      const x = anomaly.x + Math.cos(th) * r;
+      const y = anomaly.y + Math.sin(th) * r;
+      followCamera(
+        cam,
+        DEFAULT_RENDER_CONFIG,
+        x,
+        y,
+        field,
+        null,
+        FIXED_DT,
+        { x: anomaly.x, y: anomaly.y, lock: 1 },
+        0,
+        true,
+        barrierRelax(createBodies(DEFAULT_CONFIG), x, y, DEFAULT_RENDER_CONFIG),
+      );
+      if (i > 60) {
+        lefts.push(cam.left);
+        centres.push(anomaly.x - cam.left);
+      }
+    }
+    expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThan(0.5);
+    expect(centres[0]!).toBeCloseTo(390 / 2, 0);
+  });
+
+  it('crosses the barrier without a jerk', () => {
+    // Reported as a jagged transition across the red zone. The field rule used to
+    // let go all at once at the boundary, so the view went from pinned to matching
+    // the ship's speed in a single tick: 1247px/s of camera movement against a
+    // ship doing 228. The bubble opens the allowance over the 150px BEFORE the
+    // wall, so the camera is already moving when the ship crosses.
+    const bodies = createBodies(DEFAULT_CONFIG);
+    const dx = anomaly.x - 200;
+    const dy = anomaly.y - -3003;
+    const L = Math.hypot(dx, dy);
+    const run = (speed: number, relaxOn: boolean): number => {
+      const cam = cam390();
+      let x = 200;
+      let y = -3003;
+      cam.left = Math.max(field.left, Math.min(field.right - 390, x - 390 / 2));
+      cam.centerY = y;
+      let worst = 0;
+      for (let i = 0; i < 220; i++) {
+        x += (dx / L) * speed * FIXED_DT;
+        y += (dy / L) * speed * FIXED_DT;
+        const r = relaxOn ? barrierRelax(bodies, x, y, DEFAULT_RENDER_CONFIG) : 0;
+        const before = cam.left;
+        followCamera(
+          cam,
+          DEFAULT_RENDER_CONFIG,
+          x,
+          y,
+          field,
+          null,
+          FIXED_DT,
+          null,
+          (dx / L) * speed,
+          false,
+          r,
+        );
+        worst = Math.max(worst, Math.abs(cam.left - before) * 60);
+        if (Math.hypot(anomaly.x - x, anomaly.y - y) < 70) break;
+      }
+      return worst;
+    };
+    for (const speed of [228, 352]) {
+      // The pin, updated rather than deleted. This used to read `> 900`, because
+      // the allowance was the whole of the fix. It is not any more: most of that
+      // jerk turned out to be the BACKSTOP repeating the field rule and switching
+      // it at the boundary, and removing that duplicate took the unrelaxed
+      // crossing to around 430px/s on its own. The allowance is now a refinement
+      // worth 13% outbound and 30% on the way back, so what is asserted is that it
+      // still helps — and if it stops helping it should be deleted, not kept.
+      expect(run(speed, true), `${speed}: the allowance no longer helps`).toBeLessThan(
+        run(speed, false),
+      );
+      // Bounded as a multiple of the SHIP's speed, because what is left is a
+      // proportionate catch-up rather than a discontinuity — 1.68x at 228px/s and
+      // 1.22x at 352, against 5.5x and 4.0x without the allowance.
+      expect(run(speed, true), `${speed}: relaxed crossing still jerks`).toBeLessThan(speed * 1.8);
+    }
+  });
+
+  it('opens the barrier only inside a bubble', () => {
+    const bodies = createBodies(DEFAULT_CONFIG);
+    const rc = DEFAULT_RENDER_CONFIG;
+    // dead centre of the corridor, nowhere near one
+    expect(barrierRelax(bodies, 195, anomaly.y, rc)).toBe(0);
+    // just outside the bubble, then just inside
+    expect(barrierRelax(bodies, anomaly.x + anomaly.bubble + 1, anomaly.y, rc)).toBe(0);
+    expect(barrierRelax(bodies, anomaly.x + anomaly.bubble - 40, anomaly.y, rc)).toBeCloseTo(40, 0);
+    // fully open well inside
+    expect(barrierRelax(bodies, anomaly.x, anomaly.y, rc)).toBe(rc.cameraBarrierRelax);
   });
 });

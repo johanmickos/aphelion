@@ -46,6 +46,29 @@ export interface Anomaly {
   name: string;
   /** Radius within which the side boundary is suspended. */
   bubble: number;
+  /**
+   * The orbit a capture here settles to, regardless of how the dive arrived.
+   *
+   * An anomaly is a rest stop, not a test of the approach: a fixed modest orbit
+   * at a fixed unhurried pace is the breathing room it exists to give. Held on
+   * the BODY rather than read from config at the point of use, like `bubble`, so
+   * that anomalies of different kinds can differ without any of this moving.
+   */
+  orbitR: number;
+  /** Seconds for one lap of that orbit, once settled. */
+  orbitPeriod: number;
+  /** Fuel per second restored while parked in it. */
+  refuel: number;
+  /**
+   * Seconds to reach that orbit, instead of `SimConfig.settleDur`.
+   *
+   * Shorter, because the arrival is not the point here. Reported as "I spent a
+   * second or so waiting to stabilize which felt wasted — the screen with just
+   * the purple orb is really powerful and I don't want to delay that effect": the
+   * settle is the delay between committing and getting the thing you committed
+   * for.
+   */
+  settleDur: number;
 }
 
 export type Body = Planet | Anomaly;
@@ -149,6 +172,19 @@ export interface Capture {
   boost: number;
   /** Seconds since the orbit froze. */
   boostT: number;
+
+  /**
+   * Angular rate the settle eases to, or 0 to ease to the circular rate.
+   *
+   * Set only by a body that authors its own orbit. `rPeri` carries the authored
+   * RADIUS — it is the circle the settle tightens toward, which is what every
+   * consumer downstream already reads it as — and this carries the pace.
+   */
+  settleSweep: number;
+  /** Fuel per second restored while parked, from the body. */
+  refuel: number;
+  /** Seconds this capture takes to settle. `SimConfig.settleDur` unless authored. */
+  settleDur: number;
 
   /** Ran dry mid-circularization; the ship putters out with a weak, boostless release. */
   puttered: boolean;

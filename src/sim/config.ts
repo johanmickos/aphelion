@@ -236,6 +236,39 @@ export interface SimConfig {
    */
   anomalyBubble: number;
   /**
+   * Radius a capture at an anomaly settles to, whatever the dive did.
+   *
+   * An anomaly is a rest stop. Measured, an ordinary capture there settled at
+   * 62-69px with a 1.3-1.5s lap — indistinguishable from a planet, and too quick
+   * to take stock in. 130 is twice a planet's orbit so it reads as somewhere else
+   * the moment you arrive, and it sits inside the 177px the camera can hold
+   * perfectly still for; beyond that the view has to pan to keep the ship, which
+   * is what an over-wide orbit was reported as.
+   */
+  anomalyOrbitR: number;
+  /** Seconds per lap once settled there. Roughly two laps inside a bonus window. */
+  anomalyOrbitPeriod: number;
+  /**
+   * Fuel per second restored while parked at an anomaly.
+   *
+   * A capture suppresses `fuelRegen` outright, so before this there was no way for
+   * the tank to recover without leaving — "catch your breath" was not something
+   * the economy could express. Matched to `fuelRegen` so there is no second number
+   * to tune, and it still costs the resource a streak run is actually short of,
+   * which is time.
+   */
+  anomalyRefuel: number;
+  /**
+   * Seconds a capture at an anomaly takes to settle, against `settleDur` 1.2 for
+   * a planet.
+   *
+   * The arrival is not what an anomaly is for. Reported as a wasted second spent
+   * waiting to stabilise before the thing that was committed to actually arrives.
+   * Short enough to feel immediate, long enough that carrying the ship from its
+   * dive radius out to `anomalyOrbitR` is still a glide rather than a jump.
+   */
+  anomalySettleDur: number;
+  /**
    * How far below the highest point reached a run may fall before it ends.
    * 0 disables it entirely.
    */
@@ -392,6 +425,10 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   anomalyCount: 0,
   anomalyOffset: 250,
   anomalyBubble: 400,
+  anomalyOrbitR: 130,
+  anomalyOrbitPeriod: 3,
+  anomalyRefuel: 30,
+  anomalySettleDur: 0.45,
   backtrackLimit: 0,
   boundGrabsCapture: false,
   clearanceOnConvert: false,
@@ -540,7 +577,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 13;
+export const SIM_VERSION = 14;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

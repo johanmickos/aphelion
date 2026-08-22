@@ -13,6 +13,7 @@
  * The window is scaled to fit and centred, with bars filling any excess, so every
  * device sees exactly the same slice of world. Portrait-only by design.
  */
+import type { Body } from '../sim/types.ts';
 import type { RenderConfig } from './config.ts';
 
 /**
@@ -132,6 +133,16 @@ export function cameraTarget(
   /** Ship velocity, for the look-ahead. Zero disables it. */
   shipVX = 0,
   /**
+   * How far past a barrier the view may reach, in px — see `barrierRelax`.
+   *
+   * Zero everywhere the barrier is real. Inside an anomaly's bubble it opens over
+   * the 150px BEFORE the wall, which is what lets the camera be already moving
+   * when the ship crosses instead of pinned against a line it is about to pass.
+   * Without it the view held still, then had to match the ship's speed in one
+   * tick: measured at 1137px/s of camera jerk, reported as a jagged crossing.
+   */
+  relax = 0,
+  /**
    * The orbit is frozen — `settle` or `orbit` — so `shipVX` is the phase clock's
    * circular velocity and NOT a heading.
    *
@@ -179,27 +190,80 @@ export function cameraTarget(
   let left = cam.left;
   if (want - left > W - margin) left = want - (W - margin);
   else if (want - left < margin) left = want - margin;
-  left = Math.max(field.left, Math.min(field.right - W, left));
-  if (field.width <= W) left = field.left;
-  // The clamp exists to avoid spending screen on dead space outside the field.
-  // A ship out at an anomaly is legitimately outside it, so that reason lapses —
-  // and honouring the clamp there would hold the view at the barrier while the
-  // ship flew off it, which is the one thing a camera must never do.
-  //
-  // GATED, and that gate is load-bearing. Unconditional, it also fired in
-  // ordinary play whenever the ship came within a margin of a wall, panning the
-  // view up to 80px past the barrier to show dead space — which is precisely what
-  // the clamp exists to prevent.
-  //
-  // It also applies whenever a focus is pulling the view off the ship, which is
-  // what stops the anomaly framing below from ever pushing the ship off screen.
-  // Measured on the SHIP and never on the focus: it is the ship that must not
-  // leave the screen.
-  if (w > 0 || shipX < field.left || shipX > field.right) {
-    left = Math.min(left, shipX - margin);
-    left = Math.max(left, shipX - (W - margin));
-  }
 
+  // Centre a locked subject, by the same weight. The deadzone exists because
+  // defaulting to centred oscillates — pan the ship inside the margin and the
+  // target snaps back to centre, which pans the other way — but that argument is
+  // about a subject that MOVES. A locked anchor does not, so centring on it
+  // converges instead of cycling, and the deadzone's own reason to exist lapses.
+  //
+  // Without this an orbited body sat at the margin rather than in the middle of
+  // the window, which is not what "the view is locked to it" should look like.
+  if (w > 0) left += (subjX - W / 2 - left) * w;
+
+  // Two rules, and which one yields is the whole of it.
+  //
+  //   the field   the view may not show dead space beyond a barrier
+  //   framing     the ship may not leave the window
+  //
+  // Inside the corridor they agree and the field rule binds, exactly as before.
+  // Out at an anomaly they cannot both hold — the ship is legitimately past the
+  // barrier — and framing wins, because a view with the ship missing is worse
+  // than a view with some black in it.
+  //
+  // Written as an intersection rather than an `if (outside)`, because the switch
+  // was measured at 1137px/s of camera jerk crossing the boundary: the field rule
+  // let go all at once and the target moved 86px in a tick. Here the binding bound
+  // is `shipX - edge`, which slides with the ship, so the handover is continuous
+  // and there is nothing to cross.
+  //
+  // Framing is expressed on the WINDOW, not the deadzone's margins. Using margins
+  // made this fight the orbit lock: `shipX - margin` orbits with the ship, so it
+  // dragged a stationary camera 83px back and forth around an anomaly.
+  // The framing bound's edge RAMPS with how far outside the ship actually is,
+  // rather than switching on at the boundary. At zero it degenerates to "the ship
+  // must be on screen at all", which the field rule already satisfies everywhere
+  // inside the corridor — so inside, the field rule simply wins and no dead space
+  // is ever shown. Outside, the edge opens to its full value over the first few
+  // pixels and framing takes over smoothly. Without the ramp, framing outranked
+  // the field for a ship merely NEAR a wall and panned 12px into the void.
+  const outside = Math.max(0, field.left - shipX, shipX - field.right);
+  const edge = Math.min(cfg.cameraBackstopEdge, outside);
+
+  // The field rule may not prevent framing the thing being framed.
+  //
+  // An anomaly sits `anomalyOffset` beyond the barrier, so centring it puts the
+  // view a further half-window out — about 445px past the field edge, well past
+  // anything `relax` opens. Without this the bound yanked the view back toward the
+  // corridor every time the orbit swung that way and let it settle again on the
+  // far side: reported as the camera panning to a split view of anomaly and field
+  // and back. Measured at 55px of pan on a 120px orbit and 174px on a 180px one.
+  //
+  // Conditioned on the SUBJECT being outside, not the ship. Inside the corridor
+  // the subject is the ship, `subjX - W / 2` would allow half a window of dead
+  // space at all times, and the field rule would stop meaning anything.
+  // Ramped by HOW FAR outside the subject is, not switched on whether it is.
+  // As a boolean this let go in a single tick on the way back into the corridor
+  // and threw the camera 158px — 9496px/s, reported as a jagged jump returning to
+  // the field. The outbound crossing was smooth only because `relax` happened to
+  // cover it; the return had nothing.
+  const subjOut = Math.max(0, field.left - subjX, subjX - field.right);
+  const t = Math.min(1, subjOut / Math.max(1, W / 2));
+  const base = field.left - relax;
+  const baseHi = field.right - W + relax;
+  const fieldLo = base + (Math.min(base, subjX - W / 2) - base) * t;
+  const fieldHi = baseHi + (Math.max(baseHi, subjX - W / 2) - baseHi) * t;
+  let lo = Math.max(fieldLo, shipX - W + edge);
+  let hi = Math.min(fieldHi, shipX - edge);
+  if (field.width <= W) {
+    lo = field.left;
+    hi = field.left;
+  }
+  if (lo > hi) {
+    lo = shipX - W + edge;
+    hi = shipX - edge;
+  }
+  left = Math.max(lo, Math.min(hi, left));
   return { left, centerY: clampToFloor(cam, subjY, floorY) };
 }
 
@@ -262,6 +326,8 @@ export function followCamera(
   shipVX = 0,
   /** The orbit is frozen — see `cameraTarget`'s parameter of the same name. */
   frozen = false,
+  /** Barrier allowance — see `cameraTarget`'s parameter of the same name. */
+  relax = 0,
 ): void {
   // Track the anchor's position while there is one, and KEEP it after the
   // capture ends so the weight has something to decay away from. Dropping the
@@ -274,7 +340,7 @@ export function followCamera(
   const wantW = anchor ? Math.max(0, Math.min(1, anchor.lock)) * cfg.cameraOrbitLock : 0;
   cam.anchorW += (wantW - cam.anchorW) * Math.min(1, dt * cfg.cameraOrbitEase);
 
-  const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY, shipVX, frozen);
+  const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY, shipVX, relax, frozen);
   const k = Math.min(1, dt * cfg.cameraFollow);
   cam.left += (t.left - cam.left) * k;
   cam.centerY += (t.centerY - cam.centerY) * k;
@@ -292,15 +358,25 @@ export function followCamera(
   // for a ship inside the corridor: the alternative is panning past a wall to show
   // dead space, and a ship pinned to the edge there is about to die anyway.
   const W = cam.designW;
-  const margin = W * cfg.cameraMarginFrac;
-  let lo = shipX - (W - margin);
-  let hi = shipX - margin;
-  if (shipX >= field.left && shipX <= field.right && field.width > W) {
-    lo = Math.max(lo, field.left);
-    hi = Math.min(hi, field.right - W);
-  }
-  if (lo > hi) return;
-
+  // The WINDOW, not the deadzone's margins, and the distinction is the whole
+  // point of this being a backstop. A margin is a soft framing preference and
+  // belongs to the deadzone; this is a hard guarantee and must not express an
+  // opinion about framing on top of it.
+  //
+  // With the margins it fought the orbit lock and won. Locked to an anchor the
+  // ship is SUPPOSED to move around the frame, but `shipX - margin` orbits with
+  // the ship, so the bound kept catching a camera whose target never moved:
+  // measured on a real anomaly orbit, 83px of left-right swing at a lock weight
+  // of exactly 1. Reported as the anomaly not staying centred, which it was not.
+  const edge = cfg.cameraBackstopEdge;
+  const lo = shipX - (W - edge);
+  const hi = shipX - edge;
+  // NO field rule here, deliberately. `cameraTarget` already refuses to aim past
+  // a barrier, and the ease only moves toward that target, so the camera cannot
+  // wander out on its own. Repeating the rule here made two clamps fight: the
+  // backstop's field bound switched on the tick the ship re-entered the corridor
+  // and yanked the view 107px — 6406px/s, the jagged jump on returning to the
+  // field. This has one job, which is that the ship stays in the window.
   // Clamp to the NEAREST bound: the smallest correction that puts the ship back
   // on screen, and nothing more. An earlier version repositioned to a preferred
   // side instead, reasoning that a lagging camera should show what is ahead —
@@ -374,4 +450,34 @@ export function clipToWindow(ctx: CanvasRenderingContext2D, cam: Camera): void {
  */
 export function frozenOrbit(phase: string | null | undefined): boolean {
   return phase === 'settle' || phase === 'orbit';
+}
+
+/**
+ * How far past a barrier the view may reach, given where the ship is.
+ *
+ * Zero unless the ship is inside an anomaly's bubble, where the barrier is not a
+ * barrier: it ramps with how far INTO the bubble the ship has travelled, so by
+ * the time it reaches the wall the camera has had the whole 150px of bubble that
+ * sits inside the corridor to get moving. That is the difference between a view
+ * that is already tracking and one pinned to a line it is about to cross.
+ *
+ * Render-only, and deliberately shaped like the bubble rather than like a
+ * distance to the wall — the allowance exists because of the anomaly, so it
+ * should appear and vanish with the anomaly and not with the geometry of the
+ * corridor.
+ */
+export function barrierRelax(
+  bodies: readonly Body[],
+  x: number,
+  y: number,
+  cfg: RenderConfig,
+): number {
+  let best = 0;
+  for (const b of bodies) {
+    if (b.kind !== 'anomaly') continue;
+    const d = Math.hypot(x - b.x, y - b.y);
+    if (d > b.bubble) continue;
+    best = Math.max(best, Math.min(cfg.cameraBarrierRelax, b.bubble - d));
+  }
+  return best;
 }

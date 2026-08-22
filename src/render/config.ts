@@ -57,6 +57,27 @@ export interface RenderConfig {
    * release, which is the other discontinuity.
    */
   cameraOrbitEase: number;
+  /**
+   * How close to the window's edge the backstop lets the ship get, in design px.
+   *
+   * Deliberately much smaller than `cameraMarginFrac`. The deadzone's margin says
+   * where the ship should SIT; this says only where it may not go, and using the
+   * margin for both made the guarantee fight every framing decision above it —
+   * most visibly the orbit lock, where the bound orbits with the ship and drags a
+   * stationary camera 83px back and forth.
+   *
+   * Sized to keep the ship's own sprite fully on screen with a little air, so
+   * hitting it means the ship was genuinely about to disappear.
+   */
+  cameraBackstopEdge: number;
+  /**
+   * Ceiling on how far past a barrier an anomaly's bubble lets the view reach.
+   *
+   * Sized to the 150px of bubble that sits inside the corridor, so the allowance
+   * is fully open by the time the ship reaches the wall and the camera crosses
+   * already moving.
+   */
+  cameraBarrierRelax: number;
 
   // --- starfield ---
   starCount: number;
@@ -139,6 +160,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   cameraLookRefSpeed: 260,
   cameraOrbitLock: 1,
   cameraOrbitEase: 3,
+  cameraBackstopEdge: 18,
+  cameraBarrierRelax: 150,
 
   starCount: 160,
   starParallaxMin: 0.045,

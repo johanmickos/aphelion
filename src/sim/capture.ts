@@ -35,7 +35,7 @@
  * docs/PORT_NOTES.md note 17.
  */
 import type { SimConfig } from './config.ts';
-import type { Body, Capture, GrabResult, SimState } from './types.ts';
+import type { Anomaly, Body, Capture, GrabResult, SimState } from './types.ts';
 import { circSpeed, clearanceDv, escapeSpeed, hypot, naturalPeriapsis } from './orbit.ts';
 
 export type { GrabResult } from './types.ts';
@@ -188,6 +188,9 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     prevDR: 0,
     passedPeri: false,
     brakeSpent: 0,
+    settleSweep: 0,
+    refuel: 0,
+    settleDur: 0,
     periR: grabR,
     apoR: grabR,
     clearFramesLeft: 0,
@@ -249,7 +252,7 @@ export function applyClearance(cap: Capture, cfg: SimConfig): void {
  * instantaneous speed, because a floor clamp on a head-on dive craters the latter
  * and would flatten the oval into a circle.
  */
-export function freezeOrbit(cap: Capture, cfg: SimConfig): void {
+export function freezeOrbit(cap: Capture, cfg: SimConfig, authored?: Anomaly | null): void {
   const { rx, ry, vx, vy } = cap;
   const r = hypot(rx, ry);
   const spd = hypot(vx, vy);
@@ -279,6 +282,31 @@ export function freezeOrbit(cap: Capture, cfg: SimConfig): void {
 
   const span = Math.max(1, cap.grabR - cap.minR);
   cap.tightness = Math.max(0, Math.min(1, (cap.grabR - cap.rPeri) / span));
+
+  // A body may author the orbit a capture settles into, instead of inheriting it
+  // from the dive. `rPeri` is the circle the settle tightens toward — which is
+  // what the compass, the release solver and the renderer all already read it as
+  // — so overriding it here authors the radius everywhere at once, with no second
+  // quantity to keep in step. The ellipse itself is left honest, still passing
+  // through the ship's real position, so the handover has nothing to jump.
+  //
+  // `Lfrozen` is the exception: it is the only consumer that wants `rPeri` as a
+  // PHYSICAL periapsis. Computed here from the true radius rather than lazily
+  // from the overridden one.
+  cap.Lfrozen = cap.phaseSpeedReal * rPeri * rPeri;
+  cap.settleDur = cfg.settleDur;
+  if (authored) {
+    cap.rPeri = authored.orbitR;
+    cap.settleSweep = (Math.PI * 2) / Math.max(0.01, authored.orbitPeriod);
+    cap.refuel = authored.refuel;
+    cap.settleDur = authored.settleDur;
+    // Full credit, always. Measured, an arrival four ticks late took `tightness`
+    // from 1.00 to 0.20 and `boostFull` from 60 to 0 — the whole payoff of the
+    // hardest commitment in the game decided by a lottery at the end of a blind
+    // four-second coast. A rest stop does not grade the approach.
+    cap.tightness = 1;
+  }
+
   const over = Math.max(0, (cap.tightness - cfg.boostThreshold) / (1 - cfg.boostThreshold));
   cap.boostFull = cfg.boostMax * over;
   cap.boost = 0;

@@ -348,7 +348,8 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
       cap.passedPeri = true;
       cap.periR = nr;
       if (holding) {
-        freezeOrbit(cap, cfg);
+        const anchor = state.bodies[cap.planet];
+        freezeOrbit(cap, cfg, anchor?.kind === 'anomaly' ? anchor : null);
         cap.phase = 'settle';
       }
     }
@@ -372,7 +373,9 @@ function stepPhase(state: SimState, cfg: SimConfig, holding: boolean, dt: number
   const orbit = cap.orbit!;
 
   cap.settleT += dt;
-  const u = Math.min(1, cap.settleT / cfg.settleDur);
+  // Per capture, not per config: a body may author a shorter settle. Falls back to
+  // `cfg.settleDur`, which `freezeOrbit` copies in for every ordinary capture.
+  const u = Math.min(1, cap.settleT / Math.max(0.01, cap.settleDur || cfg.settleDur));
   const shape = smootherstep(u);
   const tightenAmt = cfg.tightenFrac * shape;
 
@@ -381,8 +384,11 @@ function stepPhase(state: SimState, cfg: SimConfig, holding: boolean, dt: number
 
   // As tightening rounds the orbit toward a circle, holding the oval's angular
   // momentum would spin that small circle at periapsis speed forever. Physically
-  // you must shed energy to circularize, so ease L toward the circular value.
-  const Lcirc = circSpeed(cfg, rNow) * rNow;
+  // you must shed energy to circularize, so ease L toward the circular value —
+  // or, where the body authors its own pace, toward that instead. Easing the same
+  // quantity either way is what keeps the settle seamless: the sweep always
+  // matches whatever shape currently exists, authored or not.
+  const Lcirc = cap.settleSweep > 0 ? cap.settleSweep * rNow * rNow : circSpeed(cfg, rNow) * rNow;
   const Leff = cap.Lfrozen * (1 - tightenAmt) + Lcirc * tightenAmt;
   const sweepRate = (Leff / (rNow * rNow)) * cfg.phaseRate;
   cap.phaseSpeed = sweepRate;
@@ -399,11 +405,21 @@ function stepPhase(state: SimState, cfg: SimConfig, holding: boolean, dt: number
   cap.vy = ty * tangentialSpeed;
 
   // Circularizing costs fuel; running dry mid-burn putters the ship out.
+  //
+  // A body that authors a `refuel` rate pays it back once the orbit is round and
+  // the ship is simply parked. Nothing else in the game restores fuel inside a
+  // capture, which is precisely why "catch your breath" was not something the
+  // economy could say: `fuelRegen` runs only while drifting, so resting anywhere
+  // cost the tank. Gated on `u >= 1` so it is the settled orbit that pays, not
+  // the circularization on the way in.
   if (holding && (u < 1 || cap.phaseMul !== 1)) {
     state.fuel = burn(state.fuel, cfg.fuelPerSec, dt);
     if (state.fuel <= 0 && u < 1) cap.puttered = true;
   } else if (!holding) {
     state.fuel = regen(cfg, state.fuel, dt);
+  }
+  if (cap.refuel > 0 && u >= 1) {
+    state.fuel = Math.min(cfg.fuelMax, state.fuel + cap.refuel * dt);
   }
 
   cap.periR = Math.min(cap.periR, rNew);

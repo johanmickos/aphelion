@@ -172,6 +172,10 @@ function placeAnomalies(
       R: 40 + rnd() * 16,
       name: 'A' + (i + 1),
       bubble: cfg.anomalyBubble,
+      orbitR: cfg.anomalyOrbitR,
+      orbitPeriod: cfg.anomalyOrbitPeriod,
+      refuel: cfg.anomalyRefuel,
+      settleDur: cfg.anomalySettleDur,
     });
     side = -side;
   }
