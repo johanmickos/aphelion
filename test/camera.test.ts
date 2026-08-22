@@ -12,6 +12,7 @@ import {
   createCamera,
   fitCamera,
   followCamera,
+  frozenOrbit,
   orbitLock,
   toScreenX,
   toScreenY,
@@ -443,16 +444,91 @@ describe('what the camera watches', () => {
     expect(wake(DEFAULT_RENDER_CONFIG.cameraLookAhead)).toBeLessThan(wake(0));
   });
 
-  it('does not lean during a capture, where velocity swings right round', () => {
-    // A captured ship's vx reverses every half orbit. Biasing on it would put
-    // back exactly the wobble the anchor is there to remove, on the other axis.
+  it('does not lean once the orbit is frozen, at any lock weight', () => {
+    // A frozen orbit's vx is the phase clock's, not a heading: measured across one
+    // settle it runs +397 -> -285 -> +137 -> -207. Anything steering off it swings
+    // the view left and right in time with the orbit, which is what was reported.
+    //
+    // Asserted at anchorW 0 as well as 1, and that is the case that actually
+    // regressed: the look-ahead used to be gated on the lock weight, so the moment
+    // the settle stopped being locked — to give the oval its bounce back — the
+    // lean came back on through the whole oval.
+    for (const w of [0, 0.5, 1]) {
+      const cam = cam390();
+      cam.anchorW = w;
+      cam.anchorX = 200;
+      cam.anchorY = -1000;
+      const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, 300, true);
+      const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, -300, true);
+      expect(a.left, `anchorW ${w} leaned on a frozen orbit`).toBe(b.left);
+    }
+  });
+
+  it('still leans through the dive, where velocity IS a heading', () => {
+    // `clear` and `flyby` run on real physics. Suppressing the lean there was
+    // measured to put a 110px lurch into the dive, so the gate is the frozen
+    // phases and not the whole capture.
+    expect(frozenOrbit('clear')).toBe(false);
+    expect(frozenOrbit('flyby')).toBe(false);
+    expect(frozenOrbit('settle')).toBe(true);
+    expect(frozenOrbit('orbit')).toBe(true);
+    // Placed so the deadzone is actually engaged; inside it the target does not
+    // move at all and the lean has nothing to show.
     const cam = cam390();
-    cam.anchorW = 1;
-    cam.anchorX = 200;
-    cam.anchorY = -1000;
-    const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, 300);
-    const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, -300);
-    expect(a.left).toBe(b.left);
+    cam.left = 0;
+    const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 330, -1000, field, null, 300, false);
+    const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 330, -1000, field, null, -300, false);
+    expect(a.left).not.toBe(b.left);
+  });
+
+  it('keeps the ship in the window however fast it outruns the camera', () => {
+    // `cameraTarget` refuses to AIM anywhere the ship would be off screen, but
+    // `cam.left` only eases toward that. At `cameraFollow` 3 the camera trails by
+    // about v/3 — 117px at the 352px/s a release toward an anomaly reaches — so
+    // the ship overtook a correct target and left the frame. Reported as "my ship
+    // flew faster than the camera".
+    const W = 390;
+    const margin = W * DEFAULT_RENDER_CONFIG.cameraMarginFrac;
+    for (const speed of [200, 300, 352, 500]) {
+      const cam = cam390();
+      let x = 100;
+      cam.left = x - W / 2;
+      let worstOff = 0;
+      for (let i = 0; i < 240; i++) {
+        x -= speed * FIXED_DT;
+        followCamera(cam, DEFAULT_RENDER_CONFIG, x, -1000, field, null, FIXED_DT, null, -speed);
+        const sx = x - cam.left;
+        // The WINDOW, not the margins. Pressed against a wall the field clamp
+        // outranks this and the ship legitimately sits inside the margin — but it
+        // must never leave the screen.
+        worstOff = Math.max(worstOff, Math.max(0, -sx), Math.max(0, sx - W));
+      }
+      // A few px of tolerance for exactly one case, measured rather than allowed
+      // for: crossing the field boundary itself, where the field clamp and the
+      // ship clamp are mutually unsatisfiable for a tick. Worst observed is 3.1px
+      // at 500px/s, and only ever at shipX within 1px of `field.left`. The field
+      // clamp deliberately wins there — a sliver at the instant of leaving the
+      // corridor is a better trade than panning into dead space for real.
+      expect(worstOff, `ship left the window at ${speed}px/s`).toBeLessThan(5);
+      void margin;
+    }
+  });
+
+  it('corrects minimally when it does engage', () => {
+    // The backstop once repositioned to a preferred side rather than clamping to
+    // the nearest bound, on the reasoning that a lagging camera should show what
+    // is ahead. Because the condition is marginal exactly when the ship grazes the
+    // edge, a sub-pixel violation became a 109px jump mid-orbit. It must move the
+    // camera no further than it has to.
+    const W = 390;
+    const margin = W * DEFAULT_RENDER_CONFIG.cameraMarginFrac;
+    const cam = cam390();
+    const shipX = 200;
+    // park the camera a hair beyond the legal range, then step with no motion
+    cam.left = shipX - (W - margin) - 0.5;
+    const before = cam.left;
+    followCamera(cam, DEFAULT_RENDER_CONFIG, shipX, -1000, field, null, 1 / 600, null, 0);
+    expect(Math.abs(cam.left - before)).toBeLessThan(2);
   });
 });
 
@@ -465,39 +541,33 @@ describe('what the camera watches', () => {
  * zero while the anchor is far away and only reaches full once it is not.
  */
 describe('the orbit lock', () => {
-  it('is off through the dive and full only in a true orbit', () => {
+  it('is off for everything that is not a true orbit, the settle included', () => {
     expect(orbitLock('clear', 0)).toBe(0);
     expect(orbitLock('flyby', 0)).toBe(0);
-    expect(orbitLock('settle', 0)).toBe(0);
-    expect(orbitLock('settle', 0.5)).toBeCloseTo(0.5, 6);
     expect(orbitLock('orbit', 1)).toBe(1);
-  });
-
-  it('rises only as the orbit rounds, which is what removes the lurch', () => {
-    // The anchor is furthest away exactly when a capture begins — up to
-    // `grabRange`. A lock that switched on there would drag the view that whole
-    // distance. Riding `settleProgress` means it is still zero at the grab and
-    // only reaches full once the ship is a settled radius from the anchor.
-    let prev = -1;
-    for (let u = 0; u <= 1.0001; u += 0.05) {
-      const v = orbitLock('settle', u);
-      expect(v).toBeGreaterThanOrEqual(prev);
-      prev = v;
+    // The settle is the OVAL, and it is deliberately unlocked at every point of
+    // it. This assertion used to read `toBeCloseTo(0.5)` — the lock rode
+    // `settleProgress` and that was measured to eat half the oval, because
+    // smootherstep already reads 0.47 at the apoapsis and 0.83-0.94 through the
+    // 12-14px return swing. Of 83px of swing only 41 survived.
+    for (const sp of [0, 0.25, 0.5, 0.75, 0.99, 1]) {
+      expect(orbitLock('settle', sp), `settle at ${sp} should be unlocked`).toBe(0);
     }
-    expect(orbitLock('settle', 0)).toBe(0);
   });
 
-  it('adds no camera movement at the grab that the old camera did not have', () => {
-    // The regression this replaced: a hard switch peaked the camera at 336px/s
-    // just after the grab, against the plain follower's own 295px/s.
-    const peak = (lock: number, hard: boolean): number => {
+  it('leaves the oval exactly as the old camera flew it', () => {
+    // The point of waiting for a true orbit. The settle must be bit-for-bit the
+    // unlocked camera, or the thing that made a capture exciting is being eaten.
+    const travel = (lock: number): { settle: number; orbit: number; peak: number } => {
       const st = createInitialState(DEFAULT_CONFIG);
       const cam = cam390();
       const rcfg2 = { ...DEFAULT_RENDER_CONFIG, cameraOrbitLock: lock };
+      const settle: number[] = [];
+      const late: number[] = [];
       let px = cam.left;
       let py = cam.centerY;
-      let worst = 0;
-      for (let i = 0; i < 400; i++) {
+      let peak = 0;
+      for (let i = 0; i < 700; i++) {
         stepSim(
           st,
           DEFAULT_CONFIG,
@@ -508,7 +578,7 @@ describe('the orbit lock', () => {
         const cap = st.capture;
         const b = cap ? st.bodies[cap.planet]! : null;
         const anchor = b
-          ? { x: b.x, y: b.y, lock: hard ? 1 : orbitLock(cap!.phase, cap!.settleProgress) }
+          ? { x: b.x, y: b.y, lock: orbitLock(cap!.phase, cap!.settleProgress) }
           : null;
         followCamera(
           cam,
@@ -521,15 +591,25 @@ describe('the orbit lock', () => {
           anchor,
           st.ship.vx,
         );
-        if (i > 20) worst = Math.max(worst, Math.hypot(cam.left - px, cam.centerY - py) * 60);
+        if (cap?.phase === 'settle') settle.push(cam.centerY);
+        if (cap?.phase === 'orbit' && i > 300) late.push(cam.centerY);
+        if (i > 20) peak = Math.max(peak, Math.hypot(cam.left - px, cam.centerY - py) * 60);
         px = cam.left;
         py = cam.centerY;
       }
-      return worst;
+      const sp = (v: number[]): number => (v.length ? Math.max(...v) - Math.min(...v) : 0);
+      return { settle: sp(settle), orbit: sp(late), peak };
     };
-    const plain = peak(0, false);
-    expect(peak(1, true), 'a hard switch should be the jumpy one').toBeGreaterThan(plain + 20);
-    expect(peak(1, false)).toBeLessThanOrEqual(plain + 1);
+
+    const off = travel(0);
+    const on = travel(1);
+    expect(off.settle, 'the oval should move the camera a long way').toBeGreaterThan(50);
+    expect(on.settle).toBeCloseTo(off.settle, 6);
+    // ...and then the settled orbit holds still, which is the whole trade.
+    expect(off.orbit).toBeGreaterThan(50);
+    expect(on.orbit).toBeLessThan(1);
+    // No camera movement the plain follower did not already have.
+    expect(on.peak).toBeLessThanOrEqual(off.peak + 1);
   });
 
   it('is fully switchable off, back to the plain follower', () => {

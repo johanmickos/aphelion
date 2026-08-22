@@ -1179,6 +1179,98 @@ disabled during a capture before: a captured ship's velocity reverses every half
 orbit, and a look-ahead surviving into a settled orbit puts the wobble straight
 back on the other axis.
 
+**Corrected once more, after flying it: the settle is not ramped at all.** Riding
+`settleProgress` looked like the smooth choice and was measured to eat half the
+oval. The ship swings 59 -> 107 -> 59px across a settle, and because
+`settleProgress` is smootherstep'd the lock already reads 0.47 at the apoapsis and
+0.83-0.94 through the 12-14px return swing — flattening the most dramatic part of
+a capture to under 2px. Of 83px of total swing, 41 survived.
+
+```
+where in the settle   swing    ramped    unramped
+  40-50% (apoapsis)     8px     5.6px       8.0px
+  70-80% (swinging in) 12px     2.1px      12.0px
+                       14px     0.9px      14.0px
+  TOTAL                83px      41px        83px
+```
+
+Reported as missing the bounce during the oval, and the numbers agreed. The lock
+now waits for the thing it is named after: zero through the dive AND the settle,
+1 in a true orbit. `cameraOrbitEase` — slowed 6 -> 3, a third of a second — turns
+the phase change into a glide.
+
+A step is affordable HERE and was not affordable at the grab, and the reason is
+the bound: the glide is limited by the settled orbit radius, about 59px, against
+the 560px of `grabRange` the first version could lurch across. Measured end to
+end, the settle's camera travel is now 72.2px with the lock on and 72.2px with it
+off — identical — while a settled orbit goes from 61.06px to 0.52px, and the peak
+camera speed is 295px/s either way.
+
+One honest casualty: the test that pinned "a hard switch is the jumpy one" no
+longer holds, because slowing the ease to 3 tames a hard switch too. It has been
+replaced by the assertion that actually matters — that the settle is bit-for-bit
+the unlocked camera — rather than propped up.
+
+**And it caused a regression, caught in testing before it shipped: "I capture the
+first planet and the camera flips left/right depending on which side of the planet
+I'm on."** The look-ahead was faded out by `1 - w`, the LOCK weight. Unhooking the
+settle from that weight — the fix above — unhooked the look-ahead with it, so the
+lean ran at full strength through the whole oval, steering off a velocity that
+reverses every half orbit. Measured on the reported capture: +397 -> -285 -> +137
+-> -207 -> +261 across one settle into orbit.
+
+Two quantities had been conflated. The lock weight says what to look AT, and is
+zero through the settle on purpose. Whether velocity MEANS anything is a different
+question with a different answer, and `frozenOrbit` now asks it: `clear` and
+`flyby` run on real physics and have a real heading, `settle` and `orbit` are the
+phase clock and do not. Gating on the whole capture instead was tried and put a
+110px lurch into the dive.
+
+### 34 — A backstop must be minimal, or it is a lurch with a good excuse
+
+`src/render/camera.ts` · `src/render/edge-markers.ts` · **[CHANGED]** · reported
+as "my ship flew faster than the camera and I couldn't see when I was close to the
+anomaly to capture it"
+
+Three findings from one report, and only one of them was the camera.
+
+**The ship really did leave the screen.** `cameraTarget` refuses to aim anywhere
+the ship would be off frame, but that constrains the TARGET and `cam.left` only
+eases toward it at `cameraFollow` 3. At the 352px/s a release toward an anomaly
+reaches, the camera trails by about 117px, so the ship overtook a perfectly
+correct target. The guarantee is now enforced on the camera itself, after the
+ease. It survives one bounded exception, measured at 3.1px for a single tick and
+only within a pixel of `field.left`, where the field clamp and the ship clamp
+cannot both be satisfied; the field clamp wins there deliberately.
+
+**The first version of that backstop was worse than the bug.** It repositioned the
+ship to the trailing side when it engaged, reasoning that a lagging camera should
+show what is ahead — and it did, lifting the anomaly's time on screen from 0.17s
+to 0.40s. But the engage condition is marginal exactly when the ship grazes the
+edge, so a sub-pixel violation became a **109px jump** mid-settle, and it read as
+the view flipping sides. Reverted to a nearest-bound clamp: the smallest
+correction that works, and nothing about framing. Where the ship sits inside the
+window is the deadzone's and the look-ahead's business, not a safety net's.
+
+**What actually fixed the report was not the camera at all.** `drawEdgeMarkers`
+filters `if (b.y >= snap.y) continue` — upward only, because an arrow pointing
+back down the climb is clutter and a suggestion to turn around. On the reported
+run the ship was 178px ABOVE the anomaly at the release, so the one always-on
+indicator was suppressed for the entire approach. There was no compass either,
+because that needs a capture, and the anomaly itself was off screen until 0.24s
+before arrival. **The player had nothing to read.** Anomalies are exempt from the
+filter now and draw in purple, with the distance label the code already had: 1.77s
+of live readout across that approach, against 0s.
+
+**Measured and dropped: leaning the view toward the anomaly during the coast.** It
+modelled well before the backstop existed and, once the ship was actually kept on
+screen, changed the anomaly's time on screen by 0.00s at 200, 260, 300 and
+352px/s — twice, under both backstop designs. The window is 390px wide and the
+ship has to be inside it, so nothing can show more than `W - margin` ahead
+whatever it points at. Seeing further needs a wider view, not a different subject.
+It is recorded here because the idea is a natural one to have again, and because
+`ANOMALY_FRAME` looked entirely reasonable sitting in the file doing nothing.
+
 **It is on a toggle**, in the tune panel footer, because this changes how the game
 feels and the only way to judge that is to fly the same field both ways.
 `cameraOrbitLock` 0 is exactly the old camera. Two positions and not a slider: the
@@ -1215,7 +1307,7 @@ tests    port-equality 11 · invariants 32 · render 79 · camera 34
          diagnostics 25 · backtrack 15 · world 14 · tune 7 · clearance 6
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 10 · anomaly 8
-         343 total
+         345 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

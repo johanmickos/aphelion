@@ -58,7 +58,19 @@ export function drawEdgeMarkers(
     const onScreen = bx > winL - r && bx < winL + winW + r && by > winT - r && by < winT + winH + r;
     if (onScreen) continue;
 
-    if (b.y >= snap.y) continue; // behind us, down the climb
+    // Upward only, EXCEPT anomalies. The rule exists because an arrow pointing
+    // back down the climb is clutter and a suggestion to turn around — but an
+    // anomaly is the one thing in the field worth turning toward, it is placed
+    // off to the side rather than ahead, and a release aimed at one routinely
+    // leaves the ship above it.
+    //
+    // Reported as "my ship flew faster than the camera and I couldn't see when I
+    // was close to the anomaly to capture it". Measured on that run the ship sat
+    // 178px above the anomaly at the release, so this filter suppressed the only
+    // always-on indicator for the whole approach: no compass either, because that
+    // needs a capture, and the anomaly itself was off screen until 0.24s before
+    // arrival. There was nothing at all to read.
+    if (b.kind !== 'anomaly' && b.y >= snap.y) continue; // behind us, down the climb
     const dist = hypot(b.x - snap.x, b.y - snap.y);
     if (dist > rcfg.edgeMarkerRange) continue;
 
@@ -82,7 +94,10 @@ export function drawEdgeMarkers(
     ctx.save();
     ctx.translate(ex, ey);
     ctx.rotate(ang);
-    ctx.fillStyle = `rgba(150,200,255,${0.5 * near + 0.2})`;
+    const purple = b.kind === 'anomaly';
+    ctx.fillStyle = purple
+      ? `rgba(206,150,255,${0.6 * near + 0.3})`
+      : `rgba(150,200,255,${0.5 * near + 0.2})`;
     ctx.beginPath();
     ctx.moveTo(7 * s, 0);
     ctx.lineTo(-4 * s, 4.5 * s);
@@ -92,7 +107,9 @@ export function drawEdgeMarkers(
     ctx.restore();
 
     const label = dist >= 1000 ? `${(dist / 1000).toFixed(1)}k` : String(Math.round(dist));
-    ctx.fillStyle = `rgba(190,215,245,${0.55 * near + 0.25})`;
+    ctx.fillStyle = purple
+      ? `rgba(214,164,255,${0.6 * near + 0.3})`
+      : `rgba(190,215,245,${0.55 * near + 0.25})`;
     ctx.font = `${8 * s}px ui-monospace, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

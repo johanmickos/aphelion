@@ -50,10 +50,11 @@ export interface RenderConfig {
   /**
    * How fast the lock eases in and out, in units of 1/second.
    *
-   * Exists only for the two discontinuities the blend cannot smooth by itself:
-   * the grab, where a capture appears from nothing, and the release, where it
-   * vanishes. Across the settle the weight already rides `settleProgress`, which
-   * is smooth, so this barely engages there.
+   * This IS the blend, since `orbitLock` steps rather than ramps: the settle keeps
+   * its full oval and the lock arrives when the orbit becomes round. 3 is a third
+   * of a second, slow enough to read as the view settling with the orbit and fast
+   * enough not to trail it. The same rate carries the lock back out at the
+   * release, which is the other discontinuity.
    */
   cameraOrbitEase: number;
 
@@ -137,7 +138,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   cameraLookAhead: 0.18,
   cameraLookRefSpeed: 260,
   cameraOrbitLock: 1,
-  cameraOrbitEase: 6,
+  cameraOrbitEase: 3,
 
   starCount: 160,
   starParallaxMin: 0.045,

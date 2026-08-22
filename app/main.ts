@@ -13,7 +13,7 @@ import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
 import type { Input } from '../src/sim/types.ts';
 import { createLoop } from '../src/app/loop.ts';
-import { orbitLock } from '../src/render/camera.ts';
+import { frozenOrbit, orbitLock } from '../src/render/camera.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { centerCamera, createCamera, fitCamera, followCamera } from '../src/render/camera.ts';
 import { Scene } from '../src/render/scene.ts';
@@ -287,9 +287,8 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // A settled orbit is watched around its anchor; everything else is flown.
     const cap = snap.capture;
     const body = cap ? state.bodies[cap.planet] : null;
-    const held = body
-      ? { x: body.x, y: body.y, lock: orbitLock(cap!.phase, cap!.settleProgress) }
-      : null;
+    const focus =
+      cap && body ? { x: body.x, y: body.y, lock: orbitLock(cap.phase, cap.settleProgress) } : null;
     followCamera(
       cam,
       rcfg,
@@ -298,8 +297,9 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       field,
       backtrackFloorY(sim, snap.highWaterY),
       frameDt,
-      held,
+      focus,
       snap.vx,
+      frozenOrbit(cap?.phase),
     );
     scene.draw(ctx, cam, snap, {
       timeMs: performance.now(),

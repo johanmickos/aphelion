@@ -131,6 +131,24 @@ export function cameraTarget(
   floorY: number | null,
   /** Ship velocity, for the look-ahead. Zero disables it. */
   shipVX = 0,
+  /**
+   * The orbit is frozen — `settle` or `orbit` — so `shipVX` is the phase clock's
+   * circular velocity and NOT a heading.
+   *
+   * Separate from the lock weight, and the separation is the whole point. The
+   * weight says what to look AT, and is deliberately zero through the settle so
+   * the oval keeps its bounce. This says whether velocity MEANS anything. Once an
+   * orbit is frozen it does not: vx reverses every half orbit, measured at
+   * +397 -> -285 -> +137 -> -207 across one settle. Anything steering off it
+   * swings the view left and right in time with the orbit — reported exactly that
+   * way, and caused by gating the look-ahead on the lock weight instead, which
+   * unhooked it the moment the settle stopped being locked.
+   *
+   * NOT the whole capture. Through `clear` and `flyby` the ship is on real
+   * physics with a real heading, and suppressing the lead there put a 110px lurch
+   * into the dive.
+   */
+  frozen = false,
 ): { left: number; centerY: number } {
   const W = cam.designW;
   const margin = W * cfg.cameraMarginFrac;
@@ -151,15 +169,11 @@ export function cameraTarget(
   const subjX = shipX + (cam.anchorX - shipX) * w;
   const subjY = shipY + (cam.anchorY - shipY) * w;
 
-  // Look where you are going, not where you have been — faded out by the same
-  // weight. A captured ship's velocity swings right round every orbit, so a
-  // look-ahead that survived into a settled orbit would put the wobble straight
-  // back on the other axis.
-  const look =
-    (1 - w) *
-    W *
-    cfg.cameraLookAhead *
-    Math.max(-1, Math.min(1, shipVX / Math.max(1, cfg.cameraLookRefSpeed)));
+  // Look where you are going, not where you have been. Off entirely while
+  // captured — see `captured` above; there is no "going" to look toward when the
+  // heading comes back round every orbit.
+  const lead = frozen ? 0 : velocityLead(cfg, shipVX);
+  const look = W * cfg.cameraLookAhead * lead;
   const want = subjX + look;
 
   let left = cam.left;
@@ -172,12 +186,16 @@ export function cameraTarget(
   // and honouring the clamp there would hold the view at the barrier while the
   // ship flew off it, which is the one thing a camera must never do.
   //
-  // GATED on the ship actually being outside, and that gate is load-bearing.
-  // Unconditional, it also fired in ordinary play whenever the ship came within
-  // a margin of a wall, panning the view up to 80px past the barrier to show dead
-  // space — which is precisely what the clamp exists to prevent. Measured on the
-  // SHIP and never on the anchor: it is the ship that must not leave the screen.
-  if (shipX < field.left || shipX > field.right) {
+  // GATED, and that gate is load-bearing. Unconditional, it also fired in
+  // ordinary play whenever the ship came within a margin of a wall, panning the
+  // view up to 80px past the barrier to show dead space — which is precisely what
+  // the clamp exists to prevent.
+  //
+  // It also applies whenever a focus is pulling the view off the ship, which is
+  // what stops the anomaly framing below from ever pushing the ship off screen.
+  // Measured on the SHIP and never on the focus: it is the ship that must not
+  // leave the screen.
+  if (w > 0 || shipX < field.left || shipX > field.right) {
     left = Math.min(left, shipX - margin);
     left = Math.max(left, shipX - (W - margin));
   }
@@ -242,6 +260,8 @@ export function followCamera(
    */
   anchor: { x: number; y: number; lock: number } | null = null,
   shipVX = 0,
+  /** The orbit is frozen — see `cameraTarget`'s parameter of the same name. */
+  frozen = false,
 ): void {
   // Track the anchor's position while there is one, and KEEP it after the
   // capture ends so the weight has something to decay away from. Dropping the
@@ -254,10 +274,46 @@ export function followCamera(
   const wantW = anchor ? Math.max(0, Math.min(1, anchor.lock)) * cfg.cameraOrbitLock : 0;
   cam.anchorW += (wantW - cam.anchorW) * Math.min(1, dt * cfg.cameraOrbitEase);
 
-  const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY, shipVX);
+  const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY, shipVX, frozen);
   const k = Math.min(1, dt * cfg.cameraFollow);
   cam.left += (t.left - cam.left) * k;
   cam.centerY += (t.centerY - cam.centerY) * k;
+
+  // BACKSTOP: the ship may not leave the window, whatever the easing is doing.
+  //
+  // `cameraTarget` already refuses to aim anywhere the ship would be off screen,
+  // but that is a constraint on the TARGET and `cam.left` only eases toward it.
+  // At `cameraFollow` 3 the camera trails by roughly v/3 — 117px at the 352px/s a
+  // release out to an anomaly reaches — so the ship overtook a perfectly correct
+  // target and left the frame. Reported as "my ship flew faster than the camera".
+  //
+  // Applied AFTER the ease and to the camera itself, so it is invisible at
+  // ordinary speeds and absolute at high ones. The field clamp still outranks it
+  // for a ship inside the corridor: the alternative is panning past a wall to show
+  // dead space, and a ship pinned to the edge there is about to die anyway.
+  const W = cam.designW;
+  const margin = W * cfg.cameraMarginFrac;
+  let lo = shipX - (W - margin);
+  let hi = shipX - margin;
+  if (shipX >= field.left && shipX <= field.right && field.width > W) {
+    lo = Math.max(lo, field.left);
+    hi = Math.min(hi, field.right - W);
+  }
+  if (lo > hi) return;
+
+  // Clamp to the NEAREST bound: the smallest correction that puts the ship back
+  // on screen, and nothing more. An earlier version repositioned to a preferred
+  // side instead, reasoning that a lagging camera should show what is ahead —
+  // which turned a sub-pixel boundary violation into a 109px jump, because the
+  // condition is marginal exactly when the ship is grazing the edge. A backstop
+  // must be invisible until it is needed and minimal when it is. Where the ship
+  // sits inside the window is the deadzone's and the look-ahead's business.
+  cam.left = Math.max(lo, Math.min(hi, cam.left));
+}
+
+/** Travel direction as -1..1, the ramp the look-ahead leans on. */
+function velocityLead(cfg: RenderConfig, shipVX: number): number {
+  return Math.max(-1, Math.min(1, shipVX / Math.max(1, cfg.cameraLookRefSpeed)));
 }
 
 /**
@@ -265,16 +321,26 @@ export function followCamera(
  *
  * The whole rule, in one place because the camera and anything that wants to
  * explain it must agree. A TRUE orbit — round, settled, the ship going round a
- * still point — is the only case that wants a locked view. The dive is the
- * exciting part and stays flown.
+ * still point — is the only case that wants a locked view. Everything before it,
+ * the dive and the oval, is the exciting part and stays flown.
  *
- * `settleProgress` is already smootherstep'd by the phase clock, so the ramp
- * across the settle is smooth without anything here shaping it.
+ * **The settle is deliberately NOT ramped**, and this is the second correction to
+ * this function. Riding `settleProgress` looked like the smooth choice and was
+ * measured to eat half the oval: the ship swings 59 -> 107 -> 59px across a
+ * settle, and because `settleProgress` is smootherstep'd it already reads 0.47 at
+ * the apoapsis and 0.83-0.94 through the 12-14px return swing — flattening the
+ * most dramatic part of a capture to under 2px. Of 83px of total swing only 41
+ * survived. Reported as missing the bounce during the oval, and the numbers
+ * agreed.
+ *
+ * So the lock waits for the thing it is named after. `cameraOrbitEase` turns the
+ * phase change into a glide, and the glide is bounded by the settled orbit radius
+ * — about 59px, against the 560px of `grabRange` that the first version of this
+ * could lurch across. That bound is why a step is affordable here and was not
+ * there.
  */
-export function orbitLock(phase: string, settleProgress: number): number {
-  if (phase === 'orbit') return 1;
-  if (phase === 'settle') return Math.max(0, Math.min(1, settleProgress));
-  return 0;
+export function orbitLock(phase: string, _settleProgress: number): number {
+  return phase === 'orbit' ? 1 : 0;
 }
 
 export function toScreenX(cam: Camera, wx: number): number {
@@ -296,4 +362,16 @@ export function clipToWindow(ctx: CanvasRenderingContext2D, cam: Camera): void {
   ctx.beginPath();
   ctx.rect(cam.offsetX, cam.offsetY, cam.designW * cam.scale, cam.viewH * cam.scale);
   ctx.clip();
+}
+
+/**
+ * Is this capture phase one where the ship's velocity is the phase clock's rather
+ * than a heading?
+ *
+ * `clear` and `flyby` run on real physics — `stepPhysical` — so velocity there
+ * points where the ship is going. From the periapsis freeze onward it is authored
+ * circular motion and points wherever the ship happens to be in its orbit.
+ */
+export function frozenOrbit(phase: string | null | undefined): boolean {
+  return phase === 'settle' || phase === 'orbit';
 }
