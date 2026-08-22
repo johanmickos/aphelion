@@ -536,8 +536,11 @@ describe('what the camera watches', () => {
     // about v/3 — 117px at the 352px/s a release toward an anomaly reaches — so
     // the ship overtook a correct target and left the frame. Reported as "my ship
     // flew faster than the camera".
+    //
+    // Inside the corridor, which is where the guarantee is unconditional. Past a
+    // wall it is not — see the sibling below — so the run stops at the boundary,
+    // which is also where the simulation would have ended it.
     const W = 390;
-    const margin = W * DEFAULT_RENDER_CONFIG.cameraMarginFrac;
     for (const speed of [200, 300, 352, 500]) {
       const cam = cam390();
       let x = 100;
@@ -545,6 +548,7 @@ describe('what the camera watches', () => {
       let worstOff = 0;
       for (let i = 0; i < 240; i++) {
         x -= speed * FIXED_DT;
+        if (x <= field.left) break;
         followCamera(cam, DEFAULT_RENDER_CONFIG, x, -1000, field, null, FIXED_DT, null, -speed);
         const sx = x - cam.left;
         // The WINDOW, not the margins. Pressed against a wall the field clamp
@@ -552,14 +556,84 @@ describe('what the camera watches', () => {
         // must never leave the screen.
         worstOff = Math.max(worstOff, Math.max(0, -sx), Math.max(0, sx - W));
       }
-      // A few px of tolerance for exactly one case, measured rather than allowed
-      // for: crossing the field boundary itself, where the field clamp and the
-      // ship clamp are mutually unsatisfiable for a tick. Worst observed is 3.1px
-      // at 500px/s, and only ever at shipX within 1px of `field.left`. The field
-      // clamp deliberately wins there — a sliver at the instant of leaving the
-      // corridor is a better trade than panning into dead space for real.
-      expect(worstOff, `ship left the window at ${speed}px/s`).toBeLessThan(5);
-      void margin;
+      expect(worstOff, `ship left the window at ${speed}px/s`).toBe(0);
+    }
+  });
+
+  it('lets the ship go rather than show what is past the wall', () => {
+    // The other half of the same rule, and the regression that made it explicit:
+    // the framing guarantee is not unconditional, because the field rule outranks
+    // it. A ship past a wall with no anomaly holding it open is four pixels and
+    // one tick from the end of the run — and then the ending holds the wreck there
+    // for `crashPause`, with the camera free to keep panning. Replayed from the
+    // session that reported it, the view sat 82px into the void on both walls.
+    //
+    // So the ship leaves the frame instead. It is dead; the wall is the thing
+    // worth looking at.
+    const W = 390;
+    const cam = cam390();
+    let x = field.left + 200;
+    cam.left = field.left;
+    let ever = 0;
+    for (let i = 0; i < 120; i++) {
+      x -= 300 * FIXED_DT;
+      followCamera(cam, DEFAULT_RENDER_CONFIG, x, -1000, field, null, FIXED_DT, null, -300);
+      expect(cam.left, `panned past the wall at shipX ${x.toFixed(0)}`).toBeGreaterThanOrEqual(
+        field.left - 1e-9,
+      );
+      ever = Math.max(ever, Math.max(0, cam.left - x));
+    }
+    // and it really did go off the edge, or this asserts nothing
+    expect(ever).toBeGreaterThan(20);
+    expect(cam.left).toBeCloseTo(field.left, 6);
+    void W;
+  });
+
+  it('holds the wall through the death and the hold after it', () => {
+    // The reported shape, flown rather than asserted about: a ship leaves the
+    // corridor, the run ends four pixels past the line, and `crashPause` then
+    // holds the wreck out there for 0.7s — 42 frames during which the camera is
+    // still being driven and the ship is still outside. That hold is most of what
+    // the player actually sees of the mistake, and the view spent it drifting into
+    // the void. Replayed from the session that reported it: 82px past the dashed
+    // line on the left wall and 82 on the right.
+    //
+    // Driven through `stepSim` because the ending is the part that matters and no
+    // hand-placed ship reproduces it: `endRun` freezes the position, so the ship
+    // stops moving while the camera does not.
+    const cfg = DEFAULT_CONFIG;
+    for (const dir of [-1, 1] as const) {
+      const st = createInitialState(cfg);
+      const startX = dir < 0 ? field.left + 260 : field.right - 260;
+      Object.assign(st.ship, { x: startX, y: -2000, vx: dir * 320, vy: -40 });
+      st.highWaterY = -2000;
+      const cam = cam390();
+      centerCamera(cam, startX, -2000, field, null);
+      let ended = 0;
+      let worst = 0;
+      for (let i = 0; i < 200; i++) {
+        stepSim(st, cfg, { held: false, pressed: false, released: false }, FIXED_DT);
+        const p = shipWorldPos(st);
+        followCamera(
+          cam,
+          DEFAULT_RENDER_CONFIG,
+          p.x,
+          p.y,
+          field,
+          backtrackFloorY(cfg, st.highWaterY),
+          FIXED_DT,
+          null,
+          st.ship.vx,
+          false,
+          barrierRelax(st.bodies, p.x, p.y, DEFAULT_RENDER_CONFIG),
+        );
+        if (st.ending.active) ended++;
+        worst = Math.max(worst, field.left - cam.left, cam.left + cam.designW - field.right);
+      }
+      // The run really did end at the wall and really was held there, or this is
+      // asserting about a ship that never left.
+      expect(ended, `dir ${dir} never ended at the wall`).toBeGreaterThan(30);
+      expect(worst, `dir ${dir} showed dead space past the wall`).toBeLessThan(1e-9);
     }
   });
 
@@ -734,13 +808,15 @@ describe('the view around an anomaly', () => {
     const dx = anomaly.x - 200;
     const dy = anomaly.y - -3003;
     const L = Math.hypot(dx, dy);
-    const run = (speed: number, relaxOn: boolean): number => {
+    const run = (speed: number, relaxOn: boolean) => {
       const cam = cam390();
       let x = 200;
       let y = -3003;
       cam.left = Math.max(field.left, Math.min(field.right - 390, x - 390 / 2));
       cam.centerY = y;
       let worst = 0;
+      let offScreen = 0;
+      let pastWall = 0;
       for (let i = 0; i < 220; i++) {
         x += (dx / L) * speed * FIXED_DT;
         y += (dy / L) * speed * FIXED_DT;
@@ -760,30 +836,40 @@ describe('the view around an anomaly', () => {
           r,
         );
         worst = Math.max(worst, Math.abs(cam.left - before) * 60);
+        // Either wall: the anomalies alternate sides, so which one this run
+        // crosses is a property of the seed and not of the rule being measured.
+        offScreen = Math.max(offScreen, x - (cam.left + 390), cam.left - x);
+        pastWall = Math.max(pastWall, field.left - cam.left, cam.left + 390 - field.right);
         if (Math.hypot(anomaly.x - x, anomaly.y - y) < 70) break;
       }
-      return worst;
+      return { worst, offScreen, pastWall };
     };
     for (const speed of [228, 352]) {
-      // The pin, updated rather than deleted, and twice now. It first read
-      // `> 900`, because the allowance was the whole of the fix; then the backstop
-      // stopped carrying its own field rule and the unrelaxed crossing fell to
-      // ~430px/s on its own, so the assertion became a comparison. The backstop
-      // reads the same `panBounds` as the target again — it had to, or ordinary
-      // play saw 18px past the wall — and this arm is back up at 643-1280px/s.
+      // The pin, updated rather than deleted, and three times now — each rewrite
+      // is a note in PORT_NOTES, and each one changed what the unrelaxed arm even
+      // MEANS. It first read `> 900`, when the allowance was the whole of the fix.
+      // Then the backstop stopped carrying its own field rule and the unrelaxed
+      // crossing fell to ~430px/s on its own, so it became a comparison. Then the
+      // backstop shared the target's bounds again and it rose to 643-1280.
       //
-      // That is a counterfactual, not a regression: `relaxOn: false` is a barrier
-      // crossing with no bubble around it, which the simulation cannot produce,
-      // because the bubble is the only thing that lets a ship past the wall alive.
-      // The relaxed arm — the one play actually takes — is unchanged to the pixel
-      // at 249 and 390px/s. What is asserted is that the allowance still helps.
-      expect(run(speed, true), `${speed}: the allowance no longer helps`).toBeLessThan(
-        run(speed, false),
-      );
-      // Bounded as a multiple of the SHIP's speed, because what is left is a
-      // proportionate catch-up rather than a discontinuity — 1.09x at 228px/s and
-      // 1.11x at 352.
-      expect(run(speed, true), `${speed}: relaxed crossing still jerks`).toBeLessThan(speed * 1.8);
+      // It is not a comparison any more, because `relax` is now the ONLY thing
+      // that lets the view past a barrier at all: with it forced to zero the
+      // camera does not follow the ship out, it stops at the wall and lets the
+      // ship go. So the unrelaxed arm is no longer a rougher version of the same
+      // crossing — it is a different outcome, and that is what is asserted.
+      const relaxed = run(speed, true);
+      const bare = run(speed, false);
+
+      // Bounded as a multiple of the SHIP's speed, because what the allowance
+      // leaves is a proportionate catch-up rather than a discontinuity — 1.09x at
+      // 228px/s and 1.11x at 352, unchanged across all three rewrites.
+      expect(relaxed.worst, `${speed}: relaxed crossing jerks`).toBeLessThan(speed * 1.8);
+      // With the allowance the ship stays framed and the view goes out with it.
+      expect(relaxed.offScreen, `${speed}: relaxed crossing lost the ship`).toBeLessThan(1);
+      expect(relaxed.pastWall, `${speed}: the allowance opened nothing`).toBeGreaterThan(100);
+      // Without it the wall holds absolutely, and the ship is the one that leaves.
+      expect(bare.pastWall, `${speed}: the bare crossing showed dead space`).toBeLessThan(1e-9);
+      expect(bare.offScreen, `${speed}: the bare crossing kept the ship`).toBeGreaterThan(50);
     }
   });
 

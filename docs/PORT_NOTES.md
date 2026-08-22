@@ -1790,6 +1790,55 @@ orbit's PHASE, and only part of that circle points back at the corridor.
 
 ---
 
+### 44 — The barrier is only negotiable where an anomaly holds it open
+
+`src/render/camera.ts` · **[CHANGED]** · reported as "as I approach the sides the
+camera pans past the dashed line and I see the black background beyond it"
+
+Note 41 fixed the backstop outranking the field and was not enough, because the
+leak it fixed was the small one. `panBounds` lets framing take over from the field
+rule when the ship is OUTSIDE the corridor — which is right at an anomaly, where
+the ship is legitimately out there and a view with the ship missing is worse than
+a view with some black in it. But "outside the corridor" is also true of the last
+four pixels of an ordinary run into the wall, and then of the whole `crashPause`
+that holds the wreck out there afterwards. Replayed from the reported session, the
+view sat **82px into the void, on both walls**, with no anomaly within thousands of
+pixels — and most of it during the 0.7s hold, which is the part of a death the
+player actually looks at.
+
+The gate is `escape`: `relax / cameraBarrierRelax`, which is nonzero only inside an
+anomaly's bubble. It multiplies both places where the field rule yields — the
+framing edge and the `subjOut` ramp — so the handover happens where the barrier is
+suspended and nowhere else. Ramped rather than switched, because leaving the far
+side of a bubble is fatal and a boolean would snap the view back to the corridor on
+the tick of the death; easing it back over the last stretch reads as the safe
+ground running out.
+
+**The conflict resolution flipped with it.** When framing and the field cannot both
+hold, the range used to be handed to framing outright — which is the other half of
+the same bug, since a ship four pixels past a wall makes them unsatisfiable
+immediately. Now it resolves to the nearest legal point inside the field range,
+which is continuous in `shipX` and means the ship, not the wall, is what leaves the
+frame. It is dead; the wall is the thing worth looking at.
+
+That cost the framing guarantee its "however fast" wording, which was always
+conditional and is now honestly so: inside the corridor the ship never leaves the
+window, and past a wall it does. The pin is split in two to say both.
+
+**A third rewrite of the barrier-crossing pin, and this one changed its meaning
+rather than its number.** `relaxOn: false` used to be a rougher version of the same
+crossing; `relax` is now the only thing that lets the view past a barrier at all,
+so the bare arm is a different outcome — the wall holds and the ship goes off the
+edge. Asserted as that, and the relaxed arm is unchanged for the third time at
+1.09x and 1.11x of ship speed.
+
+One consequence worth writing down: near an anomaly you CAN see past the dashed
+line, by up to `cameraBarrierRelax`, while still inside the corridor. That is note
+35 working as designed and it is what makes the crossing smooth. It is bounded to
+within 400px of an anomaly, and everywhere else the line is absolute again.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -1812,11 +1861,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 95 · camera 48
+tests    port-equality 11 · invariants 32 · render 95 · camera 50
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 10
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         390 total
+         392 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

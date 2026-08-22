@@ -255,8 +255,28 @@ function panBounds(
   // is ever shown. Outside, the edge opens to its full value over the first few
   // pixels and framing takes over smoothly. Without the ramp, framing outranked
   // the field for a ship merely NEAR a wall and panned 12px into the void.
+  // How negotiable the barrier is here, 0..1, and the answer is almost always
+  // zero. `relax` is nonzero only inside an anomaly's bubble, so this is the one
+  // quantity in the file that knows the difference between a ship that is outside
+  // the corridor because an anomaly is holding the wall open and a ship that is
+  // outside it because it is about to die there.
+  //
+  // Everything below that lets framing outrank the field is multiplied by it, and
+  // that is the whole of the fix: the handover was written for the anomaly case
+  // and gated on the ship merely BEING outside, which is also true for the last
+  // few pixels of an ordinary run into the wall — and for the 0.7s the ending
+  // holds the wreck there. Replayed from the session that reported it, the view
+  // opened 82px past the dashed line on both walls, with no anomaly within
+  // thousands of px.
+  //
+  // Ramped, not switched. Leaving the far side of a bubble is fatal, and a
+  // boolean would snap the view back to the corridor on the tick of the death;
+  // this eases it back over the last stretch instead, which reads as the safe
+  // ground running out.
+  const escape = Math.min(1, relax / Math.max(1, cfg.cameraBarrierRelax));
+
   const outside = Math.max(0, field.left - shipX, shipX - field.right);
-  const edge = Math.min(cfg.cameraBackstopEdge, outside);
+  const edge = Math.min(cfg.cameraBackstopEdge, outside) * escape;
 
   // The field rule may not prevent framing the thing being framed.
   //
@@ -276,7 +296,7 @@ function panBounds(
   // the field. The outbound crossing was smooth only because `relax` happened to
   // cover it; the return had nothing.
   const subjOut = Math.max(0, field.left - subjX, subjX - field.right);
-  const t = Math.min(1, subjOut / Math.max(1, W / 2));
+  const t = Math.min(1, subjOut / Math.max(1, W / 2)) * escape;
   const base = field.left - relax;
   const baseHi = field.right - W + relax;
   const fieldLo = base + (Math.min(base, subjX - W / 2) - base) * t;
@@ -288,8 +308,17 @@ function panBounds(
     hi = field.left;
   }
   if (lo > hi) {
-    lo = shipX - W + edge;
-    hi = shipX - edge;
+    // Framing and the field cannot both hold, and the field wins — it is a rule
+    // about what the player may SEE, and the only thing that may open it is
+    // `escape`, which opens it by moving the bound rather than by outranking it.
+    // This used to hand the range to framing outright, which is how a ship four
+    // pixels past a wall dragged the view into the void behind it.
+    //
+    // The nearest legal point to what framing wanted, which for a disjoint range
+    // is whichever field bound is on framing's side. Continuous, because
+    // `shipX - W / 2` is.
+    lo = Math.max(fieldLo, Math.min(fieldHi, shipX - W / 2));
+    hi = lo;
   }
   return { lo, hi };
 }
