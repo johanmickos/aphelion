@@ -263,13 +263,30 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(0, 0, 0, 0.55);
+        /* Nearly opaque, not merely dimmed. The attract canvas above the title
+           paints itself solid black so the live field cannot show through the
+           figure, and at 0.55 that patch read as a dark rectangle sitting on the
+           screen. At 0.88 the field is still faintly there — which is the only
+           feedback ⟳ NEW MAP has — and the canvas edge disappears. */
+        background: rgba(0, 0, 0, 0.88);
         text-align: center;
         pointer-events: none;
       }
       #armed.hidden {
         display: none;
       }
+      /* The attract loop: two planets and a ship, above the wordmark.
+         Width-driven with the aspect fixed, so it scales down on a short screen
+         instead of pushing the title and the hint off the bottom. The canvas
+         inherits `pointer-events: none` from #armed, so a tap on it still starts
+         the run rather than being swallowed. */
+      #attract {
+        display: block;
+        margin: 0 auto 24px;
+        width: min(100%, calc(clamp(90px, 20vh, 176px) * 450 / 220));
+        aspect-ratio: 450 / 220;
+      }
+
       #armedTitle {
         font: 600 26px/1.2 ui-monospace, 'SFMono-Regular', Menlo, monospace;
         letter-spacing: 0.3em;
@@ -357,6 +374,7 @@
 
     <div id="armed">
       <div id="armedInner">
+        <canvas id="attract"></canvas>
         <div id="armedTitle">APHELION</div>
         <div id="armedHint">tap to start</div>
         <div id="armedSub">

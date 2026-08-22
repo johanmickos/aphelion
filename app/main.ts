@@ -17,6 +17,7 @@ import { anomalyFocus, barrierRelax, frozenOrbit, orbitLock } from '../src/rende
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { centerCamera, createCamera, fitCamera, followCamera } from '../src/render/camera.ts';
 import { Scene } from '../src/render/scene.ts';
+import { createAttractLoop, drawAttractLoop } from '../src/render/attract.ts';
 import { captureSnapshot, lerpSnapshot } from '../src/render/snapshot.ts';
 import { RunRecorder } from '../src/app/recorder.ts';
 import { createScoreState, scoreTick } from '../src/score/index.ts';
@@ -38,6 +39,30 @@ const TELEPORT_DISTANCE = 200;
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
+
+/**
+ * The attract loop above the title.
+ *
+ * Its own canvas, its own coordinate space, and no camera: it is a closed-form
+ * figure-8 rather than anything the simulation produces, so it cannot be
+ * disturbed by — or disturb — the run behind it. See `src/render/attract.ts` for
+ * why authoring it is faithful rather than a shortcut.
+ *
+ * Drawn from the existing render callback rather than a second requestAnimationFrame:
+ * one clock, and it stops for free when the tab is backgrounded.
+ */
+const attractCanvas = document.getElementById('attract') as HTMLCanvasElement;
+const attractCtx = attractCanvas.getContext('2d')!;
+const attract = createAttractLoop(DEFAULT_CONFIG);
+/**
+ * A perpetual loop is exactly what this setting is for. Frozen mid-transfer, the
+ * still frame still shows both planets and a ship between them, which is the
+ * whole message.
+ */
+const stillOnly = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let attractT = stillOnly ? attract.stillT : 0;
+let attractW = 0;
+let attractH = 0;
 
 // Mutable so the camera toggle can take effect mid-run. Render config never
 // reaches the simulation — `pnpm portable` enforces that src/sim imports nothing
@@ -233,6 +258,19 @@ function resize(): void {
   const note = document.getElementById('note');
   const rect = note?.getBoundingClientRect();
   headerBottom = rect && rect.height > 0 ? Math.max(0, (rect.bottom - cam.offsetY) / cam.scale) : 0;
+
+  // The attract canvas is laid out by CSS, so its size is read back rather than
+  // computed. Zero once the run starts and #armed goes display:none — guarded,
+  // because a zero-sized backing store throws on some engines.
+  const aw = attractCanvas.clientWidth;
+  const ah = attractCanvas.clientHeight;
+  if (aw > 0 && ah > 0) {
+    attractW = aw;
+    attractH = ah;
+    attractCanvas.width = Math.round(aw * dpr);
+    attractCanvas.height = Math.round(ah * dpr);
+    attractCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
 }
 addEventListener('resize', resize);
 resize();
@@ -318,6 +356,17 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       frozenOrbit(cap?.phase),
       barrierRelax(state.bodies, snap.x, snap.y, rcfg),
     );
+    // The armed screen's animation. Skipped once a run starts, and while a
+    // full-screen panel is covering it — there is nothing to draw to.
+    if (
+      life.phase === 'armed' &&
+      !tuneEl.classList.contains('open') &&
+      !debugEl.classList.contains('open')
+    ) {
+      if (!stillOnly) attractT = (attractT + frameDt) % attract.period;
+      drawAttractLoop(attractCtx, attract, attractT, attractW, attractH);
+    }
+
     scene.draw(ctx, cam, snap, {
       timeMs: performance.now(),
       paused,

@@ -93,6 +93,22 @@ export function trailColor(heat: number): [number, number, number] {
 }
 
 /**
+ * The ship's silhouette, nose along +x, as a path ready to fill or stroke.
+ *
+ * Extracted so the attract loop on the title screen draws the same ship the game
+ * does. Two copies of these five numbers would drift, and the title screen would
+ * end up advertising a vessel that does not exist.
+ */
+export function shipPath(ctx: CanvasRenderingContext2D, s: number): void {
+  ctx.beginPath();
+  ctx.moveTo(9 * s, 0);
+  ctx.lineTo(-6 * s, 5 * s);
+  ctx.lineTo(-3 * s, 0);
+  ctx.lineTo(-6 * s, -5 * s);
+  ctx.closePath();
+}
+
+/**
  * The ship, rotated to its velocity.
  *
  * It now carries phase. The prototype distinguished only held-vs-not, so `flyby`
@@ -109,12 +125,7 @@ export function drawShip(ctx: CanvasRenderingContext2D, cam: Camera, snap: Rende
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(ang);
-  ctx.beginPath();
-  ctx.moveTo(9 * s, 0);
-  ctx.lineTo(-6 * s, 5 * s);
-  ctx.lineTo(-3 * s, 0);
-  ctx.lineTo(-6 * s, -5 * s);
-  ctx.closePath();
+  shipPath(ctx, s);
   ctx.fillStyle = snap.held ? '#fff' : '#cfdcf2';
   ctx.fill();
 
