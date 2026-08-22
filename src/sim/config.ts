@@ -47,6 +47,59 @@ export interface SimConfig {
   flybyBrakeRefSpeed: number;
   /** Below this speed the brake is off entirely; slow grabs coast on gravity. */
   flybyBrakeMinSpeed: number;
+  /**
+   * The flyby brake's fuel cost scales with the brake actually applied, instead
+   * of being a flat rate for as long as the button is held.
+   *
+   * WHY. `speedTaper` scales the brake to zero between `flybyBrakeRefSpeed` and
+   * `flybyBrakeMinSpeed`, and the burn ignored it. Below 120px/s the impulse is
+   * identically nothing and the ship was still paying 40 fuel/second for it.
+   *
+   * The repo's own `fast unbound grab -> flyby, braked` scenario had this sitting
+   * in it the whole time: of a full tank, 47 fuel buys the full-strength brake
+   * (400 -> 204px/s), 23 buys the tapering one, and the last **26 buys zero
+   * impulse** — a quarter of the tank for nothing, over which speed falls 116 ->
+   * 91 on gravity alone.
+   *
+   * This is a price correction, not a discount. At full strength the rate is
+   * unchanged, which is where a real rescue is bought; only the part that was
+   * being sold twice goes away. Holding a dead brake is still not free — a
+   * capture suppresses `fuelRegen`, so it costs the regen it forgoes.
+   */
+  flybyFuelTracksBrake: boolean;
+  /**
+   * Fraction of a flyby's brake spend handed back the moment it converts into a
+   * capture. 0 disables it.
+   *
+   * WHY IT EXISTS. A brake sets up the capture that follows it, but its cost was
+   * charged entirely against that capture's budget while the release refund was
+   * sized for a capture that needed no brake. So a converted flyby — the harder
+   * play — cost 40 more and paid exactly the same. Measured on the session that
+   * prompted it: a 1.33s brake spent 53 fuel and converted, the capture it
+   * converted into began on 13.9, ran dry mid-circularization, puttered out, and
+   * took the streak from x2.00 to x1.00 — then cost 2.7s of drifting to refuel.
+   *
+   * WHY IT PAYS AT THE CONVERSION. The refund has to arrive before the settle
+   * spends the fuel it is meant to cover. Folded into the release it would land
+   * after the putter-out it exists to prevent, which is the entire failure.
+   *
+   * WHY 0.5. It is the value at which a rescue that WORKS costs about what a
+   * capture costs. Over that session's four expensive conversions the net brake
+   * bill lands at 18 / 13 / 20 / 26 fuel against a median capture burn of 18-20,
+   * and the worst following capture bottoms out at 20 fuel instead of 2. Every
+   * putter-out is gone by 0.25 already; the extra is headroom, on the same
+   * reasoning as `linkFuelReward` — condition the constraint, do not remove it.
+   *
+   * WHY ONLY ON CONVERSION. A brake that fails still pays in full, which is where
+   * the tension the refund must not blunt actually lives: over 18 braking episodes
+   * the 13 that converted spent 160 fuel and the 5 that sailed past spent 167. The
+   * refund touches the first group and leaves the second exactly as expensive.
+   *
+   * `brakeSpent` accumulates what was actually DEDUCTED rather than what was
+   * quoted, so a brake held against an empty tank cannot earn a refund for fuel
+   * that was never spent.
+   */
+  flybyConvertRefund: number;
 
   // --- boost ---
   boostThreshold: number;
@@ -55,6 +108,30 @@ export interface SimConfig {
   boostArmTime: number;
   /** Seconds for the boost to fade to zero after its peak. */
   boostDecayTime: number;
+  /**
+   * The boost holds at its peak until the settle finishes, instead of beginning
+   * to decay the instant it arms.
+   *
+   * WHY. `boostT` and `settleT` start together at the periapsis freeze, so with
+   * `boostArmTime` 0.45 and `settleDur` 1.2 the boost peaked 38% of the way into
+   * the settle and was 46% dead by the time the orbit was round — the window
+   * closed inside the manoeuvre it was meant to reward. Completing a
+   * circularization therefore guaranteed missing it.
+   *
+   * Measured over the three sessions that carry award records, the median hold
+   * was 1.42s, 1.47s and 1.83s against an envelope that reached zero at 1.85s.
+   * In the last of those, 6 of 11 links paid no boost and no fuel, including the
+   * best capture of the session (grab closeness 0.74, aim 0.95, held 1.83s), and
+   * the tank bottomed out at 3. The two links that DID pay well came off the two
+   * loosest grabs of the session, released early — the axis was paying for haste
+   * rather than for flying the capture.
+   *
+   * The ramp is untouched, so a reflexive tap-through still earns nothing and the
+   * footgun stays disarmed. Only the start of the decay moves, and it tracks
+   * `settleDur` rather than a second constant — `settleDur` is a tune knob, and a
+   * hardcoded plateau would silently re-break the moment it was dragged.
+   */
+  boostHoldsThroughSettle: boolean;
   /** Fraction of the boost that permanently carries into drift velocity. */
   boostPermFrac: number;
   /** Transient burst multiplier, for a punchy escape. */
@@ -101,6 +178,15 @@ export interface SimConfig {
    * waiting 0.45s for it costs a link and the streak pays more for the link. Fuel
    * is the lever that can win that argument, because it is spent, watched, and
    * missed. Points could not, and adding more of them would not have.
+   *
+   * WHY IT STILL PAID ALMOST NOTHING. That reasoning was right about the axis and
+   * wrong about the obstacle: the cost was not waiting 0.45s FOR the peak, it was
+   * that the peak had already decayed away by the time the settle finished. See
+   * `boostHoldsThroughSettle`, which moved the decay's start and took this session's
+   * zero-paying links from 6 of 11 to 0 while the two sessions that were never
+   * starved moved by under 8 fuel at their minimum. That is the shape of a defect
+   * being fixed rather than a subsidy being added, and it is why the reward stayed
+   * at 20 instead of going up.
    *
    * `earned` is `releaseCapture`'s own test — a real orbit, past periapsis, not a
    * flyby, not a putter-out — and is the SAME quantity the scorer reads as
@@ -249,11 +335,14 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyOutwardEase: 0.35,
   flybyBrakeRefSpeed: 200,
   flybyBrakeMinSpeed: 120,
+  flybyFuelTracksBrake: false,
+  flybyConvertRefund: 0,
 
   boostThreshold: 0.5,
   boostMax: 95,
   boostArmTime: 0.45,
   boostDecayTime: 1.4,
+  boostHoldsThroughSettle: false,
   boostPermFrac: 0.22,
   boostPunch: 1.8,
   boostBurstDecay: 1.3,
@@ -384,6 +473,8 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   crashConeRange: 50,
   flybyBrake: 600,
   flybyFuelPerSec: 40,
+  flybyFuelTracksBrake: true,
+  flybyConvertRefund: 0.5,
   fuelRegen: 30,
   linkFuelReward: 20,
   fieldWidthFrac: 1.9,
@@ -399,6 +490,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   bodySpread: 160,
   rowPairChance: 0.4,
   boostMax: 60,
+  boostHoldsThroughSettle: true,
   grabLeadTime: 0.2,
   crashConeSeverityFloor: 0,
 } satisfies SimConfig);
@@ -410,7 +502,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 9;
+export const SIM_VERSION = 12;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

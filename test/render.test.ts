@@ -15,6 +15,7 @@ import {
 import { Starfield } from '../src/render/starfield.ts';
 import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
+import { boostEnvelope } from '../src/sim/boost.ts';
 import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture.ts';
 import { GAUGE, drawFuelGauge, drawScore, formatScore, readoutLines } from '../src/render/hud.ts';
 import { drawCompass } from '../src/render/compass.ts';
@@ -345,13 +346,16 @@ describe('boost halo', () => {
     const radii: number[] = [];
     const alphas: number[] = [];
 
-    // sweep the whole envelope at 60Hz, sampling the drawn glow each tick
-    for (let i = 0; i < 120; i++) {
+    // sweep the whole envelope at 60Hz, sampling the drawn glow each tick. The
+    // bound is derived, not 120: the envelope's tail moved out to
+    // `settleDur + boostDecayTime` and a fixed count would stop short of it.
+    const ticks = Math.ceil((sim.settleDur + sim.boostDecayTime + 0.2) * 60);
+    for (let i = 0; i < ticks; i++) {
       const boostT = i * (1 / 60);
-      const charge =
-        boostT < sim.boostArmTime
-          ? boostT / sim.boostArmTime
-          : Math.max(0, 1 - (boostT - sim.boostArmTime) / sim.boostDecayTime);
+      // Read the real envelope rather than restating it: the plateau added by
+      // `boostHoldsThroughSettle` changed its shape once already, and a copy here
+      // would have kept sweeping the old one and stopped covering the halo.
+      const charge = boostEnvelope(sim, 1, boostT);
       if (charge <= 0.02) continue;
       const r = recordingContext();
       drawBoostHalo(

@@ -127,6 +127,13 @@ export interface Capture {
   /** Ran dry mid-circularization; the ship putters out with a weak, boostless release. */
   puttered: boolean;
 
+  /**
+   * Fuel spent braking this flyby, for the conversion refund. Zeroed once paid,
+   * so a capture cannot collect twice — though `phase` only ever leaves `flyby`
+   * one way, so the conversion happens at most once per capture anyway.
+   */
+  brakeSpent: number;
+
   /** Per-sample heading deflection, for the trace recorder. Not physics. */
   lastAngle: number;
   defl: number;

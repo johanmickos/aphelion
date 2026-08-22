@@ -187,6 +187,7 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     prevR: grabR,
     prevDR: 0,
     passedPeri: false,
+    brakeSpent: 0,
     periR: grabR,
     apoR: grabR,
     clearFramesLeft: 0,

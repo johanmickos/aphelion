@@ -9,14 +9,29 @@
  *
  *                     tier 1 (top ~25%)   tier 2 (top ~10%)
  *   aim                     0.94                0.98
- *   boost peak              0.44                0.52
+ *   boost peak              0.85                0.94
  *   grab clearance         <=59px              <=48px
  *
  * Round numbers would have been worse than useless here. Gated at a plausible
- * 0.90, the boost-peak word would have fired zero times in 112 releases — the
- * best release on record peaked at 0.80 and the median at 0.32 — so a third of
- * this feature would have been invisible while looking implemented. Praise has to
- * mean "better than you usually manage", and only measurement knows what that is.
+ * 0.90, the boost-peak word would have fired zero times in 112 releases — under
+ * the envelope of the day the best release on record peaked at 0.80 and the
+ * median at 0.32 — so a third of this feature would have been invisible while
+ * looking implemented. Praise has to mean "better than you usually manage", and
+ * only measurement knows what that is.
+ *
+ * BOOST PEAK WAS RE-MEASURED, and the expiry date above is why. It read 0.44 /
+ * 0.52 until `boostHoldsThroughSettle` (PORT_NOTES 27) moved the envelope's decay
+ * out to the end of the settle, which lifted the median release from 0.21 to 0.71
+ * without a player changing anything they did. At the old thresholds the word
+ * would have fired on 85% and 79% of releases — the same defect as gating at a
+ * round 0.90, inverted: a word that lands on almost every release names nothing.
+ *
+ * The new numbers come from the 52 links across the three sessions carrying award
+ * records, which is a smaller sample than the original 112 and a better one: an
+ * award is recorded on the phone, so it survives a replay divergence. Each
+ * release's true `boostT` was recovered by inverting its RECORDED `timing`
+ * through the old envelope and pushed back through the new one, so no part of it
+ * depends on re-simulating a trajectory. 0.85 fires on 25%, 0.94 on 8%.
  *
  * Revisit these when the feel changes. They are a snapshot of one player on one
  * build, which is the most honest thing they could be and also their expiry date.
@@ -67,7 +82,7 @@ export interface Praise {
  */
 export const CLOSE_PX = Object.freeze({ tier1: 59, tier2: 48 });
 export const AIM = Object.freeze({ tier1: 0.94, tier2: 0.98 });
-export const PEAK = Object.freeze({ tier1: 0.44, tier2: 0.52 });
+export const PEAK = Object.freeze({ tier1: 0.85, tier2: 0.94 });
 
 /**
  * The nerve grab: already boring in, and you waited.

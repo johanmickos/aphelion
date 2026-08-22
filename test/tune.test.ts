@@ -46,6 +46,8 @@ describe('tunable parameters', () => {
     // the flyby brake, and a short run never reaches the second body.
     interface Sc {
       ship?: { x: number; y: number; vx: number; vy: number };
+      /** Starting tank. Defaults to `fuelMax`, like a fresh life. */
+      fuel?: number;
       edges: Array<[number, 0 | 1]>;
       ticks: number;
     }
@@ -102,9 +104,19 @@ describe('tunable parameters', () => {
       // never gets near the grab gate. The brake gate is different and still easy
       // to reach: hold a 410px/s grab until the tank is dry, let go, and grab
       // again ten ticks later. With no regen the second brake is dead on arrival
-      // and the ship sails past; with a fast one it bites. That is 738px.
+      // and the ship sails past; with a fast one it bites.
+      //
+      // STARTS PART-DRAINED, and that is the load-bearing part. It used to open on
+      // a full tank and empty it inside the first brake, which stopped working the
+      // moment `flybyFuelTracksBrake` (PORT_NOTES 28) stopped billing for a brake
+      // that had tapered off — the first hold now leaves 45 in the tank, the
+      // second brake never reaches its gate, and `fuelRegen` measured as dead
+      // knob. It is not dead; the scenario simply stopped reaching the mechanism,
+      // which is the failure mode this whole test is prone to. Opening at 40
+      // restores it without depending on any particular brake price.
       {
         ship: { x: 105, y: 354, vx: 0, vy: -410 },
+        fuel: 40,
         edges: [
           [20, 1],
           [170, 0],
@@ -140,6 +152,7 @@ describe('tunable parameters', () => {
     const run = (cfg: SimConfig, sc: Sc) => {
       const st = createInitialState(cfg);
       if (sc.ship) Object.assign(st.ship, sc.ship);
+      if (sc.fuel !== undefined) st.fuel = sc.fuel;
       const edges = new Map(sc.edges);
       let held = false;
       const path: Array<{ x: number; y: number }> = [];

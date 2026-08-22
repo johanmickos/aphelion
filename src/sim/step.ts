@@ -298,7 +298,19 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
 
         cap.vx = rhx2 * vr + thx * vt;
         cap.vy = rhy2 * vr + thy * vt;
-        state.fuel = burn(state.fuel, cfg.flybyFuelPerSec, h);
+        // Bill for the brake actually applied, not for holding the button. The
+        // flat rate charged full price through the whole taper and kept charging
+        // after `speedTaper` reached zero, where the impulse above is identically
+        // nothing. See `flybyFuelTracksBrake`.
+        const rate = cfg.flybyFuelTracksBrake
+          ? cfg.flybyFuelPerSec * speedTaper
+          : cfg.flybyFuelPerSec;
+        const before = state.fuel;
+        state.fuel = burn(state.fuel, rate, h);
+        // What the brake actually cost, not what it was quoted: `burn` clamps at
+        // an empty tank, and a brake the tank could not pay for must not earn a
+        // refund for fuel that was never there.
+        cap.brakeSpent += before - state.fuel;
       }
     }
 
@@ -313,6 +325,14 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
         // A capture is a capture however it began. Without this the converted
         // path dives through the surface and is caught by the floor clamp.
         if (cfg.clearanceOnConvert) applyClearance(cap, cfg);
+        // The rescue landed: hand back part of what the brake cost. Paid HERE and
+        // not folded into the release refund, because the whole point is to reach
+        // the capture that is about to burn fuel — arriving at the release would
+        // be after the putter-out it exists to prevent. See `flybyConvertRefund`.
+        if (cfg.flybyConvertRefund > 0 && cap.brakeSpent > 0) {
+          state.fuel = Math.min(cfg.fuelMax, state.fuel + cfg.flybyConvertRefund * cap.brakeSpent);
+          cap.brakeSpent = 0;
+        }
       }
     }
 

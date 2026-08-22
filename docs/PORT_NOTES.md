@@ -689,6 +689,287 @@ merely moved a tune slider. The header now separates the three cases: keys in
 `KNOBS` are a deliberate experiment, `worldSeed` is a different world, and
 everything else is build skew, which is the only one the banner is about.
 
+### 27 — The boost window closed inside the manoeuvre it was rewarding
+
+`src/sim/boost.ts` · `src/sim/config.ts` · **[CHANGED]** · reported as "I felt
+like I was close to running out of fuel a lot during the fun swinging moments"
+
+`boostT` and `settleT` both start at zero in `beginSettle`, and nothing had ever
+compared them. With `boostArmTime` 0.45 and `settleDur` 1.2, the boost peaked 38%
+of the way into the settle and was 46% dead by the time the orbit was round,
+reaching zero at 1.85s — 0.65s after the manoeuvre finished. **Completing a
+circularization therefore guaranteed missing the boost**, and with it the
+`linkFuelReward` refund, which scales by `cap.boost / cap.boostFull`.
+
+Nothing caught this because every part of it was individually correct. The
+envelope was internally consistent, the refund scaled by it faithfully,
+`test/link-fuel.test.ts` asserted exactly that, and the two together paid nothing
+for a well-flown capture. The defect lived in the RELATIONSHIP between three
+values, which was the one thing no test named.
+
+What the reports say, over the three sessions carrying award records:
+
+```
+                    links   median hold   zero-paying links   min fuel
+2026-08-21T21-27      16        1.42s          1 / 16            39
+2026-08-21T21-55      25        1.47s          3 / 25            47
+2026-08-22T07-31      11        1.83s          6 / 11             3
+```
+
+against an envelope that hit zero at 1.85s. The last session is what the boost
+axis actually was: its best capture — grab closeness 0.74, aim 0.95, CLUTCH and
+SIGHTED both — paid **zero**, held 1.83s. Its two best-paying links came off its
+two loosest grabs (closeness 0.07 and 0.10), released early. The axis was paying
+for haste rather than for flying the capture, which is also why it read as
+economically dead in the score calibration.
+
+The fix moves where the decay STARTS, not how the ramp works: the peak holds
+until `settleDur`, then decays over `boostDecayTime` as before. The ramp is
+untouched, so a reflexive tap-through still earns nothing and the always-loaded
+footgun the ramp exists to disarm stays disarmed. It tracks `settleDur` rather
+than a second constant
+because `settleDur` is a tune-panel slider, and a hardcoded plateau would silently
+re-break the moment it was dragged — the same failure mode as a frame-denominated
+constant.
+
+Modelled against the recorded fuel curves, replaying each session's checkpoints
+with the refunds substituted and the spill above `fuelMax` discarded:
+
+```
+                       min fuel   time under a quarter tank   zero-paying links
+2026-08-22T07-31
+  before                    3               19%                   6 / 11
+  linkFuelReward 20 -> 32   5               12%                   6 / 11
+  plateau                  45                0%                   0 / 11
+```
+
+Raising the reward cannot work: anything times zero is zero, and the zeros are
+exactly where the tank drained. The plateau fixes the starved session and moves
+the two that were never starved by under 8 fuel at their minimum — the signature
+of a defect being fixed rather than a subsidy being added, and the reason
+`linkFuelReward` stayed at 20.
+
+The gate is untouched at zero: `boostHoldsThroughSettle` is `false` in
+`PROTOTYPE_CONFIG`, where the plateau collapses onto `boostArmTime` and the
+expression reduces to the old one exactly — `test/boost-envelope.test.ts` asserts
+that with `toBe`, not `toBeCloseTo`, since the prototype comparison is exact.
+`SIM_VERSION` went 9 -> 10; the golden was recaptured because a key was added.
+
+**The praise threshold had to be re-measured, and this is the case the rule is
+for.** `PEAK` in `src/score/praise.ts` was a percentile of play under the broken
+envelope. Moving the envelope lifted the median release from 0.21 to 0.71 without
+a player changing anything they did, so at the old 0.44 / 0.52 the boost-peak word
+would have fired on 85% and 79% of releases — the same defect as gating at a round
+0.90, inverted: a word that lands on almost every release names nothing. It is
+0.85 / 0.94 now, still cut at the top ~25% and top ~10%.
+
+The re-measurement deliberately does not re-simulate anything. Each release's true
+`boostT` was recovered by inverting its RECORDED `timing` through the old
+envelope, then pushed back through the new one — 52 links across the three
+sessions carrying award records. Fewer than the original 112 replayed releases and
+better evidence, for the reason `AwardRecord` exists at all: an award is written
+on the phone and stays true however far a replay drifted, a recomputed one does
+not.
+
+**Fixed alongside:** `test/render.test.ts` restated the envelope inline to sweep
+the boost halo. It now calls `boostEnvelope`, and derives its tick count from
+`settleDur + boostDecayTime` — a copy would have kept sweeping the old shape and
+quietly stopped covering the halo's tail.
+
+### 28 — The flyby brake charged full price after it had switched itself off
+
+`src/sim/step.ts` · the flyby brake block · **[CHANGED]** · found while reading
+the session that note 27 was verified on
+
+`speedTaper` scales the brake from full strength at `flybyBrakeRefSpeed` (200) to
+nothing at `flybyBrakeMinSpeed` (120). The impulse read it; the fuel burn did not,
+and charged a flat `flybyFuelPerSec` for as long as the button was held. Below
+120px/s the brake applies an impulse of identically zero and the ship was still
+paying 40 fuel/second for it.
+
+**The repo's own scenario had it the whole time.** `fast unbound grab -> flyby,
+braked` in `test/scenarios.ts`, from a full tank:
+
+```
+ticks    speed         taper   fuel        what the fuel bought
+ 20-90   400 -> 204     1.00   100 -> 53   the full-strength brake
+ 95-125  183 -> 121  0.78-0.01   53 -> 29   the tapering brake
+130-170  116 ->  91     0.00    26 ->  0   nothing at all
+```
+
+A quarter of the tank for zero impulse, and the 116 -> 91 over that stretch is
+gravity, not the brake. The ship now finishes that scenario on 43.4 fuel instead
+of 0, on an identical trajectory — minimum speed 84px/s either way. The brake was
+never wrong; only its price was.
+
+This is a price correction and not a discount: at `speedTaper` 1 the rate is
+unchanged, which is where a real rescue is bought, and `test/flyby-fuel.test.ts`
+asserts the two paths agree to nine decimals across that whole band. Holding a
+dead brake is still not free, because a capture suppresses `fuelRegen` — the same
+test asserts fuel never rises inside a flyby.
+
+**It broke a knob's coverage, exactly the way this test is known to break.**
+`test/tune.test.ts` measures a knob by how far it moves the ship, and its
+`fuelRegen` scenario worked by emptying a full tank inside one brake and then
+braking again against the `fuel > 0` gate. With the brake no longer billing after
+it tapers off, the first hold ends with 45 in the tank, the second brake never
+reaches its gate, and `fuelRegen` measured as **0.0px across its whole range** —
+i.e. dead. It is not dead; it is +19 fuel/second across 21 seconds of drift in the
+very session this note is about. The scenario now opens on a part-drained tank
+instead of manufacturing one, which is both closer to when a player actually
+notices refuelling and no longer hostage to what a brake costs. This is the second
+time this exact thing has happened to `fuelRegen` — see the note above it in the
+file — and the pattern is worth naming: when a knob measures inert, the scenario
+stopped reaching the mechanism far more often than the knob stopped working.
+
+**What this does NOT explain.** The session it was found in was starved, and it
+was not starved by this: measured over its eight braking episodes, 327 fuel went
+into the brake and only 9 of it (3%) bought no impulse, because the player never
+rode the brake down into the dead band — every episode ended between 157 and
+266px/s. Recorded separately so the next reader does not credit the fix with the
+wrong symptom. What that session actually shows is in the numbers below.
+
+**The economy after note 27**, from the same session's checkpoints, taking only
+intervals with no phase change so no transition or refund contaminates the rate:
+
+```
+phase     rate/s     time     net fuel
+settle     -18.0     23.0s        -414      33 links refunded +390
+flyby      -39.3      8.3s        -327      refunds nothing
+orbit        0.0      5.3s           0
+drift      +19.0     21.0s        +398      (below fuelRegen 30: clips at fuelMax)
+```
+
+The capture loop now recovers 94% of its own cost, which is note 27 working. The
+flyby is the entire net drain, and the sharpest cost is not the fuel itself but
+where it lands: at t700 a 1.33s brake spent 53 fuel and converted, and the capture
+it converted INTO began on 13.9, ran dry mid-circularization, puttered out, and
+took the streak from x2.00 to x1.00 — then cost 2.7 seconds of drifting to refuel.
+**The brake that sets a capture up is charged against that capture's budget, while
+the refund is sized for a capture that needed no brake.** A converted flyby is the
+harder play, costs 40 more and pays exactly the same. Fixed in note 29.
+
+---
+
+### 29 — A rescue paid for itself twice
+
+`src/sim/step.ts` · `src/sim/config.ts` · **[CHANGED]** · the cascade note 28 ends on
+
+`flybyConvertRefund` hands back half of what the brake cost, at the moment the
+flyby converts into a capture.
+
+**Why it pays at the conversion and not at the release.** The refund exists to
+reach the settle that is about to spend the fuel. Folded into `linkFuelReward` it
+would arrive after the putter-out it exists to prevent, which is the entire
+failure — at t700 the capture was already dry 140 ticks before its release.
+
+**Why half.** Measured, not chosen: it is the value at which a rescue that WORKS
+costs about what a capture costs. Over the session's four expensive conversions
+the net brake bill lands at 18 / 13 / 20 / 26 fuel against a median capture burn
+of 18-20, and the worst following capture bottoms out at 20 fuel instead of 2.
+Every putter-out is already gone at a quarter; the rest is headroom, on the same
+reasoning `linkFuelReward` records — condition the constraint, do not remove it.
+
+```
+refund   worst following capture bottoms at   putter-outs
+  0%                  2 fuel                     1 / 13
+ 25%                 11                          0 / 13
+ 50%                 20                          0 / 13
+ 75%                 29                          0 / 13
+```
+
+**Why only on conversion.** A brake that fails still pays in full, and that is
+where the tension lives that this must not blunt: of 18 braking episodes, the 13
+that converted spent 160 fuel and the 5 that sailed past spent 167. The refund
+touches the first group and leaves the second exactly as expensive as it was.
+Eight of those 13 braked for under a third of a second and spent nothing, so they
+collect nothing — the refund finds the rescues and ignores the taps.
+
+`brakeSpent` accumulates what `burn` actually DEDUCTED rather than what it quoted,
+so a brake held against a near-empty tank cannot convert into more fuel than it
+ever had. `test/flyby-fuel.test.ts` pins that bound directly, and pins the two
+places the obvious version of that test goes wrong: an empty ship cannot reach a
+flyby at all, because a grab is refused at `fuel <= 0.5`, and a ship on 2 fuel
+dies inside 200 ticks and respawns with a full tank, which reads exactly like the
+leak being tested for.
+
+### 30 — The fuel ramp is emergent, and both knobs that look like it are not it
+
+no code change · measured on `diagnostics/2026-08-22T08-16-08-005Z.json`, reported
+as "at first I felt like the fuel regen was too lenient, but towards the end I
+found myself struggling to keep the streak clean and felt the pressure nicely"
+
+The felt ramp is real and it is in the numbers. Halving the session at 32s:
+
+```
+                    first half   second half
+median fuel              83           50
+minimum                  38           23
+time at a full tank      17%           7%
+time under a quarter      0%           4%
+median hold           1.40s        1.65s
+settle share of time     40%          49%
+drift share of time      20%          21%
+```
+
+**The mechanism is that income is flat and spend is not.** Drift share — the only
+thing that earns `fuelRegen` — barely moves, 20% to 21%. What rises is the settle,
+40% to 49%, at a flat 18/s, because the holds get longer as the chain gets better.
+Pressure is produced by playing well, and it arrives without any part of the
+config knowing the session has been going on for a while.
+
+**Both obvious ways to tighten the opening make it worse, and this is why the note
+exists.** Modelled by walking the recorded checkpoint deltas under the candidate
+value:
+
+```
+                  first half            second half
+fuelRegen 30    med 83  atFull 17%    med 50  min 23  under-quarter  4%
+fuelRegen 25    med 81  atFull  8%    med 42  min 16                 9%
+fuelRegen 22    med 80  atFull  8%    med 37  min 12                22%
+fuelRegen 15    med 78  atFull  8%    med 24  min  1                51%
+```
+
+`fuelRegen` is a LATE-game knob wearing an early-game label. Cutting it in half
+moves the opening's median by 5 fuel and takes the closing's from 50 to 24. The
+opening tops out whatever the rate is, because its drifts are long; the closing
+feels every unit, because its drifts are short. Tuning it to fix the opening
+destroys precisely the stretch that was reported as feeling right.
+
+`fuelMax` does not touch the opening's leniency either — it translates the whole
+curve down and leaves time-at-full unchanged at 17%, because the player still tops
+out, just lower. At 80 the closing's minimum falls from 23 to 3; at 70 it runs dry.
+
+So the opening's slack is not a mistuned number, it is the shape of loose play:
+long gaps between captures, long drifts, a full tank. About 150 fuel of regen and
+34 of link refund were discarded against the cap over the session. That waste IS
+the on-ramp, and the game reclaims it automatically the moment the chain tightens.
+Left alone deliberately.
+
+**The streak ceiling is no longer out of reach.** This session ran 25 links with
+**zero** streak breaks and one death, at 61s — effectively a single 61-second
+life. The multiplier climbed unbroken to x5.00 by link 17 and sat there for the
+last nine. Previous calibration had `streakMax: 5` needing 17 consecutive links
+and being "~2x out of reach"; notes 27 and 29 made it reachable, and the last
+third of a good run is now played at a ceiling that pays nothing more and costs
+everything to lose. That is a different kind of tension from the one the ladder
+was designed around, and worth knowing before anyone re-tunes `streakMax`.
+
+**A drift worth watching, not yet worth fixing.** Releases before the settle
+completes have gone 19-32% -> 40% across sessions, because note 27's plateau pays
+full boost from 0.45s and nothing now requires finishing the circularization.
+Short holds do aim worse — 0.70 under 0.6s against 0.86 between 1.2s and 1.8s —
+but points come out level (1485 against 1446) and session-median aim is unchanged
+at 0.82, in line with every session before it. Recorded so that if aim does start
+falling, the cause is already written down.
+
+**Method note, learned the hard way in this session.** The replay's `findings`
+block reported "9 run(s) ended" and "aim 0.37"; the recorded checkpoints show ONE
+respawn and a median aim of 0.82. The block is recomputed past a divergence at
+t=4.0s and is fiction. The `findings` and the per-life quality averages are replay
+output — only the checkpoints and the award table are the session. This was known
+(note 15, and the recorder's own comment) and got believed anyway.
+
 ---
 
 ## Tuning vs. fidelity
@@ -716,7 +997,8 @@ golden baseline               golden/physics-v1.json
 tests    port-equality 11 · invariants 32 · render 79 · camera 34
          diagnostics 25 · backtrack 15 · world 14 · tune 7 · clearance 6
          score 60 · input 8 · grab-target 8 · link-fuel 6
-         305 total
+         boost-envelope 6 · flyby-fuel 10
+         321 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

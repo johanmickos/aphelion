@@ -448,10 +448,16 @@ describe('grab quality (PORT_NOTES 17)', () => {
  * cannot stand in for it — the pilot grabs close and aims well every single time,
  * so it earns a word on every capture and would happily agree with thresholds
  * that praised everything.
+ *
+ * `timing` was re-measured for `boostHoldsThroughSettle` (PORT_NOTES 27), which
+ * moved the envelope under the same player behaviour and lifted the median from
+ * 0.21 to 0.71. Its row comes from the 52 links in the three sessions carrying
+ * award records rather than from replays, because an award is recorded on the
+ * phone and survives a divergence. See the header of `src/score/praise.ts`.
  */
 const REAL = {
   clearance: { p10: 48, p25: 59, med: 83, p75: 123 },
-  timing: { med: 0.32, p75: 0.44, p90: 0.52 },
+  timing: { med: 0.71, p75: 0.85, p90: 0.94 },
   aim: { med: 0.85, p75: 0.94, p90: 0.98 },
 } as const;
 
