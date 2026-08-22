@@ -13,6 +13,7 @@ import {
   ATTRACT,
   ORBIT_BIG,
   ORBIT_SMALL,
+  PLAYBACK_RATE,
   createAttractLoop,
   drawAttractLoop,
 } from '../src/render/attract.ts';
@@ -29,6 +30,28 @@ function angleDelta(a: number, b: number): number {
   return d;
 }
 
+/**
+ * The three interior seam times, found from the poses alone: a straight stretch
+ * is the only place the heading holds still. Derived rather than imported so the
+ * tests keep checking the shape rather than the bookkeeping that built it.
+ */
+function segmentEnds(): number[] {
+  const dt = 0.0005;
+  const out: number[] = [];
+  let straight = false;
+  let prev = loop.pose(0);
+  for (let t = dt; t < loop.period; t += dt) {
+    const p = loop.pose(t);
+    const turning = Math.abs(angleDelta(p.angle, prev.angle)) > 1e-9;
+    if (turning === straight) {
+      out.push(t);
+      straight = !turning;
+    }
+    prev = p;
+  }
+  return out;
+}
+
 describe('attract loop', () => {
   it('closes exactly: the end of the cycle is its beginning', () => {
     const a = loop.pose(0);
@@ -41,7 +64,7 @@ describe('attract loop', () => {
     // The seams are what a hand-authored path gets wrong. Sampled finer than any
     // frame so a discontinuity cannot hide between two samples.
     const dt = 0.001;
-    const maxSpeed = circSpeed(DEFAULT_CONFIG, ORBIT_SMALL);
+    const maxSpeed = circSpeed(DEFAULT_CONFIG, ORBIT_SMALL) * PLAYBACK_RATE;
     let worstStep = 0;
     let worstTurn = 0;
     let prev = loop.pose(0);
@@ -53,7 +76,7 @@ describe('attract loop', () => {
     }
     // A step larger than the fastest the ship ever moves would be a teleport.
     expect(worstStep).toBeLessThan(maxSpeed * dt * 1.05);
-    // The tightest turn is the small orbit's sweep rate, ~3.3 rad/s.
+    // The tightest turn is the small orbit's sweep rate, ~4.1 rad/s once played.
     expect(worstTurn).toBeLessThan(0.01);
   });
 
@@ -110,24 +133,57 @@ describe('attract loop', () => {
     expect(worst).toBeGreaterThan(DEFAULT_CONFIG.minOrbitGap);
   });
 
-  it('runs at the game’s own orbital speeds', () => {
-    // Not a round number chosen to look right: sqrt(GM/r) is what the ship would
-    // actually be doing at these radii, and the lobes differ because a tighter
-    // orbit is genuinely faster.
+  it('runs at the game’s own orbital speeds, played at one rate', () => {
+    // Not numbers chosen to look right: sqrt(GM/r) is what the ship would
+    // actually be doing at these radii. PLAYBACK_RATE is the single deliberate
+    // departure and it is UNIFORM — if it ever leaks into one lobe and not the
+    // other, the shape stops being the simulation's and this fails.
     const speedAt = (t: number): number => {
       const a = loop.pose(t);
       const b = loop.pose(t + 1e-4);
       return Math.hypot(b.x - a.x, b.y - a.y) / 1e-4;
     };
-    expect(speedAt(loop.period * 0.2)).toBeCloseTo(circSpeed(DEFAULT_CONFIG, ORBIT_BIG), 2);
-    expect(speedAt(loop.period * 0.75)).toBeCloseTo(circSpeed(DEFAULT_CONFIG, ORBIT_SMALL), 2);
+    const big = speedAt(loop.period * 0.2);
+    const small = speedAt(loop.period * 0.8);
+    expect(big).toBeCloseTo(circSpeed(DEFAULT_CONFIG, ORBIT_BIG) * PLAYBACK_RATE, 2);
+    expect(small).toBeCloseTo(circSpeed(DEFAULT_CONFIG, ORBIT_SMALL) * PLAYBACK_RATE, 2);
+    // The ratio survives the rate, because the rate is uniform.
+    expect(small / big).toBeCloseTo(Math.sqrt(ORBIT_BIG / ORBIT_SMALL), 6);
   });
 
-  it('holds a whole cycle inside ten and a half seconds', () => {
-    // Pinned because the pacing is a decision, not an accident: one extra lap per
-    // lobe. If a radius is retuned this moves, and it should be looked at.
-    expect(loop.period).toBeGreaterThan(9.5);
-    expect(loop.period).toBeLessThan(10.5);
+  it('orbits the small body and slingshots the large one', () => {
+    // The asymmetry IS the lesson: the ship must visibly stay at one and pass the
+    // other. Measured as total turning, which is what "went round it again" means.
+    const turned = (t0: number, t1: number): number => {
+      let total = 0;
+      const dt = 0.001;
+      let prev = loop.pose(t0);
+      for (let t = t0 + dt; t <= t1; t += dt) {
+        const p = loop.pose(t);
+        total += Math.abs(angleDelta(p.angle, prev.angle));
+        prev = p;
+      }
+      return total;
+    };
+    // Segment boundaries, found by where the heading stops changing (a straight).
+    const bigArcEnd = segmentEnds()[0]!;
+    const smallArcStart = segmentEnds()[1]!;
+    const smallArcEnd = segmentEnds()[2]!;
+    const bigTurn = turned(0, bigArcEnd);
+    const smallTurn = turned(smallArcStart, smallArcEnd);
+    // Under one full turn round the big body; more than one round the small.
+    expect(bigTurn).toBeLessThan(2 * Math.PI);
+    expect(smallTurn).toBeGreaterThan(2 * Math.PI);
+    // And the extra is exactly one lap, not a fudge.
+    expect(smallTurn - bigTurn).toBeCloseTo(2 * Math.PI, 1);
+  });
+
+  it('holds a whole cycle inside six seconds', () => {
+    // Pinned because the pacing is a decision, not an accident: one lap at the
+    // small body, none at the large, played at PLAYBACK_RATE. If a radius is
+    // retuned this moves, and it should be looked at rather than absorbed.
+    expect(loop.period).toBeGreaterThan(5.2);
+    expect(loop.period).toBeLessThan(6.0);
   });
 
   it('paints the region opaque before anything else', () => {

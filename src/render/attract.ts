@@ -25,14 +25,21 @@
  * construction is `cos φ = (r1 + r2) / d`. There is no path data in this file,
  * which is why the shape cannot drift out of true when the radii are retuned.
  *
- * NO BOOST, DELIBERATELY. `boostEnvelope` is zero 2.6s after periapsis
- * (`settleDur` 1.2 plus `boostDecayTime` 1.4) and a lobe here is held for 5.4s,
- * so `releaseCapture` would add nothing and `releaseFlingBoost` is 1. The exit
- * speed is the orbital speed, exactly as the game would give it at this dwell.
- * The two lobes still differ — 224px/s against 262 — because a tighter orbit is
- * genuinely faster. Showing a harder fling here would be promising a release the
- * game scores as worthless; the honest way to earn one is a shorter, tighter
- * lobe, which is what `EXTRA_LAPS` trades away.
+ * ONE LOBE ORBITS, ONE SLINGSHOTS. The small body gets the extra lap and reads
+ * as somewhere the ship settles; the large one gets only the arc the tangents
+ * force, which is a single wide sweep round its far side and reads as a pass.
+ * That asymmetry is the whole lesson the screen teaches, and it is `LAPS_BIG` /
+ * `LAPS_SMALL` — nothing else in here knows about it.
+ *
+ * NO BOOST, STILL. `boostEnvelope` is zero 2.6s after periapsis (`settleDur` 1.2
+ * plus `boostDecayTime` 1.4). The slingshot lobe is now held for 2.61s, which
+ * clears that cliff by ten milliseconds, and the orbit lobe for 3.54s — so
+ * `releaseCapture` pays nothing at either and `releaseFlingBoost` is 1. The exit
+ * speed is the orbital speed, exactly as the game would give it at these dwells,
+ * and the slingshot is carried by the SHAPE of the pass rather than by
+ * acceleration. Tightening `ORBIT_BIG` to about 95 would drop that lobe under
+ * two seconds and earn a real ~1.3x fling, at the cost of the two lobes looking
+ * nearly the same size.
  */
 import type { SimConfig } from '../sim/config.ts';
 import { circSpeed } from '../sim/orbit.ts';
@@ -63,11 +70,25 @@ const R_SMALL = 34;
  * Whole revolutions added to each lobe beyond the arc the tangents force.
  *
  * The forced arc is `2π - 2φ` with `φ < π/2`, so it is always more than half a
- * turn: a crossing figure-8 cannot have a short dwell, only a fast one. One
- * extra lap makes the orbit read as somewhere the ship stays rather than a
- * corner it rounds. It costs the boost on the way out — see the file header.
+ * turn: a crossing figure-8 cannot have a short dwell, only a fast one. What it
+ * can have is two different ones, which is the point of splitting these. The big
+ * body gets nothing added — one sweep round the back and out, a slingshot. The
+ * small body gets a lap, so the ship visibly stays. Equal values here make both
+ * lobes the same manoeuvre and the screen stops saying anything.
  */
-const EXTRA_LAPS = 1;
+const LAPS_BIG = 0;
+const LAPS_SMALL = 1;
+
+/**
+ * How much faster than real time the loop plays.
+ *
+ * A deliberate departure and the only one: the radii are set by how much room
+ * there is above the wordmark, and at that size the honest sweep rates read as a
+ * drift. Uniform, so the shape is untouched and the ratio between the two lobes
+ * is still the `1/sqrt(r)` the simulation would give — this changes the wall
+ * clock, not the physics, the way a montage does.
+ */
+export const PLAYBACK_RATE = 1.25;
 
 /** Colours. Grey enough that the violet wordmark below is the only hue. */
 export const ATTRACT = {
@@ -175,20 +196,22 @@ export function createAttractLoop(cfg: SimConfig): AttractLoop {
   const p2a = { x: c2x - r2 * cph, y: c2y - r2 * sph };
   const p2b = { x: c2x - r2 * cph, y: c2y + r2 * sph };
 
-  // Real orbital speeds, from the game's own GM. A tighter orbit is faster, so
-  // the small lobe is the quicker one and the transfer it launches is quicker
-  // too — the only speed variation in the whole loop, and an honest one.
-  const v1 = circSpeed(cfg, r1);
-  const v2 = circSpeed(cfg, r2);
-  const sweep = 2 * Math.PI - 2 * phi + 2 * Math.PI * EXTRA_LAPS;
+  // Real orbital speeds, from the game's own GM, then played at PLAYBACK_RATE.
+  // A tighter orbit is genuinely faster, so the small lobe is the quicker one and
+  // the transfer it launches is quicker too — the only speed variation in the
+  // whole loop, and one the simulation would produce.
+  const v1 = circSpeed(cfg, r1) * PLAYBACK_RATE;
+  const v2 = circSpeed(cfg, r2) * PLAYBACK_RATE;
+  const forced = 2 * Math.PI - 2 * phi;
 
   const segments: Segment[] = [
-    // Big lobe: entered at -φ and left at +φ, which forces it clockwise.
-    arc(c1x, c1y, r1, -phi, -1, v1 / r1, sweep),
+    // Big lobe, the slingshot: entered at -φ and left at +φ, which forces it
+    // clockwise, and nothing added — one sweep round the far side and gone.
+    arc(c1x, c1y, r1, -phi, -1, v1 / r1, forced + 2 * Math.PI * LAPS_BIG),
     line(p1a.x, p1a.y, p2a.x, p2a.y, v1),
-    // Small lobe: entered at π+φ and left at π-φ — anticlockwise, the opposite
-    // sense, because the tangents cross. This is the figure-8, not a racetrack.
-    arc(c2x, c2y, r2, Math.PI + phi, 1, v2 / r2, sweep),
+    // Small lobe, the orbit: entered at π+φ and left at π-φ — anticlockwise, the
+    // opposite sense, because the tangents cross. This is the 8, not a racetrack.
+    arc(c2x, c2y, r2, Math.PI + phi, 1, v2 / r2, forced + 2 * Math.PI * LAPS_SMALL),
     line(p2b.x, p2b.y, p1b.x, p1b.y, v2),
   ];
 
