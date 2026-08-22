@@ -13,7 +13,19 @@ export default tseslint.config(
   // own branch. Linting them from here reports another branch's problems against
   // this one's working tree, which is confusing at best and blocks `pnpm check`
   // for changes that are nothing to do with it.
-  { ignores: ['**/dist/**', 'golden/**', 'index.html', '**/node_modules/**', '.claude/**'] },
+  // `scratch/` is gitignored and holds throwaway measurement scripts (AGENTS,
+  // "thresholds are measured"). Linting them blocks `pnpm check` on code that is
+  // never shipped — the same trap `dist` and `.claude` were fixed for.
+  {
+    ignores: [
+      '**/dist/**',
+      'golden/**',
+      'index.html',
+      '**/node_modules/**',
+      '.claude/**',
+      'scratch/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,

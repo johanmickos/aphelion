@@ -1577,6 +1577,100 @@ rising, and the capture that runs the tank dry is exactly the capture also raisi
 a word — two channels, two sides. The crash freeze suppresses it entirely: a tank
 that ran dry on the way into a planet does not get to explain the planet.
 
+### 40 — A capture you cannot reach is not a capture **[FIXED]**
+
+`src/sim/capture.ts` · `beginCapture()` · **[CHANGED]** · reported as "here my
+last capture attempt spent no fuel. Why is that?"
+
+It had not spent any, and nothing was wrong with the fuel. The grab took, entered
+`clear`, and `clear` is the free phase — only the settle (`fuelPerSec`) and the
+flyby brake (`flybyFuelPerSec`) ever spend. A capture converts to a settle at
+**periapsis**, and that grab had none ahead of it.
+
+The press at tick 777 re-grabbed the planet it had released from eleven ticks
+earlier:
+
+```
+  r = 100      speed 311      escape speed there 331   ->  BOUND (94% of it)
+  radial velocity +223                                 ->  already leaving
+```
+
+`boundGrabsCapture: true` says a grab below escape speed is a capture, so: phase
+`clear`, waiting for a periapsis on the far side of an orbit roughly ten seconds
+wide. The checkpoints — phone truth, though that session's replay diverged at tick
+200 — show the whole hold in one column:
+
+```
+  tick 780   r=100   speed 311   fuel 77.2   clear
+  tick 840   r=284   speed 180   fuel 77.2   clear
+  tick 900   r=425   speed 140   fuel 77.2   clear
+  tick 920   r=467               fuel 81.2   drift   <- released, regen resumes
+```
+
+Re-flown from the tick-780 checkpoint: out of bounds against the left wall at
+**t=2.78s**. The field was three seconds away and periapsis was ten. Two seconds
+of holding the button, no fuel, no burn indicator, and no readout — `clear` is the
+one phase with nothing to say, while a flyby gets `BRAKING — n% over`.
+
+**`boundGrabsCapture` had traded one failure for its mirror.** The prototype
+called any outbound grab a flyby regardless of speed (41% of grabs, note at the
+key); the replacement rule says bound is always a capture, which says nothing
+about whether the capture is REACHABLE. Measured over 55 recordings, 60 minutes,
+694 grabs that began in `clear`:
+
+```
+  OUTBOUND grabs        n   reached periapsis   run ended still holding
+    below 0.65         31        12 (39%)              3 (10%)
+    0.65 and above     78         4 ( 5%)             16 (21%)
+  INBOUND, 0.80+      136       124 (91%)              1 ( 1%)
+```
+
+Above 0.65 of escape speed an outbound grab converts four times in seventy-eight
+and ends the run one time in five. Below it, it behaves like an ordinary slow
+grab. So `outboundFlybyFrac` is 0.65 — the resolution the data supports, not a
+rounder number that would look more deliberate. It reclassifies 78 of 694 grabs
+(11%), against the 41% the prototype's rule caught.
+
+**A flyby is the right answer for them, not a refusal.** The brake is the
+mechanism that fixes this exact shape: it sheds radial speed first
+(`flybyRadialBias`), it already knows the case (`flybyOutwardEase` — "brake gently
+so the ship coasts wide and arcs back"), and conversion needs bound AND inbound,
+so a braked outbound grab converts when it has actually turned around rather than
+the instant it is classified. The same re-flight, under the new rule:
+
+```
+  t=0.02  flyby   fuel 76.5      the brake fires
+  t=1.02  flyby   fuel 59.3      radial speed shed
+  t=2.02  clear   fuel 68.2      bound AND inbound -> converted, refund paid
+  t=4.02  settle  fuel 63.1      periapsis reached
+  t=4.93  orbit   fuel 46.9      settled
+```
+
+Out-of-bounds death becomes a stable orbit for 30 fuel — and holding costs fuel,
+which is what the report was asking for.
+
+**The prototype holds 1, not 0.** The key is inert under
+`boundGrabsCapture: false`, so the prototype cannot tell the difference and the
+gate stays at exactly zero — the golden recapture moved one line of recorded
+config and not one number. But `configFromReport` resolves a missing key from
+PROTOTYPE_CONFIG, and a report recorded before this key existed ran with bound
+grabs as captures. 1 is what those sessions did; 0 would replay every one of their
+outbound grabs as a flyby and still grade itself faithful. That is note 21, and it
+is why the prototype value is chosen by what older reports did rather than by what
+looks inert.
+
+**It is a knob**, `CATCH` in the tune panel's FLYBY group, because it changes how
+the game feels and the only way to judge that is to fly it. It sits at the top of
+that group rather than in CAPTURE: what it moves is which grabs REACH the brake,
+so it is the door into the group, not a property of the dive. 1 is the old rule, 0
+is the prototype's.
+
+**Fixed alongside:** `pnpm check` failed on a measurement script. `scratch/` is
+gitignored for exactly those (AGENTS, "thresholds are measured"), but ESLint and
+Prettier were still walking it, so a throwaway file blocked the gate — the third
+time a directory that is deliberately not part of the build has done this, after
+`dist` and `.claude`. Both ignore `scratch` now.
+
 ---
 
 ## Tuning vs. fidelity
@@ -1604,8 +1698,8 @@ golden baseline               golden/physics-v1.json
 tests    port-equality 11 · invariants 32 · render 94 · camera 48
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 10
          score 60 · input 8 · grab-target 8 · link-fuel 6
-         boost-envelope 6 · flyby-fuel 10 · anomaly 14
-         374 total
+         boost-envelope 6 · flyby-fuel 10 · anomaly 14 · outbound-grab 6
+         380 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

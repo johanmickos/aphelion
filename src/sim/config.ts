@@ -284,6 +284,53 @@ export interface SimConfig {
    */
   boundGrabsCapture: boolean;
   /**
+   * How fast a bound grab already moving OUTWARD has to be, as a fraction of
+   * escape speed, before it counts as a flyby after all.
+   *
+   * `boundGrabsCapture` traded one failure for its mirror. The prototype called
+   * any outbound grab a flyby regardless of speed; that rule replaced it with
+   * "bound is always a capture", which says nothing about whether the capture is
+   * REACHABLE. A capture converts at periapsis, and if the ship is already
+   * climbing away at 94% of escape speed, periapsis is on the far side of an
+   * orbit some ten seconds wide — while the field wall is under three seconds
+   * away. The grab takes, `clear` spends no fuel because only the settle and the
+   * brake ever do, and the run coasts silently out of bounds.
+   *
+   * Measured over 55 recordings, 60 minutes, 694 grabs that began in `clear`:
+   *
+   * ```
+   *   OUTBOUND grabs        n   reached periapsis   run ended still holding
+   *     below 0.65         31        12 (39%)              3 (10%)
+   *     0.65 and above     78         4 ( 5%)             16 (21%)
+   *   INBOUND, 0.80+      136       124 (91%)              1 ( 1%)
+   * ```
+   *
+   * So the line is 0.65 — the resolution the data supports, not a rounder number
+   * that looks more deliberate. Above it an outbound grab is a capture that
+   * essentially never completes; below it, it completes about as often as an
+   * ordinary slow one. Being a flyby is the right answer for the rest, because
+   * the brake is exactly the mechanism that fixes them: it sheds radial speed
+   * (`flybyRadialBias`), it already knows this case (`flybyOutwardEase`: "brake
+   * gently so the ship coasts wide and arcs back"), and conversion needs bound
+   * AND inbound, so a braked outbound grab converts when it has actually turned
+   * around rather than the instant it is classified.
+   *
+   * It also restores the thing the player expects and the report asked about:
+   * holding costs fuel, and the readout says `BRAKING`.
+   *
+   * 0 reproduces the prototype's rule (every outbound grab is a flyby) and 1
+   * disables the carve-out entirely (`boundGrabsCapture` as it was).
+   *
+   * **The prototype holds 1, not 0**, and that is note 21 rather than taste. The
+   * key is inert under `boundGrabsCapture: false` so the prototype itself cannot
+   * tell the difference — but `configFromReport` resolves a missing key from
+   * PROTOTYPE_CONFIG, and a report recorded before this key existed ran with
+   * bound grabs as captures. 1 is what those sessions actually did; 0 would
+   * replay every one of their outbound grabs as a flyby and still call itself
+   * faithful.
+   */
+  outboundFlybyFrac: number;
+  /**
    * A flyby that converts into a capture gets its clearance impulse.
    *
    * Clearance was only ever computed in `beginCapture`, so anything that became a
@@ -451,6 +498,8 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   anomalySettleDur: 0.45,
   backtrackLimit: 0,
   boundGrabsCapture: false,
+  // Inert here — but it is also what an older report replays under. See the key.
+  outboundFlybyFrac: 1,
   clearanceOnConvert: false,
   clearanceEnergyNeutral: false,
   grabRange: 0,
@@ -578,6 +627,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   backtrackLimit: 700,
   holdClimbInCapture: true,
   boundGrabsCapture: true,
+  outboundFlybyFrac: 0.65,
   clearanceOnConvert: true,
   clearanceEnergyNeutral: true,
   grabRange: 560,
@@ -599,7 +649,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 15;
+export const SIM_VERSION = 16;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

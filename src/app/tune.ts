@@ -1,5 +1,5 @@
 /**
- * The tunable parameters, and why these ten.
+ * The tunable parameters, and why these eleven.
  *
  * Chosen from a sensitivity sweep — each parameter perturbed 25% across six
  * scenarios — rather than from taste. Anything that only ever produced a
@@ -95,6 +95,20 @@ export const KNOBS: readonly Knob[] = [
     step: 5,
     dp: 0,
     hint: 'speed a perfect release adds',
+  },
+  {
+    group: 'FLYBY',
+    key: 'outboundFlybyFrac',
+    label: 'CATCH',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    dp: 2,
+    // In FLYBY rather than CAPTURE because what it moves is which grabs REACH the
+    // brake: it is the door into this group, not a property of the dive. 1 is the
+    // old rule (a bound grab is always a capture, however fast it is leaving), 0
+    // is the prototype's (any outbound grab is a flyby).
+    hint: 'grabs already flying away are braked above this share of escape speed · 1 never brakes them',
   },
   {
     group: 'FLYBY',

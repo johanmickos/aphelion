@@ -49,6 +49,7 @@
   "anomalySettleDur": 0.45,
   "backtrackLimit": 0,
   "boundGrabsCapture": false,
+  "outboundFlybyFrac": 1,
   "clearanceOnConvert": false,
   "clearanceEnergyNeutral": false,
   "grabRange": 0,
