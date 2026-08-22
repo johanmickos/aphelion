@@ -115,8 +115,15 @@ const LAPS_SMALL = 1;
  * drift. Uniform, so the shape is untouched and the ratio between the two lobes
  * is still the `1/sqrt(r)` the simulation would give — this changes the wall
  * clock, not the physics, the way a montage does.
+ *
+ * Applied LAST, after the dwell that decides the boost, which is what makes it
+ * safe to turn: the fling is earned in simulation seconds and the projector
+ * cannot buy a bigger one. The ceiling is perceptual instead. At 1.6 the flung
+ * crossing lasts 0.31s, about eighteen frames, which is still long enough to see
+ * the ship leave faster than it was going; past roughly 2.0 it is not, and the
+ * whole point of the pass is lost even though every number still checks out.
  */
-export const PLAYBACK_RATE = 1.25;
+export const PLAYBACK_RATE = 1.6;
 
 /** Colours. Grey enough that the violet wordmark below is the only hue. */
 export const ATTRACT = {

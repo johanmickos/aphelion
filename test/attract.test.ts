@@ -178,12 +178,12 @@ describe('attract loop', () => {
     expect(smallTurn - bigTurn).toBeCloseTo(2 * Math.PI, 1);
   });
 
-  it('holds a whole cycle inside four and a half seconds', () => {
+  it('holds a whole cycle inside three and a half seconds', () => {
     // Pinned because the pacing is a decision, not an accident: one lap at the
     // small body, none at the large, played at PLAYBACK_RATE. If a radius is
     // retuned this moves, and it should be looked at rather than absorbed.
-    expect(loop.period).toBeGreaterThan(4.0);
-    expect(loop.period).toBeLessThan(4.7);
+    expect(loop.period).toBeGreaterThan(3.1);
+    expect(loop.period).toBeLessThan(3.7);
   });
 
   it('keeps the slingshot lobe inside the boost window', () => {
