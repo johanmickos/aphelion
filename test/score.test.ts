@@ -268,17 +268,46 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
  * late link cannot move it. The pair is the honest signature: the best life, and
  * everything the session was ever paid.
  */
-function outcomeOf(scfg: ScoreConfig): number[] {
-  const out: number[] = [];
-  const add = (r: { score: ScoreState; awards: ScoreAward[] }): void => {
-    out.push(
-      r.score.best,
-      r.awards.reduce((n, a) => n + a.points, 0),
-    );
-  };
-  add(pilot(4000, DEFAULT_CONFIG, scfg));
-  for (const s of SESSIONS) add(play(s.edges, s.ticks, DEFAULT_CONFIG, scfg, true, s.ship));
-  return out;
+function outcomeOf(r: { score: ScoreState; awards: ScoreAward[] }): number[] {
+  return [r.score.best, r.awards.reduce((n, a) => n + a.points, 0)];
+}
+
+/**
+ * The battery a weight is measured against, one thunk per session, unrun.
+ *
+ * Lazy because this is by an order of magnitude the most expensive thing in the
+ * file: one full pass is ~12k scored ticks and the sweep below wants dozens of
+ * them. Eager, it timed out on CI, where a shared runner is ~3x slower per core
+ * than the machine this is usually written on.
+ *
+ * The pilot goes first because it is the most discriminating — a long
+ * multi-life chain touches every weight — so a difference is usually found
+ * before a single hand-written session has been replayed. Do not reorder the
+ * rest: the comparison is positional.
+ */
+function battery(scfg: ScoreConfig): Array<() => number[]> {
+  return [
+    () => outcomeOf(pilot(4000, DEFAULT_CONFIG, scfg)),
+    ...SESSIONS.map(
+      (s) => () => outcomeOf(play(s.edges, s.ticks, DEFAULT_CONFIG, scfg, true, s.ship)),
+    ),
+  ];
+}
+
+/**
+ * Did any session in the battery come out differently under `scfg`?
+ *
+ * Stops at the first one that did. That is exactly the question the sweep asks
+ * — does this weight change SOME outcome — so short-circuiting proves what the
+ * full walk proved. Only the failing case, a weight that changes nothing, still
+ * pays for the whole battery, which is the one case worth paying for.
+ */
+function differs(base: number[][], scfg: ScoreConfig): boolean {
+  const parts = battery(scfg);
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i]!().some((n, j) => n !== base[i]![j])) return true;
+  }
+  return false;
 }
 
 // ------------------------------------------------------------------ structure
@@ -335,14 +364,16 @@ describe('scoring weights', () => {
     // The twin of the tune-panel guarantee. These cannot go in the tune panel —
     // `test/tune.test.ts` measures a knob by how far it moves the ship, and a
     // score weight moves no pixel — so the same promise is kept here instead.
-    const base = outcomeOf(DEFAULT_SCORE_CONFIG);
+    const base = battery(DEFAULT_SCORE_CONFIG).map((f) => f());
     for (const key of Object.keys(DEFAULT_SCORE_CONFIG) as Array<keyof ScoreConfig>) {
       const v = DEFAULT_SCORE_CONFIG[key];
       let moved = false;
       for (const alt of [0, v * 0.5, v * 2]) {
         if (alt === v) continue;
-        const outcome = outcomeOf({ ...DEFAULT_SCORE_CONFIG, [key]: alt });
-        if (outcome.some((s, i) => s !== base[i])) moved = true;
+        if (differs(base, { ...DEFAULT_SCORE_CONFIG, [key]: alt })) {
+          moved = true;
+          break;
+        }
       }
       expect(moved, `${key} cannot change any session's outcome`).toBe(true);
     }
