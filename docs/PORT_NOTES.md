@@ -1895,6 +1895,60 @@ in, against 14% with the lock held through.
 
 ---
 
+### 46 — The floor pin: a run that could not end **[FIXED]**
+
+`src/sim/capture.ts` · `src/sim/config.ts` · **[CHANGED]** · reported as "my ship
+got stuck on the surface" and, seven weeks of sessions later, "I got stuck when
+trying a kinky capture"
+
+Diagnosed on 2026-08-21 and left unfixed, because the fix was a choice between
+three and none had been picked. The second report picked it: this is measurably
+common, not a curiosity.
+
+The chain, all confirmed:
+
+1. A near-radial FLYBY dives into the minimum-orbit floor.
+2. The clamp cancels inward radial velocity every substep; with no tangential
+   component left, the total reaches exactly zero.
+3. Below 1px/s the flyby brake is off, so no fuel burns and nothing pushes. The
+   recorded fuel sitting perfectly constant is the tell.
+4. Conversion needs `vrad < 0`. At rest it is not, so the capture never converts —
+   and `applyClearance`, which exists to stop a dive reaching the floor, is gated
+   behind exactly that conversion.
+5. Gravity pulls in, the clamp cancels it. Stable equilibrium.
+6. On release the velocity is still zero, so the ship drifts at zero forever.
+
+**Nothing in the simulation can end a run that is not moving.** It never falls
+behind the trailing floor, never leaves the field, never crashes. The reported
+session sat at (170.55, -1656.6) with velocity exactly (0,0) for the rest of the
+recording. Only a reset escapes.
+
+Measured over 1224 close, fast, near-radial presses under the CURRENT config:
+**23.6% pinned**, rising with speed — 6.5% at 300px/s, 34% at 500. Worst exactly
+where the game is being flown hardest. The 2026-08-21 note put it at 19% falling to
+1%, on a longer-range repro that no longer reaches the stall at all: pressing from
+700px out gives the brake time to work, and a dead-centre press from there is now
+refused by the crash cone. Re-measuring under the current config was the difference
+between "a curiosity at low speed" and "a quarter of the region, worst when fast".
+
+The fix is one clause: stop gating the cure behind the thing the disease prevents.
+`clearanceOnFlyby` gives a flyby the same impulse a bound dive already gets, at the
+press rather than on conversion. It is a no-op unless the natural periapsis is
+inside the floor, so a flyby that would have sailed clear is untouched tick for
+tick. A 23,436-press sweep finds 32 standstills with it off and none with it on.
+
+Collateral over 1599 flyby presses with realistic aim: conversions 1325 -> 1318,
+and 19 of the 104 that used to sit in flyby forever now resolve — mostly by sailing
+out of bounds, which is the honest end of a flyby that cannot be braked.
+
+The two rejected alternatives, both measured rather than argued away: a minimum
+tangential speed at the floor clamp catches every route to the floor, but the clamp
+is the contact the capture feel rests on and note 38 put more bound dives onto it;
+ending the run at a standstill is the simplest and leaves the stall in place,
+trading "I got stuck" for "I died for no visible reason".
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -1918,10 +1972,10 @@ scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
 tests    port-equality 11 · invariants 32 · render 97 · camera 53
-         diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 10
+         diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         397 total
+         401 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

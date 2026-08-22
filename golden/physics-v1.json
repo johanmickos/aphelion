@@ -51,6 +51,7 @@
   "backtrackLimit": 0,
   "boundGrabsCapture": false,
   "outboundFlybyFrac": 1,
+  "clearanceOnFlyby": false,
   "clearanceOnConvert": false,
   "clearanceEnergyNeutral": false,
   "grabRange": 0,

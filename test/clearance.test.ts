@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, FIXED_DT, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
+import { createBodies } from '../src/sim/world.ts';
 import {
   clearanceDelta,
   clearanceDv,
@@ -67,6 +68,11 @@ describe('every capture gets clearance', () => {
     ...DEFAULT_CONFIG,
     boundGrabsCapture: false,
     clearanceOnConvert: false,
+    // The whole of the clearance work off, not part of it. `clearanceOnFlyby`
+    // arrived later, for the floor pin below, and with `boundGrabsCapture` off
+    // most of this sweep's grabs are flybys — so leaving it on here suppressed
+    // the very defect the baseline exists to exercise.
+    clearanceOnFlyby: false,
   });
 
   /**
@@ -198,5 +204,131 @@ describe('clearance never unbinds the ship', () => {
   it('is off in the prototype config, which keeps the gate at zero', () => {
     expect(PROTOTYPE_CONFIG.clearanceEnergyNeutral).toBe(false);
     expect(DEFAULT_CONFIG.clearanceEnergyNeutral).toBe(true);
+  });
+});
+
+/**
+ * The floor pin: the stall that bricked a run.
+ *
+ * Reported twice from a phone — "my ship got stuck on the surface" and "I got
+ * stuck when trying a kinky capture" — and diagnosed long before it was fixed,
+ * because the fix was a design choice between three and none had been picked.
+ * The chain is written out at `clearanceOnFlyby`.
+ *
+ * What makes it worth its own describe rather than a line in the sweep above: the
+ * failure is not a bad trajectory, it is the ABSENCE of one. The ship stops, and
+ * nothing in the simulation can end a run that is not moving — it never falls
+ * behind the floor, never leaves the field, never crashes. Only a reset escapes.
+ */
+describe('a stalled flyby cannot brick the run', () => {
+  /** Press close, fast and near-radially. Returns whether the ship ended up stuck. */
+  function pins(cfg: SimConfig, bodyIdx: number, dist: number, speed: number, offDeg: number) {
+    const bodies = createBodies(cfg);
+    const p = bodies[bodyIdx]!;
+    const st = createInitialState(cfg);
+    const a = Math.PI / 2 + (offDeg * Math.PI) / 180;
+    const x = p.x + Math.cos(a) * dist;
+    const y = p.y + Math.sin(a) * dist;
+    const toward = Math.atan2(p.y - y, p.x - x);
+    Object.assign(st.ship, { x, y, vx: Math.cos(toward) * speed, vy: Math.sin(toward) * speed });
+    st.highWaterY = Math.min(y, p.y) - 400;
+    st.fuel = cfg.fuelMax;
+    let still = 0;
+    for (let i = 0; i < 900; i++) {
+      stepSim(st, cfg, { held: i >= 1, pressed: i === 1, released: false }, FIXED_DT);
+      if (st.ending.active) return false;
+      const cap = st.capture;
+      const v = cap ? hypot(cap.vx, cap.vy) : hypot(st.ship.vx, st.ship.vy);
+      if (v < 1) {
+        still++;
+        if (still > 180) return true;
+      } else {
+        still = 0;
+      }
+    }
+    const cap = st.capture;
+    return (cap ? hypot(cap.vx, cap.vy) : hypot(st.ship.vx, st.ship.vy)) < 1;
+  }
+
+  /** The region the report came from: close, fast, aimed near the centre. */
+  function sweepPins(cfg: SimConfig) {
+    let pinned = 0;
+    let total = 0;
+    for (const speed of [300, 360, 420, 500]) {
+      for (const dist of [90, 122, 170]) {
+        for (let off = -8; off <= 8; off += 2) {
+          for (const bi of [3, 11]) {
+            total++;
+            if (pins(cfg, bi, dist, speed, off)) pinned++;
+          }
+        }
+      }
+    }
+    return { pinned, total };
+  }
+
+  it('never stalls anywhere in the region the reports came from', () => {
+    const r = sweepPins(DEFAULT_CONFIG);
+    expect(r.pinned, `${r.pinned}/${r.total} presses pinned`).toBe(0);
+  });
+
+  it('is the defect it was: a quarter of that region bricked', () => {
+    // The pin, kept rather than deleted, because it is the measurement that says
+    // why the flag exists. Over the wider 1224-press version of this sweep: 23.6%,
+    // rising with speed from 6.5% at 300px/s to 34% at 500 — worst exactly where
+    // the game is being flown hardest.
+    const r = sweepPins({ ...DEFAULT_CONFIG, clearanceOnFlyby: false });
+    expect(r.pinned / r.total).toBeGreaterThan(0.1);
+  });
+
+  it('leaves a flyby that was already clear of the surface alone', () => {
+    // The impulse is a no-op unless the natural periapsis is inside the floor, so
+    // a flyby that would have missed anyway is untouched — tick for tick, not
+    // merely in outcome. Asserted over every geometry in a grid that qualifies,
+    // rather than one hand-picked aim, because which ones qualify is exactly the
+    // thing that would drift.
+    const bodies = createBodies(DEFAULT_CONFIG);
+    const p = bodies[3]!;
+    let checked = 0;
+    for (const dist of [200, 300, 420]) {
+      for (const aim of [120, 180, 240, 320]) {
+        const x = p.x;
+        const y = p.y + dist;
+        const toward = Math.atan2(p.y - y, p.x - x) + Math.atan2(aim, dist);
+        const vx = Math.cos(toward) * 420;
+        const vy = Math.sin(toward) * 420;
+        const fly = (cfg: SimConfig) => {
+          const st = createInitialState(cfg);
+          Object.assign(st.ship, { x, y, vx, vy });
+          st.highWaterY = y - 400;
+          st.fuel = cfg.fuelMax;
+          const path: number[] = [];
+          let clearedAtPress = false;
+          for (let i = 0; i < 200; i++) {
+            stepSim(st, cfg, { held: i >= 1, pressed: i === 1, released: false }, FIXED_DT);
+            const cap = st.capture;
+            // Read on the press tick: `clearEaseFrames` counts down from there.
+            if (i === 1 && cap) clearedAtPress = cap.clearFramesLeft > 0;
+            path.push(cap ? cap.rx : st.ship.x, cap ? cap.ry : st.ship.y);
+          }
+          return { path, clearedAtPress };
+        };
+        // Qualifying on what the simulation DID, not on a periapsis recomputed
+        // here against a body it might not even have grabbed — `grabTarget` takes
+        // the nearest, which in a generated field is not always the one aimed at.
+        const now = fly(DEFAULT_CONFIG);
+        if (now.clearedAtPress) continue;
+        checked++;
+        expect(now.path, `d=${dist} aim=${aim} moved`).toEqual(
+          fly({ ...DEFAULT_CONFIG, clearanceOnFlyby: false }).path,
+        );
+      }
+    }
+    expect(checked, 'no geometry in the grid was already clear').toBeGreaterThan(3);
+  });
+
+  it('is off in the prototype config, which is what keeps the gate at zero', () => {
+    expect(PROTOTYPE_CONFIG.clearanceOnFlyby).toBe(false);
+    expect(DEFAULT_CONFIG.clearanceOnFlyby).toBe(true);
   });
 });
