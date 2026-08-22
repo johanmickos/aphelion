@@ -24,6 +24,7 @@
   "flybyBrakeRefSpeed": 200,
   "flybyBrakeMinSpeed": 120,
   "flybyFuelTracksBrake": false,
+  "flybyBrakeShedsWhip": false,
   "flybyConvertRefund": 0,
   "boostThreshold": 0.5,
   "boostMax": 95,

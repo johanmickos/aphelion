@@ -1673,6 +1673,71 @@ time a directory that is deliberately not part of the build has done this, after
 
 ---
 
+### 41 — The backstop outranked the wall, by 18px, everywhere
+
+`src/render/camera.ts` · **[CHANGED]** · reported as "I can see past the dashed
+red line if I approach the side"
+
+Note 37 removed the field rule from `followCamera`'s backstop because two clamps
+that both knew the rule fought at the boundary and yanked the view 107px. What was
+left behind is a framing-only bound at the full `cameraBackstopEdge` — and that is
+not a WEAKER version of the target's rule, it is a stronger one. Applied after the
+ease, it outranked the field everywhere: to hold the ship 18px inside the window a
+ship hugging a side wall dragged the view exactly 18px past the barrier.
+
+Measured with no anomaly within thousands of px, on both walls and at every speed:
+`cam.left` settles at `field.left - 18`.
+
+The fix is not a third rule but one fewer. `panBounds` computes the intersection
+once and both the target and the backstop read it, so there is nothing left to
+disagree. Continuity across the barrier was never the field rule's doing — it is
+the framing edge ramping with how far outside the ship actually is, which note 35
+already built and which the shared bound inherits. Inside the corridor the edge is
+zero, the field rule binds, and the guarantee degrades to "the ship is somewhere in
+the window", which is what it meant before anomalies existed.
+
+The real crossing is unchanged to the pixel: 249px/s at 228 and 390px/s at 352,
+the same numbers note 37 measured. The counterfactual arm of that pin — `relax`
+forced to zero, which is a barrier crossing with no bubble and therefore something
+the simulation cannot produce — is back up to 643-1280px/s, and the pin now says
+why that is not a regression.
+
+---
+
+### 42 — The brake bought energy back at the freeze
+
+`src/sim/step.ts` · `src/sim/capture.ts` · **[CHANGED]** · reported as "when I was
+approaching to circularize my ship snapped to a lower orbit. The snap was too
+jerky."
+
+Two independent causes of one visible thing: the ship SPEEDS UP as it settles.
+
+`whipE` is the peak specific orbital energy seen during a dive, kept as a running
+maximum so the minimum-orbit floor cannot crater it — a head-on dive that clips the
+floor loses radial speed to the clamp, and reading the instantaneous speed at the
+freeze would flatten the oval it earned into a circle. `freezeOrbit` reconstructs
+the periapsis speed from it, and that speed is exactly what the phase clock's first
+tick flies at.
+
+**The flyby brake is the opposite of a clamp.** The player spends fuel to shed that
+energy on purpose, and the maximum never came back down, so the freeze handed all
+of it back. On the repo's own `fast unbound grab -> flyby, braked` scenario: 28
+fuel spent braking, arrival at periapsis doing 375px/s, first tick of the settle at
+**543px/s — a 45% step in one tick**. The mark now follows the brake down by
+exactly the energy the impulse removed, behind `flybyBrakeShedsWhip` (false in the
+prototype config, so the gate is untouched). The floor still cannot lower it, which
+is why the same scenario still steps 11%: that part is the oval, and deliberate.
+
+**An authored orbit has no use for the reconstruction at all.** An anomaly
+overrides `rPeri` and authors the sweep, so the ellipse `vPeriTrue` shapes is
+discarded — the only thing it can still reach is the speed the settle starts at.
+Measured on synthetic arrivals: 155 -> 517px/s, and 257 -> 503. Off the ship's real
+speed there is nothing to step, and the eccentricity that survives is the honest
+one (0.24 rather than the 0.6 cap on the session that reported it). Needs no flag:
+`anomalyCount` is 0 in the prototype config.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -1698,8 +1763,8 @@ golden baseline               golden/physics-v1.json
 tests    port-equality 11 · invariants 32 · render 94 · camera 48
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 10
          score 60 · input 8 · grab-target 8 · link-fuel 6
-         boost-envelope 6 · flyby-fuel 10 · anomaly 14 · outbound-grab 6
-         380 total
+         boost-envelope 6 · flyby-fuel 14 · anomaly 15 · outbound-grab 6
+         385 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

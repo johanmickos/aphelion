@@ -303,6 +303,17 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
 
         cap.vx = rhx2 * vr + thx * vt;
         cap.vy = rhy2 * vr + thy * vt;
+
+        // The brake shed energy the player paid for; lower the whip mark by
+        // exactly that much, or the freeze hands it all back. `whipE` is a
+        // running max precisely so the floor clamp cannot lower it, and a brake
+        // is the opposite of a clamp. See `flybyBrakeShedsWhip`. Radius does not
+        // change across an impulse, so the potential term cancels and what the
+        // brake removed is the kinetic difference alone.
+        if (cfg.flybyBrakeShedsWhip && cap.whipE !== undefined) {
+          const spdAfter = hypot(cap.vx, cap.vy);
+          cap.whipE -= 0.5 * (spdF * spdF - spdAfter * spdAfter);
+        }
         // Bill for the brake actually applied, not for holding the button. The
         // flat rate charged full price through the whole taper and kept charging
         // after `speedTaper` reached zero, where the impulse above is identically

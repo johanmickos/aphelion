@@ -68,6 +68,28 @@ export interface SimConfig {
    */
   flybyFuelTracksBrake: boolean;
   /**
+   * A flyby brake also lowers the whip-energy mark the freeze reads back.
+   *
+   * WHY. `whipE` is the peak specific orbital energy seen during the dive, kept
+   * as a running MAX so the minimum-orbit floor cannot crater it — a head-on dive
+   * that clips the floor loses radial speed to the clamp, and reading the
+   * instantaneous speed at the freeze would flatten its oval into a circle. That
+   * is right for the floor, which is a clamp the player did not ask for.
+   *
+   * The brake is the opposite kind of event: the player spent fuel to shed that
+   * energy on purpose, and the max never came back down, so the freeze handed all
+   * of it back. Measured on the repo's own `fast unbound grab -> flyby, braked`
+   * scenario, the ship arrives at periapsis doing 375px/s and the phase clock's
+   * first tick puts it at 543 — a 45% step, in one tick, after a brake that cost
+   * 28 fuel. Reported from a phone as an anomaly capture "snapping" as it settled;
+   * there the step was 179 -> 335px/s.
+   *
+   * So the mark follows the brake down by exactly the energy the impulse removed,
+   * and nothing else changes: the floor still cannot lower it, and an unbraked
+   * dive never reaches this code.
+   */
+  flybyBrakeShedsWhip: boolean;
+  /**
    * Fraction of a flyby's brake spend handed back the moment it converts into a
    * capture. 0 disables it.
    *
@@ -470,6 +492,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyBrakeRefSpeed: 200,
   flybyBrakeMinSpeed: 120,
   flybyFuelTracksBrake: false,
+  flybyBrakeShedsWhip: false,
   flybyConvertRefund: 0,
 
   boostThreshold: 0.5,
@@ -618,6 +641,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyBrake: 600,
   flybyFuelPerSec: 40,
   flybyFuelTracksBrake: true,
+  flybyBrakeShedsWhip: true,
   flybyConvertRefund: 0.5,
   fuelRegen: 30,
   linkFuelReward: 20,
@@ -649,7 +673,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 16;
+export const SIM_VERSION = 17;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

@@ -228,6 +228,60 @@ describe('an anomaly authors its own orbit', () => {
     }
   });
 
+  it('starts the settle at the speed the ship arrived with', () => {
+    // Reported from a phone: "when I was approaching to circularize my ship
+    // snapped to a lower orbit. The snap was too jerky." It was not the radius —
+    // it was the speed. `freezeOrbit` reconstructs a periapsis speed from
+    // `whipE`, the dive's peak energy, so an ellipse flattened by the floor clamp
+    // keeps the oval it earned. An authored orbit throws that ellipse away, so
+    // all the reconstruction could still reach was the speed the phase clock
+    // starts at — measured at 155 -> 517px/s on the far arrival below, and at
+    // 179 -> 335 on the session that reported it.
+    //
+    // Read one tick apart: the tick that flips the phase to `settle` still ran
+    // `stepPhysical`, so the step lands on the tick after it.
+    const a = rightAnomaly(DEFAULT_CONFIG);
+    for (const [dist, dy, vx, vy] of [
+      [300, -70, 344, 0],
+      [420, -70, 344, 0],
+      [260, 260, 150, -150],
+      [200, -200, 60, 300],
+    ] as const) {
+      const state = createInitialState(DEFAULT_CONFIG);
+      Object.assign(state.ship, { x: a.x - dist, y: a.y + dy, vx, vy });
+      state.highWaterY = a.y;
+      let frozen = false;
+      let before = 0;
+      let seen = false;
+      for (let i = 0; i < 900; i++) {
+        stepSim(
+          state,
+          DEFAULT_CONFIG,
+          { held: i >= 5, pressed: i === 5, released: false },
+          FIXED_DT,
+        );
+        const cap = state.capture;
+        if (!cap) continue;
+        const speed = hypot(cap.vx, cap.vy);
+        if (frozen) {
+          // Within 1%, not exact: one tick of the tighten has already moved the
+          // radius a little, and that motion is the settle doing its job.
+          expect(
+            Math.abs(speed / before - 1),
+            `arrival from ${dist}px stepped at the freeze: ${before.toFixed(0)} -> ${speed.toFixed(0)}px/s`,
+          ).toBeLessThan(0.01);
+          seen = true;
+          break;
+        }
+        if (cap.phase === 'settle') {
+          frozen = true;
+          before = speed;
+        }
+      }
+      expect(seen, `arrival from ${dist}px never reached the settle`).toBe(true);
+    }
+  });
+
   it('stays inside the radius the camera can hold still for', () => {
     // Not a taste bound. Beyond about half a window less the backstop's edge the
     // view has to pan to keep the ship, which is what an over-wide anomaly orbit

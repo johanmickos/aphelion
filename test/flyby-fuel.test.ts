@@ -53,6 +53,72 @@ function spentOnNothing(rows: Sample[]): number {
   return dead[0]!.fuel - dead[dead.length - 1]!.fuel;
 }
 
+/**
+ * Speed on the last physical tick of the dive and on the first tick the phase
+ * clock drives, which is where the freeze hands over.
+ *
+ * Read one tick APART on purpose. The tick that flips the phase to `settle` still
+ * ran `stepPhysical` — `freezeOrbit` is the last thing it does — so its velocity
+ * is the dive's. The step, if there is one, appears on the tick after.
+ */
+function freezeSeam(cfg: SimConfig, ticks = 900): { before: number; after: number } {
+  const state = createInitialState(cfg);
+  state.ship.x = 105;
+  state.ship.y = 354;
+  state.ship.vx = 0;
+  state.ship.vy = -400;
+  state.fuel = cfg.fuelMax;
+  let frozen = false;
+  let before = 0;
+  for (let i = 0; i < ticks; i++) {
+    stepSim(state, cfg, { held: i >= 20, pressed: i === 20, released: false }, FIXED_DT);
+    const cap = state.capture;
+    if (!cap) continue;
+    const speed = hypot(cap.vx, cap.vy);
+    if (frozen) return { before, after: speed };
+    if (cap.phase === 'settle') {
+      frozen = true;
+      before = speed;
+    }
+  }
+  throw new Error('never froze');
+}
+
+describe('the brake keeps the energy it paid to remove', () => {
+  it('does not get it back at the freeze', () => {
+    // `whipE` is a running MAX of orbital energy, so the minimum-orbit floor
+    // cannot crater the oval a head-on dive earned. A brake is the opposite of a
+    // clamp — the player spent fuel to shed that energy — and the max never came
+    // back down, so the freeze reconstructed the pre-brake speed and the ship
+    // sped up as it settled. Reported from a phone as an anomaly capture that
+    // "snapped"; the same scenario shows it at a planet.
+    const seam = freezeSeam(DEFAULT_CONFIG);
+    expect(seam.after / seam.before).toBeLessThan(1.2);
+  });
+
+  it('is the defect it was: a 45% step in one tick', () => {
+    // The pin. This scenario brakes for 28 fuel, arrives at periapsis doing
+    // 375px/s, and the phase clock's first tick used to put it at 543.
+    const seam = freezeSeam({ ...DEFAULT_CONFIG, flybyBrakeShedsWhip: false });
+    expect(seam.before).toBeCloseTo(375, 0);
+    expect(seam.after).toBeCloseTo(543, 0);
+  });
+
+  it('leaves the floor clamp exactly as it was', () => {
+    // What survives the fix is the step the FLOOR causes, which is deliberate:
+    // this dive clips the minimum-orbit floor, loses radial speed to the clamp,
+    // and the freeze restores the oval it had earned. Braking must not be able to
+    // lower the mark past that.
+    const seam = freezeSeam(DEFAULT_CONFIG);
+    expect(seam.after).toBeGreaterThan(seam.before);
+  });
+
+  it('is off in the prototype config, which is what keeps the gate at zero', () => {
+    expect(PROTOTYPE_CONFIG.flybyBrakeShedsWhip).toBe(false);
+    expect(DEFAULT_CONFIG.flybyBrakeShedsWhip).toBe(true);
+  });
+});
+
 describe('the flyby brake bills for the brake, not for the button', () => {
   it('spends nothing once the taper has shut the brake off', () => {
     const rows = brakedFlyby(DEFAULT_CONFIG);

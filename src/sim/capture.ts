@@ -322,6 +322,21 @@ export function freezeOrbit(cap: Capture, cfg: SimConfig, authored?: Anomaly | n
   cap.Lfrozen = cap.phaseSpeedReal * rPeri * rPeri;
   cap.settleDur = cfg.settleDur;
   if (authored) {
+    // The seam is continuous in speed, because nothing here wants it otherwise.
+    //
+    // `vPeriTrue` above reconstructs the dive's speed from `whipE`, so an ellipse
+    // whose periapsis was flattened by the floor clamp keeps the oval it earned.
+    // An authored orbit throws that ellipse away — `rPeri` is overridden on the
+    // next line and the sweep on the line after — so all the reconstruction can
+    // still do is set the speed the phase clock starts at, which is
+    // `vPeriTrue` exactly. Measured on a phone capture that reported the settle
+    // "snapping": the ship reached the anomaly doing 179px/s and the first tick
+    // of the settle put it at 335. Off `spd` there is nothing to step.
+    cap.phaseSpeedReal = spd / rPeri;
+    cap.phaseSpeed = cap.phaseSpeedReal;
+    cap.Lfrozen = cap.phaseSpeedReal * rPeri * rPeri;
+    const eAuth = Math.max(0, Math.min(0.6, (spd * spd) / (vc * vc) - 1));
+    cap.orbit = { a: rPeri / (1 - eAuth), e: eAuth, argp: posAng, dir };
     cap.rPeri = authored.orbitR;
     cap.settleSweep = (Math.PI * 2) / Math.max(0.01, authored.orbitPeriod);
     cap.refuel = authored.refuel;
