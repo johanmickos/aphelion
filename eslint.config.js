@@ -8,7 +8,12 @@ export default tseslint.config(
   // .claude/ was linted as source — 228 errors about `document` being undefined
   // in a minified bundle, which blocked `pnpm check` for reasons unrelated to any
   // change being made.
-  { ignores: ['**/dist/**', 'golden/**', 'index.html', '**/node_modules/**'] },
+  // `.claude/**` holds Claude Code's own state, including git worktrees — which
+  // are full checkouts of this repo and get linted on their own terms, from their
+  // own branch. Linting them from here reports another branch's problems against
+  // this one's working tree, which is confusing at best and blocks `pnpm check`
+  // for changes that are nothing to do with it.
+  { ignores: ['**/dist/**', 'golden/**', 'index.html', '**/node_modules/**', '.claude/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,
