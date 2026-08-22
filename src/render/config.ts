@@ -35,6 +35,27 @@ export interface RenderConfig {
   cameraLookAhead: number;
   /** Speed at which the look-ahead reaches full extent. */
   cameraLookRefSpeed: number;
+  /**
+   * How much a settled orbit locks the view to the body being orbited, 0..1.
+   *
+   * **0 is the old camera** — pure ship-following everywhere, which is what to
+   * compare against. 1 holds a true orbit perfectly still. Nothing between the
+   * two is a different mode; it is the same blend at less strength.
+   *
+   * Only a SETTLED orbit is affected at any value. The dive, the flyby and the
+   * drift are ship-followed regardless, because that is the exciting part and it
+   * should be flown rather than watched.
+   */
+  cameraOrbitLock: number;
+  /**
+   * How fast the lock eases in and out, in units of 1/second.
+   *
+   * Exists only for the two discontinuities the blend cannot smooth by itself:
+   * the grab, where a capture appears from nothing, and the release, where it
+   * vanishes. Across the settle the weight already rides `settleProgress`, which
+   * is smooth, so this barely engages there.
+   */
+  cameraOrbitEase: number;
 
   // --- starfield ---
   starCount: number;
@@ -115,6 +136,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   cameraFollow: 3,
   cameraLookAhead: 0.18,
   cameraLookRefSpeed: 260,
+  cameraOrbitLock: 1,
+  cameraOrbitEase: 6,
 
   starCount: 160,
   starParallaxMin: 0.045,

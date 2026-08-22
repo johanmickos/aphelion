@@ -13,6 +13,7 @@ import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
 import type { Input } from '../src/sim/types.ts';
 import { createLoop } from '../src/app/loop.ts';
+import { orbitLock } from '../src/render/camera.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { centerCamera, createCamera, fitCamera, followCamera } from '../src/render/camera.ts';
 import { Scene } from '../src/render/scene.ts';
@@ -38,7 +39,10 @@ const TELEPORT_DISTANCE = 200;
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
-const rcfg = DEFAULT_RENDER_CONFIG;
+// Mutable so the camera toggle can take effect mid-run. Render config never
+// reaches the simulation — `pnpm portable` enforces that src/sim imports nothing
+// from src/render — so nothing here can change what a replay reproduces.
+const rcfg = { ...DEFAULT_RENDER_CONFIG };
 const cam = createCamera(rcfg);
 
 // One seed per session, recorded so a reported frame can be reproduced.
@@ -280,8 +284,12 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
   },
   render(alpha, frameDt) {
     const snap = lerpSnapshot(prev, curr, alpha);
-    // A capture is watched around its anchor; a drift is flown, and looks ahead.
-    const held = snap.capture ? (state.bodies[snap.capture.planet] ?? null) : null;
+    // A settled orbit is watched around its anchor; everything else is flown.
+    const cap = snap.capture;
+    const body = cap ? state.bodies[cap.planet] : null;
+    const held = body
+      ? { x: body.x, y: body.y, lock: orbitLock(cap!.phase, cap!.settleProgress) }
+      : null;
     followCamera(
       cam,
       rcfg,
@@ -590,6 +598,24 @@ tuneBtn.addEventListener('click', (e) => {
   if (life.phase !== 'armed') return;
   buildTuneRows();
   tuneEl.classList.add('open');
+});
+
+/**
+ * Camera lock, on a toggle because it changes how the game FEELS and the only way
+ * to judge that is to flip it mid-flight and fly the same field both ways.
+ *
+ * Two positions, not a slider: the question is whether a settled orbit should
+ * hold still, and a half-locked orbit answers neither side of it.
+ */
+const tuneCam = document.getElementById('tuneCam') as HTMLButtonElement;
+function paintCam(): void {
+  tuneCam.textContent = rcfg.cameraOrbitLock > 0 ? 'CAM: ORBIT-LOCK' : 'CAM: FOLLOW SHIP';
+}
+paintCam();
+tuneCam.addEventListener('click', (e) => {
+  e.preventDefault();
+  rcfg.cameraOrbitLock = rcfg.cameraOrbitLock > 0 ? 0 : DEFAULT_RENDER_CONFIG.cameraOrbitLock;
+  paintCam();
 });
 
 tuneClose.addEventListener('click', (e) => {

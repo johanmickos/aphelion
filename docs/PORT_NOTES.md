@@ -1129,6 +1129,64 @@ from 12px to 17px and a purple bar drains beside it, because a colour cannot say
 how long is left and ten seconds is long enough for "is it still running?" to be
 a real question mid-flight.
 
+### 33 — The camera lock is a weight, not a mode
+
+`src/render/camera.ts` · **[CHANGED]** · reported as "it feels a bit jarring when
+it snaps to the next planet ... the main thing I don't want is oscillation when
+I'm in a true orbit; any other time the old camera was exciting"
+
+Note 32 switched the camera's subject from the ship to the anchor for the whole of
+a capture. That removed the wobble and bought a lurch: **the anchor is furthest
+away exactly when a capture begins**, up to `grabRange` 560, so every grab dragged
+the view across that gap. Measured, a hard switch peaks the camera at 336px/s just
+after the grab against the plain follower's own 295px/s.
+
+The requirement, stated precisely, was narrower than what had been built: a TRUE
+orbit must not oscillate, and everything else was already good. So the lock is a
+weight rather than a mode, and it rides `settleProgress`:
+
+```
+phase     clear   flyby   settle        orbit
+lock        0       0     0 -> 1          1
+```
+
+The subject is `ship + (anchor - ship) * w`, so the residual wobble is exactly
+`r * (1 - w)` — continuous, with no mode to switch and therefore no moment at
+which anything can jump. And the lurch is gone for a structural reason rather than
+by tuning: the weight is zero while the anchor is far away, and only reaches full
+once the ship is a settled radius from it, by which point the two are nearly the
+same point. Measured on a scenario capture:
+
+```
+                peak camera speed   orbit wobble (steady)
+plain follower        295px/s              76.9px
+hard switch           336px/s               0.0px
+weighted              295px/s              0.02px
+```
+
+The 9.9px seen across the whole orbit phase is entirely the ease settling over its
+first second — `anchorW` 0.946 -> 1.0. Past that it is 0.02px, which is the thing
+that was asked for.
+
+`cam.anchorX/Y` are kept after the capture ends rather than dropped with it, so
+the weight has something to decay away from; dropping them would snap the subject
+back by a whole orbit radius on the release tick — the same jump, at the other
+end. `centerCamera` zeroes the lock, because carrying one across a respawn would
+hold the new ship's view on the body the old one died at.
+
+The look-ahead from note 32 is scaled by `1 - w` for the same reason it was
+disabled during a capture before: a captured ship's velocity reverses every half
+orbit, and a look-ahead surviving into a settled orbit puts the wobble straight
+back on the other axis.
+
+**It is on a toggle**, in the tune panel footer, because this changes how the game
+feels and the only way to judge that is to fly the same field both ways.
+`cameraOrbitLock` 0 is exactly the old camera. Two positions and not a slider: the
+question is whether a settled orbit should hold still, and a half-locked orbit
+answers neither side of it. `rcfg` is a copy of the defaults now so the toggle can
+take effect mid-run — render config cannot reach the simulation, which `pnpm
+portable` enforces, so nothing a replay reproduces can move.
+
 ---
 
 ## Tuning vs. fidelity
@@ -1157,7 +1215,7 @@ tests    port-equality 11 · invariants 32 · render 79 · camera 34
          diagnostics 25 · backtrack 15 · world 14 · tune 7 · clearance 6
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 10 · anomaly 8
-         339 total
+         343 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

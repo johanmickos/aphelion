@@ -12,6 +12,7 @@ import {
   createCamera,
   fitCamera,
   followCamera,
+  orbitLock,
   toScreenX,
   toScreenY,
   visibleWorldY,
@@ -24,6 +25,13 @@ import { backtrackFloorY } from '../src/sim/world.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 
 const rcfg = DEFAULT_RENDER_CONFIG;
+
+/** A camera fitted to the design viewport, which is what every framing test wants. */
+function cam390(): Camera {
+  const c = createCamera(DEFAULT_RENDER_CONFIG);
+  fitCamera(c, { w: 390, h: 844, dpr: 2 });
+  return c;
+}
 const field = fieldBounds(DEFAULT_CONFIG, createBodies(DEFAULT_CONFIG));
 
 describe('fitting the viewport', () => {
@@ -356,13 +364,7 @@ describe('the view stops at the trailing floor', () => {
  * pinned as behaviour rather than left to the eye.
  */
 describe('what the camera watches', () => {
-  function cam390(): Camera {
-    const c = createCamera(DEFAULT_RENDER_CONFIG);
-    fitCamera(c, { w: 390, h: 844, dpr: 2 });
-    return c;
-  }
-
-  it('holds still on the anchor through a capture instead of chasing the ship', () => {
+  it('locks a settled orbit still, and only a settled orbit', () => {
     // Reported as the view bouncing while orbiting. Measured on a real capture
     // the ship travels 129px vertically per orbit with a ~0.6s period, against a
     // camera lag of 0.33s — too slow to track it, and with no vertical deadzone
@@ -379,10 +381,14 @@ describe('what the camera watches', () => {
           FIXED_DT,
         );
         const p = shipWorldPos(st);
-        const anchor = anchored && st.capture ? st.bodies[st.capture.planet]! : null;
+        const cap = st.capture;
+        const b = cap ? st.bodies[cap.planet]! : null;
+        const anchor = b
+          ? { x: b.x, y: b.y, lock: orbitLock(cap!.phase, cap!.settleProgress) }
+          : null;
         followCamera(
           cam,
-          DEFAULT_RENDER_CONFIG,
+          { ...DEFAULT_RENDER_CONFIG, cameraOrbitLock: anchored ? 1 : 0 },
           p.x,
           p.y,
           field,
@@ -408,7 +414,7 @@ describe('what the camera watches', () => {
     const cam = cam390();
     for (const shipX of [400, 480, 540, 560, field.right]) {
       cam.left = field.right - cam.designW;
-      const t = cameraTarget(cam, DEFAULT_RENDER_CONFIG, shipX, -1000, field, null, null, 0);
+      const t = cameraTarget(cam, DEFAULT_RENDER_CONFIG, shipX, -1000, field, null, 0);
       expect(t.left + cam.designW, `ship at ${shipX} panned past the wall`).toBeLessThanOrEqual(
         field.right + 0.5,
       );
@@ -441,9 +447,96 @@ describe('what the camera watches', () => {
     // A captured ship's vx reverses every half orbit. Biasing on it would put
     // back exactly the wobble the anchor is there to remove, on the other axis.
     const cam = cam390();
-    const anchor = { x: 200, y: -1000 };
-    const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, anchor, 300);
-    const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, anchor, -300);
+    cam.anchorW = 1;
+    cam.anchorX = 200;
+    cam.anchorY = -1000;
+    const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, 300);
+    const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, -300);
     expect(a.left).toBe(b.left);
+  });
+});
+
+/**
+ * The orbit lock's shape.
+ *
+ * Pinned separately from the wobble measurement because the SHAPE is the fix: a
+ * hard switch removed the wobble too, and lurched the view across up to
+ * `grabRange` at every grab doing it. What has to stay true is that the lock is
+ * zero while the anchor is far away and only reaches full once it is not.
+ */
+describe('the orbit lock', () => {
+  it('is off through the dive and full only in a true orbit', () => {
+    expect(orbitLock('clear', 0)).toBe(0);
+    expect(orbitLock('flyby', 0)).toBe(0);
+    expect(orbitLock('settle', 0)).toBe(0);
+    expect(orbitLock('settle', 0.5)).toBeCloseTo(0.5, 6);
+    expect(orbitLock('orbit', 1)).toBe(1);
+  });
+
+  it('rises only as the orbit rounds, which is what removes the lurch', () => {
+    // The anchor is furthest away exactly when a capture begins — up to
+    // `grabRange`. A lock that switched on there would drag the view that whole
+    // distance. Riding `settleProgress` means it is still zero at the grab and
+    // only reaches full once the ship is a settled radius from the anchor.
+    let prev = -1;
+    for (let u = 0; u <= 1.0001; u += 0.05) {
+      const v = orbitLock('settle', u);
+      expect(v).toBeGreaterThanOrEqual(prev);
+      prev = v;
+    }
+    expect(orbitLock('settle', 0)).toBe(0);
+  });
+
+  it('adds no camera movement at the grab that the old camera did not have', () => {
+    // The regression this replaced: a hard switch peaked the camera at 336px/s
+    // just after the grab, against the plain follower's own 295px/s.
+    const peak = (lock: number, hard: boolean): number => {
+      const st = createInitialState(DEFAULT_CONFIG);
+      const cam = cam390();
+      const rcfg2 = { ...DEFAULT_RENDER_CONFIG, cameraOrbitLock: lock };
+      let px = cam.left;
+      let py = cam.centerY;
+      let worst = 0;
+      for (let i = 0; i < 400; i++) {
+        stepSim(
+          st,
+          DEFAULT_CONFIG,
+          { held: i >= 18, pressed: i === 18, released: false },
+          FIXED_DT,
+        );
+        const p = shipWorldPos(st);
+        const cap = st.capture;
+        const b = cap ? st.bodies[cap.planet]! : null;
+        const anchor = b
+          ? { x: b.x, y: b.y, lock: hard ? 1 : orbitLock(cap!.phase, cap!.settleProgress) }
+          : null;
+        followCamera(
+          cam,
+          rcfg2,
+          p.x,
+          p.y,
+          field,
+          backtrackFloorY(DEFAULT_CONFIG, st.highWaterY),
+          FIXED_DT,
+          anchor,
+          st.ship.vx,
+        );
+        if (i > 20) worst = Math.max(worst, Math.hypot(cam.left - px, cam.centerY - py) * 60);
+        px = cam.left;
+        py = cam.centerY;
+      }
+      return worst;
+    };
+    const plain = peak(0, false);
+    expect(peak(1, true), 'a hard switch should be the jumpy one').toBeGreaterThan(plain + 20);
+    expect(peak(1, false)).toBeLessThanOrEqual(plain + 1);
+  });
+
+  it('is fully switchable off, back to the plain follower', () => {
+    const cam = cam390();
+    cam.anchorW = 0;
+    const off = { ...DEFAULT_RENDER_CONFIG, cameraOrbitLock: 0 };
+    followCamera(cam, off, 200, -1000, field, null, FIXED_DT, { x: 900, y: -2000, lock: 1 }, 0);
+    expect(cam.anchorW).toBe(0);
   });
 });

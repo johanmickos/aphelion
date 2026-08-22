@@ -48,12 +48,33 @@ export interface Camera {
   designW: number;
   /** Visible world height. Flexes with the viewport's aspect ratio. */
   viewH: number;
+
+  /**
+   * How much the view is currently locked to the body being orbited, 0..1.
+   *
+   * Eased rather than switched, and that is the whole design. Snapping the
+   * subject from the ship to the anchor at the grab lurched the view across up to
+   * `grabRange` — the anchor is furthest away exactly when the capture begins.
+   * The weight instead rises with how settled the orbit is, so it only reaches
+   * full once the ship is a settled radius from the anchor and the two are nearly
+   * the same point. What was a jump becomes nothing to see.
+   */
+  anchorW: number;
+  /**
+   * The last body orbited, held after the capture ends so `anchorW` has something
+   * to decay away from rather than snapping the subject back to the ship.
+   */
+  anchorX: number;
+  anchorY: number;
 }
 
 export function createCamera(cfg: RenderConfig): Camera {
   return {
     scale: 1,
     offsetX: 0,
+    anchorW: 0,
+    anchorX: 0,
+    anchorY: 0,
     offsetY: 0,
     left: 0,
     centerY: 0,
@@ -108,34 +129,37 @@ export function cameraTarget(
   shipY: number,
   field: { left: number; right: number; width: number },
   floorY: number | null,
-  /**
-   * What the view should sit on instead of the ship, while a capture holds one.
-   *
-   * See `anchorTarget` below for why a capture gets its own subject at all.
-   */
-  anchor: { x: number; y: number } | null = null,
   /** Ship velocity, for the look-ahead. Zero disables it. */
   shipVX = 0,
 ): { left: number; centerY: number } {
   const W = cam.designW;
   const margin = W * cfg.cameraMarginFrac;
 
-  // A capture is watched, not flown through: the anchor is still, the ship goes
-  // round it, and the compass — the thing actually being read — is drawn centred
-  // on the anchor. Following the ship instead put a 129px vertical oscillation
-  // through a 0.33s lag, which is over half its own 0.6s period: too slow to
-  // track and with no deadzone to ignore it, so all it could do was smear.
-  const subjX = anchor ? anchor.x : shipX;
-  const subjY = anchor ? anchor.y : shipY;
+  // Blend between the ship and the body it is orbiting, by `cam.anchorW`.
+  //
+  // A SETTLED orbit is the only thing this is for. There the ship goes round a
+  // still point and following it put a 129px vertical oscillation through a 0.33s
+  // lag — over half its own 0.6s period, too slow to track and with no vertical
+  // deadzone to ignore it, so all it could do was smear. Everywhere else the
+  // ship-following camera is the good one: the dive is the exciting part and it
+  // should be flown, not watched.
+  //
+  // Because the ship orbits at radius r, the subject's residual wobble is
+  // r * (1 - anchorW) — full at 0, gone at 1, and continuous in between. There is
+  // no mode to switch and therefore no moment at which anything can jump.
+  const w = cam.anchorW;
+  const subjX = shipX + (cam.anchorX - shipX) * w;
+  const subjY = shipY + (cam.anchorY - shipY) * w;
 
-  // Look where you are going, not where you have been. Only while drifting: a
-  // captured ship's velocity swings right round every orbit, and biasing on it
-  // would reintroduce exactly the wobble the anchor is here to remove.
-  const look = anchor
-    ? 0
-    : W *
-      cfg.cameraLookAhead *
-      Math.max(-1, Math.min(1, shipVX / Math.max(1, cfg.cameraLookRefSpeed)));
+  // Look where you are going, not where you have been — faded out by the same
+  // weight. A captured ship's velocity swings right round every orbit, so a
+  // look-ahead that survived into a settled orbit would put the wobble straight
+  // back on the other axis.
+  const look =
+    (1 - w) *
+    W *
+    cfg.cameraLookAhead *
+    Math.max(-1, Math.min(1, shipVX / Math.max(1, cfg.cameraLookRefSpeed)));
   const want = subjX + look;
 
   let left = cam.left;
@@ -195,6 +219,11 @@ export function centerCamera(
       ? field.left
       : Math.max(field.left, Math.min(field.right - cam.designW, wanted));
   cam.centerY = clampToFloor(cam, shipY, floorY);
+  // A fresh start is never mid-orbit, and carrying a lock across a respawn would
+  // hold the new ship's view on the body the old one died at.
+  cam.anchorW = 0;
+  cam.anchorX = shipX;
+  cam.anchorY = shipY;
 }
 
 /** Ease the camera toward its target. Render-only; never observed by the sim. */
@@ -206,13 +235,46 @@ export function followCamera(
   field: { left: number; right: number; width: number },
   floorY: number | null,
   dt: number,
-  anchor: { x: number; y: number } | null = null,
+  /**
+   * The body being orbited and how settled that orbit is, or null when drifting.
+   *
+   * `lock` is 0 through the dive and 1 in a true orbit — see `orbitLock`.
+   */
+  anchor: { x: number; y: number; lock: number } | null = null,
   shipVX = 0,
 ): void {
-  const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY, anchor, shipVX);
+  // Track the anchor's position while there is one, and KEEP it after the
+  // capture ends so the weight has something to decay away from. Dropping the
+  // position with the capture would snap the subject back to the ship by a whole
+  // orbit radius on the release tick, which is the jump this exists to avoid.
+  if (anchor) {
+    cam.anchorX = anchor.x;
+    cam.anchorY = anchor.y;
+  }
+  const wantW = anchor ? Math.max(0, Math.min(1, anchor.lock)) * cfg.cameraOrbitLock : 0;
+  cam.anchorW += (wantW - cam.anchorW) * Math.min(1, dt * cfg.cameraOrbitEase);
+
+  const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY, shipVX);
   const k = Math.min(1, dt * cfg.cameraFollow);
   cam.left += (t.left - cam.left) * k;
   cam.centerY += (t.centerY - cam.centerY) * k;
+}
+
+/**
+ * How locked the view should be, for a capture in this phase.
+ *
+ * The whole rule, in one place because the camera and anything that wants to
+ * explain it must agree. A TRUE orbit — round, settled, the ship going round a
+ * still point — is the only case that wants a locked view. The dive is the
+ * exciting part and stays flown.
+ *
+ * `settleProgress` is already smootherstep'd by the phase clock, so the ramp
+ * across the settle is smooth without anything here shaping it.
+ */
+export function orbitLock(phase: string, settleProgress: number): number {
+  if (phase === 'orbit') return 1;
+  if (phase === 'settle') return Math.max(0, Math.min(1, settleProgress));
+  return 0;
 }
 
 export function toScreenX(cam: Camera, wx: number): number {
