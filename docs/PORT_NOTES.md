@@ -2080,7 +2080,7 @@ tests    port-equality 11 · invariants 32 · render 97 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · 411 total
+         zip-charge 8 · attract 13 · 424 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
