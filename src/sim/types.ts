@@ -183,6 +183,18 @@ export interface Capture {
   settleSweep: number;
   /** Fuel per second restored while parked, from the body. */
   refuel: number;
+  /**
+   * The radius and radial speed the authored approach starts from.
+   *
+   * An authored orbit is not an ellipse being tightened toward a circle — there
+   * is no ellipse, because the freeze happens at the press rather than at a
+   * periapsis, and at a press the ship is usually still falling. These are the
+   * boundary conditions at the near end of the glide: where the ship was and how
+   * fast it was closing. The far end is the authored circle, reached with no
+   * radial speed left. Zero for every capture that is not authored.
+   */
+  approachR0: number;
+  approachVR: number;
   /** Seconds this capture takes to settle. `SimConfig.settleDur` unless authored. */
   settleDur: number;
 

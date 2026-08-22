@@ -50,6 +50,7 @@ import type { RenderSnapshot } from '../src/render/snapshot.ts';
 
 const rcfg = DEFAULT_RENDER_CONFIG;
 const field = fieldBounds(DEFAULT_CONFIG, createBodies(DEFAULT_CONFIG));
+const ANOMALY = createBodies(DEFAULT_CONFIG).find((b) => b.kind === 'anomaly' && b.x > 195)!;
 
 function cam() {
   const c = createCamera(rcfg);
@@ -246,6 +247,16 @@ describe('scene', () => {
       release: 200,
       ticks: 240,
       ship: { x: 105, y: 354, vx: 0, vy: -400 },
+    },
+    // An anomaly is its own drawing path: the capture freezes at the press, so
+    // there is never a live dive to preview and the curve drawn from the first
+    // tick is the destination circle. Nothing else in the suite renders one.
+    {
+      name: 'parked at an anomaly',
+      press: 5,
+      release: 200,
+      ticks: 260,
+      ship: { x: ANOMALY.x - 300, y: ANOMALY.y - 70, vx: 344, vy: 0 },
     },
   ];
 

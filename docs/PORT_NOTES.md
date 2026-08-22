@@ -1738,6 +1738,58 @@ one (0.24 rather than the 0.6 cap on the session that reported it). Needs no fla
 
 ---
 
+### 43 — The press is the arrival, because everything before it was waiting
+
+`src/sim/capture.ts` · `src/sim/step.ts` · `src/sim/types.ts` · **[CHANGED]** ·
+reported as "the anomaly circularization took way too long" and "I want to settle
+into orbit around an anomaly in 500ms or so"
+
+Measured on the two sessions that reported it, press to parked:
+
+```
+                  flyby + brake   fall to periapsis   settle    total
+session 1            1.93s / 65 fuel        ~0.1s      0.45s    2.47s
+session 2            2.10s / 63 fuel         2.00s     0.45s    4.55s
+```
+
+`anomalySettleDur` — the thing named after settling — is 10-18% of it. Turning it
+down could not have fixed this, and the report that asked for 500ms was asking for
+something the knob could not reach.
+
+So an anomaly now freezes at the PRESS. There is no flyby to brake and no dive to
+fall, and what is left is an authored approach: a quintic in radius whose near end
+is the ship's own position and closing rate and whose far end is the authored
+circle, reached with no radial speed left. It takes `settleDur` from anywhere —
+that is the whole of "quick regardless of speed or distance", the clock is fixed
+and the distance is whatever it is. Measured across seven arrivals from 127 to
+426px and 0 to 418px/s: **0.45s, every one.**
+
+**Both ends of the curve are nailed down, and so is the acceleration.** A cubic
+was tried first and matches position and velocity, which sounds sufficient and is
+not: with nothing said about the second derivative the pull-in opens at full
+strength, 8770px/s² arriving between one tick and the next, a 146px/s velocity step
+at the instant of the press. Continuous, and still a jolt. The quintic adds
+`r''(0) = r''(1) = 0` and costs 25% more peak radial speed in the middle, which
+nobody has ever complained about. The first glide tick is now within 2-6% of the
+speed the ship pressed with, against 7-35% under the cubic.
+
+The velocity carries its radial component now, which the tangential-only form used
+by the ellipse could not: a glide is closing as well as sweeping, and the release,
+the trail and the camera all read that vector.
+
+**It costs nothing.** The brake it replaced cost 65 and 63 fuel in the two
+sessions, half of it refunded on conversion — an economy that existed to pay for
+waiting. The hard part of an anomaly is the release that gets the ship inside the
+barrier, and that is already paid for.
+
+Two fixtures had to move, both because they were pinned to a clock that changed:
+`test/score.test.ts`'s anomaly session let go at a tick that used to aim home and
+now aims out through the far side of the bubble, which killed the ship and took
+`anomalyBonusMult` inert with it — the release tick is chosen from the parked
+orbit's PHASE, and only part of that circle points back at the corridor.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -1760,11 +1812,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 94 · camera 48
+tests    port-equality 11 · invariants 32 · render 95 · camera 48
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 10
          score 60 · input 8 · grab-target 8 · link-fuel 6
-         boost-envelope 6 · flyby-fuel 14 · anomaly 15 · outbound-grab 6
-         385 total
+         boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
+         390 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

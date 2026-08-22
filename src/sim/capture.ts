@@ -204,6 +204,8 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     settleSweep: 0,
     refuel: 0,
     settleDur: 0,
+    approachR0: 0,
+    approachVR: 0,
     periR: grabR,
     apoR: grabR,
     clearFramesLeft: 0,
@@ -234,7 +236,39 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     defl: 0,
   };
 
-  if (!isFlyby) applyClearance(cap, cfg);
+  // An anomaly catches you where you are.
+  //
+  // There is no dive to fly and no flyby to brake: the press IS the arrival, and
+  // the authored approach carries the ship onto the circle from whatever it
+  // happened to be doing. Everything that used to sit between the press and the
+  // parked orbit was waiting, and it was most of the wall clock — measured on two
+  // phone sessions, 2.47s and 4.55s from press to parked, of which the settle the
+  // anomaly authors is 0.45. The rest was 1.9-2.1s of braking (60+ fuel) and up to
+  // 2.0s of falling. Reported both times as taking too long to be enjoyable, and
+  // the second report named the target: about half a second.
+  //
+  // Nothing here grades the approach, which is the same reason `freezeOrbit` hands
+  // an anomaly full tightness: the hard part was aiming the release that got the
+  // ship inside the barrier, and that has already been paid for.
+  //
+  // `isFlyby` is computed above and then deliberately ignored here, including the
+  // `unreachable` carve-out that note 40 added. That rule exists because a bound
+  // grab already climbing away cannot reach its own periapsis before the wall
+  // does, and a capture is only real once it converts at periapsis. An anomaly has
+  // no periapsis to reach — the press is the conversion — so the failure it
+  // guards against cannot happen here, at any speed or heading. It still governs
+  // every planet, which is every body the rule was measured on.
+  if (p.kind === 'anomaly') {
+    freezeOrbit(cap, cfg, p);
+    cap.phase = 'settle';
+    // The swing has happened, as far as anything downstream is concerned: the
+    // grab award is owed, and a release from here is a release from a real orbit.
+    // Also what stops the periapsis detector — which never runs now — from ever
+    // freezing this capture a second time.
+    cap.passedPeri = true;
+  } else if (!isFlyby) {
+    applyClearance(cap, cfg);
+  }
 
   state.capture = cap;
   return 'captured';
@@ -322,22 +356,33 @@ export function freezeOrbit(cap: Capture, cfg: SimConfig, authored?: Anomaly | n
   cap.Lfrozen = cap.phaseSpeedReal * rPeri * rPeri;
   cap.settleDur = cfg.settleDur;
   if (authored) {
-    // The seam is continuous in speed, because nothing here wants it otherwise.
+    // Nothing computed above survives an authored orbit, and that is the point.
     //
-    // `vPeriTrue` above reconstructs the dive's speed from `whipE`, so an ellipse
-    // whose periapsis was flattened by the floor clamp keeps the oval it earned.
-    // An authored orbit throws that ellipse away — `rPeri` is overridden on the
-    // next line and the sweep on the line after — so all the reconstruction can
-    // still do is set the speed the phase clock starts at, which is
-    // `vPeriTrue` exactly. Measured on a phone capture that reported the settle
-    // "snapping": the ship reached the anomaly doing 179px/s and the first tick
-    // of the settle put it at 335. Off `spd` there is nothing to step.
-    cap.phaseSpeedReal = spd / rPeri;
-    cap.phaseSpeed = cap.phaseSpeedReal;
-    cap.Lfrozen = cap.phaseSpeedReal * rPeri * rPeri;
-    const eAuth = Math.max(0, Math.min(0.6, (spd * spd) / (vc * vc) - 1));
-    cap.orbit = { a: rPeri / (1 - eAuth), e: eAuth, argp: posAng, dir };
+    // The ellipse existed to carry the shape the dive earned, and this capture
+    // has no dive: it froze at the press, where the ship is usually still falling
+    // and `vPeriTrue`'s whole premise — that the velocity here is tangential — is
+    // false. So the state at the press becomes the near boundary of a glide, and
+    // the authored circle the far one. See `stepPhase`.
+    //
+    // The seam is continuous in position AND velocity by construction: at u=0 the
+    // glide is at this radius closing at this rate, and the sweep starts at the
+    // angular rate the ship arrived with. Before this the settle began at
+    // `vPeriTrue` however fast the ship really was, which is what a phone capture
+    // reported as "snapping" — 179px/s arriving, 335 on the next tick.
+    const vrad = (rx * vx + ry * vy) / r;
+    const angRate = Math.abs(L) / (r * r);
+    cap.approachR0 = r;
+    cap.approachVR = vrad;
+    cap.phaseSpeedReal = angRate;
+    cap.phaseSpeed = angRate;
+    cap.Lfrozen = Math.abs(L);
     cap.rPeri = authored.orbitR;
+    // The drawn curve is the DESTINATION from the press onward. A ship spiralling
+    // in has no ellipse to preview, and the circle it is heading for is both the
+    // useful thing to show and true within half a second. `orbit` is read for a
+    // curve to draw and for the release solver's target — never for the ship's
+    // own path, which `stepPhase` computes.
+    cap.orbit = { a: authored.orbitR, e: 0, argp: posAng, dir };
     cap.settleSweep = (Math.PI * 2) / Math.max(0.01, authored.orbitPeriod);
     cap.refuel = authored.refuel;
     cap.settleDur = authored.settleDur;

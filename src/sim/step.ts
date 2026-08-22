@@ -12,7 +12,7 @@
  */
 import type { SimConfig } from './config.ts';
 import { DEFAULT_CONFIG } from './config.ts';
-import type { Body, EndingReason, Input, SimState } from './types.ts';
+import type { Body, Capture, EndingReason, Input, SimState } from './types.ts';
 import { circSpeed, escapeSpeed, gAccel, hypot, orbitRadius, smootherstep } from './orbit.ts';
 import { applyClearance, beginCapture, freezeOrbit, releaseCapture } from './capture.ts';
 import { contactPolicy, reflectCoefficient } from './contact.ts';
@@ -372,6 +372,57 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
 }
 
 /**
+ * The authored approach: radius as a quintic with both ends nailed down.
+ *
+ * Five conditions, and each one is a thing that would otherwise be visible:
+ *
+ *   r(0)  = where the ship is        position cannot jump
+ *   r'(0) = how fast it was closing  velocity cannot jump
+ *   r''(0)= 0                        the pull-in cannot start with a yank
+ *   r(1)  = the authored radius      it arrives where it was told to
+ *   r'(1) = r''(1) = 0               and stops there rather than passing through
+ *
+ * The cubic that only nails the first two and the last two was tried first and is
+ * the reason the second derivative is in the list: with no condition on it, the
+ * curve opens with its full acceleration — measured at 8770px/s² applied between
+ * one tick and the next on a 426px arrival, which is a velocity step of 146px/s
+ * at the exact moment of the press. Continuous and still a jolt. The quintic eases
+ * the same distance in and out for a peak radial speed 25% higher in the middle,
+ * which is nobody's complaint.
+ *
+ * It takes `settleDur` however far away the press was — that is the whole of
+ * "quick regardless of speed or distance": the clock is fixed and the distance is
+ * whatever it is.
+ *
+ * Clamped at the floor because a curve with a fast inbound end can overshoot the
+ * target radius; the ship would dip inside the body it is parking around and come
+ * back out. Inert on every ordinary arrival.
+ */
+function approachRadius(cap: Capture, u: number): number {
+  const T = Math.max(0.01, cap.settleDur);
+  const s2 = u * u;
+  const s3 = s2 * u;
+  const s4 = s3 * u;
+  const s5 = s4 * u;
+  const h0 = 1 - 10 * s3 + 15 * s4 - 6 * s5;
+  const h1 = u - 6 * s3 + 8 * s4 - 3 * s5;
+  const h3 = 10 * s3 - 15 * s4 + 6 * s5;
+  return Math.max(cap.minR, h0 * cap.approachR0 + h1 * T * cap.approachVR + h3 * cap.rPeri);
+}
+
+/** The same quintic differentiated: how fast the approach is closing, in px/s. */
+function approachRate(cap: Capture, u: number): number {
+  const T = Math.max(0.01, cap.settleDur);
+  const s2 = u * u;
+  const s3 = s2 * u;
+  const s4 = s3 * u;
+  const dh0 = -30 * s2 + 60 * s3 - 30 * s4;
+  const dh1 = 1 - 18 * s2 + 32 * s3 - 15 * s4;
+  const dh3 = 30 * s2 - 60 * s3 + 30 * s4;
+  return (dh0 * cap.approachR0 + dh1 * T * cap.approachVR + dh3 * cap.rPeri) / T;
+}
+
+/**
  * The phase clock: ride the frozen curve, sweeping it the way a real orbit does.
  *
  * dtheta/dt = L / r^2 conserves angular momentum, so motion is fast at periapsis
@@ -390,7 +441,18 @@ function stepPhase(state: SimState, cfg: SimConfig, holding: boolean, dt: number
   const shape = smootherstep(u);
   const tightenAmt = cfg.tightenFrac * shape;
 
-  const rNow = orbitRadius(orbit, cap.rPeri, cap.theta, tightenAmt);
+  // An authored orbit is a glide with boundary conditions, not an ellipse being
+  // rounded off. The cubic below leaves the press at exactly the radius and
+  // closing rate the ship had, and arrives at the authored circle with no radial
+  // speed left — so both ends match and there is nothing to step at either.
+  //
+  // Radius here does not depend on the angle at all, which is why it is computed
+  // once and used for the sweep and for the new position both. A spiral in is not
+  // a curve the ship rides round; it is a distance closing on a clock.
+  const authored = cap.settleSweep > 0;
+  const rNow = authored
+    ? approachRadius(cap, u)
+    : orbitRadius(orbit, cap.rPeri, cap.theta, tightenAmt);
   if (cap.Lfrozen === undefined) cap.Lfrozen = cap.phaseSpeedReal * cap.rPeri * cap.rPeri;
 
   // As tightening rounds the orbit toward a circle, holding the oval's angular
@@ -406,7 +468,7 @@ function stepPhase(state: SimState, cfg: SimConfig, holding: boolean, dt: number
   cap.phaseMul = cfg.phaseRate;
   cap.theta += orbit.dir * sweepRate * dt;
 
-  const rNew = orbitRadius(orbit, cap.rPeri, cap.theta, tightenAmt);
+  const rNew = authored ? rNow : orbitRadius(orbit, cap.rPeri, cap.theta, tightenAmt);
   cap.rx = Math.cos(cap.theta) * rNew;
   cap.ry = Math.sin(cap.theta) * rNew;
   const tx = -Math.sin(cap.theta) * orbit.dir;
@@ -414,6 +476,16 @@ function stepPhase(state: SimState, cfg: SimConfig, holding: boolean, dt: number
   const tangentialSpeed = cap.phaseSpeed * rNew;
   cap.vx = tx * tangentialSpeed;
   cap.vy = ty * tangentialSpeed;
+  // A glide is closing as well as sweeping, and the velocity has to say so — it
+  // is what the release flings, what the trail draws and what the camera leans
+  // on. The tangential-only form is right for an ellipse, where the phase clock
+  // rides a curve; here it would report a ship in a circular orbit while it is
+  // visibly falling toward one.
+  if (authored) {
+    const rDot = approachRate(cap, u);
+    cap.vx += Math.cos(cap.theta) * rDot;
+    cap.vy += Math.sin(cap.theta) * rDot;
+  }
 
   // Circularizing costs fuel; running dry mid-burn putters the ship out.
   //
@@ -423,7 +495,7 @@ function stepPhase(state: SimState, cfg: SimConfig, holding: boolean, dt: number
   // economy could say: `fuelRegen` runs only while drifting, so resting anywhere
   // cost the tank. Gated on `u >= 1` so it is the settled orbit that pays, not
   // the circularization on the way in.
-  if (holding && (u < 1 || cap.phaseMul !== 1)) {
+  if (holding && !authored && (u < 1 || cap.phaseMul !== 1)) {
     state.fuel = burn(state.fuel, cfg.fuelPerSec, dt);
     if (state.fuel <= 0 && u < 1) cap.puttered = true;
   } else if (!holding) {

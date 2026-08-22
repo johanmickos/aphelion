@@ -243,17 +243,25 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
    *
    * It must also GET HOME and grab again, or `anomalyBonusMult` measures inert:
    * a bonus that expires with nothing scored under it changes no outcome. The
-   * second press takes a corridor planet ~1.2s after the release, inside the
+   * second press takes a corridor planet 1.8s after the release, inside the
    * window, so the multiplier addition is actually paid on something.
+   *
+   * The release tick is chosen from the parked orbit's PHASE, not from the clock:
+   * the ship goes round the anomaly once every `anomalyOrbitPeriod`, so which way
+   * it is thrown depends entirely on when it is let go, and only part of that
+   * circle is aimed back at the corridor. Letting go at the wrong point sends it
+   * out through the far side of the bubble, where the barrier resumes and the run
+   * ends — which is what happened to the previous numbers when the anomaly
+   * approach stopped taking two seconds and every tick after the press moved.
    */
   {
     name: 'out to an anomaly and back',
     ship: { x: ANOMALY.x - 520, y: ANOMALY.y - 70, vx: 320, vy: 0 },
     edges: [
       [ANOMALY_PRESS, 1],
-      [150, 0],
-      [220, 1],
-      [330, 0],
+      [186, 0],
+      [296, 1],
+      [406, 0],
     ],
     ticks: 900,
   },

@@ -228,57 +228,157 @@ describe('an anomaly authors its own orbit', () => {
     }
   });
 
-  it('starts the settle at the speed the ship arrived with', () => {
-    // Reported from a phone: "when I was approaching to circularize my ship
-    // snapped to a lower orbit. The snap was too jerky." It was not the radius —
-    // it was the speed. `freezeOrbit` reconstructs a periapsis speed from
-    // `whipE`, the dive's peak energy, so an ellipse flattened by the floor clamp
-    // keeps the oval it earned. An authored orbit throws that ellipse away, so
-    // all the reconstruction could still reach was the speed the phase clock
-    // starts at — measured at 155 -> 517px/s on the far arrival below, and at
-    // 179 -> 335 on the session that reported it.
+  /**
+   * Arrivals that cover the shape of the thing: fast and near, fast and far, a
+   * slow diagonal, a crossing, one flying directly AWAY from the anomaly, and one
+   * dead stopped beside it. Distances 127-426px, speeds 0-418px/s.
+   */
+  const ARRIVALS = [
+    [-300, -70, 344, 0],
+    [-420, -70, 344, 0],
+    [-260, 260, 150, -150],
+    [-200, -200, 60, 300],
+    [-380, 120, 400, -120],
+    [-150, 0, -300, 0],
+    [-90, -90, 0, 0],
+  ] as const;
+
+  /** Press beside the right-hand anomaly on tick 5 and hold. */
+  function arrive(cfg: SimConfig, dx: number, dy: number, vx: number, vy: number, fuel = 50) {
+    const a = rightAnomaly(cfg);
+    const state = createInitialState(cfg);
+    Object.assign(state.ship, { x: a.x + dx, y: a.y + dy, vx, vy });
+    state.highWaterY = a.y;
+    state.fuel = fuel;
+    const press = 5;
+    let driftSpeed = 0;
+    let firstGlide = -1;
+    let parked = -1;
+    let worstStep = 0;
+    let worstDefl = 0;
+    let minR = Infinity;
+    let prev = -1;
+    let fuelAtPress = -1;
+    let fuelLowInGlide = Infinity;
+    for (let i = 0; i < 400; i++) {
+      if (i === press) driftSpeed = hypot(state.ship.vx, state.ship.vy);
+      stepSim(state, cfg, { held: i >= press, pressed: i === press, released: false }, FIXED_DT);
+      const cap = state.capture;
+      if (!cap) continue;
+      const speed = hypot(cap.vx, cap.vy);
+      if (firstGlide < 0) firstGlide = speed;
+      if (prev >= 0) worstStep = Math.max(worstStep, Math.abs(speed - prev));
+      // Only where a heading means something. A ship being turned round passes
+      // through a near-standstill, and `atan2` of nothing much is noise.
+      if (speed > 60) worstDefl = Math.max(worstDefl, cap.defl);
+      minR = Math.min(minR, hypot(cap.rx, cap.ry));
+      prev = speed;
+      if (fuelAtPress < 0) fuelAtPress = state.fuel;
+      if (cap.phase === 'settle') fuelLowInGlide = Math.min(fuelLowInGlide, state.fuel);
+      if (cap.phase === 'orbit' && parked < 0) parked = i;
+    }
+    return {
+      press,
+      driftSpeed,
+      firstGlide,
+      parked,
+      worstStep,
+      worstDefl,
+      minR,
+      fuelAtPress,
+      fuelLowInGlide,
+      state,
+    };
+  }
+
+  it('parks in the authored time from anywhere, at any speed', () => {
+    // The whole point of the change, and the number the author asked for. Two
+    // phone sessions measured 2.47s and 4.55s from press to parked, of which the
+    // authored settle was 0.45 — the rest was 1.9-2.1s of braking and up to 2.0s
+    // of falling to a periapsis. The press is the arrival now, so what is left is
+    // the authored clock and nothing else, whatever the arrival was.
+    const ticks = Math.round(DEFAULT_CONFIG.anomalySettleDur / FIXED_DT);
+    for (const [dx, dy, vx, vy] of ARRIVALS) {
+      const r = arrive(DEFAULT_CONFIG, dx, dy, vx, vy);
+      expect(r.parked - r.press, `arrival (${dx},${dy}) v(${vx},${vy})`).toBe(ticks);
+    }
+  });
+
+  it('takes the velocity the ship pressed with, and never steps', () => {
+    // Both ends of this were reported. "My ship snapped to a lower orbit, the snap
+    // was too jerky" was the freeze reading a reconstructed periapsis speed —
+    // 179px/s arriving, 335 on the next tick, and up to 517 on synthetic arrivals.
+    // The press-is-the-arrival version replaced it with a glide whose near end is
+    // the ship's own state, so there is nothing left to step at.
     //
-    // Read one tick apart: the tick that flips the phase to `settle` still ran
-    // `stepPhysical`, so the step lands on the tick after it.
-    const a = rightAnomaly(DEFAULT_CONFIG);
-    for (const [dist, dy, vx, vy] of [
-      [300, -70, 344, 0],
-      [420, -70, 344, 0],
-      [260, 260, 150, -150],
-      [200, -200, 60, 300],
-    ] as const) {
+    // The 10% is one tick of a pull-in that has half a second to cover up to
+    // 300px; it is the glide accelerating, not a seam. It was 35% while the glide
+    // was a cubic, which is why it is a quintic.
+    for (const [dx, dy, vx, vy] of ARRIVALS) {
+      const r = arrive(DEFAULT_CONFIG, dx, dy, vx, vy);
+      const label = `arrival (${dx},${dy}) v(${vx},${vy})`;
+      if (r.driftSpeed > 60) {
+        expect(
+          Math.abs(r.firstGlide / r.driftSpeed - 1),
+          `${label} stepped at the press: ${r.driftSpeed.toFixed(0)} -> ${r.firstGlide.toFixed(0)}px/s`,
+        ).toBeLessThan(0.1);
+      }
+      // A reversal is still a reversal: a ship pressed while flying straight out
+      // has to be turned round, and turns hardest where it is slowest. What must
+      // not happen is a step in SPEED, which is what a bad seam looks like.
+      expect(r.worstStep, `${label} stepped mid-glide`).toBeLessThan(100);
+      expect(r.worstDefl, `${label} kinked`).toBeLessThan(25);
+    }
+  });
+
+  it('never dips inside the body it is parking around', () => {
+    // A curve with a fast inbound end overshoots its target; the floor clamp in
+    // `approachRadius` is what stops the ship passing through the anomaly and
+    // coming back out. Asserted against the authored radius rather than the floor,
+    // because reaching the floor at all would already be visible.
+    for (const [dx, dy, vx, vy] of ARRIVALS) {
+      const r = arrive(DEFAULT_CONFIG, dx, dy, vx, vy);
+      const started = hypot(dx, dy);
+      const floor = Math.min(started, DEFAULT_CONFIG.anomalyOrbitR);
+      expect(r.minR, `arrival (${dx},${dy}) v(${vx},${vy})`).toBeGreaterThanOrEqual(floor - 1);
+    }
+  });
+
+  it('charges nothing for the approach', () => {
+    // The brake it replaced cost 65 and 63 fuel in the two reported sessions, and
+    // half of that came straight back as the conversion refund — an economy that
+    // existed to pay for the waiting. Nothing is spent reaching a rest stop now:
+    // the hard part was the release that got the ship inside the barrier, and that
+    // is already paid for. Read on the way IN, because the refuel starts at the
+    // far end and would hide a burn.
+    for (const [dx, dy, vx, vy] of ARRIVALS) {
+      const r = arrive(DEFAULT_CONFIG, dx, dy, vx, vy);
+      expect(r.fuelLowInGlide, `arrival (${dx},${dy}) v(${vx},${vy}) paid for the approach`).toBe(
+        r.fuelAtPress,
+      );
+    }
+  });
+
+  it('never flies a dive or a flyby at an anomaly', () => {
+    // The phases that used to hold all the time are simply not reachable there
+    // any more. Pinned because the press path decides this, and a future change to
+    // the flyby classification could quietly send an anomaly back through it.
+    for (const [dx, dy, vx, vy] of ARRIVALS) {
+      const a = rightAnomaly(DEFAULT_CONFIG);
       const state = createInitialState(DEFAULT_CONFIG);
-      Object.assign(state.ship, { x: a.x - dist, y: a.y + dy, vx, vy });
+      Object.assign(state.ship, { x: a.x + dx, y: a.y + dy, vx, vy });
       state.highWaterY = a.y;
-      let frozen = false;
-      let before = 0;
-      let seen = false;
-      for (let i = 0; i < 900; i++) {
+      const seen = new Set<string>();
+      for (let i = 0; i < 200; i++) {
         stepSim(
           state,
           DEFAULT_CONFIG,
           { held: i >= 5, pressed: i === 5, released: false },
           FIXED_DT,
         );
-        const cap = state.capture;
-        if (!cap) continue;
-        const speed = hypot(cap.vx, cap.vy);
-        if (frozen) {
-          // Within 1%, not exact: one tick of the tighten has already moved the
-          // radius a little, and that motion is the settle doing its job.
-          expect(
-            Math.abs(speed / before - 1),
-            `arrival from ${dist}px stepped at the freeze: ${before.toFixed(0)} -> ${speed.toFixed(0)}px/s`,
-          ).toBeLessThan(0.01);
-          seen = true;
-          break;
-        }
-        if (cap.phase === 'settle') {
-          frozen = true;
-          before = speed;
-        }
+        if (state.capture) seen.add(state.capture.phase);
       }
-      expect(seen, `arrival from ${dist}px never reached the settle`).toBe(true);
+      expect([...seen].sort(), `arrival (${dx},${dy}) v(${vx},${vy})`).toEqual(['orbit', 'settle']);
     }
   });
 
@@ -303,7 +403,7 @@ describe('an anomaly authors its own orbit', () => {
   });
 
   it('refuels while parked, which nothing else in a capture does', () => {
-    const r = park(DEFAULT_CONFIG, 88, 40);
+    const r = park(DEFAULT_CONFIG, 88, 20);
     expect(r.fuelEnd).toBeGreaterThan(r.fuelAtOrbit + 20);
     expect(r.fuelEnd).toBeLessThanOrEqual(DEFAULT_CONFIG.fuelMax);
     // And a planet still does not: the rest stop is the anomaly's rule, not a
