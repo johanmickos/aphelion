@@ -424,6 +424,53 @@ describe('what the camera watches', () => {
     }
   });
 
+  it('never shows dead space past a wall once the camera has actually moved', () => {
+    // The sibling above pins the TARGET, and the target was never the leak. The
+    // backstop in `followCamera` wrote its own bound — framing only, at the full
+    // `cameraBackstopEdge`, with no field rule — so a ship hugging a side wall
+    // dragged the view 18px past the dashed line to hold itself 18px inside the
+    // window. Measured at exactly -18px against `field.left` at every speed, with
+    // no anomaly within thousands of px. Both clamps read `panBounds` now.
+    const bodies = createBodies(DEFAULT_CONFIG);
+    for (const dir of [-1, 1] as const) {
+      for (const speed of [100, 300, 500]) {
+        const cam = cam390();
+        let x = dir < 0 ? field.left + 300 : field.right - 300;
+        const y = -2000;
+        cam.left = Math.max(field.left, Math.min(field.right - 390, x - 195));
+        cam.centerY = y;
+        for (let i = 0; i < 400; i++) {
+          x = Math.min(field.right, Math.max(field.left, x + dir * speed * FIXED_DT));
+          const r = barrierRelax(bodies, x, y, DEFAULT_RENDER_CONFIG);
+          followCamera(
+            cam,
+            DEFAULT_RENDER_CONFIG,
+            x,
+            y,
+            field,
+            null,
+            FIXED_DT,
+            null,
+            dir * speed,
+            false,
+            r,
+          );
+          expect(
+            cam.left,
+            `${dir} at ${speed}px/s panned past the left wall`,
+          ).toBeGreaterThanOrEqual(field.left - 1e-9);
+          expect(
+            cam.left + cam.designW,
+            `${dir} at ${speed}px/s panned past the right wall`,
+          ).toBeLessThanOrEqual(field.right + 1e-9);
+          // and the ship is still on screen, which is what the backstop is for
+          expect(x - cam.left).toBeGreaterThanOrEqual(-1e-9);
+          expect(x - cam.left).toBeLessThanOrEqual(cam.designW + 1e-9);
+        }
+      }
+    }
+  });
+
   it('leans the way the ship is going, so coming off a wall is not a dead second', () => {
     // The deadzone parks the ship at whichever margin it last crossed, so leaving
     // the right wall the view held completely still for 310px — over a second —
@@ -718,19 +765,24 @@ describe('the view around an anomaly', () => {
       return worst;
     };
     for (const speed of [228, 352]) {
-      // The pin, updated rather than deleted. This used to read `> 900`, because
-      // the allowance was the whole of the fix. It is not any more: most of that
-      // jerk turned out to be the BACKSTOP repeating the field rule and switching
-      // it at the boundary, and removing that duplicate took the unrelaxed
-      // crossing to around 430px/s on its own. The allowance is now a refinement
-      // worth 13% outbound and 30% on the way back, so what is asserted is that it
-      // still helps — and if it stops helping it should be deleted, not kept.
+      // The pin, updated rather than deleted, and twice now. It first read
+      // `> 900`, because the allowance was the whole of the fix; then the backstop
+      // stopped carrying its own field rule and the unrelaxed crossing fell to
+      // ~430px/s on its own, so the assertion became a comparison. The backstop
+      // reads the same `panBounds` as the target again — it had to, or ordinary
+      // play saw 18px past the wall — and this arm is back up at 643-1280px/s.
+      //
+      // That is a counterfactual, not a regression: `relaxOn: false` is a barrier
+      // crossing with no bubble around it, which the simulation cannot produce,
+      // because the bubble is the only thing that lets a ship past the wall alive.
+      // The relaxed arm — the one play actually takes — is unchanged to the pixel
+      // at 249 and 390px/s. What is asserted is that the allowance still helps.
       expect(run(speed, true), `${speed}: the allowance no longer helps`).toBeLessThan(
         run(speed, false),
       );
       // Bounded as a multiple of the SHIP's speed, because what is left is a
-      // proportionate catch-up rather than a discontinuity — 1.68x at 228px/s and
-      // 1.22x at 352, against 5.5x and 4.0x without the allowance.
+      // proportionate catch-up rather than a discontinuity — 1.09x at 228px/s and
+      // 1.11x at 352.
       expect(run(speed, true), `${speed}: relaxed crossing still jerks`).toBeLessThan(speed * 1.8);
     }
   });

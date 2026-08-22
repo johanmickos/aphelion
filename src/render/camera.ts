@@ -177,7 +177,7 @@ export function cameraTarget(
   // r * (1 - anchorW) — full at 0, gone at 1, and continuous in between. There is
   // no mode to switch and therefore no moment at which anything can jump.
   const w = cam.anchorW;
-  const subjX = shipX + (cam.anchorX - shipX) * w;
+  const subjX = subjectX(cam, shipX);
   const subjY = shipY + (cam.anchorY - shipY) * w;
 
   // Look where you are going, not where you have been. Off entirely while
@@ -201,22 +201,50 @@ export function cameraTarget(
   // the window, which is not what "the view is locked to it" should look like.
   if (w > 0) left += (subjX - W / 2 - left) * w;
 
-  // Two rules, and which one yields is the whole of it.
-  //
-  //   the field   the view may not show dead space beyond a barrier
-  //   framing     the ship may not leave the window
-  //
-  // Inside the corridor they agree and the field rule binds, exactly as before.
-  // Out at an anomaly they cannot both hold — the ship is legitimately past the
-  // barrier — and framing wins, because a view with the ship missing is worse
-  // than a view with some black in it.
-  //
-  // Written as an intersection rather than an `if (outside)`, because the switch
-  // was measured at 1137px/s of camera jerk crossing the boundary: the field rule
-  // let go all at once and the target moved 86px in a tick. Here the binding bound
-  // is `shipX - edge`, which slides with the ship, so the handover is continuous
-  // and there is nothing to cross.
-  //
+  const { lo, hi } = panBounds(cam, cfg, shipX, subjX, field, relax);
+  left = Math.max(lo, Math.min(hi, left));
+  return { left, centerY: clampToFloor(cam, subjY, floorY) };
+}
+
+/** The blended subject's x — see `cameraTarget`. The ship, unless a lock is held. */
+function subjectX(cam: Camera, shipX: number): number {
+  return shipX + (cam.anchorX - shipX) * cam.anchorW;
+}
+
+/**
+ * The range `cam.left` is allowed to sit in, as an intersection of two rules.
+ *
+ *   the field   the view may not show dead space beyond a barrier
+ *   framing     the ship may not leave the window
+ *
+ * Inside the corridor they agree and the field rule binds. Out at an anomaly they
+ * cannot both hold — the ship is legitimately past the barrier — and framing
+ * wins, because a view with the ship missing is worse than a view with some black
+ * in it.
+ *
+ * ONE function, called by both the target and the backstop, because these are not
+ * two rules that happen to resemble each other: they are the same rule, applied
+ * to the place the camera is aiming and then to the place it actually reached.
+ * Writing the backstop its own weaker version is what let ordinary play see past
+ * the dashed line — see `followCamera`.
+ *
+ * Written as an intersection rather than an `if (outside)`, because the switch
+ * was measured at 1137px/s of camera jerk crossing the boundary: the field rule
+ * let go all at once and the target moved 86px in a tick. Here the binding bound
+ * is `shipX - edge`, which slides with the ship, so the handover is continuous
+ * and there is nothing to cross.
+ */
+function panBounds(
+  cam: Camera,
+  cfg: RenderConfig,
+  shipX: number,
+  /** The blended subject — see `cameraTarget`. The ship, unless a lock is held. */
+  subjX: number,
+  field: { left: number; right: number; width: number },
+  relax: number,
+): { lo: number; hi: number } {
+  const W = cam.designW;
+
   // Framing is expressed on the WINDOW, not the deadzone's margins. Using margins
   // made this fight the orbit lock: `shipX - margin` orbits with the ship, so it
   // dragged a stationary camera 83px back and forth around an anomaly.
@@ -263,8 +291,7 @@ export function cameraTarget(
     lo = shipX - W + edge;
     hi = shipX - edge;
   }
-  left = Math.max(lo, Math.min(hi, left));
-  return { left, centerY: clampToFloor(cam, subjY, floorY) };
+  return { lo, hi };
 }
 
 /**
@@ -345,38 +372,32 @@ export function followCamera(
   cam.left += (t.left - cam.left) * k;
   cam.centerY += (t.centerY - cam.centerY) * k;
 
-  // BACKSTOP: the ship may not leave the window, whatever the easing is doing.
+  // BACKSTOP: the camera may not FINISH a frame outside the range it was aiming
+  // inside of.
   //
-  // `cameraTarget` already refuses to aim anywhere the ship would be off screen,
-  // but that is a constraint on the TARGET and `cam.left` only eases toward it.
-  // At `cameraFollow` 3 the camera trails by roughly v/3 — 117px at the 352px/s a
+  // `cameraTarget` already refuses to aim anywhere illegal, but that is a
+  // constraint on the TARGET and `cam.left` only eases toward it. At
+  // `cameraFollow` 3 the camera trails by roughly v/3 — 117px at the 352px/s a
   // release out to an anomaly reaches — so the ship overtook a perfectly correct
   // target and left the frame. Reported as "my ship flew faster than the camera".
   //
-  // Applied AFTER the ease and to the camera itself, so it is invisible at
-  // ordinary speeds and absolute at high ones. The field clamp still outranks it
-  // for a ship inside the corridor: the alternative is panning past a wall to show
-  // dead space, and a ship pinned to the edge there is about to die anyway.
-  const W = cam.designW;
-  // The WINDOW, not the deadzone's margins, and the distinction is the whole
-  // point of this being a backstop. A margin is a soft framing preference and
-  // belongs to the deadzone; this is a hard guarantee and must not express an
-  // opinion about framing on top of it.
+  // The SAME `panBounds` as the target, and that is the whole of it. This once
+  // wrote its own bound — framing only, at the full backstop edge, with no field
+  // rule — for the good reason that repeating the field rule as a SECOND,
+  // independently switching clamp made the two fight and yanked the view 107px on
+  // the tick the ship re-entered the corridor. But framing-only is not a weaker
+  // restatement of the target's rule, it is a stronger rule, and it outranked the
+  // field everywhere: hugging a side wall in ordinary play it pulled the view
+  // `cameraBackstopEdge` past the dashed line to hold the ship 18px inside the
+  // window — 18px of dead space beyond a barrier that the target had refused to
+  // show, and the anomaly work's one real regression. Sharing the bounds cannot
+  // fight, because there is only one rule to disagree with.
   //
-  // With the margins it fought the orbit lock and won. Locked to an anchor the
-  // ship is SUPPOSED to move around the frame, but `shipX - margin` orbits with
-  // the ship, so the bound kept catching a camera whose target never moved:
-  // measured on a real anomaly orbit, 83px of left-right swing at a lock weight
-  // of exactly 1. Reported as the anomaly not staying centred, which it was not.
-  const edge = cfg.cameraBackstopEdge;
-  const lo = shipX - (W - edge);
-  const hi = shipX - edge;
-  // NO field rule here, deliberately. `cameraTarget` already refuses to aim past
-  // a barrier, and the ease only moves toward that target, so the camera cannot
-  // wander out on its own. Repeating the rule here made two clamps fight: the
-  // backstop's field bound switched on the tick the ship re-entered the corridor
-  // and yanked the view 107px — 6406px/s, the jagged jump on returning to the
-  // field. This has one job, which is that the ship stays in the window.
+  // The cost, deliberately: pressed against a wall the ship may reach the very
+  // edge of the window rather than staying `cameraBackstopEdge` inside it. The
+  // ramp means the inset comes back the instant the ship is actually outside,
+  // which is the case it was added for.
+  const { lo, hi } = panBounds(cam, cfg, shipX, subjectX(cam, shipX), field, relax);
   // Clamp to the NEAREST bound: the smallest correction that puts the ship back
   // on screen, and nothing more. An earlier version repositioned to a preferred
   // side instead, reasoning that a lagging camera should show what is ahead —
