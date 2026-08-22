@@ -1451,6 +1451,54 @@ been what note 35 said it was. `barrierRelax` is now worth 13% outbound and 30% 
 the way back, and the assertion says that instead — and fails if it ever stops
 helping, which is when it should be deleted rather than kept.
 
+---
+
+### 38 — The clearance nudge could fling you out of the capture it was saving
+
+`src/sim/orbit.ts` · `src/sim/capture.ts` · **[CHANGED]** · reported as "what
+happened here before death? I kind of shot off the planet at super speed"
+
+`clearanceDv` finds the smallest TANGENTIAL delta-v that lifts a dive's periapsis
+clear of the surface. Minimal for that goal, and silent about energy — so on a
+near-radial dive it is enormous, bounded only by `circSpeed(target) * 1.2`, about
+283px/s, which is comparable to a whole orbit's speed. Sampled over 144 bound
+dives that needed clearing, it put **46 of them above escape speed**:
+
+```
+  r=120, speed 151 — half the escape speed of 303
+  clearance adds 277  ->  334px/s  ->  unbound  ->  gone
+```
+
+The ship is then in a capture that can never reach periapsis. It coasts, and in
+the reported run it left the field 8px past the right wall with the nearest body
+**349px behind it**. The recorded speeds show it plainly and impossibly: 387px/s
+at 81px from the planet, then 510 at 139px — you cannot be faster receding than at
+closest approach, unless something added energy in between.
+
+The fix turns the velocity toward tangential instead of adding along it. Turning
+raises angular momentum and therefore periapsis for nothing, and cannot unbind by
+construction. Ejections go 46 -> 0, worst speed gain 277 -> 171px/s.
+
+**Minimal deviation, and that part is load-bearing.** The first version turned
+everywhere and put a kink into a scenario that had none — a turn is a sharper
+heading change than an addition along the heading, and `clearEaseFrames` is the
+one frame-denominated constant in the simulation and may not be lengthened to hide
+it. It now starts from exactly what `clearanceDv` would do and only deviates where
+that would eject: bit-identical in 93 of 144 sampled dives, and every test that
+pins a trajectory still passed without a single number being touched.
+
+21 dives now fall short of the surface target and ride the floor instead. That is
+expensive — note 18 measured the floor destroying 44% of a ship's speed in one
+substep — but survivable, where being ejected is neither. The "no scenario rides
+the minimum-orbit floor" invariant still holds.
+
+**Fixed alongside:** `pnpm check` was failing on another branch's code.
+`.claude/worktrees/` holds full checkouts of this repo, and both ESLint and
+Prettier were walking them, so a lint error on a different branch blocked a commit
+here. Both ignore `.claude` now — the same shape as the `dist` fix that preceded
+it, and the second time that directory has broken the gate for reasons unrelated
+to any change being made.
+
 **It is on a toggle**, in the tune panel footer, because this changes how the game
 feels and the only way to judge that is to fly the same field both ways.
 `cameraOrbitLock` 0 is exactly the old camera. Two positions and not a slider: the
@@ -1487,7 +1535,7 @@ tests    port-equality 11 · invariants 32 · render 79 · camera 34
          diagnostics 25 · backtrack 15 · world 14 · tune 7 · clearance 6
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 10 · anomaly 14
-         354 total
+         358 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

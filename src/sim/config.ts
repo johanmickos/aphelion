@@ -294,6 +294,26 @@ export interface SimConfig {
    */
   clearanceOnConvert: boolean;
   /**
+   * The clearance nudge turns the velocity toward tangential instead of simply
+   * adding tangential speed, and never adds enough to unbind the ship.
+   *
+   * WHY. Adding tangential delta-v is the honest way to raise a periapsis and also
+   * a free energy injection, bounded only by `circSpeed(target) * 1.2` — about
+   * 283px/s, comparable to a whole orbit's speed. Sampled over bound dives it puts
+   * a ship at HALF its escape speed above escape: at r=120 and 151px/s it adds 277
+   * and leaves it doing 334 against an escape speed of 303. The capture then never
+   * reaches periapsis, coasts, and leaves the field. Reported as "I kind of shot
+   * off the planet at super speed", with the nearest body 349px behind the wreck.
+   *
+   * Turning at constant speed raises angular momentum, and therefore periapsis,
+   * for nothing — and cannot unbind by construction. It clears the target on its
+   * own in 94 of 144 sampled dives; beyond that it tops up under a cap, and what
+   * is still short the floor clamp catches. Riding the floor is expensive (note 18
+   * measured it destroying 44% of a ship's speed in one substep) but survivable,
+   * where being ejected from a capture is neither.
+   */
+  clearanceEnergyNeutral: boolean;
+  /**
    * Furthest a grab can reach. 0 is unlimited.
    *
    * Gravity in this simulation only exists during a capture, so without a limit
@@ -432,6 +452,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   backtrackLimit: 0,
   boundGrabsCapture: false,
   clearanceOnConvert: false,
+  clearanceEnergyNeutral: false,
   grabRange: 0,
   proceduralLayout: false,
   worldSeed: 0x5eed_1e55,
@@ -558,6 +579,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   holdClimbInCapture: true,
   boundGrabsCapture: true,
   clearanceOnConvert: true,
+  clearanceEnergyNeutral: true,
   grabRange: 560,
   proceduralLayout: true,
   bodySpacing: 280,
@@ -577,7 +599,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 14;
+export const SIM_VERSION = 15;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;
