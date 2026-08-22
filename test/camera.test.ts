@@ -18,7 +18,10 @@ import {
 } from '../src/render/camera.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { SPAWN, createBodies, fieldBounds } from '../src/sim/world.ts';
-import { DEFAULT_CONFIG } from '../src/sim/config.ts';
+import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
+import type { Camera } from '../src/render/camera.ts';
+import { backtrackFloorY } from '../src/sim/world.ts';
+import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 
 const rcfg = DEFAULT_RENDER_CONFIG;
 const field = fieldBounds(DEFAULT_CONFIG, createBodies(DEFAULT_CONFIG));
@@ -343,5 +346,104 @@ describe('the view stops at the trailing floor', () => {
     // exponential easing only asymptotes, so this settles at the line rather
     // than landing exactly on it
     expect(visibleWorldY(c).bottom).toBeCloseTo(floorY, 1);
+  });
+});
+
+/**
+ * What the camera watches, and which way it leans.
+ *
+ * All three of these are regressions that shipped or nearly shipped, so they are
+ * pinned as behaviour rather than left to the eye.
+ */
+describe('what the camera watches', () => {
+  function cam390(): Camera {
+    const c = createCamera(DEFAULT_RENDER_CONFIG);
+    fitCamera(c, { w: 390, h: 844, dpr: 2 });
+    return c;
+  }
+
+  it('holds still on the anchor through a capture instead of chasing the ship', () => {
+    // Reported as the view bouncing while orbiting. Measured on a real capture
+    // the ship travels 129px vertically per orbit with a ~0.6s period, against a
+    // camera lag of 0.33s — too slow to track it, and with no vertical deadzone
+    // to ignore it, so all it could do was smear.
+    const run = (anchored: boolean): number[] => {
+      const st = createInitialState(DEFAULT_CONFIG);
+      const cam = cam390();
+      const ys: number[] = [];
+      for (let i = 0; i < 700; i++) {
+        stepSim(
+          st,
+          DEFAULT_CONFIG,
+          { held: i >= 18, pressed: i === 18, released: false },
+          FIXED_DT,
+        );
+        const p = shipWorldPos(st);
+        const anchor = anchored && st.capture ? st.bodies[st.capture.planet]! : null;
+        followCamera(
+          cam,
+          DEFAULT_RENDER_CONFIG,
+          p.x,
+          p.y,
+          field,
+          backtrackFloorY(DEFAULT_CONFIG, st.highWaterY),
+          FIXED_DT,
+          anchor,
+          st.ship.vx,
+        );
+        if (i > 400 && st.capture?.phase === 'orbit') ys.push(cam.centerY);
+      }
+      return ys;
+    };
+    const spread = (v: number[]): number => Math.max(...v) - Math.min(...v);
+    expect(spread(run(false)), 'the ship-following case should wobble').toBeGreaterThan(30);
+    expect(spread(run(true))).toBeLessThan(0.5);
+  });
+
+  it('never shows dead space past a wall in ordinary play', () => {
+    // The anomaly work relaxed this clamp so the view could follow a ship out
+    // past the barrier — unconditionally, which also fired in ordinary play and
+    // panned up to 80px beyond the wall to show nothing. The relaxation is gated
+    // on the ship actually being outside; inside, the wall is a hard stop.
+    const cam = cam390();
+    for (const shipX of [400, 480, 540, 560, field.right]) {
+      cam.left = field.right - cam.designW;
+      const t = cameraTarget(cam, DEFAULT_RENDER_CONFIG, shipX, -1000, field, null, null, 0);
+      expect(t.left + cam.designW, `ship at ${shipX} panned past the wall`).toBeLessThanOrEqual(
+        field.right + 0.5,
+      );
+    }
+  });
+
+  it('leans the way the ship is going, so coming off a wall is not a dead second', () => {
+    // The deadzone parks the ship at whichever margin it last crossed, so leaving
+    // the right wall the view held completely still for 310px — over a second —
+    // before the ship reached the far margin. Reported as the camera lagging; it
+    // is not the smoothing, it is a deadzone with no idea which way you are going.
+    const wake = (look: number): number => {
+      const cam = cam390();
+      const rcfg = { ...DEFAULT_RENDER_CONFIG, cameraLookAhead: look };
+      cam.left = field.right - cam.designW;
+      const start = cam.left;
+      let x = 545;
+      for (let i = 0; i < 200; i++) {
+        x -= 300 * FIXED_DT;
+        followCamera(cam, rcfg, x, -1000, field, null, FIXED_DT, null, -300);
+        if (start - cam.left > 3) return i;
+      }
+      return 200;
+    };
+    expect(wake(0), 'the unbiased case should be the slow one').toBeGreaterThan(55);
+    expect(wake(DEFAULT_RENDER_CONFIG.cameraLookAhead)).toBeLessThan(wake(0));
+  });
+
+  it('does not lean during a capture, where velocity swings right round', () => {
+    // A captured ship's vx reverses every half orbit. Biasing on it would put
+    // back exactly the wobble the anchor is there to remove, on the other axis.
+    const cam = cam390();
+    const anchor = { x: 200, y: -1000 };
+    const a = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, anchor, 300);
+    const b = cameraTarget(cam, DEFAULT_RENDER_CONFIG, 200, -1000, field, null, anchor, -300);
+    expect(a.left).toBe(b.left);
   });
 });

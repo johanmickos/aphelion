@@ -8,7 +8,7 @@
  * compass did not show them.
  */
 import type { Body } from '../sim/types.ts';
-import { AIM_RANGE, readAim } from '../score/aim.ts';
+import { AIM_RANGE, ANOMALY_AIM_RANGE, readAim, readAnomalyAim } from '../score/aim.ts';
 import type { SimConfig } from '../sim/config.ts';
 import { orbitRadius, predictedCaptureOrbit } from '../sim/orbit.ts';
 import type { Camera } from './camera.ts';
@@ -157,6 +157,56 @@ export function drawCompass(
       cy + Math.sin(t.angle) * (ringR + 12) * s + 3 * s,
     );
   });
+
+  // The anomaly's ring: a fourth, outside the three, on its own scale.
+  //
+  // Its own scale because it is signposted from further than `AIM_RANGE`, so
+  // sharing the planets' sizing would peg it at the outermost radius and throw
+  // away the distance information the ring exists to carry. Purple, and always
+  // outermost, so it reads as a different KIND of destination rather than as a
+  // fourth planet — which is exactly what it is.
+  const anom = readAnomalyAim(orbit, rPeri, tighten, bodies, cap.planet, shipAng);
+  if (anom) {
+    const ringR =
+      gaugeR +
+      rcfg.compassRingInner +
+      rcfg.compassRingSpread * (1 + 0.35 * Math.min(1, anom.distance / ANOMALY_AIM_RANGE));
+    outermost = Math.max(outermost, ringR);
+
+    const dim = (anom.blocked ? 0.3 : 1) * fade;
+    const near = anom.align > 0.9 && !anom.blocked;
+    const pulse = near ? 0.6 + 0.4 * Math.sin(timeMs / 90) : 1;
+
+    ctx.setLineDash([5 * s, 5 * s]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringR * s, 0, TAU);
+    ctx.strokeStyle = `rgba(190,120,255,${0.16 * dim})`;
+    ctx.lineWidth = Math.max(1, s);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringR * s, anom.angle - 0.35, anom.angle + 0.35);
+    ctx.strokeStyle = `rgba(206,150,255,${(0.18 + 0.55 * anom.align) * dim})`;
+    ctx.lineWidth = (2 + 2.5 * anom.align) * s;
+    ctx.stroke();
+
+    const mx = cx + Math.cos(anom.angle) * ringR * s;
+    const my = cy + Math.sin(anom.angle) * ringR * s;
+    ctx.beginPath();
+    ctx.arc(mx, my, (near ? 5.5 : 4) * pulse * s, 0, TAU);
+    ctx.fillStyle = `rgba(214,164,255,${(0.75 + 0.25 * anom.align) * dim})`;
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(214,164,255,${0.9 * dim})`;
+    ctx.font = `${8 * s}px ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      anom.blocked ? `${anom.body.name} ✕` : anom.body.name,
+      cx + Math.cos(anom.angle) * (ringR + 12) * s,
+      cy + Math.sin(anom.angle) * (ringR + 12) * s + 3 * s,
+    );
+  }
 
   // The sweep: where the ship is, drawn across every ring so alignment with any
   // of them can be read at a glance.

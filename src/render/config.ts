@@ -16,6 +16,25 @@ export interface RenderConfig {
   cameraMarginFrac: number;
   /** Camera follow rate (exponential lerp coefficient). */
   cameraFollow: number;
+  /**
+   * How far ahead of the ship the view sits, as a fraction of the window width,
+   * at `cameraLookRefSpeed` and above.
+   *
+   * WHY. The horizontal deadzone parks the ship at whichever margin it last
+   * crossed, so travelling right you sit at the RIGHT margin and see mostly where
+   * you have been. Coming back off the right wall the camera then holds
+   * completely still for 288px — about a second — before the ship reaches the far
+   * margin and it finally moves. Reported as the camera lagging behind, and it is
+   * not the smoothing: it is a deadzone that has no idea which way you are going.
+   *
+   * This is NOT the "default the target to centred" fix the deadzone comment
+   * warns about. That one oscillates because the target is a function of the
+   * camera's own position, so correcting it changes it. This is a function of the
+   * ship's velocity, which the camera cannot influence, so there is no loop.
+   */
+  cameraLookAhead: number;
+  /** Speed at which the look-ahead reaches full extent. */
+  cameraLookRefSpeed: number;
 
   // --- starfield ---
   starCount: number;
@@ -94,6 +113,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   designW: 390,
   cameraMarginFrac: 0.22,
   cameraFollow: 3,
+  cameraLookAhead: 0.18,
+  cameraLookRefSpeed: 260,
 
   starCount: 160,
   starParallaxMin: 0.045,

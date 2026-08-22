@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
+import { createBodies } from '../src/sim/world.ts';
 import { grabTarget } from '../src/sim/capture.ts';
 import { hypot } from '../src/sim/orbit.ts';
 import { fingerprint } from '../src/sim/serialize.ts';
@@ -85,7 +86,7 @@ function play(
     if (released) held = false;
     stepSim(state, cfg, { held: held || pressed, pressed, released } as Input, FIXED_DT);
     if (score) {
-      const out = scoreTick(sc, state, cfg, scfg);
+      const out = scoreTick(sc, state, cfg, FIXED_DT, scfg);
       awards.push(...out.awards);
       shouts.push(...out.shouts);
     }
@@ -158,7 +159,7 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
     }
 
     stepSim(state, cfg, { held: held || pressed, pressed, released }, FIXED_DT);
-    const out = scoreTick(sc, state, cfg, scfg);
+    const out = scoreTick(sc, state, cfg, FIXED_DT, scfg);
     awards.push(...out.awards);
     shouts.push(...out.shouts);
     if (sc.score === 0 && prevScore > 0) lives.push(prevScore);
@@ -167,6 +168,16 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
   }
   return { score: sc, awards, shouts, state, lives };
 }
+
+/**
+ * The right-hand anomaly of the default field, read from the generator.
+ *
+ * `ANOMALY_PRESS` is the tick the ship above arrives within pressing range: it
+ * starts 520px out at 320px/s, so ~98 ticks covers 520px and the press lands
+ * with the anomaly close enough to convert rather than sail past.
+ */
+const ANOMALY = createBodies(DEFAULT_CONFIG).find((b) => b.kind === 'anomaly' && b.x > 195)!;
+const ANOMALY_PRESS = 88;
 
 /**
  * The sessions every weight is measured against.
@@ -216,6 +227,36 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
   },
   // never presses at all
   { name: 'never engages', edges: [], ticks: 3000 },
+  /**
+   * Out through the barrier to an anomaly, captured, then released.
+   *
+   * Here for the same reason the nerve grab above is: no other session can reach
+   * one, and without it all three `anomaly*` weights measure as inert — a blind
+   * spot in the fixture, not a dead weight. That failure mode has now bitten
+   * `fuelRegen` twice on the tune-panel twin of this test, so it is worth naming.
+   *
+   * The ship's line is derived from the field rather than written down, because a
+   * hardcoded position would silently stop reaching the anomaly the first time
+   * anything about placement moved, and the test would go quietly green while
+   * covering nothing. Aimed slightly off-centre so it captures rather than
+   * flying into the surface.
+   *
+   * It must also GET HOME and grab again, or `anomalyBonusMult` measures inert:
+   * a bonus that expires with nothing scored under it changes no outcome. The
+   * second press takes a corridor planet ~1.2s after the release, inside the
+   * window, so the multiplier addition is actually paid on something.
+   */
+  {
+    name: 'out to an anomaly and back',
+    ship: { x: ANOMALY.x - 520, y: ANOMALY.y - 70, vx: 320, vy: 0 },
+    edges: [
+      [ANOMALY_PRESS, 1],
+      [150, 0],
+      [220, 1],
+      [330, 0],
+    ],
+    ticks: 900,
+  },
 ];
 
 /**
@@ -736,11 +777,11 @@ describe('the reckless shout', () => {
       for (const d of deflections) {
         state.capture = capAt(d);
         state.tick = tick++;
-        shouts.push(...scoreTick(sc, state, cfg).shouts);
+        shouts.push(...scoreTick(sc, state, cfg, FIXED_DT).shouts);
       }
       state.capture = null;
       state.tick = tick++;
-      shouts.push(...scoreTick(sc, state, cfg).shouts);
+      shouts.push(...scoreTick(sc, state, cfg, FIXED_DT).shouts);
     };
 
     /**
@@ -767,11 +808,11 @@ describe('the reckless shout', () => {
       state.ship.vx = speed;
       state.ship.vy = 0;
       state.tick = tick++;
-      scoreTick(sc, state, cfg); // a drift tick, so `lastDrift` carries the speed
+      scoreTick(sc, state, cfg, FIXED_DT); // a drift tick, so `lastDrift` carries the speed
       state.ending.active = true;
       state.ending.reason = reason;
       state.tick = tick++;
-      shouts.push(...scoreTick(sc, state, cfg).shouts);
+      shouts.push(...scoreTick(sc, state, cfg, FIXED_DT).shouts);
       state.ending.active = false;
     };
 
@@ -966,7 +1007,7 @@ describe('the grab award lands at periapsis, not at the press', () => {
       if (released) held = false;
       stepSim(st, cfg, { held: held || pressed, pressed, released } as Input, FIXED_DT);
       if (freeze < 0 && st.capture?.passedPeri) freeze = t;
-      for (const a of scoreTick(sc, st, cfg).awards)
+      for (const a of scoreTick(sc, st, cfg, FIXED_DT).awards)
         if (a.kind === 'grab' && paid < 0) paid = a.tick;
     }
     expect(freeze, 'the capture never reached periapsis').toBeGreaterThan(240);

@@ -221,6 +221,13 @@ export function aimTargets(
   for (let i = 0; i < bodies.length; i++) {
     if (i === anchorIndex) continue;
     const b = bodies[i]!;
+    // Anomalies are signposted on their own channel, never as one of these.
+    // Letting one in here would displace a real planet from a reading capped at
+    // `AIM_MAX_TARGETS`, and this reading is not only what the compass draws — it
+    // is the quantity the aim score is paid on, and the aim thresholds in
+    // `praise.ts` are percentiles of measured aim scores. An anomaly in the field
+    // would silently re-scale ordinary play's aim.
+    if (b.kind === 'anomaly') continue;
     if (b.y >= anchor.y) continue; // not upward
     const d = hypot(b.x - anchor.x, b.y - anchor.y);
     if (d <= maxDistance) out.push({ body: b, index: i, distance: d });
@@ -273,4 +280,63 @@ export function readAim(
   }
 
   return { targets, best, bestTarget };
+}
+
+/**
+ * How far an anomaly is signposted from.
+ *
+ * Wider than `AIM_RANGE` on purpose. `bodySpacing` is 280, so this covers about
+ * three rows: you spot one while orbiting, may decline it and take a normal link,
+ * and can still commit from the next planet. That is what makes going a decision
+ * rather than a reflex — one row would mean a player already mid-settle when it
+ * appeared had no chance to react, for reasons that are not skill.
+ */
+export const ANOMALY_AIM_RANGE = 900;
+
+/**
+ * The nearest anomaly worth signposting from here, solved like any other release.
+ *
+ * SEPARATE from `readAim`, and that separation is the point. This file's rule is
+ * that one sweep feeds both the compass and the score, so a player can never be
+ * scored against something they were not shown. An anomaly is shown and NOT
+ * scored for aim — the safe direction of that rule, and the only one available:
+ * letting anomalies into `aimTargets` would displace a real planet from a reading
+ * capped at `AIM_MAX_TARGETS`, silently re-scaling the aim score of ordinary
+ * play and invalidating the percentile thresholds in `praise.ts`.
+ *
+ * The anomaly's reward is its capture, not its aim. Nothing here pays.
+ */
+export function readAnomalyAim(
+  orbit: Orbit,
+  rPeri: number,
+  tighten: number,
+  bodies: readonly Body[],
+  anchorIndex: number,
+  shipAng: number,
+  maxDistance: number = ANOMALY_AIM_RANGE,
+): AimTarget | null {
+  const anchor = bodies[anchorIndex];
+  if (!anchor || anchor.kind === 'anomaly') return null;
+
+  let found: { body: Body; index: number; distance: number } | null = null;
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i]!;
+    if (b.kind !== 'anomaly') continue;
+    const d = hypot(b.x - anchor.x, b.y - anchor.y);
+    if (d > maxDistance) continue;
+    if (!found || d < found.distance) found = { body: b, index: i, distance: d };
+  }
+  if (!found) return null;
+
+  const { angle } = releaseAngleFor(orbit, rPeri, tighten, anchor, found.body);
+  const error = normalizeAngle(shipAng - angle);
+  const rr = orbitRadius(orbit, rPeri, angle, tighten);
+  const from = { x: anchor.x + Math.cos(angle) * rr, y: anchor.y + Math.sin(angle) * rr };
+  return {
+    ...found,
+    angle,
+    error,
+    align: alignment(error),
+    blocked: pathBlocked(from, found.body, bodies, [anchor]),
+  };
 }

@@ -108,17 +108,57 @@ export function cameraTarget(
   shipY: number,
   field: { left: number; right: number; width: number },
   floorY: number | null,
+  /**
+   * What the view should sit on instead of the ship, while a capture holds one.
+   *
+   * See `anchorTarget` below for why a capture gets its own subject at all.
+   */
+  anchor: { x: number; y: number } | null = null,
+  /** Ship velocity, for the look-ahead. Zero disables it. */
+  shipVX = 0,
 ): { left: number; centerY: number } {
   const W = cam.designW;
   const margin = W * cfg.cameraMarginFrac;
 
+  // A capture is watched, not flown through: the anchor is still, the ship goes
+  // round it, and the compass — the thing actually being read — is drawn centred
+  // on the anchor. Following the ship instead put a 129px vertical oscillation
+  // through a 0.33s lag, which is over half its own 0.6s period: too slow to
+  // track and with no deadzone to ignore it, so all it could do was smear.
+  const subjX = anchor ? anchor.x : shipX;
+  const subjY = anchor ? anchor.y : shipY;
+
+  // Look where you are going, not where you have been. Only while drifting: a
+  // captured ship's velocity swings right round every orbit, and biasing on it
+  // would reintroduce exactly the wobble the anchor is here to remove.
+  const look = anchor
+    ? 0
+    : W *
+      cfg.cameraLookAhead *
+      Math.max(-1, Math.min(1, shipVX / Math.max(1, cfg.cameraLookRefSpeed)));
+  const want = subjX + look;
+
   let left = cam.left;
-  if (shipX - left > W - margin) left = shipX - (W - margin);
-  else if (shipX - left < margin) left = shipX - margin;
+  if (want - left > W - margin) left = want - (W - margin);
+  else if (want - left < margin) left = want - margin;
   left = Math.max(field.left, Math.min(field.right - W, left));
   if (field.width <= W) left = field.left;
+  // The clamp exists to avoid spending screen on dead space outside the field.
+  // A ship out at an anomaly is legitimately outside it, so that reason lapses —
+  // and honouring the clamp there would hold the view at the barrier while the
+  // ship flew off it, which is the one thing a camera must never do.
+  //
+  // GATED on the ship actually being outside, and that gate is load-bearing.
+  // Unconditional, it also fired in ordinary play whenever the ship came within
+  // a margin of a wall, panning the view up to 80px past the barrier to show dead
+  // space — which is precisely what the clamp exists to prevent. Measured on the
+  // SHIP and never on the anchor: it is the ship that must not leave the screen.
+  if (shipX < field.left || shipX > field.right) {
+    left = Math.min(left, shipX - margin);
+    left = Math.max(left, shipX - (W - margin));
+  }
 
-  return { left, centerY: clampToFloor(cam, shipY, floorY) };
+  return { left, centerY: clampToFloor(cam, subjY, floorY) };
 }
 
 /**
@@ -166,8 +206,10 @@ export function followCamera(
   field: { left: number; right: number; width: number },
   floorY: number | null,
   dt: number,
+  anchor: { x: number; y: number } | null = null,
+  shipVX = 0,
 ): void {
-  const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY);
+  const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY, anchor, shipVX);
   const k = Math.min(1, dt * cfg.cameraFollow);
   cam.left += (t.left - cam.left) * k;
   cam.centerY += (t.centerY - cam.centerY) * k;

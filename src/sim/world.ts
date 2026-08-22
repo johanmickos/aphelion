@@ -120,7 +120,62 @@ export function createBodies(cfg: SimConfig): Body[] {
     side = -side;
   }
 
-  return placed.map((b, i) => ({ kind: 'planet' as const, ...b, name: 'P' + (i + 1) }));
+  const bodies: Body[] = placed.map((b, i) => ({
+    kind: 'planet' as const,
+    ...b,
+    name: 'P' + (i + 1),
+  }));
+  return bodies.concat(placeAnomalies(cfg, rnd, placed));
+}
+
+/**
+ * Anomalies, out past the barrier on alternating sides.
+ *
+ * Placed AFTER the corridor and from the same `rnd`, so the field a seed
+ * produces is unchanged in every respect except the anomalies themselves — a
+ * seed's corridor is the same corridor whether `anomalyCount` is 0 or 3, which is
+ * what lets the two be compared.
+ *
+ * The y positions are spread evenly over the rows the generator actually built,
+ * with the bottom eighth skipped: an anomaly beside the opening bodies would ask
+ * for the commit before the player has a corridor rhythm to break away from.
+ */
+function placeAnomalies(
+  cfg: SimConfig,
+  rnd: () => number,
+  placed: ReadonlyArray<{ x: number; y: number; R: number }>,
+): Body[] {
+  if (cfg.anomalyCount <= 0 || placed.length === 0) return [];
+
+  const fw = DESIGN_W * cfg.fieldWidthFrac;
+  const cx = DESIGN_W * 0.5;
+  const wallL = cx - fw / 2;
+  const wallR = cx + fw / 2;
+
+  let topY = 0;
+  for (const b of placed) if (b.y < topY) topY = b.y;
+  const bottomY = placed[0]!.y;
+  const span = bottomY - topY;
+
+  const out: Body[] = [];
+  // Alternate sides so a run cannot present every anomaly on the same hand, and
+  // start the alternation from the seed so which hand comes first still varies.
+  let side = rnd() < 0.5 ? -1 : 1;
+  for (let i = 0; i < cfg.anomalyCount; i++) {
+    const t = 0.125 + ((i + 0.5) / cfg.anomalyCount) * 0.875;
+    const y = bottomY - span * t;
+    const x = side < 0 ? wallL - cfg.anomalyOffset : wallR + cfg.anomalyOffset;
+    out.push({
+      kind: 'anomaly',
+      x,
+      y,
+      R: 40 + rnd() * 16,
+      name: 'A' + (i + 1),
+      bubble: cfg.anomalyBubble,
+    });
+    side = -side;
+  }
+  return out;
 }
 
 /** Ship spawn, frozen from the prototype's `resetShip` at the design viewport. */
@@ -137,6 +192,30 @@ export interface FieldBounds {
   top: number;
   /** Beyond this (falling) the run ends. */
   bottom: number;
+}
+
+/**
+ * Is this point inside some anomaly's bubble?
+ *
+ * The whole anomaly mechanic, in one predicate. `stepSim` suspends the SIDE
+ * boundary — and only the side boundary — while this is true, which is what lets
+ * a well-aimed release coast through the barrier and back.
+ *
+ * Deliberately not applied to the top, bottom or the trailing floor. The side
+ * walls are the only boundary an anomaly sits beyond, and a bubble that
+ * suspended the others would open a hole with nothing on the far side of it: a
+ * ship exempted from every bound drifts forever in a straight line, because
+ * `driftAccel` is zero and nothing would ever catch it. Leaving the far side of
+ * the bubble must always be reachable and always be fatal.
+ */
+export function inAnomalyField(x: number, y: number, bodies: readonly Body[]): boolean {
+  for (const b of bodies) {
+    if (b.kind !== 'anomaly') continue;
+    const dx = x - b.x;
+    const dy = y - b.y;
+    if (dx * dx + dy * dy <= b.bubble * b.bubble) return true;
+  }
+  return false;
 }
 
 /**

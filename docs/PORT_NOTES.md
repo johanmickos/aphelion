@@ -970,6 +970,165 @@ t=4.0s and is fiction. The `findings` and the per-life quality averages are repl
 output — only the checkpoints and the award table are the session. This was known
 (note 15, and the recorder's own comment) and got believed anyway.
 
+### 31 — Anomalies: one predicate, not an alcove
+
+`src/sim/world.ts` · `src/sim/step.ts` · **[CHANGED]** · asked for directly
+
+A purple alien body sitting OUTSIDE the barrier. Aim a release at it, coast
+through the wall, capture it, and fling back carrying points and a temporary
+multiplier. Miss, and the wall is still there.
+
+**The design was three times larger before the right question was asked.** It
+started as a rectangular alcove: the field's side bound made y-dependent, the wall
+stepping out and back, `drawHazardZones` tracing a profile instead of a line, the
+camera clamp reading bounds at the ship's height, and a shield to survive a bad
+exit. Asked what the MINIMUM was that produced the same illusion, all of it
+collapsed into one clause:
+
+```js
+const outX =
+  (pos.x < fb.left - 4 || pos.x > fb.right + 4) &&
+  !inAnomalyField(pos.x, pos.y, state.bodies);
+```
+
+`fieldBounds` is untouched. An anomaly projects a circular bubble in which the
+side boundary is suspended, and that is the whole mechanic. The lesson worth
+keeping is that the feature was walls when the thing wanted was a hole.
+
+**Why only the side boundary.** `driftAccel` is zero: a ship exempted from every
+bound holds its `y`, so `outY` and the trailing floor never fire, and it drifts in
+a straight line forever with only a reset to escape — the shape of the floor-pin
+stall. Every bubble must therefore END, and outside it the boundary must bite.
+`test/anomaly.test.ts` flies that case rather than reasoning about it, and
+`test/world.test.ts` asserts it geometrically for all 64 swept seeds.
+
+**The load-bearing number is a relationship, not a value.** `anomalyBubble` 400
+against `anomalyOffset` 250 puts the rim 150px back INSIDE the corridor, so a ship
+crosses the barrier already protected. Smaller than the offset and the wall kills
+before the exemption starts, which reads as the mechanic simply not working — so
+the test asserts the overlap, not the numbers.
+
+**What it cost elsewhere, which was mostly tests.**
+
+- `Body` became a union, as `types.ts` always said it would. Exactly two sites
+  switch on `kind` and the compiler named both. An anomaly contacts exactly as a
+  planet does: what is special about it is the boundary it projects, not its
+  surface, and flying into one still kills.
+- `aimTargets` excludes anomalies. They are signposted on a fourth, purple ring of
+  their own, solved by `readAnomalyAim` at a wider 900px so it can be seen for
+  about three rows. Letting one into the normal reading would displace a real
+  planet from a list capped at `AIM_MAX_TARGETS` — and that reading is not only
+  what the compass draws, it is what the aim score is paid on, whose thresholds
+  are percentiles (note 27). An anomaly is shown and not scored for aim, which is
+  the safe direction of this file's rule.
+- **The camera could not show it.** `cameraTarget` clamped `left` to
+  `field.right - W`, making the rightmost world x it would ever render exactly the
+  barrier — an anomaly beyond it was permanently off-screen. The clamp exists to
+  avoid spending screen on dead space outside the field; a ship at an anomaly is
+  legitimately outside it, so the clamp now yields as far as keeping the ship in
+  frame requires.
+- `scoreTick` takes `dt`. The scorer owns a duration now, and `FIXED_DT` says of
+  itself that it is passed as a parameter and never read globally.
+- **Six world tests failed, all correctly.** They analyse the body list AS the
+  corridor — how it weaves, forks, spaces its rows, stays inside the playfield —
+  and an anomaly is deliberately none of those things. Scoped to planets, with a
+  separate block asserting what IS true of anomalies, including that a seed's
+  corridor is bit-identical with `anomalyCount` at 0. Without that last one the
+  two cannot be compared and turning anomalies off would silently be a different
+  game.
+- `anomalyBonus` and then `anomalyBonusMult` measured as dead weights, because no
+  session in `test/score.test.ts` reached an anomaly and then got home to score
+  under the window. Same blind spot as `fuelRegen` in note 28, third time in two
+  days: **when a weight measures inert, suspect the fixture before the weight.**
+  The new session derives its line from the generator rather than hardcoding a
+  position, so it cannot quietly stop reaching the anomaly and go green covering
+  nothing.
+
+**The reward adds ON TOP of the streak ceiling** — `min(streakMax, 1 + step *
+streak) + bonus`, never inside the `min`. Inside it the bonus does literally
+nothing to a maxed streak, which is precisely the player who earned the right to
+go and fetch it. Note 30 measured that ceiling being reached at link 17 and held
+for the last nine of a good run, paying nothing more and costing everything to
+lose; this is the thing to climb toward that the dead spot was missing. The window
+starts at the RELEASE, not the grab, so the 1.5-2s of settling and aiming does not
+burn a fifth of it inside an orbit going nowhere.
+
+The multiplier readout turns purple while it runs, because `heat` saturates at
+`streakMax` — a boosted x7 and an unboosted x5 were otherwise the same colour on
+the only gauge that shows it. That is a state, not a rarity, so it stays out of
+the accolade ladder.
+
+**Known-open, deliberately.** Leaving the bubble is fatal in both directions, so a
+release aimed the wrong way out of an anomaly kills a player who just flew the
+hardest thing in the game. The exit is meant to be easy and is not yet: the return
+leg is served by the existing compass, which does find corridor bodies from an
+anomaly anchor, but the ship dies before reaching them on most release angles.
+Measured, not guessed — and left for the next pass at the author's direction.
+
+### 32 — `app/` was never typechecked, and a camera watched the wrong thing
+
+`tsconfig.json` · `src/render/camera.ts` · **[CHANGED]** · reported as "my first
+press seems to freeze the ship entirely"
+
+**The freeze was an undefined variable in `app/main.ts`**, referencing a `bodies`
+that does not exist in that scope. It threw inside `render()` on the first frame
+where `snap.capture` was truthy — the first press — and killed the render loop.
+
+`pnpm typecheck` was green. `tsconfig.json` included `src`, `test`, `tools` and
+`*.ts`, and **not `app`** — the entry point of the actual game, and the only file
+that wires the simulation, the scorer and the renderer together. Everything the
+type system is for was switched off in exactly the place where three layers meet.
+`app` is in `include` now, which needed only `vite/client` added to `types`
+alongside it. One line of config bought back a whole file.
+
+The lesson is not "check names". It is that a green typecheck was evidence about
+a set of files nobody had checked the membership of, and the tests could not
+cover it either: they call `scene.draw` directly, so nothing in the suite has ever
+executed `main.ts`.
+
+**The camera followed the ship through a capture, which is the wrong subject.**
+Measured on the reported session's 16.9-second anomaly orbit: the ship travels
+129px vertically per orbit — 15% of the window — with a direction change every
+0.6s, against a camera lag of 0.33s. Over half the oscillation's own period. Too
+slow to track it and, unlike the horizontal axis, with no deadzone to ignore it,
+so the only thing it could do was smear.
+
+A capture is watched, not flown through: the anchor is still, the ship goes round
+it, and the compass — the thing actually being read — is drawn centred on the
+anchor. Following the anchor takes the camera's vertical travel from 61px to
+**0.0px** on a scenario capture. The ship then visibly orbits a fixed point,
+which is what is actually happening.
+
+**And it leaned the wrong way.** The horizontal deadzone parks the ship at
+whichever margin it last crossed, so travelling right you sit at the right margin
+and see mostly where you have been. Coming off the right wall the view then held
+completely still for 310px — 1.02s — before the ship reached the far margin.
+Reported as the camera lagging, and it is not the smoothing: it is a deadzone with
+no idea which way you are going. `cameraLookAhead` biases the target by the ship's
+velocity, taking that dead stretch to 240px / 0.78s.
+
+That is NOT the fix the deadzone's own comment warns about. "Default the target to
+centred" oscillates because the target is a function of the camera's position, so
+correcting it changes it. This is a function of the ship's velocity, which the
+camera cannot influence, so there is no loop. It is disabled during a capture,
+where vx reverses every half orbit and would put the wobble straight back on the
+other axis.
+
+**A regression from note 31, caught while measuring this.** The clamp relaxation
+that lets the view follow a ship out past the barrier was unconditional, so it
+also fired in ordinary play whenever the ship came within a margin of a wall —
+panning up to 80px beyond the barrier to show dead space, which is precisely what
+the clamp exists to prevent. Gated on the ship actually being outside the field.
+All three are pinned in `test/camera.test.ts` as behaviour, not left to the eye.
+
+**The bonus was invisible for a reason the presentation could not fix.** In the
+reported session the anomaly was captured at t4869 and released at t5881, and the
+recording ended at t5941 — **1.0s into a 10s window, with zero awards scored under
+it**. The window is now shown as well as coloured: the multiplier readout grows
+from 12px to 17px and a purple bar drains beside it, because a colour cannot say
+how long is left and ten seconds is long enough for "is it still running?" to be
+a real question mid-flight.
+
 ---
 
 ## Tuning vs. fidelity
@@ -997,8 +1156,8 @@ golden baseline               golden/physics-v1.json
 tests    port-equality 11 · invariants 32 · render 79 · camera 34
          diagnostics 25 · backtrack 15 · world 14 · tune 7 · clearance 6
          score 60 · input 8 · grab-target 8 · link-fuel 6
-         boost-envelope 6 · flyby-fuel 10
-         321 total
+         boost-envelope 6 · flyby-fuel 10 · anomaly 8
+         339 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

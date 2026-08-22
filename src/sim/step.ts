@@ -18,7 +18,7 @@ import { applyClearance, beginCapture, freezeOrbit, releaseCapture } from './cap
 import { contactPolicy, reflectCoefficient } from './contact.ts';
 import { boostEnvelope } from './boost.ts';
 import { burn, regen } from './fuel.ts';
-import { backtrackFloorY, createBodies, fieldBounds, SPAWN } from './world.ts';
+import { backtrackFloorY, createBodies, fieldBounds, inAnomalyField, SPAWN } from './world.ts';
 
 /** A fresh run. Deterministic: same config in, same state out. */
 export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
@@ -161,7 +161,12 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
     return;
   }
 
-  const outX = pos.x < fb.left - 4 || pos.x > fb.right + 4;
+  // The side boundary is suspended inside an anomaly's bubble, which is what a
+  // release aimed past the barrier is flying through. Nothing else is suspended:
+  // leaving the far side of the bubble puts the ship back outside `fb.right` on
+  // the very next tick and ends the run, which is the miss.
+  const outX =
+    (pos.x < fb.left - 4 || pos.x > fb.right + 4) && !inAnomalyField(pos.x, pos.y, state.bodies);
   const outY = pos.y > fb.bottom || pos.y < fb.top;
   if (outX || outY) {
     // Hold on the boundary the way an impact does, so leaving the field reads as

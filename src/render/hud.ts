@@ -430,11 +430,38 @@ export function drawScore(
   if (score.multiplier > 1) {
     // Warms toward the ceiling, so a streak reads as heat rather than as a number
     // you have to compare against a maximum you cannot see.
+    //
+    // Purple while an anomaly bonus is running, because `heat` SATURATES at the
+    // streak ceiling: the bonus adds on top of that cap, so without this the one
+    // gauge that shows the multiplier would show a boosted x7 and an unboosted x5
+    // in exactly the same colour. The colour is a state — bonus live — not a
+    // rarity, so it stays out of the accolade ladder.
     const heat = Math.min(1, (score.multiplier - 1) / 4);
-    const col = lerpColor([120, 210, 255], [255, 170, 60], heat);
-    ctx.font = `600 ${12 * s}px ui-monospace, monospace`;
+    const col = score.bonusActive
+      ? [206, 150, 255]
+      : lerpColor([120, 210, 255], [255, 170, 60], heat);
+    // Bigger while boosted, not only recoloured. Reported as "the bonus and
+    // multiplier weren't very obvious": a 12px readout that changes hue is easy
+    // to miss on a phone in the middle of flying, and the boost is the largest
+    // thing that has ever happened to this number.
+    const size = score.bonusActive ? 17 : 12;
+    ctx.font = `600 ${size * s}px ui-monospace, monospace`;
     ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
-    ctx.fillText(`x${score.multiplier.toFixed(2)}`, cx, cam.offsetY + SCORE.multY * s);
+    const multY = cam.offsetY + SCORE.multY * s;
+    ctx.fillText(`x${score.multiplier.toFixed(2)}`, cx, multY);
+
+    if (score.bonusActive) {
+      // A draining bar, because the window is the part of the reward the player
+      // has to ACT on and a colour cannot say how long is left. Ten seconds is
+      // long enough that "is it still running?" is a real question mid-flight.
+      const w = 64 * s;
+      const h = 3 * s;
+      const y = multY + 5 * s;
+      ctx.fillStyle = 'rgba(206,150,255,.22)';
+      ctx.fillRect(cx - w / 2, y, w, h);
+      ctx.fillStyle = 'rgba(214,164,255,.9)';
+      ctx.fillRect(cx - w / 2, y, w * score.bonusFrac, h);
+    }
   }
 
   const a = score.lastAward;

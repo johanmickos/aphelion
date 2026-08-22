@@ -246,7 +246,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // Popups are raised here, on the tick the award lands, and read the ship's
     // position at that instant — after a release that is the point it let go
     // from, which is exactly the act being praised.
-    const scored = scoreTick(score, state, sim);
+    const scored = scoreTick(score, state, sim, dt);
     // Recorded as well as shown. A replay recomputes these, but only while it is
     // still reproducing the run — and past a divergence it recomputes a different
     // session's. These are what the player was actually paid.
@@ -280,7 +280,19 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
   },
   render(alpha, frameDt) {
     const snap = lerpSnapshot(prev, curr, alpha);
-    followCamera(cam, rcfg, snap.x, snap.y, field, backtrackFloorY(sim, snap.highWaterY), frameDt);
+    // A capture is watched around its anchor; a drift is flown, and looks ahead.
+    const held = snap.capture ? (state.bodies[snap.capture.planet] ?? null) : null;
+    followCamera(
+      cam,
+      rcfg,
+      snap.x,
+      snap.y,
+      field,
+      backtrackFloorY(sim, snap.highWaterY),
+      frameDt,
+      held,
+      snap.vx,
+    );
     scene.draw(ctx, cam, snap, {
       timeMs: performance.now(),
       paused,

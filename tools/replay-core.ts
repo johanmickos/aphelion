@@ -131,7 +131,7 @@ export function replayReport(report: DiagReport): Analysis {
     if (released) held = false;
     const input: Input = { held: held || pressed, pressed, released };
     stepSim(state, cfg, input, report.dt);
-    const scored = scoreTick(score, state, cfg);
+    const scored = scoreTick(score, state, cfg, report.dt);
     awards.push(...scored.awards);
     shouts.push(...scored.shouts);
 

@@ -8,11 +8,12 @@
  * single-seed versions of these assertions could not tell the difference.
  */
 import { describe, expect, it } from 'vitest';
-import { createBodies, fieldBounds, DESIGN_W } from '../src/sim/world.ts';
+import { createBodies, fieldBounds, inAnomalyField, DESIGN_W } from '../src/sim/world.ts';
 import { DEFAULT_CONFIG, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { mulberry32 } from '../src/sim/rng.ts';
 import { hypot } from '../src/sim/orbit.ts';
+import type { Anomaly } from '../src/sim/types.ts';
 
 /**
  * The seeds every geometric property is checked against.
@@ -33,13 +34,32 @@ const SEEDS: readonly number[] = (() => {
   return out;
 })();
 
-/** Every swept field, as `[label, config, bodies]`. */
+/**
+ * Every swept field, as `[label, config, corridor]`.
+ *
+ * **Planets only.** Every property below is a statement about the CORRIDOR — how
+ * it weaves, how it forks, how far apart its rows sit, that it stays inside the
+ * playfield. An anomaly is deliberately none of those things: it sits outside the
+ * barrier, off the weave, at no row. Left in the list it reads as a malformed row
+ * and fails six of these for being exactly what it is meant to be. Anomalies get
+ * their own assertions further down, about the things that ARE true of them.
+ */
 const FIELDS: ReadonlyArray<[string, SimConfig, ReturnType<typeof createBodies>]> = SEEDS.map(
   (seed) => {
     const cfg: SimConfig = { ...DEFAULT_CONFIG, worldSeed: seed };
-    return [`seed ${seed.toString(16)}`, cfg, createBodies(cfg)];
+    return [`seed ${seed.toString(16)}`, cfg, createBodies(cfg).filter((b) => b.kind === 'planet')];
   },
 );
+
+/** Every swept field's anomalies, as `[label, config, anomalies]`. */
+const ANOMALY_FIELDS: ReadonlyArray<[string, SimConfig, Anomaly[]]> = SEEDS.map((seed) => {
+  const cfg: SimConfig = { ...DEFAULT_CONFIG, worldSeed: seed };
+  return [
+    `seed ${seed.toString(16)}`,
+    cfg,
+    createBodies(cfg).filter((b): b is Anomaly => b.kind === 'anomaly'),
+  ];
+});
 
 /**
  * The field grouped into rows. A forked row holds two bodies at nearly the same
@@ -249,6 +269,113 @@ describe('world generation', () => {
     const top = (bs: ReturnType<typeof createBodies>) => Math.min(...bs.map((b) => b.y));
     for (const [label, , bodies] of FIELDS) {
       expect(top(bodies), label).toBeLessThan(top(short) * 1.7);
+    }
+  });
+});
+
+/**
+ * Anomalies: the things that ARE true of a body placed outside the corridor.
+ *
+ * The corridor sweep above deliberately excludes them, so without this block they
+ * would be generated and never checked at all.
+ */
+describe('anomalies', () => {
+  it('places the configured number, on alternating sides', () => {
+    for (const [label, cfg, anomalies] of ANOMALY_FIELDS) {
+      expect(anomalies, label).toHaveLength(cfg.anomalyCount);
+      const cx = DESIGN_W * 0.5;
+      for (let i = 1; i < anomalies.length; i++) {
+        const prev = Math.sign(anomalies[i - 1]!.x - cx);
+        const here = Math.sign(anomalies[i]!.x - cx);
+        expect(here, `${label}: ${anomalies[i]!.name} repeats a side`).toBe(-prev);
+      }
+    }
+  });
+
+  it('sits outside the barrier, which is the entire point', () => {
+    // Inside the corridor an anomaly is just an oddly-coloured planet and the
+    // barrier crossing — the whole feeling — never happens.
+    for (const [label, cfg, anomalies] of ANOMALY_FIELDS) {
+      const fb = fieldBounds(cfg, createBodies(cfg));
+      for (const a of anomalies) {
+        const outside = a.x < fb.left || a.x > fb.right;
+        expect(outside, `${label}: ${a.name} is inside the corridor`).toBe(true);
+      }
+    }
+  });
+
+  it('projects a bubble that reaches back inside the barrier', () => {
+    // The load-bearing relationship between `anomalyBubble` and `anomalyOffset`.
+    // If the bubble does not overlap the wall, the wall kills the ship before the
+    // exemption starts and the mechanic simply does not work. Asserted as a real
+    // margin rather than as mere contact, so a ship crosses already protected.
+    for (const [label, cfg, anomalies] of ANOMALY_FIELDS) {
+      const fb = fieldBounds(cfg, createBodies(cfg));
+      for (const a of anomalies) {
+        const wall = a.x < 0 ? fb.left : fb.right;
+        expect(
+          inAnomalyField(wall, a.y, [a]),
+          `${label}: ${a.name}'s bubble does not reach its barrier`,
+        ).toBe(true);
+        const reach = a.bubble - Math.abs(a.x - wall);
+        expect(
+          reach,
+          `${label}: ${a.name} only reaches ${reach.toFixed(0)}px inside`,
+        ).toBeGreaterThan(100);
+      }
+    }
+  });
+
+  it('leaves the far side of every bubble reachable and fatal', () => {
+    // The soft-lock guard. `driftAccel` is zero, so a ship exempted from a bound
+    // with nothing beyond it flies straight forever and only a reset escapes.
+    // Every bubble must therefore END, and outside it the boundary must bite.
+    for (const [label, cfg, anomalies] of ANOMALY_FIELDS) {
+      const all = createBodies(cfg);
+      const fb = fieldBounds(cfg, all);
+      for (const a of anomalies) {
+        const outward = a.x < 0 ? -1 : 1;
+        const beyond = a.x + outward * (a.bubble + 1);
+        expect(
+          inAnomalyField(beyond, a.y, all),
+          `${label}: ${a.name}'s bubble has no far side`,
+        ).toBe(false);
+        const dead = beyond < fb.left - 4 || beyond > fb.right + 4;
+        expect(dead, `${label}: past ${a.name}'s bubble is still in bounds`).toBe(true);
+      }
+    }
+  });
+
+  it('never overlaps a planet, or another anomaly', () => {
+    for (const [label, , all] of SEEDS.map(
+      (seed) =>
+        [
+          `seed ${seed.toString(16)}`,
+          seed,
+          createBodies({ ...DEFAULT_CONFIG, worldSeed: seed }),
+        ] as const,
+    )) {
+      const anomalies = all.filter((b) => b.kind === 'anomaly');
+      for (const a of anomalies) {
+        for (const b of all) {
+          if (b === a) continue;
+          const d = Math.hypot(b.x - a.x, b.y - a.y);
+          expect(d, `${label}: ${a.name} overlaps ${b.name}`).toBeGreaterThan(a.R + b.R + 24);
+        }
+      }
+    }
+  });
+
+  it('generates the same corridor whether or not anomalies are on', () => {
+    // Anomalies are drawn from the shared `rnd` AFTER the corridor, so a seed's
+    // corridor must be identical with them off. Without this the two cannot be
+    // compared, and turning them off would silently be a different game.
+    for (const seed of SEEDS.slice(0, 12)) {
+      const on = createBodies({ ...DEFAULT_CONFIG, worldSeed: seed }).filter(
+        (b) => b.kind === 'planet',
+      );
+      const off = createBodies({ ...DEFAULT_CONFIG, worldSeed: seed, anomalyCount: 0 });
+      expect(off, `seed ${seed.toString(16)}`).toEqual(on);
     }
   });
 });

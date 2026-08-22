@@ -22,7 +22,33 @@ export interface Planet {
   name: string;
 }
 
-export type Body = Planet;
+/**
+ * An anomaly: an alien body sitting OUTSIDE the corridor, past the barrier.
+ *
+ * It is a normal gravitating body in every respect the simulation cares about —
+ * captured by the same code, orbited by the same phase clock, contacted by the
+ * same policy. The only thing that makes it special is `bubble`.
+ *
+ * The bubble is a radius within which the field's side boundary does not kill.
+ * That single exemption is the whole mechanic: it is what lets a well-aimed
+ * release coast THROUGH the barrier, and what kills a badly-aimed one the moment
+ * it drifts out the far side. The barrier itself never moves — `fieldBounds` is
+ * untouched — so ordinary play is unaffected everywhere the bubble does not
+ * reach, and the protection cannot leak to the opposite wall because the two are
+ * further apart than any bubble is wide.
+ */
+export interface Anomaly {
+  kind: 'anomaly';
+  x: number;
+  y: number;
+  /** Surface radius. */
+  R: number;
+  name: string;
+  /** Radius within which the side boundary is suspended. */
+  bubble: number;
+}
+
+export type Body = Planet | Anomaly;
 
 // -------------------------------------------------------------------- contact
 

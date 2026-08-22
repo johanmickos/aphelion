@@ -37,7 +37,11 @@ export function contactPolicy(
   effects: Effects = {},
 ): ContactResponse {
   switch (body.kind) {
+    // An anomaly contacts exactly as a planet does. It is deliberately NOT a
+    // softer or safer body: what makes it special is the boundary exemption it
+    // projects, not its surface. Flying into one still kills.
     case 'planet':
+    case 'anomaly':
       switch (site) {
         case 'capture-anchor':
           return { kind: 'bounce', offset: cfg.minOrbitGap, restitution: 0, lethal: false };

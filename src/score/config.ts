@@ -108,6 +108,40 @@ export interface ScoreConfig {
    * construction.
    */
   streakMax: number;
+  /**
+   * Raw points for capturing an anomaly, before the multiplier.
+   *
+   * Sized against a link's ~300-400 raw so the capture lands as two or three
+   * links' worth: at a maxed streak that is around 4000, a visible number at the
+   * moment of greatest tension. Deliberately not larger. The ten-second window is
+   * meant to be the prize, and a flat award big enough to dominate would turn a
+   * run's score into a count of anomalies found rather than a measure of how well
+   * it was flown.
+   */
+  anomalyBonus: number;
+  /**
+   * Added to the multiplier while an anomaly bonus is running, ON TOP of
+   * `streakMax` — see `multiplierFor`.
+   *
+   * At a maxed streak this is x5 -> x7 for the window's duration, worth roughly
+   * 2500-3000 across the four links it covers. Set against dying and losing a
+   * 16-link streak, that is the arithmetic that has to make going worth it.
+   */
+  anomalyBonusMult: number;
+  /**
+   * Seconds the bonus runs, starting at the RELEASE from the anomaly.
+   *
+   * From the release and not the grab because converting the flyby, settling and
+   * waiting for a release angle costs 1.5-2s that would otherwise burn a fifth of
+   * the window inside an orbit going nowhere — and would mean holding a tighter,
+   * better orbit actively cost bonus time. Starting at the release makes the
+   * number here the number the player experiences.
+   *
+   * This is a weight, not a constant: it multiplies how many links the bonus is
+   * paid on, so it changes what the bonus is worth and belongs with the rest of
+   * them. See the note on `ScoreConfig` about what does and does not live here.
+   */
+  anomalyBonusSecs: number;
 }
 
 /**
@@ -158,4 +192,7 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
 
   streakStep: 0.25,
   streakMax: 5,
+  anomalyBonus: 800,
+  anomalyBonusMult: 2,
+  anomalyBonusSecs: 10,
 } satisfies ScoreConfig);

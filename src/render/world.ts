@@ -115,6 +115,8 @@ export class BodyRenderer {
     bodies: readonly Body[],
     /** Index of the body currently holding the ship, if any. */
     anchorIndex = -1,
+    /** Wall clock, for the anomaly pulse only. Nothing here feeds the sim. */
+    timeMs = 0,
   ): void {
     if (cam.scale !== this.cacheScale) {
       this.cache = new Map();
@@ -129,6 +131,9 @@ export class BodyRenderer {
       switch (b.kind) {
         case 'planet':
           this.drawPlanet(ctx, cam, sim, b, i === anchorIndex);
+          break;
+        case 'anomaly':
+          drawAnomaly(ctx, cam, sim, b, i === anchorIndex, timeMs);
           break;
       }
     }
@@ -196,4 +201,83 @@ export class BodyRenderer {
     ctx.fillText(p.name, x, y);
     ctx.textBaseline = 'alphabetic';
   }
+}
+
+/**
+ * An anomaly and the bubble it projects.
+ *
+ * The bubble is drawn because it is a BOUNDARY, and the same lesson applies that
+ * `drawHazardZones` records: a limit the player cannot see is a limit they cannot
+ * play against. Its edge is where the side barrier resumes and the run ends, so
+ * it gets a hard line exactly like the red one does.
+ *
+ * The gradient runs the other way round from the hazard band, though, and
+ * deliberately: there the danger is OUTSIDE a line you approach, so the warning
+ * builds toward it. Here the safety is INSIDE, so the fill is densest at the
+ * anomaly and fades to nothing at the rim — it reads as a pocket of shelter you
+ * are inside of rather than a wall you are heading for.
+ */
+function drawAnomaly(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  sim: SimConfig,
+  a: Extract<Body, { kind: 'anomaly' }>,
+  held: boolean,
+  timeMs: number,
+): void {
+  const x = toScreenX(cam, a.x);
+  const y = toScreenY(cam, a.y);
+  const s = cam.scale;
+  const bubble = a.bubble * s;
+
+  ctx.save();
+
+  // The shelter, densest at the centre and gone by the rim.
+  const g = ctx.createRadialGradient(x, y, 0, x, y, bubble);
+  g.addColorStop(0, 'rgba(168,92,255,.20)');
+  g.addColorStop(0.55, 'rgba(140,70,230,.09)');
+  g.addColorStop(1, 'rgba(120,60,210,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, bubble, 0, Math.PI * 2);
+  ctx.fill();
+
+  // The rim: the exact line the run ends at, drawn like the barrier it replaces.
+  ctx.setLineDash([6 * s, 6 * s]);
+  ctx.strokeStyle = 'rgba(190,120,255,.42)';
+  ctx.lineWidth = Math.max(1, 1.5 * s);
+  ctx.beginPath();
+  ctx.arc(x, y, bubble, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Minimum-orbit ring, same as a planet's — it is captured by the same code and
+  // clamped to the same limit, so it must advertise the same limit.
+  ctx.beginPath();
+  ctx.arc(x, y, (a.R + sim.minOrbitGap) * s, 0, Math.PI * 2);
+  ctx.strokeStyle = held ? 'rgba(225,180,255,.55)' : 'rgba(180,130,235,.28)';
+  ctx.lineWidth = Math.max(1, s) * (held ? 1.4 : 1);
+  ctx.stroke();
+
+  // The body. A slow breath so it reads as alive rather than as scenery, and
+  // slow enough not to compete with the boost halo's pulse.
+  const pulse = 0.5 + 0.5 * Math.sin(timeMs / 620);
+  const r = a.R * s;
+  const body = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+  body.addColorStop(0, `rgba(226,178,255,${0.95 - 0.12 * pulse})`);
+  body.addColorStop(0.6, 'rgba(150,70,220,.95)');
+  body.addColorStop(1, 'rgba(74,26,120,.95)');
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Corona, breathing opposite the surface so the whole thing never goes flat.
+  ctx.strokeStyle = `rgba(206,150,255,${0.25 + 0.3 * pulse})`;
+  ctx.lineWidth = Math.max(1, 2 * s);
+  ctx.beginPath();
+  ctx.arc(x, y, r + 5 * s, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
 }

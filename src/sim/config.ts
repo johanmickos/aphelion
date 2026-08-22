@@ -202,6 +202,40 @@ export interface SimConfig {
   /** How many bodies the field holds. */
   bodyCount: number;
   /**
+   * How many anomalies the field holds, on top of `bodyCount`. 0 disables them
+   * entirely, which is what keeps the equality gate at zero — there is no
+   * separate flag because a field with no anomalies in it is the off state.
+   *
+   * 3 over the ~43 rows a full field holds. A life reaches 29-48% of the climb,
+   * so that is about one encounter a life and occasionally two: rare enough to
+   * stay an event, common enough that the window, the bonus and the bubble can
+   * actually be tuned against real play rather than against one sighting.
+   */
+  anomalyCount: number;
+  /**
+   * How far BEYOND the side boundary an anomaly's centre sits.
+   *
+   * The point is that it is outside the world. Inside the corridor it would just
+   * be an oddly-coloured planet, and the barrier crossing — which is the whole
+   * feeling — would not happen.
+   */
+  anomalyOffset: number;
+  /**
+   * Radius of the bubble in which the side boundary does not kill.
+   *
+   * Sized against `anomalyOffset` rather than chosen freely, and the relationship
+   * is what matters: at 400 against an offset of 250 the bubble reaches 150px
+   * back INSIDE the corridor, so a ship crosses the barrier already protected and
+   * the transition is never a surprise. Make it smaller than the offset and the
+   * barrier kills you before the exemption starts, which reads as the mechanic
+   * being broken.
+   *
+   * It is also the miss window: at a release speed near 300px/s it buys about
+   * 1.3s of flight past the anomaly before the far edge, which is long enough to
+   * see the mistake arrive and short enough to be clearly over.
+   */
+  anomalyBubble: number;
+  /**
    * How far below the highest point reached a run may fall before it ends.
    * 0 disables it entirely.
    */
@@ -355,6 +389,9 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
 
   fieldWidthFrac: 1.2,
   bodyCount: 8,
+  anomalyCount: 0,
+  anomalyOffset: 250,
+  anomalyBubble: 400,
   backtrackLimit: 0,
   boundGrabsCapture: false,
   clearanceOnConvert: false,
@@ -479,6 +516,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   linkFuelReward: 20,
   fieldWidthFrac: 1.9,
   bodyCount: 60,
+  anomalyCount: 3,
   backtrackLimit: 700,
   holdClimbInCapture: true,
   boundGrabsCapture: true,
@@ -502,7 +540,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 12;
+export const SIM_VERSION = 13;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

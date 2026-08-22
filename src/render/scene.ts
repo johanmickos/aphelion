@@ -80,7 +80,14 @@ export class Scene {
     this.stars.draw(ctx, cam, render);
     drawHazardZones(ctx, cam, render, field);
     drawBacktrackFloor(ctx, cam, sim, render, snap.highWaterY);
-    this.bodyRenderer.draw(ctx, cam, sim, bodies, snap.capture ? snap.capture.planet : -1);
+    this.bodyRenderer.draw(
+      ctx,
+      cam,
+      sim,
+      bodies,
+      snap.capture ? snap.capture.planet : -1,
+      opts.timeMs,
+    );
 
     const cap = snap.capture;
     if (cap) {
