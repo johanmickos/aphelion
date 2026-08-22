@@ -67,6 +67,12 @@ export interface Camera {
    */
   anchorX: number;
   anchorY: number;
+  /**
+   * Which body that is, so a DIFFERENT one cannot be adopted while the old still
+   * has weight. Identity rather than position, because comparing coordinates
+   * would start lying the day a body moves. -1 when there is none.
+   */
+  anchorId: number;
 }
 
 export function createCamera(cfg: RenderConfig): Camera {
@@ -76,6 +82,7 @@ export function createCamera(cfg: RenderConfig): Camera {
     anchorW: 0,
     anchorX: 0,
     anchorY: 0,
+    anchorId: -1,
     offsetY: 0,
     left: 0,
     centerY: 0,
@@ -362,6 +369,7 @@ export function centerCamera(
   cam.anchorW = 0;
   cam.anchorX = shipX;
   cam.anchorY = shipY;
+  cam.anchorId = -1;
 }
 
 /** Ease the camera toward its target. Render-only; never observed by the sim. */
@@ -378,7 +386,7 @@ export function followCamera(
    *
    * `lock` is 0 through the dive and 1 in a true orbit — see `orbitLock`.
    */
-  anchor: { x: number; y: number; lock: number } | null = null,
+  anchor: { x: number; y: number; lock: number; id: number } | null = null,
   shipVX = 0,
   /** The orbit is frozen — see `cameraTarget`'s parameter of the same name. */
   frozen = false,
@@ -389,11 +397,30 @@ export function followCamera(
   // capture ends so the weight has something to decay away from. Dropping the
   // position with the capture would snap the subject back to the ship by a whole
   // orbit radius on the release tick, which is the jump this exists to avoid.
-  if (anchor) {
+  //
+  // A DIFFERENT body cannot be adopted while the old one still has weight. The
+  // subject is `ship + (anchor - ship) * w`, so swapping the anchor under a
+  // non-zero `w` moves the subject by the distance between the two bodies times
+  // that weight — instantly, because only the weight eases and the position does
+  // not. Measured on the session that reported it: leaving an anomaly, still
+  // inside its bubble, the approach lean was holding weight 0.43 when a press
+  // took a planet 500px away, and the view moved 6846px/s on that single tick.
+  // Reported as the return to the field feeling abrupt.
+  //
+  // Before the lean existed this could not happen — there was no anchor while
+  // drifting, so every press started from zero. So the fix belongs with the lean:
+  // let the old body's weight decay to nothing first, holding its position while
+  // it does, exactly as the end of a capture already does. Pressing on the body
+  // already being leaned at — the anomaly case, and the good one — is not a swap
+  // and flows straight through.
+  const swapping = anchor !== null && cam.anchorId !== anchor.id && cam.anchorW > 0.02;
+  if (anchor && !swapping) {
     cam.anchorX = anchor.x;
     cam.anchorY = anchor.y;
+    cam.anchorId = anchor.id;
   }
-  const wantW = anchor ? Math.max(0, Math.min(1, anchor.lock)) * cfg.cameraOrbitLock : 0;
+  const wantW =
+    anchor && !swapping ? Math.max(0, Math.min(1, anchor.lock)) * cfg.cameraOrbitLock : 0;
   cam.anchorW += (wantW - cam.anchorW) * Math.min(1, dt * cfg.cameraOrbitEase);
 
   const t = cameraTarget(cam, cfg, shipX, shipY, field, floorY, shipVX, relax, frozen);
@@ -543,22 +570,38 @@ export function anomalyFocus(
   x: number,
   y: number,
   cfg: RenderConfig,
-): { x: number; y: number; lock: number } | null {
+  /** Ship velocity. The lean is for an APPROACH, and fades as one stops closing. */
+  vx = 0,
+  vy = 0,
+): { x: number; y: number; lock: number; id: number } | null {
   let best: Body | null = null;
   let bestD = Infinity;
-  for (const b of bodies) {
+  let bestI = -1;
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i]!;
     if (b.kind !== 'anomaly') continue;
     const d = Math.hypot(x - b.x, y - b.y);
     if (d <= b.bubble && d < bestD) {
       bestD = d;
       best = b;
+      bestI = i;
     }
   }
   if (!best) return null;
   const relax = Math.min(cfg.cameraBarrierRelax, best.bubble - bestD);
   const escape = Math.min(1, relax / Math.max(1, cfg.cameraBarrierRelax));
   if (escape <= 0) return null;
-  return { x: best.x, y: best.y, lock: escape * cfg.cameraAnomalyLead };
+  // Closing, and how hard. The lean exists to put the anomaly on screen before
+  // the ship gets there; on the way home it is a hand on the shoulder pulling
+  // backwards, and the press that takes a body in the FIELD then swaps the anchor
+  // out from under whatever weight it had built. Faded by the radial component
+  // rather than switched on its sign, so the parked orbit — which closes and
+  // recedes every half lap — has nothing to flicker.
+  const speed = Math.hypot(vx, vy);
+  const closing =
+    speed < 1 ? 0 : Math.max(0, -((x - best.x) * vx + (y - best.y) * vy) / bestD / speed);
+  if (closing <= 0) return null;
+  return { x: best.x, y: best.y, lock: escape * closing * cfg.cameraAnomalyLead, id: bestI };
 }
 
 export function barrierRelax(

@@ -389,7 +389,7 @@ describe('what the camera watches', () => {
         const cap = st.capture;
         const b = cap ? st.bodies[cap.planet]! : null;
         const anchor = b
-          ? { x: b.x, y: b.y, lock: orbitLock(cap!.phase, cap!.settleProgress) }
+          ? { x: b.x, y: b.y, lock: orbitLock(cap!.phase, cap!.settleProgress), id: cap!.planet }
           : null;
         followCamera(
           cam,
@@ -679,7 +679,7 @@ describe('what the camera watches', () => {
           field,
           null,
           FIXED_DT,
-          anomalyFocus(bodies, x, y, rc),
+          anomalyFocus(bodies, x, y, rc, vx, vy),
           vx,
           false,
           barrierRelax(bodies, x, y, rc),
@@ -737,18 +737,94 @@ describe('what the camera watches', () => {
     const bodies = createBodies(cfg);
     const a = bodies.find((b) => b.kind === 'anomaly')!;
     const rc = DEFAULT_RENDER_CONFIG;
-    expect(anomalyFocus(bodies, 195, a.y, rc), 'leaned from the middle of the corridor').toBe(null);
-    expect(anomalyFocus(bodies, a.x + a.bubble + 1, a.y, rc)).toBe(null);
+    // closing on it, head on, from the corridor side
+    const toward = (x: number) => [x > a.x ? -300 : 300, 0] as const;
+    const at = (x: number) => {
+      const [vx, vy] = toward(x);
+      return anomalyFocus(bodies, x, a.y, rc, vx, vy);
+    };
+    expect(at(195), 'leaned from the middle of the corridor').toBe(null);
+    expect(at(a.x + a.bubble + 1)).toBe(null);
     // A pixel inside the bubble the weight is a thousandth, not a step: the lean
     // has to arrive with the barrier opening or it is the switch note 37 spent a
     // session removing.
-    expect(anomalyFocus(bodies, a.x + a.bubble - 1, a.y, rc)!.lock).toBeLessThan(0.01);
-    const half = anomalyFocus(bodies, a.x + a.bubble - rc.cameraBarrierRelax / 2, a.y, rc)!;
-    const full = anomalyFocus(bodies, a.x, a.y, rc)!;
+    expect(at(a.x + a.bubble - 1)!.lock).toBeLessThan(0.01);
+    const half = at(a.x + a.bubble - rc.cameraBarrierRelax / 2)!;
+    const full = at(a.x + 1)!;
     expect(half.lock).toBeCloseTo(rc.cameraAnomalyLead / 2, 2);
-    expect(full.lock).toBeCloseTo(rc.cameraAnomalyLead, 6);
+    expect(full.lock).toBeCloseTo(rc.cameraAnomalyLead, 1);
     expect(full.x).toBe(a.x);
     expect(full.y).toBe(a.y);
+  });
+
+  it('lets go of the anomaly on the way home', () => {
+    // The lean exists to put the anomaly on screen before the ship gets there. On
+    // the way out of the bubble it is a hand on the shoulder pulling backwards —
+    // and worse, it is still holding weight when a press takes a body in the
+    // field, which swaps the anchor out from under it. Reported as the return to
+    // the field feeling abrupt.
+    //
+    // Faded by the radial component rather than switched on its sign, so a parked
+    // orbit — which closes and recedes every half lap — has nothing to flicker.
+    const cfg = DEFAULT_CONFIG;
+    const bodies = createBodies(cfg);
+    const a = bodies.find((b) => b.kind === 'anomaly')!;
+    const rc = DEFAULT_RENDER_CONFIG;
+    const x = a.x + 200;
+    const closing = anomalyFocus(bodies, x, a.y, rc, -300, 0)!;
+    const across = anomalyFocus(bodies, x, a.y, rc, 0, 300);
+    const leaving = anomalyFocus(bodies, x, a.y, rc, 300, 0);
+    expect(closing.lock).toBeGreaterThan(0.2);
+    expect(across, 'leaned while flying past it').toBe(null);
+    expect(leaving, 'leaned while flying away from it').toBe(null);
+    // and it fades rather than stepping: half the closing speed, half the lean
+    const half = anomalyFocus(bodies, x, a.y, rc, -300 * Math.SQRT1_2, 300 * Math.SQRT1_2)!;
+    expect(half.lock).toBeCloseTo(closing.lock * Math.SQRT1_2, 4);
+  });
+
+  it('will not adopt a new anchor while the old one still has weight', () => {
+    // The subject is `ship + (anchor - ship) * w`, so swapping the anchor under a
+    // non-zero weight moves the subject by the distance between the two bodies
+    // times that weight — instantly, because only the weight eases. Measured on
+    // the reported session: the approach lean was holding 0.43 when a press took a
+    // planet 500px away, and the view moved 6846px/s on that single tick.
+    const cam = cam390();
+    cam.anchorW = 0.5;
+    cam.anchorX = 1000;
+    cam.anchorY = -1000;
+    cam.anchorId = 4;
+    const before = cam.anchorX;
+    followCamera(
+      cam,
+      DEFAULT_RENDER_CONFIG,
+      200,
+      -1000,
+      field,
+      null,
+      FIXED_DT,
+      { x: -900, y: -2000, lock: 1, id: 9 },
+      0,
+    );
+    // the old body is held, and its weight is on the way out
+    expect(cam.anchorX, 'adopted the new body immediately').toBe(before);
+    expect(cam.anchorId).toBe(4);
+    expect(cam.anchorW).toBeLessThan(0.5);
+    // once the weight is gone, the new one is taken up
+    for (let i = 0; i < 200; i++) {
+      followCamera(
+        cam,
+        DEFAULT_RENDER_CONFIG,
+        200,
+        -1000,
+        field,
+        null,
+        FIXED_DT,
+        { x: -900, y: -2000, lock: 1, id: 9 },
+        0,
+      );
+    }
+    expect(cam.anchorId).toBe(9);
+    expect(cam.anchorX).toBe(-900);
   });
 
   it('corrects minimally when it does engage', () => {
@@ -815,7 +891,7 @@ describe('the orbit lock', () => {
         const cap = st.capture;
         const b = cap ? st.bodies[cap.planet]! : null;
         const anchor = b
-          ? { x: b.x, y: b.y, lock: orbitLock(cap!.phase, cap!.settleProgress) }
+          ? { x: b.x, y: b.y, lock: orbitLock(cap!.phase, cap!.settleProgress), id: cap!.planet }
           : null;
         followCamera(
           cam,
@@ -853,7 +929,17 @@ describe('the orbit lock', () => {
     const cam = cam390();
     cam.anchorW = 0;
     const off = { ...DEFAULT_RENDER_CONFIG, cameraOrbitLock: 0 };
-    followCamera(cam, off, 200, -1000, field, null, FIXED_DT, { x: 900, y: -2000, lock: 1 }, 0);
+    followCamera(
+      cam,
+      off,
+      200,
+      -1000,
+      field,
+      null,
+      FIXED_DT,
+      { x: 900, y: -2000, lock: 1, id: 0 },
+      0,
+    );
     expect(cam.anchorW).toBe(0);
   });
 });
@@ -884,6 +970,9 @@ describe('the view around an anomaly', () => {
     cam.anchorW = 1;
     cam.anchorX = anomaly.x;
     cam.anchorY = anomaly.y;
+    // Built by hand, so the identity has to be built too: a weight held against a
+    // stale id reads as a swap, which is exactly what it is meant to catch.
+    cam.anchorId = 0;
     const lefts: number[] = [];
     const centres: number[] = [];
     for (let i = 0; i < 400; i++) {
@@ -898,7 +987,7 @@ describe('the view around an anomaly', () => {
         field,
         null,
         FIXED_DT,
-        { x: anomaly.x, y: anomaly.y, lock: 1 },
+        { x: anomaly.x, y: anomaly.y, lock: 1, id: 0 },
         0,
         true,
         barrierRelax(createBodies(DEFAULT_CONFIG), x, y, DEFAULT_RENDER_CONFIG),

@@ -345,8 +345,9 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
             x: body.x,
             y: body.y,
             lock: orbitLock(cap.phase, cap.settleProgress, body.kind === 'anomaly'),
+            id: cap.planet,
           }
-        : anomalyFocus(state.bodies, snap.x, snap.y, rcfg);
+        : anomalyFocus(state.bodies, snap.x, snap.y, rcfg, snap.vx, snap.vy);
     followCamera(
       cam,
       rcfg,

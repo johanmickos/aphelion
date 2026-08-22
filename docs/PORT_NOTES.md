@@ -2003,6 +2003,57 @@ with `settleT` never advancing.
 
 ---
 
+### 48 — A subject may not change identity while it is being looked at
+
+`src/render/camera.ts` · **[CHANGED]** · reported as "the field return felt REALLY
+abrupt compared to zipping to the anomaly"
+
+The zip home is mechanically GENTLER than the zip out on every axis measured —
+peak speed 792 against 1048px/s, peak acceleration 4599 against 5974, total turn
+289 against 416 degrees. The glide was never the problem. The camera was, and the
+regression was introduced by note 45.
+
+`followCamera` snaps `cam.anchorX/anchorY` to whatever anchor it is handed but
+EASES `anchorW`. The subject is `ship + (anchor - ship) * w`, so adopting a
+different body while the old one still has weight moves the subject by the
+distance between them times that weight, in one tick. Before note 45 there was no
+anchor while drifting, so every press started from zero weight and the swap was
+free. The approach lean changed that: leaving the anomaly, still inside its
+bubble, the lean was holding 0.43 when a press took a planet 500px away.
+**6846px/s on that single tick**, against 909 for the whole anomaly zip.
+
+Two fixes, and the second is the one that also makes sense on its own.
+
+`Camera.anchorId` — identity, not position, because comparing coordinates starts
+lying the day a body moves. A different id is not adopted until the old weight has
+decayed, holding the old position while it does, exactly as the end of a capture
+already does. Pressing on the body already being leaned at is not a swap and flows
+straight through, which is why the anomaly zip was always fine. 6846 -> 933px/s.
+
+**The lean is for an APPROACH.** It exists to put the anomaly on screen before the
+ship gets there; on the way home it is a hand on the shoulder pulling backwards.
+Faded by the radial component of velocity rather than switched on its sign, so a
+parked orbit — which closes and recedes every half lap — has nothing to flicker.
+933 -> 409px/s at the press, and the worst movement anywhere in the glide from
+1175 to 792.
+
+For scale, what the camera does at an ordinary planet grab is 151-180px/s. A zip
+is a big camera move because the ship really does cross 200px in half a second;
+what it should not be is a bigger move than the ship makes. Measured as a ratio of
+the ship's own peak speed: ordinary grab 0.38, anomaly zip 0.87, field return
+**1.48 before and 1.00 after**.
+
+Two things that were tried and measured worse, recorded so they are not tried
+again. Holding the lock through a zipped planet settle — the obvious reading of
+note 45's third `orbitLock` case — changes the numbers by nothing at all
+(792 both ways): `cameraOrbitEase` is 3 and the glide is 0.45s, so the weight
+barely moves before it is over. And decaying a swapped-out anchor FASTER makes it
+worse, not better, because the subject then snaps back toward the ship: at 2x,
+3x, 5x, 8x the ease the press-tick movement runs 1325, 1705, 2426, 3412px/s
+against 933 at the plain rate.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -2025,11 +2076,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 97 · camera 53
+tests    port-equality 11 · invariants 32 · render 97 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · 409 total
+         zip-charge 8 · 411 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
