@@ -19,6 +19,7 @@ import {
 } from '../src/render/attract.ts';
 import { DEFAULT_CONFIG } from '../src/sim/config.ts';
 import { circSpeed } from '../src/sim/orbit.ts';
+import { boostEnvelope } from '../src/sim/boost.ts';
 
 const loop = createAttractLoop(DEFAULT_CONFIG);
 
@@ -64,7 +65,6 @@ describe('attract loop', () => {
     // The seams are what a hand-authored path gets wrong. Sampled finer than any
     // frame so a discontinuity cannot hide between two samples.
     const dt = 0.001;
-    const maxSpeed = circSpeed(DEFAULT_CONFIG, ORBIT_SMALL) * PLAYBACK_RATE;
     let worstStep = 0;
     let worstTurn = 0;
     let prev = loop.pose(0);
@@ -75,7 +75,7 @@ describe('attract loop', () => {
       prev = p;
     }
     // A step larger than the fastest the ship ever moves would be a teleport.
-    expect(worstStep).toBeLessThan(maxSpeed * dt * 1.05);
+    expect(worstStep).toBeLessThan(loop.maxSpeed * dt * 1.05);
     // The tightest turn is the small orbit's sweep rate, ~4.1 rad/s once played.
     expect(worstTurn).toBeLessThan(0.01);
   });
@@ -178,12 +178,47 @@ describe('attract loop', () => {
     expect(smallTurn - bigTurn).toBeCloseTo(2 * Math.PI, 1);
   });
 
-  it('holds a whole cycle inside six seconds', () => {
+  it('holds a whole cycle inside four and a half seconds', () => {
     // Pinned because the pacing is a decision, not an accident: one lap at the
     // small body, none at the large, played at PLAYBACK_RATE. If a radius is
     // retuned this moves, and it should be looked at rather than absorbed.
-    expect(loop.period).toBeGreaterThan(5.2);
-    expect(loop.period).toBeLessThan(6.0);
+    expect(loop.period).toBeGreaterThan(4.0);
+    expect(loop.period).toBeLessThan(4.7);
+  });
+
+  it('keeps the slingshot lobe inside the boost window', () => {
+    // ORBIT_BIG is 95 rather than 110 for exactly this reason, and nothing else
+    // in the file records it. boostEnvelope holds its peak to settleDur and is
+    // spent by settleDur + boostDecayTime; the short lobe has to land inside
+    // that or the fling below silently becomes nothing.
+    const cliff = DEFAULT_CONFIG.settleDur + DEFAULT_CONFIG.boostDecayTime;
+    const bigDwell = segmentEnds()[0]! * PLAYBACK_RATE;
+    const smallDwell = (segmentEnds()[2]! - segmentEnds()[1]!) * PLAYBACK_RATE;
+    expect(bigDwell).toBeLessThan(cliff);
+    expect(boostEnvelope(DEFAULT_CONFIG, DEFAULT_CONFIG.boostMax, bigDwell)).toBeGreaterThan(30);
+    // And the long one is past it, which is the game's own rule on display.
+    expect(smallDwell).toBeGreaterThan(cliff);
+    expect(boostEnvelope(DEFAULT_CONFIG, DEFAULT_CONFIG.boostMax, smallDwell)).toBe(0);
+  });
+
+  it('flings off the slingshot and coasts off the orbit', () => {
+    const speedAt = (t: number): number => {
+      const a = loop.pose(t);
+      const b = loop.pose(t + 1e-4);
+      return Math.hypot(b.x - a.x, b.y - a.y) / 1e-4;
+    };
+    const ends = segmentEnds();
+    const orbitalBig = circSpeed(DEFAULT_CONFIG, ORBIT_BIG) * PLAYBACK_RATE;
+    const orbitalSmall = circSpeed(DEFAULT_CONFIG, ORBIT_SMALL) * PLAYBACK_RATE;
+    // Just after each release, before the burst has bled off.
+    const offBig = speedAt(ends[0]! + 1e-3);
+    const offSmall = speedAt(ends[2]! + 1e-3);
+    expect(offBig / orbitalBig).toBeGreaterThan(1.2);
+    // The long hold forfeited the boost, so this one leaves at what it was doing.
+    expect(offSmall / orbitalSmall).toBeCloseTo(1, 2);
+    // And the fling decays rather than persisting: the game's burst, not a speed
+    // the ship simply keeps.
+    expect(speedAt(ends[1]! - 1e-3)).toBeLessThan(offBig);
   });
 
   it('paints the region opaque before anything else', () => {

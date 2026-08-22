@@ -31,24 +31,52 @@
  * That asymmetry is the whole lesson the screen teaches, and it is `LAPS_BIG` /
  * `LAPS_SMALL` — nothing else in here knows about it.
  *
- * NO BOOST, STILL. `boostEnvelope` is zero 2.6s after periapsis (`settleDur` 1.2
- * plus `boostDecayTime` 1.4). The slingshot lobe is now held for 2.61s, which
- * clears that cliff by ten milliseconds, and the orbit lobe for 3.54s — so
- * `releaseCapture` pays nothing at either and `releaseFlingBoost` is 1. The exit
- * speed is the orbital speed, exactly as the game would give it at these dwells,
- * and the slingshot is carried by the SHAPE of the pass rather than by
- * acceleration. Tightening `ORBIT_BIG` to about 95 would drop that lobe under
- * two seconds and earn a real ~1.3x fling, at the cost of the two lobes looking
- * nearly the same size.
+ * THE FLING IS EARNED, NOT DRAWN EITHER. `boostEnvelope` holds its peak until
+ * `settleDur` 1.2s past periapsis and is spent by 2.6s. The radii are chosen to
+ * straddle that cliff. The slingshot lobe takes 1.71s, inside the window, so its
+ * release pays: 38 of `boostMax` 60, which `releaseCapture` splits into a
+ * permanent +8 along the tangent and a +54 burst decaying over
+ * `boostBurstDecay`. It leaves at 1.25x its orbital speed and cools as it
+ * crosses. The orbit lobe takes 2.64s, past the cliff by forty milliseconds, so
+ * it earns exactly nothing and leaves at the speed it was already going.
+ *
+ * That contrast is the game's actual rule — a long hold forfeits the boost —
+ * shown rather than stated. Both radii are load-bearing for it and neither is
+ * free to move: see their notes.
+ *
+ * THE ONE ASSUMPTION. `boostFull` is `boostMax * over`, and `over` grades how
+ * deep the dive went — but the attract ship has no dive, it arrives already on
+ * its circle, so a value has to be chosen rather than derived. This takes full
+ * credit, `tightness` 1, because a title screen shows the game flown well. A
+ * player earns that only by bottoming the dive out on the floor.
  */
 import type { SimConfig } from '../sim/config.ts';
+import { boostEnvelope } from '../sim/boost.ts';
 import { circSpeed } from '../sim/orbit.ts';
 import { shipPath } from './ship.ts';
 
-/** Orbit radius at the larger body. */
-export const ORBIT_BIG = 110;
-/** Orbit radius at the smaller body. */
-export const ORBIT_SMALL = 80;
+/**
+ * Orbit radius at the larger body.
+ *
+ * Tuned against `boostEnvelope`, not against the drawing. It sets how long the
+ * slingshot lobe takes, and that duration is what the fling is paid for: at 110
+ * the lobe ran 2.61s and earned nothing, at 89 it runs 1.71s and earns 38 of 60.
+ * Raising it back past ~103 silently kills the fling and leaves a pass that
+ * looks identical and means nothing.
+ */
+export const ORBIT_BIG = 89;
+/**
+ * Orbit radius at the smaller body.
+ *
+ * Also tuned against the envelope, from the other side: the orbit lobe has to
+ * stay PAST the 2.6s cliff so a long hold visibly forfeits its boost. At 68 it
+ * runs 2.64s and clears by forty milliseconds. Below about 66 it starts earning
+ * one too and the two lobes stop meaning different things.
+ *
+ * Together with `ORBIT_BIG` it also sets the crossing: `sqrt(d² - (r1+r2)²)` is
+ * 147 units here. A larger pair shortens that toward zero and the 8 collapses.
+ */
+export const ORBIT_SMALL = 68;
 /**
  * Distance between the two centres.
  *
@@ -120,6 +148,8 @@ export interface AttractPlanet {
 
 interface Segment {
   dur: number;
+  /** Fastest the ship moves during it, for `AttractLoop.maxSpeed`. */
+  peak: number;
   pose(t: number): Pose;
 }
 
@@ -129,6 +159,8 @@ export interface AttractLoop {
   readonly box: { x: number; y: number; w: number; h: number };
   /** Seconds for one full cycle. */
   readonly period: number;
+  /** Fastest the ship ever moves, in loop units per played second. */
+  readonly maxSpeed: number;
   /** A time mid-transfer, for the still frame shown under reduced motion. */
   readonly stillT: number;
   pose(t: number): Pose;
@@ -146,6 +178,7 @@ function arc(
 ): Segment {
   return {
     dur: sweep / omega,
+    peak: r * omega,
     pose(t: number): Pose {
       const th = theta0 + dir * omega * t;
       return {
@@ -157,18 +190,90 @@ function arc(
   };
 }
 
-/** A straight run at constant speed — what the game does between captures. */
-function line(x0: number, y0: number, x1: number, y1: number, speed: number): Segment {
+/** What a release hands the ship, in the same terms `releaseCapture` does. */
+interface Release {
+  /** Speed retained for the whole crossing. */
+  base: number;
+  /** Extra speed at the instant of release, decaying linearly to nothing. */
+  burst: number;
+  /** Seconds the burst takes to decay — `boostBurstDecay`. */
+  decay: number;
+}
+
+/**
+ * `releaseCapture` and `boostEnvelope`, evaluated for a lobe held `dwell`
+ * seconds past periapsis.
+ *
+ * `dwell` is in SIMULATION seconds, not played ones: what the game pays depends
+ * on how long the hold actually was, and `PLAYBACK_RATE` is a projector speed.
+ * Feeding it the played duration would hand the loop a boost the game never
+ * offers, which is the exact dishonesty this file exists to avoid.
+ */
+function release(cfg: SimConfig, orbitalSpeed: number, dwell: number): Release {
+  const add = boostEnvelope(cfg, cfg.boostMax, dwell);
+  return {
+    // The fling scales the permanent part; the burst is applied after it and is
+    // not scaled, matching `releaseCapture`.
+    base: (orbitalSpeed + add * cfg.boostPermFrac) * cfg.releaseFlingBoost,
+    burst: add * (1 - cfg.boostPermFrac) * cfg.boostPunch,
+    decay: cfg.boostBurstDecay,
+  };
+}
+
+/**
+ * The straight crossing between two lobes.
+ *
+ * `driftAccel` is zero, so the only thing happening out here is the release
+ * burst bleeding off — which is why the transfer is a line the ship traverses at
+ * a falling speed rather than at a constant one. Solved rather than stepped: the
+ * distance covered is the integral of `base + burst·(1 - t/decay)`, so the
+ * crossing time is a root of that, and the segment stays exactly as long as the
+ * geometry says it is.
+ */
+function transfer(x0: number, y0: number, x1: number, y1: number, r: Release): Segment {
   const dx = x1 - x0;
   const dy = y1 - y0;
   const len = Math.sqrt(dx * dx + dy * dy);
   const angle = Math.atan2(dy, dx);
+  const { base, burst, decay } = r;
+
+  const dist = (t: number): number =>
+    t >= decay ? base * t + (burst * decay) / 2 : base * t + burst * (t - (t * t) / (2 * decay));
+
+  // Inside the decay window the distance is a quadratic in t; past it the burst
+  // is spent and what remains is covered at `base`.
+  const a = burst / (2 * decay);
+  const b = base + burst;
+  const dur =
+    dist(decay) >= len
+      ? a === 0
+        ? len / b
+        : (b - Math.sqrt(b * b - 4 * a * len)) / (2 * a)
+      : decay + (len - dist(decay)) / base;
+
   return {
-    dur: len / speed,
+    dur,
+    peak: base + burst,
     pose(t: number): Pose {
-      const u = (speed * t) / len;
+      const u = Math.min(1, dist(Math.min(t, dur)) / len);
       return { x: x0 + dx * u, y: y0 + dy * u, angle };
     },
+  };
+}
+
+/**
+ * Play a segment faster than it happened.
+ *
+ * Applied once, at the end, to every segment alike — which is what keeps
+ * `PLAYBACK_RATE` a projector speed rather than a physics change. Everything
+ * upstream of here is in simulation seconds, including the dwell that decides
+ * the boost.
+ */
+function played(seg: Segment, rate: number): Segment {
+  return {
+    dur: seg.dur / rate,
+    peak: seg.peak * rate,
+    pose: (t: number): Pose => seg.pose(t * rate),
   };
 }
 
@@ -196,24 +301,29 @@ export function createAttractLoop(cfg: SimConfig): AttractLoop {
   const p2a = { x: c2x - r2 * cph, y: c2y - r2 * sph };
   const p2b = { x: c2x - r2 * cph, y: c2y + r2 * sph };
 
-  // Real orbital speeds, from the game's own GM, then played at PLAYBACK_RATE.
-  // A tighter orbit is genuinely faster, so the small lobe is the quicker one and
-  // the transfer it launches is quicker too — the only speed variation in the
-  // whole loop, and one the simulation would produce.
-  const v1 = circSpeed(cfg, r1) * PLAYBACK_RATE;
-  const v2 = circSpeed(cfg, r2) * PLAYBACK_RATE;
+  // Real orbital speeds, from the game's own GM. A tighter orbit is genuinely
+  // faster, so the small lobe sweeps quicker. Simulation seconds throughout —
+  // PLAYBACK_RATE is applied once, at the bottom.
+  const v1 = circSpeed(cfg, r1);
+  const v2 = circSpeed(cfg, r2);
   const forced = 2 * Math.PI - 2 * phi;
 
+  // Big lobe, the slingshot: entered at -φ and left at +φ, which forces it
+  // clockwise, and nothing added — one sweep round the far side and gone.
+  const big = arc(c1x, c1y, r1, -phi, -1, v1 / r1, forced + 2 * Math.PI * LAPS_BIG);
+  // Small lobe, the orbit: entered at π+φ and left at π-φ — anticlockwise, the
+  // opposite sense, because the tangents cross. This is the 8, not a racetrack.
+  const small = arc(c2x, c2y, r2, Math.PI + phi, 1, v2 / r2, forced + 2 * Math.PI * LAPS_SMALL);
+
+  // Each crossing is paid for by the lobe that launched it, at the boost that
+  // lobe's own dwell earned. The short pass is inside the window and flings; the
+  // long orbit is past it and leaves at the speed it was already going.
   const segments: Segment[] = [
-    // Big lobe, the slingshot: entered at -φ and left at +φ, which forces it
-    // clockwise, and nothing added — one sweep round the far side and gone.
-    arc(c1x, c1y, r1, -phi, -1, v1 / r1, forced + 2 * Math.PI * LAPS_BIG),
-    line(p1a.x, p1a.y, p2a.x, p2a.y, v1),
-    // Small lobe, the orbit: entered at π+φ and left at π-φ — anticlockwise, the
-    // opposite sense, because the tangents cross. This is the 8, not a racetrack.
-    arc(c2x, c2y, r2, Math.PI + phi, 1, v2 / r2, forced + 2 * Math.PI * LAPS_SMALL),
-    line(p2b.x, p2b.y, p1b.x, p1b.y, v2),
-  ];
+    big,
+    transfer(p1a.x, p1a.y, p2a.x, p2a.y, release(cfg, v1, big.dur)),
+    small,
+    transfer(p2b.x, p2b.y, p1b.x, p1b.y, release(cfg, v2, small.dur)),
+  ].map((seg) => played(seg, PLAYBACK_RATE));
 
   const period = segments.reduce((a, s) => a + s.dur, 0);
 
@@ -224,6 +334,7 @@ export function createAttractLoop(cfg: SimConfig): AttractLoop {
     ],
     box: { x: c1x - r1, y: c1y - r1, w: r1 + d + r2, h: 2 * r1 },
     period,
+    maxSpeed: segments.reduce((m, seg) => Math.max(m, seg.peak), 0),
     stillT: segments[0]!.dur + segments[1]!.dur / 2,
     pose(t: number): Pose {
       let u = t % period;
