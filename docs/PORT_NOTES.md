@@ -1507,6 +1507,76 @@ answers neither side of it. `rcfg` is a copy of the defaults now so the toggle c
 take effect mid-run — render config cannot reach the simulation, which `pnpm
 portable` enforces, so nothing a replay reproduces can move.
 
+### 39 — Every fuel cue lived where nobody was looking
+
+`src/render/fuel-warning.ts` · `src/render/hud.ts` · **[ADDED]** · from
+`docs/IDEAS.md`, "flash a brief icon next to ship when running out of fuel"
+
+Fuel is the only resource in the game, and everything that reported on it sat in
+the bottom-left corner (the gauge, its flashing LOW badge) or under the score (the
+readout's `⚠ LOW FUEL`, `⚠ OUT OF FUEL`). The one moment those matter is the
+moment the ship stopped doing what the player asked — the circularisation puttered
+out, the flyby brake quit — and at that moment the player is looking at the ship.
+The answer was two hundred pixels away, in the periphery, competing with a
+starfield.
+
+So the corner gauge is now also drawn beside the ship, miniaturised and empty, for
+three flashes on the transition. Deliberately the same object rather than a new
+symbol: the shape says "fuel", the colour says how bad, the word says which. Both
+colours are `FUEL_RAMP` entries — the ramp's red for empty and its yellow for low
+— so the badge and the gauge cannot come to disagree about what red means, the
+same reason `accolade.ts` is one table with two consumers.
+
+**A transition, never a state.** Replayed over 54 recordings, 60 minutes of play:
+
+```
+                                        fires   per min   sessions
+  crossed DOWN through LOW (0.25)          71     1.18      25/54
+  crossed DOWN through 0.15                54     0.89      23/54
+  ran the tank dry                         36     0.60      15/54
+  grab refused for an empty tank            0     0.00       0/54
+  re-pressed with an empty tank             0     0.00       0/54
+
+  time spent below LOW: 4.7% of ticks     at zero: 1.1%
+```
+
+The tank sits below LOW for 4.7% of a session, so a standing badge beside the ship
+would be part of the ship's silhouette for a twentieth of the run and would stop
+being a warning. One flash per crossing, at 1.18/min, is roughly one every fifty
+seconds.
+
+The threshold is `FUEL_LOW_FRAC`, extracted from the literal `0.25` inside
+`drawFuelGauge` and now shared. Measuring 0.15 as an alternative is what settled
+it: it only removes a quarter of the firings, which is not worth two cues that
+disagree about when the tank is low.
+
+**The re-arm is what makes it a warning and not a tic.** Fuel regenerates during
+drift, so a tank parked on the line re-crosses it every second or so. The low
+badge re-arms only above 40% of the tank, the empty badge only above 0.5 fuel —
+which is `beginCapture`'s own refusal threshold, so it re-arms exactly when a grab
+becomes possible again.
+
+**The refused grab has never happened.** Zero times in 60 minutes: the drift you
+would be tapping from regenerates enough fuel to grab with before you arrive. It
+is wired up anyway, because it is the one case where the game genuinely ignores an
+input and the player has no other cue at all, and because `GrabResult` is a union
+— a new way to refuse a grab makes the compiler ask whether it belongs here. The
+other measured-at-zero trigger, re-pressing mid-capture on an empty tank, was
+dropped: running dry already fires while the player is holding.
+
+**It changes nothing under `src/sim/`.** The badge is an observer of
+`RenderSnapshot` — fuel, `lastGrab`, `ending` — fed on the fixed tick like `Trail`
+(a dip below the line and back can fit between two frames, and that dip is the
+whole warning) and aged on the frame delta like `Popups` (three flashes should
+look like three flashes at 120Hz). No new snapshot field, no config key, no
+`SIM_VERSION` bump; the equality gate stays at exactly zero and the golden did not
+move.
+
+It draws BELOW the ship. Score popups rise from `SPAWN_LIFT` above it and keep
+rising, and the capture that runs the tank dry is exactly the capture also raising
+a word — two channels, two sides. The crash freeze suppresses it entirely: a tank
+that ran dry on the way into a planet does not get to explain the planet.
+
 ---
 
 ## Tuning vs. fidelity
@@ -1531,11 +1601,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 79 · camera 34
-         diagnostics 25 · backtrack 15 · world 14 · tune 7 · clearance 6
+tests    port-equality 11 · invariants 32 · render 94 · camera 48
+         diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 10
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 10 · anomaly 14
-         358 total
+         374 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

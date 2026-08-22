@@ -14,6 +14,7 @@ import { Starfield } from './starfield.ts';
 import { BodyRenderer, drawBacktrackFloor, drawHazardZones } from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
+import { FuelWarning } from './fuel-warning.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
 import { drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
@@ -33,6 +34,7 @@ export interface SceneDeps {
 export class Scene {
   readonly trail: Trail;
   readonly popups = new Popups();
+  readonly fuelWarning = new FuelWarning();
   private readonly stars: Starfield;
   private readonly bodyRenderer = new BodyRenderer();
 
@@ -102,7 +104,10 @@ export class Scene {
     const compass = drawCompass(ctx, cam, sim, render, snap, bodies, opts.timeMs);
 
     // Paused means paused: a popup must not age out behind the overlay.
-    if (!opts.paused) this.popups.update(opts.frameDt);
+    if (!opts.paused) {
+      this.popups.update(opts.frameDt);
+      this.fuelWarning.update(opts.frameDt);
+    }
 
     this.trail.draw(ctx, cam, snap.x, snap.y);
     drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
@@ -111,6 +116,8 @@ export class Scene {
     // Above the ship and its wake, below the HUD: it belongs to the world, but
     // nothing in the world should ever cover it.
     this.popups.draw(ctx, cam);
+    // Under the ship, in the lane the rising popups leave clear.
+    this.fuelWarning.draw(ctx, cam, snap);
 
     drawEdgeMarkers(ctx, cam, render, snap, bodies, opts.headerBottom);
 

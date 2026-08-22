@@ -83,6 +83,16 @@ export function fuelColor(at: number): string {
   return FUEL_RAMP[Math.max(0, Math.min(FUEL_RAMP.length - 1, i))]!;
 }
 
+/**
+ * Where the tank counts as low, as a fraction of `fuelMax`.
+ *
+ * One number, two consumers: the gauge's flashing LOW state and the badge that
+ * flashes beside the ship (`src/render/fuel-warning.ts`). Two cues for the same
+ * fact that disagreed about when the fact was true would be worse than either
+ * alone — the same reason `accolade.ts` is one table.
+ */
+export const FUEL_LOW_FRAC = 0.25;
+
 /** Alpha of a pill the tank has not reached, and of one it has. */
 const PILL_DIM = 0.14;
 const PILL_LIT = 1;
@@ -170,7 +180,7 @@ export function drawFuelGauge(
   const gbot = cam.offsetY + (cam.viewH - GAUGE.bottomGap) * s;
   const gy = gbot - gh;
 
-  const low = frac <= 0.25;
+  const low = frac <= FUEL_LOW_FRAC;
   const flash = low ? 0.55 + 0.45 * Math.sin(timeMs / 110) : 1;
 
   ctx.save();
