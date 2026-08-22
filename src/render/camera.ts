@@ -465,7 +465,16 @@ function velocityLead(cfg: RenderConfig, shipVX: number): number {
  * could lurch across. That bound is why a step is affordable here and was not
  * there.
  */
-export function orbitLock(phase: string, _settleProgress: number): number {
+export function orbitLock(phase: string, _settleProgress: number, authored = false): number {
+  // An AUTHORED settle is the exception, and it is not a softening of the rule
+  // above — it is the rule applied to a different thing. The argument against
+  // locking a settle is the oval: the ship swings 59 -> 107 -> 59px and the lock
+  // flattens the most dramatic part of a capture. An anomaly's settle has no oval.
+  // It is a boundary-matched glide straight onto the authored circle, so there is
+  // nothing to flatten, and holding the lock through it keeps the approach, the
+  // glide and the parked orbit one continuous movement — the lean the approach
+  // already has does not drop to nothing and climb back.
+  if (authored && phase === 'settle') return 1;
   return phase === 'orbit' ? 1 : 0;
 }
 
@@ -516,6 +525,42 @@ export function frozenOrbit(phase: string | null | undefined): boolean {
  * should appear and vanish with the anomaly and not with the geometry of the
  * corridor.
  */
+/**
+ * The anomaly the view should be leaning toward, and how hard, or null.
+ *
+ * Shaped as an `anchor` because it IS one: the same subject blend a settled orbit
+ * uses, at a lighter weight, so the approach and the capture that follows it are
+ * one continuous movement rather than two behaviours meeting at the press. The
+ * weight rides `barrierRelax`, which is nonzero only inside a bubble and ramps
+ * with depth into it — so the lean arrives with the barrier opening, and there is
+ * no moment at which it switches on.
+ *
+ * Render-only, and asked on every drifting frame: a capture supplies its own
+ * anchor and outranks this.
+ */
+export function anomalyFocus(
+  bodies: readonly Body[],
+  x: number,
+  y: number,
+  cfg: RenderConfig,
+): { x: number; y: number; lock: number } | null {
+  let best: Body | null = null;
+  let bestD = Infinity;
+  for (const b of bodies) {
+    if (b.kind !== 'anomaly') continue;
+    const d = Math.hypot(x - b.x, y - b.y);
+    if (d <= b.bubble && d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  if (!best) return null;
+  const relax = Math.min(cfg.cameraBarrierRelax, best.bubble - bestD);
+  const escape = Math.min(1, relax / Math.max(1, cfg.cameraBarrierRelax));
+  if (escape <= 0) return null;
+  return { x: best.x, y: best.y, lock: escape * cfg.cameraAnomalyLead };
+}
+
 export function barrierRelax(
   bodies: readonly Body[],
   x: number,

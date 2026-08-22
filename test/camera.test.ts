@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_VIEW_H,
   MIN_VIEW_H,
+  anomalyFocus,
   cameraTarget,
   centerCamera,
   createCamera,
@@ -26,6 +27,7 @@ import type { Camera } from '../src/render/camera.ts';
 import type { Anomaly } from '../src/sim/types.ts';
 import { backtrackFloorY } from '../src/sim/world.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
+import { hypot } from '../src/sim/orbit.ts';
 
 const rcfg = DEFAULT_RENDER_CONFIG;
 
@@ -635,6 +637,118 @@ describe('what the camera watches', () => {
       expect(ended, `dir ${dir} never ended at the wall`).toBeGreaterThan(30);
       expect(worst, `dir ${dir} showed dead space past the wall`).toBeLessThan(1e-9);
     }
+  });
+
+  it('leans toward an anomaly so it is on screen before the ship arrives', () => {
+    // Reported as "I didn't have a lot of time to react to the anomaly to capture
+    // it. I was en route to crash into it." Reconstructed from that session — the
+    // approach is pure drift, so it is exact rather than a replay — the anomaly's
+    // disc first appeared 0.15s AFTER the press and 0.23s before impact, at
+    // 303px/s. It sits `anomalyOffset` past the wall and the view may not reach it
+    // until the bubble opens the barrier, so it arrives on screen with the ship.
+    //
+    // The ceiling worth knowing: an instant camera glued to the anomaly reaches
+    // 0.83s. Camera work cannot make this calm on its own, which is why the grab
+    // ring in `edge-markers.ts` carries the other half.
+    const cfg = DEFAULT_CONFIG;
+    const bodies = createBodies(cfg);
+    const a = bodies.find((b) => b.kind === 'anomaly')!;
+    const visibleFor = (lead: number): number => {
+      const rc = { ...DEFAULT_RENDER_CONFIG, cameraAnomalyLead: lead };
+      const cam = createCamera(rc);
+      fitCamera(cam, { w: 393, h: 651, dpr: 2 });
+      // straight at it from inside the corridor, at the speed the report showed
+      const sp = 303;
+      let x = a.x + 500;
+      let y = a.y + 160;
+      const len = hypot(a.x - x, a.y - y);
+      const vx = ((a.x - x) / len) * sp;
+      const vy = ((a.y - y) / len) * sp;
+      centerCamera(cam, x, y, field, null);
+      for (let i = 0; i < 60; i++) followCamera(cam, rc, x, y, field, null, FIXED_DT, null, vx);
+      let first = -1;
+      let impact = -1;
+      for (let t = 0; t < 400; t++) {
+        x += vx * FIXED_DT;
+        y += vy * FIXED_DT;
+        followCamera(
+          cam,
+          rc,
+          x,
+          y,
+          field,
+          null,
+          FIXED_DT,
+          anomalyFocus(bodies, x, y, rc),
+          vx,
+          false,
+          barrierRelax(bodies, x, y, rc),
+        );
+        const sx = toScreenX(cam, a.x);
+        const sy = toScreenY(cam, a.y);
+        const r = a.R * cam.scale;
+        const on =
+          sx + r > cam.offsetX &&
+          sx - r < cam.offsetX + cam.designW * cam.scale &&
+          sy + r > cam.offsetY &&
+          sy - r < cam.offsetY + cam.viewH * cam.scale;
+        if (on && first < 0) first = t;
+        if (hypot(x - a.x, y - a.y) <= a.R + cfg.minOrbitGap) {
+          impact = t;
+          break;
+        }
+      }
+      expect(first, 'the anomaly never came on screen').toBeGreaterThanOrEqual(0);
+      expect(impact, 'the run never reached the anomaly').toBeGreaterThan(0);
+      return (impact - first) / 60;
+    };
+    const bare = visibleFor(0);
+    const led = visibleFor(DEFAULT_RENDER_CONFIG.cameraAnomalyLead);
+    // 0.117s -> 0.300s on this line, and 0.23 -> 0.40 on the reported one, which
+    // came in shallower. Both bounds are asserted: the ratio, because that is what
+    // the lean does, and an absolute floor, because a ratio over a vanishing
+    // number would satisfy the first while still giving the player nothing.
+    expect(led, `lead bought nothing: ${bare.toFixed(2)}s -> ${led.toFixed(2)}s`).toBeGreaterThan(
+      bare * 2,
+    );
+    expect(led).toBeGreaterThanOrEqual(0.25);
+  });
+
+  it('holds the lean through an authored settle rather than dropping it', () => {
+    // A planet's settle is deliberately unlocked — the oval is the drama and the
+    // lock flattens it. An anomaly's settle has no oval: it is a glide onto the
+    // authored circle, so there is nothing to protect and dropping the weight
+    // there would put a dip between the approach's lean and the parked orbit's
+    // lock.
+    //
+    // Measured on a real anomaly capture, the dip is not cosmetic: without it the
+    // lock arrives after the ship has parked and pans 367px/s of its own, and the
+    // ship is squeezed to 5% of the window on the way in against 14% with it.
+    expect(orbitLock('settle', 0.5, true)).toBe(1);
+    expect(orbitLock('settle', 0.5, false)).toBe(0);
+    expect(orbitLock('orbit', 1, false)).toBe(1);
+    // and the dive is still flown, authored or not
+    expect(orbitLock('clear', 0, true)).toBe(0);
+    expect(orbitLock('flyby', 0, true)).toBe(0);
+  });
+
+  it('leans only inside a bubble, and ramps with how far in', () => {
+    const cfg = DEFAULT_CONFIG;
+    const bodies = createBodies(cfg);
+    const a = bodies.find((b) => b.kind === 'anomaly')!;
+    const rc = DEFAULT_RENDER_CONFIG;
+    expect(anomalyFocus(bodies, 195, a.y, rc), 'leaned from the middle of the corridor').toBe(null);
+    expect(anomalyFocus(bodies, a.x + a.bubble + 1, a.y, rc)).toBe(null);
+    // A pixel inside the bubble the weight is a thousandth, not a step: the lean
+    // has to arrive with the barrier opening or it is the switch note 37 spent a
+    // session removing.
+    expect(anomalyFocus(bodies, a.x + a.bubble - 1, a.y, rc)!.lock).toBeLessThan(0.01);
+    const half = anomalyFocus(bodies, a.x + a.bubble - rc.cameraBarrierRelax / 2, a.y, rc)!;
+    const full = anomalyFocus(bodies, a.x, a.y, rc)!;
+    expect(half.lock).toBeCloseTo(rc.cameraAnomalyLead / 2, 2);
+    expect(full.lock).toBeCloseTo(rc.cameraAnomalyLead, 6);
+    expect(full.x).toBe(a.x);
+    expect(full.y).toBe(a.y);
   });
 
   it('corrects minimally when it does engage', () => {

@@ -1839,6 +1839,62 @@ within 400px of an anomaly, and everywhere else the line is absolute again.
 
 ---
 
+### 45 — The anomaly arrived at the same moment the ship did
+
+`src/render/camera.ts` · `src/render/edge-markers.ts` · `src/render/snapshot.ts` ·
+**[CHANGED]** · reported as "I didn't have a lot of time to react to the anomaly
+to capture it. I was en route to crash into it."
+
+Reconstructed rather than replayed: the approach is pure drift, so a straight line
+off the t1500 checkpoint is exact phone truth.
+
+```
+  d=560  t1508  in grab range — but a nearer planet takes the press
+  d=400  t1539  bubble entry
+  d=395  t1540  the anomaly becomes what a press would take
+         t1550  the ship crosses the wall
+  d=178  t1583  THE PRESS — anomaly still 95px left of the window edge
+  d=133  t1592  the anomaly's disc first appears
+  d= 84  t1602  crash cone refuses a grab
+  d= 66  t1606  impact
+```
+
+**The press was made blind.** The anomaly became visible 0.15s AFTER it, and 0.23s
+before impact, at 303px/s. It sits `anomalyOffset` past the wall and the view may
+not reach it until the bubble opens the barrier, so it arrives on screen with the
+ship rather than ahead of it.
+
+Two fixes, because the camera cannot carry this alone. An instantaneous camera
+glued to the anomaly — which would itself read as the view abandoning the ship —
+reaches 0.83s, so that is the ceiling on camera work. `cameraAnomalyLead` leans the
+view toward the anomaly inside its bubble, at half weight, through the same subject
+blend a settled orbit uses and riding `barrierRelax` so it arrives with the barrier
+opening. Worth 0.23s -> 0.40 on the reported line and 0.117 -> 0.300 on a steeper
+synthetic one.
+
+**The larger half was that nothing said the grab was available.** The window is
+1.03s — from the tick the anomaly becomes the nearest body to the tick the crash
+cone refuses it — against 0.23s of being able to see the thing. So the snapshot now
+carries `grabOffer`, which is `grabTarget`'s own answer rather than a second copy
+of its four tests, and the edge marker rings the body a press would actually take.
+That distinction is the part that surprises: for the first 32 ticks inside
+`grabRange` a nearer planet would have taken the press instead, so "an anomaly is
+in range" would have been a lie.
+
+The ring survives the body coming into view — off screen it rides the arrow, on
+screen it goes round the body — because a cue that blinks out at the moment you
+can finally see the thing is worst exactly when it matters.
+
+**`orbitLock` grew a third case, and it is a framing fix rather than tidiness.** A
+planet's settle is deliberately unlocked because the oval is the drama; an
+anomaly's settle has no oval, it is a glide onto the authored circle (note 43). Left
+unlocked, the weight dipped to nothing between the approach's lean and the parked
+orbit's lock, and the lock then arrived AFTER the ship had parked and panned
+367px/s of its own — with the ship squeezed to 5% of the window width on the way
+in, against 14% with the lock held through.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -1861,11 +1917,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 95 · camera 50
+tests    port-equality 11 · invariants 32 · render 97 · camera 53
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 10
          score 60 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         392 total
+         397 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

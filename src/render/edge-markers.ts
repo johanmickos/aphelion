@@ -1,5 +1,6 @@
 /**
- * Arrows at the screen edge pointing to bodies that are off-screen.
+ * Arrows at the screen edge pointing to bodies that are off-screen, and the ring
+ * that says which body a press would actually take.
  *
  * The compass needs an orbit, so it only exists during a capture. These are
  * always on, which is what gives you any spatial sense at all during a long
@@ -51,12 +52,27 @@ export function drawEdgeMarkers(
   const boxB = winT + winH - rcfg.edgeMarkerInset * s;
 
   ctx.save();
-  for (const b of bodies) {
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i]!;
     const bx = toScreenX(cam, b.x);
     const by = toScreenY(cam, b.y);
     const r = b.R * s;
     const onScreen = bx > winL - r && bx < winL + winW + r && by > winT - r && by < winT + winH + r;
-    if (onScreen) continue;
+    if (onScreen) {
+      // The cue must not blink out at the moment the thing it points at comes
+      // into view — that is exactly when the player is deciding. Same ring, drawn
+      // around the body instead of around an arrow to it.
+      if (i === snap.grabOffer) {
+        ctx.save();
+        ctx.strokeStyle = b.kind === 'anomaly' ? 'rgba(214,164,255,.7)' : 'rgba(190,215,245,.6)';
+        ctx.lineWidth = 1.5 * s;
+        ctx.beginPath();
+        ctx.arc(bx, by, r + 10 * s, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      continue;
+    }
 
     // Upward only, EXCEPT anomalies. The rule exists because an arrow pointing
     // back down the climb is clutter and a suggestion to turn around — but an
@@ -88,7 +104,13 @@ export function drawEdgeMarkers(
     const ex = cx + dx * t;
     const ey = cy + dy * t;
 
-    const near = Math.max(0.35, Math.min(1, 1 - (dist - 200) / 1400));
+    // Full strength for the one a press would take, whatever the distance fade
+    // would otherwise say. That is the difference between "there is an anomaly
+    // over there" and "take it now", and it was the missing half of the approach:
+    // measured on the session that reported it, the ship was inside the grab
+    // window for 1.03s and could see the anomaly itself for 0.23 of that.
+    const offered = i === snap.grabOffer;
+    const near = offered ? 1 : Math.max(0.35, Math.min(1, 1 - (dist - 200) / 1400));
     const ang = Math.atan2(dy, dx);
 
     ctx.save();
@@ -105,6 +127,18 @@ export function drawEdgeMarkers(
     ctx.closePath();
     ctx.fill();
     ctx.restore();
+
+    // The ring is the cue, and it rides the arrow rather than the label so it
+    // reads at a glance from the same place the eye already is.
+    if (offered) {
+      ctx.save();
+      ctx.strokeStyle = purple ? 'rgba(214,164,255,.85)' : 'rgba(190,215,245,.8)';
+      ctx.lineWidth = 1.5 * s;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 9 * s, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     const label = dist >= 1000 ? `${(dist / 1000).toFixed(1)}k` : String(Math.round(dist));
     ctx.fillStyle = purple

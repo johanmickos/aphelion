@@ -1311,6 +1311,45 @@ describe('edge markers point up the climb', () => {
     return (r.calls('translate') as Array<[string, number, number]>).map((o) => o[2]);
   }
 
+  /** Arc radii drawn for a ship at (x, y) with `grabOffer` pointing at `offer`. */
+  function ringsFor(x: number, y: number, offer: number) {
+    const c = cam();
+    const state = createInitialState(sim);
+    const snap = { ...captureSnapshot(state, false, sim), x, y, grabOffer: offer };
+    centerCamera(c, snap.x, snap.y, field, null);
+    const r = recordingContext();
+    drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies);
+    return (r.calls('arc') as Array<[string, number, number, number]>).length;
+  }
+
+  it('rings the one body a press would actually take', () => {
+    // The missing half of an anomaly approach. Measured on the session that
+    // reported it, the ship was inside the grab window for 1.03s and could see the
+    // anomaly for 0.23 of it — the rest was spent reading an arrow that looked the
+    // same whether a press would work or not.
+    //
+    // `grabOffer` is `grabTarget`'s answer, so the ring means what a press means,
+    // including the part that surprises: a nearer planet takes the press instead.
+    const b = bodies.findIndex((x) => x.kind === 'anomaly');
+    const a = bodies[b]!;
+    // far enough that the anomaly is off screen, so this is the arrow case
+    const x = a.x + 420;
+    const y = a.y + 120;
+    expect(ringsFor(x, y, -1), 'a ring appeared with nothing on offer').toBe(0);
+    expect(ringsFor(x, y, b), 'no ring for the offered body').toBe(1);
+  });
+
+  it('keeps the ring when the body comes into view', () => {
+    // The cue must not blink out at the moment the thing it points at appears —
+    // that is exactly when the decision is being made. Off screen it rides the
+    // arrow; on screen it goes round the body.
+    const b = bodies.findIndex((x) => x.kind === 'anomaly');
+    const a = bodies[b]!;
+    // right beside it: the anomaly is on screen, so no arrow is drawn at all
+    expect(ringsFor(a.x + 60, a.y, -1)).toBe(0);
+    expect(ringsFor(a.x + 60, a.y, b)).toBe(1);
+  });
+
   it('never puts an arrow below the ship', () => {
     // partway up the field, so there are bodies both above and below
     const shipY = bodies[6]!.y;

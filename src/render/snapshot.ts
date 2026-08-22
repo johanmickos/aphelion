@@ -6,6 +6,7 @@
 import type { CapturePhase, EndingReason, GrabResult, SimState } from '../sim/types.ts';
 import type { SimConfig } from '../sim/config.ts';
 import { escapeSpeed, hypot } from '../sim/orbit.ts';
+import { grabTarget } from '../sim/capture.ts';
 
 export interface RenderSnapshot {
   /** Simulation tick, so the HUD can age transient messages without a wall clock. */
@@ -51,6 +52,18 @@ export interface RenderSnapshot {
   held: boolean;
   /** The most recent grab attempt and its outcome, for the readout. */
   lastGrab: { tick: number; result: GrabResult } | null;
+  /**
+   * Index of the body a press would take right now, or -1.
+   *
+   * `grabTarget` is the simulation's single definition of what is on offer —
+   * range, fuel, the crash cone and the targeting rule, which is the part that
+   * surprises: a press takes ONE body, so a reachable anomaly with a nearer planet
+   * beside it was never actually on offer. Asking it here rather than
+   * reimplementing the test is the whole point; a second copy would drift from it.
+   *
+   * -1 during a capture, where a press means nothing.
+   */
+  grabOffer: number;
   ending: { active: boolean; t: number; x: number; y: number; reason: EndingReason };
 }
 
@@ -92,6 +105,7 @@ export function captureSnapshot(state: SimState, held: boolean, cfg: SimConfig):
     highWaterY: state.highWaterY,
     held,
     lastGrab: state.telemetry.lastGrab ? { ...state.telemetry.lastGrab } : null,
+    grabOffer: state.capture ? -1 : grabTarget(state, cfg).index,
     ending: { ...state.ending },
   };
 }

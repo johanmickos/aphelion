@@ -78,6 +78,23 @@ export interface RenderConfig {
    * already moving.
    */
   cameraBarrierRelax: number;
+  /**
+   * How far the view leans toward an anomaly while inside its bubble, 0..1, as a
+   * weight on the same subject blend a settled orbit uses.
+   *
+   * WHY. An anomaly sits `anomalyOffset` past the wall and the view may not reach
+   * it until the bubble opens the barrier, so on a fast approach it arrives on
+   * screen almost at the same moment as the ship. Measured on the session that
+   * reported it: the anomaly's disc first appeared 0.15s AFTER the press and 0.23s
+   * before impact, at 303px/s. The lead buys 0.40-0.50s of it instead.
+   *
+   * Half, not one. At 1 the view sits on the anomaly and the ship is the thing
+   * being watched from a distance, which reads as the camera having left; at 0.5
+   * the frame holds both and the anomaly is simply in it early. The ceiling worth
+   * knowing: an instant camera glued to the anomaly reaches 0.83s, so this is most
+   * of what camera work can buy and the rest of the fix is not the camera's.
+   */
+  cameraAnomalyLead: number;
 
   // --- starfield ---
   starCount: number;
@@ -162,6 +179,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   cameraOrbitEase: 3,
   cameraBackstopEdge: 18,
   cameraBarrierRelax: 150,
+  cameraAnomalyLead: 0.5,
 
   starCount: 160,
   starParallaxMin: 0.045,

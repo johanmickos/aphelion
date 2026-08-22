@@ -13,7 +13,7 @@ import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
 import type { Input } from '../src/sim/types.ts';
 import { createLoop } from '../src/app/loop.ts';
-import { barrierRelax, frozenOrbit, orbitLock } from '../src/render/camera.ts';
+import { anomalyFocus, barrierRelax, frozenOrbit, orbitLock } from '../src/render/camera.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { centerCamera, createCamera, fitCamera, followCamera } from '../src/render/camera.ts';
 import { Scene } from '../src/render/scene.ts';
@@ -294,8 +294,17 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // A settled orbit is watched around its anchor; everything else is flown.
     const cap = snap.capture;
     const body = cap ? state.bodies[cap.planet] : null;
+    // A capture supplies its own subject; drifting inside a bubble, the anomaly
+    // is one anyway — the view leans toward it so it is on screen before the ship
+    // arrives rather than with it. One continuous movement across the press.
     const focus =
-      cap && body ? { x: body.x, y: body.y, lock: orbitLock(cap.phase, cap.settleProgress) } : null;
+      cap && body
+        ? {
+            x: body.x,
+            y: body.y,
+            lock: orbitLock(cap.phase, cap.settleProgress, body.kind === 'anomaly'),
+          }
+        : anomalyFocus(state.bodies, snap.x, snap.y, rcfg);
     followCamera(
       cam,
       rcfg,
