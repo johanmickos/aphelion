@@ -361,6 +361,42 @@ export interface SimConfig {
    * floor then caught it, destroying 44% of its speed in one substep, which is
    * what the 56-degree kink and "stuck to the surface" both were.
    */
+  /**
+   * A flyby gets its clearance impulse at the PRESS, not only if it converts.
+   *
+   * WHY. This is the floor pin, reported twice from a phone as "my ship got stuck
+   * on the surface" and "I got stuck when trying a kinky capture". The chain, all
+   * confirmed:
+   *
+   * 1. A near-radial flyby dives into the minimum-orbit floor.
+   * 2. The clamp cancels inward radial velocity every substep; with no tangential
+   *    component left, the total reaches exactly zero.
+   * 3. Below 1px/s the flyby brake is off, so no fuel burns and nothing pushes.
+   * 4. Conversion needs `vrad < 0`. At rest it is not, so the capture never
+   *    converts — and `applyClearance`, the thing that exists to stop a dive
+   *    reaching the floor, is gated behind exactly that conversion.
+   * 5. Gravity pulls in, the clamp cancels it. Stable equilibrium.
+   * 6. On release the velocity is still zero, so the ship drifts at zero forever.
+   *    It never falls behind the floor, leaves the field, or crashes. Only a
+   *    reset escapes.
+   *
+   * Measured over 1224 close, fast, near-radial presses: **23.6% pinned**, rising
+   * with speed — 6.5% at 300px/s, 34% at 500. Not a knife edge, and worst exactly
+   * where the game is being played hardest. With this on, none of the 1224 pin.
+   *
+   * The fix is to stop gating the cure behind the thing the disease prevents. A
+   * flyby aimed inside the surface becomes a grazing pass, which is what the same
+   * impulse already does for every bound dive — consistency rather than a new
+   * behaviour. Collateral over 1599 flyby presses with realistic aim: conversions
+   * 1325 -> 1318, and 19 of the 104 that used to sit in flyby forever now resolve.
+   *
+   * Two alternatives were measured and rejected. A minimum tangential speed at the
+   * floor clamp catches every route, but the clamp is the contact the capture feel
+   * rests on and note 38 put more bound dives onto it. Ending the run at a
+   * standstill is simplest and leaves the stall in place, trading "I got stuck"
+   * for "I died for no visible reason".
+   */
+  clearanceOnFlyby: boolean;
   clearanceOnConvert: boolean;
   /**
    * The clearance nudge turns the velocity toward tangential instead of simply
@@ -523,6 +559,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   boundGrabsCapture: false,
   // Inert here — but it is also what an older report replays under. See the key.
   outboundFlybyFrac: 1,
+  clearanceOnFlyby: false,
   clearanceOnConvert: false,
   clearanceEnergyNeutral: false,
   grabRange: 0,
@@ -652,6 +689,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   holdClimbInCapture: true,
   boundGrabsCapture: true,
   outboundFlybyFrac: 0.65,
+  clearanceOnFlyby: true,
   clearanceOnConvert: true,
   clearanceEnergyNeutral: true,
   grabRange: 560,
@@ -673,7 +711,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 17;
+export const SIM_VERSION = 18;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

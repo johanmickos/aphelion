@@ -266,7 +266,13 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     // Also what stops the periapsis detector — which never runs now — from ever
     // freezing this capture a second time.
     cap.passedPeri = true;
-  } else if (!isFlyby) {
+  } else if (!isFlyby || cfg.clearanceOnFlyby) {
+    // A flyby gets this too, and the reason is the floor pin: `applyClearance`
+    // exists to stop a dive reaching the minimum-orbit floor, and gating it on
+    // conversion gated it behind the very thing a stalled flyby cannot do. It is
+    // a no-op unless the natural periapsis is already inside the floor, so the
+    // flybys that would have sailed clear anyway do not notice. See
+    // `clearanceOnFlyby`.
     applyClearance(cap, cfg);
   }
 
