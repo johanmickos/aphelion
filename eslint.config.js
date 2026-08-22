@@ -3,7 +3,12 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'golden/**', 'index.html', 'node_modules/**'] },
+  // `**/dist/**` and not `dist/**`: .gitignore's `dist/` matches build output at
+  // any depth and ESLint's does not, so a `dist` inside a git worktree under
+  // .claude/ was linted as source — 228 errors about `document` being undefined
+  // in a minified bundle, which blocked `pnpm check` for reasons unrelated to any
+  // change being made.
+  { ignores: ['**/dist/**', 'golden/**', 'index.html', '**/node_modules/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,
