@@ -181,7 +181,7 @@
         text-align: center;
       }
 
-      #diag {
+      #debug {
         position: absolute;
         inset: 0;
         z-index: 10;
@@ -194,28 +194,28 @@
           calc(env(safe-area-inset-bottom, 0px) + 14px)
           calc(env(safe-area-inset-left, 0px) + 14px);
       }
-      #diag.open {
+      #debug.open {
         display: flex;
       }
-      #diag h1 {
+      #debug h1 {
         font: 600 12px/1.4 ui-monospace, monospace;
         letter-spacing: 0.12em;
         color: #eef3fb;
         margin: 0;
       }
-      #diagMeta,
-      #diagBuild {
+      #debugMeta,
+      #debugBuild {
         font: 10px/1.6 ui-monospace, monospace;
         color: #8595b0;
         white-space: pre-wrap;
       }
-      #diagBuild {
+      #debugBuild {
         color: #5b6a86;
       }
       /* The report has to be selectable and copyable, so the callout comes back
          here — this is the one place a loupe is wanted. */
-      #diagNote,
-      #diagOut {
+      #debugNote,
+      #debugOut {
         -webkit-touch-callout: default;
         -webkit-user-modify: read-write-plaintext-only;
         display: block;
@@ -230,21 +230,21 @@
         -webkit-user-select: text;
         user-select: text;
       }
-      #diagNote {
+      #debugNote {
         flex: 0 0 72px;
       }
-      #diagOut {
+      #debugOut {
         flex: 1 1 0;
         /* Flex items default to min-height:auto and refuse to shrink; without
            this the output box pushes the buttons off the bottom. */
         min-height: 60px;
       }
-      #diagRow {
+      #debugRow {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
       }
-      #diagRow .ctl {
+      #debugRow .ctl {
         flex: 1 1 auto;
         /* Same story horizontally: min-width:auto is why the row overflowed. */
         min-width: 0;
@@ -324,7 +324,7 @@
     <div id="controls">
       <button class="ctl" id="tuneBtn">TUNE</button>
       <button class="ctl" id="reset">RESET</button>
-      <button class="ctl" id="diagBtn">DIAG</button>
+      <button class="ctl" id="debugBtn">DEBUG</button>
       <button class="ctl" id="flag">⚑</button>
     </div>
 
@@ -339,19 +339,19 @@
       </div>
     </div>
 
-    <div id="diag">
-      <h1>DIAGNOSTICS</h1>
-      <div id="diagMeta"></div>
-      <div id="diagBuild"></div>
+    <div id="debug">
+      <h1>DEBUG DIAGNOSTICS</h1>
+      <div id="debugMeta"></div>
+      <div id="debugBuild"></div>
       <textarea
-        id="diagNote"
+        id="debugNote"
         placeholder="What felt wrong? (e.g. 'the settle jerked here', 'grab was refused but I had room')"
       ></textarea>
-      <textarea id="diagOut" readonly spellcheck="false"></textarea>
-      <div id="diagRow">
-        <button class="ctl" id="diagSend">SEND</button>
-        <button class="ctl" id="diagCopy">COPY</button>
-        <button class="ctl" id="diagClose">CLOSE</button>
+      <textarea id="debugOut" readonly spellcheck="false"></textarea>
+      <div id="debugRow">
+        <button class="ctl" id="debugSend">SEND</button>
+        <button class="ctl" id="debugCopy">COPY</button>
+        <button class="ctl" id="debugClose">CLOSE</button>
       </div>
     </div>
 
@@ -359,7 +359,10 @@
       <div id="armedInner">
         <div id="armedTitle">APHELION</div>
         <div id="armedHint">tap to start</div>
-        <div id="armedSub">press and hold near a planet to be caught by it</div>
+        <div id="armedSub">
+          press and hold near a planet to be caught by it</br>
+          hold longer to orbit
+        </div>
         <div id="armedMap">
           <button class="ctl" id="newMap">⟳ NEW MAP</button>
           <div id="armedSeed"></div>

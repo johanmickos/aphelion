@@ -99,7 +99,7 @@ let pressedEdge = false;
 let releasedEdge = false;
 canvas.addEventListener('pointerdown', (e) => {
   // Controls sit above the canvas; a tap on one must not also be a grab.
-  if ((e.target as HTMLElement | null)?.closest('.ctl, #diag, #tune')) return;
+  if ((e.target as HTMLElement | null)?.closest('.ctl, #debug, #tune')) return;
   // Right and middle click raise pointerdown too, and the context menu is
   // suppressed over the canvas — so without this a right-click is a silent grab
   // with no way to see why. Touch contact reports button 0, so the phone is
@@ -144,7 +144,7 @@ addEventListener('keydown', (e) => {
     code: e.code,
     repeat: e.repeat,
     typing: isTypingTarget(e.target),
-    panelOpen: tuneEl.classList.contains('open') || diagEl.classList.contains('open'),
+    panelOpen: tuneEl.classList.contains('open') || debugEl.classList.contains('open'),
     armed: life.phase === 'armed',
   });
   if (action === 'ignore') return;
@@ -185,7 +185,8 @@ addEventListener('blur', up);
  * the fallback when the clipboard API is unavailable, which is exactly the case
  * on a LAN dev server.
  */
-const inPanel = (t: EventTarget | null): boolean => !!(t as HTMLElement | null)?.closest?.('#diag');
+const inPanel = (t: EventTarget | null): boolean =>
+  !!(t as HTMLElement | null)?.closest?.('#debug');
 
 const suppressGesture = (e: Event): void => {
   if (inPanel(e.target)) return;
@@ -321,14 +322,14 @@ loop.start();
 // it the moment something feels wrong and keep going. The panel then produces a
 // report that replays the whole session elsewhere, exactly.
 const flagBtn = document.getElementById('flag') as HTMLButtonElement;
-const diagBtn = document.getElementById('diagBtn') as HTMLButtonElement;
-const diagEl = document.getElementById('diag') as HTMLDivElement;
-const diagMeta = document.getElementById('diagMeta') as HTMLDivElement;
-const diagNote = document.getElementById('diagNote') as HTMLTextAreaElement;
-const diagOut = document.getElementById('diagOut') as HTMLTextAreaElement;
-const diagCopy = document.getElementById('diagCopy') as HTMLButtonElement;
-const diagSend = document.getElementById('diagSend') as HTMLButtonElement;
-const diagBuild = document.getElementById('diagBuild') as HTMLDivElement;
+const debugBtn = document.getElementById('debugBtn') as HTMLButtonElement;
+const debugEl = document.getElementById('debug') as HTMLDivElement;
+const debugMeta = document.getElementById('debugMeta') as HTMLDivElement;
+const debugNote = document.getElementById('debugNote') as HTMLTextAreaElement;
+const debugOut = document.getElementById('debugOut') as HTMLTextAreaElement;
+const debugCopy = document.getElementById('debugCopy') as HTMLButtonElement;
+const debugSend = document.getElementById('debugSend') as HTMLButtonElement;
+const debugBuild = document.getElementById('debugBuild') as HTMLDivElement;
 const resetBtn = document.getElementById('reset') as HTMLButtonElement;
 
 /**
@@ -363,7 +364,7 @@ resetBtn.addEventListener('click', (e) => {
   }
   location.reload();
 });
-const diagClose = document.getElementById('diagClose') as HTMLButtonElement;
+const debugClose = document.getElementById('debugClose') as HTMLButtonElement;
 
 flagBtn.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -379,7 +380,7 @@ function refreshReport(): string {
     config: sim,
     seed,
     ticks: state.tick,
-    note: diagNote.value,
+    note: debugNote.value,
     // Carried so a replay can tell a session played on this build from one
     // played on the bundle that was open ten minutes ago.
     loadedAt: PAGE_LOADED_AT.toISOString(),
@@ -392,34 +393,34 @@ function refreshReport(): string {
   });
   const text = serializeReport(report);
   const s = summarize(report);
-  diagMeta.textContent =
+  debugMeta.textContent =
     `${s.seconds.toFixed(1)}s · ${report.ticks} ticks · ${s.grabs} grabs · ` +
     `${s.marks} flagged · ${report.checks.length} checkpoints\n` +
     `${(text.length / 1024).toFixed(1)} KB — paste this into the conversation`;
-  diagOut.value = text;
+  debugOut.value = text;
   // Stale-bundle check: if this timestamp is older than your last edit, the page
   // needs RELOAD.
-  diagBuild.textContent = `page loaded ${PAGE_LOADED} — press RELOAD if that predates your last edit`;
+  debugBuild.textContent = `page loaded ${PAGE_LOADED} — press RELOAD if that predates your last edit`;
   return text;
 }
 
-diagBtn.addEventListener('click', (e) => {
+debugBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   paused = true;
   refreshReport();
-  diagEl.classList.add('open');
+  debugEl.classList.add('open');
 });
 
-diagNote.addEventListener('input', refreshReport);
+debugNote.addEventListener('input', refreshReport);
 
-diagClose.addEventListener('click', (e) => {
+debugClose.addEventListener('click', (e) => {
   e.stopPropagation();
-  diagEl.classList.remove('open');
+  debugEl.classList.remove('open');
   paused = document.hidden;
   loop.resetClock();
 });
 
-diagCopy.addEventListener('click', async (e) => {
+debugCopy.addEventListener('click', async (e) => {
   e.stopPropagation();
   const text = refreshReport();
   let ok = false;
@@ -433,11 +434,11 @@ diagCopy.addEventListener('click', async (e) => {
     ok = false;
   }
   if (!ok) {
-    diagOut.focus();
-    diagOut.setSelectionRange(0, diagOut.value.length);
+    debugOut.focus();
+    debugOut.setSelectionRange(0, debugOut.value.length);
   }
-  diagCopy.textContent = ok ? 'COPIED ✓' : 'SELECTED — long-press to copy';
-  setTimeout(() => (diagCopy.textContent = 'COPY REPORT'), 2200);
+  debugCopy.textContent = ok ? 'COPIED ✓' : 'SELECTED — long-press to copy';
+  setTimeout(() => (debugCopy.textContent = 'COPY REPORT'), 2200);
 });
 
 // Sending straight to the dev server is the short feedback loop: press it on the
@@ -447,10 +448,10 @@ diagCopy.addEventListener('click', async (e) => {
 // Dev only. `import.meta.env.DEV` is a compile-time constant, so this whole block
 // — and the button it reveals — is eliminated from a production build.
 if (import.meta.env.DEV) {
-  diagSend.addEventListener('click', async (e) => {
+  debugSend.addEventListener('click', async (e) => {
     e.stopPropagation();
     const text = refreshReport();
-    diagSend.textContent = 'SENDING…';
+    debugSend.textContent = 'SENDING…';
     try {
       const res = await fetch('/__diag', {
         method: 'POST',
@@ -459,19 +460,19 @@ if (import.meta.env.DEV) {
       });
       const out = (await res.json()) as { ok: boolean; fidelity?: string; error?: string };
       if (!out.ok) throw new Error(out.error ?? 'rejected');
-      diagSend.textContent = `SENT ✓ ${out.fidelity ?? ''}`.trim();
+      debugSend.textContent = `SENT ✓ ${out.fidelity ?? ''}`.trim();
       recorder.clearMarkers();
-      diagNote.value = '';
+      debugNote.value = '';
       flagBtn.textContent = '⚑';
     } catch (err) {
-      diagSend.textContent = 'FAILED — use COPY';
+      debugSend.textContent = 'FAILED — use COPY';
       console.error('diagnostics send failed', err);
     }
-    setTimeout(() => (diagSend.textContent = 'SEND'), 2600);
+    setTimeout(() => (debugSend.textContent = 'SEND'), 2600);
   });
 } else {
   // Not merely hidden: the button should not exist in a shipped build.
-  diagSend.remove();
+  debugSend.remove();
 }
 
 // ------------------------------------------------------------------ lifecycle
