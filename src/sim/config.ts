@@ -874,10 +874,10 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
    * leaves noticeably harder than an ordinary release without out-running the
    * whip, which is still where speed properly comes from.
    *
-   * 34 first, raised on the author's report that it "should be slightly
-   * stronger". A feel knob: nothing measures it, and nothing can.
+   * 34 first, then 48, then this, on two reports that it should be stronger. A
+   * feel knob: nothing measures it, and nothing can.
    */
-  escapeFling: 48,
+  escapeFling: 64,
   escapeRefund: 0.5,
 } satisfies SimConfig);
 

@@ -592,6 +592,76 @@ describe('scene', () => {
     );
   });
 
+  it('says SAFE in green when a rescue pays, and Nice! for the press that dared', () => {
+    // Two beats, one slot, a median 0.38s apart: you dared, then you made it.
+    // SAFE takes the slot while it is running, because it is the one that resolves
+    // the question. Green is `FUEL_RAMP`'s full end — this game's existing word
+    // for "everything is fine" — and deliberately not the accolade ladder's green,
+    // which means a rung.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const scene = new Scene(
+      { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
+      99,
+    );
+    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
+    centerCamera(c, snap.x, snap.y, f, null);
+
+    const say = (
+      verdict: Partial<ScoreState>,
+      tickOffset = 0,
+    ): { text: string[]; green: boolean } => {
+      const r = recordingContext();
+      scene.draw(
+        r.ctx,
+        c,
+        { ...snap, tick: snap.tick + tickOffset },
+        {
+          timeMs: 0,
+          paused: false,
+          viewportW: 390,
+          viewportH: 844,
+          headerBottom: 0,
+          frameDt: 1 / 60,
+          score: { ...createScoreState(), ...verdict },
+        },
+      );
+      return {
+        text: r.ops.filter((op) => op[0] === 'fillText').map((op) => String(op[1])),
+        green: r.ops.some((op) => op[0] === '=fillStyle' && op[1] === rcfg.safeColor),
+      };
+    };
+
+    const safe = say({ tight: { side: 1, tick: snap.tick } });
+    expect(safe.text, 'the recovery').toContain('SAFE');
+    expect(safe.green, 'in the green the fuel gauge calls full').toBe(true);
+
+    expect(say({ nice: { side: 1, tick: snap.tick } }).text, 'the press that dared').toContain(
+      'Nice!',
+    );
+
+    // Both owed: SAFE wins the slot.
+    const both = say({
+      nice: { side: 1, tick: snap.tick },
+      tight: { side: 1, tick: snap.tick },
+    });
+    expect(both.text).toContain('SAFE');
+    expect(both.text).not.toContain('Nice!');
+
+    // The skull outranks both: there is no good news to give.
+    const doomed = say({
+      doomed: { side: 1, tick: snap.tick },
+      tight: { side: 1, tick: snap.tick },
+    });
+    expect(doomed.text).not.toContain('SAFE');
+
+    // Nice! is the shorter of the two, so it is not still talking when the answer
+    // arrives.
+    expect(say({ nice: { side: 1, tick: snap.tick } }, 60).text, 'expired').not.toContain('Nice!');
+  });
+
   it('never draws an arm longer than the clamp, however far away the cross is', () => {
     // The cross sits a median 432px ahead and 1551px at p90, against a 390-wide
     // viewport — so without the clamp the common case is a line across the map.

@@ -40,6 +40,25 @@ import { shipWorldPos } from '../sim/step.ts';
 import { readAim } from './aim.ts';
 import { edgeHeat } from './burn.ts';
 import { rescueScar } from '../sim/rescue.ts';
+
+/**
+ * How much of the rescue window a press has to spend to earn a word.
+ *
+ * A CONSTANT NEXT TO ITS CODE and not a `ScoreConfig` weight, on the rule that a
+ * value which decides WHEN something is judged and never what it costs is not a
+ * weight. Nothing here pays a point: the rescue award already pays, on a
+ * continuous scale, and this only decides whether the ship says so.
+ *
+ * 0.86 is the 90th percentile of the quality actually paid across the corpus —
+ * p25 0.30, median 0.56, p75 0.78 — so it fires about 0.36 times a session. That
+ * makes it roughly as rare as the rarest words already in `praise.ts`, which is
+ * the frequency "very close to the last second" ought to have.
+ *
+ * PROVISIONAL, in a knowable direction. Every press in that sample was made
+ * BLIND, before the cross could be drawn, so presses will move later and this
+ * will want raising. Re-measure rather than adjusting on feel.
+ */
+export const NICE_QUALITY = 0.86;
 import { isNerveGrab } from './praise.ts';
 import {
   BONK_SPEED,
@@ -119,6 +138,8 @@ export function createScoreState(): ScoreState {
     rescue: null,
     rescued: [],
     doomed: null,
+    nice: null,
+    tight: null,
     hopped: [],
     wasCharged: false,
     hopTotal: 0,
@@ -181,6 +202,8 @@ function endLife(sc: ScoreState): void {
   sc.rescue = null;
   sc.rescued.length = 0;
   sc.doomed = null;
+  sc.nice = null;
+  sc.tight = null;
   sc.hopped.length = 0;
   // A death ends the window without a tally. Left set, the falling edge would be
   // seen on the first tick after the respawn and the player would be shown a
@@ -365,6 +388,7 @@ export function scoreTick(
     // a quality that was read at a different press against a different wall.
     sc.rescue = null;
     sc.doomed = null;
+    sc.nice = null;
     if (!sc.capKinked) sc.recklessStreak = 0;
     sc.capKinked = false;
     sc.inKink = false;
@@ -380,6 +404,13 @@ export function scoreTick(
       const armed = armRescue(sc, state, cfg, scfg, dt);
       sc.rescue = armed.rescue;
       sc.doomed = armed.doomed;
+      // Praise for the commitment, at the instant it is made. A press past the
+      // cross is not "nice", it is doomed, and `armRescue` reports that
+      // separately — so this only ever fires on a press that still works.
+      sc.nice =
+        armed.rescue && armed.rescue.quality >= NICE_QUALITY && !armed.doomed
+          ? { side: armed.rescue.side, tick: state.tick }
+          : null;
       // The press distance, for a zipped capture exactly as for a flown one, and
       // that is a correction to what this was nearly changed to.
       //
@@ -498,7 +529,12 @@ export function scoreTick(
       if (cap.vx * r.side <= 0) {
         sc.rescue = null;
         const award = awardRescue(sc, state, scfg, r);
-        if (award) awards.push(award);
+        if (award) {
+          awards.push(award);
+          // You recovered. Every rescue award is one, so this is not gated on the
+          // fire — the fire has its own word and its own points.
+          sc.tight = { side: r.side, tick: state.tick };
+        }
       }
     }
 

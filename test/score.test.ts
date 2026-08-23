@@ -721,57 +721,41 @@ describe('the skull: a press made past the last chance', () => {
   });
 });
 
-describe('the word for getting out of the fire', () => {
-  it('carries the heat it turned away at, and earns a word only when alight', () => {
-    // "By tight I mean the player would've been in the flames section of the
-    // side" — which needs no threshold, because `burnHeat` is already a fact.
-    // Measured over the corpus, 12% of rescues qualify, 0.4 a session, and their
-    // presses run a median quality of 0.81 against 0.54 for the cold ones.
-    const cold = play([[60, 1]], 600, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, {
-      x: 165.5,
-      y: 150,
-      vx: 150,
-      vy: -60,
-    });
-    const a = cold.awards.find((w) => w.kind === 'rescue');
-    expect(a, 'the fixture is meant to rescue itself').toBeTruthy();
-    expect(a!.heat, 'this one never caught fire').toBe(0);
-    expect(praiseFor(a!), 'so it earns no word').toBeNull();
+describe('what the ship says about a rescue', () => {
+  const WALL_DRIFT = { x: 165.5, y: 150, vx: 150, vy: -60 };
+  const run = (at: number) =>
+    play([[at, 1]], 600, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, WALL_DRIFT);
+
+  it('says SAFE for any rescue that pays, because every one is a recovery', () => {
+    const s = run(60);
+    expect(
+      s.awards.some((a) => a.kind === 'rescue'),
+      'the fixture is meant to rescue itself',
+    ).toBe(true);
+    expect(s.score.tight, 'and it recovered').not.toBeNull();
   });
 
-  it('says it in the escape vocabulary, on its own axis', () => {
-    // Synthesised rather than flown: an alight rescue is 0.4 of a session and the
-    // battery has none. What is being pinned is the rule, not the fixture.
-    const alight: ScoreAward = {
-      tick: 100,
-      kind: 'rescue',
-      points: 400,
-      multiplier: 1,
-      body: 'P4',
-      close: 0,
-      clearance: Infinity,
-      skim: Infinity,
-      defl: 0,
-      timing: 0.9,
-      aim: 0,
-      climb: 0,
-      heat: 0.6,
-    };
-    const p = praiseFor(alight);
-    expect(p, 'an alight rescue earns a word').not.toBeNull();
-    expect(p!.category).toBe('escape');
-    expect(WORDS.escape[0]).toContain(p!.word);
-    // One tier, so both slots hold the same words: the axis has no measured
-    // threshold to split on, and inventing one would calibrate against play that
-    // could not see the line.
-    expect(WORDS.escape[0]).toEqual(WORDS.escape[1]);
+  it('says Nice! only for a press very close to the last one that works', () => {
+    // Tick 60 spends 0.71 of the window, tick 100 spends 0.99. The threshold is
+    // the 90th percentile of the quality actually paid across the corpus.
+    const loose = run(60);
+    const tight = run(100);
+    expect(loose.score.nice, 'a press with most of the window left says nothing').toBeNull();
+    expect(tight.score.nice, 'one that shaves it does').not.toBeNull();
   });
 
-  it('is a different axis from the burn, which is about having been in it', () => {
-    const escape = WORDS.escape.flat();
-    for (const w of WORDS.burn.flat()) {
-      expect(escape, `${w} belongs to the burn, not the escape`).not.toContain(w);
-    }
+  it('says nothing at all about a press that was already too late', () => {
+    // Doomed and "nice" are mutually exclusive by construction: the praise is for
+    // daring, and a press past the cross was not daring, it was late.
+    const late = run(120);
+    expect(late.score.nice).toBeNull();
+  });
+
+  it('earns no praise WORD, because the burn already has one', () => {
+    // It had an `escape` axis for a session — DOUSED, CLEARED — and it was
+    // withdrawn: "we already have the point reward from going through flames".
+    const a = run(60).awards.find((w) => w.kind === 'rescue')!;
+    expect(praiseFor(a), 'a rescue speaks beside the ship, not in the popups').toBeNull();
   });
 });
 

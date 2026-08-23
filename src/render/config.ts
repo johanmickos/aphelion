@@ -196,13 +196,22 @@ export interface RenderConfig {
    */
   doomAlpha: number;
   /**
-   * Peak alpha of the tight-rescue spark.
+   * Peak alpha of the SAFE and Nice! labels.
    *
-   * Quieter than the skull. It is colourless where the skull is red, so it needs
-   * less alpha to carry — and it reports something that already went right, which
-   * does not have to interrupt.
+   * Quieter than the skull: they report something that went right, which does not
+   * have to interrupt.
    */
   tightAlpha: number;
+  /**
+   * Colour of the two good verdicts.
+   *
+   * `FUEL_RAMP`'s full end, which is already this game's word for "everything is
+   * fine" and is already a badge colour drawn beside the ship — `fuel-warning.ts`
+   * takes both of its colours from the same ramp. Deliberately NOT the accolade
+   * ladder's green `#5cd67a`: that one means a rung, and a badge borrowing it
+   * would claim a rarity it is not on.
+   */
+  safeColor: string;
   /**
    * Seconds a tick represents, for the verdict badges that beat on the tick.
    *
@@ -332,7 +341,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarPrizeFull: 860,
 
   doomAlpha: 0.78,
-  tightAlpha: 0.66,
+  tightAlpha: 0.72,
+  safeColor: '#54F39A',
   verdictTickSecs: 1 / 60,
   scarArmWidth: 1.3,
   scarBarWidth: 1.7,

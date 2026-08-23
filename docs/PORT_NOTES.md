@@ -3394,22 +3394,40 @@ still out of pocket. It matters less than it sounds only because 67% of escapes
 never reach the first refund at all — 46% are released while still a flyby and 21%
 never braked.
 
-**The word moved, and where it went is the point.** A tight rescue had a badge
-beside the ship: first a spark, then the word SAFE. Asked for instead as "a small
-red verbal confirmation ... just like we do for tight planetary captures and
-exits", which is precisely what the popup praise words are. So the confirmation is
-now an `escape` axis in `praise.ts` — DOUSED and CLEARED, drawn in the burn's
-ember — and the badge beside the ship is the skull alone. Two announcements of one
-event, one beside the ship and one above it, was one too many.
+**What a rescue says went around the houses, and where it landed matters.** It was
+a spark beside the ship, then the word SAFE, then an `escape` praise axis in the
+popups — DOUSED and CLEARED in the burn's ember — and then back beside the ship
+again. The praise axis lasted one session and was withdrawn with the reason that
+retires it for good: *"we already have the point reward from going through
+flames"*. The burn pays for the fire and names it in its own word; a second word
+about the same fire in the same second was the vocabulary arguing with itself. Do
+not re-add it.
 
-**The axis has no threshold, and cannot need one.** A rescue award carries `heat`:
-the heat the ship was at when it turned away. The word fires on `heat > 0`, which
-is the author's own definition — "the player would've been in the flames section
-of the side" — and being alight is a fact rather than a percentile of one. One
-tier for the same reason: splitting it would need a measured percentile, and every
-recording predates the line being drawable, so the split would be calibrated
-against a game the player could not see. Two words rather than three or four, on
-the playtest's finding that 3-4 synonyms a tier means no word is ever seen twice.
+**So the verdict slot beside the ship carries three beats, and they are a
+sequence rather than a choice:**
+
+```
+  Nice!   at the PRESS, if it spent at least NICE_QUALITY of the window
+  SAFE    when the rescue pays, because every rescue award is a recovery
+  skull   instead of either, when the press was already too late
+```
+
+Nice! and SAFE land a median 0.38s apart — you dared, then you made it — so SAFE
+simply takes the slot while it runs, being the one that resolves the question.
+Both are drawn in `FUEL_RAMP`'s full end, this game's existing word for
+"everything is fine" and already a badge colour beside the ship, and deliberately
+NOT the accolade ladder's green: that one means a rung, and a badge borrowing it
+would claim a rarity it is not on.
+
+**`NICE_QUALITY` is the one threshold in any of this, and it is provisional.** SAFE
+needs none — every rescue is a recovery — and the skull needs none, because past
+the cross is a fact. But "very close to the last second" has no natural edge, so it
+is the 90th percentile of the quality actually paid across the corpus, 0.86, firing
+about 0.36 times a session. Every press in that sample was made blind, before the
+cross could be drawn, so presses will move later and this will want raising.
+Re-measure rather than adjusting on feel. It is a constant beside its code and not
+a `ScoreConfig` weight, on the rule that a value deciding WHEN something is judged
+and never what it costs is not a weight.
 
 **`SIM_VERSION` 20 -> 21**, and the golden was recaptured twice as keys were added
 — three lines each time, no numbers. The equality gate never moved off zero,
