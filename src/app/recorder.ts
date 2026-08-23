@@ -21,8 +21,13 @@ export type InputRecord = [number, 0 | 1];
 /**
  * One scoring event exactly as the phone paid it.
  *
- * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body]`
- * with `kind` 'g' for a grab and 'l' for a link.
+ * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body, heat]`
+ * with `kind` 'g' for a grab, 'l' for a link and 'b' for a burn.
+ *
+ * `heat` is last and optional because it was added after the format was in use:
+ * reports recorded before the burn shipped simply end at `body`, and a reader
+ * that defaults the missing field to zero reads them correctly rather than
+ * rejecting the corpus the scoring was calibrated on.
  *
  * WHY THIS IS RECORDED AT ALL, when a score is a pure function of
  * (config, seed, inputLog) and a replay can recompute it: because in practice
@@ -43,7 +48,7 @@ export type InputRecord = [number, 0 | 1];
  */
 export type AwardRecord = [
   number,
-  'g' | 'l',
+  'g' | 'l' | 'b',
   number,
   number,
   number,
@@ -54,6 +59,7 @@ export type AwardRecord = [
   number,
   number,
   string,
+  number?,
 ];
 /**
  * [tick, fingerprint, x, y, vx, vy, fuel, phase]
@@ -137,7 +143,7 @@ export class RunRecorder {
     for (const a of awards) {
       this.awards.push([
         a.tick,
-        a.kind === 'grab' ? 'g' : 'l',
+        a.kind === 'grab' ? 'g' : a.kind === 'burn' ? 'b' : 'l',
         Math.round(a.points),
         q(a.multiplier),
         q(a.close),
@@ -148,6 +154,7 @@ export class RunRecorder {
         q(a.aim),
         Math.round(a.climb),
         a.body,
+        q(a.heat),
       ]);
       if (this.awards.length > this.opts.maxAwards) {
         this.awards.shift();

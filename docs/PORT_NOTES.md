@@ -2054,6 +2054,76 @@ against 933 at the plain rate.
 
 ---
 
+### 49 — Closeness is given away, so the burn had to be paid for in speed
+
+`src/score/burn.ts` · **[ADDED]** · requested as "a fire-like flare and red point
+boost when I pull really close to the edge while capturing a planet, and I want
+the points to roll up while the ship is burning"
+
+Read literally, "really close to the edge" is altitude, and altitude is the one
+thing in this game that cannot be earned. The clearance correction (note 18)
+deliberately steers every dive down onto `minR`. Measured over the 1386 captures
+in `diagnostics/`, by phase, the share of captures bottoming out under 0.5px of
+clearance:
+
+```
+dive (clear)    17%
+settle          54%
+orbit (parked)  68%
+```
+
+Two thirds of settled orbits sit at EXACTLY zero. A burn gated on depth would
+have paid most for holding still on the floor — the idle faucet the grab award
+already refuses to open by paying at periapsis rather than at the press.
+
+**Speed is what separates a hot pass from parking, and it separates it cleanly.**
+A parked minimum orbit is a slow circle: across the whole corpus its speed never
+exceeds 342px/s, while a dive whipping through periapsis reaches 430-570. So heat
+is `depth * speed` with the speed term starting at 360, just above everything
+parking can reach, and of the captures that flare, **zero flare while parked**.
+That is also the physics the flame is drawing — heating goes as density times
+speed cubed — so the honest mechanic and the legible picture turned out to be the
+same one.
+
+**The objection, and the measurement that answered it.** A fast periapsis needs an
+eccentric orbit, so the burn looked like it would reward being stretched far out —
+paying for the lazy distant grab that `closeBonus` exists to discourage. It does
+the opposite. Peak heat against grab clearance correlates **-0.36**, against
+apoapsis **-0.43**. A grab from 200px+ out flares 19% of the time; an apoapsis of
+400-800px flares **1%**, because a stretched approach arrives as a flyby that has
+to be braked, and braking sheds exactly the speed the heat is made of. What burns
+is the middle: apoapsis 100-200px, grabbed 25-100px out.
+
+So it does not double-pay `close`, it complements it at the opposite extreme — a
+grab from inside 10px flares **0%** of the time, having no dive left to build
+speed with, and that is precisely where `close` and the nerve bonus pay most.
+
+**The burn is a flash, and no amount of tuning makes it a burn.** Median flare
+0.17s over 760 real ones, p90 0.28s. Widening the hot zone from 30px to 80px moved
+the median to 0.18s — the speed term bounds the flare, not the altitude. A tally
+cannot be read in 0.17s, so the fire stays the length it really is and the
+READOUT is what lingers: the points are settled the instant the flame dies, and
+the popup rolls an already-decided number up over 0.8s. It is an animation of a
+finished total, not a meter that keeps earning.
+
+**What is red and what is not.** The flame is red because it is fire. The points
+and the word ride the rarity ladder like every other award, because colour on an
+award means how good it was and nothing else — see `src/render/accolade.ts`. The
+alternative was a second exception to that rule alongside the reckless shout, for
+a cue that already has a shape, a size and a position nothing else in the game
+uses.
+
+Thresholds are percentiles of the same corpus. The word fires at peak heat 0.53
+(p70 of flares, about one capture in six) and its better rung at 0.75 (p90, about
+one in eighteen); 55% of captures flare at all, and most of those earn points and
+no name. `burnRate` 1500 puts a median capture's burn at ~84 points and the best
+on record at ~205 — the band `closeBonus` and `nerveBonus` already occupy.
+
+Nothing under `src/sim/` changed: heat is read off `Capture` by an observer, the
+gate stayed at exactly zero, and no golden was recaptured.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -2076,11 +2146,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 97 · camera 55
+tests    port-equality 11 · invariants 32 · render 100 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
-         score 60 · input 8 · grab-target 8 · link-fuel 6
+         score 66 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 424 total
+         zip-charge 8 · attract 13 · 433 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

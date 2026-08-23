@@ -266,9 +266,21 @@ export function replayReport(report: DiagReport): Analysis {
   // nothing about how the session went.
   findings.push(
     `best life scored ${score.best} (${score.score} standing at the end) — ` +
-      `${score.grabs} grab(s), ${score.links} link(s), ` +
+      `${score.grabs} grab(s), ${score.links} link(s), ${score.burns} burn(s), ` +
       `best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,
   );
+  if (score.burns > 0) {
+    const burns = awards.filter((a) => a.kind === 'burn');
+    const paid = burns.reduce((n, a) => n + a.points, 0);
+    const hottest = Math.max(...burns.map((a) => a.heat));
+    // Burns per CAPTURE rather than per burn, because the question a report is
+    // being read to answer is how often a dive got hot — and a capture that dips
+    // through the hot zone twice raises two of them.
+    findings.push(
+      `${score.burns} burn(s) over ${score.grabs} capture(s) — worth ${paid}, ` +
+        `hottest ${hottest.toFixed(2)} (measured: 55% of captures flare, p90 heat 0.75)`,
+    );
+  }
   if (score.links > 0) {
     const links = awards.filter((a) => a.kind === 'link');
     const mean = (pick: (a: ScoreAward) => number): string =>
@@ -325,9 +337,23 @@ export function replayReport(report: DiagReport): Analysis {
 export function recordedAwards(report: DiagReport): ScoreAward[] | null {
   if (!report.awards?.length) return null;
   return report.awards.map(
-    ([tick, kind, points, multiplier, close, clearance, skim, defl, timing, aim, climb, body]) => ({
+    ([
       tick,
-      kind: kind === 'g' ? ('grab' as const) : ('link' as const),
+      kind,
+      points,
+      multiplier,
+      close,
+      clearance,
+      skim,
+      defl,
+      timing,
+      aim,
+      climb,
+      body,
+      heat,
+    ]) => ({
+      tick,
+      kind: kind === 'g' ? ('grab' as const) : kind === 'b' ? ('burn' as const) : ('link' as const),
       points,
       multiplier,
       body,
@@ -338,6 +364,10 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       timing,
       aim,
       climb,
+      // Appended after the field existed, so every report recorded before the
+      // burn shipped is missing it. Zero is the truth for those: nothing burned,
+      // because nothing could.
+      heat: heat ?? 0,
     }),
   );
 }
@@ -364,7 +394,8 @@ export function awardAgreement(
       r.kind === p.kind &&
       r.points === Math.round(p.points) &&
       Math.abs(r.timing - Math.round(p.timing * 100) / 100) < 1e-9 &&
-      Math.abs(r.aim - Math.round(p.aim * 100) / 100) < 1e-9;
+      Math.abs(r.aim - Math.round(p.aim * 100) / 100) < 1e-9 &&
+      Math.abs(r.heat - Math.round(p.heat * 100) / 100) < 1e-9;
     if (!same) return { matched, firstDisagreement: r.tick };
     matched++;
   }
@@ -533,7 +564,7 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
       out.push('  score — RECOMPUTED (this report predates recorded awards)');
     }
     out.push(
-      '    tick  ev     what      points   mult   close   peak    aim   defl   climb  earned',
+      '    tick  ev     what      points   mult   close   heat   peak    aim   defl   climb  earned',
     );
     for (const w of shown.slice(0, 24)) {
       out.push(
@@ -541,6 +572,7 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
           `${w.body.padEnd(10)}` +
           `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
           `${(w.kind === 'grab' ? w.close.toFixed(2) : '  · ').padStart(5)}  ` +
+          `${(w.kind === 'burn' ? w.heat.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.aim.toFixed(2) : '  · ').padStart(5)}  ` +
           `${w.defl.toFixed(0).padStart(4)}  ` +
