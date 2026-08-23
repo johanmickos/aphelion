@@ -28,8 +28,9 @@ import {
 import { FUEL_WARNING, FuelWarning, pulseAlpha } from '../src/render/fuel-warning.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
-import { BURN, LEVEL, ROUTINE, SHOUT } from '../src/render/accolade.ts';
+import { BURN, BURN_WORD, LEVEL, ROUTINE, SHOUT } from '../src/render/accolade.ts';
 import { drawBurnTally } from '../src/render/burn-tally.ts';
+import { DEFAULT_SCORE_CONFIG, edgeHeat } from '../src/score/index.ts';
 import { FUEL_RAMP } from '../src/render/hud.ts';
 import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
 import {
@@ -1933,5 +1934,45 @@ describe('the burn tally', () => {
       .calls('=fillStyle')
       .map((o) => String(o[1]));
     expect(fills).toContain(BURN.color);
+  });
+
+  it('lights the moment the ship crosses into the red band', () => {
+    // "From the second they enter the dangerous red zone." At the old threshold
+    // the fire kindled 54px out and 7% of band entries grazed the outer strip and
+    // left without ever lighting — visibly in the red with nothing happening.
+    const span = DEFAULT_SCORE_CONFIG.burnEdgeSpan;
+    const justInside = field.left + span - 1;
+    const bodies = createBodies(DEFAULT_CONFIG);
+    const heat = edgeHeat(justInside, 0, field, bodies, true, DEFAULT_SCORE_CONFIG);
+    expect(heat).toBeGreaterThan(DEFAULT_SCORE_CONFIG.burnMinHeat);
+    // And nothing at all a pixel outside it.
+    expect(edgeHeat(field.left + span + 1, 0, field, bodies, true, DEFAULT_SCORE_CONFIG)).toBe(0);
+  });
+});
+
+describe('the burn palette', () => {
+  it('is only ever fire — deep orange, red, or black', () => {
+    // "All text should be shades of deep orange or red or black, to match the
+    // singe of fire." Anything that reaches the burn channel has to satisfy that,
+    // and the cheap way to break it is to reach for a ladder colour when a drag
+    // earns no word.
+    const hexes = [BURN.color, BURN.labelColor, BURN_WORD.color, BURN_WORD.labelColor];
+    for (const hex of hexes) {
+      const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+      expect(m, `${hex} should be a plain hex so it can be checked`).not.toBeNull();
+      const [r, g, b] = [1, 2, 3].map((i) => parseInt(m![i]!, 16)) as [number, number, number];
+      // Red leads, blue trails: that is what makes it fire rather than pink,
+      // amber or anything on the rarity ladder.
+      expect(r, `${hex} red should lead`).toBeGreaterThan(g);
+      expect(g, `${hex} green should lead blue`).toBeGreaterThan(b);
+      // Not washed out toward white or amber — a singe is saturated.
+      expect(r - b, `${hex} should be saturated`).toBeGreaterThan(100);
+    }
+  });
+
+  it('keeps the word and the number in one family but tells them apart', () => {
+    // Two shades of one fire, not two colours. Close enough to read as a pair,
+    // far enough not to look like a mistake.
+    expect(BURN.color).not.toBe(BURN_WORD.color);
   });
 });

@@ -85,8 +85,12 @@ export interface ScoreConfig {
    *
    * Derived from the drags that SURVIVE, because those are the only ones that
    * ever pay — a death drops the banked flare entire. Their median integrates
-   * 0.199 heat-seconds, so 425 puts it at ~85 points, the band `closeBonus` 150
-   * and `nerveBonus` 200 already occupy. The best on record lands at ~390.
+   * 0.153 heat-seconds, so 555 puts it at ~85 points, the band `closeBonus` 150
+   * and `nerveBonus` 200 already occupy. The best on record lands at ~510.
+   *
+   * Re-derived when `burnMinHeat` dropped to the band's edge: lighting on the
+   * shallow grazes too pulled the median integral down, so the same points band
+   * needs more rate behind it.
    *
    * Worth noticing that this is a THIRD of the rate the reentry burn used, for
    * the same points: an edge-drag lasts four to ten times longer than a periapsis
@@ -101,9 +105,20 @@ export interface ScoreConfig {
    * points from a smoulder too faint to draw. A weight, not a constant, because
    * it changes what a session scores.
    *
-   * At 0.10 the fire kindles 54px from the lethal line, which is 6px inside the
-   * red band — so it catches almost exactly as the ship enters the red, and the
-   * two cues agree about when the danger starts.
+   * As close to the band's outer edge as a weight is allowed to sit. "The second
+   * they enter the dangerous red zone" is the brief, and the honest value for that
+   * is zero — heat is exactly 0 outside the band or while drifting, so `heat > 0`
+   * already brackets a drag perfectly and needs no threshold at all.
+   *
+   * It is 0.01 rather than 0 for a mechanical reason worth writing down:
+   * `test/score.test.ts` proves a weight is live by trying it at 0, half and
+   * double, and every one of those is 0 when the value is 0 — so a zero weight
+   * reads as a dead one and fails a test that is right to exist. 0.01 is 0.6px
+   * inside a 60px band: the same instant, and still a number.
+   *
+   * At the old 0.10 the fire kindled 54px out, and 7% of band entries grazed the
+   * outer strip and left without ever lighting — visibly in the red with nothing
+   * happening, which is precisely what the brief was about.
    */
   burnMinHeat: number;
 
@@ -239,8 +254,8 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   timingSharpness: 2,
 
   burnEdgeSpan: 60,
-  burnRate: 425,
-  burnMinHeat: 0.1,
+  burnRate: 555,
+  burnMinHeat: 0.01,
 
   streakStep: 0.25,
   streakMax: 5,

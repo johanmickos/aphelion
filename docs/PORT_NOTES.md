@@ -2278,20 +2278,42 @@ horizontal choice is not a leftover: a burning ship is by definition pressed
 against the left or right edge, so the inboard side is both the empty half of the
 screen and the half the eye is already on.
 
-**The red, and the collision that is not a bug.** `#FF465A` is the hazard band's
-own colour, so the band, the flame and the number are visibly one event. It is
-also exactly `FUEL_RAMP[0]`, and every candidate that still reads as the band's
-red lands within dE 31 of the tank (#ff3b30 at 21, #ff2a18 at 31) — because they
-ARE the same red. There is no third option that matches the band and clears the
-fuel.
+**The palette is fire, not the band.** The first cut took the hazard band's red
+exactly, so band, flame and number would be one substance. That red is
+pink-leaning — `rgba(255,70,90)`, B=90 — and beside an actual flame it read as a
+different material. The text sits next to the FIRE, so it takes the fire's
+colours: `drawBurn` builds its core from (255, 150+, 38+), and the number
+(`#ff3b2e`), the word (`#ff7a1e`) and the detail line (`#c2521f`) are that family
+deepened for text weight. Three shades and a black rim, because a singe has no
+other colours in it. Number and word sit dE 30 apart — one family, still
+distinguishable.
 
-So it is named instead of dodged: #FF465A is this game's LETHALITY colour. Out of
-fuel, inside the dead zone, and on fire are three ways of being about to die and
-are allowed to look alike. Where they co-occur they separate by form and content,
+**The collision with fuel is not a bug.** Every shade here lands within dE 14-26
+of some step of `FUEL_RAMP`, and nothing in the fire family does better, because
+`FUEL_RAMP` IS a fire gradient — red at empty through amber to green. There is no
+orange-red that says "burning" and does not also look like a tank in trouble.
+
+So it is named instead of dodged: this game's danger palette is fire-coloured. Out
+of fuel, inside the dead zone, and on fire are three ways of being about to die and
+are allowed to look alike. Where they co-occur they separate by form and position,
 which is the right channel for it — the fuel badge is a pill glyph and the word
 EMPTY on a plate below the ship, this is a signed number to the side. Nobody
 misreads `+430` as `EMPTY`. The dE discipline in `accolade.ts` exists so a RANK can
 be read off a hue, and there is no rank between "burning" and "out of fuel".
+
+**It lights at the band's edge, not 6px inside it.** `burnMinHeat` was 0.10, which
+put ignition 54px from the lethal line — and 7% of band entries grazed the outer
+strip and left without ever lighting, which is the player visibly in the red with
+nothing happening. The honest value is 0: heat is exactly zero outside the band or
+while drifting, so `heat > 0` already brackets a drag and needs no threshold. It is
+0.01 rather than 0 only because `test/score.test.ts` proves a weight is live by
+trying it at 0, half and double — all of which are 0 when the value is 0, so a zero
+weight reads as a dead one. 0.01 is 0.6px into a 60px band.
+
+Lighting on the shallow grazes changed the population it is calibrated against —
+159 drags rather than 147, survivors 44 rather than 33 — so `burnRate` went 425 ->
+555 and the word tiers 0.57/0.83 -> 0.52/0.70. Same frequency targets, re-measured
+quantity.
 
 This is also the first colour off the rarity ladder that is not a shout, and the
 reason it is allowed: it is a STATE, not a category. The player is not learning a
@@ -2321,11 +2343,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 106 · camera 55
+tests    port-equality 11 · invariants 32 · render 109 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
          score 67 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 440 total
+         zip-charge 8 · attract 13 · 443 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

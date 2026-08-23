@@ -90,20 +90,20 @@ export const PEAK = Object.freeze({ tier1: 0.85, tier2: 0.94 });
  *
  * MEASURED ON THE DRAGS THAT SURVIVE, which is the only population that can ever
  * see a word: a drag ending in the wall drops its whole banked flare with the
- * life, so it pays nothing and names nothing. Over 58 sessions, 33 of 147 drags
- * pulled out alive, and their peak depths run p25 0.27, p50 0.44, p70 0.57,
- * p90 0.83.
+ * life, so it pays nothing and names nothing. Over 58 sessions, 44 of 159 drags
+ * pulled out alive, and their peak depths run p25 0.11, p50 0.34, p70 0.52,
+ * p90 0.70.
  *
  * Calibrating on all 147 instead would have been useless in a way worth
- * recording: the 114 that die all reach the line, so peak depth reads 1.00 at
- * every percentile from p10 up. A threshold drawn from that distribution puts
+ * recording: the 115 that die all reach the line, so peak depth reads 1.00 at
+ * every percentile from p50 up. A threshold drawn from that distribution puts
  * every tier at 1.0 and names nothing — the axis only has spread inside the
  * subpopulation that can actually be praised.
  *
  * So tier1 is the p70 survivor and tier2 the p90: about a third of survived drags
  * earn a word, and about a tenth earn the better one.
  */
-export const BURN = Object.freeze({ tier1: 0.57, tier2: 0.83 });
+export const BURN = Object.freeze({ tier1: 0.52, tier2: 0.7 });
 
 /**
  * The nerve grab: already boring in, and you waited.

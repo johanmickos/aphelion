@@ -66,40 +66,56 @@ export const ROUTINE: AccoladeStyle = {
  * band, a burning ship and a red number at the same time, and the colour is what
  * says those three things are one event.
  *
- * Which is why it is exactly the band's own red, `rgba(255,70,90)` from
- * `drawHazardZones`, and not a red chosen to sit well beside it. Same substance,
- * same colour.
+ * WHY THESE SHADES
  *
- * Measured as the ladder was: dE 60.6 to its nearest neighbour in this table
- * (`SHOUT`), against dE 41.0 for the closest pair already in it (`ROUTINE` vs
- * `good`). L* 58 sits between `ROUTINE` at 43 and `great` at 77, so the order
- * survives for a player who cannot separate the hues.
+ * Fire, not the band. The first version took the hazard band's own red exactly,
+ * on the grounds that band, flame and number should be one substance — and the
+ * band's red is pink-leaning (`rgba(255,70,90)`, B=90), which beside an actual
+ * flame reads as a different material. The text sits next to the FIRE, not next
+ * to the wall, so it takes the fire's colours: `drawBurn` builds its core out of
+ * (255, 150+, 38+) and these are the same family, deepened for text weight.
  *
- * IT IS EXACTLY `FUEL_RAMP[0]`, AND THAT IS NOT AN ACCIDENT TO FIX. The empty-tank
- * colour is already this same red, and so is the hazard band — the three were the
- * same value before this constant existed. Every candidate that reads as the
- * band's red is within dE 31 of the fuel colour (measured: #ff3b30 at 21, #ff2a18
- * at 31), because they ARE the same red; there is no third option that matches the
- * band and clears the tank.
+ * Three shades and nothing else — deep orange, red, black — because a singe has
+ * no other colours in it. The number is the reddest, the word above it a deeper
+ * orange, and the rim is black. They are dE 30 apart, which is close enough to
+ * read as one family and far enough not to look like a mistake.
  *
- * So the collision is named rather than dodged: #FF465A is this game's lethality
- * colour. Out of fuel, inside the dead zone, and on fire are three ways of being
- * about to die, and they are allowed to look alike. What separates them where they
- * co-occur is form and content, which is the right channel for it — the fuel badge
- * is a pill glyph and the word EMPTY on a plate 26 units BELOW the ship, and this
- * is a signed number to the SIDE of it. Nobody misreads `+430` as `EMPTY`.
+ * THE COLLISION WITH FUEL, WHICH IS NOT A BUG
  *
- * The dE discipline in this table exists so a RANK can be read off a hue. There is
- * no rank between "burning" and "out of fuel" for a player to get wrong.
+ * Every one of these lands within dE 14-26 of some step of `FUEL_RAMP`, and no
+ * candidate anywhere in the fire family does better — because `FUEL_RAMP` IS a
+ * fire gradient, red at empty through amber to green. There is no orange-red that
+ * says "burning" and does not also look like a tank in trouble.
+ *
+ * So it is named rather than dodged: this game's danger palette is fire-coloured,
+ * and out of fuel, inside the dead zone and on fire are three ways of being about
+ * to die. They separate by form and position, which is the right channel for it —
+ * the fuel badge is a pill glyph and the word EMPTY on a plate 26 units BELOW the
+ * ship, the tally is a signed number to the SIDE of it, and nobody misreads `+430`
+ * as `EMPTY`. The dE discipline in this table exists so a RANK can be read off a
+ * hue, and there is no rank between "burning" and "out of fuel".
  *
  * Bigger than a praise word, and the only thing here that is. A drag runs a second
  * or more with the ship pinned against a wall it is probably about to die on, and
  * the number is the whole of what the player is deciding on.
  */
 export const BURN: AccoladeStyle = {
-  color: '#ff465a',
-  labelColor: 'rgba(255,120,135,.85)',
+  color: '#ff3b2e',
+  labelColor: '#c2521f',
   size: 17,
+};
+
+/**
+ * The word a survived drag earns, a step deeper into the orange than its number.
+ *
+ * A separate style rather than a second field on `AccoladeStyle`, because only
+ * this channel has two text colours and widening the shared shape for one case is
+ * how a table stops being readable.
+ */
+export const BURN_WORD: AccoladeStyle = {
+  color: '#ff7a1e',
+  labelColor: '#c2521f',
+  size: 15,
 };
 
 /**
