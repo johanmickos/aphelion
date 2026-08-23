@@ -726,36 +726,47 @@ describe('what the ship says about a rescue', () => {
   const run = (at: number) =>
     play([[at, 1]], 600, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, WALL_DRIFT);
 
-  it('says SAFE for any rescue that pays, because every one is a recovery', () => {
-    const s = run(60);
-    expect(
-      s.awards.some((a) => a.kind === 'rescue'),
-      'the fixture is meant to rescue itself',
-    ).toBe(true);
-    expect(s.score.tight, 'and it recovered').not.toBeNull();
+  it('says nothing in words, and that took three attempts to arrive at', () => {
+    // A rescue had a praise axis (DOUSED, CLEARED), then a badge for the recovery
+    // (SAFE), then a badge for the press that dared it (Nice!). All three were cut
+    // on sight: "we already have the point reward from going through flames",
+    // "it's too crowded and the anticipation is fun", "the 'nice!' is a bit
+    // cluttered". What confirms a rescue now is the cross brightening as the ship
+    // closes on it, and then the points.
+    const a = run(60).awards.find((w) => w.kind === 'rescue');
+    expect(a, 'the fixture is meant to rescue itself').toBeTruthy();
+    expect(praiseFor(a!), 'a rescue speaks through the instrument, not the vocabulary').toBeNull();
   });
 
-  it('says Nice! only for a press very close to the last one that works', () => {
-    // Tick 60 spends 0.71 of the window, tick 100 spends 0.99. The threshold is
-    // the 90th percentile of the quality actually paid across the corpus.
-    const loose = run(60);
-    const tight = run(100);
-    expect(loose.score.nice, 'a press with most of the window left says nothing').toBeNull();
-    expect(tight.score.nice, 'one that shaves it does').not.toBeNull();
-  });
-
-  it('says nothing at all about a press that was already too late', () => {
-    // Doomed and "nice" are mutually exclusive by construction: the praise is for
-    // daring, and a press past the cross was not daring, it was late.
-    const late = run(120);
-    expect(late.score.nice).toBeNull();
-  });
-
-  it('earns no praise WORD, because the burn already has one', () => {
-    // It had an `escape` axis for a session — DOUSED, CLEARED — and it was
-    // withdrawn: "we already have the point reward from going through flames".
-    const a = run(60).awards.find((w) => w.kind === 'rescue')!;
-    expect(praiseFor(a), 'a rescue speaks beside the ship, not in the popups').toBeNull();
+  it('still marks a press that was already too late', () => {
+    // The one thing nothing else can say: there is no award for being doomed.
+    //
+    // Watched tick by tick rather than read off the end, because a run that ends
+    // at the wall clears it — `endLife` does, and `drawVerdict` refuses to draw
+    // during the ending hold for the same reason. The flag exists between the
+    // press and the death, which is the whole of its life.
+    const everDoomed = (at: number): boolean => {
+      const state = createInitialState(DEFAULT_CONFIG);
+      Object.assign(state.ship, WALL_DRIFT);
+      const sc = createScoreState();
+      let held = false;
+      for (let t = 0; t < 400; t++) {
+        const pressed = t === at;
+        if (pressed) held = true;
+        stepSim(
+          state,
+          DEFAULT_CONFIG,
+          { held: held || pressed, pressed, released: false } as Input,
+          FIXED_DT,
+        );
+        scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+        if (sc.doomed) return true;
+        if (state.ending.active) break;
+      }
+      return false;
+    };
+    expect(everDoomed(120), 'a press past the cross').toBe(true);
+    expect(everDoomed(100), 'one that still works').toBe(false);
   });
 });
 

@@ -282,22 +282,6 @@ export interface ScoreState {
    */
   doomed: { side: 1 | -1; tick: number } | null;
   /**
-   * A press made very close to the last one that could have worked, or null.
-   *
-   * Set at the PRESS — the moment being praised is the commitment, not the
-   * outcome — and it is the one thing here that needs a threshold, because "very
-   * close" has no natural edge the way "alight" did. `NICE_QUALITY` carries it.
-   */
-  nice: { side: 1 | -1; tick: number } | null;
-  /**
-   * A rescue that came back, or null. Set at the moment it pays.
-   *
-   * ANY rescue, not only a tight one: it says you recovered, and every rescue
-   * award is a recovery. The tight ones are already picked out at the press by
-   * `nice`, and the fire is already paid for by the burn.
-   */
-  tight: { side: 1 | -1; tick: number } | null;
-  /**
    * Bodies a rescue has already been paid against this life. Cleared by `endLife`.
    *
    * The same shape as `claimed`, for the same reason it exists there. A drag along

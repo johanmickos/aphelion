@@ -187,8 +187,16 @@ export class Scar {
       // arm must lie along the ship's heading where the mark is.
       const upto = scar.path.filter((s) => s.t <= c.t);
       const n = upto.length;
+      // Two DISTINCT samples, or the heading collapses to nothing.
+      //
+      // Taking `upto[n - 1]` and `upto[n - 2]` reads well and is wrong at the one
+      // moment that matters: when the cross is inside the first sample there is
+      // only one entry, both ends resolve to it, and the heading comes out (0, 0)
+      // — so the crossbar has zero length and the whole mark silently disappears
+      // exactly as the ship arrives at it. Falling back to the projection's own
+      // first step keeps a direction whatever the filter left.
       const prev = n > 1 ? upto[n - 2]! : scar.path[0]!;
-      const last = n > 0 ? upto[n - 1]! : scar.path[Math.min(1, scar.path.length - 1)]!;
+      const last = n > 1 ? upto[n - 1]! : scar.path[Math.min(1, scar.path.length - 1)]!;
       let dx = last.x - prev.x;
       let dy = last.y - prev.y;
       const len = hypot(dx, dy) || 1;
@@ -311,16 +319,35 @@ export class Scar {
     // rate as the follower, because both answer "how fast does the scar react to
     // a change": one for where it is, one for whether it is there at all.
     const born = 1 - Math.exp(-rcfg.scarSettleRate * m.born);
+
+    // CLOSING, 0 at `scarFullSecs` out and 1 at the cross itself.
+    //
+    // The compass's own gesture: its rings run `(0.15 + 0.5 * align)` on alpha and
+    // `(2 + 2 * align)` on width, both rising together as the sweep lines up. Here
+    // the mark brightens and thickens over the last stretch, so the instrument
+    // sharpens exactly as the decision does. It is continuous, so nothing has to
+    // decide what counts as a good press — which is why it could replace two
+    // labels that both read as clutter.
+    //
+    // Held at its peak once the cross is passed rather than falling back: the mark
+    // that stays behind is the one being explained, and it should not get quieter
+    // at the moment it starts to matter.
+    const closing =
+      m.age >= 0 ? 1 : clamp01(1 - Math.max(0, this.lead) / Math.max(1e-6, rcfg.scarFullSecs));
+    const peak = rcfg.scarAlpha + (rcfg.scarNearAlpha - rcfg.scarAlpha) * closing;
+
     const alpha =
       born *
       (m.age >= 0
-        ? rcfg.scarAlpha * (1 - smoothstep(m.age / Math.max(1e-6, rcfg.scarFadeOutSecs)))
-        : rcfg.scarAlpha *
+        ? peak * (1 - smoothstep(m.age / Math.max(1e-6, rcfg.scarFadeOutSecs)))
+        : peak *
           (1 -
             smoothstep(
               (this.lead - rcfg.scarFullSecs) /
                 Math.max(1e-6, rcfg.scarFadeInSecs - rcfg.scarFullSecs),
             )));
+    // Width rises with it, the compass's second half.
+    const weight = m.scale * (1 + (rcfg.scarNearWidth - 1) * closing);
     if (alpha <= 0.004) return;
 
     // Every length in the glyph moves together, so the mark grows as one thing
@@ -372,7 +399,7 @@ export class Scar {
           w: armWidth(
             span > 0 ? (run[i]! - base) / span : 0,
             uc,
-            rcfg.scarArmWidth * cam.scale * m.scale,
+            rcfg.scarArmWidth * cam.scale * weight,
           ),
           a: alpha * (s.live ? 1 : rcfg.scarDeadFrac),
         });
@@ -391,7 +418,7 @@ export class Scar {
         pts.push({
           x: toScreenX(cam, m.x + m.dx * stub * u),
           y: toScreenY(cam, m.y + m.dy * stub * u),
-          w: armWidth(uc + (1 - uc) * u, uc, rcfg.scarArmWidth * cam.scale * m.scale),
+          w: armWidth(uc + (1 - uc) * u, uc, rcfg.scarArmWidth * cam.scale * weight),
           a: alpha * rcfg.scarDeadFrac,
         });
       }
@@ -406,7 +433,7 @@ export class Scar {
         m.y - m.dy * stub,
         m.x + m.dx * stub,
         m.y + m.dy * stub,
-        rcfg.scarArmWidth * m.scale,
+        rcfg.scarArmWidth * weight,
         alpha,
       );
     }
@@ -422,7 +449,7 @@ export class Scar {
       m.y - py * barHalf,
       m.x + px * barHalf,
       m.y + py * barHalf,
-      rcfg.scarBarWidth * m.scale,
+      rcfg.scarBarWidth * weight,
       alpha,
     );
 

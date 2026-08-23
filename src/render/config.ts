@@ -196,23 +196,6 @@ export interface RenderConfig {
    */
   doomAlpha: number;
   /**
-   * Peak alpha of the SAFE and Nice! labels.
-   *
-   * Quieter than the skull: they report something that went right, which does not
-   * have to interrupt.
-   */
-  tightAlpha: number;
-  /**
-   * Colour of the two good verdicts.
-   *
-   * `FUEL_RAMP`'s full end, which is already this game's word for "everything is
-   * fine" and is already a badge colour drawn beside the ship — `fuel-warning.ts`
-   * takes both of its colours from the same ramp. Deliberately NOT the accolade
-   * ladder's green `#5cd67a`: that one means a rung, and a badge borrowing it
-   * would claim a rarity it is not on.
-   */
-  safeColor: string;
-  /**
    * Seconds a tick represents, for the verdict badges that beat on the tick.
    *
    * Here rather than imported from `SimConfig` because it is a RENDER fact — how
@@ -236,6 +219,29 @@ export interface RenderConfig {
    */
   scarAlpha: number;
   scarDeadFrac: number;
+  /**
+   * What the mark reaches, in alpha and in width, at the moment of the cross.
+   *
+   * THE COMPASS'S OWN IDIOM. Its rings run `(0.15 + 0.5 * align)` on alpha and
+   * `(2 + 2 * align)` on width, so both rise together as the sweep lines up, and
+   * the author named it: "I like how we do the compass by making the color
+   * brighter when the ship is in the window." Here `align` is how close the ship
+   * is to the cross, so the mark tightens and burns brighter over the last stretch
+   * exactly as the decision gets sharper.
+   *
+   * IT REPLACED A LABEL, AND IS BETTER THAN ONE. Two badges were tried and cut on
+   * sight — SAFE for the recovery, then Nice! for the press that dared it — with
+   * "it's too crowded and the anticipation is fun" and "the 'nice!' is a bit
+   * cluttered". An instrument reacting is worth more than a word about the
+   * instrument, and it costs no threshold: this is continuous, so nothing has to
+   * decide what counts as a good press.
+   *
+   * The old ramp saturated at `scarFullSecs`, which is 1.65s out — so the
+   * brightening was entirely spent before the part of the approach worth aiming
+   * at. This is the second half of the same gesture.
+   */
+  scarNearAlpha: number;
+  scarNearWidth: number;
   /**
    * How fast the scar reacts to a change, per second: both how the mark follows
    * a moved cross and how a new mark fades in. One rate, because they are one
@@ -341,15 +347,15 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarPrizeFull: 860,
 
   doomAlpha: 0.78,
-  tightAlpha: 0.72,
-  safeColor: '#54F39A',
   verdictTickSecs: 1 / 60,
   scarArmWidth: 1.3,
   scarBarWidth: 1.7,
   scarAlpha: 0.5,
   scarDeadFrac: 0.18,
+  scarNearAlpha: 0.95,
+  scarNearWidth: 1.5,
   scarSettleRate: 9,
-  scarArmMaxPx: 260,
+  scarArmMaxPx: 150,
 
   boostGlowMin: 13,
   boostGlowMax: 42,

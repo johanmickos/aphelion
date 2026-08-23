@@ -1,13 +1,22 @@
 /**
  * The wall's verdict, in one slot beside the ship, over three beats.
  *
- *   Nice!   at the PRESS, if it was made very close to the last one that works
- *   SAFE    when the rescue pays, because you recovered
- *   skull   instead of either, when the press was already too late
+ * ONE THING, and it took three tries to get there. A rescue had a badge for the
+ * recovery (SAFE) and a badge for the press that dared it (Nice!), and both were
+ * cut on sight — "it's too crowded and the anticipation is fun", then "the 'nice!'
+ * is a bit cluttered". Both readings are right, and together they say something
+ * this file should not forget: the good news does not need a badge. The scar
+ * already says where the line is and the flames say you are on it, so announcing
+ * the outcome the instant it resolves spends the two seconds the game is at its
+ * most tense.
  *
- * The two good ones are a sequence and not a choice: you dared, then you made it.
- * They land a median 0.38s apart, so the later simply takes the slot — SAFE is the
- * one that resolves the question, so it wins while it is running.
+ * What replaced the praise is not a label at all: the CROSS ITSELF brightens and
+ * thickens as the ship closes on it, the way the compass rings do as the sweep
+ * lines up. See `src/render/scar.ts`. An instrument reacting is worth more than a
+ * word about the instrument.
+ *
+ * So the slot says only the thing nothing else can: a death that has not happened
+ * yet. There is no award for being doomed.
  *
  * WHY THEY LIVE HERE AND NOT IN THE POPUPS. They were a praise word for one
  * session, an `escape` axis in `praise.ts` drawn in the burn's ember, and it was
@@ -29,18 +38,6 @@ import type { ScoreState } from '../score/types.ts';
 
 /** Design units to the side of the ship the verdict sits at. */
 const OFFSET = 24;
-/**
- * How long each word stays, in pulses.
- *
- * Nice! is the shorter of the two deliberately — it is a reaction to a press, and
- * SAFE is usually only 0.38s behind it. A long one would still be talking when the
- * answer arrives.
- */
-const NICE_PULSES = 2;
-const SAFE_PULSES = 3;
-/** Label sizes in design units. Nice! is the smaller: it is an aside, not a verdict. */
-const SAFE_SIZE = 9.5;
-const NICE_SIZE = 8;
 /** Cranium radius, in design units. */
 const R = 6.2;
 /** Seconds per pulse. The fuel warning's own rate, so every badge beats alike. */
@@ -93,35 +90,7 @@ function skull(
 }
 
 /**
- * A short word beside the ship.
- *
- * Set in `600 ui-monospace` at the fuel warning's own label size, because that is
- * the other badge that speaks beside the ship and two badges that speak should not
- * be set in two typefaces.
- */
-function label(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  s: number,
-  size: number,
-  color: string,
-  alpha: number,
-): void {
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  ctx.font = `600 ${size * s}px ui-monospace, monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, x, y);
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-}
-
-/**
- * Draw whichever verdict is owed, if either.
+ * Draw the skull, if one is owed.
  *
  * A pure function of the snapshot and the score — it holds no state, because the
  * only thing it would have to remember is a phase, and the tick is already a clock
@@ -151,41 +120,18 @@ export function drawVerdict(
   // the press that dared. Each is checked against its own lifetime, so an expired
   // one hands the slot back rather than holding it empty.
   const doom = score.doomed;
-  const doomAge = ageOf(doom);
-  const safeAge = ageOf(score.tight);
-  const niceAge = ageOf(score.nice);
+  if (!doom) return;
+  const age = ageOf(doom);
+  if (age < 0) return;
 
-  let mark: { side: 1 | -1 } | null = null;
-  let age = 0;
-  let word: 'SAFE' | 'Nice!' | null = null;
-  let size = 0;
-
-  if (doom && doomAge >= 0) {
-    mark = doom;
-    age = doomAge;
-  } else if (score.tight && safeAge >= 0 && safeAge <= SAFE_PULSES * PULSE_SEC) {
-    mark = score.tight;
-    age = safeAge;
-    word = 'SAFE';
-    size = SAFE_SIZE;
-  } else if (score.nice && niceAge >= 0 && niceAge <= NICE_PULSES * PULSE_SEC) {
-    mark = score.nice;
-    age = niceAge;
-    word = 'Nice!';
-    size = NICE_SIZE;
-  }
-  if (!mark) return;
-
-  const peak = word ? rcfg.tightAlpha : rcfg.doomAlpha;
-  const alpha = peak * (0.45 + 0.55 * beat((age % PULSE_SEC) / PULSE_SEC));
+  const alpha = rcfg.doomAlpha * (0.45 + 0.55 * beat((age % PULSE_SEC) / PULSE_SEC));
 
   const s = cam.scale;
   // Away from the wall it is about to hit; `side` is +1 for the right boundary.
-  const x = toScreenX(cam, snap.x - mark.side * OFFSET);
+  const x = toScreenX(cam, snap.x - doom.side * OFFSET);
   const y = toScreenY(cam, snap.y);
 
   ctx.save();
-  if (word) label(ctx, word, x, y, s, size, rcfg.safeColor, alpha);
-  else skull(ctx, x, y, R * s, alpha);
+  skull(ctx, x, y, R * s, alpha);
   ctx.restore();
 }

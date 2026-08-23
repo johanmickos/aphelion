@@ -592,74 +592,79 @@ describe('scene', () => {
     );
   });
 
-  it('says SAFE in green when a rescue pays, and Nice! for the press that dared', () => {
-    // Two beats, one slot, a median 0.38s apart: you dared, then you made it.
-    // SAFE takes the slot while it is running, because it is the one that resolves
-    // the question. Green is `FUEL_RAMP`'s full end — this game's existing word
-    // for "everything is fine" — and deliberately not the accolade ladder's green,
-    // which means a rung.
+  it('brightens and thickens the mark as the ship closes on it', () => {
+    // The compass's own gesture, named by the author: "I like how we do the
+    // compass by making the color brighter when the ship is in the window." It
+    // replaced two labels that both read as clutter, and it needs no threshold —
+    // being continuous, nothing has to decide what counts as a good press.
     const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
-    const c = createCamera(rcfg);
-    fitCamera(c, { w: 390, h: 844, dpr: 1 });
-    const scene = new Scene(
-      { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
-      99,
-    );
-    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
-    centerCamera(c, snap.x, snap.y, f, null);
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
+    expect(scar?.cross).toBeTruthy();
 
-    const say = (
-      verdict: Partial<ScoreState>,
-      tickOffset = 0,
-    ): { text: string[]; green: boolean } => {
+    /** Peak alpha and widest stroke drawn, with the cross `lead` seconds away. */
+    const at = (lead: number): { alpha: number; width: number } => {
+      const mark = new Scar();
+      mark.observe({ ...scar!, cross: { ...scar!.cross!, t: lead } }, 0, rcfg, FIXED_DT);
+      mark.update(1, rcfg);
+      const c = createCamera(rcfg);
+      fitCamera(c, { w: 390, h: 844, dpr: 1 });
+      centerCamera(c, state.ship.x, state.ship.y, f, null);
       const r = recordingContext();
-      scene.draw(
-        r.ctx,
-        c,
-        { ...snap, tick: snap.tick + tickOffset },
-        {
-          timeMs: 0,
-          paused: false,
-          viewportW: 390,
-          viewportH: 844,
-          headerBottom: 0,
-          frameDt: 1 / 60,
-          score: { ...createScoreState(), ...verdict },
-        },
-      );
-      return {
-        text: r.ops.filter((op) => op[0] === 'fillText').map((op) => String(op[1])),
-        green: r.ops.some((op) => op[0] === '=fillStyle' && op[1] === rcfg.safeColor),
-      };
+      mark.draw(r.ctx, c, rcfg);
+
+      let alpha = 0;
+      let width = 0;
+      let pending: number[] = [];
+      for (const op of r.ops) {
+        if (op[0] === '=fillStyle') {
+          const m = /rgba\(255,70,90,([\d.]+)\)/.exec(String(op[1]));
+          if (m) alpha = Math.max(alpha, Number(m[1]));
+          pending = [];
+        } else if (op[0] === 'moveTo' || op[0] === 'lineTo') {
+          pending.push(op[1] as number, op[2] as number);
+          if (pending.length === 8) {
+            width = Math.max(
+              width,
+              Math.hypot(pending[0]! - pending[6]!, pending[1]! - pending[7]!),
+            );
+          }
+        }
+      }
+      return { alpha, width };
     };
 
-    const safe = say({ tight: { side: 1, tick: snap.tick } });
-    expect(safe.text, 'the recovery').toContain('SAFE');
-    expect(safe.green, 'in the green the fuel gauge calls full').toBe(true);
+    const far = at(rcfg.scarFullSecs);
+    const near = at(0.02);
+    expect(near.alpha, 'brighter at the cross').toBeGreaterThan(far.alpha);
+    expect(near.width, 'and heavier').toBeGreaterThan(far.width);
+    // It reaches the configured peak rather than merely rising toward it.
+    expect(near.alpha).toBeGreaterThan(rcfg.scarAlpha);
+    expect(near.alpha).toBeLessThanOrEqual(rcfg.scarNearAlpha + 1e-6);
+  });
 
-    expect(say({ nice: { side: 1, tick: snap.tick } }).text, 'the press that dared').toContain(
-      'Nice!',
-    );
-
-    // Both owed: SAFE wins the slot.
-    const both = say({
-      nice: { side: 1, tick: snap.tick },
-      tight: { side: 1, tick: snap.tick },
-    });
-    expect(both.text).toContain('SAFE');
-    expect(both.text).not.toContain('Nice!');
-
-    // The skull outranks both: there is no good news to give.
-    const doomed = say({
-      doomed: { side: 1, tick: snap.tick },
-      tight: { side: 1, tick: snap.tick },
-    });
-    expect(doomed.text).not.toContain('SAFE');
-
-    // Nice! is the shorter of the two, so it is not still talking when the answer
-    // arrives.
-    expect(say({ nice: { side: 1, tick: snap.tick } }, 60).text, 'expired').not.toContain('Nice!');
+  it('still draws the mark when the ship is right on top of it', () => {
+    // The bug this pins: `upto` holds one sample when the cross is inside the
+    // first, both ends of the heading resolved to it, the direction came out
+    // (0, 0), and the crossbar had zero length — so the mark vanished silently at
+    // the exact moment the ship reached it.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
+    const mark = new Scar();
+    mark.observe({ ...scar, cross: { ...scar.cross!, t: 0.005 } }, 0, rcfg, FIXED_DT);
+    mark.update(1, rcfg);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, state.ship.x, state.ship.y, f, null);
+    const r = recordingContext();
+    mark.draw(r.ctx, c, rcfg);
+    expect(
+      r.ops.some((op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90')),
+      'the mark is still there at the cross',
+    ).toBe(true);
   });
 
   it('never draws an arm longer than the clamp, however far away the cross is', () => {

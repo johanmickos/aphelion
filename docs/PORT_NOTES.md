@@ -3394,40 +3394,51 @@ still out of pocket. It matters less than it sounds only because 67% of escapes
 never reach the first refund at all — 46% are released while still a flyby and 21%
 never braked.
 
-**What a rescue says went around the houses, and where it landed matters.** It was
-a spark beside the ship, then the word SAFE, then an `escape` praise axis in the
-popups — DOUSED and CLEARED in the burn's ember — and then back beside the ship
-again. The praise axis lasted one session and was withdrawn with the reason that
-retires it for good: *"we already have the point reward from going through
-flames"*. The burn pays for the fire and names it in its own word; a second word
-about the same fire in the same second was the vocabulary arguing with itself. Do
-not re-add it.
-
-**So the verdict slot beside the ship carries three beats, and they are a
-sequence rather than a choice:**
+**What a rescue says went around the houses, and the destination is the point.**
+Four attempts, each cut on sight, and the sequence is worth keeping because every
+one of them looked reasonable when it was proposed:
 
 ```
-  Nice!   at the PRESS, if it spent at least NICE_QUALITY of the window
-  SAFE    when the rescue pays, because every rescue award is a recovery
-  skull   instead of either, when the press was already too late
+  a spark beside the ship        "the spark isn't intuitive enough"
+  the word SAFE beside the ship  "it's too crowded and the anticipation is fun"
+  a DOUSED / CLEARED praise word "we already have the point reward from going
+                                  through flames"
+  the word Nice! at the press    "the 'nice!' is a bit cluttered"
 ```
 
-Nice! and SAFE land a median 0.38s apart — you dared, then you made it — so SAFE
-simply takes the slot while it runs, being the one that resolves the question.
-Both are drawn in `FUEL_RAMP`'s full end, this game's existing word for
-"everything is fine" and already a badge colour beside the ship, and deliberately
-NOT the accolade ladder's green: that one means a rung, and a badge borrowing it
-would claim a rarity it is not on.
+Read together they say one thing: the good news does not need to be announced. The
+scar already says where the line is, the flames say the ship is on it, and the
+points say what it was worth — so a badge or a word at the moment of resolution is
+a fourth voice on a subject already covered, and it spends the two seconds the game
+is at its most tense.
 
-**`NICE_QUALITY` is the one threshold in any of this, and it is provisional.** SAFE
-needs none — every rescue is a recovery — and the skull needs none, because past
-the cross is a fact. But "very close to the last second" has no natural edge, so it
-is the 90th percentile of the quality actually paid across the corpus, 0.86, firing
-about 0.36 times a session. Every press in that sample was made blind, before the
-cross could be drawn, so presses will move later and this will want raising.
-Re-measure rather than adjusting on feel. It is a constant beside its code and not
-a `ScoreConfig` weight, on the rule that a value deciding WHEN something is judged
-and never what it costs is not a weight.
+**What replaced them is not a label at all.** The CROSS ITSELF brightens and
+thickens as the ship closes on it, named by the author: *"I like how we do the
+compass by making the color brighter when the ship is in the window."* The compass
+rings run `(0.15 + 0.5 * align)` on alpha and `(2 + 2 * align)` on width, both
+rising together as the sweep lines up; `scarNearAlpha` and `scarNearWidth` are the
+same gesture with proximity to the cross as the alignment.
+
+It also costs no threshold, which is why it could replace `NICE_QUALITY` outright.
+That constant was the only measured percentile in any of this and the only thing
+here that would have gone stale as play changed. A continuous ramp never has to
+decide what counts as a good press.
+
+The half of the ramp that already existed saturated at `scarFullSecs`, 1.65s out —
+so the brightening was entirely spent before the part of the approach worth aiming
+at. This is the second half of the same gesture, and the mark now peaks at 0.95
+alpha and 1.5x weight at the cross itself.
+
+**A bug fell out of building it, at the worst possible moment.** `upto` holds the
+path samples up to the cross, and the heading was read from its last two entries.
+When the cross sits inside the first sample there is only one, both ends resolved
+to it, the heading came out (0, 0), the crossbar had zero length — and the mark
+vanished silently exactly as the ship arrived at it. `test/render.test.ts` pins it.
+
+**The arm was capped again, 260px to 150.** Reported as "there are some times where
+the line to the cross is really long, multiple centimeters to my eye". A little
+over a third of the viewport width still reads as a lead-in pointing at the mark
+and stops being a line the eye has to follow.
 
 **`SIM_VERSION` 20 -> 21**, and the golden was recaptured twice as keys were added
 — three lines each time, no numbers. The equality gate never moved off zero,
