@@ -3073,6 +3073,74 @@ wall-drift scenario rather than only by the one test that looks at it.
 
 ---
 
+### 55 — The skull: the trigger that was right beat the trigger that was useful
+
+`src/render/doom.ts` · `src/score/score.ts` · **[NEW]** · asked for as "adding a
+pulsing skull next to the ship if they grab and hold too late"
+
+**"Too late" has two readings and they measure very differently.** Both were run
+against all 251 deaths in the corpus:
+
+```
+  PRESS made past the cross     108 of 251 deaths (43%)   lead median 0.85s p90 1.72
+                                fatal 94% of the time — ~7 of 115 such presses lived
+  HOLDING from here ends the run 94 of 251 deaths (37%)   lead median 0.83s p90 2.18
+                                true-then-recovered 141 times against 94 real deaths
+```
+
+The live one loses, and the reason is worth keeping: RELEASING is the escape, so
+"holding kills you" is right about the hold and wrong about the fate. A
+death's-head that is wrong more often than right teaches the player to ignore it.
+The press test is an omen and is almost always correct; the hold test would make a
+good "let go" cue, which is a different cue and should be built as one if it is
+built.
+
+The first version of that measurement was worthless and the mistake is easy to
+repeat: it asked the hold question on EVERY tick, including drifting ones. A held
+button does nothing while drifting — `stepSim` starts a capture on the pressed
+edge alone — so the test was reporting "this drift ends badly", which is true of
+every approach the player later presses out of, and it produced 754 false alarms
+instead of 141.
+
+**The scorer already knew, so the renderer does not ask again.** `armRescue` calls
+`rescueScar` at the press for the rescue award; whether a cross existed is the
+same question this needs, on the same tick. `ScoreState.doomed` carries it —
+observability, like `burnHeat`, which the flame already reads. A second forward
+simulation of the same press would be both waste and a second place for the answer
+to live.
+
+That reordering exposed something: the once-per-body rescue latch used to
+short-circuit before the scar was computed, which would have hidden the omen on a
+body already paid. Whether the run is lost is not a question about whether it has
+already been paid, so the scar is asked first and the latch applies only to the
+payout.
+
+**It may stand rather than flash, and that is a departure from `fuel-warning.ts`**
+— which argues, correctly, that a permanent badge beside the ship becomes part of
+the ship's silhouette, having measured its own condition riding along for 4.7% of
+a session. This one cannot: it lives a median 0.85s, p90 1.72s, appears about 1.7
+times a session, and 94% of the time the thing that ends it is the run ending. It
+is a countdown, not a status.
+
+**On the side away from the wall**, so it never draws over the hazard gradient or
+the receding scar — both red, both already in that space — and so the one thing on
+screen that is not the wall sits where an escape would be. Below the ship was
+taken by the fuel badge and above it is the lane the popups rise through.
+
+**It hands over at the death rather than surviving it.** `endLife` clears the flag
+on the ending tick and `drawDoom` refuses to draw during the ending hold, so the
+skull stops exactly where the `LOST — OFF COURSE` notice starts. The scar's mark
+does the opposite — it freezes and stays through the hold — and the difference is
+deliberate: the mark is evidence of where the line was, the skull is a countdown,
+and a countdown that continues after the thing it was counting to is noise.
+
+**It is withdrawn when the prediction is beaten.** 6% of presses past the cross
+turn away anyway, because the search is conservative by construction. When one
+does, the omen clears on the same event that pays the rescue at the top of its
+scale — the two are one moment, read two ways.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

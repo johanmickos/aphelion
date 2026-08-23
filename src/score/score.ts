@@ -118,6 +118,7 @@ export function createScoreState(): ScoreState {
     claimed: [],
     rescue: null,
     rescued: [],
+    doomed: null,
     hopped: [],
     wasCharged: false,
     hopTotal: 0,
@@ -179,6 +180,7 @@ function endLife(sc: ScoreState): void {
   // be rescued by the same planet, exactly as it may re-claim an anomaly.
   sc.rescue = null;
   sc.rescued.length = 0;
+  sc.doomed = null;
   sc.hopped.length = 0;
   // A death ends the window without a tally. Left set, the falling edge would be
   // seen on the first tick after the respawn and the player would be shown a
@@ -362,6 +364,7 @@ export function scoreTick(
     // Cleared here rather than left to expire, so a later capture cannot inherit
     // a quality that was read at a different press against a different wall.
     sc.rescue = null;
+    sc.doomed = null;
     if (!sc.capKinked) sc.recklessStreak = 0;
     sc.capKinked = false;
     sc.inKink = false;
@@ -374,7 +377,9 @@ export function scoreTick(
     // never again — the capture's own rx/ry/vx/vy start moving immediately.
     if (!sc.wasCaptured) {
       sc.grabSkim = skimClearance(sc, state, cap);
-      sc.rescue = armRescue(sc, state, cfg, scfg, dt);
+      const armed = armRescue(sc, state, cfg, scfg, dt);
+      sc.rescue = armed.rescue;
+      sc.doomed = armed.doomed;
       // The press distance, for a zipped capture exactly as for a flown one, and
       // that is a correction to what this was nearly changed to.
       //
@@ -496,6 +501,11 @@ export function scoreTick(
         if (award) awards.push(award);
       }
     }
+
+    // A press past the cross that turned away anyway. Rare — 6% of them — and the
+    // prediction was wrong about that one, so the omen is withdrawn rather than
+    // left standing over a ship that is plainly fine.
+    if (sc.doomed && cap.vx * sc.doomed.side <= 0) sc.doomed = null;
 
     sc.pending = readPending(state, cfg, scfg, cap, sc.grabSkim, sc.maxDefl);
   } else {
@@ -685,14 +695,13 @@ function armRescue(
   cfg: SimConfig,
   scfg: ScoreConfig,
   dt: number,
-): ScoreState['rescue'] {
+): { rescue: ScoreState['rescue']; doomed: ScoreState['doomed'] } {
+  const none = { rescue: null, doomed: null };
   const cap = state.capture;
   const drift = sc.lastDrift;
-  if (!cap || !drift) return null;
+  if (!cap || !drift) return none;
   const body = state.bodies[cap.planet];
-  // Once per body per life. A drag along the wall hangs off one distant planet,
-  // so without this the tightest rescue would also be the most repeatable one.
-  if (!body || sc.rescued.includes(body.name)) return null;
+  if (!body) return none;
 
   const pre: SimState = {
     ...state,
@@ -703,14 +712,29 @@ function armRescue(
     bodies: state.bodies.slice(),
   };
   const scar = rescueScar(pre, cfg, dt);
-  if (!scar) return null;
+  if (!scar) return none;
 
-  // No cross left means the press was later than the last one that could work.
-  // It is scored as the tightest possible rather than as nothing, because the
-  // only way it can ever collect is by turning the ship away anyway — and a press
-  // that beats a prediction pinned to the tick has earned the top of the scale.
-  const quality = scar.cross ? clamp01(1 - scar.cross.t / Math.max(1e-6, scfg.rescueSpan)) : 1;
-  return { side: scar.side, quality, body: body.name };
+  // Past the last press that could have worked. Asked before the once-per-body
+  // rule below, deliberately: whether the run is lost is not a question about
+  // whether it has already been paid.
+  //
+  // It is still armed at the top of the scale. The only way such a press can ever
+  // collect is by turning the ship away regardless — which happens 6% of the time,
+  // because the prediction is conservative — and a press that beats a prediction
+  // pinned to the tick has earned the top of the scale. The omen is withdrawn on
+  // the same event that pays it.
+  if (!scar.cross) {
+    const doomed = { side: scar.side, tick: state.tick };
+    if (sc.rescued.includes(body.name)) return { rescue: null, doomed };
+    return { rescue: { side: scar.side, quality: 1, body: body.name }, doomed };
+  }
+
+  // Once per body per life. A drag along the wall hangs off one distant planet,
+  // so without this the tightest rescue would also be the most repeatable one.
+  if (sc.rescued.includes(body.name)) return none;
+
+  const quality = clamp01(1 - scar.cross.t / Math.max(1e-6, scfg.rescueSpan));
+  return { rescue: { side: scar.side, quality, body: body.name }, doomed: null };
 }
 
 /**

@@ -618,6 +618,109 @@ describe('what a rescue is worth', () => {
   });
 });
 
+describe('the skull: a press made past the last chance', () => {
+  const WALL_DRIFT = { x: 165.5, y: 150, vx: 150, vy: -60 };
+
+  /** Press `at` ticks in and report what the scorer knew, tick by tick. */
+  const run = (at: number, ticks = 400) => {
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, WALL_DRIFT);
+    const sc = createScoreState();
+    const seen: Array<{ tick: number; doomed: boolean }> = [];
+    let held = false;
+    for (let t = 0; t < ticks; t++) {
+      const pressed = t === at;
+      if (pressed) held = true;
+      stepSim(
+        state,
+        DEFAULT_CONFIG,
+        { held: held || pressed, pressed, released: false } as Input,
+        FIXED_DT,
+      );
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+      seen.push({ tick: t, doomed: sc.doomed !== null });
+      if (state.ending.active) break;
+    }
+    return { sc, seen, state };
+  };
+
+  it('lights on a press past the cross, and not on one before it', () => {
+    // Tick 100 spends 99% of the window on this fixture; tick 120 is past it.
+    const inTime = run(100);
+    expect(
+      inTime.seen.some((s) => s.doomed),
+      'a press in time owes no skull',
+    ).toBe(false);
+
+    const late = run(120);
+    expect(
+      late.seen.some((s) => s.doomed),
+      'a press past the cross owes one',
+    ).toBe(true);
+    expect(late.state.ending.reason, 'and the run really does end at the wall').toBe(
+      'out-of-bounds',
+    );
+  });
+
+  it('stays lit from the press until the wall', () => {
+    const late = run(120);
+    const first = late.seen.findIndex((s) => s.doomed);
+    expect(first, 'it lights on the press itself').toBe(120);
+    // Every tick from there to the end, with no flicker: it is a countdown, not
+    // a status that can be re-evaluated.
+    //
+    // Except the ending tick itself, where `endLife` clears it — the life is over
+    // and the LOST notice is the explanation from there. `drawDoom` refuses to
+    // draw during the ending hold for the same reason, so the two agree.
+    const after = late.seen.slice(first);
+    expect(after.slice(0, -1).every((s) => s.doomed)).toBe(true);
+    expect(after[after.length - 1]!.doomed, 'and it hands over at the death').toBe(false);
+    // And it is short. Measured over the corpus, a median 0.85s.
+    expect(after.length * FIXED_DT).toBeLessThan(3);
+  });
+
+  it('is withdrawn if the ship turns away regardless', () => {
+    // The prediction is conservative and 6% of these live. When one does, the
+    // omen is wrong and is taken back on the same event that pays the rescue.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, WALL_DRIFT);
+    const sc = createScoreState();
+    // Arm it by hand at a wall, then hand the scorer a capture that turns away.
+    sc.doomed = { side: 1, tick: 0 };
+    let held = false;
+    for (let t = 0; t < 200; t++) {
+      const pressed = t === 20;
+      if (pressed) held = true;
+      stepSim(
+        state,
+        DEFAULT_CONFIG,
+        { held: held || pressed, pressed, released: false } as Input,
+        FIXED_DT,
+      );
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+      if (sc.doomed === null && t > 20) break;
+    }
+    expect(sc.doomed, 'a ship that turned away owes no skull').toBeNull();
+  });
+
+  it('clears with the life, so a fresh ship is never born under it', () => {
+    const late = run(120, 600);
+    // The run above ended at the wall; drive on through the hold and respawn.
+    const state = late.state;
+    const sc = late.sc;
+    for (let t = 0; t < 200; t++) {
+      stepSim(
+        state,
+        DEFAULT_CONFIG,
+        { held: false, pressed: false, released: false } as Input,
+        FIXED_DT,
+      );
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+    }
+    expect(sc.doomed).toBeNull();
+  });
+});
+
 describe('what a link is worth', () => {
   it('pays more for a deeper, better-timed, better-aimed release', () => {
     const links = pilot(4000).awards.filter((a) => a.kind === 'link');

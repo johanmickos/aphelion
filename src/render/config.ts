@@ -186,6 +186,26 @@ export interface RenderConfig {
    * rescue burns. The scale is about how much, not whether.
    */
   scarPrizeFull: number;
+
+  // --- the skull ---
+  /**
+   * Peak alpha of the doom skull.
+   *
+   * Louder than the scar's 0.5: the scar is something to read while deciding, and
+   * this is the announcement that there is nothing left to decide.
+   */
+  doomAlpha: number;
+  /**
+   * Seconds a tick represents, for cues that beat on the simulation clock.
+   *
+   * Here rather than imported from `SimConfig` because it is a RENDER fact — how
+   * fast a pulse looks — and because nothing in `src/render/` should be reaching
+   * into the simulation's timestep to animate itself. If the two ever disagree the
+   * skull beats at the wrong speed, which is a cosmetic bug; reading `FIXED_DT`
+   * here would make the renderer's animation a function of physics tuning, which
+   * is a worse one.
+   */
+  doomTickSecs: number;
   /** Peak half-width of the long arm and of the crossbar, in design units. */
   scarArmWidth: number;
   scarBarWidth: number;
@@ -302,6 +322,9 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarPrizeMin: 0.62,
   scarPrizeMax: 1.42,
   scarPrizeFull: 860,
+
+  doomAlpha: 0.78,
+  doomTickSecs: 1 / 60,
   scarArmWidth: 1.3,
   scarBarWidth: 1.7,
   scarAlpha: 0.5,

@@ -44,6 +44,7 @@ import {
   releaseAngleFor,
 } from '../src/score/aim.ts';
 import { createScoreState } from '../src/score/score.ts';
+import type { ScoreState } from '../src/score/types.ts';
 import { orbitRadius } from '../src/sim/orbit.ts';
 import { Trail } from '../src/render/ship.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
@@ -536,6 +537,56 @@ describe('scene', () => {
     // It saturates rather than growing without limit: the top of the measured
     // distribution is three times the p90 the span is set to.
     expect(spanOf(rcfg.scarPrizeFull * 10)).toBeCloseTo(big, 6);
+  });
+
+  it('shows the skull only when a press was made past the last chance', () => {
+    // Measured: a press past the cross is fatal 94% of the time and precedes 43%
+    // of deaths by a median 0.85s. It is drawn on the side AWAY from the wall, so
+    // it never sits over the hazard gradient or the receding scar.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const scene = new Scene(
+      { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
+      99,
+    );
+    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
+    centerCamera(c, snap.x, snap.y, f, null);
+
+    const drawWith = (doomed: ScoreState['doomed']) => {
+      const r = recordingContext();
+      scene.draw(r.ctx, c, snap, {
+        timeMs: 0,
+        paused: false,
+        viewportW: 390,
+        viewportH: 844,
+        headerBottom: 0,
+        frameDt: 1 / 60,
+        score: { ...createScoreState(), doomed },
+      });
+      const xs: number[] = [];
+      let skull = false;
+      for (const op of r.ops) {
+        if (op[0] === '=globalCompositeOperation' && op[1] === 'destination-out') skull = true;
+        if (skull && (op[0] === 'ellipse' || op[0] === 'fillRect')) xs.push(op[1] as number);
+      }
+      return { skull, xs };
+    };
+
+    expect(drawWith(null).skull, 'nothing is drawn when nothing is owed').toBe(false);
+
+    const right = drawWith({ side: 1, tick: snap.tick });
+    expect(right.skull, 'the skull is drawn when a press was too late').toBe(true);
+    const left = drawWith({ side: -1, tick: snap.tick });
+    expect(left.skull).toBe(true);
+
+    // Away from the wall: heading at the RIGHT wall puts it left of the ship.
+    const shipX = toScreenX(c, snap.x);
+    expect(Math.min(...right.xs), 'right wall -> skull sits left of the ship').toBeLessThan(shipX);
+    expect(Math.max(...left.xs), 'left wall -> skull sits right of the ship').toBeGreaterThan(
+      shipX,
+    );
   });
 
   it('never draws an arm longer than the clamp, however far away the cross is', () => {
