@@ -54,20 +54,31 @@ export const LEVEL: Record<PraiseLevel, AccoladeStyle> = {
  * not worth celebrating, and an older value sat 25 dE from the superlative, which
  * made the rarest award in the game look like the commonest event in it.
  *
- * Dimmest is not the same as dim. At `#5f6673` this was 3.6:1 against the
- * starfield — the least legible text in the game, and the one shown most often,
- * which is the wrong way round. `#838c9c` is 6.2:1, against `good` at 7.9:1.
+ * QUIET BY BEING COLOURLESS, NOT BY BEING DARK. That is the whole idea here and
+ * it took three goes to find. At `#5f6673` this was 3.6:1 against the starfield —
+ * the least legible text in the game and the one shown most often, which is the
+ * wrong way round — and lightening it toward the ladder ran into the ladder: at
+ * L* 58 against `good` at 66 there was nowhere left to go without the bottom rung
+ * ceasing to be ordinal.
  *
- * THIS IS AS LIGHT AS IT CAN GO ON ITS OWN, and the constraint is the ladder
- * rather than legibility. L* here is 58 and `good` is 66; the next step up
- * (`#8b95a5`) closes that to 5, and a bottom gap under about 8 stops the ladder
- * being ordinal for anyone who cannot separate the hues — the rungs above it are
- * 11 and 10 apart. Lighter than this means lifting `LEVEL` with it, which is a
- * change to every award in the game and not a tweak to the quiet one.
+ * Lightness was the wrong axis. A near-white at 66% alpha reads as recessive
+ * because it has NO HUE, which leaves lightness free: effective (153,158,168) on
+ * black, L* 65, 7.8:1, and chroma 5.8 against 42 / 64 / 78 for the three rungs
+ * above it. The ladder still climbs monotonically, in saturation rather than in
+ * light, and it climbs much harder — 5.8 to 42 is a bigger step than any it had.
+ *
+ * It never has to be ranked against `good` in isolation anyway: a ROUTINE popup
+ * carries a number and NO WORD, so the absence of the word is the signal, and the
+ * colour only has to look unremarkable while staying readable.
+ *
+ * The transparency is doing real work and is not decoration. It is what keeps a
+ * near-white from being the brightest thing on a dark screen, and it lets the
+ * starfield show through the strokes, which is what makes it read as a readout
+ * rather than as a label pasted on top.
  */
 export const ROUTINE: AccoladeStyle = {
-  color: '#838c9c',
-  labelColor: 'rgba(140,148,164,.85)',
+  color: 'rgba(232,240,255,.66)',
+  labelColor: 'rgba(214,226,246,.5)',
   size: 13,
 };
 

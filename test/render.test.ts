@@ -675,6 +675,30 @@ describe('floating score popups', () => {
   const texts = (r: ReturnType<typeof recordingContext>) =>
     (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
 
+  it('keeps the routine colour quiet by chroma, not by darkness', () => {
+    // The rule that is easy to undo by reaching for a darker grey. ROUTINE was a
+    // dark grey once and it was the least legible text in the game while being the
+    // one shown most often. It is a near-white now, and what makes it recessive is
+    // having no hue — which leaves the ladder free to climb in saturation instead
+    // of in light.
+    const m = /rgba\((\d+),(\d+),(\d+),([\d.]+)\)/.exec(ROUTINE.color);
+    expect(m, 'ROUTINE should be an rgba near-white').not.toBeNull();
+    const [r, g, b, a] = [1, 2, 3, 4].map((i) => Number(m![i])) as [number, number, number, number];
+    // Near-white: bright, and close to neutral.
+    expect(Math.min(r, g, b)).toBeGreaterThan(200);
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThan(40);
+    // Slightly transparent, so it cannot be the brightest thing on a dark screen
+    // and the starfield shows through the strokes.
+    expect(a).toBeGreaterThan(0.4);
+    expect(a).toBeLessThan(0.85);
+
+    // And every rung above it is saturated, so the ladder is a chroma ladder.
+    for (const level of [LEVEL.good, LEVEL.great, LEVEL.exceptional]) {
+      const [lr, lg, lb] = [1, 3, 5].map((i) => parseInt(level.color.slice(i, i + 2), 16));
+      expect(Math.max(lr!, lg!, lb!) - Math.min(lr!, lg!, lb!)).toBeGreaterThan(80);
+    }
+  });
+
   it('shows the points for a routine link, with no word', () => {
     const p = new Popups();
     p.spawn(award(), 195, 0);

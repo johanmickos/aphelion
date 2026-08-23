@@ -2326,19 +2326,34 @@ that scored well turned the number BLUE next to an orange word: two hues on one
 two-line popup, neither of them fire. A burn's colour now lives entirely in its
 word, and size still climbs the rung, so how good it was is not lost.
 
-**And the default grey was too dark to be the default.** `ROUTINE` sat at 3.6:1
-against the starfield — the least legible text in the game, and the one shown most
-often, which is the wrong way round. It is `#838c9c` at 6.2:1 now, against `good`
-at 7.9:1.
+**And the default text was quiet in the wrong way.** `ROUTINE` sat at 3.6:1
+against the starfield — the least legible text in the game and the one shown most
+often, which is the wrong way round. Lightening it ran straight into the ladder:
+by `#838c9c` it was L* 58 against `good` at 66, and one more step would have closed
+that to 5 when the rungs above are 11 and 10 apart. dE had already fallen 41 -> 34,
+making it the closest pair in a table whose whole point was separation.
 
-That is as light as it can go on its own, and the binding constraint is the ladder
-rather than legibility. L* is 58 against `good` at 66; one step further closes that
-gap to 5, and a bottom gap under about 8 stops the ladder being ordinal for anyone
-who cannot separate the hues — the rungs above it are 11 and 10 apart. The hue
-separation is already spent: `ROUTINE` vs `good` went dE 41 -> 34, which makes it
-the closest pair in the table, where the file used to be able to claim 41. Lighter
-than this means lifting `LEVEL` with it, which is a change to every award in the
-game rather than a tweak to the quiet one.
+**Lightness was the wrong axis.** A near-white at 66% alpha —
+`rgba(232,240,255,.66)`, effective (153,158,168) on black — is recessive because it
+has NO HUE, which leaves lightness free to be whatever legibility wants: L* 65 and
+7.8:1. Chroma is 5.8 against 42, 64 and 78 for the three rungs above it, so the
+ladder still climbs monotonically, now in saturation, and climbs harder than it
+ever did in light: 5.8 -> 42 is a bigger first step than 43 -> 66 was.
+
+It never had to be ranked against `good` in isolation anyway. A ROUTINE popup
+carries a number and NO WORD; the absence of the word is the signal, and the colour
+only has to look unremarkable while staying readable.
+
+The transparency is load-bearing rather than decorative: it is what stops a
+near-white being the brightest thing on a dark screen, and it lets the starfield
+through the strokes, which is what makes it read as a readout instead of a label
+pasted over the scene. The rim came down with it — 3px at .55 alpha was sized for
+a dark grey that needed forcing apart from a dark sky, and under pale text a heavy
+black outline reads as a sticker. 2px at .38 now.
+
+The general lesson, since it cost three passes: when a colour has to be quiet AND
+legible, those pull against each other only if quiet is spelled "dark". Spelled
+"colourless", they stop competing.
 
 It costs one piece of awkwardness worth knowing about: the score band draws points,
 multiplier and word as a single centred string, so a burn has to lay out two runs

@@ -91,6 +91,18 @@ const STACK_GAP = 20;
  */
 const STACK_X = 80;
 
+/**
+ * The dark rim that keeps text legible over planets and stars.
+ *
+ * Thinner and lighter than it was — 3px at .55 alpha, which was sized for a text
+ * colour that no longer exists. `ROUTINE` used to be a dark grey that needed
+ * separating from a dark sky by force; it is a near-white now, and the rim only
+ * has to keep it off the occasional bright star. A heavy black outline under pale
+ * text reads as a sticker.
+ */
+const RIM_WIDTH = 2;
+const RIM = 'rgba(0,0,0,.38)';
+
 import { BURN_WORD, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 function easeOutCubic(u: number): number {
@@ -215,8 +227,8 @@ export class Popups {
         // thing on screen and, at that size, the hardest to read over anything
         // else in the air.
         ctx.font = `600 ${SHOUT.size * s}px ui-monospace, monospace`;
-        ctx.lineWidth = 3 * s;
-        ctx.strokeStyle = 'rgba(0,0,0,.55)';
+        ctx.lineWidth = RIM_WIDTH * s;
+        ctx.strokeStyle = RIM;
         ctx.strokeText(p.shout, x, y);
         ctx.fillStyle = SHOUT.color;
         ctx.fillText(p.shout, x, y);
@@ -241,8 +253,8 @@ export class Popups {
         ctx.fillStyle = wordColor;
         // A dark rim rather than a filled plate: the word sits over planets and
         // stars, and a box that size would punch a hole in the scene.
-        ctx.lineWidth = 3 * s;
-        ctx.strokeStyle = 'rgba(0,0,0,.55)';
+        ctx.lineWidth = RIM_WIDTH * s;
+        ctx.strokeStyle = RIM;
         ctx.strokeText(p.praise.word, x, y);
         ctx.fillText(p.praise.word, x, y);
       }
@@ -252,8 +264,8 @@ export class Popups {
       const numY = y + (p.praise ? style.size + 2 : 0) * s;
       ctx.font = `600 ${(p.praise ? style.size - 2 : style.size) * s}px ui-monospace, monospace`;
       ctx.fillStyle = numberColor;
-      ctx.lineWidth = 3 * s;
-      ctx.strokeStyle = 'rgba(0,0,0,.55)';
+      ctx.lineWidth = RIM_WIDTH * s;
+      ctx.strokeStyle = RIM;
       // Always a gain: nothing takes points away.
       //
       // A rolling number decelerates into its total rather than arriving at a
