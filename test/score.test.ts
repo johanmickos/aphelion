@@ -552,6 +552,7 @@ const grab = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   skim: 40,
   defl: 3,
   timing: 0,
+  heat: 0,
   aim: 0,
   climb: 0,
   ...over,
@@ -570,6 +571,7 @@ const link = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   timing: REAL.timing.med,
   aim: REAL.aim.med,
   climb: 400,
+  heat: 0,
   ...over,
 });
 
@@ -1106,5 +1108,140 @@ describe('the grab award lands at periapsis, not at the press', () => {
     expect(g.timing).toBe(0);
     expect(l.close).toBe(0);
     expect(l.clearance).toBe(Infinity);
+  });
+});
+
+// ------------------------------------------------------------------------ burn
+
+/**
+ * The burn's guarantee, and the only one worth pinning at this level.
+ *
+ * "Close to the edge" cannot be altitude, because the simulation gives altitude
+ * away: the clearance correction steers every dive onto `minR`, and measured over
+ * 1386 real captures, 68% of settled orbits sit at EXACTLY zero clearance. What
+ * separates a hot pass from parking is SPEED, and `burnSpeed0` is set above
+ * everything a parked orbit can reach.
+ *
+ * If that ever stops being true the burn becomes an idle faucet — points for
+ * holding still on the floor — which is the same failure the grab award refuses
+ * by paying at periapsis instead of at the press.
+ */
+describe('the burn', () => {
+  /** Step a session, sampling what the burn saw on every tick. */
+  function trace(edges: Edges, ticks: number, scfg: ScoreConfig = DEFAULT_SCORE_CONFIG) {
+    const cfg = DEFAULT_CONFIG;
+    const state = createInitialState(cfg);
+    const sc = createScoreState();
+    const awards: ScoreAward[] = [];
+    const samples: Array<{
+      tick: number;
+      phase: string;
+      clearance: number;
+      speed: number;
+      heat: number;
+    }> = [];
+    const map = new Map(edges);
+    let held = false;
+
+    for (let t = 0; t < ticks; t++) {
+      const e = map.get(t);
+      const pressed = e === 1;
+      const released = e === 0;
+      if (pressed) held = true;
+      if (released) held = false;
+      stepSim(state, cfg, { held: held || pressed, pressed, released } as Input, FIXED_DT);
+      awards.push(...scoreTick(sc, state, cfg, FIXED_DT, scfg).awards);
+      const cap = state.capture;
+      if (cap) {
+        samples.push({
+          tick: state.tick,
+          phase: cap.phase,
+          clearance: hypot(cap.rx, cap.ry) - cap.minR,
+          speed: hypot(cap.vx, cap.vy),
+          heat: sc.burnHeat,
+        });
+      }
+    }
+    return { score: sc, awards, samples };
+  }
+
+  /**
+   * Grab early and never let go: the dive circularises and parks a hair off the
+   * floor — measured at 1.03px of clearance, which `closeSpan` would score as a
+   * near-perfect 0.99 and which a depth-only burn would pay full marks for.
+   */
+  const PARK: Edges = [[150, 1]];
+
+  it('pays nothing for parking on the minimum-orbit floor', () => {
+    const { samples, awards } = trace(PARK, 2400);
+    const parked = samples.filter((s) => s.phase === 'orbit' && s.clearance < 2);
+    // The scenario has to actually get there, or this proves nothing.
+    expect(parked.length).toBeGreaterThan(60);
+    // Skimming the floor for over a thousand ticks, and stone cold for all of it.
+    expect(parked.every((s) => s.heat === 0)).toBe(true);
+    // And the ledger agrees. The DIVE into this orbit does burn, and should — it
+    // was a fast low pass. What pays nothing is the parking afterwards, however
+    // long it is held and however close to the floor it sits.
+    const settled = samples.find((s) => s.phase === 'orbit')!.tick;
+    expect(awards.filter((a) => a.kind === 'burn' && a.tick > settled)).toHaveLength(0);
+  });
+
+  it('keeps the parked orbit below the speed the burn starts at', () => {
+    // The measurement the threshold came from: over the whole diagnostics corpus
+    // a parked minimum orbit never exceeded 342 px/s, against a burn gate of 360.
+    // This is what makes depth-plus-speed discriminate where depth alone does not.
+    const { samples } = trace(PARK, 2400);
+    const parked = samples.filter((s) => s.phase === 'orbit');
+    expect(parked.length).toBeGreaterThan(60);
+    const fastest = Math.max(...parked.map((s) => s.speed));
+    expect(fastest).toBeLessThan(DEFAULT_SCORE_CONFIG.burnSpeed0);
+  });
+
+  it('lights on a fast low pass, and pays what it burned', () => {
+    const { score, awards } = pilot(4000);
+    const burns = awards.filter((a) => a.kind === 'burn');
+    expect(burns.length).toBeGreaterThan(0);
+    expect(burns).toHaveLength(score.burns);
+    for (const b of burns) {
+      // A flare that rounds to nothing is dropped rather than floated as `+0`.
+      expect(b.points).toBeGreaterThan(0);
+      expect(b.heat).toBeGreaterThan(DEFAULT_SCORE_CONFIG.burnMinHeat);
+      expect(b.heat).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('reports no arrival or release quality, so nothing is paid or praised twice', () => {
+    const burns = pilot(4000).awards.filter((a) => a.kind === 'burn');
+    expect(burns.length).toBeGreaterThan(0);
+    for (const b of burns) {
+      expect(b.close).toBe(0);
+      expect(b.timing).toBe(0);
+      expect(b.aim).toBe(0);
+      expect(b.climb).toBe(0);
+    }
+  });
+
+  it('pays in proportion to the heat it integrated', () => {
+    const base = pilot(4000).awards.filter((a) => a.kind === 'burn');
+    const doubled = pilot(4000, DEFAULT_CONFIG, {
+      ...DEFAULT_SCORE_CONFIG,
+      burnRate: DEFAULT_SCORE_CONFIG.burnRate * 2,
+    }).awards.filter((a) => a.kind === 'burn');
+    expect(base.length).toBeGreaterThan(0);
+    expect(doubled).toHaveLength(base.length);
+    for (let i = 0; i < base.length; i++) {
+      // Rounding is applied after the multiplier, so allow a point of slack
+      // rather than demanding exactly twice.
+      expect(Math.abs(doubled[i]!.points - 2 * base[i]!.points)).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('leaves nothing banked when a life ends mid-flare', () => {
+    // Whatever the run did, a death must not leave a half-integrated flare behind
+    // to be paid into the NEXT life — the score it would have banked is exactly
+    // what the death is taking.
+    const { score } = pilot(4000);
+    expect(score.burnBank).toBe(0);
+    expect(score.burnPeak).toBe(0);
   });
 });

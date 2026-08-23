@@ -69,6 +69,52 @@ export interface ScoreConfig {
   aimSharpness: number;
   timingSharpness: number;
 
+  // --- the burn ---
+  /**
+   * Clearance, in px above the minimum orbit, at which reentry heat reaches zero.
+   *
+   * The span is narrow on purpose. Widening it does not lengthen the burn — the
+   * speed term is what bounds it — it only lets a slow, shallow pass smoulder.
+   * Measured: at a span of 30 the median flare runs 0.17s, and at 80 it runs
+   * 0.18s.
+   */
+  burnSpan: number;
+  /**
+   * Planet-relative speed, in px/s, below which nothing burns however low it is.
+   *
+   * THIS IS THE KEY THAT MAKES THE BURN MEAN ANYTHING, and it is why heat is not
+   * simply altitude. The simulation actively steers every dive down onto `minR`
+   * — that is the clearance fix — so being at the floor is not an achievement:
+   * measured across 1386 real captures, 68% of settled orbits sit at EXACTLY zero
+   * clearance. A burn gated on depth alone would pay most for parking.
+   *
+   * A parked minimum orbit is slow, though: its speed tops out at 342 px/s over
+   * the whole corpus, while a dive whipping through periapsis reaches 430-570. So
+   * 360 sits just above everything a parked orbit can reach, and the result is
+   * that of the captures that flare, ZERO flare while parked.
+   */
+  burnSpeed0: number;
+  /** Speed at which the heat term saturates. 560 is the p99 of real low passes. */
+  burnSpeed1: number;
+  /**
+   * Points per heat-second.
+   *
+   * Heat is `depth * speed`, both 0..1, so a whole second held at full heat pays
+   * this — which never happens: the hot pass is a flash. Measured against real
+   * play, 1500 puts a median capture's burn at ~84 points and the best on record
+   * at ~205, which is the band `closeBonus` and `nerveBonus` already occupy.
+   */
+  burnRate: number;
+  /**
+   * Heat below which the ship is not burning: no flame, and no points.
+   *
+   * It brackets the flare — a burn award is owed when heat falls back under this
+   * — so it decides what counts as one pass rather than two, and it withholds the
+   * points from a smoulder too faint to draw. A weight, not a constant, because
+   * it changes what a session scores.
+   */
+  burnMinHeat: number;
+
   // --- the streak ---
   /**
    * Each link after the first adds this much to the multiplier.
@@ -150,13 +196,27 @@ export interface ScoreConfig {
  * The shape of the model, which is the part worth arguing about:
  *
  *   grab = (close + nerve)                       x multiplier   at periapsis
+ *   burn = (heat integrated over the pass)       x multiplier   when the fire dies
  *   link = (base + climb + timing + aim)         x multiplier   at the release
  *
- * Two events, because they are settled at different moments and describe
+ * Three events, because they are settled at different moments and describe
  * different acts. The grab is judged on how the ship arrived and pays when the
  * dive swings through the bottom — not at the press, so a tap that never gets
  * there earns nothing and tapping beside a planet is not a faucet. The link is
- * judged on how it left.
+ * judged on how it left. The burn is judged on the ride between them.
+ *
+ * The burn is the only one that accrues rather than being read off an instant,
+ * and the only one that can pay twice in one capture — a settle that dips through
+ * the hot zone on two successive passes lights twice, because it did.
+ *
+ * It does NOT double-pay `close`, which is the obvious worry. `close` is settled
+ * at the press and the burn at periapsis, and measured over 1386 real captures
+ * they are ANTI-correlated: peak heat against grab clearance is -0.36, against
+ * apoapsis -0.43. A grab from inside 10px flares 0% of the time — there is no
+ * dive left to build speed with — which is exactly where `close` pays most. The
+ * far, stretched grab does not burn either: it arrives as a flyby that has to be
+ * braked, and braking sheds the speed the heat is made of. What burns is the
+ * middle: a moderate orbit, dived hard.
  *
  * `close` is how near you let the body get before committing to the grab.
  * `cap.tightness` was the obvious candidate and is the wrong one — it saturates
@@ -189,6 +249,12 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   nerveBonus: 200,
   aimSharpness: 3,
   timingSharpness: 2,
+
+  burnSpan: 30,
+  burnSpeed0: 360,
+  burnSpeed1: 560,
+  burnRate: 1500,
+  burnMinHeat: 0.05,
 
   streakStep: 0.25,
   streakMax: 5,

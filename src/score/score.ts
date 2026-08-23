@@ -36,6 +36,7 @@ import type { SimConfig } from '../sim/config.ts';
 import type { Capture, SimState } from '../sim/types.ts';
 import { hypot } from '../sim/orbit.ts';
 import { readAim } from './aim.ts';
+import { burnHeat } from './burn.ts';
 import { isNerveGrab } from './praise.ts';
 import {
   BONK_SPEED,
@@ -69,6 +70,10 @@ export function createScoreState(): ScoreState {
     bonusFrac: 0,
     grabs: 0,
     links: 0,
+    burns: 0,
+    burnHeat: 0,
+    burnBank: 0,
+    burnPeak: 0,
     lastAward: null,
     pending: null,
     climbFromY: null,
@@ -146,6 +151,12 @@ function endLife(sc: ScoreState): void {
   sc.bonusUntil = -1;
   sc.bonusArmed = false;
   sc.claimed.length = 0;
+  // A flare still burning at the moment of death is dropped rather than paid.
+  // Flying into the ground is how a hot pass goes wrong, and the score it would
+  // have banked is exactly what the death is taking.
+  sc.burnHeat = 0;
+  sc.burnBank = 0;
+  sc.burnPeak = 0;
 }
 
 /**
@@ -207,6 +218,35 @@ export function scoreTick(
   }
   sc.endingSeen = false;
   if (sc.climbFromY === null) sc.climbFromY = state.highWaterY;
+
+  // ---- the burn: heat integrated over a hot pass, paid when the fire dies
+  //
+  // Ahead of the release below, and deliberately: a hot pass happens during the
+  // ride, so when a release ends a flare the two awards land on the same tick and
+  // the one that describes the earlier moment should be the earlier of the pair.
+  //
+  // Both ends of a flare are edges on the same quantity, so a flare is exactly
+  // one continuous stretch above the ignition heat — no separate latch to get out
+  // of step with the fire the player is watching. A settle that dips through the
+  // hot zone on two passes pays twice, which is right: it burned twice.
+  //
+  // Placed outside the capture branch so a release mid-burn settles here too.
+  // Otherwise letting go at the hottest instant — which is a thing a player will
+  // do on purpose, because it is also the best boost — would silently forfeit the
+  // whole flare.
+  {
+    const cap = state.capture;
+    const heat = cap ? burnHeat(hypot(cap.rx, cap.ry) - cap.minR, hypot(cap.vx, cap.vy), scfg) : 0;
+    if (heat > scfg.burnMinHeat) {
+      sc.burnHeat = heat;
+      sc.burnBank += heat * dt * scfg.burnRate;
+      if (heat > sc.burnPeak) sc.burnPeak = heat;
+    } else {
+      sc.burnHeat = 0;
+      const burn = awardBurn(sc, state, scfg);
+      if (burn) awards.push(burn);
+    }
+  }
 
   // ---- ran dry mid-circularisation: a failure, not a release
   if (state.telemetry.putterOuts > sc.putterOuts) {
@@ -440,10 +480,12 @@ function awardGrab(
     skim: sc.grabSkim,
     defl: sc.maxDefl,
     // Release qualities are not this event's business and must read as absent
-    // rather than as zero-scoring.
+    // rather than as zero-scoring. The burn is not this event's business either:
+    // the arrival is one instant, and heat is a stretch of the ride after it.
     timing: 0,
     aim: 0,
     climb: 0,
+    heat: 0,
   };
   // An anomaly pays its own flat award on top of whatever the arrival was worth,
   // and arms the bonus window for the release. Once per life: without the claim
@@ -463,6 +505,59 @@ function awardGrab(
   award.points = Math.round(raw * multiplier);
   sc.score += award.points;
   sc.grabs++;
+  return award;
+}
+
+/**
+ * Pay for a hot pass, once the fire is out.
+ *
+ * Returns null when nothing was burning, which is the common case — this is
+ * called on every tick the ship is not alight, purely to catch the falling edge.
+ *
+ * The bank is committed in ONE award rather than a slice a tick, even though it
+ * was accumulated a slice a tick. Paying continuously would break the promise
+ * `test/score.test.ts` pins — that awards inside a life sum to the score — and
+ * with it `tools/replay.ts`, which reconstructs a session from its award list and
+ * would come up short by every burn. The player still sees the number climb: the
+ * popup rolls it up over 0.8s, outliving the flame it is counting, because the
+ * flame itself is only about 0.17s long and a number that resolved in 0.17s would
+ * be a flicker rather than a tally.
+ */
+function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAward | null {
+  if (sc.burnBank <= 0) return null;
+  const raw = sc.burnBank;
+  const peak = sc.burnPeak;
+  sc.burnBank = 0;
+  sc.burnPeak = 0;
+
+  const multiplier = multiplierFor(sc, scfg, state.tick);
+  const points = Math.round(raw * multiplier);
+  // A flare so faint it rounds to nothing pays nothing and says nothing: a `+0`
+  // floating off the ship is worse than silence, the same rule `awardGrab` keeps.
+  if (points <= 0) return null;
+
+  const cap = state.capture;
+  const award: ScoreAward = {
+    tick: state.tick,
+    kind: 'burn',
+    points,
+    multiplier,
+    // The body it burned against, or the one it just left — a release can end a
+    // flare, and by then the capture is already gone.
+    body: (cap ? state.bodies[cap.planet]?.name : sc.pending?.body) ?? '?',
+    // Arrival and release qualities both belong to other events. Reported as
+    // absent so nothing downstream can pay or praise them a second time.
+    close: 0,
+    clearance: Infinity,
+    skim: Infinity,
+    defl: 0,
+    timing: 0,
+    aim: 0,
+    climb: 0,
+    heat: peak,
+  };
+  sc.score += points;
+  sc.burns++;
   return award;
 }
 
@@ -498,6 +593,7 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
     timing: p.timing,
     aim: p.aim,
     climb,
+    heat: 0,
   };
   award.points = Math.round(raw * multiplier);
   sc.score += award.points;

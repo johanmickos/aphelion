@@ -47,7 +47,7 @@ import { mulberry32 } from '../sim/rng.ts';
 import type { ScoreAward } from './types.ts';
 
 /** Which quality earned the word. `super` is two or more at once. */
-export type PraiseCategory = 'close' | 'aim' | 'peak' | 'nerve' | 'super';
+export type PraiseCategory = 'close' | 'aim' | 'peak' | 'nerve' | 'burn' | 'super';
 
 /**
  * How good it was, on one ladder shared by every category.
@@ -83,6 +83,21 @@ export interface Praise {
 export const CLOSE_PX = Object.freeze({ tier1: 59, tier2: 48 });
 export const AIM = Object.freeze({ tier1: 0.94, tier2: 0.98 });
 export const PEAK = Object.freeze({ tier1: 0.85, tier2: 0.94 });
+
+/**
+ * Peak heat of a flare. Percentiles of the 760 flares in `diagnostics/`.
+ *
+ * Measured against the frequency of the thing being named, not against the 0..1
+ * scale, because the scale is not the question — how often the word should appear
+ * is. tier1 is the p70 flare and tier2 the p90, which puts a burn word on about
+ * one capture in six and the better word on about one in eighteen.
+ *
+ * Read those as shares of ALL captures, not of flares: 55% of captures flare at
+ * all, and most of those are a faint scrape that earns its points and no name.
+ * Naming them too would make the commonest event in the game a celebrated one,
+ * which is the mistake the 15-degree kink line made.
+ */
+export const BURN = Object.freeze({ tier1: 0.53, tier2: 0.75 });
 
 /**
  * The nerve grab: already boring in, and you waited.
@@ -126,6 +141,12 @@ export const NERVE_SKIM_PX = 0;
  *   nerve    composure    — you were going to hit it and you waited. BRINK, CLUTCH.
  *   aim      marksmanship — you pointed it. BULLSEYE, THREADED, DEADEYE.
  *   peak     launch       — you let go at the right instant. SLINGSHOT, REDLINE.
+ *   burn     fire         — you came in low and fast enough to cook. SEARED, INFERNO.
+ *
+ * `burn` and `close` are the pair to watch here, because both are about being
+ * near a planet and a shared register would collapse them. Proximity and fire are
+ * far enough apart in English that they do not — and the events themselves barely
+ * overlap anyway, since a grab from point blank has no dive left to heat up with.
  *
  * The two that must never blur are `aim` and `peak`, because they are the two
  * that can fire on the same event. Marksmanship and launch are about as far apart
@@ -154,6 +175,13 @@ export const WORDS: Readonly<
     ['TIMED', 'SNAPPED', 'WHIPPED'],
     ['SLINGSHOT', 'REDLINE', 'CATAPULT'],
   ],
+  // REDLINE is a `peak` word and stays one: it is engine-rev, not fire. Nothing
+  // here is about heat in a figurative sense for the same reason — the ship is
+  // literally burning, and the words should mean it.
+  burn: [
+    ['SINGED', 'SEARED', 'SCORCHED'],
+    ['BLAZING', 'INFERNO', 'METEOR'],
+  ],
   // The two slots here are the two EVENTS, not two rungs — the only entry where
   // that is true. A superlative arrival and a superlative departure are different
   // achievements and used to share one gold word, which made the rarest thing in
@@ -172,6 +200,10 @@ const ORDINAL: Record<PraiseCategory, number> = {
   peak: 3,
   nerve: 4,
   super: 5,
+  // Appended rather than slotted in beside `close`, where it belongs
+  // thematically. The ordinal is a hash input: renumbering an existing category
+  // changes which synonym every past session's replay prints, for no gain.
+  burn: 6,
 };
 
 /**
@@ -228,7 +260,26 @@ export function isNerveGrab(award: ScoreAward): boolean {
 export function praiseFor(award: ScoreAward): Praise | null {
   if (award.kind === 'grab') return praiseGrab(award);
   if (award.kind === 'link') return praiseRelease(award);
+  if (award.kind === 'burn') return praiseBurn(award);
   return null;
+}
+
+/**
+ * How hot the pass got.
+ *
+ * No `super` rung, unlike the grab and the release. Those two each judge a pair
+ * of independent qualities and reserve gold for landing both at once; a burn has
+ * one quality, so a gold word here would mean nothing more than "even hotter" —
+ * which is what the ladder's colour already says.
+ */
+function praiseBurn(award: ScoreAward): Praise | null {
+  const heat = tierOf(award.heat, BURN.tier1, BURN.tier2);
+  if (heat === 0) return null;
+  return {
+    category: 'burn',
+    level: heat === 2 ? 'great' : 'good',
+    word: pick(WORDS.burn[heat - 1]!, award.tick, 'burn'),
+  };
 }
 
 /**
