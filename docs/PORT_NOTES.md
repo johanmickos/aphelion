@@ -2245,61 +2245,57 @@ battery did it never, until a scenario was added that does.
 
 ---
 
-### 51 — The one award the player decides on while it is still happening
+### 51 — A live tally, built and taken back out
 
-`src/render/burn-tally.ts` · **[ADDED]** · "I want the time spent in the red zone,
-burning, to tally up a red text near the ship rolling upwards"
+`src/render/burn-tally.ts` · **[REVERTED]** · asked for as "I want the time spent
+in the red zone, burning, to tally up a red text near the ship rolling upwards",
+withdrawn one playtest later as "the way you had it before was better (rolling up
+at the end)"
 
-Every other award is settled before a number appears. A grab pays at periapsis, a
-link at the release, and the popup reports something already over. The burn is not
-like that: the ship is in the red band with a wall a few pixels away and the
-question in front of the player — hold on for more, or get out with what I have —
-is live. A number that only arrived afterwards could not be part of it.
+Recorded because the argument for it was good and it still lost, which is the kind
+of thing that otherwise gets re-proposed every six months.
 
-It could not have been built before note 50. A periapsis flare ran 0.17s, about
-four frames of a changing number, which is why the first version settled for a
-popup that rolled up after the fact. A drag runs 0.42s at the median and up to
-1.45s.
+The case for counting live: every other award is settled before a number appears —
+a grab pays at periapsis, a link at the release, and the popup reports something
+already over. A drag is not like that. The ship is in the red band with a wall a
+few pixels away and the question is live: hold on for more, or get out with what I
+have. A number that only arrives afterwards cannot be part of that decision. It
+had become buildable, too — a periapsis flare ran 0.17s, about four frames of a
+changing number, where a drag runs 0.45s at the median and up to 1.47s.
 
-**`ScoreState.burnPoints` is computed once and read twice.** The tally draws it and
-`awardBurn` pays it, rather than each deriving it from the bank. They would agree
-in every case anyone has thought of, and that is exactly how a readout and its
-payout begin to drift — at the loudest moment the game has, where a one-point
-disagreement would be a visible lie.
+What that argument missed is that the decision does not want help. Inches from a
+wall, a number climbing in peripheral vision competes with the thing the player is
+actually doing rather than informing it — and the fire is already saying
+everything the tally would, on a channel that costs no reading. Afterwards there
+is nothing left to decide and the number has the moment to itself.
 
-The popup no longer rolls. It counted for the whole drag beside the ship, so
-re-counting from zero would replay what was just watched and, worse, would put a
-smaller number on screen than was there a frame earlier.
+So the roll is back where it was: the popup counts 0 to the total over 0.8s once
+the drag is over, deliberately taking longer than the 0.45s drag it is summing so
+that it reads as a tally rather than as a replay in real time.
 
-**Position: inboard, not above or below.** Both vertical lanes were taken —
-popups rise from `SPAWN_LIFT`, the fuel badge sits 26 below — and a third channel
-stacked into either would collide at the busiest moment in the game. The
-horizontal choice is not a leftover: a burning ship is by definition pressed
-against the left or right edge, so the inboard side is both the empty half of the
-screen and the half the eye is already on.
+Two things from the attempt were kept, because they were separate requests that
+happened to arrive together:
 
-**The palette is fire, not the band.** The first cut took the hazard band's red
-exactly, so band, flame and number would be one substance. That red is
-pink-leaning — `rgba(255,70,90)`, B=90 — and beside an actual flame it read as a
-different material. The text sits next to the FIRE, so it takes the fire's
-colours: `drawBurn` builds its core from (255, 150+, 38+), and the number
-(`#ff3b2e`), the word (`#ff7a1e`) and the detail line (`#c2521f`) are that family
-deepened for text weight. Three shades and a black rim, because a singe has no
-other colours in it. Number and word sit dE 30 apart — one family, still
-distinguishable.
+**The text is fire.** Three shades and nothing else — number `#ff3b2e`, word
+`#ff7a1e` a step deeper into the orange, detail line `#c2521f`, black rim. Taken
+from the FLAME rather than from the hazard band: the band's red is pink-leaning
+(`rgba(255,70,90)`, B=90) and beside an actual fire it reads as a different
+material, while `drawBurn` builds its core from (255, 150+, 38+). Number and word
+sit dE 30 apart — one fire, two shades.
 
-**The collision with fuel is not a bug.** Every shade here lands within dE 14-26
-of some step of `FUEL_RAMP`, and nothing in the fire family does better, because
-`FUEL_RAMP` IS a fire gradient — red at empty through amber to green. There is no
-orange-red that says "burning" and does not also look like a tank in trouble.
+This is also the first colour off the rarity ladder that is not a shout, and the
+reason it is allowed: it is a STATE, not a category. Nobody has to learn the hue;
+the player is looking at a red band, a burning ship and a red number at once.
 
-So it is named instead of dodged: this game's danger palette is fire-coloured. Out
-of fuel, inside the dead zone, and on fire are three ways of being about to die and
-are allowed to look alike. Where they co-occur they separate by form and position,
-which is the right channel for it — the fuel badge is a pill glyph and the word
-EMPTY on a plate below the ship, this is a signed number to the side. Nobody
-misreads `+430` as `EMPTY`. The dE discipline in `accolade.ts` exists so a RANK can
-be read off a hue, and there is no rank between "burning" and "out of fuel".
+Every shade lands within dE 14-26 of some step of `FUEL_RAMP`, and nothing in the
+fire family does better, because `FUEL_RAMP` IS a fire gradient — red at empty
+through amber to green. There is no orange-red that says "burning" and does not
+also look like a tank in trouble. So it is named rather than dodged: this game's
+danger palette is fire-coloured, and out of fuel, inside the dead zone and on fire
+are three ways of being about to die. They separate by form and position — the
+fuel badge is a pill glyph and the word EMPTY on a plate below the ship — and the
+dE discipline in `accolade.ts` exists so a RANK can be read off a hue, which is not
+a question anyone asks between "burning" and "out of fuel".
 
 **It lights at the band's edge, not 6px inside it.** `burnMinHeat` was 0.10, which
 put ignition 54px from the lethal line — and 7% of band entries grazed the outer
@@ -2310,14 +2306,10 @@ while drifting, so `heat > 0` already brackets a drag and needs no threshold. It
 trying it at 0, half and double — all of which are 0 when the value is 0, so a zero
 weight reads as a dead one. 0.01 is 0.6px into a 60px band.
 
-Lighting on the shallow grazes changed the population it is calibrated against —
-159 drags rather than 147, survivors 44 rather than 33 — so `burnRate` went 425 ->
-555 and the word tiers 0.57/0.83 -> 0.52/0.70. Same frequency targets, re-measured
-quantity.
-
-This is also the first colour off the rarity ladder that is not a shout, and the
-reason it is allowed: it is a STATE, not a category. The player is not learning a
-hue, they are looking at a red band, a burning ship and a red number at once.
+Lighting on the shallow grazes changed the population the weights are calibrated
+against — 159 drags rather than 147, survivors 44 rather than 33 — so `burnRate`
+went 425 -> 555 and the word tiers 0.57/0.83 -> 0.52/0.70. Same frequency targets,
+re-measured quantity.
 
 ---
 
@@ -2343,11 +2335,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 109 · camera 55
+tests    port-equality 11 · invariants 32 · render 105 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
-         score 67 · input 8 · grab-target 8 · link-fuel 6
+         score 68 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 443 total
+         zip-charge 8 · attract 13 · 439 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

@@ -76,7 +76,6 @@ export function createScoreState(): ScoreState {
     burnHeat: 0,
     burnBank: 0,
     burnPeak: 0,
-    burnPoints: 0,
     lastAward: null,
     pending: null,
     climbFromY: null,
@@ -160,7 +159,6 @@ function endLife(sc: ScoreState): void {
   sc.burnHeat = 0;
   sc.burnBank = 0;
   sc.burnPeak = 0;
-  sc.burnPoints = 0;
 }
 
 /**
@@ -255,11 +253,6 @@ export function scoreTick(
       sc.burnHeat = heat;
       sc.burnBank += heat * dt * scfg.burnRate;
       if (heat > sc.burnPeak) sc.burnPeak = heat;
-      // What it would pay if the ship got out right now. This is the number
-      // drawn beside the ship, and the one the award will hand over — computed
-      // once, here, so the tally the player watched cannot disagree with the
-      // award they were paid.
-      sc.burnPoints = Math.round(sc.burnBank * multiplierFor(sc, scfg, state.tick));
     } else {
       sc.burnHeat = 0;
       const burn = awardBurn(sc, state, scfg);
@@ -544,15 +537,13 @@ function awardGrab(
  */
 function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAward | null {
   if (sc.burnBank <= 0) return null;
+  const raw = sc.burnBank;
   const peak = sc.burnPeak;
-  // The last number the tally showed, not a fresh computation from the bank. The
-  // two would agree in every case anyone has thought of, and "agree in every case
-  // anyone has thought of" is how a readout and its payout start to drift.
-  const points = sc.burnPoints;
-  const multiplier = multiplierFor(sc, scfg, state.tick);
   sc.burnBank = 0;
   sc.burnPeak = 0;
-  sc.burnPoints = 0;
+
+  const multiplier = multiplierFor(sc, scfg, state.tick);
+  const points = Math.round(raw * multiplier);
   // A flare so faint it rounds to nothing pays nothing and says nothing: a `+0`
   // floating off the ship is worse than silence, the same rule `awardGrab` keeps.
   if (points <= 0) return null;

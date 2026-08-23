@@ -14,7 +14,6 @@ import { Starfield } from './starfield.ts';
 import { BodyRenderer, drawBacktrackFloor, drawHazardZones } from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
-import { drawBurnTally } from './burn-tally.ts';
 import { FuelWarning } from './fuel-warning.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
@@ -136,20 +135,6 @@ export class Scene {
     this.trail.draw(ctx, cam, snap.x, snap.y);
     drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
     drawShip(ctx, cam, snap, this.burn, opts.timeMs);
-    // Above the ship it annotates and below the popups, which outrank everything
-    // in the world. Uses the SCORER's heat, not the flame's smoothed follower —
-    // the number should stop the moment the points stop, even though the fire
-    // takes another quarter second to die down.
-    drawBurnTally(
-      ctx,
-      cam,
-      field,
-      snap.x,
-      snap.y,
-      opts.score.burnPoints,
-      opts.score.burnHeat,
-      opts.timeMs,
-    );
 
     // Above the ship and its wake, below the HUD: it belongs to the world, but
     // nothing in the world should ever cover it.

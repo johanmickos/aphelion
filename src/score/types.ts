@@ -187,18 +187,6 @@ export interface ScoreState {
   burnBank: number;
   /** Hottest instant of the flare currently burning. 0 when nothing is. */
   burnPeak: number;
-  /**
-   * What the current drag would pay if it ended now, multiplier included.
-   *
-   * The number the player watches climb beside the ship, and — deliberately —
-   * the exact number the award pays when the fire goes out. `awardBurn` reads
-   * this rather than recomputing from the bank, because a tally you watched for a
-   * second and an award that then disagreed with it by a point would be a small
-   * lie told at the loudest moment in the game.
-   *
-   * 0 when nothing is burning.
-   */
-  burnPoints: number;
   /** Ticks left before the grab award lands. -1 once it has. */
   grabDue: number;
   /**

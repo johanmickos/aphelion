@@ -23,14 +23,28 @@ const LIFE = 1.15;
 const LIFE_SUPER = 1.6;
 const LIFE_SHOUT = 1.4;
 /**
- * A burn lingers, because it is the end of the longest moment in the game.
+ * A burn lives longer than the others, because its number has to count.
  *
- * It no longer counts up here — `src/render/burn-tally.ts` did that live, beside
- * the ship, for the whole drag. This popup is the number letting go and drifting
- * off, so the life is for reading a total already known rather than for animating
- * one into existence.
+ * Long enough that the roll below finishes well before the fade starts: the fade
+ * takes the last 45% of the life, so at 1.7s it begins at 0.94s and the roll lands
+ * at 0.8s.
  */
 const LIFE_BURN = 1.7;
+
+/**
+ * Seconds a burn's number spends counting up to its total.
+ *
+ * The count happens AFTER the drag, not during it. A live tally beside the ship
+ * was built and taken out again — see PORT_NOTES 51 — and the reason it lost is
+ * that a number climbing next to a ship that is inches from a wall competes with
+ * the decision the player is actually making. Afterwards there is nothing left to
+ * decide and the number has the moment to itself.
+ *
+ * 0.8s against a drag that runs 0.45s at the median: the tally deliberately takes
+ * longer than the thing it is counting, so it reads as a total being tallied up
+ * rather than as a replay of the drag in real time.
+ */
+const ROLL = 0.8;
 
 /** World units risen over a full life. */
 const RISE = 34;
@@ -129,11 +143,7 @@ export class Popups {
       points: award.points,
       praise,
       shout: null,
-      // No roll on a burn any more. The tally beside the ship has been counting
-      // this number up for the whole drag, so re-counting it from zero would
-      // replay something the player just watched — and, worse, would show a
-      // smaller number than the one that was on screen a frame earlier.
-      roll: 0,
+      roll: burning ? ROLL : 0,
       burn: burning,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();

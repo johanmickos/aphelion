@@ -1159,6 +1159,17 @@ describe('the burn', () => {
     expect(heatAt(field.right, true)).toBeCloseTo(1, 5);
   });
 
+  it('lights the moment the ship crosses into the red band', () => {
+    // "From the second they enter the dangerous red zone." At the old threshold of
+    // 0.10 the fire kindled 54px out, and 7% of band entries grazed the outer strip
+    // and left without ever lighting — the player visibly in the red with nothing
+    // happening, which is the whole thing that was being complained about.
+    const span = DEFAULT_SCORE_CONFIG.burnEdgeSpan;
+    expect(heatAt(field.left + span - 1, true)).toBeGreaterThan(DEFAULT_SCORE_CONFIG.burnMinHeat);
+    // And nothing at all a pixel outside it.
+    expect(heatAt(field.left + span + 1, true)).toBe(0);
+  });
+
   it('does not burn in mid-field, however the ship got there', () => {
     expect(heatAt((field.left + field.right) / 2, true)).toBe(0);
   });
