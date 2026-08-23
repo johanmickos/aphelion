@@ -3460,6 +3460,64 @@ is inert without them.
 
 ---
 
+### 59 — The receipt: one popup a capture, except for anything that speaks
+
+`src/render/popups.ts` · `app/main.ts` · **[CHANGED]** · reported as "we need to
+revisit the various popups and numbers we're showing, because right now there are
+so many at so many different points that the user doesn't know what they're being
+rewarded for"
+
+**Measured before anything moved**, over 65 minutes of real play:
+
+```
+  things appearing                       31.7 a minute, one every 1.9s
+  landing while the previous was still up  51%   (median 1 live, p90 3, max 6)
+  score-band lines overwritten early       68%   (median line gets 1.08s)
+  awards carrying nothing but a number     74%   (1416 of 1917)
+  composition   link 36%  grab 32%  rescue 11%  flyby 10%  shouts 7%  burn 4%
+```
+
+The cause is structural rather than a matter of any one popup being wrong: a
+capture pays at least twice — a grab at periapsis and a link at the release — and
+up to four times with a flyby, a burn and a rescue, all inside about two seconds,
+in one lane. Three quarters of those events are not answering "what am I being
+rewarded for" at all; they are spending attention to say a number.
+
+**Grouping by capture is exact, which is why it is the rule.** A link lands at the
+release and a burn when the fire dies — both after the capture is over, both
+before the next press — so "everything since the last capture began" collects them
+and nothing else. Across the corpus it produces zero orphans. `app/main.ts` calls
+`settleReceipt()` on the press that takes, before `scoreTick` runs, so a grab
+landing on that very tick belongs to the capture it started.
+
+`RECEIPT_TAIL` is a cap rather than the rule. Consecutive awards inside one
+capture land a median 1.07s apart and 1.80s at p90, so 1.8 holds about nine in ten
+of them together — and it stops a capture held through a long settle from keeping
+one popup open for the eighteen seconds the longest in the corpus would have.
+
+**A WORD ALWAYS KEEPS ITS OWN POPUP, and that is the correction that matters.**
+The first version merged everything and kept the better of two words, which
+`test/render.test.ts` caught immediately: `praise.ts` gives a superlative arrival
+and a superlative departure disjoint word lists precisely because they once shared
+one gold word, "which made the rarest thing in the game the only one that could not
+say what it was for". A merge that discarded one would have rebuilt exactly that,
+on the rarest and most expressive events in the game.
+
+So the receipt collects the NUMBERS and every word still speaks for itself, which
+is also what the measurement pointed at — the noise was never the words.
+
+```
+  popups a minute   29.5 -> 22.1
+  mute popups       1416 -> 935
+```
+
+A 25% cut in count and a 34% cut in the mute ones, where a full merge would have
+reached 15.3 a minute. The difference is the price of keeping every word, and it
+is worth paying: the complaint was that the player cannot tell what they are being
+rewarded for, and the words are the part that tells them.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

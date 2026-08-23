@@ -874,10 +874,13 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
    * leaves noticeably harder than an ordinary release without out-running the
    * whip, which is still where speed properly comes from.
    *
-   * 34 first, then 48, then this, on two reports that it should be stronger. A
-   * feel knob: nothing measures it, and nothing can.
+   * 34, then 48, then 64, then this, on three reports that it should be stronger.
+   * A feel knob: nothing measures it, and nothing can. Worth knowing at this size
+   * — it is now above `boostMax` (60), so a rescue leaves harder than a perfectly
+   * timed ordinary release does. That is defensible for the rarest manoeuvre in
+   * the game and would not be for anything commoner.
    */
-  escapeFling: 64,
+  escapeFling: 86,
   escapeRefund: 0.5,
 } satisfies SimConfig);
 

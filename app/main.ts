@@ -333,7 +333,12 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     pressedEdge = false;
     releasedEdge = false;
 
+    const wasCaptured = state.capture !== null;
     stepSim(state, sim, input, dt);
+    // A new capture begins, so the previous one's receipt is finished and the
+    // awards raised below open a fresh one. Before `scoreTick`, deliberately: a
+    // grab landing on this very tick belongs to the capture that just started.
+    if (!wasCaptured && state.capture) scene.popups.settleReceipt();
     // Popups are raised here, on the tick the award lands, and read the ship's
     // position at that instant — after a release that is the point it let go
     // from, which is exactly the act being praised.
@@ -371,6 +376,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       // A full tank came with the new ship; a warning about the old one's is a
       // message about a run that is over.
       scene.fuelWarning.clear();
+      scene.popups.settleReceipt();
       // Same for the scar: it is a world-space mark against a wall this ship has
       // never approached, and the projection behind it describes a dead run.
       scene.scar.clear();
