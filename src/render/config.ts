@@ -239,6 +239,11 @@ export interface RenderConfig {
    * The old ramp saturated at `scarFullSecs`, which is 1.65s out — so the
    * brightening was entirely spent before the part of the approach worth aiming
    * at. This is the second half of the same gesture.
+   *
+   * 0.95 first, reported as "there are times that the cross glows a bit too
+   * bright". The lift matters more than the ceiling: half again over `scarAlpha`
+   * is plainly legible as the mark sharpening, where nearly double read as the
+   * mark shouting. The scar is meant to be faint enough to fly past.
    */
   scarNearAlpha: number;
   scarNearWidth: number;
@@ -352,8 +357,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarBarWidth: 1.7,
   scarAlpha: 0.5,
   scarDeadFrac: 0.18,
-  scarNearAlpha: 0.95,
-  scarNearWidth: 1.5,
+  scarNearAlpha: 0.74,
+  scarNearWidth: 1.4,
   scarSettleRate: 9,
   scarArmMaxPx: 150,
 
