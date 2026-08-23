@@ -154,6 +154,25 @@ export interface RenderConfig {
    * behind the notice the player is reading.
    */
   scarFadeOutSecs: number;
+  /**
+   * How long a DISPLACED mark gets instead, in seconds.
+   *
+   * Reported as "we should fade old crosses a bit faster if the user taps more.
+   * The scars add clutter, and it's only the most recent one that matters." Both
+   * halves of that are right, and they pull in opposite directions on one number:
+   * the mark left behind at a death is the explanation of the death and wants the
+   * long fade, while a mark shoved aside by a fresh answer is stale the instant it
+   * is replaced.
+   *
+   * So the duration belongs to the MARK and not to the class. A mark keeps
+   * `scarFadeOutSecs` for as long as it is the current one, and is cut to this the
+   * moment another takes its place. Tapping through the band replaces marks fast,
+   * which is exactly when the clutter appears and exactly when this bites.
+   *
+   * Applied as a rescale rather than a jump — see `Scar.observe` — so a ghost
+   * carries on from the alpha it already had instead of blinking down to it.
+   */
+  scarGhostSecs: number;
   /** Half-length of the crossbar, and of the arm stub kept after the cross is passed. */
   scarBarHalf: number;
   scarStubHalf: number;
@@ -355,6 +374,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarFadeInSecs: 3.67,
   scarFullSecs: 1.65,
   scarFadeOutSecs: 1.6,
+  scarGhostSecs: 0.3,
   scarBarHalf: 13,
   scarStubHalf: 17,
   scarPrizeMin: 0.62,

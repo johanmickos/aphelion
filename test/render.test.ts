@@ -661,6 +661,37 @@ describe('scene', () => {
     ).toBe(true);
   });
 
+  it('cuts a displaced mark short, but not the one left behind at a death', () => {
+    // "We should fade old crosses a bit faster if the user taps more. The scars
+    // add clutter, and it's only the most recent one that matters." Both halves
+    // pull opposite ways on one number, so the duration belongs to the mark: the
+    // one explaining a death keeps the long fade, the one shoved aside does not.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
+    const peek = (m: Scar) =>
+      m as unknown as { mark: { fade: number } | null; ghost: { fade: number } | null };
+
+    const mark = new Scar();
+    mark.observe(scar, 0, rcfg, FIXED_DT);
+    expect(peek(mark).mark!.fade, 'a live mark gets the long fade').toBe(rcfg.scarFadeOutSecs);
+
+    // Passed without a press: still the most recent thing, so it keeps it. This
+    // is the mark that explains a death, and the fade deliberately outlasts the
+    // median 0.53s between the cross and the wall.
+    mark.observe({ ...scar, cross: null }, 0, rcfg, FIXED_DT);
+    expect(peek(mark).mark!.fade, 'the mark left behind keeps it').toBe(rcfg.scarFadeOutSecs);
+
+    // Displaced by a fresher answer: cut short.
+    mark.observe({ ...scar, cross: { ...scar.cross!, x: scar.cross!.x + 400 } }, 0, rcfg, FIXED_DT);
+    expect(peek(mark).ghost, 'the old one was let go').not.toBeNull();
+    expect(peek(mark).ghost!.fade, 'and is cut short').toBe(rcfg.scarGhostSecs);
+    expect(peek(mark).mark!.fade, 'while the new one gets the long fade').toBe(
+      rcfg.scarFadeOutSecs,
+    );
+    expect(rcfg.scarGhostSecs).toBeLessThan(rcfg.scarFadeOutSecs);
+  });
+
   it('never draws an arm longer than the clamp, however far away the cross is', () => {
     // The cross sits a median 432px ahead and 1551px at p90, against a 390-wide
     // viewport — so without the clamp the common case is a line across the map.

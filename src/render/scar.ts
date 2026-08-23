@@ -58,6 +58,15 @@ interface Mark {
    */
   glow: number;
   /**
+   * Seconds this mark's fade-out runs for.
+   *
+   * Per-mark rather than a constant, because the two kinds want opposite things:
+   * the mark left behind at a death is explaining the death and wants the long
+   * fade, and a mark displaced by a fresher answer is stale the moment it is
+   * replaced. See `RenderConfig.scarGhostSecs`.
+   */
+  fade: number;
+  /**
    * How big the mark draws, as a multiple of its configured size.
    *
    * Set from the fire waiting at the cross. Carried on the mark rather than
@@ -186,7 +195,7 @@ export class Scar {
     if (this.ghost) {
       this.ghost.age += dt;
       this.ghost.born += dt;
-      if (this.ghost.age >= rcfg.scarFadeOutSecs) this.ghost = null;
+      if (this.ghost.age >= this.ghost.fade) this.ghost = null;
     }
 
     if (scar?.cross) {
@@ -235,10 +244,32 @@ export class Scar {
 
       if (!this.mark || this.mark.age >= 0) {
         if (this.mark) {
-          this.mark.age = Math.max(0, this.mark.age);
-          this.ghost = this.mark;
+          const old = this.mark;
+          old.age = Math.max(0, old.age);
+          // Cut short, because something fresher has taken its place and only the
+          // most recent mark is about the decision in front of the player.
+          //
+          // RESCALED rather than jumped: the alpha comes from `age / fade`, so
+          // shrinking both together leaves the ghost exactly as bright as it was
+          // and only shortens what is left of it. Setting the age alone would
+          // blink it down to a tenth on the frame it was displaced.
+          if (old.fade > rcfg.scarGhostSecs) {
+            old.age *= rcfg.scarGhostSecs / old.fade;
+            old.fade = rcfg.scarGhostSecs;
+          }
+          this.ghost = old;
         }
-        this.mark = { x: c.x, y: c.y, dx, dy, age: -c.t, born: 0, scale, glow: 0 };
+        this.mark = {
+          x: c.x,
+          y: c.y,
+          dx,
+          dy,
+          age: -c.t,
+          born: 0,
+          scale,
+          glow: 0,
+          fade: rcfg.scarFadeOutSecs,
+        };
       } else {
         this.mark.age = -c.t;
       }
@@ -357,7 +388,7 @@ export class Scar {
     const alpha =
       born *
       (m.age >= 0
-        ? peak * (1 - smoothstep(m.age / Math.max(1e-6, rcfg.scarFadeOutSecs)))
+        ? peak * (1 - smoothstep(m.age / Math.max(1e-6, m.fade)))
         : peak *
           (1 -
             smoothstep(
