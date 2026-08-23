@@ -1211,6 +1211,7 @@ describe('the score band', () => {
     aim: 0.96,
     climb: 412,
     heat: 0,
+    turn: 0,
     ...over,
   });
 

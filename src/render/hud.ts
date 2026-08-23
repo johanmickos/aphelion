@@ -156,7 +156,14 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
   // calibrated on rarity. The multiplier climbing IS the feedback.
   flyby: (a) => ({
     style: ROUTINE,
-    detail: `${a.body}  FLYBY · CLOSE ${pct(a.close)}`,
+    // TURN is reported in degrees rather than as a percentage of
+    // `flybyTurnSpan`, unlike every other quality on this line, and the reason is
+    // that it is the one the player can check against the screen: the ship
+    // visibly swings that far around the planet. A normalised figure would be a
+    // score the readout is asking to be trusted on. It is also now the term that
+    // decides the award — closeness is multiplied BY it — so leaving it out left
+    // the line reporting the smaller half of what was paid.
+    detail: `${a.body}  FLYBY · CLOSE ${pct(a.close)} · TURN ${Math.round(a.turn)}°`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
   }),
   burn: (a) => ({

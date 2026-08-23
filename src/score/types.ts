@@ -106,6 +106,14 @@ export interface ScoreAward {
    * second deserves to be called an inferno.
    */
   heat: number;
+  /**
+   * Degrees of heading the pass swept, press to release. Flyby only.
+   *
+   * Nothing else reports it because nothing else needs it. A grab and a link are
+   * paid on an instant, and a capture that converts is judged on the orbit it
+   * reached rather than on the arc it took to get there.
+   */
+  turn: number;
 }
 
 /**
@@ -136,6 +144,9 @@ export interface PendingLink {
  * The qualities are measured at the bottom and never re-read, because that is
  * where the pass was decided — by the time it is paid the ship is seconds away
  * and has none of them any more.
+ *
+ * `turn` is the exception and is deliberately NOT here: it is the only quality of
+ * a flyby that is not finished at the bottom. See `FLYBY_TURN_MIN`.
  */
 export interface PendingFlyby {
   body: string;
@@ -201,6 +212,28 @@ export interface ScoreState {
   grabSkim: number;
   /** Worst deflection seen so far in the current capture. */
   maxDefl: number;
+  /**
+   * Degrees of heading the current capture has swept so far.
+   *
+   * A running sum of `cap.defl`, which is the simulation's own per-tick heading
+   * change — so there is exactly one definition in the codebase of how far a
+   * heading moved in a tick, and this is its integral.
+   *
+   * SWEPT AND NOT NET, which was tried first and is the wrong measure by one
+   * case. Over the 206 paid flybys in `diagnostics/` the two are interchangeable
+   * where it matters — the same 21 passes fall below 8 degrees either way, and the
+   * percentiles agree to a degree through p70. They part on six passes, every one
+   * of them shaving clearance 0 and paying 987-1899: a hard skimming pass bends
+   * hard one way and the flyby brake, which is 85% radial, straightens it back
+   * out, so the ship leaves on roughly the heading it arrived on having been
+   * thrown right around the planet. Net reads that as no steering at all. The
+   * suite's own flyby fixture is the extreme of it — 200 ticks, 83 fuel, 500px/s
+   * shed to 112, and a net course change of 3.5 degrees.
+   *
+   * The exploit this exists to close is not reached by the difference: a tap
+   * sweeps as little as it nets, because there is no time to bend and unbend.
+   */
+  capTurn: number;
   /** Grab clearance of the current capture, in px above the minimum orbit. */
   grabClearance: number;
   /** The dive has passed periapsis; the grab award is owed. */

@@ -417,6 +417,7 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       climb,
       body,
       heat,
+      turn,
     ]) => ({
       tick,
       kind: AWARD_KIND[kind],
@@ -434,6 +435,11 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       // burn shipped is missing it. Zero is the truth for those: nothing burned,
       // because nothing could.
       heat: heat ?? 0,
+      // Same again, one field later: reports from before the flyby turn gate end at
+      // `heat`. Zero reads as "this pass turned nothing", which is wrong about
+      // those sessions but is the only honest thing a missing field can say — and
+      // nothing recomputes an award from it.
+      turn: turn ?? 0,
     }),
   );
 }

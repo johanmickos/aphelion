@@ -33,6 +33,7 @@ import {
   shoutWord,
   CLOSE_PX,
   DEFAULT_SCORE_CONFIG,
+  FLYBY_TURN_MIN,
   edgeHeat,
   reentryHeat,
   PEAK,
@@ -620,6 +621,7 @@ const grab = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   defl: 3,
   timing: 0,
   heat: 0,
+  turn: 0,
   aim: 0,
   climb: 0,
   ...over,
@@ -639,6 +641,7 @@ const link = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   aim: REAL.aim.med,
   climb: 400,
   heat: 0,
+  turn: 0,
   ...over,
 });
 
@@ -1137,6 +1140,81 @@ describe('a flyby that stays a flyby', () => {
     expect(awards).toHaveLength(0);
   });
 
+  /** The fixture pass, pressed at `start` and let go `len` ticks later. */
+  function tap(start: number, len: number) {
+    return play(
+      [
+        [start, 1],
+        [start + len, 0],
+      ],
+      400,
+      DEFAULT_CONFIG,
+      DEFAULT_SCORE_CONFIG,
+      true,
+      FLYBY_SHIP,
+    );
+  }
+
+  it('refuses a tap flicked across the closest approach, however well timed', () => {
+    // THE REPORTED EXPLOIT, and the reason `FLYBY_TURN_MIN` exists. The award is
+    // owed at the bottom of a pass, so a press that merely brackets that instant
+    // used to collect the whole thing — `close` is read off geometry the ship
+    // already had, and every unconverted flyby clears `FLYBY_SPEED_MIN` by
+    // definition. Flying past at speed and tapping beside each planet paid 1000+
+    // a time and, worse, stepped the ladder every time.
+    //
+    // Swept over every press tick rather than at one chosen instant, because the
+    // claim is about the whole family: there is no timing that makes a flick pay.
+    for (const len of [4, 8]) {
+      for (let start = 1; start < 80; start++) {
+        const { awards, score } = tap(start, len);
+        expect(
+          awards.filter((a) => a.kind === 'flyby'),
+          `a ${len}-tick tap pressed at ${start} was paid`,
+        ).toHaveLength(0);
+        expect(score.streak, `a ${len}-tick tap pressed at ${start} stepped the ladder`).toBe(0);
+      }
+    }
+  });
+
+  it('pays in proportion to how far the pass swung the ship', () => {
+    // The half a floor cannot do. What was wrong was not only the flick — it was
+    // that a pass which barely bent the ship collected the same award as one
+    // flown right around the planet, and then multiplied it by a ladder built out
+    // of more of the same.
+    //
+    // One line past one body, held for longer and longer, so the geometry and the
+    // closeness are identical and the swing is the only thing that varies.
+    const held = [40, 60, 200].map((len) => {
+      const f = tap(1, len).awards.filter((a) => a.kind === 'flyby');
+      expect(f, `held ${len} ticks`).toHaveLength(1);
+      return f[0]!;
+    });
+    for (const a of held) expect(a.close).toBeCloseTo(held[0]!.close, 6);
+
+    expect(held[0]!.turn).toBeLessThan(held[1]!.turn);
+    expect(held[1]!.turn).toBeLessThan(held[2]!.turn);
+    expect(held[0]!.points).toBeLessThan(held[1]!.points);
+    expect(held[1]!.points).toBeLessThan(held[2]!.points);
+
+    // The longest hold swings past `flybyTurnSpan` and so collects the whole
+    // award — the pass flown properly is worth exactly what it was worth before
+    // any of this, which is the point: nothing was taken from a good pass.
+    expect(held[2]!.turn).toBeGreaterThan(DEFAULT_SCORE_CONFIG.flybyTurnSpan);
+    expect(held[2]!.points).toBe(
+      Math.round(
+        DEFAULT_SCORE_CONFIG.flybyBase + held[2]!.close * DEFAULT_SCORE_CONFIG.flybyCloseBonus,
+      ),
+    );
+    // ...and the shortest is scaled by exactly the fraction of the span it swung.
+    expect(held[0]!.points).toBe(
+      Math.round(
+        (DEFAULT_SCORE_CONFIG.flybyBase + held[0]!.close * DEFAULT_SCORE_CONFIG.flybyCloseBonus) *
+          (held[0]!.turn / DEFAULT_SCORE_CONFIG.flybyTurnSpan),
+      ),
+    );
+  });
+
   it('pays nothing once the pass has puttered out below the floor', () => {
     // `FLYBY_SPEED_MIN` is a floor under a dead tail, not a bar that selects fast
     // passes — every unconverted flyby is fast, so the bar could not select one.
@@ -1149,8 +1227,12 @@ describe('a flyby that stays a flyby', () => {
     // one corner where a flyby CAN bottom out slowly. It bottoms out at 139 and
     // pays nothing; the same pass at 160px/s bottoms out at 158 and pays.
     //
-    // Both pay `flybyBase` and no closeness: 400px to the side is far outside
-    // `closeSpan`, which is the point — the floor is not a closeness test.
+    // Neither earns any closeness: 400px to the side is far outside `closeSpan`,
+    // which is the point — the floor is not a closeness test. So the control pays
+    // `flybyBase` and nothing else, scaled by how far it swung the ship: it sweeps
+    // most of `flybyTurnSpan` but not all of it, and asserting the scaled value
+    // rather than the bare base is what keeps this a test of the SPEED floor. See
+    // `FLYBY_TURN_MIN`.
     //
     // Filtered to flyby awards, and that is not tidiness: this line starts 37.9px
     // from the left wall, which is inside the 60px dead zone, so a captured ship
@@ -1178,7 +1260,14 @@ describe('a flyby that stays a flyby', () => {
     expect(paid(140), 'a flyby below the floor was paid').toHaveLength(0);
     const fast = paid(160);
     expect(fast, 'the control pass stopped reaching a flyby — see FAR_BODY').toHaveLength(1);
-    expect(fast[0]!.points).toBe(DEFAULT_SCORE_CONFIG.flybyBase);
+    const a = fast[0]!;
+    expect(a.close, 'the control pass drifted inside closeSpan').toBe(0);
+    expect(a.turn).toBeGreaterThan(FLYBY_TURN_MIN);
+    expect(a.points).toBe(
+      Math.round(
+        DEFAULT_SCORE_CONFIG.flybyBase * Math.min(1, a.turn / DEFAULT_SCORE_CONFIG.flybyTurnSpan),
+      ),
+    );
   });
 
   it('pays a grab and not a flyby once the pass converts', () => {

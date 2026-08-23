@@ -82,6 +82,32 @@ const GRAB_AWARD_DELAY = 2;
  */
 export const FLYBY_SPEED_MIN = 150;
 
+/**
+ * Degrees of heading swept below which a pass is not a scoring event at all.
+ *
+ * A constant and not a weight, by the rule in AGENTS.md: it decides WHEN a flyby
+ * is judged, never what one costs. `ScoreConfig.flybyTurnSpan` is the half that
+ * costs, and it is the half that does most of the work here.
+ *
+ * What THIS one exists for is the ladder. The award scales to nothing on its own
+ * as the turn goes to zero, but `awardFlyby` also steps the streak, and a step is
+ * not divisible — so without a floor a press that bent the ship by two degrees
+ * would still climb the multiplier every later award is paid at. That is the
+ * compounding half of the reported exploit, and the half a span cannot reach.
+ *
+ * Refusing costs a run nothing beyond the step: a flyby that does not qualify is
+ * a non-event exactly as a dive abandoned early is, so it does not BREAK a
+ * streak, it only fails to advance one.
+ *
+ * Eight degrees, measured. Sorted, the 206 paid flybys in `diagnostics/` have a
+ * gap between 7.60 and 9.47 — every value in that band selects the identical 21
+ * passes, 10.2% of the corpus, and none of the 13 whose replay was still bit-exact
+ * where they happened. On the other side, synthetic taps aimed at closest approach
+ * sweep p50 1.4-4.7 degrees and p90 3.0-9.4, so the floor sits above the tap
+ * distribution and below every verified real pass, whose minimum was 15.3.
+ */
+export const FLYBY_TURN_MIN = 8;
+
 export function createScoreState(): ScoreState {
   return {
     score: 0,
@@ -104,6 +130,7 @@ export function createScoreState(): ScoreState {
     grabSkim: Infinity,
     grabClearance: Infinity,
     maxDefl: 0,
+    capTurn: 0,
     periSeen: false,
     grabDue: -1,
     flybyR: Infinity,
@@ -336,7 +363,10 @@ export function scoreTick(
   if (sc.pendingFlyby && !state.capture) {
     const f = sc.pendingFlyby;
     sc.pendingFlyby = null;
-    awards.push(awardFlyby(sc, state, scfg, f));
+    // Null when the pass never turned the ship far enough to be one. Not a
+    // failure and not a broken streak — see `FLYBY_TURN_MIN`.
+    const flyby = awardFlyby(sc, state, scfg, f);
+    if (flyby) awards.push(flyby);
   }
 
   if (sc.pending && !state.capture) {
@@ -378,6 +408,7 @@ export function scoreTick(
       // flying, and what the capture is worth is left alone.
       sc.grabClearance = Math.max(0, cap.grabR - cap.minR);
       sc.maxDefl = 0;
+      sc.capTurn = 0;
       sc.periSeen = false;
       sc.grabDue = -1;
       sc.flybyR = Infinity;
@@ -440,6 +471,14 @@ export function scoreTick(
     // the whole ride, and the roughest moment of it is usually the brake biting
     // early on, long before the ship is let go of.
     if (cap.defl > sc.maxDefl) sc.maxDefl = cap.defl;
+
+    // ---- how far this pass has swung the ship around, accumulating
+    //
+    // The same `cap.defl` the line above takes a maximum of, integrated instead.
+    // Two readings of one measurement: the worst tick says how rough the ride
+    // was, the sum says how much of a ride it was at all. See `capTurn` for why
+    // this is swept rather than net.
+    sc.capTurn += cap.defl;
 
     // Rising edges only: one rough passage is one event, however many ticks the
     // deflection stays over the line. Two edges because there are two questions —
@@ -582,10 +621,13 @@ function awardGrab(
     // Release qualities are not this event's business and must read as absent
     // rather than as zero-scoring. The burn is not this event's business either:
     // the arrival is one instant, and heat is a stretch of the ride after it.
+    // Nor is the turn: a capture is judged on the orbit it reached, and the arc
+    // it took to get there is the flyby award's question.
     timing: 0,
     aim: 0,
     climb: 0,
     heat: 0,
+    turn: 0,
   };
   const body = state.bodies[cap.planet];
 
@@ -679,6 +721,7 @@ function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
     aim: 0,
     climb: 0,
     heat: peak,
+    turn: 0,
   };
   sc.score += points;
   sc.burns++;
@@ -700,8 +743,10 @@ function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
  * flying the harder line. Nothing about that was a decision anyone made; the
  * counter simply could not see the style.
  *
- * Whether the pass qualified at all is settled by `readPendingFlyby`; by the time
- * this runs the award is owed and pays.
+ * Whether the pass was one at all is settled by `readPendingFlyby`. Whether it
+ * EARNED anything is settled at the release, by how far it turned the ship — the
+ * one quality of a pass that is still being made when the bottom goes by. See
+ * `FLYBY_TURN_MIN` and `ScoreConfig.flybyTurnSpan`.
  */
 function readPendingFlyby(
   sc: ScoreState,
@@ -735,8 +780,23 @@ function awardFlyby(
   state: SimState,
   scfg: ScoreConfig,
   p: PendingFlyby,
-): ScoreAward {
-  const raw = scfg.flybyBase + p.close * scfg.flybyCloseBonus;
+): ScoreAward | null {
+  // How far the pass actually swung the ship, which is the whole of what a flyby
+  // is paid for. Read HERE and not in `readPendingFlyby` with the other
+  // qualities, because unlike them it is not finished at the bottom: the outbound
+  // half of a pass steers as much as the inbound half, and a player who holds
+  // through the swing has earned all of it.
+  //
+  // It measures what it does because gravity acts on the ship ONLY while it is
+  // captured — an uncaptured ship drifts in a dead straight line — so every
+  // degree here was bought by keeping the button down next to a planet. That is
+  // what makes one number cover both halves of what was asked for: some pressing,
+  // and some course altering.
+  const turn = sc.capTurn;
+  if (turn < FLYBY_TURN_MIN) return null;
+
+  const raw =
+    (scfg.flybyBase + p.close * scfg.flybyCloseBonus) * clamp01(turn / scfg.flybyTurnSpan);
   const multiplier = multiplierFor(sc, scfg);
   const award: ScoreAward = {
     tick: state.tick,
@@ -748,6 +808,7 @@ function awardFlyby(
     clearance: p.clearance,
     skim: p.skim,
     defl: p.defl,
+    turn,
     // Release qualities. There is no release: the ship never stopped.
     timing: 0,
     aim: 0,
@@ -795,6 +856,7 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
     aim: p.aim,
     climb,
     heat: 0,
+    turn: 0,
   };
   award.points = Math.round(raw * multiplier);
   sc.score += award.points;

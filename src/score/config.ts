@@ -27,6 +27,7 @@
  *
  * The exceptions, which carry their own measured rationale and should not be
  * moved on feel: `closeSpan`, `flybyCloseBonus` (why closeness and not speed),
+ * `flybyTurnSpan` (a percentile of how far real passes actually bend the ship),
  * `flybyBase` and `streakStep` (both retuned against a recorded speed run),
  * `streakMax` (which has already been mis-tuned once on too small a sample), and
  * all three `burn*` keys — calibrated on the 159 dead-zone drags in the corpus,
@@ -115,6 +116,35 @@ export interface ScoreConfig {
    * gone.
    */
   flybyCloseBonus: number;
+  /**
+   * Degrees of course change at which a flyby collects its whole award. Below it
+   * the award scales down linearly; below `FLYBY_TURN_MIN` there is no award.
+   *
+   * This is the term that decides what a flyby is FOR. Base and closeness both
+   * describe where the ship was; only this describes what the pass did to it, and
+   * without it the award pays for arriving next to a planet rather than for using
+   * one. Reported from play as: fly past at speed, tap beside each planet, collect
+   * 1000+ a time. That is exactly what the other two terms pay for — `close` is
+   * read off geometry the ship already had, and `FLYBY_SPEED_MIN` cannot help
+   * because an unconverted flyby is fast by definition.
+   *
+   * Sixty degrees is p79 of the 206 paid flybys in `diagnostics/`, whose turn runs
+   * p10 7.6, p25 17.3, p50 31.2, p75 51.2, p90 79.2. So the median real pass
+   * collects about half and a strong one collects all of it.
+   *
+   * A SPAN AND NOT A FLOOR, which is the half a gate cannot do. Rescored across
+   * the corpus, the passes that pay wrongly are not the near-zero ones — those
+   * already pay 112-176 — but the mid band riding a ladder built out of them: 6.6
+   * degrees paying 850, 10.1 paying 1247, 17.7 paying 1439. No floor low enough to
+   * spare real play reaches those; a span does, and takes them to 0, 208 and 424
+   * while leaving a 64-degree pass at its full 1573.
+   *
+   * Total flyby income across the recorded corpus falls to 65% at this value, and
+   * that is the intended shape rather than a side effect: the missing 35% was
+   * being paid for passes that never bent the ship. The weights above were NOT
+   * raised to compensate, so a great pass still tops out where it always did.
+   */
+  flybyTurnSpan: number;
   /**
    * Shaping exponents. The underlying measures are generous ramps — alignment is
    * linear over a full 90 degrees, the boost envelope over ~1.8 seconds — which
@@ -283,7 +313,7 @@ export interface ScoreConfig {
  *
  *   grab  = (close + nerve)                      x multiplier   at periapsis
  *   link  = (base + climb + timing + aim)        x multiplier   at the release
- *   flyby = (base + close)                       x multiplier   at closest approach
+ *   flyby = (base + close) x turn                x multiplier   at the release
  *   burn  = (dead-zone depth, integrated)        x multiplier   when the fire dies
  *
  * Four events, because they are settled at different moments and describe
@@ -291,7 +321,9 @@ export interface ScoreConfig {
  * dive swings through the bottom — not at the press, so a tap that never gets
  * there earns nothing and tapping beside a planet is not a faucet. The link is
  * judged on how it left. The flyby is judged on a pass that was never a capture
- * at all, and pays at the bottom of it for the same reason the grab does.
+ * at all: its qualities are read at the bottom, for the same reason the grab's
+ * are, but it is settled at the release because the one thing it is really paid
+ * for — how far the pass bent the ship — is not finished until the ship lets go.
  *
  * The flyby's real payload is not in the line above: it steps the streak. Before
  * it, the ladder counted links, so the only way to reach a large multiplier was to
@@ -339,6 +371,7 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   nerveBonus: 200,
   flybyBase: 80,
   flybyCloseBonus: 300,
+  flybyTurnSpan: 60,
   aimSharpness: 3,
   timingSharpness: 2,
 

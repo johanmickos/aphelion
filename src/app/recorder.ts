@@ -21,14 +21,18 @@ export type InputRecord = [number, 0 | 1];
 /**
  * One scoring event exactly as the phone paid it.
  *
- * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body, heat]`
+ * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body, heat, turn]`
  * with `kind` 'g' for a grab, 'l' for a link, 'h' for a hop, 'f' for a flyby and
  * 'b' for a burn.
  *
- * `heat` is last and optional because it was added after the format was in use:
- * reports recorded before the burn shipped simply end at `body`, and a reader
- * that defaults the missing field to zero reads them correctly rather than
- * rejecting the corpus the scoring was calibrated on.
+ * `heat` and `turn` are last and optional because they were added after the
+ * format was in use: reports recorded before the burn shipped simply end at
+ * `body`, ones from before the flyby turn gate end at `heat`, and a reader that
+ * defaults a missing field to zero reads them correctly rather than rejecting the
+ * corpus the scoring was calibrated on. Trailing and optional is the only way to
+ * grow this tuple, and the reason is not politeness to old files: those files ARE
+ * the calibration set, and a threshold measured on them is only defensible while
+ * they can still be read.
  *
  * WHY THIS IS RECORDED AT ALL, when a score is a pure function of
  * (config, seed, inputLog) and a replay can recompute it: because in practice
@@ -60,6 +64,7 @@ export type AwardRecord = [
   number,
   number,
   string,
+  number?,
   number?,
 ];
 
@@ -173,6 +178,7 @@ export class RunRecorder {
         Math.round(a.climb),
         a.body,
         q(a.heat),
+        Math.round(a.turn),
       ]);
       if (this.awards.length > this.opts.maxAwards) {
         this.awards.shift();
