@@ -23,27 +23,14 @@ const LIFE = 1.15;
 const LIFE_SUPER = 1.6;
 const LIFE_SHOUT = 1.4;
 /**
- * A burn lives longer than it burns, because its number has to count.
+ * A burn lingers, because it is the end of the longest moment in the game.
  *
- * Long enough that the roll-up below finishes well before the fade starts: the
- * fade takes the last 45% of the life, so at 1.7s it begins at 0.94s and the roll
- * lands at 0.8s.
+ * It no longer counts up here — `src/render/burn-tally.ts` did that live, beside
+ * the ship, for the whole drag. This popup is the number letting go and drifting
+ * off, so the life is for reading a total already known rather than for animating
+ * one into existence.
  */
 const LIFE_BURN = 1.7;
-
-/**
- * Seconds a burn's number spends counting up to its total.
- *
- * The flare itself is a flash — measured over 760 real ones, the median lasts
- * 0.17s and the longest on record 0.37s, and that is not a length a tally can be
- * read at. Widening the hot zone does not help: the speed term bounds the flare,
- * not the altitude, so tripling the zone moved the median from 0.17s to 0.18s.
- *
- * So the fire stays honest and the READOUT is what lingers. The points are
- * settled the instant the flame dies — this rolls a number that is already
- * decided, it does not keep earning.
- */
-const ROLL = 0.8;
 
 /** World units risen over a full life. */
 const RISE = 34;
@@ -90,7 +77,7 @@ const STACK_GAP = 20;
  */
 const STACK_X = 80;
 
-import { LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+import { BURN, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 function easeOutCubic(u: number): number {
   const k = 1 - u;
@@ -108,6 +95,8 @@ interface Popup {
   shout: string | null;
   /** Seconds the number spends counting up to `points`. 0 shows it at once. */
   roll: number;
+  /** On the burn's own red channel — see `BURN` in `accolade.ts`. */
+  burn: boolean;
 }
 
 export class Popups {
@@ -140,7 +129,12 @@ export class Popups {
       points: award.points,
       praise,
       shout: null,
-      roll: burning ? ROLL : 0,
+      // No roll on a burn any more. The tally beside the ship has been counting
+      // this number up for the whole drag, so re-counting it from zero would
+      // replay something the player just watched — and, worse, would show a
+      // smaller number than the one that was on screen a frame earlier.
+      roll: 0,
+      burn: burning,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -178,6 +172,7 @@ export class Popups {
       praise: null,
       shout: shout.word,
       roll: 0,
+      burn: false,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -222,7 +217,10 @@ export class Popups {
         continue;
       }
 
-      const style = p.praise ? LEVEL[p.praise.level] : ROUTINE;
+      // A burn keeps its own colour whether or not it earned a word: the red is
+      // saying WHICH CHANNEL this is, not how good it was, and it has to match
+      // the tally the number was just counting up in beside the ship.
+      const style = p.burn ? BURN : p.praise ? LEVEL[p.praise.level] : ROUTINE;
 
       if (p.praise) {
         // A brief overshoot on the way in. Only the top of the ladder gets it —

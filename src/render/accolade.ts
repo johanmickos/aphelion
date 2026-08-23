@@ -55,6 +55,54 @@ export const ROUTINE: AccoladeStyle = {
 };
 
 /**
+ * The burn: off the ladder, on its own channel — see `src/score/burn.ts`.
+ *
+ * WHY THIS ONE IS ALLOWED TO BE A COLOUR
+ *
+ * Colour here means how good it was, and a CATEGORY colour was tried and removed
+ * for reasons that still hold. This is not a category. It is a STATE: the ship is
+ * inside the dead zone and on fire, and the number is counting what it will bank
+ * if it gets out. Nobody has to learn this hue — the player is looking at a red
+ * band, a burning ship and a red number at the same time, and the colour is what
+ * says those three things are one event.
+ *
+ * Which is why it is exactly the band's own red, `rgba(255,70,90)` from
+ * `drawHazardZones`, and not a red chosen to sit well beside it. Same substance,
+ * same colour.
+ *
+ * Measured as the ladder was: dE 60.6 to its nearest neighbour in this table
+ * (`SHOUT`), against dE 41.0 for the closest pair already in it (`ROUTINE` vs
+ * `good`). L* 58 sits between `ROUTINE` at 43 and `great` at 77, so the order
+ * survives for a player who cannot separate the hues.
+ *
+ * IT IS EXACTLY `FUEL_RAMP[0]`, AND THAT IS NOT AN ACCIDENT TO FIX. The empty-tank
+ * colour is already this same red, and so is the hazard band — the three were the
+ * same value before this constant existed. Every candidate that reads as the
+ * band's red is within dE 31 of the fuel colour (measured: #ff3b30 at 21, #ff2a18
+ * at 31), because they ARE the same red; there is no third option that matches the
+ * band and clears the tank.
+ *
+ * So the collision is named rather than dodged: #FF465A is this game's lethality
+ * colour. Out of fuel, inside the dead zone, and on fire are three ways of being
+ * about to die, and they are allowed to look alike. What separates them where they
+ * co-occur is form and content, which is the right channel for it — the fuel badge
+ * is a pill glyph and the word EMPTY on a plate 26 units BELOW the ship, and this
+ * is a signed number to the SIDE of it. Nobody misreads `+430` as `EMPTY`.
+ *
+ * The dE discipline in this table exists so a RANK can be read off a hue. There is
+ * no rank between "burning" and "out of fuel" for a player to get wrong.
+ *
+ * Bigger than a praise word, and the only thing here that is. A drag runs a second
+ * or more with the ship pinned against a wall it is probably about to die on, and
+ * the number is the whole of what the player is deciding on.
+ */
+export const BURN: AccoladeStyle = {
+  color: '#ff465a',
+  labelColor: 'rgba(255,120,135,.85)',
+  size: 17,
+};
+
+/**
  * The shout: off the ladder too, and on its own channel — see
  * `src/score/reckless.ts`.
  *

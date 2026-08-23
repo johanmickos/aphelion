@@ -28,7 +28,8 @@ import {
 import { FUEL_WARNING, FuelWarning, pulseAlpha } from '../src/render/fuel-warning.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
-import { LEVEL, SHOUT } from '../src/render/accolade.ts';
+import { BURN, LEVEL, ROUTINE, SHOUT } from '../src/render/accolade.ts';
+import { drawBurnTally } from '../src/render/burn-tally.ts';
 import { FUEL_RAMP } from '../src/render/hud.ts';
 import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
 import {
@@ -697,9 +698,16 @@ describe('floating score popups', () => {
     expect(WORDS.aim[1]).toContain(words[0]);
   });
 
-  it("rolls a burn's number up, and keeps rolling after the flame is out", () => {
-    // The flare itself is a flash — 0.17s at the median across 760 real ones —
-    // which is not long enough to read a tally at. So the number outlives it.
+  it("shows a burn's full total at once, because the tally already counted it", () => {
+    // This assertion used to pin the opposite, and the reason it changed is the
+    // point: when the burn fired on a 0.17s periapsis flare there was no time to
+    // read a number live, so the popup rolled it up AFTER the fact. The burn now
+    // fires on a dead-zone drag that runs 0.42s at the median, and
+    // `src/render/burn-tally.ts` counts it beside the ship for the whole of it.
+    //
+    // Re-counting from zero here would replay something the player just watched,
+    // and — worse — would put a SMALLER number on screen than was there a frame
+    // earlier, at the exact moment they are deciding whether it was worth it.
     const p = new Popups();
     p.spawn(award({ kind: 'burn' as const, points: 200, heat: 0.9 }), 195, 0);
     const shown = (): number => {
@@ -709,15 +717,24 @@ describe('floating score popups', () => {
       return Number(n.slice(1).replace(/,/g, ''));
     };
 
-    expect(shown()).toBe(0);
-    p.update(0.2); // the flame is out by here
-    const mid = shown();
-    expect(mid).toBeGreaterThan(0);
-    expect(mid).toBeLessThan(200);
-    p.update(0.3);
-    expect(shown()).toBeGreaterThan(mid);
-    p.update(0.4); // past the 0.8s roll
     expect(shown()).toBe(200);
+    p.update(0.3);
+    expect(shown()).toBe(200);
+  });
+
+  it('draws a burn on its own red channel, word or no word', () => {
+    // The tally beside the ship is red and this is the same number letting go of
+    // it, so a popup that reverted to the rarity ladder would change colour
+    // mid-thought. Below the word threshold it would land on ROUTINE grey, which
+    // is where the burn was indistinguishable from a routine link.
+    const p = new Popups();
+    // heat 0.2 is well under BURN.tier1, so this one earns no word at all.
+    p.spawn(award({ kind: 'burn' as const, points: 40, heat: 0.2 }), 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    const fills = r.calls('=fillStyle').map((o) => String(o[1]));
+    expect(fills).toContain(BURN.color);
+    expect(fills).not.toContain(ROUTINE.color);
   });
 
   it("shows a link's points at once, with no roll", () => {
@@ -1867,5 +1884,54 @@ describe('the fuel warning beside the ship', () => {
       w.update(FIXED_DT);
     }
     expect(fired).toEqual(['low', 'empty']);
+  });
+});
+
+describe('the burn tally', () => {
+  const draw = (shipX: number, points: number, heat: number) => {
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, shipX, 0, field, null);
+    const r = recordingContext();
+    drawBurnTally(r.ctx, c, field, shipX, 0, points, heat, 0);
+    return r;
+  };
+
+  it('shows the exact points the award will pay', () => {
+    // Not a rounded-off approximation of them. The tally and the award both read
+    // `ScoreState.burnPoints`, so what is watched for a second and what is banked
+    // are the same number by construction.
+    const r = draw(field.left + 10, 1234, 0.8);
+    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(texts).toContain('+1,234');
+  });
+
+  it('draws nothing when the ship is not burning', () => {
+    expect(draw(field.left + 10, 0, 0).calls('fillText')).toHaveLength(0);
+    // Heat gone but a stale total: still nothing. The fire's smoothed decay
+    // outlives the scoring by a quarter second, and the number must not.
+    expect(draw(field.left + 10, 400, 0).calls('fillText')).toHaveLength(0);
+  });
+
+  it('sits inboard, on the opposite side of the ship from the wall', () => {
+    // Both vertical lanes beside the ship are taken — popups rise above it, the
+    // fuel badge sits below — so this one goes sideways, and the side is the half
+    // of the screen a wall-hugging ship leaves empty.
+    const nearLeft = draw(field.left + 10, 500, 0.8);
+    const leftX = (nearLeft.calls('fillText') as Array<[string, string, number]>)[0]![2];
+    const leftAlign = nearLeft.calls('=textAlign').map((o) => String(o[1]));
+    expect(leftAlign).toContain('left');
+
+    const nearRight = draw(field.right - 10, 500, 0.8);
+    const rightAlign = nearRight.calls('=textAlign').map((o) => String(o[1]));
+    expect(rightAlign).toContain('right');
+    expect(typeof leftX).toBe('number');
+  });
+
+  it('is drawn in the burn red', () => {
+    const fills = draw(field.left + 10, 500, 0.8)
+      .calls('=fillStyle')
+      .map((o) => String(o[1]));
+    expect(fills).toContain(BURN.color);
   });
 });

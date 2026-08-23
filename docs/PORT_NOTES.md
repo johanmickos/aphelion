@@ -2245,6 +2245,60 @@ battery did it never, until a scenario was added that does.
 
 ---
 
+### 51 — The one award the player decides on while it is still happening
+
+`src/render/burn-tally.ts` · **[ADDED]** · "I want the time spent in the red zone,
+burning, to tally up a red text near the ship rolling upwards"
+
+Every other award is settled before a number appears. A grab pays at periapsis, a
+link at the release, and the popup reports something already over. The burn is not
+like that: the ship is in the red band with a wall a few pixels away and the
+question in front of the player — hold on for more, or get out with what I have —
+is live. A number that only arrived afterwards could not be part of it.
+
+It could not have been built before note 50. A periapsis flare ran 0.17s, about
+four frames of a changing number, which is why the first version settled for a
+popup that rolled up after the fact. A drag runs 0.42s at the median and up to
+1.45s.
+
+**`ScoreState.burnPoints` is computed once and read twice.** The tally draws it and
+`awardBurn` pays it, rather than each deriving it from the bank. They would agree
+in every case anyone has thought of, and that is exactly how a readout and its
+payout begin to drift — at the loudest moment the game has, where a one-point
+disagreement would be a visible lie.
+
+The popup no longer rolls. It counted for the whole drag beside the ship, so
+re-counting from zero would replay what was just watched and, worse, would put a
+smaller number on screen than was there a frame earlier.
+
+**Position: inboard, not above or below.** Both vertical lanes were taken —
+popups rise from `SPAWN_LIFT`, the fuel badge sits 26 below — and a third channel
+stacked into either would collide at the busiest moment in the game. The
+horizontal choice is not a leftover: a burning ship is by definition pressed
+against the left or right edge, so the inboard side is both the empty half of the
+screen and the half the eye is already on.
+
+**The red, and the collision that is not a bug.** `#FF465A` is the hazard band's
+own colour, so the band, the flame and the number are visibly one event. It is
+also exactly `FUEL_RAMP[0]`, and every candidate that still reads as the band's
+red lands within dE 31 of the tank (#ff3b30 at 21, #ff2a18 at 31) — because they
+ARE the same red. There is no third option that matches the band and clears the
+fuel.
+
+So it is named instead of dodged: #FF465A is this game's LETHALITY colour. Out of
+fuel, inside the dead zone, and on fire are three ways of being about to die and
+are allowed to look alike. Where they co-occur they separate by form and content,
+which is the right channel for it — the fuel badge is a pill glyph and the word
+EMPTY on a plate below the ship, this is a signed number to the side. Nobody
+misreads `+430` as `EMPTY`. The dE discipline in `accolade.ts` exists so a RANK can
+be read off a hue, and there is no rank between "burning" and "out of fuel".
+
+This is also the first colour off the rarity ladder that is not a shout, and the
+reason it is allowed: it is a STATE, not a category. The player is not learning a
+hue, they are looking at a red band, a burning ship and a red number at once.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -2267,11 +2321,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 101 · camera 55
+tests    port-equality 11 · invariants 32 · render 106 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
          score 67 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 435 total
+         zip-charge 8 · attract 13 · 440 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

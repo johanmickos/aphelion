@@ -20,9 +20,9 @@ export interface ScoreAward {
    * is already behind you.
    *
    * `burn` is the third, and the only one that accrues rather than being read off
-   * an instant: it integrates reentry heat over a hot pass and pays when the fire
-   * goes out. One capture can raise two of them, because a settle can dip through
-   * the hot zone twice.
+   * an instant: it integrates how deep into the edge dead zone a captured ship is,
+   * and pays when the fire goes out. One capture can raise two of them, and a
+   * DEATH cancels one outright — see `endLife`.
    */
   kind: 'grab' | 'link' | 'burn';
   /** Points actually applied. Never negative — nothing takes points away. */
@@ -79,12 +79,12 @@ export interface ScoreAward {
   /** World pixels of climb banked into this link. */
   climb: number;
   /**
-   * Hottest instant of the pass this burn paid for, 0..1. Burn only.
+   * Deepest the drag got into the dead zone, 0..1. Burn only.
    *
    * The PEAK rather than the integral, because it is what the word is chosen on
-   * and a word describes the moment, not the invoice. Two flares worth the same
-   * points can be a long shallow scrape and a brief plunge; only the second one
-   * deserves to be called an inferno.
+   * and a word describes the moment, not the invoice. Two drags worth the same
+   * points can be a long shallow graze and a brief plunge at the line; only the
+   * second deserves to be called an inferno.
    */
   heat: number;
 }
@@ -142,7 +142,7 @@ export interface ScoreState {
   links: number;
   burns: number;
   /**
-   * Reentry heat this tick, 0..1, and 0 whenever the ship is not burning.
+   * Dead-zone heat this tick, 0..1, and 0 whenever the ship is not burning.
    *
    * The renderer's only input for the flame. Published on the score state rather
    * than derived a second time from the snapshot, so the fire and the points
@@ -187,6 +187,18 @@ export interface ScoreState {
   burnBank: number;
   /** Hottest instant of the flare currently burning. 0 when nothing is. */
   burnPeak: number;
+  /**
+   * What the current drag would pay if it ended now, multiplier included.
+   *
+   * The number the player watches climb beside the ship, and — deliberately —
+   * the exact number the award pays when the fire goes out. `awardBurn` reads
+   * this rather than recomputing from the bank, because a tally you watched for a
+   * second and an award that then disagreed with it by a point would be a small
+   * lie told at the loudest moment in the game.
+   *
+   * 0 when nothing is burning.
+   */
+  burnPoints: number;
   /** Ticks left before the grab award lands. -1 once it has. */
   grabDue: number;
   /**
