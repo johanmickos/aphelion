@@ -2919,6 +2919,87 @@ should be judged on its own. `docs/IDEAS.md`.
 
 ---
 
+### 53 — The rescue pays for the decision, because the burn already pays for the depth
+
+`src/score/score.ts` · `src/score/config.ts` · **[NEW]** · asked for as "I want to
+reward the player for pressing/rescuing themselves, with more points for tighter,
+last minute rescues"
+
+**Timing, not margin, and that is the whole design.** How CLOSE to the wall a
+rescue came is already paid, continuously and precisely: `burnBank` integrates
+`edgeHeat` over the fire, so a later press is already worth more because it starts
+deeper and burns longer. A margin bonus would be note 29 in points form — one act
+collecting twice. What the score did not know is how much of the available window
+the player CHOSE to spend, and the cross is what makes that quantity visible and
+therefore aimable. So the award reads the press and nothing else.
+
+**It is armed at the press and paid at the outcome.** The quality is a property of
+the instant the button went down, and one tick later the drift it was measured
+against no longer exists — `sc.lastDrift` is the state `beginCapture` actually
+read, and is not interchangeable with the capture's own `rx`/`ry`, which
+`stepCapture` has already advanced by a tick on that same tick. But the press
+alone cannot tell a rescue from a death: a press past the cross looks identical
+until the ship fails to come back. So the points settle when the ship's velocity
+toward the wall reaches zero, which is exactly what `src/render/scar.ts` draws.
+Being doomed and being lazy both pay nothing, for the same reason.
+
+**Once per body per life**, the same shape as `claimed`. The rule is not
+hypothetical: the author's own report of the scar was *"I can tap a bunch to
+extend my burn through the red zone"*, and every one of those taps is a press with
+almost no window left that does turn the ship away. Without the latch the tightest
+possible rescue would also be the most repeatable one, several times a second —
+the faucet `ScoreAward` already documents for tap-in-place grabs. Per BODY rather
+than per press, so rescuing yourself onto a different planet still pays: that is a
+new decision about a new body.
+
+**The span is measured, and is provisional in a knowable direction.** Over the
+507 presses in the corpus made while committed to a wall:
+
+```
+  window left at the press   p10 0.28s   median 1.30s   p75 2.37s   p90 3.90s
+```
+
+`rescueSpan` is 2.4 — that p75, chosen the way `closeSpan` was, to span real play.
+Every press in that sample was made BLIND, though: the scar did not exist, so the
+distribution describes players who could not see the line they are now scored
+against. Presses will move later, the median quality will rise, and the span will
+want to shrink. Re-measure rather than adjusting on feel.
+
+What it comes to, replaying the corpus under the new rule:
+
+```
+  rescues paid            224 over 62 sessions   (3.6 a session, 15 sessions had none)
+  points from rescues     8.7% of everything awarded, mean 435 each
+  quality actually paid   p25 0.30   median 0.56   p75 0.78   p90 0.86
+```
+
+A rescue is worth about what a link is worth, which is the intended size: saving
+the run at the last moment should rank with the thing the game is otherwise about,
+not above it. The quality distribution is the number that matters — it sits across
+the middle of its range rather than pinned at either end, so the scale is being
+used rather than saturated.
+
+**No praise word, deliberately, and this is the second time that call has been
+made.** Every threshold in `praise.ts` is a measured percentile of real play, and
+exactly one recording has ever been flown with the cross visible. A word gated on
+blind play would be calibrated on a game where the line was invisible. The band
+caption says `RESCUE · LATE 0.87`, which reads as praise the moment it is high and
+needs no vocabulary behind it; the word waits for play to measure it on.
+
+**Cost.** `armRescue` runs `rescueScar`, which forward-simulates — affordable only
+because it runs once per capture and because 63% of presses take the predictor's
+cheap refusal without ever reaching the projection. `test/score.test.ts` went 1.7s
+to 2.8s for the whole file.
+
+**A fixture blind spot, for the third time.** `rescueBonus` and `rescueSpan` both
+measured as inert at first, because no session in the battery ever pressed while
+committed to a side boundary — the same shape as the `nerveBonus` and
+`burnEdgeSpan` gaps recorded beside their scenarios. Real play does it on 37% of
+presses; the battery did it never. The new scenario drifts at the right wall from
+400px out, which gives a 1.7s window, and pressing at tick 60 spends 0.71 of it.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

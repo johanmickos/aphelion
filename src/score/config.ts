@@ -136,6 +136,47 @@ export interface ScoreConfig {
    * does would be teaching a line that is not the line.
    */
   burnEdgeSpan: number;
+
+  // --- the rescue: pressing at the last moment that still works ---
+  /**
+   * Full bonus for a press made with no rescue window left at all.
+   *
+   * Paid when the rescue COMPLETES — the instant the ship's velocity toward the
+   * wall reaches zero, which is the exact promise `src/render/scar.ts` draws. A
+   * press that never turns pays nothing, so a doomed one cannot collect, and the
+   * award describes the outcome rather than the intention.
+   *
+   * WHY TIMING AND NOT MARGIN. How CLOSE to the wall the rescue came is already
+   * paid, continuously and precisely, by the burn: `burnBank` integrates depth
+   * into the band over time, so a later press is already worth more because it
+   * starts deeper and burns longer. Paying again for the same closeness would be
+   * note 29 in points form. What the score does not otherwise know is how much of
+   * the available window the player CHOSE to spend, and that is the quantity the
+   * cross makes visible and therefore aimable.
+   *
+   * Sized against `nerveBonus` (200), which pays for the planet-side version of
+   * the same nerve: a late press on a line already boring in. The wall version
+   * asks for more — a nerve grab is judged against a surface you can see, this
+   * against a deadline you have to read.
+   */
+  rescueBonus: number;
+  /**
+   * Seconds of window left at which the rescue bonus has decayed to zero.
+   *
+   * Measured over the 507 presses in `diagnostics/` that were made while
+   * committed to a wall: the window left at the press runs p10 0.28s, median
+   * 1.30s, p75 2.37s, p90 3.90s. 2.4 is that p75 — chosen the way `closeSpan`
+   * was, to span real play rather than to be a round number. Across the measured
+   * distribution it puts a tight press at 0.88, the median press at 0.46 and a
+   * lazy one at nearly nothing, which is spread rather than a cliff.
+   *
+   * PROVISIONAL, and it should be re-measured. Every press in that sample was
+   * made BLIND — the scar did not exist — so the distribution describes players
+   * who could not see the line they are now being scored against. The direction
+   * of the error is knowable in advance: presses will move later, the median
+   * quality will rise, and the span will want to shrink.
+   */
+  rescueSpan: number;
   /**
    * Points per heat-second of dragging the dead zone.
    *
@@ -345,6 +386,9 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   burnEdgeSpan: 60,
   burnRate: 555,
   burnMinHeat: 0.01,
+
+  rescueBonus: 320,
+  rescueSpan: 2.4,
 
   streakStep: 0.4,
   streakMax: 5,

@@ -256,6 +256,24 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
     edges: [[90, 1]],
     ticks: 900,
   },
+  /**
+   * Drifting at the right wall, pressed while the cross is still ahead.
+   *
+   * Here for the same reason as the two above: without it `rescueBonus` and
+   * `rescueSpan` measure as inert, because no other session in the battery ever
+   * presses while committed to a side boundary — a blind spot in the fixture, not
+   * a dead weight. Real play does it on 37% of presses.
+   *
+   * The right wall is at x=565.5. Starting 400px short of it at 150px/s across
+   * gives a 1.7s window at the spawn, and pressing at tick 60 spends 0.71 of it —
+   * neither 0 nor 1, so both weights move the payout.
+   */
+  {
+    name: 'rescued off the right wall',
+    ship: { x: 165.5, y: 150, vx: 150, vy: -60 },
+    edges: [[60, 1]],
+    ticks: 600,
+  },
   // holds through the settle and releases mid-decay
   {
     name: 'held long, released in the decay',
@@ -456,6 +474,93 @@ describe('scoring weights', () => {
 });
 
 // ------------------------------------------------------------------ behaviour
+
+describe('what a rescue is worth', () => {
+  /** A drift at the right wall, pressed `at` ticks in. */
+  const WALL_DRIFT = { x: 165.5, y: 150, vx: 150, vy: -60 };
+  const rescueRun = (at: number, scfg: ScoreConfig = DEFAULT_SCORE_CONFIG) =>
+    play([[at, 1]], 600, DEFAULT_CONFIG, scfg, true, WALL_DRIFT);
+
+  it('pays for turning away from the wall, and pays more the later you press', () => {
+    const early = rescueRun(20).awards.filter((a) => a.kind === 'rescue');
+    const late = rescueRun(100).awards.filter((a) => a.kind === 'rescue');
+    expect(early.length, 'an early press still rescues').toBe(1);
+    expect(late.length, 'so does a late one').toBe(1);
+    expect(late[0]!.timing, 'the later press spent more of its window').toBeGreaterThan(
+      early[0]!.timing,
+    );
+    expect(late[0]!.points, 'and is paid more for it').toBeGreaterThan(early[0]!.points);
+  });
+
+  it('pays nothing when the weight is zero, and more when the span shrinks', () => {
+    const full = rescueRun(60).awards.filter((a) => a.kind === 'rescue');
+    expect(full.length).toBe(1);
+
+    const off = rescueRun(60, { ...DEFAULT_SCORE_CONFIG, rescueBonus: 0 });
+    expect(
+      off.awards.some((a) => a.kind === 'rescue'),
+      'rescueBonus pays nothing at 0',
+    ).toBe(false);
+
+    // A shorter span is a harsher scale: the same press keeps less of the bonus.
+    const tight = rescueRun(60, { ...DEFAULT_SCORE_CONFIG, rescueSpan: 1.2 }).awards.filter(
+      (a) => a.kind === 'rescue',
+    );
+    expect(tight[0]!.points).toBeLessThan(full[0]!.points);
+  });
+
+  it('pays once per body per life, so tapping at the wall cannot farm it', () => {
+    // Press, release, press again on the same planet — the shape the author
+    // reported as "I can tap a bunch to extend my burn through the red zone".
+    // Every one of those taps turns the ship away, so only the once-per-body rule
+    // stops the tightest rescue also being the most repeatable one.
+    const tapped = play(
+      [
+        [60, 1],
+        [130, 0],
+        [136, 1],
+        [190, 0],
+        [196, 1],
+      ],
+      600,
+      DEFAULT_CONFIG,
+      DEFAULT_SCORE_CONFIG,
+      true,
+      WALL_DRIFT,
+    );
+    const paid = tapped.awards.filter((a) => a.kind === 'rescue');
+    const bodies = new Set(paid.map((a) => a.body));
+    expect(paid.length, 'one rescue per body, however many presses').toBe(bodies.size);
+  });
+
+  it('pays nothing for a press that was not headed at a wall', () => {
+    // The ordinary case: 63% of real presses never reach the projection at all.
+    const ordinary = pilot(2000).awards.filter((a) => a.kind === 'rescue');
+    for (const a of ordinary) expect(a.timing).toBeGreaterThan(0);
+    const straight = play(
+      [
+        [18, 1],
+        [150, 0],
+      ],
+      400,
+    );
+    expect(
+      straight.awards.some((a) => a.kind === 'rescue'),
+      'a mid-field grab is not a rescue',
+    ).toBe(false);
+  });
+
+  it('reports no arrival or release quality of its own', () => {
+    // Those belong to the grab and the link. Reported as absent so nothing
+    // downstream can pay or praise them a second time.
+    const a = rescueRun(60).awards.find((w) => w.kind === 'rescue')!;
+    expect(a.close).toBe(0);
+    expect(a.aim).toBe(0);
+    expect(a.climb).toBe(0);
+    expect(a.heat).toBe(0);
+    expect(a.clearance).toBe(Infinity);
+  });
+});
 
 describe('what a link is worth', () => {
   it('pays more for a deeper, better-timed, better-aimed release', () => {

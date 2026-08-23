@@ -38,7 +38,7 @@ export interface ScoreAward {
    * a captured ship is and pays when the fire goes out, one capture can raise two
    * of them, and a DEATH cancels one outright — see `endLife`.
    */
-  kind: 'grab' | 'link' | 'hop' | 'flyby' | 'burn';
+  kind: 'grab' | 'link' | 'hop' | 'flyby' | 'burn' | 'rescue';
   /** Points actually applied. Never negative — nothing takes points away. */
   points: number;
   /** The multiplier in force. */
@@ -258,6 +258,28 @@ export interface ScoreState {
   grabDue: number;
   /** Names of anomalies already claimed this life. Cleared by `endLife`. */
   claimed: string[];
+  /**
+   * A rescue armed at a press and waiting on its outcome, or null.
+   *
+   * Read once, on the first tick of a capture, from the drift state the press was
+   * made in — and never again, because the answer is a property of that instant.
+   */
+  rescue: { side: 1 | -1; quality: number; body: string } | null;
+  /**
+   * Bodies a rescue has already been paid against this life. Cleared by `endLife`.
+   *
+   * The same shape as `claimed`, for the same reason it exists there. A drag along
+   * the wall is spent hanging off ONE distant planet, and the author's own
+   * playtest found the behaviour it guards against — "I can tap a bunch to extend
+   * my burn through the red zone". Every one of those taps is a press with almost
+   * no window left that does turn the ship away, so without this the tightest
+   * possible rescue would also be the most repeatable one, several times a second.
+   *
+   * Per body rather than per press, so rescuing yourself onto a DIFFERENT planet
+   * still pays: that is a new decision about a new body, not the same one
+   * collected twice.
+   */
+  rescued: string[];
   /**
    * Bodies already hopped to in the CURRENT charged window.
    *

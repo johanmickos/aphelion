@@ -39,6 +39,7 @@ import { fieldBounds } from '../sim/world.ts';
 import { shipWorldPos } from '../sim/step.ts';
 import { readAim } from './aim.ts';
 import { edgeHeat } from './burn.ts';
+import { rescueScar } from '../sim/rescue.ts';
 import { isNerveGrab } from './praise.ts';
 import {
   BONK_SPEED,
@@ -115,6 +116,8 @@ export function createScoreState(): ScoreState {
     inHardKink: false,
     putterOuts: 0,
     claimed: [],
+    rescue: null,
+    rescued: [],
     hopped: [],
     wasCharged: false,
     hopTotal: 0,
@@ -171,6 +174,11 @@ function endLife(sc: ScoreState): void {
   // the last one — the once-only rule exists to stop a window being refreshed by
   // re-grabbing the same body in one flight, not to retire it from the field.
   sc.claimed.length = 0;
+  // A rescue that had not yet turned the ship away dies with the life it was
+  // meant to save, and the paid list clears with everything else: a new life may
+  // be rescued by the same planet, exactly as it may re-claim an anomaly.
+  sc.rescue = null;
+  sc.rescued.length = 0;
   sc.hopped.length = 0;
   // A death ends the window without a tally. Left set, the falling edge would be
   // seen on the first tick after the respawn and the player would be shown a
@@ -350,6 +358,10 @@ export function scoreTick(
   // A capture that ended without ever being thrown around breaks the run. Checked
   // before the branch below so it sees the capture that just went away.
   if (sc.wasCaptured && !cap) {
+    // Let go of before it ever turned away: the press was not a rescue after all.
+    // Cleared here rather than left to expire, so a later capture cannot inherit
+    // a quality that was read at a different press against a different wall.
+    sc.rescue = null;
     if (!sc.capKinked) sc.recklessStreak = 0;
     sc.capKinked = false;
     sc.inKink = false;
@@ -362,6 +374,7 @@ export function scoreTick(
     // never again — the capture's own rx/ry/vx/vy start moving immediately.
     if (!sc.wasCaptured) {
       sc.grabSkim = skimClearance(sc, state, cap);
+      sc.rescue = armRescue(sc, state, cfg, scfg, dt);
       // The press distance, for a zipped capture exactly as for a flown one, and
       // that is a correction to what this was nearly changed to.
       //
@@ -467,6 +480,21 @@ export function scoreTick(
         kind: 'reckless',
         streak: sc.recklessStreak,
       });
+    }
+
+    // ---- the rescue: paid the instant the ship stops closing on the wall
+    //
+    // The award describes the press, but it waits on the outcome, because the
+    // press alone cannot tell a rescue from a death: a press past the cross looks
+    // identical until the ship fails to come back. Turning away is what the cross
+    // promises, so it is what the points are settled against.
+    if (sc.rescue) {
+      const r = sc.rescue;
+      if (cap.vx * r.side <= 0) {
+        sc.rescue = null;
+        const award = awardRescue(sc, state, scfg, r);
+        if (award) awards.push(award);
+      }
     }
 
     sc.pending = readPending(state, cfg, scfg, cap, sc.grabSkim, sc.maxDefl);
@@ -630,6 +658,102 @@ function awardGrab(
   award.points = Math.round(raw * multiplier);
   sc.score += award.points;
   sc.grabs++;
+  return award;
+}
+
+/**
+ * Read the rescue this press was, or null if it was not one.
+ *
+ * Called on the FIRST tick of a capture and never again. The quality is a
+ * property of the instant the button went down, and one tick later the drift it
+ * was measured against no longer exists.
+ *
+ * `sc.lastDrift` is the state `beginCapture` actually read — held for exactly
+ * this kind of question, and not interchangeable with the capture's own
+ * `rx`/`ry`, which `stepCapture` has already advanced by a tick on this same
+ * tick. Everything else is taken from the live state: `clear` is the free phase,
+ * so the fuel a rescue would have to brake with has not moved yet.
+ *
+ * COST. This runs `rescueScar`, which forward-simulates. It is affordable because
+ * it happens once per capture and because the great majority of presses take its
+ * cheap refusal — measured over the corpus, 37% of presses are made while
+ * committed to a wall and the other 63% never reach the projection at all.
+ */
+function armRescue(
+  sc: ScoreState,
+  state: SimState,
+  cfg: SimConfig,
+  scfg: ScoreConfig,
+  dt: number,
+): ScoreState['rescue'] {
+  const cap = state.capture;
+  const drift = sc.lastDrift;
+  if (!cap || !drift) return null;
+  const body = state.bodies[cap.planet];
+  // Once per body per life. A drag along the wall hangs off one distant planet,
+  // so without this the tightest rescue would also be the most repeatable one.
+  if (!body || sc.rescued.includes(body.name)) return null;
+
+  const pre: SimState = {
+    ...state,
+    capture: null,
+    ship: { ...state.ship, x: drift.x, y: drift.y, vx: drift.vx, vy: drift.vy },
+    ending: { ...state.ending },
+    telemetry: { ...state.telemetry },
+    bodies: state.bodies.slice(),
+  };
+  const scar = rescueScar(pre, cfg, dt);
+  if (!scar) return null;
+
+  // No cross left means the press was later than the last one that could work.
+  // It is scored as the tightest possible rather than as nothing, because the
+  // only way it can ever collect is by turning the ship away anyway — and a press
+  // that beats a prediction pinned to the tick has earned the top of the scale.
+  const quality = scar.cross ? clamp01(1 - scar.cross.t / Math.max(1e-6, scfg.rescueSpan)) : 1;
+  return { side: scar.side, quality, body: body.name };
+}
+
+/**
+ * Pay a rescue that turned the ship away from the wall.
+ *
+ * Nothing here reads how deep it went, deliberately. That is the burn's
+ * quantity, integrated over the fire and already paid; this pays for the decision
+ * that set the fire up. See `ScoreConfig.rescueBonus`.
+ */
+function awardRescue(
+  sc: ScoreState,
+  state: SimState,
+  scfg: ScoreConfig,
+  r: NonNullable<ScoreState['rescue']>,
+): ScoreAward | null {
+  const multiplier = multiplierFor(sc, scfg);
+  const points = Math.round(scfg.rescueBonus * r.quality * multiplier);
+  // A rescue so loose it rounds to nothing pays nothing and says nothing, the
+  // same rule `awardGrab` and `awardBurn` both keep.
+  if (points <= 0) return null;
+  sc.rescued.push(r.body);
+  const award: ScoreAward = {
+    tick: state.tick,
+    kind: 'rescue',
+    points,
+    multiplier,
+    body: r.body,
+    // Arrival and release qualities belong to the grab and the link. Reported as
+    // absent so nothing downstream can pay or praise them a second time.
+    close: 0,
+    clearance: Infinity,
+    skim: Infinity,
+    defl: 0,
+    // The one quality this award carries, on the axis it is about: how much of
+    // the rescue window was spent. Carried in `timing` rather than in a field of
+    // its own because it IS a timing, and `tools/replay.ts` already prints that
+    // column.
+    timing: r.quality,
+    aim: 0,
+    climb: 0,
+    heat: 0,
+  };
+  sc.score += points;
   return award;
 }
 
