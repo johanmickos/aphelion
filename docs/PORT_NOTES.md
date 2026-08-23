@@ -3413,11 +3413,24 @@ a fourth voice on a subject already covered, and it spends the two seconds the g
 is at its most tense.
 
 **What replaced them is not a label at all.** The CROSS ITSELF brightens and
-thickens as the ship closes on it, named by the author: *"I like how we do the
-compass by making the color brighter when the ship is in the window."* The compass
-rings run `(0.15 + 0.5 * align)` on alpha and `(2 + 2 * align)` on width, both
-rising together as the sweep lines up; `scarNearAlpha` and `scarNearWidth` are the
-same gesture with proximity to the cross as the alignment.
+thickens, named by the author: *"I like how we do the compass by making the color
+brighter when the ship is in the window."* The compass rings run
+`(0.15 + 0.5 * align)` on alpha and `(2 + 2 * align)` on width, both rising
+together as the sweep lines up; `scarNearAlpha` and `scarNearWidth` are the same
+gesture.
+
+**Keyed to the PRESS, not to the approach**, which was the correction after one
+session. Rising with proximity alone, it lit on every approach — including the ones
+the player was going to sail straight past — so it was ambience rather than an
+answer, and it also read as too bright at 0.95. Asked for as *"maybe we can only
+make it glow if the user presses close to it? so the glow is proximity+press
+based"*. `Mark.glow` is frozen at the press and read for the rest of the mark's
+life, so a mark the ship merely drifted past never lights and a press right on the
+cross lights it fully.
+
+The renderer can tell the two apart without being told: a null scar means the ship
+is captured, so a press happened; a scar that still exists with no cross left means
+the ship drifted past. Two different calls, already distinct for other reasons.
 
 It also costs no threshold, which is why it could replace `NICE_QUALITY` outright.
 That constant was the only measured percentile in any of this and the only thing

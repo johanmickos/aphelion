@@ -592,56 +592,50 @@ describe('scene', () => {
     );
   });
 
-  it('brightens and thickens the mark as the ship closes on it', () => {
-    // The compass's own gesture, named by the author: "I like how we do the
-    // compass by making the color brighter when the ship is in the window." It
-    // replaced two labels that both read as clutter, and it needs no threshold —
-    // being continuous, nothing has to decide what counts as a good press.
+  it('glows for a press close to the cross, and not for one that drifted past', () => {
+    // Proximity TIMES a press, and both halves matter. It rose with proximity
+    // alone for one session and lit on every approach, including the ones the
+    // player was going to sail straight past — ambience rather than an answer.
     const state = createInitialState(DEFAULT_CONFIG);
     Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
-    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
-    expect(scar?.cross).toBeTruthy();
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
+    expect(scar.cross).toBeTruthy();
 
-    /** Peak alpha and widest stroke drawn, with the cross `lead` seconds away. */
-    const at = (lead: number): { alpha: number; width: number } => {
+    /** Brightest red drawn after the mark stops being live. */
+    const glowOf = (lead: number, ended: 'press' | 'drifted'): number => {
       const mark = new Scar();
-      mark.observe({ ...scar!, cross: { ...scar!.cross!, t: lead } }, 0, rcfg, FIXED_DT);
+      mark.observe({ ...scar, cross: { ...scar.cross!, t: lead } }, 0, rcfg, FIXED_DT);
       mark.update(1, rcfg);
+      // A null scar means captured — a press. A scar with no cross left means the
+      // ship drifted past without pressing.
+      mark.observe(ended === 'press' ? null : { ...scar, cross: null }, 0, rcfg, FIXED_DT);
       const c = createCamera(rcfg);
       fitCamera(c, { w: 390, h: 844, dpr: 1 });
       centerCamera(c, state.ship.x, state.ship.y, f, null);
       const r = recordingContext();
       mark.draw(r.ctx, c, rcfg);
-
-      let alpha = 0;
-      let width = 0;
-      let pending: number[] = [];
+      let peak = 0;
       for (const op of r.ops) {
-        if (op[0] === '=fillStyle') {
-          const m = /rgba\(255,70,90,([\d.]+)\)/.exec(String(op[1]));
-          if (m) alpha = Math.max(alpha, Number(m[1]));
-          pending = [];
-        } else if (op[0] === 'moveTo' || op[0] === 'lineTo') {
-          pending.push(op[1] as number, op[2] as number);
-          if (pending.length === 8) {
-            width = Math.max(
-              width,
-              Math.hypot(pending[0]! - pending[6]!, pending[1]! - pending[7]!),
-            );
-          }
-        }
+        if (op[0] !== '=fillStyle') continue;
+        const m = /rgba\(255,70,90,([\d.]+)\)/.exec(String(op[1]));
+        if (m) peak = Math.max(peak, Number(m[1]));
       }
-      return { alpha, width };
+      return peak;
     };
 
-    const far = at(rcfg.scarFullSecs);
-    const near = at(0.02);
-    expect(near.alpha, 'brighter at the cross').toBeGreaterThan(far.alpha);
-    expect(near.width, 'and heavier').toBeGreaterThan(far.width);
-    // It reaches the configured peak rather than merely rising toward it.
-    expect(near.alpha).toBeGreaterThan(rcfg.scarAlpha);
-    expect(near.alpha).toBeLessThanOrEqual(rcfg.scarNearAlpha + 1e-6);
+    const onIt = glowOf(0.02, 'press');
+    const early = glowOf(rcfg.scarFullSecs, 'press');
+    const missed = glowOf(0.02, 'drifted');
+
+    expect(onIt, 'a press right on the cross lights it').toBeGreaterThan(early);
+    expect(onIt, 'up to the configured peak').toBeLessThanOrEqual(rcfg.scarNearAlpha + 1e-6);
+    expect(early, 'a press with the whole window left does not').toBeLessThanOrEqual(
+      rcfg.scarAlpha + 1e-6,
+    );
+    expect(missed, 'and drifting past it never lights, however close').toBeLessThanOrEqual(
+      rcfg.scarAlpha + 1e-6,
+    );
   });
 
   it('still draws the mark when the ship is right on top of it', () => {

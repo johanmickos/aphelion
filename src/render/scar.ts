@@ -49,6 +49,15 @@ interface Mark {
   /** Seconds since this mark appeared, so nothing ever pops into existence. */
   born: number;
   /**
+   * How close to the cross the press that ended this mark was, 0..1, or 0 if it
+   * was not ended by a press at all.
+   *
+   * Frozen at the moment of the press and read for the rest of the mark's life,
+   * which is what makes the glow a reward rather than an ambience: it says "you
+   * pressed there", and a mark the ship merely drifted past never lights.
+   */
+  glow: number;
+  /**
    * How big the mark draws, as a multiple of its configured size.
    *
    * Set from the fire waiting at the cross. Carried on the mark rather than
@@ -229,7 +238,7 @@ export class Scar {
           this.mark.age = Math.max(0, this.mark.age);
           this.ghost = this.mark;
         }
-        this.mark = { x: c.x, y: c.y, dx, dy, age: -c.t, born: 0, scale };
+        this.mark = { x: c.x, y: c.y, dx, dy, age: -c.t, born: 0, scale, glow: 0 };
       } else {
         this.mark.age = -c.t;
       }
@@ -251,6 +260,15 @@ export class Scar {
     // capture makes the prediction null for as long as it lasts — so a hard
     // clear here made a rapid tap blink the mark out and back.
     if (this.mark) {
+      // WHICH of the two it is decides whether the mark glows, and the caller has
+      // already told us: a null scar means the ship is captured, so a press
+      // happened; a scar that still exists but has no cross left means the ship
+      // drifted past without pressing. The glow is for the press.
+      if (this.mark.age < 0) {
+        this.mark.glow = scar
+          ? 0
+          : clamp01(1 - Math.max(0, this.lead) / Math.max(1e-6, rcfg.scarFullSecs));
+      }
       if (this.mark.age < 0) this.mark.age = 0;
       this.mark.age += dt;
       // The arm is dropped even though the mark is not: it is anchored to the
@@ -320,21 +338,21 @@ export class Scar {
     // a change": one for where it is, one for whether it is there at all.
     const born = 1 - Math.exp(-rcfg.scarSettleRate * m.born);
 
-    // CLOSING, 0 at `scarFullSecs` out and 1 at the cross itself.
+    // THE GLOW IS PROXIMITY TIMES A PRESS, and both halves are load-bearing.
     //
-    // The compass's own gesture: its rings run `(0.15 + 0.5 * align)` on alpha and
-    // `(2 + 2 * align)` on width, both rising together as the sweep lines up. Here
-    // the mark brightens and thickens over the last stretch, so the instrument
-    // sharpens exactly as the decision does. It is continuous, so nothing has to
-    // decide what counts as a good press — which is why it could replace two
-    // labels that both read as clutter.
+    // The compass's own gesture — its rings run `(0.15 + 0.5 * align)` on alpha
+    // and `(2 + 2 * align)` on width, both rising together as the sweep lines up —
+    // but keyed to the press rather than to the approach. It rose continuously
+    // with proximity for one session and that was too much: it lit on every
+    // approach, including the ones the player was going to sail straight past, so
+    // it was ambience rather than an answer. Asked for as "maybe we can only make
+    // it glow if the user presses close to it? so the glow is proximity+press
+    // based".
     //
-    // Held at its peak once the cross is passed rather than falling back: the mark
-    // that stays behind is the one being explained, and it should not get quieter
-    // at the moment it starts to matter.
-    const closing =
-      m.age >= 0 ? 1 : clamp01(1 - Math.max(0, this.lead) / Math.max(1e-6, rcfg.scarFullSecs));
-    const peak = rcfg.scarAlpha + (rcfg.scarNearAlpha - rcfg.scarAlpha) * closing;
+    // `m.glow` is frozen at the press, so a mark the ship drifted past never
+    // lights, and a press right on the cross lights it fully. It costs no
+    // threshold either way: how close is a number, not a category.
+    const peak = rcfg.scarAlpha + (rcfg.scarNearAlpha - rcfg.scarAlpha) * m.glow;
 
     const alpha =
       born *
@@ -347,7 +365,7 @@ export class Scar {
                 Math.max(1e-6, rcfg.scarFadeInSecs - rcfg.scarFullSecs),
             )));
     // Width rises with it, the compass's second half.
-    const weight = m.scale * (1 + (rcfg.scarNearWidth - 1) * closing);
+    const weight = m.scale * (1 + (rcfg.scarNearWidth - 1) * m.glow);
     if (alpha <= 0.004) return;
 
     // Every length in the glyph moves together, so the mark grows as one thing

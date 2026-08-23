@@ -220,7 +220,7 @@ export interface RenderConfig {
   scarAlpha: number;
   scarDeadFrac: number;
   /**
-   * What the mark reaches, in alpha and in width, at the moment of the cross.
+   * What the mark reaches, in alpha and in width, when a press lands right on it.
    *
    * THE COMPASS'S OWN IDIOM. Its rings run `(0.15 + 0.5 * align)` on alpha and
    * `(2 + 2 * align)` on width, so both rise together as the sweep lines up, and
@@ -233,12 +233,13 @@ export interface RenderConfig {
    * sight — SAFE for the recovery, then Nice! for the press that dared it — with
    * "it's too crowded and the anticipation is fun" and "the 'nice!' is a bit
    * cluttered". An instrument reacting is worth more than a word about the
-   * instrument, and it costs no threshold: this is continuous, so nothing has to
-   * decide what counts as a good press.
+   * instrument, and it costs no threshold: how close a press was is a number, not
+   * a category.
    *
-   * The old ramp saturated at `scarFullSecs`, which is 1.65s out — so the
-   * brightening was entirely spent before the part of the approach worth aiming
-   * at. This is the second half of the same gesture.
+   * KEYED TO THE PRESS, not to the approach. It rose continuously with proximity
+   * for one session and lit on every approach, including the ones the player was
+   * going to sail straight past — ambience rather than an answer. `Mark.glow` is
+   * frozen at the press instead, so a mark the ship drifted past never lights.
    *
    * 0.95 first, reported as "there are times that the cross glows a bit too
    * bright". The lift matters more than the ceiling: half again over `scarAlpha`
