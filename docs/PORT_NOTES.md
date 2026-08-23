@@ -2160,6 +2160,30 @@ body a press takes when there is a real choice. "Forward" is up, which is not an
 arbitrary axis in this game: the field is a vertical climb, the score pays for
 altitude, and falling behind the trailing floor is what ends a run.
 
+**One orbit, every hop.** A zip used to land on the orbit the dive would have
+reached — `max(minR, predictedCaptureOrbit().periapsis)` — on the reasoning above
+that aim should still decide where the ship ends up. Reported as "I sometimes got
+high orbits and sometimes low", and measured across 108,000 approach geometries
+that is not a gradient but a lottery:
+
+| | ×minR | px above minR |
+| --- | --- | --- |
+| min | 1.00 | 0 |
+| median | 1.36 | 20 |
+| p75 | 3.13 | 123 |
+| p90 | 4.78 | 210 |
+| max | 8.13 | 330 |
+
+43% pin exactly at the floor and the top quartile sits 3.1x to 8.1x above it,
+with no way for the player to tell in advance which they will get. A frenzy is a
+rhythm and a rhythm needs every beat the same, so `chargedOrbitR` is now an
+absolute 90: identical height AND period on every body — 247px/s, 2.29s a lap.
+Absolute rather than a multiple of `minR` because that is what makes it literally
+fixed, and it is the idiom `anomalyOrbitR` already uses, which is part of why a
+rest stop reads as a place rather than as a result. Clamped above `minR` at the
+point of use, so a body large enough can never orbit inside itself. Scoring is
+untouched: a zipped grab is paid on press distance, not on the orbit it reaches.
+
 **Numbers.** 500 a hop, about four hops in seven seconds — a hop cycle is the
 0.45s glide, plus `boostArmTime` before a release earns its boost, plus the
 crossing to the next body. Started at five seconds, which measured at three hops and read as a
@@ -2175,6 +2199,23 @@ dormant against a future pickup was considered and declined: speculative
 infrastructure for something that does not exist is the same bet as a knob that
 does nothing. Git remembers note 47 if a pickup ever wants it, and it should be
 rebuilt against whatever the paradigms are then.
+
+**A dev-only anomaly at the bottom of the field.** `anomalyAtSpawn` drags the
+first anomaly level with the opening body so the window can be reached in seconds
+rather than after a minute of climbing. A config key and not an
+`import.meta.env.DEV` branch inside world generation, for two reasons: `src/sim/`
+may not read bundler syntax, and a run is `(config, seed, inputLog)` — as a key it
+is recorded in the report, so a dev session still replays exactly. `app/main.ts`
+sets it, which is where knowing about the bundler is legal. The position is
+overridden inside the placement loop rather than branched around it, so `rnd()` is
+called the same number of times in the same order and the corridor a seed produces
+is untouched — pinned by a test.
+
+That needed a FOURTH case in the replay header's config classification. Dev
+sessions are where reports come from, so leaving `anomalyAtSpawn` in the skew
+bucket would have raised "THIS REPORT CAME FROM A DIFFERENT BUILD" on every report
+ever filed — precisely the crying-wolf failure the three-way split existed to end.
+It prints as `dev` instead.
 
 `SIM_VERSION` 19 → 20, goldens recaptured. `chargedSecs` is 0 in
 `PROTOTYPE_CONFIG`, so the equality gate stayed at exactly zero throughout.

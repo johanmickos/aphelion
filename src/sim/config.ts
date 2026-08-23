@@ -441,6 +441,51 @@ export interface SimConfig {
    * live there, as `hopBonus`.
    */
   chargedSecs: number;
+  /**
+   * Orbit radius a charged hop settles onto, in world units. 0 falls back to the
+   * orbit the dive would have reached.
+   *
+   * ABSOLUTE, not a multiple of the body's minimum orbit, so that height and
+   * period are literally identical on every hop — 247px/s and 2.29s a lap at 90.
+   * That is the point: a frenzy is a rhythm, and a rhythm needs every beat to be
+   * the same. It is the same idiom `anomalyOrbitR` already uses, which is part of
+   * why a rest stop reads as a place rather than as a result.
+   *
+   * WHY IT EXISTS. A zip used to land on `max(minR, predictedCaptureOrbit())` —
+   * the orbit the dive would have flown to — so that aim still decided the
+   * outcome (note 47). Measured across 108,000 approach geometries, that is not a
+   * gradient but a lottery: 43% pin exactly at `minR`, the median sits 1.36x above
+   * it and the top quartile 3.1x to 8.1x, which is 0 to 330px of spread with no
+   * way for a player to tell in advance which they will get.
+   *
+   * Low, but deliberately not the minimum. `minR` runs 46-68 across the field, so
+   * this clears the tightest orbit in the game by 22px at worst; and it sits well
+   * inside the anomaly's own 130, so a hop still feels tighter than a rest stop.
+   *
+   * Clamped above `minR` at the point of use, so a body large enough can never
+   * put this orbit underground.
+   */
+  chargedOrbitR: number;
+  /**
+   * Put the first anomaly level with the opening body, for testing. DEV ONLY.
+   *
+   * `placeAnomalies` deliberately skips the bottom eighth of the field, because
+   * an anomaly beside the opening bodies asks for the commit before the player
+   * has a corridor rhythm to break away from. That is right for play and wrong
+   * for iterating on the charged window, which otherwise costs a minute of
+   * climbing before it can be looked at once.
+   *
+   * A CONFIG KEY AND NOT AN `import.meta.env.DEV` CHECK. Nothing under `src/sim/`
+   * may read bundler syntax — `pnpm portable` enforces it — and more importantly a
+   * run is `(config, seed, inputLog)`: as a config key this is recorded in the
+   * diagnostics report, so a replay reproduces the field the dev session actually
+   * flew. A build-time branch inside world generation would make dev reports
+   * silently unreproducible. `app/main.ts` sets it, which is where knowing about
+   * the bundler is legal.
+   *
+   * False in both configs. It is turned on by the shell, never by a default.
+   */
+  anomalyAtSpawn: boolean;
   clearanceOnFlyby: boolean;
   clearanceOnConvert: boolean;
   /**
@@ -606,6 +651,8 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   outboundFlybyFrac: 1,
   zipDur: 0,
   chargedSecs: 0,
+  chargedOrbitR: 0,
+  anomalyAtSpawn: false,
   clearanceOnFlyby: false,
   clearanceOnConvert: false,
   clearanceEnergyNeutral: false,
@@ -738,6 +785,8 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   outboundFlybyFrac: 0.65,
   zipDur: 0.45,
   chargedSecs: 7,
+  chargedOrbitR: 90,
+  anomalyAtSpawn: false,
   clearanceOnFlyby: true,
   clearanceOnConvert: true,
   clearanceEnergyNeutral: true,

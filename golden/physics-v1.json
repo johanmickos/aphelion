@@ -53,6 +53,8 @@
   "outboundFlybyFrac": 1,
   "zipDur": 0,
   "chargedSecs": 0,
+  "chargedOrbitR": 0,
+  "anomalyAtSpawn": false,
   "clearanceOnFlyby": false,
   "clearanceOnConvert": false,
   "clearanceEnergyNeutral": false,

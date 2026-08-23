@@ -20,6 +20,16 @@ import type { ScoreAward, ScoreState, Shout } from '../src/score/index.ts';
 /** The keys the tune panel can move. A difference in one of these is a choice. */
 const TUNED_KEYS = new Set<string>(KNOBS.map((k) => k.key));
 
+/**
+ * Keys the dev server always sets, which are therefore never build skew.
+ *
+ * Dev sessions are where diagnostics reports come from, so classifying one of
+ * these as skew would raise "THIS REPORT CAME FROM A DIFFERENT BUILD" on every
+ * report ever filed — which is exactly the crying-wolf failure the three-way
+ * split was introduced to end.
+ */
+const DEV_KEYS = new Set<string>(['anomalyAtSpawn']);
+
 export interface Frame {
   tick: number;
   phase: string;
@@ -416,16 +426,21 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   // was recorded is missing from `report.config`, and printing "session ran
   // undefined" hides the value the session actually behaved as.
   const delta = configDelta(configFromReport(report), DEFAULT_CONFIG);
-  // Three ways a config can differ from the defaults, and only one of them is a
+  // Four ways a config can differ from the defaults, and only one of them is a
   // reason to distrust the report. A key the player TUNED is a deliberate
   // experiment; a field the player RANDOMISED is a different world, not a
-  // different build. Everything else is skew — the session ran code that is no
-  // longer what this checkout does — and that is what the banner is for. Lumping
-  // all three together made the banner fire on ordinary play and then blame the
-  // knob for a divergence it had nothing to do with.
+  // different build; a DEV key is what the dev server always sets, and since dev
+  // sessions are where reports come from, treating it as skew would fire the
+  // banner on every single one. Everything else is skew — the session ran code
+  // that is no longer what this checkout does — and that is what the banner is
+  // for. Lumping them together made the banner fire on ordinary play and then
+  // blame the knob for a divergence it had nothing to do with.
   const tuned = delta.filter((d) => TUNED_KEYS.has(d.key));
   const field = delta.find((d) => d.key === 'worldSeed');
-  const skew = delta.filter((d) => !TUNED_KEYS.has(d.key) && d.key !== 'worldSeed');
+  const dev = delta.filter((d) => DEV_KEYS.has(d.key));
+  const skew = delta.filter(
+    (d) => !TUNED_KEYS.has(d.key) && d.key !== 'worldSeed' && !DEV_KEYS.has(d.key),
+  );
   out.push(
     `  config     ${skew.length ? `${skew.length} value(s) differ from current defaults` : 'matches current defaults'}` +
       (tuned.length ? ` · ${tuned.length} tuned in the panel` : ''),
@@ -436,6 +451,9 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   }
   for (const d of tuned) {
     out.push(`  tuned      ${d.key}: ${d.theirs} (default ${d.ours})`);
+  }
+  for (const d of dev) {
+    out.push(`  dev        ${d.key}: ${d.theirs} — dev-server default, not build skew`);
   }
   const skewed = report.simVersion !== SIM_VERSION || skew.length > 0;
   if (skewed) {

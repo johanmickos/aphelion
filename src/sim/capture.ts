@@ -371,11 +371,31 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
  */
 function zipOrbit(state: SimState, cfg: SimConfig, cap: Capture, body: Body): AuthoredOrbit | null {
   if (cfg.zipDur <= 0 || state.chargedT <= 0) return null;
-  const predicted = predictedCaptureOrbit(cfg, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
-  // A hyperbola still has a periapsis and it is still where the ship was headed,
-  // so a zip rescues a flyby as readily as it shortcuts a dive. What it must not
-  // do is aim inside the surface.
-  const r = Math.max(cap.minR, predicted.periapsis);
+  // One orbit for every hop, whatever the approach was.
+  //
+  // It used to be the orbit the dive WOULD have reached —
+  // `max(minR, predictedCaptureOrbit().periapsis)` — on the reasoning in note 47
+  // that aim should still decide where the ship ends up. Measured across 108,000
+  // approach geometries that is not a gradient, it is a lottery: 43% pin exactly
+  // at `minR` and the top quartile sits 3.1x to 8.1x above it, a spread of 0 to
+  // 330px. Reported as "I sometimes got high orbits and sometimes low".
+  //
+  // A frenzy is a rhythm, and a rhythm needs every beat to be the same. Absolute
+  // rather than a multiple of `minR`, so height AND period are literally
+  // identical on every body — which is how an anomaly already authors its own
+  // rest stop (`anomalyOrbitR`), and the reason that reads as a place rather than
+  // as a result.
+  //
+  // Clamped above `minR` because a body big enough would otherwise put this orbit
+  // underground: bodies run R 34-56, so `minR` reaches 68 against this 90, and a
+  // future larger body must not silently start orbiting inside itself.
+  const r =
+    cfg.chargedOrbitR > 0
+      ? Math.max(cap.minR, cfg.chargedOrbitR)
+      : Math.max(
+          cap.minR,
+          predictedCaptureOrbit(cfg, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR).periapsis,
+        );
   if (!Number.isFinite(r) || r <= 0) return null;
   void body;
   return {

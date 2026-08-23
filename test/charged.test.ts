@@ -86,8 +86,27 @@ describe('the window itself', () => {
   });
 
   it('runs for exactly `chargedSecs` and then stops', () => {
-    const f = fly();
-    expect(f.closedAtTick).toBe(186 + Math.round(DEFAULT_CONFIG.chargedSecs / FIXED_DT) + 1);
+    // Measured on a ship drifting in open space rather than on the flight above.
+    // A window can also end by dying, and pinning the expiry against a flight
+    // means the assertion silently starts measuring the crash instead the first
+    // time a tuning change moves where that flight ends up.
+    const state = createInitialState(DEFAULT_CONFIG);
+    state.ship.vx = 0;
+    state.ship.vy = -DEFAULT_CONFIG.cruise;
+    state.chargedT = DEFAULT_CONFIG.chargedSecs;
+    let ticks = 0;
+    while (state.chargedT > 0 && ticks < 10_000) {
+      stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
+      ticks++;
+    }
+    expect(state.ending.active, 'the ship died before the window expired').toBe(false);
+    // Within a tick of the ideal, not exactly it: `dt` is 1/60, which has no exact
+    // binary representation, so 420 subtractions leave a residue too small to see
+    // and too real to subtract away. One tick in 420 is 0.24% of the window, and
+    // draining in seconds is what keeps the duration honest if the timestep ever
+    // moves — which matters more than the last 17ms.
+    const ideal = Math.round(DEFAULT_CONFIG.chargedSecs / FIXED_DT);
+    expect(Math.abs(ticks - ideal)).toBeLessThanOrEqual(1);
   });
 
   it('is what makes a grab zip — nothing else does', () => {
@@ -280,6 +299,75 @@ describe('targeting inside a charged window', () => {
     expect(got.index).toBeGreaterThanOrEqual(0);
     expect(got.result).toBe('captured');
     void behind;
+  });
+});
+
+describe('the orbit a hop lands on', () => {
+  /** Zip onto a body from a given approach, and report the settled radius. */
+  function zipRadius(cfg: SimConfig, ang: number, dist: number, tang: number): number | null {
+    const state = createInitialState(cfg);
+    const planets = state.bodies.map((b, i) => ({ b, i })).filter(({ b }) => b.kind === 'planet');
+    const { b } = planets[8]!;
+    state.chargedT = cfg.chargedSecs;
+    state.cameFrom = -1;
+    state.ship.x = b.x + Math.cos(ang) * dist;
+    state.ship.y = b.y + Math.sin(ang) * dist;
+    const ux = -Math.cos(ang);
+    const uy = -Math.sin(ang);
+    state.ship.vx = (ux - uy * tang) * 120;
+    state.ship.vy = (uy + ux * tang) * 120;
+    state.fuel = cfg.fuelMax;
+    state.highWaterY = state.ship.y;
+    stepSim(state, cfg, { held: true, pressed: true, released: false }, FIXED_DT);
+    const cap = state.capture;
+    // Whichever body the press took. Which one it is does not matter here — an
+    // absolute radius is the same on all of them, which is the claim.
+    if (!cap || !cap.zipped) return null;
+    // `rPeri` is the circle the settle glides onto — the authored destination.
+    return cap.rPeri;
+  }
+
+  it('is the same radius however the ship arrived', () => {
+    // It used to be the orbit the dive WOULD have reached, which measured across
+    // 108,000 approach geometries as a lottery rather than a gradient: 43% pinned
+    // at `minR`, the top quartile 3.1x to 8.1x above it. Reported as "I sometimes
+    // got high orbits and sometimes low".
+    const seen = new Set<number>();
+    let zips = 0;
+    for (const ang of [0, 1.1, 2.2, 3.3, 4.4, 5.5]) {
+      for (const dist of [180, 300, 420]) {
+        for (const tang of [0.3, 0.6, 0.9]) {
+          const r = zipRadius(DEFAULT_CONFIG, ang, dist, tang);
+          if (r !== null) {
+            zips++;
+            seen.add(Math.round(r * 1000) / 1000);
+          }
+        }
+      }
+    }
+    expect(seen.size, `radii seen: ${[...seen].join(', ')}`).toBe(1);
+    expect(zips, 'no press in this sweep actually zipped').toBeGreaterThan(10);
+    expect([...seen][0]).toBeCloseTo(DEFAULT_CONFIG.chargedOrbitR, 6);
+  });
+
+  it('is low, but never the minimum', () => {
+    const state = createInitialState(DEFAULT_CONFIG);
+    const minRs = state.bodies
+      .filter((b) => b.kind === 'planet')
+      .map((b) => b.R + DEFAULT_CONFIG.minOrbitGap);
+    // Clear of the tightest orbit in the game on every body...
+    expect(DEFAULT_CONFIG.chargedOrbitR).toBeGreaterThan(Math.max(...minRs));
+    // ...and still tighter than the anomaly's own rest stop, so a hop is not one.
+    expect(DEFAULT_CONFIG.chargedOrbitR).toBeLessThan(DEFAULT_CONFIG.anomalyOrbitR);
+  });
+
+  it('never orbits inside a body, however large', () => {
+    // The clamp is not decoration: bodies run R 34-56 today, and one big enough
+    // would otherwise put this orbit underground.
+    const cfg = { ...DEFAULT_CONFIG, chargedOrbitR: 10 };
+    const r = zipRadius(cfg, 1.1, 300, 0.6);
+    expect(r).not.toBeNull();
+    expect(r!).toBeGreaterThan(10);
   });
 });
 

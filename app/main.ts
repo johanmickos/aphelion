@@ -83,8 +83,18 @@ const seed = (Date.now() ^ 0x9e3779b9) >>> 0;
  * Editable only while armed. Once a run starts it is fixed, because a run is
  * `(config, seed, inputLog)` and a replay cannot reproduce a config that moved
  * underneath it.
+ *
+ * `anomalyAtSpawn` puts the first anomaly level with the opening body so the
+ * charged window can be reached in seconds rather than after a minute of
+ * climbing. Dev only: `import.meta.env.DEV` is a compile-time constant, so this
+ * whole expression folds to `false` in a production bundle.
+ *
+ * Set HERE rather than inside world generation because `src/sim/` may not read
+ * bundler syntax, and because a run is `(config, seed, inputLog)` — as a config
+ * key it is recorded in the diagnostics report, so a dev session still replays
+ * exactly. See the key's own note.
  */
-let sim: SimConfig = { ...DEFAULT_CONFIG };
+let sim: SimConfig = { ...DEFAULT_CONFIG, anomalyAtSpawn: import.meta.env.DEV };
 let state = createInitialState(sim);
 let field = fieldBounds(sim, state.bodies);
 let scene = new Scene({ sim, render: rcfg, bodies: state.bodies, field }, seed);

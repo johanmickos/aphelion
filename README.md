@@ -269,6 +269,12 @@ nearest body is still offered — so it can never waste a press or let a window
 expire on a refusal. Without it, a real session spent three of five presses in one
 window zipping straight back onto the planet it had just left.
 
+Every hop lands on the **same orbit** — `chargedOrbitR`, an absolute 90px, so the
+height and the lap time are identical on every body. It used to land on the orbit
+the dive would have reached, which measured across 108,000 approach geometries as
+a lottery rather than a gradient: 43% pinned at the minimum and the top quartile
+sat 3–8× above it. A frenzy is a rhythm, and a rhythm needs every beat the same.
+
 A body pays **once per window**. Bouncing on one planet is still legal; it just
 stops paying, because a press-glide-release cycle is about 1.2s and otherwise the
 best line inside a frenzy would be to stand still. And a hop is judged on
