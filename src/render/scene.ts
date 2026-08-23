@@ -40,6 +40,20 @@ export class Scene {
 
   private readonly deps: SceneDeps;
 
+  /**
+   * The flame's own heat, chasing the scorer's.
+   *
+   * Two reasons it is not drawn straight from `score.burnHeat`. It is sampled on
+   * the simulation tick, and a hot pass is only about ten of them — on a 120Hz
+   * screen an un-smoothed flame would visibly step through a dozen sizes beside a
+   * ship that interpolates. And fire has thermal inertia: it should catch fast and
+   * die slowly, so the asymmetric rates below are the look, not just a filter.
+   *
+   * Render-only state. The scorer's value is untouched, and nothing here can
+   * reach the simulation.
+   */
+  private burn = 0;
+
   constructor(deps: SceneDeps, seed: number) {
     this.deps = deps;
     this.stars = new Starfield(deps.render, seed);
@@ -107,11 +121,18 @@ export class Scene {
     if (!opts.paused) {
       this.popups.update(opts.frameDt);
       this.fuelWarning.update(opts.frameDt);
+      // Catches in ~0.05s and dies over ~0.25s. A pause holds the flame where it
+      // was, for the same reason it holds the popups: nothing should burn down
+      // behind the overlay.
+      const target = opts.score.burnHeat;
+      const rate = target > this.burn ? 20 : 4;
+      this.burn += (target - this.burn) * Math.min(1, opts.frameDt * rate);
+      if (this.burn < 0.002) this.burn = 0;
     }
 
     this.trail.draw(ctx, cam, snap.x, snap.y);
     drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
-    drawShip(ctx, cam, snap);
+    drawShip(ctx, cam, snap, this.burn, opts.timeMs);
 
     // Above the ship and its wake, below the HUD: it belongs to the world, but
     // nothing in the world should ever cover it.

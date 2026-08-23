@@ -309,6 +309,53 @@ describe('scene', () => {
     expect(drawn).toBe(sc.ticks);
   });
 
+  it('draws fire on the ship while it is burning, and none when it is not', () => {
+    // The scene tests above all run on a fresh score state, where nothing is ever
+    // alight — so without this the flame path would never be drawn at all.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
+    centerCamera(c, snap.x, snap.y, f, null);
+
+    const frames = (burnHeat: number) => {
+      const scene = new Scene(
+        { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
+        99,
+      );
+      const r = recordingContext();
+      // Several frames, because the flame chases the scorer's heat rather than
+      // snapping to it — one frame in, it has barely caught.
+      for (let i = 0; i < 20; i++) {
+        r.reset();
+        scene.draw(r.ctx, c, snap, {
+          timeMs: i * 16.67,
+          paused: false,
+          viewportW: 390,
+          viewportH: 844,
+          headerBottom: 0,
+          frameDt: 1 / 60,
+          score: { ...createScoreState(), burnHeat },
+        });
+      }
+      return r;
+    };
+
+    const hot = frames(0.9);
+    const cold = frames(0);
+    // The wake is the only linear gradient the ship draws. The stub records a
+    // gradient factory under a '=' prefix, like a property set.
+    expect(hot.calls('=createLinearGradient').length).toBeGreaterThan(
+      cold.calls('=createLinearGradient').length,
+    );
+    for (const op of hot.ops) {
+      for (const arg of op.slice(1)) {
+        if (typeof arg === 'number') expect(Number.isFinite(arg)).toBe(true);
+      }
+    }
+  });
+
   it('draws the ship and at least one body on a normal frame', () => {
     const state = createInitialState(DEFAULT_CONFIG);
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
@@ -564,6 +611,7 @@ describe('floating score popups', () => {
       timing: 0.1,
       aim: 0.2,
       climb: 400,
+      heat: 0,
       ...over,
     }) as Parameters<Popups['spawn']>[0];
 
@@ -590,6 +638,39 @@ describe('floating score popups', () => {
     const words = texts(r).filter((t) => !t.startsWith('+'));
     expect(words.length).toBeGreaterThan(0);
     expect(WORDS.aim[1]).toContain(words[0]);
+  });
+
+  it("rolls a burn's number up, and keeps rolling after the flame is out", () => {
+    // The flare itself is a flash — 0.17s at the median across 760 real ones —
+    // which is not long enough to read a tally at. So the number outlives it.
+    const p = new Popups();
+    p.spawn(award({ kind: 'burn' as const, points: 200, heat: 0.9 }), 195, 0);
+    const shown = (): number => {
+      const r = recordingContext();
+      p.draw(r.ctx, cam());
+      const n = texts(r).find((t) => t.startsWith('+'))!;
+      return Number(n.slice(1).replace(/,/g, ''));
+    };
+
+    expect(shown()).toBe(0);
+    p.update(0.2); // the flame is out by here
+    const mid = shown();
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(200);
+    p.update(0.3);
+    expect(shown()).toBeGreaterThan(mid);
+    p.update(0.4); // past the 0.8s roll
+    expect(shown()).toBe(200);
+  });
+
+  it("shows a link's points at once, with no roll", () => {
+    // Only the burn rolls. A link is settled at the instant it is paid and a
+    // counting animation on it would invent a duration the event does not have.
+    const p = new Popups();
+    p.spawn(award({ points: 240 }), 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    expect(texts(r)).toContain('+240');
   });
 
   it('rises and then expires', () => {
@@ -785,6 +866,7 @@ describe('the score band', () => {
     timing: 0.91,
     aim: 0.96,
     climb: 412,
+    heat: 0,
     ...over,
   });
 

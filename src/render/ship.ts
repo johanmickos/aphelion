@@ -109,13 +109,81 @@ export function shipPath(ctx: CanvasRenderingContext2D, s: number): void {
 }
 
 /**
+ * Reentry fire, drawn in ship-local space with the nose along +x.
+ *
+ * A bow shock ahead of the nose and a wake streaming behind it, because that is
+ * where the heat actually is — a plume out of the back alone would read as a
+ * thruster, which is the one thing this must not look like: the ship has no
+ * engine, and the whole game is about not having one.
+ *
+ * RED, AND ONLY HERE. Colour on an award means how good it was and nothing else —
+ * the rarity ladder in `accolade.ts` owns that, and the burn's points and word
+ * ride it like every other award. This is not an award. It is the ship being on
+ * fire, and fire is the one thing in the game allowed to be the colour of fire.
+ * It is kept clear of the amber `flyby` outline by being redder, much larger, and
+ * soft-edged where that cue is a 1.6px stroke.
+ *
+ * The flicker is driven by `timeMs`, which render may read and the simulation may
+ * not. Nothing here feeds back: the flame is a picture of `heat`, and `heat` came
+ * from the scorer, which is an observer.
+ */
+function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs: number): void {
+  // Two out-of-phase waves rather than one, so the flame breathes instead of
+  // pulsing on a period the eye can lock onto and start reading as a countdown.
+  const flick = 0.86 + 0.1 * Math.sin(timeMs * 0.033) + 0.06 * Math.sin(timeMs * 0.071 + 1.3);
+  const h = heat * flick;
+  const reach = (16 + 46 * heat) * s;
+
+  ctx.save();
+  // Additive, so overlapping tongues brighten toward white at the core the way a
+  // real flame does, and so the ship's own fill shows through the thin edges of
+  // it rather than being covered by a flat orange shape.
+  ctx.globalCompositeOperation = 'lighter';
+
+  // ---- the wake: a tapered tongue streaming off the tail
+  const wake = ctx.createLinearGradient(-3 * s, 0, -reach, 0);
+  wake.addColorStop(0, `rgba(255,236,190,${(0.85 * h).toFixed(3)})`);
+  wake.addColorStop(0.28, `rgba(255,138,40,${(0.7 * h).toFixed(3)})`);
+  wake.addColorStop(0.65, `rgba(226,42,18,${(0.34 * h).toFixed(3)})`);
+  wake.addColorStop(1, 'rgba(150,16,8,0)');
+  ctx.fillStyle = wake;
+  ctx.beginPath();
+  ctx.moveTo(-2 * s, -5.4 * s);
+  // Two long curves meeting at a point, drawn with the control handles pulled
+  // outward so the tongue swells just behind the hull before it narrows.
+  ctx.quadraticCurveTo(-reach * 0.45, -7 * s * (0.6 + 0.5 * heat), -reach, 0);
+  ctx.quadraticCurveTo(-reach * 0.45, 7 * s * (0.6 + 0.5 * heat), -2 * s, 5.4 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  // ---- the bow shock: a thin hot crescent standing off the nose
+  const nose = 9 * s;
+  const shock = ctx.createRadialGradient(nose, 0, 0, nose, 0, 13 * s);
+  shock.addColorStop(0, `rgba(255,246,214,${(0.7 * h).toFixed(3)})`);
+  shock.addColorStop(0.45, `rgba(255,122,30,${(0.42 * h).toFixed(3)})`);
+  shock.addColorStop(1, 'rgba(210,30,12,0)');
+  ctx.fillStyle = shock;
+  ctx.beginPath();
+  ctx.arc(nose, 0, 13 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
  * The ship, rotated to its velocity.
  *
  * It now carries phase. The prototype distinguished only held-vs-not, so `flyby`
  * — where you are burning fuel hard to brake an unbound approach — looked exactly
  * like a normal capture, and the only cue was HUD text.
  */
-export function drawShip(ctx: CanvasRenderingContext2D, cam: Camera, snap: RenderSnapshot): void {
+export function drawShip(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  snap: RenderSnapshot,
+  burn = 0,
+  timeMs = 0,
+): void {
   const x = toScreenX(cam, snap.x);
   const y = toScreenY(cam, snap.y);
   const ang = Math.atan2(snap.vy, snap.vx);
@@ -125,6 +193,9 @@ export function drawShip(ctx: CanvasRenderingContext2D, cam: Camera, snap: Rende
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(ang);
+  // Under the hull, so the silhouette stays readable through the brightest part
+  // of the fire — the ship is what the player is steering.
+  if (burn > 0) drawBurn(ctx, burn, s, timeMs);
   shipPath(ctx, s);
   ctx.fillStyle = snap.held ? '#fff' : '#cfdcf2';
   ctx.fill();
