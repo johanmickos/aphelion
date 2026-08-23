@@ -567,25 +567,17 @@ describe('scene', () => {
       });
       const xs: number[] = [];
       let skull = false;
-      let spark = false;
       for (const op of r.ops) {
         // The skull is the only thing in the scene that punches holes back out.
         if (op[0] === '=globalCompositeOperation' && op[1] === 'destination-out') skull = true;
-        // SAFE is the only text drawn beside the ship.
-        if (op[0] === 'fillText' && op[1] === 'SAFE') spark = true;
-        if (
-          (skull || spark) &&
-          (op[0] === 'ellipse' || op[0] === 'fillRect' || op[0] === 'lineTo')
-        ) {
+        if (skull && (op[0] === 'ellipse' || op[0] === 'fillRect' || op[0] === 'lineTo')) {
           xs.push(op[1] as number);
         }
       }
-      return { skull, spark, xs };
+      return { skull, xs };
     };
 
-    const idle = drawWith({});
-    expect(idle.skull, 'nothing is drawn when nothing is owed').toBe(false);
-    expect(idle.spark).toBe(false);
+    expect(drawWith({}).skull, 'nothing is drawn when nothing is owed').toBe(false);
 
     const right = drawWith({ doomed: { side: 1, tick: snap.tick } });
     expect(right.skull, 'the skull is drawn when a press was too late').toBe(true);
@@ -598,50 +590,6 @@ describe('scene', () => {
     expect(Math.max(...left.xs), 'left wall -> skull sits right of the ship').toBeGreaterThan(
       shipX,
     );
-  });
-
-  it('says SAFE for a rescue that came back out of the fire', () => {
-    // The author's definition of tight: "the player would've been in the flames
-    // section of the side". Measured, 12% of rescues qualify — 0.4 a session.
-    const state = createInitialState(DEFAULT_CONFIG);
-    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
-    const c = createCamera(rcfg);
-    fitCamera(c, { w: 390, h: 844, dpr: 1 });
-    const scene = new Scene(
-      { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
-      99,
-    );
-    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
-    centerCamera(c, snap.x, snap.y, f, null);
-
-    const draw = (tickOffset: number) => {
-      const r = recordingContext();
-      scene.draw(
-        r.ctx,
-        c,
-        { ...snap, tick: snap.tick + tickOffset },
-        {
-          timeMs: 0,
-          paused: false,
-          viewportW: 390,
-          viewportH: 844,
-          headerBottom: 0,
-          frameDt: 1 / 60,
-          score: { ...createScoreState(), tight: { side: 1, tick: snap.tick } },
-        },
-      );
-      return r.ops.some((op) => op[0] === 'fillText' && op[1] === 'SAFE');
-    };
-
-    expect(draw(0), 'it flashes on the tick the rescue paid').toBe(true);
-    expect(draw(30), 'and is still going half a second later').toBe(true);
-    // Three pulses at 0.36s and then gone: a flash, not a status. The skull may
-    // stand because the wall ends it; this has no such deadline.
-    //
-    // It is a WORD and not a glyph, and that was a correction: the spark it
-    // replaced needed a caption, and `accolade.ts` records that a vocabulary
-    // needing a caption is the wrong vocabulary. A skull needs none.
-    expect(draw(90), 'but it does not become part of the ship').toBe(false);
   });
 
   it('never draws an arm longer than the clamp, however far away the cross is', () => {

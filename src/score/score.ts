@@ -119,7 +119,6 @@ export function createScoreState(): ScoreState {
     rescue: null,
     rescued: [],
     doomed: null,
-    tight: null,
     hopped: [],
     wasCharged: false,
     hopTotal: 0,
@@ -182,7 +181,6 @@ function endLife(sc: ScoreState): void {
   sc.rescue = null;
   sc.rescued.length = 0;
   sc.doomed = null;
-  sc.tight = null;
   sc.hopped.length = 0;
   // A death ends the window without a tally. Left set, the falling edge would be
   // seen on the first tick after the respawn and the player would be shown a
@@ -500,13 +498,7 @@ export function scoreTick(
       if (cap.vx * r.side <= 0) {
         sc.rescue = null;
         const award = awardRescue(sc, state, scfg, r);
-        if (award) {
-          awards.push(award);
-          // Alight at the moment it paid: the rescue came back out of the fire.
-          // The burn block above has already updated `burnHeat` for this tick, so
-          // this reads the same heat the flame beside the ship is drawing at.
-          if (sc.burnHeat > 0) sc.tight = { side: r.side, tick: state.tick };
-        }
+        if (award) awards.push(award);
       }
     }
 
@@ -783,7 +775,12 @@ function awardRescue(
     timing: r.quality,
     aim: 0,
     climb: 0,
-    heat: 0,
+    // The heat the ship was at when it turned away, which is the whole of what
+    // makes a rescue a TIGHT one — "the player would've been in the flames
+    // section of the side". `praiseEscape` reads it and nothing else, so the word
+    // needs no threshold. The burn block above has already updated `burnHeat` for
+    // this tick, so this is the same heat the flame beside the ship is drawing at.
+    heat: sc.burnHeat,
   };
   sc.score += points;
   return award;

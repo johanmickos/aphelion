@@ -12,7 +12,7 @@
  * change any score is not a weight, it is decoration.
  */
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
+import { DEFAULT_CONFIG, PROTOTYPE_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { createBodies, fieldBounds, inAnomalyField } from '../src/sim/world.ts';
@@ -721,8 +721,8 @@ describe('the skull: a press made past the last chance', () => {
   });
 });
 
-describe('the spark: a rescue that came back out of the fire', () => {
-  it('is set only when the ship is alight as the rescue pays', () => {
+describe('the word for getting out of the fire', () => {
+  it('carries the heat it turned away at, and earns a word only when alight', () => {
     // "By tight I mean the player would've been in the flames section of the
     // side" — which needs no threshold, because `burnHeat` is already a fact.
     // Measured over the corpus, 12% of rescues qualify, 0.4 a session, and their
@@ -733,22 +733,45 @@ describe('the spark: a rescue that came back out of the fire', () => {
       vx: 150,
       vy: -60,
     });
-    expect(
-      cold.awards.some((a) => a.kind === 'rescue'),
-      'the fixture is meant to rescue itself',
-    ).toBe(true);
-    expect(cold.score.tight, 'a rescue that never caught fire owes no spark').toBeNull();
+    const a = cold.awards.find((w) => w.kind === 'rescue');
+    expect(a, 'the fixture is meant to rescue itself').toBeTruthy();
+    expect(a!.heat, 'this one never caught fire').toBe(0);
+    expect(praiseFor(a!), 'so it earns no word').toBeNull();
   });
 
-  it('carries the wall it was rescued from, so the badge knows which side to sit on', () => {
-    const sc = createScoreState();
-    sc.tight = { side: 1, tick: 10 };
-    expect(sc.tight.side).toBe(1);
-    // And it clears with the life, like every other per-life fact.
-    const state = createInitialState(DEFAULT_CONFIG);
-    state.ending.active = true;
-    scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
-    expect(sc.tight, 'a death clears it').toBeNull();
+  it('says it in the escape vocabulary, on its own axis', () => {
+    // Synthesised rather than flown: an alight rescue is 0.4 of a session and the
+    // battery has none. What is being pinned is the rule, not the fixture.
+    const alight: ScoreAward = {
+      tick: 100,
+      kind: 'rescue',
+      points: 400,
+      multiplier: 1,
+      body: 'P4',
+      close: 0,
+      clearance: Infinity,
+      skim: Infinity,
+      defl: 0,
+      timing: 0.9,
+      aim: 0,
+      climb: 0,
+      heat: 0.6,
+    };
+    const p = praiseFor(alight);
+    expect(p, 'an alight rescue earns a word').not.toBeNull();
+    expect(p!.category).toBe('escape');
+    expect(WORDS.escape[0]).toContain(p!.word);
+    // One tier, so both slots hold the same words: the axis has no measured
+    // threshold to split on, and inventing one would calibrate against play that
+    // could not see the line.
+    expect(WORDS.escape[0]).toEqual(WORDS.escape[1]);
+  });
+
+  it('is a different axis from the burn, which is about having been in it', () => {
+    const escape = WORDS.escape.flat();
+    for (const w of WORDS.burn.flat()) {
+      expect(escape, `${w} belongs to the burn, not the escape`).not.toContain(w);
+    }
   });
 });
 
@@ -1712,11 +1735,17 @@ describe('the burn', () => {
   });
 
   it('matches the red band the player can actually see', () => {
-    // Two modules, one number. The flame is meant to track the hazard gradient,
-    // so a fire peaking somewhere other than where the red does would teach a
-    // line that is not the line. `src/score/` may not import `src/render/`, so
-    // nothing but a test can hold the two together.
+    // THREE modules, one number, and nothing but a test can hold them together:
+    // `src/score/` may not import `src/render/`, and `src/sim/` may import
+    // neither. The flame is meant to track the hazard gradient, so a fire peaking
+    // somewhere other than where the red does would teach a line that is not the
+    // line — and the simulation pays an escape for leaving the same band, so a
+    // third value drifting would pay for escaping a fire that started elsewhere.
     expect(DEFAULT_SCORE_CONFIG.burnEdgeSpan).toBe(DEFAULT_RENDER_CONFIG.hazardZoneWidth);
+    expect(DEFAULT_SCORE_CONFIG.burnEdgeSpan).toBe(DEFAULT_CONFIG.escapeBandWidth);
+    // The prototype has no burn, but it still has to agree with itself: the band
+    // is inert there only because `escapeFling` is 0, not because it is different.
+    expect(PROTOTYPE_CONFIG.escapeBandWidth).toBe(DEFAULT_CONFIG.escapeBandWidth);
   });
 
   it('keeps the reentry model working even though nothing is wired to it', () => {
@@ -1781,6 +1810,10 @@ function fakeCapture(): NonNullable<SimState['capture']> {
     settleDur: 1,
     zipped: false,
     puttered: false,
+    fuelSpent: 0,
+    fuelBack: 0,
+    escapeSide: 0,
+    escaped: false,
     brakeSpent: 0,
     lastAngle: 0,
     defl: 0,

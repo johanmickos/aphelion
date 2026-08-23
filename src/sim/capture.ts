@@ -291,6 +291,10 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
     boostT: 0,
     zipped: false,
     puttered: false,
+    fuelSpent: 0,
+    fuelBack: 0,
+    escapeSide: 0,
+    escaped: false,
     // Seeded from the VELOCITY angle, which is what updateDefl compares against.
     // index.html seeded it from the position angle, so the first sample of every
     // capture reported the angle between position and velocity — ~160° on a
@@ -547,6 +551,11 @@ export interface ReleaseOutcome {
  *
  * A weak release (puttered out of fuel mid-circularization) earns no boost and
  * is damped: the ship gives up and drifts off unenthusiastically.
+ *
+ * An ESCAPE fling rides alongside the boost and is paid on different terms — see
+ * `SimConfig.escapeFling`. It is what a rescue out of the dead zone is worth in
+ * speed, and it survives both a weak release and a flyby, neither of which earns
+ * a boost.
  */
 export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): ReleaseOutcome {
   const cap = state.capture;
@@ -590,8 +599,18 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
   ship.x = body.x + cap.rx;
   ship.y = body.y + cap.ry;
 
-  const permAdd = add * cfg.boostPermFrac;
+  // The escape fling: paid for getting out of the dead zone alive, and split by
+  // the same two knobs as the boost so it arrives as a punchy transient plus a
+  // smaller permanent carry, without inventing either.
+  //
+  // NOT gated on `earned`. 81% of escapes are released while still a flyby, and a
+  // flyby earns no boost at all, so gating this the same way would pay nothing to
+  // four escapes in five — which is most of the mechanic.
+  const escape = cap.escaped ? cfg.escapeFling : 0;
+
+  const permAdd = (add + escape) * cfg.boostPermFrac;
   const burstAdd = add * (1 - cfg.boostPermFrac) * cfg.boostPunch;
+  const escapeBurst = escape * (1 - cfg.boostPermFrac) * cfg.boostPunch;
   ship.vx = (cap.vx + bx * permAdd) * flingScale;
   ship.vy = (cap.vy + by * permAdd) * flingScale;
   ship.burstX = bx * burstAdd;
@@ -604,5 +623,10 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
     ship.burstX = 0;
     ship.burstY = 0;
   }
+  // Added after the weak damping, deliberately: a ship that ran dry on the way
+  // out of the fire still got out of the fire, and this was earned by the escape
+  // rather than by the exit.
+  ship.burstX += bx * escapeBurst;
+  ship.burstY += by * escapeBurst;
   return { boostApplied: add, weak };
 }

@@ -47,7 +47,7 @@ import { mulberry32 } from '../sim/rng.ts';
 import type { ScoreAward } from './types.ts';
 
 /** Which quality earned the word. `super` is two or more at once. */
-export type PraiseCategory = 'close' | 'aim' | 'peak' | 'nerve' | 'burn' | 'super';
+export type PraiseCategory = 'close' | 'aim' | 'peak' | 'nerve' | 'burn' | 'escape' | 'super';
 
 /**
  * How good it was, on one ladder shared by every category.
@@ -189,6 +189,15 @@ export const WORDS: Readonly<
     ['SINGED', 'SEARED', 'SCORCHED'],
     ['BLAZING', 'INFERNO', 'METEOR'],
   ],
+  // Getting OUT, where `burn` is about having been in. Both slots hold the same
+  // two words because there is only one tier: the axis has no measured threshold
+  // to split on, and inventing one would be a percentile of play that could not
+  // see the line it is scored against. Two words rather than three or four, on the
+  // playtest's finding that 3-4 synonyms a tier means no word is ever seen twice.
+  escape: [
+    ['DOUSED', 'CLEARED'],
+    ['DOUSED', 'CLEARED'],
+  ],
   // The two slots here are the two EVENTS, not two rungs — the only entry where
   // that is true. A superlative arrival and a superlative departure are different
   // achievements and used to share one gold word, which made the rarest thing in
@@ -211,6 +220,7 @@ const ORDINAL: Record<PraiseCategory, number> = {
   // thematically. The ordinal is a hash input: renumbering an existing category
   // changes which synonym every past session's replay prints, for no gain.
   burn: 6,
+  escape: 7,
 };
 
 /**
@@ -268,10 +278,35 @@ export function praiseFor(award: ScoreAward): Praise | null {
   if (award.kind === 'grab') return praiseGrab(award);
   if (award.kind === 'link') return praiseRelease(award);
   if (award.kind === 'burn') return praiseBurn(award);
+  if (award.kind === 'rescue') return praiseEscape(award);
   // A hop earns no word, and that is not an omission. Every hop inside a charged
   // window pays the same flat `hopBonus`, so there is no quality for a word to
   // name — and the popup already says what it is by being purple.
   return null;
+}
+
+/**
+ * Getting out of the fire alive.
+ *
+ * NO THRESHOLD, and that is the point of the axis. A rescue carries the heat it
+ * was paid at, so `heat > 0` means the ship was in the flames when it turned away
+ * — the author's own definition, "the player would've been in the flames section
+ * of the side" — and being alight is a fact rather than a percentile of one.
+ * Measured over the corpus, 26 of 224 rescues qualify: 0.4 a session, which is
+ * about as often as the rarest words in the table already fire.
+ *
+ * One tier for the same reason. Splitting it would need a measured percentile,
+ * and every recording predates the line being drawable, so the split would be
+ * calibrated on a game where the player could not see what they are now scored
+ * against.
+ */
+function praiseEscape(award: ScoreAward): Praise | null {
+  if (award.heat <= 0) return null;
+  return {
+    category: 'escape',
+    level: 'great',
+    word: pick(WORDS.escape[0]!, award.tick, 'escape'),
+  };
 }
 
 /**

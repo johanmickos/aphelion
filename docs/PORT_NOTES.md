@@ -3145,7 +3145,7 @@ scale — the two are one moment, read two ways.
 
 ---
 
-### 56 — SAFE, and the threshold that turned out not to be one
+### 56 — SAFE, and the threshold that turned out not to be one **[SUPERSEDED by 58]**
 
 `src/render/verdict.ts` · `src/score/score.ts` · **[NEW]** · asked for as "can we
 add a similar pulsing icon for when the player pressed really close to the last
@@ -3221,6 +3221,13 @@ badges that speak should not be set in two typefaces.
 `fuel-warning.ts`'s reasoning about badges that become part of the ship's
 silhouette. The skull is exempt because the wall ends it inside a median 0.85s;
 SAFE has no such deadline, so it needs the count.
+
+**SAFE is gone — see note 58.** The confirmation moved into the praise vocabulary
+as an `escape` axis, beside the points it confirms, asked for as "a small red
+verbal confirmation ... just like we do for tight planetary captures and exits".
+What survives from this note is the part that was never about where it was drawn:
+the trigger is being ALIGHT, which is a fact and not a percentile, and it fires
+0.4 times a session.
 
 ---
 
@@ -3301,6 +3308,113 @@ asked — so a full picture would assemble over ~10 ticks and no tick would ever
 more than a few captures. That is a redesign of the search rather than a tuning
 pass, and it wants a performance harness in front of it, which the author has
 scoped separately.
+
+---
+
+### 58 — The escape: a reward that was taxing the thing it rewarded
+
+`src/sim/step.ts` · `src/sim/capture.ts` · `src/sim/config.ts` · `src/score/praise.ts`
+· **[NEW]** · asked for as "add a velocity boost (temporary that fades) to explode
+out of a successful fire burning rescue... with a smaller permanent boost as a
+reward", then corrected twice in play
+
+**The simulation defines the trigger for itself, because it must.** What is being
+rewarded is a scoring idea — the rescue, the burn — and `src/score/` is an observer
+the simulation may not know exists. So `escapeShove` reads only what physics
+already knows: captured, within `escapeBandWidth` of a boundary, not sheltered by
+an anomaly, and no longer moving toward it. Armed on the way in and spent on the
+way out, so a capture already leaving when it enters the band was never in trouble
+and is owed nothing. The scorer recognises the same instant for its own purposes
+and the two agree because they read the same arithmetic, never because one asks
+the other.
+
+The price is a third copy of the band width — `SimConfig.escapeBandWidth` beside
+`ScoreConfig.burnEdgeSpan` and `RenderConfig.hazardZoneWidth`. `test/score.test.ts`
+pins all three. It is one copy more than anybody wants and there was no
+alternative: the layering that makes a score a pure function of
+`(config, seed, inputLog)` is the same layering that stops the simulation reading
+the number from the scorer.
+
+**IT WAS A MID-ARC KICK FIRST, AND THAT WAS WRONG TWICE OVER.** The speed was
+added the instant the ship stopped closing on the wall, on the theory that
+exploding out of the fire should happen in the fire. Reported after one session as
+*"the kick during arc doesn't feel good"* — and the corpus agreed for a reason
+that was not obvious from the feel:
+
+```
+  within the capture that escaped, kick-at-the-arc versus nothing
+    link points   -64%      burn points  +42%      net  -1409 over 22 captures
+```
+
+Speed added mid-capture is speed the capture then has to shed to convert and
+settle, so the reward was quietly cancelling the link it was meant to celebrate.
+Moving the whole thing to the release fixed it, and the fix is provable rather
+than statistical: with the fling paid at the release, every tick up to the release
+is BIT-IDENTICAL to the feature being off. `test/escape.test.ts` asserts exactly
+that, fingerprint by fingerprint, and it is the promise the rest of the design
+rests on.
+
+```
+  same comparison, fling at the release
+    link points    +7%      net  +5995      and on each session's FIRST escape,
+                                            burn / hot ticks / rescue all exactly 0
+```
+
+**It rides the release's own split**, so `boostPermFrac` and `boostPunch` give the
+punchy transient and the smaller permanent carry without inventing either. That is
+also the only place a fading component can live at all: `ship.burstX/burstY` is
+read by `stepDrift` and nowhere else, so there is no mechanism for one mid-capture
+even in principle.
+
+**NOT gated on `earned`, unlike the boost beside it.** 81% of escapes are released
+while still a flyby, and a flyby earns no boost — gating this the same way would
+pay nothing to four escapes in five. It survives a weak release for the same
+reason: a ship that ran dry on the way out of the fire still got out of the fire.
+
+**The fuel refund, and how it avoids being note 29 again.** An escape costs a
+median 34 fuel between the press and the turn-away, p90 59, and leaves a quarter
+of them under 25 in the tank — a mechanic that punishes the player for surviving
+it. `escapeRefund` hands half of it back, chosen on note 29's own criterion that a
+rescue which WORKS should cost about what a capture costs: the median escape nets
+17 against a median capture burn of 18-20.
+
+```
+  refund   fuel back   median fuel bottom after   putter-outs
+    0.00       0.0              38.0                   5
+    0.25       7.2              51.1                   4
+    0.50      15.6              57.7                   4
+    0.75      23.0              70.3                   4
+```
+
+It pays only for fuel NOBODY HAS REFUNDED YET, which is the whole of the
+arithmetic: `flybyConvertRefund` already returns half the brake to a flyby that
+converts, and note 29 is titled "A rescue paid for itself twice". `Capture`
+tracks `fuelSpent` and `fuelBack` apart so this can pay for what is genuinely
+still out of pocket. It matters less than it sounds only because 67% of escapes
+never reach the first refund at all — 46% are released while still a flyby and 21%
+never braked.
+
+**The word moved, and where it went is the point.** A tight rescue had a badge
+beside the ship: first a spark, then the word SAFE. Asked for instead as "a small
+red verbal confirmation ... just like we do for tight planetary captures and
+exits", which is precisely what the popup praise words are. So the confirmation is
+now an `escape` axis in `praise.ts` — DOUSED and CLEARED, drawn in the burn's
+ember — and the badge beside the ship is the skull alone. Two announcements of one
+event, one beside the ship and one above it, was one too many.
+
+**The axis has no threshold, and cannot need one.** A rescue award carries `heat`:
+the heat the ship was at when it turned away. The word fires on `heat > 0`, which
+is the author's own definition — "the player would've been in the flames section
+of the side" — and being alight is a fact rather than a percentile of one. One
+tier for the same reason: splitting it would need a measured percentile, and every
+recording predates the line being drawable, so the split would be calibrated
+against a game the player could not see. Two words rather than three or four, on
+the playtest's finding that 3-4 synonyms a tier means no word is ever seen twice.
+
+**`SIM_VERSION` 20 -> 21**, and the golden was recaptured twice as keys were added
+— three lines each time, no numbers. The equality gate never moved off zero,
+because `escapeFling` and `escapeRefund` are 0 in `PROTOTYPE_CONFIG` and the band
+is inert without them.
 
 ---
 
