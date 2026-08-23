@@ -196,16 +196,24 @@ export interface RenderConfig {
    */
   doomAlpha: number;
   /**
-   * Seconds a tick represents, for cues that beat on the simulation clock.
+   * Peak alpha of the tight-rescue spark.
+   *
+   * Quieter than the skull. It is colourless where the skull is red, so it needs
+   * less alpha to carry — and it reports something that already went right, which
+   * does not have to interrupt.
+   */
+  tightAlpha: number;
+  /**
+   * Seconds a tick represents, for the verdict badges that beat on the tick.
    *
    * Here rather than imported from `SimConfig` because it is a RENDER fact — how
    * fast a pulse looks — and because nothing in `src/render/` should be reaching
-   * into the simulation's timestep to animate itself. If the two ever disagree the
-   * skull beats at the wrong speed, which is a cosmetic bug; reading `FIXED_DT`
+   * into the simulation's timestep to animate itself. If the two ever disagree a
+   * badge beats at the wrong speed, which is a cosmetic bug; reading `FIXED_DT`
    * here would make the renderer's animation a function of physics tuning, which
    * is a worse one.
    */
-  doomTickSecs: number;
+  verdictTickSecs: number;
   /** Peak half-width of the long arm and of the crossbar, in design units. */
   scarArmWidth: number;
   scarBarWidth: number;
@@ -324,7 +332,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarPrizeFull: 860,
 
   doomAlpha: 0.78,
-  doomTickSecs: 1 / 60,
+  tightAlpha: 0.66,
+  verdictTickSecs: 1 / 60,
   scarArmWidth: 1.3,
   scarBarWidth: 1.7,
   scarAlpha: 0.5,

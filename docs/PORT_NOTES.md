@@ -3141,6 +3141,71 @@ scale — the two are one moment, read two ways.
 
 ---
 
+### 56 — The spark, and the threshold that turned out not to be one
+
+`src/render/verdict.ts` · `src/score/score.ts` · **[NEW]** · asked for as "can we
+add a similar pulsing icon for when the player pressed really close to the last
+second, indicating it was a tight rescue"
+
+**The definition arrived after the design question and made it moot.** The
+question put was where to set "really close", offered as a percentile of the
+measured quality distribution — p90 at 0.86, about 0.36 firings a session, with
+the honest caveat that all of it was blind play and would want re-measuring. The
+answer was not a percentile: *"by 'tight' I mean that the player would've been in
+the flames section of the side"*.
+
+That is a FACT and not a threshold. `burnHeat` is already a quantity the scorer
+keeps, and being alight is the definition rather than a percentile of one, so
+`ScoreState.tight` is set at the moment a rescue pays if the ship is on fire then.
+Nothing to calibrate, nothing to re-measure when play changes, and no
+`ScoreConfig` key — a value that decides WHEN something is judged and never what
+it costs is a constant next to its code, and this one is not even that.
+
+The two readings very nearly agree on rarity, which is why the percentile looked
+plausible:
+
+```
+  rescues paid                       224 over 62 sessions
+    alight at the moment they paid    26  (12%)  -> 0.4 a session
+  quality of the press
+    alight     p25 0.53   median 0.81   p75 0.91
+    cold       p25 0.24   median 0.54   p75 0.75
+```
+
+0.4 a session against the 0.36 the p90 would have given. The author's reading gets
+there without a number, and it is about the thing the player actually felt rather
+than about where they landed in a distribution.
+
+Worth noting what the same table says about the ORDER of events: "alight when it
+paid" and "the capture caught fire at all" are the same 26. A rescue capture that
+burns is always burning at the turn-away, because the turn-away IS the deepest
+point of the dive. So the badge cannot miss one by asking at the wrong moment.
+
+**One slot, two verdicts.** `fuel-warning.ts` owns the space below the ship and
+the popups own the lane above it, so there is one place left beside it, and both
+marks answer the same question. They cannot collide: `doomed` clears on the very
+tick `tight` is set, which is the 6% case where a press past the cross turns away
+anyway — the slot changes its mind at the moment the ship does. `doom.ts` became
+`verdict.ts` for that reason.
+
+**The spark is colourless, and that is the whole colour reasoning.** Every hue in
+the frame is spoken for: red is the wall, `#ee3f2c` is fire, purple is an anomaly,
+and the rarity ladder owns "how good" for text. Note 51 found the remaining channel
+the hard way — a near-white is recessive because it has NO hue, which leaves
+lightness free to be whatever legibility wants. A red spark would say danger and an
+ember one would say burning, and this says neither.
+
+Its GEOMETRY is borrowed instead: four tapered points, which is the scar's own
+construction — crossbar and arm are two crossed spindles tapering to nothing —
+stood upright. The mark you were aiming at, flashing back at you.
+
+**It flashes where the skull may stand.** Three pulses and gone, on
+`fuel-warning.ts`'s reasoning about badges that become part of the ship's
+silhouette. The skull is exempt because the wall ends it inside a median 0.85s;
+the spark has no such deadline, so it needs the count.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

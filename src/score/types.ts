@@ -282,6 +282,22 @@ export interface ScoreState {
    */
   doomed: { side: 1 | -1; tick: number } | null;
   /**
+   * A rescue that came back out of the FIRE, or null.
+   *
+   * Set at the moment a rescue pays, if the ship is alight then. Asked for as
+   * "by 'tight' I mean that the player would've been in the flames section of
+   * the side", which turns out to need no threshold at all: `burnHeat` is already
+   * a fact the scorer keeps, and being on fire is the definition rather than a
+   * percentile of one. Measured over the corpus, 26 of 224 rescues (12%) qualify
+   * — 0.4 a session — and their presses run a median quality of 0.81 against 0.54
+   * for the rescues that stayed cold, which is why the author's reading and a
+   * quality percentile land in nearly the same place.
+   *
+   * Observability, like `doomed` and `burnHeat`: nothing here pays or withholds a
+   * point. The rescue award is what pays.
+   */
+  tight: { side: 1 | -1; tick: number } | null;
+  /**
    * Bodies a rescue has already been paid against this life. Cleared by `endLife`.
    *
    * The same shape as `claimed`, for the same reason it exists there. A drag along

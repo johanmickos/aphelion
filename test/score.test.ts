@@ -721,6 +721,37 @@ describe('the skull: a press made past the last chance', () => {
   });
 });
 
+describe('the spark: a rescue that came back out of the fire', () => {
+  it('is set only when the ship is alight as the rescue pays', () => {
+    // "By tight I mean the player would've been in the flames section of the
+    // side" — which needs no threshold, because `burnHeat` is already a fact.
+    // Measured over the corpus, 12% of rescues qualify, 0.4 a session, and their
+    // presses run a median quality of 0.81 against 0.54 for the cold ones.
+    const cold = play([[60, 1]], 600, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, {
+      x: 165.5,
+      y: 150,
+      vx: 150,
+      vy: -60,
+    });
+    expect(
+      cold.awards.some((a) => a.kind === 'rescue'),
+      'the fixture is meant to rescue itself',
+    ).toBe(true);
+    expect(cold.score.tight, 'a rescue that never caught fire owes no spark').toBeNull();
+  });
+
+  it('carries the wall it was rescued from, so the badge knows which side to sit on', () => {
+    const sc = createScoreState();
+    sc.tight = { side: 1, tick: 10 };
+    expect(sc.tight.side).toBe(1);
+    // And it clears with the life, like every other per-life fact.
+    const state = createInitialState(DEFAULT_CONFIG);
+    state.ending.active = true;
+    scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+    expect(sc.tight, 'a death clears it').toBeNull();
+  });
+});
+
 describe('what a link is worth', () => {
   it('pays more for a deeper, better-timed, better-aimed release', () => {
     const links = pilot(4000).awards.filter((a) => a.kind === 'link');
