@@ -2138,6 +2138,32 @@ ways:
   is one you can see — before, a heat-0.05 flare paid `+1` and drew nothing, which
   is the worst of both.
 
+**Third pass, and the actual defect: fire that was not bright and not red.**
+Reported as "no flames or redness or red text counting my score", on a session
+whose replay is bit-exact against the build — so it was not a stale bundle. Three
+things were true at once and only one of them was the bug:
+
+- The flame was NOT too brief, which was asserted here in between and was wrong.
+  Heat cleared the ignition floor for only 3-7 ticks, but the ember decay stretched
+  each episode to 65-77 frames — 1.08 to 1.28 SECONDS on screen, three times.
+- It was too dim and the wrong colour. Opacity was linear in `vis`, on the
+  assumption that heat near 1.0 would be typical. It is not: a real skim scores
+  about 0.25, so `vis` sat near 0.5 and every flame drew at half strength —
+  measured, peak alpha 0.37 against a near-white (255,236,190) core, which over
+  black is RGB (94,87,70). A warm grey smudge, no brighter than the trail that is
+  always there.
+- So heat now drives SIZE and COLOUR TEMPERATURE and only gently drives opacity:
+  `alpha = 0.58 + 0.42*vis`, and the white-hot core is reserved for a flare that
+  earned it (`white = vis^2`) so everything below reads as orange-red. At the
+  player's own heat of 0.26 the core goes from (95,88,71) to (174,119,57) at
+  double the alpha — red:green 1.46 against 1.08, which is to say from grey to
+  orange. A small fire is still a fire.
+
+`test/canvas-stub.ts` now records `addColorStop` instead of swallowing it. A
+gradient IS the colour of the thing being drawn, and a stub that discards them
+cannot tell a red flame from a grey one — which is why two rounds of render tests
+passed over this defect.
+
 **And the bound that was nearly got wrong.** The retune wanted `burnSpeed0` at
 345, on the grounds that the corpus never parked faster than 342px/s. That is a
 sample, and the quantity has a closed form: a settled capture is a circle at
@@ -2175,11 +2201,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 100 · camera 55
+tests    port-equality 11 · invariants 32 · render 101 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
          score 67 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 434 total
+         zip-charge 8 · attract 13 · 435 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

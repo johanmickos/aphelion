@@ -142,8 +142,30 @@ function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs
   // lifts that to 0.5, and leaves the top of the range where it was. Paired with
   // `burnMinHeat`, it means the faintest fire that can exist is one you can see.
   const vis = Math.sqrt(heat);
-  const h = vis * flick;
+  const h = flick;
   const reach = (18 + 52 * vis) * s;
+
+  // BRIGHTNESS DOES NOT SCALE TO NOTHING, and that was the bug the first two
+  // attempts at this shared. Opacity was linear in `vis`, on the assumption that
+  // heat near 1.0 would be the common case. It is not — a typical real skim scores
+  // around 0.25, so `vis` sits near 0.5 and every flame rendered at half strength:
+  // measured off a real session, peak alpha 0.37 against a near-white core, which
+  // over black is RGB (94,87,70). A warm grey smudge, no brighter than the trail
+  // that is always there. Reported as "no flames or redness".
+  //
+  // So heat drives SIZE and COLOUR TEMPERATURE, and only gently drives opacity. A
+  // small fire is still a fire.
+  const alpha = 0.58 + 0.42 * vis;
+
+  // Colour temperature climbs with heat, which is both how fire works and what
+  // keeps a faint one legible: the white-hot core is reserved for a flare that
+  // earned it, and everything below reads as unmistakable orange-red rather than
+  // washing out to cream. Squared, so white is the top of the range and not its
+  // middle.
+  const white = vis * vis;
+  const cr = 255;
+  const cg = Math.round(150 + 94 * white);
+  const cb = Math.round(38 + 176 * white);
 
   ctx.save();
   // Additive, so overlapping tongues brighten toward white at the core the way a
@@ -153,9 +175,9 @@ function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs
 
   // ---- the wake: a tapered tongue streaming off the tail
   const wake = ctx.createLinearGradient(-3 * s, 0, -reach, 0);
-  wake.addColorStop(0, `rgba(255,236,190,${(0.85 * h).toFixed(3)})`);
-  wake.addColorStop(0.28, `rgba(255,138,40,${(0.7 * h).toFixed(3)})`);
-  wake.addColorStop(0.65, `rgba(226,42,18,${(0.34 * h).toFixed(3)})`);
+  wake.addColorStop(0, `rgba(${cr},${cg},${cb},${(alpha * h).toFixed(3)})`);
+  wake.addColorStop(0.3, `rgba(255,116,26,${(0.72 * alpha * h).toFixed(3)})`);
+  wake.addColorStop(0.68, `rgba(228,34,14,${(0.4 * alpha * h).toFixed(3)})`);
   wake.addColorStop(1, 'rgba(150,16,8,0)');
   ctx.fillStyle = wake;
   ctx.beginPath();
@@ -167,15 +189,16 @@ function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs
   ctx.closePath();
   ctx.fill();
 
-  // ---- the bow shock: a thin hot crescent standing off the nose
+  // ---- the bow shock: a hot crescent standing off the nose
   const nose = 9 * s;
-  const shock = ctx.createRadialGradient(nose, 0, 0, nose, 0, 13 * s);
-  shock.addColorStop(0, `rgba(255,246,214,${(0.7 * h).toFixed(3)})`);
-  shock.addColorStop(0.45, `rgba(255,122,30,${(0.42 * h).toFixed(3)})`);
-  shock.addColorStop(1, 'rgba(210,30,12,0)');
+  const shockR = (10 + 6 * vis) * s;
+  const shock = ctx.createRadialGradient(nose, 0, 0, nose, 0, shockR);
+  shock.addColorStop(0, `rgba(${cr},${cg},${cb},${(0.8 * alpha * h).toFixed(3)})`);
+  shock.addColorStop(0.45, `rgba(255,104,24,${(0.5 * alpha * h).toFixed(3)})`);
+  shock.addColorStop(1, 'rgba(210,26,10,0)');
   ctx.fillStyle = shock;
   ctx.beginPath();
-  ctx.arc(nose, 0, 13 * s, 0, Math.PI * 2);
+  ctx.arc(nose, 0, shockR, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();

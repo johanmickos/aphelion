@@ -356,6 +356,63 @@ describe('scene', () => {
     }
   });
 
+  it('burns orange even when the burn is faint', () => {
+    // The defect this pins: opacity and colour both scaled linearly with heat, so
+    // a typical real skim — which scores around 0.25, not 1.0 — drew a near-white
+    // core at 37% alpha. Over black that is RGB (94,87,70): a warm grey smudge no
+    // brighter than the trail. Reported from a phone as "no flames or redness".
+    //
+    // Fire has to look like fire at the BOTTOM of its range, which is where nearly
+    // all of it happens.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
+    centerCamera(c, snap.x, snap.y, f, null);
+
+    const scene = new Scene(
+      { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
+      99,
+    );
+    const r = recordingContext();
+    for (let i = 0; i < 20; i++) {
+      r.reset();
+      scene.draw(r.ctx, c, snap, {
+        timeMs: i * 16.67,
+        paused: false,
+        viewportW: 390,
+        viewportH: 844,
+        headerBottom: 0,
+        frameDt: 1 / 60,
+        score: { ...createScoreState(), burnHeat: 0.25 },
+      });
+    }
+
+    const stops = r.calls('addColorStop').map((o) => String(o[2]));
+    const rgba = stops
+      .map((c) => /rgba?\((\d+),(\d+),(\d+),([\d.]+)\)/.exec(c))
+      .filter((m): m is RegExpExecArray => m !== null)
+      .map((m) => ({
+        r: Number(m[1]),
+        g: Number(m[2]),
+        b: Number(m[3]),
+        a: Number(m[4]),
+      }));
+
+    // The flame's opaque stops, ignoring the transparent tail every gradient ends
+    // on and the other gradients in the scene, which are not red.
+    const fire = rgba.filter((c) => c.a > 0.2 && c.r > c.g && c.g >= c.b);
+    expect(fire.length).toBeGreaterThan(0);
+
+    const brightest = fire.reduce((a, b) => (a.a > b.a ? a : b));
+    // Actually bright: the old code peaked at 0.37 here.
+    expect(brightest.a).toBeGreaterThan(0.5);
+    // Actually orange: red must clearly dominate. The old near-white core sat at
+    // a red:green ratio of 1.08, which is grey by any useful measure.
+    expect(brightest.r / brightest.g).toBeGreaterThan(1.3);
+  });
+
   it('draws the ship and at least one body on a normal frame', () => {
     const state = createInitialState(DEFAULT_CONFIG);
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);

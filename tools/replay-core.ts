@@ -295,12 +295,12 @@ export function replayReport(report: DiagReport): Analysis {
         `hottest ${hottest.toFixed(2)}, alight for ${hotTicks} tick(s) ` +
         `(${(hotTicks * report.dt).toFixed(2)}s of the session)`,
     );
-    if (hotTicks / Math.max(1, score.burns) < 8) {
-      findings.push(
-        `  the flames averaged ${(hotTicks / score.burns).toFixed(1)} tick(s) each — ` +
-          `too brief to see. Heat barely over burnMinHeat clears it for only a frame or two`,
-      );
-    }
+    // Deliberately NOT an inference about visibility. It says how long the burn
+    // was PAYING, which is what these ticks are. The flame outlives them by a wide
+    // margin — the renderer's ember decay stretched a 7-tick pass to 77 frames on
+    // a real session — so reading "3 ticks" as "you cannot have seen it" is wrong,
+    // and was briefly asserted here. What a report can honestly say is how much of
+    // the session earned burn points.
   }
   if (score.links > 0) {
     const links = awards.filter((a) => a.kind === 'link');

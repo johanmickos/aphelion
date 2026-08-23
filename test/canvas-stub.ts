@@ -17,7 +17,15 @@ export interface RecordingContext {
 
 export function recordingContext(): RecordingContext {
   const ops: Op[] = [];
-  const gradient = { addColorStop: (): void => {} };
+  // Colour stops are recorded, not swallowed. A gradient IS the colour of the
+  // thing being drawn, so a stub that throws them away cannot tell a red flame
+  // from a grey one — which is exactly the defect that shipped twice before this
+  // was added.
+  const gradient = {
+    addColorStop: (offset: number, color: string): void => {
+      ops.push(['addColorStop', offset, color]);
+    },
+  };
 
   const target: Record<string, unknown> = {};
   const ctx = new Proxy(target, {
