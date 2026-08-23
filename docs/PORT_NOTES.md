@@ -2311,11 +2311,15 @@ has to be learned; the player is reading the word FIRE while the ship is on fire
 
 Two corrections came out of looking at it on a phone.
 
-**Ember, not brick.** `#c04018` was the first pick and it reads as ketchup: dark,
-and low in orange at G/R 0.33. `#d9601f` lifts both — G/R 0.44, L* 46 -> 55,
-contrast 4.0:1 -> 5.6:1 — which keeps it an ember rather than a highlight while
-putting it unmistakably on the orange side of red, where flame lives and dried
-blood does not.
+**Red, and lit — after two wrong turns in opposite directions.** `#c04018` read as
+ketchup: G/R 0.33, but L* only 46, so it was dark AND brown. The fix lifted the
+lightness and the orange together (`#d9601f`, G/R 0.44, L* 55) and overshot into
+satsuma.
+
+The two knobs are separable, and that is the lesson: ketchup is a LIGHTNESS problem
+and orange is a HUE one. `#ee3f2c` takes the orange back out — G/R 0.26, redder
+than the brick ever was — while keeping the lightness that stopped it being brick:
+L* 54, contrast 5.4:1. A flame's own red, once it is not being drawn in mud.
 
 **The number is grey, always.** It followed the rarity ladder at first, so a drag
 that scored well turned the number BLUE next to an orange word: two hues on one
@@ -2324,12 +2328,17 @@ word, and size still climbs the rung, so how good it was is not lost.
 
 **And the default grey was too dark to be the default.** `ROUTINE` sat at 3.6:1
 against the starfield — the least legible text in the game, and the one shown most
-often, which is the wrong way round. `#78808f` is 5.3:1 and still the dimmest rung
-by a wide margin, `good` being 7.9:1. The ladder gave up 5 dE of hue separation
-for it — `ROUTINE` vs `good` goes 41 -> 36, which makes it the closest pair in the
-table — and 1.7 stops of contrast on the most-read text is worth that once. L*
-still climbs 53 -> 66 -> 77 -> 87, with the widest gap at the bottom where the
-commonest award has to be told from the next one up.
+often, which is the wrong way round. It is `#838c9c` at 6.2:1 now, against `good`
+at 7.9:1.
+
+That is as light as it can go on its own, and the binding constraint is the ladder
+rather than legibility. L* is 58 against `good` at 66; one step further closes that
+gap to 5, and a bottom gap under about 8 stops the ladder being ordinal for anyone
+who cannot separate the hues — the rungs above it are 11 and 10 apart. The hue
+separation is already spent: `ROUTINE` vs `good` went dE 41 -> 34, which makes it
+the closest pair in the table, where the file used to be able to claim 41. Lighter
+than this means lifting `LEVEL` with it, which is a change to every award in the
+game rather than a tweak to the quiet one.
 
 It costs one piece of awkwardness worth knowing about: the score band draws points,
 multiplier and word as a single centred string, so a burn has to lay out two runs

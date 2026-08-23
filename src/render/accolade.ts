@@ -56,12 +56,18 @@ export const LEVEL: Record<PraiseLevel, AccoladeStyle> = {
  *
  * Dimmest is not the same as dim. At `#5f6673` this was 3.6:1 against the
  * starfield — the least legible text in the game, and the one shown most often,
- * which is the wrong way round. `#78808f` is 5.3:1 and still the dimmest rung by a
- * wide margin: the next one up, `good`, is 7.9:1.
+ * which is the wrong way round. `#838c9c` is 6.2:1, against `good` at 7.9:1.
+ *
+ * THIS IS AS LIGHT AS IT CAN GO ON ITS OWN, and the constraint is the ladder
+ * rather than legibility. L* here is 58 and `good` is 66; the next step up
+ * (`#8b95a5`) closes that to 5, and a bottom gap under about 8 stops the ladder
+ * being ordinal for anyone who cannot separate the hues — the rungs above it are
+ * 11 and 10 apart. Lighter than this means lifting `LEVEL` with it, which is a
+ * change to every award in the game and not a tweak to the quiet one.
  */
 export const ROUTINE: AccoladeStyle = {
-  color: '#78808f',
-  labelColor: 'rgba(125,133,148,.85)',
+  color: '#838c9c',
+  labelColor: 'rgba(140,148,164,.85)',
   size: 13,
 };
 
@@ -84,15 +90,22 @@ export const ROUTINE: AccoladeStyle = {
  * times — see PORT_NOTES 51. What went wrong there was colouring the number too,
  * which spent the "how good" channel on a fact the flame was already shouting.
  *
- * EMBER, NOT BRICK. This was `#c04018` first, which is dark and low in orange —
- * G/R 0.33 — and reads as ketchup rather than as fire. `#d9601f` lifts both: G/R
- * 0.44, L* 46 -> 55, contrast 4.0:1 -> 5.6:1 against the starfield. Still deep
- * enough to be an ember rather than a highlight, and now unmistakably on the
- * orange side of red, which is where flame lives and where dried blood does not.
+ * RED, AND LIT. Two wrong turns got here, and they were wrong in opposite
+ * directions, which is what makes the final value worth explaining.
+ *
+ * `#c04018` read as ketchup: G/R 0.33, but L* only 46 — dark AND brown. The fix
+ * for that was `#d9601f`, which lifted the lightness and the orange together
+ * (G/R 0.44, L* 55) and overshot into satsuma.
+ *
+ * The two knobs are separable. Ketchup is a LIGHTNESS problem and orange is a
+ * HUE one, so `#ee3f2c` takes the orange back out — G/R 0.26, redder than the
+ * brick ever was — while keeping the lightness that stopped it being brick at all:
+ * L* 54, contrast 5.4:1. A bright vermilion, which is what a flame's own red looks
+ * like once it is not being drawn in mud.
  */
 export const BURN_WORD: AccoladeStyle = {
-  color: '#d9601f',
-  labelColor: '#a8461a',
+  color: '#ee3f2c',
+  labelColor: '#b8341f',
   size: 15,
 };
 
