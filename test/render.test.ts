@@ -571,8 +571,8 @@ describe('scene', () => {
       for (const op of r.ops) {
         // The skull is the only thing in the scene that punches holes back out.
         if (op[0] === '=globalCompositeOperation' && op[1] === 'destination-out') skull = true;
-        // The spark is the only colourless fill drawn beside the ship.
-        if (op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(232,240,255')) spark = true;
+        // SAFE is the only text drawn beside the ship.
+        if (op[0] === 'fillText' && op[1] === 'SAFE') spark = true;
         if (
           (skull || spark) &&
           (op[0] === 'ellipse' || op[0] === 'fillRect' || op[0] === 'lineTo')
@@ -600,7 +600,7 @@ describe('scene', () => {
     );
   });
 
-  it('shows the spark for a rescue that came back out of the fire', () => {
+  it('says SAFE for a rescue that came back out of the fire', () => {
     // The author's definition of tight: "the player would've been in the flames
     // section of the side". Measured, 12% of rescues qualify — 0.4 a session.
     const state = createInitialState(DEFAULT_CONFIG);
@@ -630,15 +630,17 @@ describe('scene', () => {
           score: { ...createScoreState(), tight: { side: 1, tick: snap.tick } },
         },
       );
-      return r.ops.some(
-        (op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(232,240,255'),
-      );
+      return r.ops.some((op) => op[0] === 'fillText' && op[1] === 'SAFE');
     };
 
     expect(draw(0), 'it flashes on the tick the rescue paid').toBe(true);
     expect(draw(30), 'and is still going half a second later').toBe(true);
     // Three pulses at 0.36s and then gone: a flash, not a status. The skull may
     // stand because the wall ends it; this has no such deadline.
+    //
+    // It is a WORD and not a glyph, and that was a correction: the spark it
+    // replaced needed a caption, and `accolade.ts` records that a vocabulary
+    // needing a caption is the wrong vocabulary. A skull needs none.
     expect(draw(90), 'but it does not become part of the ship').toBe(false);
   });
 

@@ -1,9 +1,9 @@
 /**
- * The wall's verdict on a press: the skull, or the spark.
+ * The wall's verdict on a press: the skull, or SAFE.
  *
  * One slot beside the ship, two things it can say, and they are mutually
  * exclusive by construction — the skull is owed for a press made past the last
- * chance, the spark for a rescue that came back out of the fire. On the 6% of
+ * chance, SAFE for a rescue that came back out of the fire. On the 6% of
  * doomed presses that turn away anyway both are true in sequence: `score.doomed`
  * clears on the very tick `score.tight` is set, so the slot changes its mind at
  * the moment the ship does.
@@ -26,17 +26,19 @@ import type { ScoreState } from '../score/types.ts';
 const OFFSET = 24;
 /** Cranium radius, in design units. */
 const R = 6.2;
+/** Size of the SAFE label, matching `fuel-warning.ts`'s own. */
+const LABEL_SIZE = 9.5;
 /** Seconds per pulse. The fuel warning's own rate, so every badge beats alike. */
 const PULSE_SEC = 0.36;
 /**
- * Pulses the spark gets before it is gone.
+ * Pulses SAFE gets before it is gone.
  *
  * The skull needs no count — it beats until the wall arrives, which is a median
- * 0.85s away. The spark has no such deadline to end it, so it borrows the fuel
+ * 0.85s away. This has no such deadline to end it, so it borrows the fuel
  * warning's three, which is what a flash looks like when it is a flash and not a
  * status.
  */
-const SPARK_PULSES = 3;
+const SAFE_PULSES = 3;
 
 /**
  * Sharp in, slow out. A heartbeat rather than a sine, which at this size reads as
@@ -85,46 +87,40 @@ function skull(
 }
 
 /**
- * The spark: you came back out of the fire.
+ * SAFE: you came back out of the fire.
  *
- * Four tapered points, which is the SCAR'S OWN GEOMETRY — its crossbar and arm
- * are two crossed spindles tapering to nothing, and this is the same construction
- * stood upright. The resemblance is the point: the mark you were aiming at,
- * flashing back at you. Longer points and a bright core keep it from being
- * mistaken for a small scar.
+ * It was a glyph first — four tapered points borrowing the scar's own crossed
+ * spindles, on the theory that the mark you aimed at should flash back at you.
+ * Reported immediately as "the spark isn't intuitive enough. I think it should
+ * say 'safe'", and the fix is not to add a caption to it. `accolade.ts` records
+ * the rule: a vocabulary that needs a caption is a vocabulary that has not been
+ * chosen carefully enough. A spark that has to be labelled SAFE is a spark that
+ * was not saying SAFE, so the label became the whole mark.
+ *
+ * WHY THE SKULL DOES NOT NEED THE SAME TREATMENT, since the pair now mixes a
+ * glyph and a word: a skull already means what it means, to everyone, with no
+ * game to learn it in. There is no equivalent universal sign for "you got away
+ * with it" — which is exactly what the first attempt discovered.
  *
  * COLOURLESS, and that is the whole colour reasoning. Every hue in the frame is
- * already spoken for — red is the wall, `#ee3f2c` is fire, purple is an anomaly,
- * and the rarity ladder owns "how good" for text. Note 51 found the remaining
- * channel the hard way: a near-white is recessive because it has NO hue, which
- * leaves lightness free to be whatever legibility wants. A red spark would say
- * danger and an ember one would say burning, when what this says is neither.
+ * spoken for — red is the wall, `#ee3f2c` is fire, purple is an anomaly, and the
+ * rarity ladder owns "how good" for text. Note 51 found the remaining channel the
+ * hard way: a near-white is recessive because it has NO hue, which leaves
+ * lightness free to be whatever legibility wants. Red would say danger and ember
+ * would say burning; this says neither.
+ *
+ * `600 ui-monospace` at the fuel warning's own label size, because that is the
+ * other badge that speaks beside the ship and two badges that speak should not be
+ * set in two typefaces.
  */
-function spark(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  r: number,
-  alpha: number,
-): void {
+function safe(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, alpha: number): void {
   ctx.fillStyle = `rgba(232,240,255,${alpha})`;
-  const long = r * 1.7;
-  const short = r * 0.34;
-  ctx.beginPath();
-  ctx.moveTo(x, y - long);
-  ctx.lineTo(x + short, y - short);
-  ctx.lineTo(x + long, y);
-  ctx.lineTo(x + short, y + short);
-  ctx.lineTo(x, y + long);
-  ctx.lineTo(x - short, y + short);
-  ctx.lineTo(x - long, y);
-  ctx.lineTo(x - short, y - short);
-  ctx.closePath();
-  ctx.fill();
-  // A core, so the middle does not read as a hole where the four points meet.
-  ctx.beginPath();
-  ctx.arc(x, y, r * 0.22, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.font = `600 ${LABEL_SIZE * s}px ui-monospace, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('SAFE', x, y);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
 }
 
 /**
@@ -157,21 +153,21 @@ export function drawVerdict(
   const startTick = doom ? doom.tick : tight!.tick;
   const age = (snap.tick - startTick) * rcfg.verdictTickSecs;
   if (age < 0) return;
-  if (!doom && age > SPARK_PULSES * PULSE_SEC) return;
+  if (!doom && age > SAFE_PULSES * PULSE_SEC) return;
 
   const alpha =
     (doom ? rcfg.doomAlpha : rcfg.tightAlpha) * (0.45 + 0.55 * beat((age % PULSE_SEC) / PULSE_SEC));
 
   const s = cam.scale;
   // Away from the wall it was about to hit; `side` is +1 for the right boundary.
-  // The spark has no side of its own — it is the same verdict slot, so it takes
-  // the side of the wall the rescue was from.
+  // Both verdicts take the side of the wall they are about: it is one slot, and a
+  // mark that moved between them would read as two different badges.
   const side = doom ? doom.side : tight!.side;
   const x = toScreenX(cam, snap.x - side * OFFSET);
   const y = toScreenY(cam, snap.y);
 
   ctx.save();
   if (doom) skull(ctx, x, y, R * s, alpha);
-  else spark(ctx, x, y, R * s, alpha);
+  else safe(ctx, x, y, s, alpha);
   ctx.restore();
 }

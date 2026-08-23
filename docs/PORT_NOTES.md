@@ -3141,7 +3141,7 @@ scale — the two are one moment, read two ways.
 
 ---
 
-### 56 — The spark, and the threshold that turned out not to be one
+### 56 — SAFE, and the threshold that turned out not to be one
 
 `src/render/verdict.ts` · `src/score/score.ts` · **[NEW]** · asked for as "can we
 add a similar pulsing icon for when the player pressed really close to the last
@@ -3188,21 +3188,35 @@ tick `tight` is set, which is the 6% case where a press past the cross turns awa
 anyway — the slot changes its mind at the moment the ship does. `doom.ts` became
 `verdict.ts` for that reason.
 
-**The spark is colourless, and that is the whole colour reasoning.** Every hue in
-the frame is spoken for: red is the wall, `#ee3f2c` is fire, purple is an anomaly,
-and the rarity ladder owns "how good" for text. Note 51 found the remaining channel
-the hard way — a near-white is recessive because it has NO hue, which leaves
-lightness free to be whatever legibility wants. A red spark would say danger and an
-ember one would say burning, and this says neither.
+**It was a spark first, and the correction is the useful part of this note.** The
+glyph was four tapered points borrowing the scar's own crossed spindles, on the
+theory that the mark you aimed at should flash back at you. Reported on sight:
+*"the spark isn't intuitive enough. I think it should say 'safe'"*.
 
-Its GEOMETRY is borrowed instead: four tapered points, which is the scar's own
-construction — crossbar and arm are two crossed spindles tapering to nothing —
-stood upright. The mark you were aiming at, flashing back at you.
+The fix was not to caption the spark. `accolade.ts` already records the rule —
+a vocabulary that needs a caption is a vocabulary that has not been chosen
+carefully enough — and a spark that has to be labelled SAFE is a spark that was not
+saying SAFE. The label became the whole mark.
+
+So the pair now mixes a glyph and a word, which is worth defending rather than
+tidying: a skull already means what it means, to everyone, with no game to learn it
+in. There is no equivalent universal sign for "you got away with it", and the first
+attempt is what discovered that. Do not replace SAFE with a symbol again without
+finding one that needs no caption.
+
+**Colourless, and that is the whole colour reasoning.** Every hue in the frame is
+spoken for: red is the wall, `#ee3f2c` is fire, purple is an anomaly, and the
+rarity ladder owns "how good" for text. Note 51 found the remaining channel the
+hard way — a near-white is recessive because it has NO hue, which leaves lightness
+free to be whatever legibility wants. Red would say danger and ember would say
+burning; this says neither. Set in `600 ui-monospace` at `fuel-warning.ts`'s own
+label size, because that is the other badge that speaks beside the ship and two
+badges that speak should not be set in two typefaces.
 
 **It flashes where the skull may stand.** Three pulses and gone, on
 `fuel-warning.ts`'s reasoning about badges that become part of the ship's
 silhouette. The skull is exempt because the wall ends it inside a median 0.85s;
-the spark has no such deadline, so it needs the count.
+SAFE has no such deadline, so it needs the count.
 
 ---
 
