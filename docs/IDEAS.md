@@ -14,6 +14,7 @@
 - Puzzle mode
 - Speed challenges
 - Trick shots
+- Early off-course warning: fire the boxed `⚠ LOST — OFF COURSE` treatment (with its leader line) as a *warning* seconds before the wall, not as the obituary. Playtest 2026-08-22 rec #4. Considered alongside the point-of-no-return scar and deliberately left out of it: the scar is a diegetic instrument, this is a screen-level alarm, and they should be judged separately.
 
 ## Entities
 - Pause planets: sometimes things get crazy. The procedural generation should include "breather" moments when things get chaotic, so that the player can enter a calmer orbit. Maybe these are service stations that refuel, repair, and feed? The user can just press and hold to keep the safe orbit, and then when ready decide to continue. This is useful for times when the user's going too fast to capture/circularize.
@@ -43,6 +44,31 @@ Sometimes the user gets lazy and may need to be punished. If they coast past pla
 - Extra points for tight captures (low peripsis)
 - Extra points for skimming the edge (getting close for a longer time and then surviving)
 - Extra points for blowing by a planet extremely close without capturing
+
+### Making an award readable (parked 2026-08-23)
+
+The rescue award (PORT_NOTES 53) pays correctly and is close to invisible. Three
+separate problems, all of which outlive it:
+
+- **A popup with no word is anonymous.** `praiseFor` returns null for a rescue, so
+  it draws as a plain grey `+420` — identical to a grab or a flyby. The word is
+  the channel that says *what*, and every threshold in `praise.ts` is a measured
+  percentile of real play. Only a handful of sessions have ever been flown with
+  the cross visible, so the word is waiting on a sample, not on a decision.
+- **The band holds one award for 1.6s and the next one overwrites it.** Measured
+  on 2026-08-23T20-37: rescue at tick 340, burn at 376, flyby at 398 — three
+  awards inside one second, so the rescue line was readable for 0.6s. A queue, a
+  stacked band, or awards that know how to merge would all fix it; which one is a
+  design call, and it wants deciding for all award kinds at once rather than for
+  the newest one.
+- **The score band is in the worst place to read it.** Playtest 2026-08-22 §1 and
+  §8 already say this. Anything done to the band above should probably wait for,
+  or come with, moving it.
+
+Related and separate: `previewBurn` deliberately under-reports by a measured 2.2x
+(PORT_NOTES 54). It is fine for sizing the scar and must not be shown as a number
+or paid, so any feature that wants to *display* the fire on offer has to extend
+the flight past the turn-away first.
 
 ## Easter Eggs
 - Award for most orbits around single planet (award: 10 or more)
