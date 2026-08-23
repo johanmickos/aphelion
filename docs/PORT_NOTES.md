@@ -2222,23 +2222,33 @@ flies.
 "I don't really see any northern lights effects and I can't quite discern the
 purple". So the clouds were demoted to texture and the aurora proper was added on
 top — long wavy curtains anchored on world y, sweeping down past the ship as it
-climbs. Each is drawn as a stack of strokes with a Gaussian width
-profile rather than as a blurred shape.
+climbs. **A stroke stack cannot be a blur, and two attempts at one proved it.** Three
+hand-listed passes at 86/44/16 looked drawn on — reported as "the waves look kind
+of tacky" — so they became eight passes on an `exp(-2.6t²)` Gaussian profile, on
+the theory that finer steps would stop the banding. A screenshot from a phone
+settled it: the terraces were still plainly visible as concentric lines fanning
+out of every band. They always would be. Every stroke is solid with a hard
+boundary, so N passes draw N terraces however their alphas are weighted; more
+passes only makes the contour map finer.
 
-Three hand-listed passes at 86/44/16 was the first attempt and it looked drawn
-on — reported as "the waves look kind of tacky". The cause was banding: three
-discrete widths draw three visibly concentric ribbons, and the eye reads the steps.
-Eight passes on an `exp(-2.6t²)` profile is where the stepping stops being
-visible; past that the extra strokes buy differences under a 255th of an alpha
-step. The total was raised from 0.34 to 0.45 at the same time, because a Gaussian
-stack spreads the same integrated alpha over a wider band and matching the old sum
-would have read as a dimmer curtain.
+So the curtains are now rendered into an offscreen canvas at 1/`DOWNSCALE` and
+drawn back up to full size with image smoothing on. The bilinear filter blurs
+across every step for free. `DOWNSCALE` is the blur radius in disguise — the
+upscale interpolates over that many screen pixels — and 8 is where the softness
+stops improving and the ribbon starts losing the wave, whose features are only a
+few tens of pixels across.
 
-`ctx.filter = 'blur()'` would be the direct way and is declined: it forces an
-offscreen rasterisation per use, its cost scales with the blurred area rather than
-with the geometry, and support across the engines this has to run on is uneven. A
-stroke stack costs a fixed handful of polyline draws — the path is built once and
-stroked eight times — and looks the same once the profile is smooth. The wave is two summed sines of different periods, because
+It is also much cheaper than what it replaced: three strokes over 1/64th of the
+pixels plus one composite, against nineteen full-resolution strokes up to 184px
+wide. `ctx.filter = 'blur()'` is the direct alternative and stays declined — it
+forces an offscreen rasterisation of its own on every draw call, its cost scales
+with the blurred area rather than with the geometry, and it would have to be
+applied once per curtain rather than once per frame.
+
+The buffer is injectable, and `test/render.test.ts` supplies one. Without that the
+suite finds no `document`, takes the hard-stroke fallback, and covers a renderer
+that never ships; the charged scene now asserts that a composite actually
+happened. The wave is two summed sines of different periods, because
 one reads as a drawn ripple and two look blown.
 
 Intensity went up with it — roughly a third across the sky floor, the clouds and

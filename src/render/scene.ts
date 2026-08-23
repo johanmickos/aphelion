@@ -14,7 +14,8 @@ import { Starfield } from './starfield.ts';
 import { BodyRenderer, drawBacktrackFloor, drawHazardZones } from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
-import { OUTRO_SECS, drawNebula } from './nebula.ts';
+import { Nebula, OUTRO_SECS } from './nebula.ts';
+import type { CanvasFactory } from './nebula.ts';
 import { FuelWarning } from './fuel-warning.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
@@ -39,6 +40,12 @@ export class Scene {
   private readonly stars: Starfield;
   private readonly bodyRenderer = new BodyRenderer();
 
+  /**
+   * The charged storm. Holds an offscreen buffer, so it is an object rather than
+   * a function — see `src/render/nebula.ts`.
+   */
+  private readonly nebula: Nebula;
+
   private readonly deps: SceneDeps;
 
   /**
@@ -53,10 +60,16 @@ export class Scene {
 
   private outroT = -1;
 
-  constructor(deps: SceneDeps, seed: number) {
+  /**
+   * `makeCanvas` supplies the storm's offscreen buffer. Injectable so a test can
+   * exercise the composited path rather than the no-`document` fallback, which is
+   * a different renderer and the one nobody ships.
+   */
+  constructor(deps: SceneDeps, seed: number, makeCanvas?: CanvasFactory) {
     this.deps = deps;
     this.stars = new Starfield(deps.render, seed);
     this.trail = new Trail(deps.render);
+    this.nebula = new Nebula(makeCanvas);
   }
 
   draw(
@@ -113,7 +126,7 @@ export class Scene {
       this.outroT += opts.frameDt;
       if (this.outroT >= OUTRO_SECS) this.outroT = -1;
     }
-    drawNebula(
+    this.nebula.draw(
       ctx,
       cam,
       snap,

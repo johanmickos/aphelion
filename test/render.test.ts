@@ -4,6 +4,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { recordingContext } from './canvas-stub.ts';
+import type { RecordingContext } from './canvas-stub.ts';
+import type { OffscreenTarget } from '../src/render/nebula.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import {
   centerCamera,
@@ -272,13 +274,33 @@ describe('scene', () => {
     },
   ];
 
+  /**
+   * An offscreen buffer for the charged storm's curtains.
+   *
+   * Injected so the suite exercises the COMPOSITED path — the low-resolution buffer
+   * plus `drawImage` upscale that produces the blur. Without it `Nebula` finds no
+   * `document`, falls back to stroking straight onto the canvas, and every test
+   * here would be covering a renderer that never ships.
+   */
+  function bufferFactory(): { make: () => OffscreenTarget; rec: RecordingContext } {
+    const rec = recordingContext();
+    const canvas: OffscreenTarget = {
+      width: 0,
+      height: 0,
+      getContext: () => rec.ctx,
+    };
+    return { make: () => canvas, rec };
+  }
+
   it.each(SCENES)('$name renders every tick without error', (sc) => {
     const state = createInitialState(DEFAULT_CONFIG);
     if (sc.ship) Object.assign(state.ship, sc.ship);
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const buf = bufferFactory();
     const scene = new Scene(
       { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
       99,
+      buf.make,
     );
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
@@ -286,6 +308,7 @@ describe('scene', () => {
 
     let held = false;
     let drawn = 0;
+    let compositedFrames = 0;
     // The ship's glow ramps with how many bodies the window has taken, so the
     // charged scene has to exercise a non-empty log as well as an empty one.
     const chargedScore = createScoreState();
@@ -317,6 +340,7 @@ describe('scene', () => {
         score: chargedScore,
       });
       drawn++;
+      if (sc.charged && snap.chargedFrac > 0) compositedFrames += r.calls('drawImage').length;
 
       // no NaN or Infinity ever reaches the canvas
       for (const op of r.ops) {
@@ -328,6 +352,12 @@ describe('scene', () => {
       }
     }
     expect(drawn).toBe(sc.ticks);
+    if (sc.charged) {
+      // The blur IS the composite: without it the curtains are a stack of hard
+      // strokes, which is the thing this replaced. A charged frame that never
+      // reaches `drawImage` is drawing the fallback renderer.
+      expect(compositedFrames, 'the curtain buffer was never composited').toBeGreaterThan(0);
+    }
   });
 
   it('draws the ship and at least one body on a normal frame', () => {
