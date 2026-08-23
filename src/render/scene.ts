@@ -181,6 +181,12 @@ export class Scene {
 
     // Under the ship and its wake: it describes where the ship is going, and
     // nothing about it should ever obscure the ship itself.
+    //
+    // The follower advances here rather than where the scar is fed, so the mark
+    // glides at display rate instead of stepping at the ten-times-a-second the
+    // prediction is recomputed at. Frozen while paused, like the popups: a mark
+    // must not slide to a new place behind an overlay.
+    if (!opts.paused) this.scar.update(opts.frameDt, render);
     this.scar.draw(ctx, cam, render);
 
     const compass = drawCompass(ctx, cam, sim, render, snap, bodies, opts.timeMs);

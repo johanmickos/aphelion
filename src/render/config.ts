@@ -171,14 +171,20 @@ export interface RenderConfig {
   scarAlpha: number;
   scarDeadFrac: number;
   /**
-   * How fast the mark follows a moved cross, per second.
+   * How fast the scar reacts to a change, per second: both how the mark follows
+   * a moved cross and how a new mark fades in. One rate, because they are one
+   * question — 9/s is about a quarter second to converge, under the reaction time
+   * the mark exists to be aimed with.
    *
-   * The mark is a follower, not a snap. The search resolves to a tick on a grid
-   * anchored to the ship, so an unchanged answer still lands a few pixels away
-   * each recompute — and a tap through the red band is a real capture and release,
-   * which moves the answer for real, several times a second. Both read as a
-   * strobe. 9/s converges in about a quarter second, which is under the reaction
-   * time the mark is there to be aimed with.
+   * Applied PER FRAME, in `Scar.update`, and that is the whole point of the key.
+   * Easing inside `observe` — which runs ten times a second — made `dt * rate`
+   * 0.9, so the mark covered 90% of a correction in one step and then sat still
+   * for a tenth of a second. A follower in name only.
+   *
+   * Worth knowing before tuning it: the position term almost never fires. Over
+   * the corpus the mark slides in 28 of 205,310 frames, by at most 3.13px,
+   * because an acquired cross is genuinely stable. What this rate mostly governs
+   * is the fade-in of a new mark, of which there are 541.
    */
   scarSettleRate: number;
   /**

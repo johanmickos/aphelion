@@ -19,6 +19,7 @@ import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
 import { rescueScar } from '../src/sim/rescue.ts';
+import { Scar } from '../src/render/scar.ts';
 import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture.ts';
 import {
   FUEL_LOW_FRAC,
@@ -442,6 +443,52 @@ describe('scene', () => {
     expect(scarFills(), 'but it does expire').toBe(0);
   });
 
+  it('replaces an interrupted mark rather than dragging it across the field', () => {
+    // Reported as "the cross kind of jumped forward a few times". On the session
+    // that reported it the scar was absent for 3.9s — a capture — and the cross
+    // that came back sat 456px away, which the follower dragged across the screen
+    // in three visible steps. Two unrelated situations, nothing continuous
+    // between them: the old mark is let go where it stands.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const scar = new Scar();
+    const at = (): { x: number; y: number; born: number } | null =>
+      (scar as unknown as { mark: { x: number; y: number; born: number } | null }).mark;
+
+    const first = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
+    expect(first?.cross).toBeTruthy();
+    scar.observe(first, rcfg, FIXED_DT);
+    const born = { ...at()! };
+
+    // An interruption: a capture makes the prediction null for as long as it lasts.
+    scar.observe(null, rcfg, FIXED_DT);
+    expect(at()!.x, 'the mark holds its ground while interrupted').toBeCloseTo(born.x, 6);
+
+    // A different answer comes back, a long way off.
+    const far = {
+      ...first!,
+      cross: { x: born.x + 400, y: born.y - 200, t: first!.cross!.t },
+    };
+    scar.observe(far, rcfg, FIXED_DT);
+    scar.update(1, rcfg);
+    expect(at()!.x, 'the new mark is born AT the new answer, not eased toward it').toBeCloseTo(
+      far.cross.x,
+      6,
+    );
+    expect(at()!.y).toBeCloseTo(far.cross.y, 6);
+
+    // Uninterrupted, a moved answer IS eased — that is the other half of the rule.
+    const nudged = {
+      ...first!,
+      cross: { x: far.cross.x + 40, y: far.cross.y, t: first!.cross!.t },
+    };
+    scar.observe(nudged, rcfg, FIXED_DT);
+    scar.update(1 / 60, rcfg);
+    const x = at()!.x;
+    expect(x, 'an uninterrupted correction is followed, not snapped').toBeGreaterThan(far.cross.x);
+    expect(x, 'and not covered in a single frame').toBeLessThan(nudged.cross.x - 1);
+  });
+
   it('never draws an arm longer than the clamp, however far away the cross is', () => {
     // The cross sits a median 432px ahead and 1551px at p90, against a 390-wide
     // viewport — so without the clamp the common case is a line across the map.
@@ -465,6 +512,9 @@ describe('scene', () => {
     // floor are drawn in the same red family, and an extent measured over all of
     // it would be measuring the field, not the mark.
     scene.scar.observe(scar, rcfg, FIXED_DT);
+    // A mark arrives rather than appearing, so it has to be allowed to finish
+    // being born before there is anything to measure.
+    scene.scar.update(1, rcfg);
     const r = recordingContext();
     centerCamera(c, state.ship.x, state.ship.y, f, null);
     scene.scar.draw(r.ctx, c, rcfg);

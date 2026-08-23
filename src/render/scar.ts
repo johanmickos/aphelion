@@ -46,6 +46,8 @@ interface Mark {
   dy: number;
   /** Seconds since the ship passed it. Negative while it is still ahead. */
   age: number;
+  /** Seconds since this mark appeared, so nothing ever pops into existence. */
+  born: number;
 }
 
 function smoothstep(u: number): number {
@@ -130,8 +132,21 @@ function bar(
 }
 
 export class Scar {
-  /** The mark being drawn, held across recomputes and past the crossing. */
+  /**
+   * Where the mark is DRAWN. Chases `target`, and is never the prediction itself.
+   */
   private mark: Mark | null = null;
+
+  /** Where the prediction currently says the cross is. */
+  private target: { x: number; y: number; dx: number; dy: number } | null = null;
+
+  /**
+   * A mark that has been abandoned, fading where it stood.
+   *
+   * One slot, because there is only ever one thing to let go of: the mark from
+   * before the last interruption.
+   */
+  private ghost: Mark | null = null;
 
   /** The path behind the current mark, ship-first. Empty once the cross is passed. */
   private path: ScarSample[] = [];
@@ -147,6 +162,12 @@ export class Scar {
    * nothing but heat. `dt` is the time since the last call.
    */
   observe(scar: RescueScar | null, rcfg: RenderConfig, dt: number): void {
+    if (this.ghost) {
+      this.ghost.age += dt;
+      this.ghost.born += dt;
+      if (this.ghost.age >= rcfg.scarFadeOutSecs) this.ghost = null;
+    }
+
     if (scar?.cross) {
       const c = scar.cross;
       // Only as far as the cross. The heading comes from the end of THAT, not
@@ -162,31 +183,31 @@ export class Scar {
       dx /= len;
       dy /= len;
 
-      if (!this.mark) {
-        this.mark = { x: c.x, y: c.y, dx, dy, age: -c.t };
+      // A MARK THAT HAS STARTED AGEING IS NOT MOVED, IT IS REPLACED.
+      //
+      // Reported as "the cross kind of jumped forward a few times". On the
+      // session that reported it the scar was absent for 3.9s — a capture — and
+      // the cross that came back sat 456px from the one that went away, which the
+      // follower then dragged across the screen in three visible steps.
+      //
+      // Those are two different situations and there is nothing continuous
+      // between them, so the old mark is let go where it stands and a new one is
+      // born where the answer now is. Nothing slides across the field, and the
+      // distinction is a FACT — this mark has been interrupted — rather than a
+      // distance threshold that a mark could drift across.
+      if (!this.mark || this.mark.age >= 0) {
+        if (this.mark) {
+          this.mark.age = Math.max(0, this.mark.age);
+          this.ghost = this.mark;
+        }
+        this.mark = { x: c.x, y: c.y, dx, dy, age: -c.t, born: 0 };
       } else {
-        // EASED, NOT SNAPPED. Reported as "I can tap a bunch to extend my burn
-        // through the red zone, and the re-drawn cross gets distracting": every
-        // tap is a capture and a release, which really does move the answer, so
-        // the twitch was the truth arriving faster than it can be read.
-        //
-        // A follower rather than a filter with a threshold, for the reason
-        // `nearestBody` gives about cones — and the same shape the flame uses to
-        // chase the scorer's heat in `Scene`. It costs a lag only while the
-        // answer is CHANGING, which is exactly when a strobing mark is useless;
-        // by the time the cross matters the ship is coasting and the follower has
-        // long since converged.
-        const k = Math.min(1, dt * rcfg.scarSettleRate);
-        const m = this.mark;
-        m.x += (c.x - m.x) * k;
-        m.y += (c.y - m.y) * k;
-        m.dx += (dx - m.dx) * k;
-        m.dy += (dy - m.dy) * k;
-        const dl = hypot(m.dx, m.dy) || 1;
-        m.dx /= dl;
-        m.dy /= dl;
-        m.age = -c.t;
+        this.mark.age = -c.t;
       }
+      // Uninterrupted, the mark eases toward this in `update`, per frame. Setting
+      // it here and moving there is what stops the mark stepping at the 10Hz the
+      // prediction is recomputed at.
+      this.target = { x: c.x, y: c.y, dx, dy };
       this.lead = c.t;
       this.path = upto;
       return;
@@ -197,9 +218,7 @@ export class Scar {
     //
     // Ageing rather than clearing, deliberately. A tap is a capture, and a
     // capture makes the prediction null for as long as it lasts — so a hard
-    // clear here made a rapid tap blink the mark out and back, which is half of
-    // what made tapping through the band distracting. Fading covers a tap and
-    // still lets a real answer expire.
+    // clear here made a rapid tap blink the mark out and back.
     if (this.mark) {
       if (this.mark.age < 0) this.mark.age = 0;
       this.mark.age += dt;
@@ -208,7 +227,32 @@ export class Scar {
       // at something the ship can no longer reach.
       this.path = [];
     }
+    this.target = null;
     this.lead = 0;
+  }
+
+  /**
+   * Advance the follower, once per FRAME.
+   *
+   * Separated from `observe` because the two run at different rates and only one
+   * of them is about smoothness. The prediction is recomputed ten times a second;
+   * easing there meant `dt * scarSettleRate` was 0.9, so the mark covered 90% of
+   * any correction in a single step and then sat still for a tenth of a second —
+   * a follower in name only, and visibly a series of jumps.
+   */
+  update(frameDt: number, rcfg: RenderConfig): void {
+    const m = this.mark;
+    if (m) m.born += frameDt;
+    if (this.ghost) this.ghost.born += frameDt;
+    if (!m || !this.target) return;
+    const k = 1 - Math.exp(-rcfg.scarSettleRate * frameDt);
+    m.x += (this.target.x - m.x) * k;
+    m.y += (this.target.y - m.y) * k;
+    m.dx += (this.target.dx - m.dx) * k;
+    m.dy += (this.target.dy - m.dy) * k;
+    const dl = hypot(m.dx, m.dy) || 1;
+    m.dx /= dl;
+    m.dy /= dl;
   }
 
   /**
@@ -217,36 +261,54 @@ export class Scar {
    */
   clear(): void {
     this.mark = null;
+    this.target = null;
+    this.ghost = null;
     this.path = [];
     this.lead = Infinity;
   }
 
   draw(ctx: CanvasRenderingContext2D, cam: Camera, rcfg: RenderConfig): void {
-    const m = this.mark;
-    if (!m) return;
+    // The abandoned one first, so a live mark always draws over it.
+    if (this.ghost) this.drawMark(ctx, cam, rcfg, this.ghost, null);
+    if (this.mark) this.drawMark(ctx, cam, rcfg, this.mark, this.path);
+  }
 
+  private drawMark(
+    ctx: CanvasRenderingContext2D,
+    cam: Camera,
+    rcfg: RenderConfig,
+    m: Mark,
+    path: ScarSample[] | null,
+  ): void {
     // Fading out behind the ship, or ramping in ahead of it. Never both.
+    //
+    // Times a birth ramp, so a mark that is BORN close to the ship — where the
+    // lead ramp is already at full strength — arrives rather than appears. Same
+    // rate as the follower, because both answer "how fast does the scar react to
+    // a change": one for where it is, one for whether it is there at all.
+    const born = 1 - Math.exp(-rcfg.scarSettleRate * m.born);
     const alpha =
-      m.age >= 0
+      born *
+      (m.age >= 0
         ? rcfg.scarAlpha * (1 - smoothstep(m.age / Math.max(1e-6, rcfg.scarFadeOutSecs)))
         : rcfg.scarAlpha *
           (1 -
             smoothstep(
               (this.lead - rcfg.scarFullSecs) /
                 Math.max(1e-6, rcfg.scarFadeInSecs - rcfg.scarFullSecs),
-            ));
+            )));
     if (alpha <= 0.004) return;
 
     ctx.save();
 
     // ---- the long arm, from the ship along its own projected path
-    if (this.path.length > 1) {
+    if (path && path.length > 1) {
       // Cumulative distance along the path, so the taper is a property of the
       // shape rather than of how fast the ship happens to be going.
       const run: number[] = [0];
-      for (let i = 1; i < this.path.length; i++) {
-        const a = this.path[i - 1]!;
-        const b = this.path[i]!;
+      for (let i = 1; i < path.length; i++) {
+        const a = path[i - 1]!;
+        const b = path[i]!;
         run.push(run[i - 1]! + hypot(b.x - a.x, b.y - a.y));
       }
 
@@ -274,8 +336,8 @@ export class Scar {
       // as a cross rather than as a sword hilt.
       const span = total + rcfg.scarStubHalf;
       const uc = span > 0 ? total / span : 1;
-      for (let i = first; i < this.path.length; i++) {
-        const s = this.path[i]!;
+      for (let i = first; i < path.length; i++) {
+        const s = path[i]!;
         pts.push({
           x: toScreenX(cam, s.x),
           y: toScreenY(cam, s.y),

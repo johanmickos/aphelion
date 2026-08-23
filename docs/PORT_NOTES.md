@@ -2848,15 +2848,61 @@ common case was a line twice the height of the screen describing a stretch with
 nothing in it to decide. Clamped from the FRONT, so what survives is the part
 nearest the mark.
 
-The mark became a follower rather than a snap. Reported as "I can tap a bunch to
-extend my burn through the red zone, and the re-drawn cross gets distracting" —
-and every tap IS a capture and a release, so the answer really was moving several
-times a second. Two things were strobing: the position, now eased at 9/s, and the
-existence, because a capture makes the prediction null and the mark was being
-hard-cleared on it. It ages out over `scarFadeOutSecs` instead, which covers a tap
-and still lets a real answer expire. The fade-out outlasts the median 0.53s slack
-between the cross and the wall on purpose: the mark left behind is the explanation
-of the death, and an explanation that finishes before the death is no use.
+The mark stopped being hard-cleared. Reported as "I can tap a bunch to extend my
+burn through the red zone, and the re-drawn cross gets distracting" — and a tap IS
+a capture, which makes the prediction null for as long as it lasts, so the mark
+was blinking out and back. It ages out over `scarFadeOutSecs` instead, which
+covers a tap and still lets a real answer expire. The fade-out outlasts the median
+0.53s slack between the cross and the wall on purpose: the mark left behind is the
+explanation of the death, and an explanation that finishes before the death is no
+use.
+
+**A follower was added in the same pass and it was the wrong mechanism.** It is
+recorded because the reasoning looked sound and the measurement refuted it. The
+theory was that the answer moves several times a second under tapping and the
+position should be eased; the correction shipped as an ease inside `observe`,
+where `dt` is the tenth of a second between recomputes, so `dt * scarSettleRate`
+came out at 0.9 — 90% of any correction in a single step, then stillness for a
+tenth of a second. A follower in name only, and still visibly a series of jumps.
+
+Both halves of that were wrong, and the next report found them: *"in
+2026-08-23T20-04-58 there was a last turn where the cross kind of jumped forward a
+few times"*. Replayed — faithfully, 31 of 32 checkpoints bit-exact — the mark
+moved 411px, then 41px, then 4px, in three steps a tenth of a second apart. It was
+not tracking a moving answer at all. The scar had been ABSENT for 3.9s while the
+ship was captured, and the cross that came back sat 456px from the one that went
+away. The follower was dragging a mark between two unrelated situations.
+
+**A mark that has been interrupted is replaced, not moved.** The old one is let go
+where it stands and fades there; a new one is born where the answer now is, over
+the same rate. Nothing traverses the field. The distinction is a FACT — this mark
+has been interrupted — rather than a distance threshold a mark could drift across,
+which is `nearestBody`'s argument about cones applied to a rendering decision. It
+needs one ghost slot, because there is only ever one thing to let go of.
+
+The measurement that would have prevented the first attempt, over the corpus:
+
+```
+  frames with a live mark            205310
+    of which it slid at all              28   (max 3.13px, per frame)
+  births (replaced, not dragged)        541
+    median gap to the previous birth    5.10s
+    under 0.4s apart                    2 of 483
+```
+
+**An acquired cross is stable.** The bisection resolves to the same world point on
+every recompute, so the position term the follower was added for fires 28 times in
+205,310 frames. It is kept — a genuine small correction should glide — but what
+`scarSettleRate` mostly governs is the fade-in of a new mark, and what actually
+answers both reports is the birth rule. The same numbers close out the risk the
+birth rule introduces: rapid tapping does not produce a pulsing cluster of ghosts,
+because births land a median 5.1s apart and only twice in 483 do they land closer
+than 0.4s.
+
+The follower also moved to `Scar.update`, called once per FRAME from `Scene`, so
+the mark glides at display rate instead of stepping at the ten-times-a-second the
+prediction is recomputed at. Feeding and smoothing run at different rates and only
+one of them is about smoothness.
 
 **Render-only, so the gate never moved.** No `SimConfig` key, no `ScoreConfig`
 key, no `SIM_VERSION` bump — `rescueScar` lives under `src/sim/` because it is a
