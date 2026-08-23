@@ -60,6 +60,38 @@ export interface ScoreConfig {
    */
   nerveBonus: number;
   /**
+   * Paid for any flyby held through its closest approach, before closeness.
+   *
+   * A flat floor rather than the whole award, because the act being paid for is
+   * committing to the pass at all: pressing on a body you are already too fast to
+   * hold, and staying on it while the brake burns fuel and gravity decides
+   * whether it catches you. What you do with the pass is `flybyCloseBonus`.
+   *
+   * SIZED AGAINST THE STREAK, not against a link. The points are the smaller half
+   * of what a flyby is worth — the larger half is that it steps the ladder, which
+   * is what a fast run could not previously do at all. Measured over the sessions
+   * in `diagnostics/`, an ordinary chained life makes 2.7 unconverted flybys a
+   * minute and a fast one makes upward of 38, so this is paid ~14x more often to
+   * the style it is meant to reward without needing to know which style it is
+   * looking at. Make it much larger and the density stops being a multiplier
+   * story and starts being a faucet.
+   */
+  flybyBase: number;
+  /**
+   * Full bonus for a flyby that shaves the minimum orbit, decaying to zero over
+   * `closeSpan` exactly as a grab's closeness does.
+   *
+   * Closeness and not speed, and that is a measurement rather than a preference.
+   * Speed at closest approach was the obvious axis and discriminates nothing: an
+   * unconverted flyby is unbound BY DEFINITION, so its speed is pinned near
+   * escape velocity — p50 314px/s, p10 149, and 90% of every flyby ever recorded
+   * sits in a band 250px/s wide. Clearance over the same 167 passages runs 0px to
+   * 318px with a median of 60, which is real spread and is a choice the player
+   * makes on the way past. Same reasoning that put grab clearance ahead of
+   * `cap.tightness`.
+   */
+  flybyCloseBonus: number;
+  /**
    * Shaping exponents. The underlying measures are generous ramps — alignment is
    * linear over a full 90 degrees, the boost envelope over ~1.8 seconds — which
    * is right for a gauge you read at a glance and far too soft for a reward.
@@ -148,14 +180,23 @@ export interface ScoreConfig {
  *
  * The shape of the model, which is the part worth arguing about:
  *
- *   grab = (close + nerve)                       x multiplier   at periapsis
- *   link = (base + climb + timing + aim)         x multiplier   at the release
+ *   grab  = (close + nerve)                      x multiplier   at periapsis
+ *   link  = (base + climb + timing + aim)        x multiplier   at the release
+ *   flyby = (base + close)                       x multiplier   at closest approach
  *
- * Two events, because they are settled at different moments and describe
+ * Three events, because they are settled at different moments and describe
  * different acts. The grab is judged on how the ship arrived and pays when the
  * dive swings through the bottom — not at the press, so a tap that never gets
  * there earns nothing and tapping beside a planet is not a faucet. The link is
- * judged on how it left.
+ * judged on how it left. The flyby is judged on a pass that was never a capture
+ * at all, and pays at the bottom of it for the same reason the grab does.
+ *
+ * The flyby is the newest and the one whose real payload is not in the line
+ * above: it steps the streak. Before it, the ladder counted links, so the only
+ * way to reach a large multiplier was to stop at bodies — and a life measured
+ * covering 3.1x the ground per second earned a fifteenth as much per pixel as a
+ * chained one, capped at x2 while the chained life ran at x5-x7. Speed was
+ * already the harder thing to do and was the thing the score could not see.
  *
  * `close` is how near you let the body get before committing to the grab.
  * `cap.tightness` was the obvious candidate and is the wrong one — it saturates
@@ -186,6 +227,8 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   timingBonus: 250,
   aimBonus: 200,
   nerveBonus: 200,
+  flybyBase: 60,
+  flybyCloseBonus: 120,
   aimSharpness: 3,
   timingSharpness: 2,
 

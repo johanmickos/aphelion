@@ -149,6 +149,16 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     detail: `${a.body}  ZIP`,
     mult: '',
   }),
+  // No praise word either, and for a different reason: `praiseFor` returns null
+  // for this kind because a fast life makes upward of 38 of these a minute where
+  // a chained one makes 2.7. A word on each would be the loudest thing on screen
+  // for the player it is meant to reward, and the vocabulary in `praise.ts` is
+  // calibrated on rarity. The multiplier climbing IS the feedback.
+  flyby: (a) => ({
+    style: ROUTINE,
+    detail: `${a.body}  FLYBY · CLOSE ${pct(a.close)}`,
+    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
+  }),
 };
 
 function lerpColor(

@@ -48,7 +48,7 @@ import {
 import type { Shout } from './reckless.ts';
 import type { ScoreConfig } from './config.ts';
 import { DEFAULT_SCORE_CONFIG } from './config.ts';
-import type { PendingLink, ScoreAward, ScoreState } from './types.ts';
+import type { PendingFlyby, PendingLink, ScoreAward, ScoreState } from './types.ts';
 
 /**
  * Ticks between periapsis and the grab award landing.
@@ -59,6 +59,26 @@ import type { PendingLink, ScoreAward, ScoreState } from './types.ts';
  */
 const GRAB_AWARD_DELAY = 2;
 
+/**
+ * Speed at closest approach below which a flyby pays nothing, in px/s.
+ *
+ * Measured, and the measurement is the interesting part: it is a FLOOR under a
+ * dead tail, not a bar that selects fast passes. Across 167 unconverted flyby
+ * closest approaches replayed out of `diagnostics/`, speed runs p10 149, p25 290,
+ * p50 314, p90 400 — because an unconverted flyby is unbound by definition, so
+ * its speed is pinned near escape velocity and cannot say who was going fast.
+ * What the bottom decile IS is the puttered-out flyby: braked below
+ * `flybyBrakeMinSpeed`, going nowhere, waiting to be dropped. That is what this
+ * excludes.
+ *
+ * Any value in [150, 243) selects exactly the same 90% — the distribution is
+ * empty between p10 and p15 — so the number is legible rather than fitted to the
+ * last pixel. What decides who gets paid is how MANY of these a life strings
+ * together, which is the density the streak already reads: 2.7 a minute in
+ * ordinary play against upward of 38 in a fast one.
+ */
+export const FLYBY_SPEED_MIN = 150;
+
 export function createScoreState(): ScoreState {
   return {
     score: 0,
@@ -67,6 +87,7 @@ export function createScoreState(): ScoreState {
     multiplier: 1,
     grabs: 0,
     links: 0,
+    flybys: 0,
     lastAward: null,
     pending: null,
     climbFromY: null,
@@ -78,6 +99,9 @@ export function createScoreState(): ScoreState {
     maxDefl: 0,
     periSeen: false,
     grabDue: -1,
+    flybyR: Infinity,
+    flybyFalling: false,
+    pendingFlyby: null,
     recklessStreak: 0,
     capKinked: false,
     inKink: false,
@@ -127,6 +151,7 @@ function multiplierFor(sc: ScoreState, scfg: ScoreConfig): number {
 function endLife(sc: ScoreState): void {
   sc.score = 0;
   sc.pending = null;
+  sc.pendingFlyby = null;
   sc.streak = 0;
   // A death ends a reckless run too. Flying like that into the ground is not the
   // same as getting away with it three times.
@@ -251,6 +276,16 @@ export function scoreTick(
   // A release that never reached a frozen orbit — a dive abandoned early, or a
   // flyby let go of — is not a failure, it is a non-event. It pays nothing and
   // costs nothing, and in particular it does not break a streak.
+  // ---- the pass ended still being a pass: pay the flyby it was
+  //
+  // Ahead of the release below, so a flyby's award lands before anything the same
+  // tick might do with the streak it just stepped.
+  if (sc.pendingFlyby && !state.capture) {
+    const f = sc.pendingFlyby;
+    sc.pendingFlyby = null;
+    awards.push(awardFlyby(sc, state, scfg, f));
+  }
+
   if (sc.pending && !state.capture) {
     const p = sc.pending;
     sc.pending = null;
@@ -292,6 +327,38 @@ export function scoreTick(
       sc.maxDefl = 0;
       sc.periSeen = false;
       sc.grabDue = -1;
+      sc.flybyR = Infinity;
+      sc.flybyFalling = false;
+      sc.pendingFlyby = null;
+    }
+
+    // ---- the flyby award: owed at the bottom of the pass, paid when it ends
+    //
+    // The bottom is where a pass is decided, so that is where its qualities are
+    // read — but it is not yet where the pass has finished being one. See
+    // `PendingFlyby`: a flyby can bottom out unbound, arc back on the brake and
+    // convert, and paying here would pay a single press twice.
+    //
+    // `stepSim` does not find this periapsis itself — its detection is gated on
+    // `phase !== 'flyby'`, because a flyby has no orbit to freeze — so the
+    // observer runs the same rising-edge test on the radius it can already see.
+    if (cap.phase === 'flyby') {
+      const r = hypot(cap.rx, cap.ry);
+      const dR = r - sc.flybyR;
+      if (sc.flybyFalling && dR >= 0) {
+        // Cleared on the edge whether or not anything was owed, or the test stays
+        // true for every remaining tick of the outbound leg and fires once a tick.
+        sc.flybyFalling = false;
+        sc.pendingFlyby ??= readPendingFlyby(sc, state, scfg, cap, r);
+      } else if (dR < 0) sc.flybyFalling = true;
+      sc.flybyR = r;
+    } else {
+      // It converted. The pass became a capture, so the grab award is the one
+      // that describes it and the flyby is owed nothing — that is what stops one
+      // press paying twice, and what keeps a zip from being a discount.
+      sc.flybyR = Infinity;
+      sc.flybyFalling = false;
+      sc.pendingFlyby = null;
     }
 
     // ---- the grab award: owed once the dive swings through periapsis
@@ -508,6 +575,80 @@ function awardGrab(
   award.points = Math.round(raw * multiplier);
   sc.score += award.points;
   sc.grabs++;
+  return award;
+}
+
+/**
+ * Pay for a pass that was never a capture.
+ *
+ * Owed at the closest approach, which is where the pass was decided, and paid
+ * when the pass ends still being one — see `PendingFlyby` for why those are two
+ * different moments and what went wrong when they were the same one. Paying at
+ * the press would be paying for the intention, exactly as it would for a grab.
+ *
+ * AND IT STEPS THE STREAK, which is the larger half of what this award does. The
+ * ladder was a count of links, so it could only be climbed by stopping at bodies
+ * — a life measured covering 3.1x the ground per second was stuck at x2 while a
+ * chained one ran at x5-x7, and earned a fifteenth as much per pixel climbed for
+ * flying the harder line. Nothing about that was a decision anyone made; the
+ * counter simply could not see the style.
+ *
+ * Whether the pass qualified at all is settled by `readPendingFlyby`; by the time
+ * this runs the award is owed and pays.
+ */
+function readPendingFlyby(
+  sc: ScoreState,
+  state: SimState,
+  scfg: ScoreConfig,
+  cap: Capture,
+  r: number,
+): PendingFlyby | null {
+  // A flyby braked below this is not going fast past anything — it has puttered
+  // out and is waiting to be dropped. See `FLYBY_SPEED_MIN`, and note it is a
+  // floor under a dead tail rather than a bar that picks out fast passes: it
+  // cannot be one, because every unconverted flyby is fast by definition.
+  if (hypot(cap.vx, cap.vy) < FLYBY_SPEED_MIN) return null;
+  const clearance = Math.max(0, r - cap.minR);
+  return {
+    body: state.bodies[cap.planet]?.name ?? '?',
+    // Measured HERE, not at the press: a flyby's press is not the choice, the
+    // pass is. See `close` in `./types.ts`.
+    close: clamp01(1 - clearance / scfg.closeSpan),
+    clearance,
+    // The approach line the press was made on, which means the same thing for a
+    // flyby as for a grab. It names nothing here — `isNerveGrab` is gated on the
+    // kind — but it is real and measured, so it travels into the report.
+    skim: sc.grabSkim,
+    defl: sc.maxDefl,
+  };
+}
+
+function awardFlyby(
+  sc: ScoreState,
+  state: SimState,
+  scfg: ScoreConfig,
+  p: PendingFlyby,
+): ScoreAward {
+  const raw = scfg.flybyBase + p.close * scfg.flybyCloseBonus;
+  const multiplier = multiplierFor(sc, scfg);
+  const award: ScoreAward = {
+    tick: state.tick,
+    kind: 'flyby',
+    points: Math.round(raw * multiplier),
+    multiplier,
+    body: p.body,
+    close: p.close,
+    clearance: p.clearance,
+    skim: p.skim,
+    defl: p.defl,
+    // Release qualities. There is no release: the ship never stopped.
+    timing: 0,
+    aim: 0,
+    climb: 0,
+  };
+  sc.score += award.points;
+  sc.flybys++;
+  sc.streak++;
   return award;
 }
 

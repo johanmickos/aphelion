@@ -43,7 +43,7 @@ export type InputRecord = [number, 0 | 1];
  */
 export type AwardRecord = [
   number,
-  'g' | 'l' | 'h',
+  'g' | 'l' | 'h' | 'f',
   number,
   number,
   number,
@@ -55,6 +55,22 @@ export type AwardRecord = [
   number,
   string,
 ];
+
+/**
+ * The one-letter code each award kind travels as.
+ *
+ * A record rather than a chain of ternaries, for the reason `BAND` in
+ * `src/render/hud.ts` is one: a nested ternary silently funnels a new kind into
+ * whichever branch happens to be last, and a report is the only evidence a phone
+ * session leaves behind. This fails to compile until a new kind has a letter.
+ */
+const AWARD_CODE: Record<ScoreAward['kind'], AwardRecord[1]> = {
+  grab: 'g',
+  link: 'l',
+  hop: 'h',
+  flyby: 'f',
+};
+
 /**
  * [tick, fingerprint, x, y, vx, vy, fuel, phase]
  *
@@ -137,7 +153,7 @@ export class RunRecorder {
     for (const a of awards) {
       this.awards.push([
         a.tick,
-        a.kind === 'grab' ? 'g' : a.kind === 'link' ? 'l' : 'h',
+        AWARD_CODE[a.kind],
         Math.round(a.points),
         q(a.multiplier),
         q(a.close),

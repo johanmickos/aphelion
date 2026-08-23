@@ -10,6 +10,7 @@ import { configDelta, configFromReport, summarize } from '../src/app/report.ts';
 import { DEFAULT_CONFIG, SIM_VERSION } from '../src/sim/config.ts';
 import { KNOBS } from '../src/app/tune.ts';
 import type { DiagReport } from '../src/app/report.ts';
+import type { AwardRecord } from '../src/app/recorder.ts';
 import { KINK_THRESHOLD_DEG, createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
 import { fieldBounds } from '../src/sim/world.ts';
@@ -276,7 +277,7 @@ export function replayReport(report: DiagReport): Analysis {
   // nothing about how the session went.
   findings.push(
     `best life scored ${score.best} (${score.score} standing at the end) — ` +
-      `${score.grabs} grab(s), ${score.links} link(s), ` +
+      `${score.grabs} grab(s), ${score.links} link(s), ${score.flybys} flyby(s), ` +
       `best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,
   );
   if (score.links > 0) {
@@ -349,12 +350,27 @@ export function replayReport(report: DiagReport): Analysis {
  * before the field existed return null and the caller falls back to recomputing,
  * which is what it always did.
  */
+/**
+ * The inverse of `AWARD_CODE` in `src/app/recorder.ts`.
+ *
+ * A table rather than a ternary chain, so an unrecognised letter cannot quietly
+ * become whichever kind happened to be on the last branch — a report is the only
+ * evidence a phone session leaves, and silently relabelling one of its awards is
+ * the kind of error that reads as a scoring bug for an afternoon.
+ */
+const AWARD_KIND: Record<AwardRecord[1], ScoreAward['kind']> = {
+  g: 'grab',
+  l: 'link',
+  h: 'hop',
+  f: 'flyby',
+};
+
 export function recordedAwards(report: DiagReport): ScoreAward[] | null {
   if (!report.awards?.length) return null;
   return report.awards.map(
     ([tick, kind, points, multiplier, close, clearance, skim, defl, timing, aim, climb, body]) => ({
       tick,
-      kind: kind === 'g' ? ('grab' as const) : kind === 'l' ? ('link' as const) : ('hop' as const),
+      kind: AWARD_KIND[kind],
       points,
       multiplier,
       body,
@@ -575,7 +591,7 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
         `    ${String(w.tick).padStart(5)}  ${w.kind.padEnd(5)}  ` +
           `${w.body.padEnd(10)}` +
           `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
-          `${(w.kind === 'grab' ? w.close.toFixed(2) : '  · ').padStart(5)}  ` +
+          `${(w.kind === 'link' ? '  · ' : w.close.toFixed(2)).padStart(5)}  ` +
           `${(w.kind === 'link' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.aim.toFixed(2) : '  · ').padStart(5)}  ` +
           `${w.defl.toFixed(0).padStart(4)}  ` +

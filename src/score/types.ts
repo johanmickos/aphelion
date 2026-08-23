@@ -18,8 +18,22 @@ export interface ScoreAward {
    * stops a stationary tap-tap-tap next to a planet from being a points faucet —
    * and it means holding on into a full orbit still collects, because periapsis
    * is already behind you.
+   *
+   * `flyby` is the one that is not part of a capture at all.
+   * A grab too fast to be held becomes a flyby; hold it through its closest
+   * approach without letting gravity catch you and it pays, and it steps the
+   * streak. It exists because the ladder used to be a count of LINKS, so a run
+   * that crossed the field fast could never climb it — measured over one session,
+   * a chained life ran at x5-x7 while a life covering 3.1x the ground per second
+   * topped out at x2 and earned a fifteenth as much per pixel climbed. Speed is
+   * skill and had no way to be paid for it.
+   *
+   * Mutually exclusive with `grab` by construction: a flyby that converts into a
+   * capture does so BEFORE its periapsis (conversion needs bound and inbound), so
+   * by the time the radius bottoms out the phase is `clear` and the grab award is
+   * the one that fires. Nothing is paid twice.
    */
-  kind: 'grab' | 'link' | 'hop';
+  kind: 'grab' | 'link' | 'hop' | 'flyby';
   /** Points actually applied. Never negative — nothing takes points away. */
   points: number;
   /** The multiplier in force. */
@@ -28,6 +42,11 @@ export interface ScoreAward {
   body: string;
   /**
    * How close the ship let the body get before grabbing. 0..1, 1 = surface.
+   *
+   * On a `flyby` this is measured at the closest approach rather than at the
+   * press, because a flyby's press is not the choice — the pass is. Same units,
+   * same span, different moment, and that difference is the whole distinction
+   * between committing to a body and shaving past it.
    *
    * NOT `cap.tightness`, which reads as the same idea and is useless as one:
    * measured over 112 real releases it sits at 0.99 or above for three quarters
@@ -97,18 +116,45 @@ export interface PendingLink {
   target: Body | null;
 }
 
+/**
+ * A flyby's closest approach, held until the pass ends. See `pendingFlyby`.
+ *
+ * The qualities are measured at the bottom and never re-read, because that is
+ * where the pass was decided — by the time it is paid the ship is seconds away
+ * and has none of them any more.
+ */
+export interface PendingFlyby {
+  body: string;
+  close: number;
+  clearance: number;
+  skim: number;
+  defl: number;
+}
+
 export interface ScoreState {
   /** Points banked in the CURRENT life. A death takes them. */
   score: number;
   /** The highest any life reached this session. Never reset by a death. */
   best: number;
-  /** Consecutive earned links, unbroken by a putter-out or a death. */
+  /**
+   * Consecutive scoring passages — earned links and paid flybys — unbroken by a
+   * putter-out or a death.
+   *
+   * Links alone until flybys joined them, and that was the bug the flyby award
+   * exists to fix rather than an incidental widening. The ladder is the game's
+   * only source of scale, and a count of links can only be climbed by stopping at
+   * bodies: a life that crossed 3.1x the ground per second sat at x2 while a
+   * chained one ran at x5-x7. Both styles now step the same ladder, so which one
+   * scores is decided by how well it is flown and not by which one the counter
+   * happens to be able to see.
+   */
   streak: number;
   /** Live multiplier: the streak ladder, plus any anomaly bonus on top. */
   multiplier: number;
   /** Session totals, across every life. Diagnostics, not the score. */
   grabs: number;
   links: number;
+  flybys: number;
   /** The most recent award, for the HUD to flash. */
   lastAward: ScoreAward | null;
 
@@ -136,6 +182,44 @@ export interface ScoreState {
   grabClearance: number;
   /** The dive has passed periapsis; the grab award is owed. */
   periSeen: boolean;
+  /**
+   * The current flyby's radius as of last tick, and whether it is still falling.
+   *
+   * A flyby's closest approach has to be found here rather than read off the
+   * capture, because `stepSim` deliberately does not look for one: periapsis
+   * detection is gated on `phase !== 'flyby'`, since a flyby has no orbit to
+   * freeze. So the observer runs the same rising-edge test the simulation runs,
+   * on the radius it can already see.
+   *
+   * `flybyR` is Infinity between passages, which is also what makes the first
+   * tick of one report `dR < 0` — never a spurious bottom-out on the tick the
+   * tracking starts.
+   */
+  flybyR: number;
+  flybyFalling: boolean;
+  /**
+   * A qualifying flyby closest approach, waiting for the pass to end.
+   *
+   * WHY IT WAITS. The obvious moment to pay is the closest approach itself, by
+   * symmetry with the grab award — and it is wrong for two measured reasons. A
+   * flyby can bottom out while still unbound, arc back on the brake, and THEN
+   * convert into the capture that pays a grab: measured across 446 synthetic
+   * approaches, that is 100% of presses at 420px/s and 59% at 340. Paying at the
+   * bottom would pay one press twice and step the ladder twice for it, and the
+   * act it would be paying for is usually an overshoot — grabbed too fast, went
+   * long, braked back. A fumble recovered is not a fast pass.
+   *
+   * It also broke a pin worth keeping: a zip glides straight to the parked orbit,
+   * so it skips the overshoot, and paying at the bottom made zipping strictly
+   * worse than flying on every fast approach — a discount, when a zip is supposed
+   * to buy back the flying time and change nothing about the price.
+   *
+   * So the award is owed at the bottom and paid when the pass ENDS STILL BEING A
+   * PASS. Converting clears it. That is the same shape as the link, which is
+   * judged mid-flight and paid at the release, and it makes the three events read
+   * as one rule: pay at the moment the act finished being reversible.
+   */
+  pendingFlyby: PendingFlyby | null;
   /** Ticks left before the grab award lands. -1 once it has. */
   grabDue: number;
   /** Names of anomalies already claimed this life. Cleared by `endLife`. */

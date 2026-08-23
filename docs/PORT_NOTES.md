@@ -2339,6 +2339,89 @@ It prints as `dev` instead.
 
 `SIM_VERSION` 19 → 20, goldens recaptured. `chargedSecs` is 0 in
 `PROTOTYPE_CONFIG`, so the equality gate stayed at exactly zero throughout.
+### 50 — Speed had no way to be paid for being speed
+
+`src/score/score.ts` · `src/score/config.ts` · `src/score/types.ts` ·
+`src/render/hud.ts` · `src/app/recorder.ts` · **[CHANGED]** · asked for as "I
+tried to be as fast as possible… I want there to be multiple ways to reach high
+scores of 100k".
+
+One 170-second session carried three lives flown two different ways, which is
+what made this measurable rather than a matter of taste. It was recorded before
+note 49, so its multiplier still had the anomaly window's x2 on top — that is
+where the x7 below comes from, and nothing else in the table depends on it:
+
+```
+life        dur    points   links   climb    px/s   maxMult   pts per px
+chained    126s   113,697      43  11,599      92      x7          9.80
+fast        28s     5,224       5   7,952     287      x2          0.66
+```
+
+The fast life covered **3.1x the ground per second** and was paid **a fifteenth
+as much per pixel**. The cause was not that climb went unpaid — `climbPerPx` was
+working and was 76% of that life's points. **The cause was the multiplier**: the
+streak ladder counted LINKS, and a run that crosses the field fast does not stop
+at bodies. 43 links buys the ceiling; 5 links buys x2. That single factor is
+nearly the whole gap.
+
+Which is also why the obvious fix does not work. Raising `climbPerPx` pays the
+chained life MORE — it climbed 11,599px at x5 — so anything that rewards distance
+rewards the wrong style. **A speed reward has to key on rate, not distance.**
+
+**So a flyby is now a scoring event.** Hold a pass through its closest approach
+and it pays, and it steps the streak. Nothing needs to detect "was that fast",
+because density does it for free: replayed out of `diagnostics/`, an ordinary
+chained life makes **2.7 unconverted flybys a minute** and the fast life above
+made **upward of 38**.
+
+**The gate that was asked for measured useless, and that is the finding worth
+keeping.** Speed at closest approach was the natural axis and cannot discriminate:
+an unconverted flyby is unbound BY DEFINITION, so its speed is pinned near escape
+velocity — across 167 recorded passages p10 149px/s, p50 314, p90 400, with 90% of
+them inside one 250px/s band. Clearance over the same passages runs 0 to 318px
+with a median of 60, which is real spread and is a choice. `FLYBY_SPEED_MIN` still
+exists at 150px/s but it is a floor under a dead tail — the puttered-out flyby
+waiting to be dropped — not a bar that selects anything. The distribution is empty
+between p10 and p15, so any value in [150, 243) selects the identical 90%.
+
+**Paid when the pass ends, not at the closest approach.** Paying at the bottom
+looked right by symmetry with the grab award and is wrong: a flyby can bottom out
+unbound, arc back on the brake and convert into the capture that pays a grab, so
+one press would be paid twice and step the ladder twice — for what is usually an
+overshoot, grabbed too fast and braked back. A fumble recovered is not a fast
+pass. Measured across 361 synthetic approaches that become flybys, it would have
+double-paid **83% of presses at 420px/s, 80% at 340, 42% at 260, 76% overall.**
+
+Owing the award at the bottom and paying it when the pass ends STILL BEING A PASS
+fixes it, and makes the events one rule: **pay at the moment the act finished
+being reversible.** Converting clears the debt, so a converted pass pays only its
+grab.
+
+The defect was originally caught by `test/zip-charge.test.ts`, which pinned a zip
+as worth exactly what the flown capture was worth: paying at the bottom made
+zipping strictly worse than flying on every fast approach, because a zip glides
+straight to the parked orbit and skips the overshoot. Note 49 has since deleted
+that file along with the charge system, and a zipped arrival inside a window now
+pays a flat `hopBonus` instead — so that pin is gone and the argument no longer
+rests on it. It is recorded because it is how the error was found, and because the
+double-pay measurement above is the reason the decision outlives the pin.
+
+**No praise word, deliberately.** The vocabulary in `src/score/praise.ts` is
+calibrated on rarity, and a word firing 38 times a minute names nothing. The
+multiplier climbing is the feedback.
+
+Measured against every recording in `diagnostics/`: session totals rise a median
+of 13.8% (max 47%), and the increase is smallest exactly where a chained run is
+strongest — at `streakMax` the extra steps buy no multiplier, only the flat
+points, so the 126s chained life above gains about 8%. Re-measured after note 49
+landed, against the same 52 recordings: unchanged to the decimal. Reconstructed from the
+recorded checkpoints, the same 28-second fast life scores 21,593 instead of
+5,224, which extrapolates to **~98k over a 126-second life against the chained
+route's 113,697** — from 5% of it to 87% of it.
+
+The equality gate is untouched at exactly zero and the golden did not move:
+scoring is an observer and nothing under `src/sim/` changed. See "Scoring is not
+`SimConfig`" in AGENTS.md.
 
 ---
 
@@ -2364,11 +2447,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 97 · camera 55
-         diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
-         score 60 · input 8 · grab-target 8 · link-fuel 6
+tests    port-equality 11 · invariants 32 · render 98 · camera 55
+         diagnostics 25 · backtrack 15 · world 23 · tune 7 · clearance 14
+         score 66 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 424 total
+         charged 26 · attract 13 · 452 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
