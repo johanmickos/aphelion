@@ -19,11 +19,16 @@
  * every key here must change the score of some session, or it is not a weight,
  * it is decoration.
  *
- * THESE NUMBERS ARE A FIRST CUT AND HAVE NOT BEEN PLAYTESTED. They were chosen
- * for legible relative size — a perfect link is worth about eight ordinary drift
- * seconds and about five times a sloppy one — not by playing. Capture feel moved
- * with the clearance fix (PORT_NOTES 18); calibrate against how the game plays
- * now, not against the numbers here.
+ * MOST OF THESE NUMBERS ARE STILL A FIRST CUT. They were chosen for legible
+ * relative size — a perfect link is worth about eight ordinary drift seconds and
+ * about five times a sloppy one — not by playing. Capture feel moved with the
+ * clearance fix (PORT_NOTES 18); calibrate against how the game plays now, not
+ * against the numbers here.
+ *
+ * The exceptions, which carry their own measured rationale and should not be
+ * moved on feel: `closeSpan`, `flybyCloseBonus` (why closeness and not speed),
+ * `flybyBase` and `streakStep` (both retuned against a recorded speed run),
+ * and `streakMax` (which has already been mis-tuned once on too small a sample).
  */
 export interface ScoreConfig {
   // --- what one capture-and-release is worth ---
@@ -75,6 +80,13 @@ export interface ScoreConfig {
    * the style it is meant to reward without needing to know which style it is
    * looking at. Make it much larger and the density stops being a multiplier
    * story and starts being a faucet.
+   *
+   * Raised 60 -> 80 while `flybyCloseBonus` went 120 -> 300, which is deliberately
+   * NOT a proportional bump: this half is paid for showing up and that half is
+   * paid for the line. At 60/120 a mean pass in the first session flown under the
+   * flyby award was 45% flat base; at 80/300 it is 31%, so the volume floor stayed
+   * roughly where it was in absolute terms and the skill half grew. See
+   * `streakStep` for the session and what the pair was calibrated against.
    */
   flybyBase: number;
   /**
@@ -89,6 +101,15 @@ export interface ScoreConfig {
    * 318px with a median of 60, which is real spread and is a choice the player
    * makes on the way past. Same reasoning that put grab clearance ahead of
    * `cap.tightness`.
+   *
+   * 120 -> 300, and this is the half of the flyby award that was raised, because
+   * it is the half that discriminates. The first fast session flown under the
+   * award shaved p10 0px / p50 67px / p90 189px across 43 passes — the same median
+   * as its own grabs — so the closeness term was already separating good passes
+   * from lazy ones and was simply priced too low to matter. It is now the largest
+   * closeness bonus in the file, above `closeBonus`, which is correct: a grab that
+   * comes in tight also gets to bank a link, and a flyby gets one number and is
+   * gone.
    */
   flybyCloseBonus: number;
   /**
@@ -111,17 +132,41 @@ export interface ScoreConfig {
    * 0.25 to 0.4 is a 23% larger session score and a 60% larger marginal reward
    * for one more link.
    *
-   * DELIBERATELY LEFT AT 0.25 pending a decision on the boost-timing axis. The
-   * step is the incentive to chain FAST, and the reason `timing` pays around 6%
-   * of link points is that waiting 0.45s at the boost peak costs a link and the
-   * streak already pays more for the link than the peak pays for the wait.
-   * Raising the step deepens exactly that arbitrage. Settle whether the peak is
-   * worth waiting for, then tune this — in that order, or this gets tuned twice.
+   * 0.25 -> 0.4, which unblocks the note this used to carry. It was parked at 0.25
+   * pending the boost-timing axis, on the grounds that `timing` paid ~6% of link
+   * points and raising the step would deepen the arbitrage against waiting for the
+   * peak. That axis has since been fixed — its window used to close inside the
+   * settle — and in the session this was retuned against `timing` paid 20% of link
+   * points, alongside `aim` at 22% and `climb` at 39%. The premise for parking it
+   * is gone, so it moved.
+   *
+   * WHAT IT WAS RETUNED FOR: the ladder's climb is a tax that a short life pays in
+   * full and a long one amortises. Over one 133s speed-run session — six lives,
+   * 8001 ticks, 97 awards — only two lives lived long enough to reach the ceiling,
+   * and both took ~25s to get there; the other four burned 48s of flying, 36% of
+   * the session, and never got past x2.25. At 0.25 the ceiling binds on the 17th
+   * scoring event, at 0.4 on the 11th, which is inside a fast life instead of at
+   * the end of one.
+   *
+   * It is NOT the lever that rebalances speed against chaining, and should not be
+   * reached for as though it were. Rescored across that session and four
+   * chain-heavy ones in `diagnostics/`, this step pays the speed run 1.18x and the
+   * chain runs 1.07-1.13x — near-uniform inflation. The flyby weights are the only
+   * measured lever that is style-specific (1.30x against 1.00x), which is why both
+   * moved together and why they moved for different stated reasons.
+   *
+   * And neither closes the headline gap the author noticed, because that gap is
+   * not in the weights: the displayed score is `best`, the best SINGLE LIFE, and
+   * that session summed 87,866 across six lives while showing 33,860. Per second
+   * inside a life it was the highest earner on record (1168 pts/s against 967 for
+   * the best chained life in `diagnostics/`). Speed was already paid at parity per
+   * second; it just gets a third as many seconds. If the gap still reads wrong
+   * after this, the thing to reconsider is the aggregation rule, not this number.
    */
   streakStep: number;
   /**
-   * Multiplier ceiling. At `streakStep` 0.25 it binds on the 17th consecutive
-   * link.
+   * Multiplier ceiling. At `streakStep` 0.4 it binds on the 11th consecutive
+   * scoring event — links and paid flybys both.
    *
    * KEPT AT 5, and briefly changed to 3 on the strength of two sessions before
    * the next one showed why that was wrong. The evidence for "unreachable" was a
@@ -227,12 +272,12 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   timingBonus: 250,
   aimBonus: 200,
   nerveBonus: 200,
-  flybyBase: 60,
-  flybyCloseBonus: 120,
+  flybyBase: 80,
+  flybyCloseBonus: 300,
   aimSharpness: 3,
   timingSharpness: 2,
 
-  streakStep: 0.25,
+  streakStep: 0.4,
   streakMax: 5,
   anomalyBonus: 800,
   hopBonus: 500,

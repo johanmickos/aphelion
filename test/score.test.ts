@@ -1080,11 +1080,20 @@ describe('a flyby that stays a flyby', () => {
     // The distinguishing property, and the reason it is not simply paid at the
     // closest approach like a grab: see `PendingFlyby`. Moving the release moves
     // the award and changes nothing about what it is worth.
+    //
+    // The award is pinned to the FIRST release's value rather than to a literal,
+    // so a retune of the flyby weights cannot make this fail for a reason that
+    // has nothing to do with the property under test. That the value is stable
+    // across releases is the assertion; what the value is belongs to
+    // `src/score/config.ts`.
+    let expected: number | null = null;
     for (const rel of [120, 200, 320]) {
       const f = pass(rel, 600).awards.filter((a) => a.kind === 'flyby');
       expect(f, `released at ${rel}`).toHaveLength(1);
       expect(f[0]!.tick, `released at ${rel}`).toBe(rel + 1);
-      expect(f[0]!.points, `released at ${rel}`).toBe(151);
+      expected ??= f[0]!.points;
+      expect(expected, `released at ${rel}`).toBeGreaterThan(0);
+      expect(f[0]!.points, `released at ${rel}`).toBe(expected);
     }
   });
 
