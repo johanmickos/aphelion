@@ -34,6 +34,14 @@ export interface Frame {
   /** First sample after a grab: its deflection is a measurement artifact. */
   firstOfCapture: boolean;
   clearance: number | null;
+  /**
+   * Reentry heat this tick, 0..1 and 0 when nothing is alight.
+   *
+   * Recorded per frame because the question a burn report has to answer is not
+   * how hot it got but how LONG it was lit — a flare of three ticks is invisible
+   * however hot its peak, and the peak alone cannot say so.
+   */
+  burnHeat: number;
   /** Floor clamps accumulated so far this session. */
   floorTotal: number;
   fp: string;
@@ -174,6 +182,7 @@ export function replayReport(report: DiagReport): Analysis {
       tightness: cap ? cap.tightness : 0,
       firstOfCapture: isFirst,
       clearance: cap ? Math.hypot(cap.rx, cap.ry) - cap.minR : null,
+      burnHeat: score.burnHeat,
       floorTotal: state.telemetry.floorSubstepsTotal,
       fp: fingerprintHex(state),
     });
@@ -273,13 +282,25 @@ export function replayReport(report: DiagReport): Analysis {
     const burns = awards.filter((a) => a.kind === 'burn');
     const paid = burns.reduce((n, a) => n + a.points, 0);
     const hottest = Math.max(...burns.map((a) => a.heat));
-    // Burns per CAPTURE rather than per burn, because the question a report is
-    // being read to answer is how often a dive got hot — and a capture that dips
-    // through the hot zone twice raises two of them.
+    // Captures counted from the frames, NOT from `score.grabs` — that is the
+    // number of grab AWARDS, and a grab from far out pays nothing and is not
+    // counted. A session of nine captures was reporting "over 0 capture(s)".
+    const captures = frames.filter((f, i) => f.r !== null && frames[i - 1]?.r == null).length;
+    // How long the fire was actually lit is the number that matters and the one
+    // that was missing: a flare has to survive long enough to be SEEN, and heat
+    // just over the ignition floor clears it for only a frame or two.
+    const hotTicks = frames.filter((f) => f.burnHeat > 0).length;
     findings.push(
-      `${score.burns} burn(s) over ${score.grabs} capture(s) — worth ${paid}, ` +
-        `hottest ${hottest.toFixed(2)} (measured: 55% of captures flare, p90 heat 0.75)`,
+      `${score.burns} burn(s) over ${captures} capture(s) — worth ${paid}, ` +
+        `hottest ${hottest.toFixed(2)}, alight for ${hotTicks} tick(s) ` +
+        `(${(hotTicks * report.dt).toFixed(2)}s of the session)`,
     );
+    if (hotTicks / Math.max(1, score.burns) < 8) {
+      findings.push(
+        `  the flames averaged ${(hotTicks / score.burns).toFixed(1)} tick(s) each — ` +
+          `too brief to see. Heat barely over burnMinHeat clears it for only a frame or two`,
+      );
+    }
   }
   if (score.links > 0) {
     const links = awards.filter((a) => a.kind === 'link');
