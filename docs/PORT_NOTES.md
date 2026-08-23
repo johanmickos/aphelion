@@ -2242,7 +2242,20 @@ stroked eight times — and looks the same once the profile is smooth. The wave 
 one reads as a drawn ripple and two look blown.
 
 Intensity went up with it — roughly a third across the sky floor, the clouds and
-the curtain spine. The first pass at "less intense" had overcorrected to the point
+the curtain spine.
+
+**Then they read as horizontal snakes.** Two numbers were wrong together. The band
+was too thin — 104px at its widest, which is a line rather than a ribbon — and the
+undulation too shallow: 40-130 of amplitude over a 260-580 wavelength never
+exceeded a slope of about 0.5, so a curtain lay along the screen instead of
+climbing and diving across it. Now 184px wide, with 130-240 of amplitude over a
+200-360 wavelength, for slopes of 0.36 to 1.20.
+
+Those cannot be tuned independently. A band 184 wide swinging 240 either way spans
+664 world units, against a viewport 651 tall — so `BAND` went 320 to 480 and the
+keep rate up to 0.85 to compensate, or the sky would have gone back to being a
+wash. Fewer, larger ribbons: 2.4 on screen at once rather than 3.3, and cheaper
+for it. The first pass at "less intense" had overcorrected to the point
 where the effect was hard to see at all.
 
 Off-screen clouds are culled before a gradient is touched. `REACH` is 760 world
@@ -2250,7 +2263,7 @@ units in every direction and the viewport is a tall narrow slice of that, so mos
 of the grid is behind the camera's back — measured, the cull takes a frame from
 about 29 gradient fills to a mean of 12 and a worst case of 14, and each one that
 survives costs up to a full-viewport alpha blend. Curtains are culled vertically
-for the same reason, and add a mean of 26 strokes — about 3.3 curtains on screen
+for the same reason, and add a mean of 19 strokes — about 2.4 curtains on screen
 at once, eight passes each.
 
 The first version scaled the whole effect by the window's remaining fraction, so

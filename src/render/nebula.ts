@@ -49,7 +49,7 @@ const CELL = 300;
  * hung across the field, anchored in world y so they sweep past as the ship
  * climbs.
  */
-const BAND = 320;
+const BAND = 480;
 
 /**
  * Seconds the closing bloom-and-collapse runs for.
@@ -213,7 +213,7 @@ export function drawNebula(
  */
 const PASSES = Array.from({ length: 8 }, (_, i) => {
   const u = i / 7;
-  const width = 104 - 92 * u;
+  const width = 184 - 162 * u;
   // exp(-2.6 t^2) over the normalised width, then scaled so the whole stack sums
   // to roughly the alpha the three-pass version reached at the spine.
   const t = 1 - u;
@@ -255,14 +255,18 @@ function drawCurtains(
   for (let bi = b0; bi <= b1; bi++) {
     const h = hash(bi, 0x51ed);
     // Gaps between curtains, so they arrive rather than parade.
-    if (unit(h, 24) > 0.78) continue;
+    if (unit(h, 24) > 0.85) continue;
 
     const baseY = (bi + 0.2 + unit(h, 0) * 0.6) * BAND;
     const near = 1 - Math.min(1, Math.abs(baseY - snap.y) / REACH);
     if (near <= 0.02) continue;
 
-    const amp = (40 + unit(h, 4) * 90) * swell;
-    const wave = 260 + unit(h, 8) * 320;
+    // Amplitude against wavelength is what decides whether a curtain reads as a
+    // ribbon or as a snake. At 40-130 over a 260-580 wavelength the slope never
+    // exceeded about 0.5 and they lay along the screen like horizontal worms; at
+    // 90-240 over 220-420 the band climbs and dives across the view instead.
+    const amp = (130 + unit(h, 4) * 110) * swell;
+    const wave = 200 + unit(h, 8) * 160;
     const drift = t * (14 + unit(h, 12) * 22) * (unit(h, 20) < 0.5 ? -1 : 1);
     const pink = unit(h, 16);
     const r = Math.round(112 + 130 * pink);
@@ -271,7 +275,7 @@ function drawCurtains(
 
     // Enough span to cross the widest field with room to spare, in world units.
     const halfSpan = 900;
-    const step = 36;
+    const step = 26;
     const y = (wx: number): number =>
       baseY +
       Math.sin((wx + drift) / wave) * amp +
@@ -293,7 +297,7 @@ function drawCurtains(
     // Vertical cull: a curtain whose whole band is off-screen still costs three
     // wide strokes, and most bands in range are above or below the viewport.
     const mid = toScreenY(cam, baseY);
-    const reachPx = (amp + 110) * s;
+    const reachPx = (amp + 150) * s;
     if (mid + reachPx < 0 || mid - reachPx > viewportH) continue;
 
     const lit = near * near * strength;
