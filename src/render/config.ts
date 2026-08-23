@@ -170,6 +170,12 @@ export interface RenderConfig {
    *
    * The mark scales between these two multiples of its configured size, so a big
    * fat scar is a big fire and a thin one is a formality.
+   *
+   * THEY COMPOUND WITH `scarNearWidth`, which is what made the mark read as too
+   * thick: a big prize and a press right on the cross used to multiply out to
+   * 1.99x, near double. Both were brought in together rather than either alone —
+   * the two signals are independent and each still has to be legible on its own,
+   * so the fix was the product and not one of the factors.
    */
   scarPrizeMin: number;
   scarPrizeMax: number;
@@ -240,6 +246,9 @@ export interface RenderConfig {
    * for one session and lit on every approach, including the ones the player was
    * going to sail straight past — ambience rather than an answer. `Mark.glow` is
    * frozen at the press instead, so a mark the ship drifted past never lights.
+   *
+   * The width half compounds with `scarPrizeMax`, and together they reached 1.99x
+   * — reported as looking "a bit thick". Both came down; see the note there.
    *
    * 0.95 first, reported as "there are times that the cross glows a bit too
    * bright". The lift matters more than the ceiling: half again over `scarAlpha`
@@ -349,7 +358,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarBarHalf: 13,
   scarStubHalf: 17,
   scarPrizeMin: 0.62,
-  scarPrizeMax: 1.42,
+  scarPrizeMax: 1.18,
   scarPrizeFull: 860,
 
   doomAlpha: 0.78,
@@ -359,7 +368,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarAlpha: 0.5,
   scarDeadFrac: 0.18,
   scarNearAlpha: 0.74,
-  scarNearWidth: 1.4,
+  scarNearWidth: 1.15,
   scarSettleRate: 9,
   scarArmMaxPx: 150,
 
