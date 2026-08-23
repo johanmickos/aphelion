@@ -427,10 +427,12 @@ export interface SimConfig {
    * window. What is here instead is a countdown you have to spend, and a hop
    * chain is worth what you can execute rather than what you were handed.
    *
-   * Five seconds is about three hops: a hop cycle is the 0.45s glide, plus
+   * Seven seconds is about four hops: a hop cycle is the 0.45s glide, plus
    * `boostArmTime` before a release earns its boost, plus the crossing to the next
-   * body. Short on purpose — it ends while the player still wants more, and it
-   * keeps the anomaly a moment in a run rather than the run's whole subject.
+   * body. Started at five, which measured at three hops in a real session and read
+   * as a repeat rather than a rhythm. Still short on purpose — it ends while the
+   * player still wants more, and it keeps the anomaly a moment in a run rather
+   * than the run's whole subject.
    *
    * SIMULATION, NOT SCORE. This gates a physical ability, so it cannot live in
    * `ScoreConfig` — `src/sim/` may not import from `src/score/`, and a simulation
@@ -735,7 +737,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   boundGrabsCapture: true,
   outboundFlybyFrac: 0.65,
   zipDur: 0.45,
-  chargedSecs: 5,
+  chargedSecs: 7,
   clearanceOnFlyby: true,
   clearanceOnConvert: true,
   clearanceEnergyNeutral: true,

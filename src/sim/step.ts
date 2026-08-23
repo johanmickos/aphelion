@@ -32,6 +32,7 @@ export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
     ending: { active: false, t: 0, x: 0, y: 0, reason: 'impact' },
     holdConsumed: false,
     chargedT: 0,
+    cameFrom: -1,
     telemetry: { lastGrab: null, floorSubsteps: 0, floorSubstepsTotal: 0, putterOuts: 0 },
   };
   respawn(state, cfg);
@@ -59,6 +60,7 @@ export function respawn(state: SimState, cfg: SimConfig): void {
   // The charge dies with the ship. It is earned by flying, and carrying it across
   // a death would pay the next run for the last one's work.
   state.chargedT = 0;
+  state.cameFrom = -1;
 }
 
 /** The ship's world position, wherever it currently lives. */

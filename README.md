@@ -249,7 +249,7 @@ putter-out or a death.
 ### The charged window
 
 Releasing from an anomaly's orbit leaves the ship **charged** for
-`chargedSecs` — five seconds during which _every_ grab zips: the press is the
+`chargedSecs` — seven seconds during which _every_ grab zips: the press is the
 arrival, and a glide carries you onto the destination orbit instead of diving to
 it. The ship arcs with the anomaly's own purple for the duration, and a bar drains
 under the score.
@@ -261,6 +261,13 @@ exactly when it was hardest to earn would be the wrong shape. A hop replaces the
 grab award rather than stacking on it — one number at the busiest moment in the
 game — and nothing about flying well is lost, because the link at the release is
 untouched and still scores aim, timing and climb at full multiplier.
+
+Charged, a press **throws the web forward**: the body you just released from is
+never on offer, and a body ahead of you is preferred over a nearer one behind.
+That is a preference and not a gate — with nothing takeable ahead the ordinary
+nearest body is still offered — so it can never waste a press or let a window
+expire on a refusal. Without it, a real session spent three of five presses in one
+window zipping straight back onto the planet it had just left.
 
 A body pays **once per window**. Bouncing on one planet is still legal; it just
 stops paying, because a press-glide-release cycle is about 1.2s and otherwise the

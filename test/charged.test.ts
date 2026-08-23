@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
+import { grabTarget } from '../src/sim/capture.ts';
 import { createBodies } from '../src/sim/world.ts';
 import type { ScoreAward, ScoreState } from '../src/score/index.ts';
 import { DEFAULT_SCORE_CONFIG, createScoreState, scoreTick } from '../src/score/index.ts';
@@ -43,7 +44,7 @@ interface Flight {
 
 function fly(
   cfg: SimConfig = DEFAULT_CONFIG,
-  ticks = 520,
+  ticks = 650,
   hook?: (t: number, state: ReturnType<typeof createInitialState>, sc: ScoreState) => void,
 ): Flight {
   const state = createInitialState(cfg);
@@ -146,7 +147,7 @@ describe('a hop', () => {
     // hardest to earn would be the wrong shape.
     const cold = hops(fly())[0]!;
     const hot = hops(
-      fly(DEFAULT_CONFIG, 520, (t, _s, sc) => {
+      fly(DEFAULT_CONFIG, 650, (t, _s, sc) => {
         if (t === 300) sc.streak = 999;
       }),
     )[0]!;
@@ -185,7 +186,7 @@ describe('what a hop refuses to pay for', () => {
     const plain = fly();
     const body = hops(plain)[0]!.body;
 
-    const f = fly(DEFAULT_CONFIG, 520, (t, _state, sc) => {
+    const f = fly(DEFAULT_CONFIG, 650, (t, _state, sc) => {
       // Already hopped to it this window.
       if (t === 300 && !sc.hopped.includes(body)) sc.hopped.push(body);
     });
@@ -195,11 +196,90 @@ describe('what a hop refuses to pay for', () => {
     expect(f.awards.some((a) => a.kind === 'grab' && a.body === body)).toBe(true);
   });
 
-  it('forgets the log when a new window opens', () => {
-    // Cleared on the rising edge rather than on the close, so the log always
-    // describes the window in progress.
-    const f = fly();
-    expect(f.score.hopped).toContain(hops(f)[0]!.body);
+  it('records what has been hopped while the window is still running', () => {
+    // Sampled DURING the window, not at the end of the flight: `endLife` clears
+    // the log, and a flight long enough to outlast a seven-second window is long
+    // enough to end in a death.
+    let during: string[] = [];
+    const f = fly(DEFAULT_CONFIG, 650, (t, _state, sc) => {
+      if (t === 400) during = [...sc.hopped];
+    });
+    expect(during).toContain(hops(f)[0]!.body);
+  });
+});
+
+describe('targeting inside a charged window', () => {
+  // Reported as three of five presses in one window zipping straight back onto
+  // the planet just left. See `chargedTarget`.
+  const field = () => {
+    const state = createInitialState(DEFAULT_CONFIG);
+    const planets = state.bodies
+      .map((b, i) => ({ b, i }))
+      .filter(({ b }) => b.kind === 'planet')
+      .sort((p, q) => q.b.y - p.b.y); // bottom of the field first
+    return { state, planets };
+  };
+
+  /** Park the ship just above `behind`, with `ahead` further up the field. */
+  function stage() {
+    const { state, planets } = field();
+    // Two neighbours far enough up that both sit inside `grabRange` of a point
+    // between them.
+    const behind = planets[6]!;
+    const ahead = planets[7]!;
+    expect(ahead.b.y).toBeLessThan(behind.b.y);
+    // Just above the lower one, so IT is the nearest body by a wide margin.
+    state.ship.x = behind.b.x;
+    state.ship.y = behind.b.y - 90;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.fuel = DEFAULT_CONFIG.fuelMax;
+    return { state, behind, ahead };
+  }
+
+  it('offers the nearest body when not charged, behind or not', () => {
+    // The uncharged path is untouched, which is also what keeps the equality gate
+    // at zero: `chargedSecs` is 0 in PROTOTYPE_CONFIG.
+    const { state, behind } = stage();
+    state.cameFrom = behind.i;
+    state.chargedT = 0;
+    expect(grabTarget(state, DEFAULT_CONFIG).index).toBe(behind.i);
+  });
+
+  it('never offers the body just released from', () => {
+    const { state, behind } = stage();
+    state.cameFrom = behind.i;
+    state.chargedT = DEFAULT_CONFIG.chargedSecs;
+    expect(grabTarget(state, DEFAULT_CONFIG).index).not.toBe(behind.i);
+  });
+
+  it('prefers a body ahead over a nearer one behind', () => {
+    // The half that excluding `cameFrom` does not achieve. Without it the ship
+    // walks back down the field one neighbour at a time.
+    const { state, behind, ahead } = stage();
+    state.cameFrom = -1; // nothing excluded: the choice is made on direction alone
+    state.chargedT = DEFAULT_CONFIG.chargedSecs;
+    const got = grabTarget(state, DEFAULT_CONFIG).index;
+    expect(got).not.toBe(behind.i);
+    expect(state.bodies[got]!.y).toBeLessThan(state.ship.y);
+    expect(got).toBe(ahead.i);
+  });
+
+  it('falls back rather than refusing when nothing ahead is takeable', () => {
+    // A preference, not a gate. `nearestBody` records why a heading cone was
+    // refused — a threshold is a cliff — so this one never forbids a press, it
+    // only decides which body a press takes when there is a real choice.
+    const { state, behind } = stage();
+    // Put the ship above everything, so nothing at all is ahead of it.
+    const top = Math.min(...state.bodies.map((b) => b.y));
+    state.ship.y = top - 200;
+    state.ship.x = state.bodies.find((b) => b.y === top)!.x;
+    state.cameFrom = -1;
+    state.chargedT = DEFAULT_CONFIG.chargedSecs;
+    const got = grabTarget(state, DEFAULT_CONFIG);
+    expect(got.index).toBeGreaterThanOrEqual(0);
+    expect(got.result).toBe('captured');
+    void behind;
   });
 });
 
@@ -209,7 +289,7 @@ describe('the commitment rule', () => {
     // press and the glide it buys can outlast the countdown; re-checking at the
     // arrival would punish the player for the one thing the window asks of them,
     // which is to hurry.
-    const f = fly(DEFAULT_CONFIG, 520, (t, state) => {
+    const f = fly(DEFAULT_CONFIG, 650, (t, state) => {
       // Slam the window shut mid-glide, after the press has already committed.
       if (t === 300) state.chargedT = 0;
     });

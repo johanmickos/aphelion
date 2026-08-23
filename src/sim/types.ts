@@ -316,6 +316,24 @@ export interface SimState {
    * diverged from its first checkpoint.
    */
   chargedT: number;
+  /**
+   * Index of the body the last release left, or -1.
+   *
+   * Read by `grabTarget` ONLY while a charged window is running, where it is
+   * excluded from targeting. Reported as "when we have our anomaly charged, it
+   * should never grab the same planet that the player is coming from — it should
+   * really feel like Spider-Man sending sticky web forward and pulling us ahead":
+   * measured in the session that reported it, three of five presses inside one
+   * window zipped straight back onto the planet just released from, because right
+   * after a release you are still well inside `grabRange` of it and it is the
+   * nearest thing there is.
+   *
+   * A discrete exclusion of one body rather than a heading cone, deliberately, and
+   * `nearestBody` records why: a cone needs a threshold, and a threshold is a
+   * cliff the player falls off as a body drifts across an arbitrary line. "The one
+   * I just let go of" needs no threshold and cannot drift.
+   */
+  cameFrom: number;
   /** Diagnostics only. Never read by physics; excluded from the fingerprint. */
   telemetry: Telemetry;
 }

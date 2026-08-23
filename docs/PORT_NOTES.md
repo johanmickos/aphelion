@@ -2135,10 +2135,36 @@ treatment there would have to compete with those; the space around the ship is
 empty and free. They are seeded from the tick rather than `Math.random`, so a
 replay shows the crackle the player saw.
 
-**Numbers.** 500 a hop, about three hops in five seconds — a hop cycle is the
+**The web goes forward.** Reported from a faithful replay as "when we have our
+anomaly charged, it should never grab the same planet that the player is coming
+from — it should really feel like Spider-Man sending sticky web forward and
+pulling us ahead". Measured in that session: of five presses inside one window,
+**three zipped straight back onto the planet just released from**, because after a
+release you are still well inside `grabRange` of it and it is the nearest thing
+there is. The claim log stopped them minting points, which was the wrong defence —
+the movement was the problem, not the payment.
+
+Excluding `cameFrom` was necessary and **not sufficient**. With only that, the
+same session went P17, P18, P19, P18, P17: the ship stopped repeating a body and
+started walking DOWN the field one neighbour at a time. On both backward grabs
+there were two bodies above and within range, so a forward preference would have
+redirected them and refused nothing — which is what it now does. The window went
+from two hops to four, climbing P17 → P18 → P19 → P20.
+
+**A preference, not a gate.** `nearestBody` records why a heading cone was
+refused: a threshold is a cliff the player falls off as a body drifts across an
+arbitrary line. Nothing here is ever forbidden — with no takeable body ahead, the
+ordinary nearest one is still offered, minus the one you came from — so the rule
+cannot waste a press or let a window expire on a refusal. It only decides WHICH
+body a press takes when there is a real choice. "Forward" is up, which is not an
+arbitrary axis in this game: the field is a vertical climb, the score pays for
+altitude, and falling behind the trailing floor is what ends a run.
+
+**Numbers.** 500 a hop, about four hops in seven seconds — a hop cycle is the
 0.45s glide, plus `boostArmTime` before a release earns its boost, plus the
-crossing to the next body. So ~1500 a window, against the ~2500-3000 the x2 window
-was reckoned at, and an anomaly is deliberately worth somewhat less than it was.
+crossing to the next body. Started at five seconds, which measured at three hops and read as a
+repeat rather than a rhythm. So ~2000 a window, against the ~2500-3000 the x2
+window was reckoned at, and an anomaly is deliberately worth somewhat less than it was.
 The difference is made up where the hops leave you: four planets of altitude is
 ~280 raw climb banked into the next link, paid by machinery that already existed.
 
