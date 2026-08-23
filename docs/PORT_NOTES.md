@@ -2222,10 +2222,23 @@ flies.
 "I don't really see any northern lights effects and I can't quite discern the
 purple". So the clouds were demoted to texture and the aurora proper was added on
 top — long wavy curtains anchored on world y, sweeping down past the ship as it
-climbs. Each is drawn as a stack of three strokes of decreasing width and
-increasing alpha rather than as a blurred shape: `ctx.filter` is expensive and
-inconsistent across engines, and three strokes give the same soft-edged glow for a
-fraction of the cost. The wave is two summed sines of different periods, because
+climbs. Each is drawn as a stack of strokes with a Gaussian width
+profile rather than as a blurred shape.
+
+Three hand-listed passes at 86/44/16 was the first attempt and it looked drawn
+on — reported as "the waves look kind of tacky". The cause was banding: three
+discrete widths draw three visibly concentric ribbons, and the eye reads the steps.
+Eight passes on an `exp(-2.6t²)` profile is where the stepping stops being
+visible; past that the extra strokes buy differences under a 255th of an alpha
+step. The total was raised from 0.34 to 0.45 at the same time, because a Gaussian
+stack spreads the same integrated alpha over a wider band and matching the old sum
+would have read as a dimmer curtain.
+
+`ctx.filter = 'blur()'` would be the direct way and is declined: it forces an
+offscreen rasterisation per use, its cost scales with the blurred area rather than
+with the geometry, and support across the engines this has to run on is uneven. A
+stroke stack costs a fixed handful of polyline draws — the path is built once and
+stroked eight times — and looks the same once the profile is smooth. The wave is two summed sines of different periods, because
 one reads as a drawn ripple and two look blown.
 
 Intensity went up with it — roughly a third across the sky floor, the clouds and
@@ -2237,8 +2250,8 @@ units in every direction and the viewport is a tall narrow slice of that, so mos
 of the grid is behind the camera's back — measured, the cull takes a frame from
 about 29 gradient fills to a mean of 12 and a worst case of 14, and each one that
 survives costs up to a full-viewport alpha blend. Curtains are culled vertically
-for the same reason, and add a mean of 10 strokes — about 3.3 curtains on screen
-at once.
+for the same reason, and add a mean of 26 strokes — about 3.3 curtains on screen
+at once, eight passes each.
 
 The first version scaled the whole effect by the window's remaining fraction, so
 it dimmed linearly to nothing and the end of the best moment in the game arrived

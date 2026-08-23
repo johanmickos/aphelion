@@ -199,12 +199,37 @@ export function drawNebula(
 }
 
 /**
+ * The soft-edge profile of a curtain: width multiplier and alpha weight per pass.
+ *
+ * Built rather than hand-listed, because the hand-listed version was the problem.
+ * Three passes at 86/44/16 drew three visibly concentric ribbons — the eye reads
+ * the steps as banding, and banding is what made the curtains look drawn on.
+ *
+ * The alpha weight is a Gaussian in the width, so the stack sums to something
+ * close to a real blurred edge: wide passes contribute almost nothing on their
+ * own and the light builds smoothly toward the spine. Eight passes is where the
+ * banding stops being visible; past that the extra strokes are paying for
+ * differences under a 255th of an alpha step.
+ */
+const PASSES = Array.from({ length: 8 }, (_, i) => {
+  const u = i / 7;
+  const width = 104 - 92 * u;
+  // exp(-2.6 t^2) over the normalised width, then scaled so the whole stack sums
+  // to roughly the alpha the three-pass version reached at the spine.
+  const t = 1 - u;
+  return { width, weight: Math.exp(-2.6 * t * t) };
+});
+const PASS_SUM = PASSES.reduce((n, p) => n + p.weight, 0);
+
+/**
  * The northern lights: wavy curtains hung across the field.
  *
- * Drawn as a stack of strokes of decreasing width and increasing alpha rather
- * than as a blurred shape — `ctx.filter` is expensive and inconsistent across
- * engines, and three strokes give the same soft-edged glow for a fraction of the
- * cost. The widest pass is the haze, the narrowest is the bright spine.
+ * Drawn as a stack of strokes with a Gaussian width profile rather than as a
+ * blurred shape. `ctx.filter = 'blur()'` would be the direct way and is declined:
+ * it forces an offscreen rasterisation per use, its cost scales with the blurred
+ * area rather than the geometry, and support across the engines this has to run on
+ * is uneven. A stroke stack costs a fixed handful of polyline draws and looks the
+ * same once the profile is smooth — see `PASSES`.
  *
  * Anchored on world y and drifting in x, so a curtain sweeps down past the ship
  * as it climbs and never sits still on the screen. The wave is two summed sines
@@ -246,7 +271,7 @@ function drawCurtains(
 
     // Enough span to cross the widest field with room to spare, in world units.
     const halfSpan = 900;
-    const step = 60;
+    const step = 36;
     const y = (wx: number): number =>
       baseY +
       Math.sin((wx + drift) / wave) * amp +
@@ -268,20 +293,19 @@ function drawCurtains(
     // Vertical cull: a curtain whose whole band is off-screen still costs three
     // wide strokes, and most bands in range are above or below the viewport.
     const mid = toScreenY(cam, baseY);
-    const reachPx = (amp + 90) * s;
+    const reachPx = (amp + 110) * s;
     if (mid + reachPx < 0 || mid - reachPx > viewportH) continue;
 
     const lit = near * near * strength;
-    const passes: ReadonlyArray<readonly [number, number]> = [
-      [86, 0.07],
-      [44, 0.1],
-      [16, 0.16],
-    ];
-    for (const [w, a] of passes) {
-      const alpha = Math.min(0.5, a * lit);
-      if (alpha < 0.004) continue;
-      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
-      ctx.lineWidth = w * s * swell;
+    for (const pass of PASSES) {
+      // 0.45 and not the 0.34 the three hard passes summed to. A Gaussian stack
+      // spreads the same integrated alpha over a visibly wider band, so matching
+      // the old total would have read as a dimmer curtain even though the light
+      // under the spine is the same.
+      const alpha = Math.min(0.5, (pass.weight / PASS_SUM) * 0.45 * lit);
+      if (alpha < 0.003) continue;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha.toFixed(4)})`;
+      ctx.lineWidth = pass.width * s * swell;
       ctx.stroke();
     }
   }
