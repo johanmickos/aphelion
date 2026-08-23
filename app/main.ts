@@ -11,6 +11,7 @@ import { KNOBS } from '../src/app/tune.ts';
 import { isGrabKey, keydownAction } from '../src/app/input.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
+import { rescueScar } from '../src/sim/rescue.ts';
 import type { Input } from '../src/sim/types.ts';
 import { createLoop } from '../src/app/loop.ts';
 import { anomalyFocus, barrierRelax, frozenOrbit, orbitLock } from '../src/render/camera.ts';
@@ -291,6 +292,10 @@ resize();
 
 rearm();
 
+/** Ticks between recomputes of the point of no return. 6 is ~0.1s. */
+const SCAR_EVERY = 6;
+let scarSkip = SCAR_EVERY;
+
 const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
   step(dt) {
     if (paused || life.phase !== 'running') return;
@@ -337,7 +342,25 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       // A full tank came with the new ship; a warning about the old one's is a
       // message about a run that is over.
       scene.fuelWarning.clear();
+      // Same for the scar: it is a world-space mark against a wall this ship has
+      // never approached.
+      scene.scar.clear();
       centerCamera(cam, curr.x, curr.y, field, backtrackFloorY(sim, curr.highWaterY));
+    }
+
+    // The point of no return, recomputed a few times a second rather than every
+    // tick. It costs a forward simulation of a few thousand ticks — the only
+    // honest way to answer "would a grab here still save me", see
+    // `src/sim/rescue.ts` — and it is a property of a straight drift, so asking
+    // faster than it can change buys nothing but heat.
+    //
+    // Skipped entirely during the ending hold, which freezes the mark where it
+    // was: the receding cross is the explanation of the death being shown, and
+    // an explanation must not fade out behind the notice it belongs to.
+    scarSkip++;
+    if (!state.ending.active && scarSkip >= SCAR_EVERY) {
+      scene.scar.observe(rescueScar(state, sim, dt), rcfg, dt * scarSkip);
+      scarSkip = 0;
     }
 
     // Sampled on the fixed tick so trail length never depends on frame rate.

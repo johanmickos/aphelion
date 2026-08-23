@@ -127,6 +127,71 @@ export interface RenderConfig {
   /** Width of the danger gradient, measured INWARD from the field edge. */
   hazardZoneWidth: number;
 
+  // --- the scar: the point of no return ---
+  /**
+   * Seconds-to-cross at which the scar starts ghosting in, and at which it
+   * reaches full strength.
+   *
+   * Measured, not chosen. Over 640 committed approaches in `diagnostics/`, the
+   * lead between the scar becoming computable and the cross runs median 1.65s,
+   * p75 3.67s. Full strength at the median means the scar is solid for at least
+   * half of every approach that has one; ghosting in at p75 means three
+   * approaches in four never see it appear out of nothing.
+   *
+   * A ramp rather than a switch, for the reason `nearestBody` gives about cones:
+   * a threshold is a cliff, and a mark that pops into existence is not a scar.
+   */
+  scarFadeInSecs: number;
+  scarFullSecs: number;
+  /**
+   * Seconds a passed cross takes to fade out, aged only while the run is live.
+   *
+   * Longer than it looks like it needs to be, deliberately. The cross sits a
+   * median 0.53s before the wall and p90 1.05s, so a fade shorter than that would
+   * finish before the death it is explaining — and explaining the death is the
+   * whole job of the mark that stays behind. Frozen during the ending hold for
+   * the same reason the popups freeze while paused: nothing should burn down
+   * behind the notice the player is reading.
+   */
+  scarFadeOutSecs: number;
+  /** Half-length of the crossbar, and of the arm stub kept after the cross is passed. */
+  scarBarHalf: number;
+  scarStubHalf: number;
+  /** Peak half-width of the long arm and of the crossbar, in design units. */
+  scarArmWidth: number;
+  scarBarWidth: number;
+  /**
+   * Alpha at the peak of the arm, and the fraction of it left where a press
+   * would NOT be accepted.
+   *
+   * The arm is broken rather than blanked over a hole: 370 of 640 live stretches
+   * are not contiguous, so blanking them would leave the commonest case looking
+   * like several unrelated marks instead of one scar with gaps in it.
+   */
+  scarAlpha: number;
+  scarDeadFrac: number;
+  /**
+   * How fast the mark follows a moved cross, per second.
+   *
+   * The mark is a follower, not a snap. The search resolves to a tick on a grid
+   * anchored to the ship, so an unchanged answer still lands a few pixels away
+   * each recompute — and a tap through the red band is a real capture and release,
+   * which moves the answer for real, several times a second. Both read as a
+   * strobe. 9/s converges in about a quarter second, which is under the reaction
+   * time the mark is there to be aimed with.
+   */
+  scarSettleRate: number;
+  /**
+   * Longest the drawn arm may be, in design units.
+   *
+   * The cross sits a median 432px ahead and 1551px at p90 across the recorded
+   * approaches, against a 390x844 viewport — so an unclamped arm is routinely
+   * twice the height of the screen, describing a stretch with nothing in it to
+   * decide. 260 is two thirds of the viewport's width: long enough to read as a
+   * lead-in to the mark, short enough never to become a line across the map.
+   */
+  scarArmMaxPx: number;
+
   // --- boost halo ---
   /** Glow radius at zero charge / at full charge, in design units. */
   boostGlowMin: number;
@@ -193,6 +258,18 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   trailHeadGap: 12,
 
   hazardZoneWidth: 60,
+
+  scarFadeInSecs: 3.67,
+  scarFullSecs: 1.65,
+  scarFadeOutSecs: 1.6,
+  scarBarHalf: 13,
+  scarStubHalf: 17,
+  scarArmWidth: 1.3,
+  scarBarWidth: 1.7,
+  scarAlpha: 0.5,
+  scarDeadFrac: 0.18,
+  scarSettleRate: 9,
+  scarArmMaxPx: 260,
 
   boostGlowMin: 13,
   boostGlowMax: 42,

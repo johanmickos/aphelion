@@ -17,6 +17,7 @@ import { Trail, drawShip } from './ship.ts';
 import { Nebula, OUTRO_SECS } from './nebula.ts';
 import type { CanvasFactory } from './nebula.ts';
 import { FuelWarning } from './fuel-warning.ts';
+import { Scar } from './scar.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
 import { drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
@@ -37,6 +38,12 @@ export class Scene {
   readonly trail: Trail;
   readonly popups = new Popups();
   readonly fuelWarning = new FuelWarning();
+  /**
+   * The point of no return. Fed on the tick from `app/main.ts`, which is where
+   * the full `SimState` the prediction needs lives — the snapshot is deliberately
+   * narrow and a scar is not something it should learn to carry.
+   */
+  readonly scar = new Scar();
   private readonly stars: Starfield;
   private readonly bodyRenderer = new BodyRenderer();
 
@@ -171,6 +178,10 @@ export class Scene {
       }
       drawBoostHalo(ctx, cam, sim, render, snap, opts.timeMs);
     }
+
+    // Under the ship and its wake: it describes where the ship is going, and
+    // nothing about it should ever obscure the ship itself.
+    this.scar.draw(ctx, cam, render);
 
     const compass = drawCompass(ctx, cam, sim, render, snap, bodies, opts.timeMs);
 

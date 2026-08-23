@@ -18,6 +18,7 @@ import { Starfield } from '../src/render/starfield.ts';
 import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
+import { rescueScar } from '../src/sim/rescue.ts';
 import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture.ts';
 import {
   FUEL_LOW_FRAC,
@@ -272,6 +273,16 @@ describe('scene', () => {
       ship: { x: ANOMALY.x - 300, y: ANOMALY.y - 70, vx: 344, vy: 0 },
       charged: true,
     },
+    // The scar's own path. Nothing else in the suite drifts at a side wall, so
+    // without this the spindles, the broken arm and the mark left behind are all
+    // drawn for the first time on a phone.
+    {
+      name: 'drifting into the wall',
+      press: -1,
+      release: -1,
+      ticks: 220,
+      ship: { x: 189, y: 120, vx: 230, vy: -70 },
+    },
   ];
 
   /**
@@ -325,6 +336,11 @@ describe('scene', () => {
       if (sc.charged && state.chargedT <= 0 && i < 150) {
         state.chargedT = DEFAULT_CONFIG.chargedSecs * (1 - i / 200);
       }
+      // Fed on the tick at the app's own cadence, so the scar is exercised
+      // through the same path `app/main.ts` drives it with.
+      if (i % 6 === 0 && !state.ending.active) {
+        scene.scar.observe(rescueScar(state, DEFAULT_CONFIG, FIXED_DT), rcfg, FIXED_DT * 6);
+      }
       const snap = captureSnapshot(state, held, DEFAULT_CONFIG);
       scene.trail.sample(snap.x, snap.y);
       centerCamera(c, snap.x, snap.y, f, null);
@@ -358,6 +374,117 @@ describe('scene', () => {
       // reaches `drawImage` is drawing the fallback renderer.
       expect(compositedFrames, 'the curtain buffer was never composited').toBeGreaterThan(0);
     }
+  });
+
+  it('marks the point of no return, and leaves the mark behind once it is passed', () => {
+    // "Renders without error" cannot tell a drawn scar from an absent one, and an
+    // absent one is the failure mode this feature has: every gate in `rescueScar`
+    // returns null, so a wiring mistake anywhere reads as a clean pass.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const scene = new Scene(
+      { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
+      99,
+    );
+    const r = recordingContext();
+
+    /** Fills in the hazard band's red, which is the scar and nothing else here. */
+    const scarFills = (): number =>
+      r.ops.filter((op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90'))
+        .length;
+
+    const frame = (): void => {
+      const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
+      centerCamera(c, snap.x, snap.y, f, null);
+      r.reset();
+      scene.draw(r.ctx, c, snap, {
+        timeMs: 0,
+        paused: false,
+        viewportW: 390,
+        viewportH: 844,
+        headerBottom: 0,
+        frameDt: 1 / 60,
+        score: createScoreState(),
+      });
+    };
+
+    frame();
+    expect(scarFills(), 'nothing is drawn before the scar has been observed').toBe(0);
+
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
+    expect(scar, 'the fixture is meant to be committed to a wall').not.toBeNull();
+    expect(scar!.cross, 'and to still have a way out').not.toBeNull();
+    scene.scar.observe(scar, rcfg, FIXED_DT);
+    frame();
+    const ahead = scarFills();
+    expect(ahead, 'the scar is drawn once it has been observed').toBeGreaterThan(0);
+
+    // Fly past the cross. The prediction now has no live press left, and the mark
+    // must stay where it was rather than vanishing at the moment it matters.
+    const crossTick = Math.round(scar!.cross!.t / FIXED_DT);
+    for (let i = 0; i <= crossTick + 2; i++) {
+      stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
+    }
+    scene.scar.observe(rescueScar(state, DEFAULT_CONFIG, FIXED_DT), rcfg, FIXED_DT);
+    frame();
+    expect(scarFills(), 'the mark stays behind after the cross is passed').toBeGreaterThan(0);
+
+    // A grab answers the question, so the mark ages out rather than blinking:
+    // a tap IS a capture, and a hard clear made tapping through the band strobe.
+    scene.scar.observe(null, rcfg, rcfg.scarFadeOutSecs * 0.25);
+    frame();
+    expect(scarFills(), 'a brief capture does not blink the mark out').toBeGreaterThan(0);
+    scene.scar.observe(null, rcfg, rcfg.scarFadeOutSecs);
+    frame();
+    expect(scarFills(), 'but it does expire').toBe(0);
+  });
+
+  it('never draws an arm longer than the clamp, however far away the cross is', () => {
+    // The cross sits a median 432px ahead and 1551px at p90, against a 390-wide
+    // viewport — so without the clamp the common case is a line across the map.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 100, y: 300, vx: 120, vy: -40 });
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const scene = new Scene(
+      { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
+      99,
+    );
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
+    expect(scar?.cross, 'the fixture is meant to have a distant cross').toBeTruthy();
+    const reach = Math.hypot(scar!.cross!.x - state.ship.x, scar!.cross!.y - state.ship.y);
+    expect(reach, 'and distant enough that the clamp has to bite').toBeGreaterThan(
+      rcfg.scarArmMaxPx,
+    );
+
+    // The scar alone, not the whole scene: the hazard band and the trailing
+    // floor are drawn in the same red family, and an extent measured over all of
+    // it would be measuring the field, not the mark.
+    scene.scar.observe(scar, rcfg, FIXED_DT);
+    const r = recordingContext();
+    centerCamera(c, state.ship.x, state.ship.y, f, null);
+    scene.scar.draw(r.ctx, c, rcfg);
+
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const op of r.ops) {
+      if (op[0] === 'moveTo' || op[0] === 'lineTo') {
+        xs.push(op[1] as number);
+        ys.push(op[2] as number);
+      }
+    }
+    expect(xs.length, 'the scar drew nothing to measure').toBeGreaterThan(0);
+    const spanPx = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    // The arm, plus the stub past the mark and the crossbar across it.
+    const limit = (rcfg.scarArmMaxPx + rcfg.scarStubHalf + rcfg.scarBarHalf) * c.scale;
+    expect(
+      spanPx,
+      `the scar spans ${spanPx.toFixed(0)}px against a ${limit.toFixed(0)}px bound`,
+    ).toBeLessThanOrEqual(limit);
   });
 
   it('draws fire on the ship while it is burning, and none when it is not', () => {
