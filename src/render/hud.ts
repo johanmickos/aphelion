@@ -13,7 +13,7 @@ import type { ScoreAward, ScoreState } from '../score/types.ts';
 import type { Praise } from '../score/index.ts';
 import { praiseFor } from '../score/index.ts';
 import type { AccoladeStyle } from './accolade.ts';
-import { HOP, LEVEL, ROUTINE } from './accolade.ts';
+import { BURN_WORD, HOP, LEVEL, ROUTINE } from './accolade.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
@@ -157,6 +157,15 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
   flyby: (a) => ({
     style: ROUTINE,
     detail: `${a.body}  FLYBY · CLOSE ${pct(a.close)}`,
+    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
+  }),
+  burn: (a) => ({
+    // Always the default, word or not — the same rule the popup follows. A burn's
+    // colour lives entirely in its word; the number is deliberately quiet.
+    style: ROUTINE,
+    // The peak, which is what the word was chosen on — reporting the integral
+    // here would caption a word the number does not explain.
+    detail: `${a.body}  BURN · HEAT ${pct(a.heat)}`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
   }),
 };
@@ -512,11 +521,31 @@ export function drawScore(
   const band = BAND[a.kind](a, praise);
 
   ctx.font = `600 ${15 * s}px ui-monospace, monospace`;
-  ctx.fillStyle = band.style.color;
   // The band carries the same word as the popup beside the ship, so the two are
   // answering the same question in the same vocabulary.
   const named = praise ? `  ${praise.word}` : '';
-  ctx.fillText(`+${formatScore(a.points)}${band.mult}${named}`, cx, cam.offsetY + SCORE.awardY * s);
+  const awardY = cam.offsetY + SCORE.awardY * s;
+  const head = `+${formatScore(a.points)}${band.mult}`;
+  if (praise?.category === 'burn') {
+    // Two runs, because a burn's word is ember and its number is not — and the
+    // popup does exactly the same split. One centred string in one colour would
+    // put the band and the popup on different rules again, which is the drift
+    // `accolade.ts` exists to prevent.
+    //
+    // Laid out from the left edge of the whole line so the pair stays centred as
+    // a unit; centring each run separately would slide them apart.
+    const prevAlign = ctx.textAlign;
+    ctx.textAlign = 'left';
+    const x0 = cx - ctx.measureText(head + named).width / 2;
+    ctx.fillStyle = band.style.color;
+    ctx.fillText(head, x0, awardY);
+    ctx.fillStyle = BURN_WORD.color;
+    ctx.fillText(named, x0 + ctx.measureText(head).width, awardY);
+    ctx.textAlign = prevAlign;
+  } else {
+    ctx.fillStyle = band.style.color;
+    ctx.fillText(head + named, cx, awardY);
+  }
 
   ctx.font = `${9 * s}px ui-monospace, monospace`;
   ctx.fillStyle = band.style.labelColor;

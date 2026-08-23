@@ -68,7 +68,7 @@ function flyAtAnomaly(cfg: SimConfig, press: number, release: number, ticks = 90
     if (pressed) held = true;
     if (released) held = false;
     stepSim(state, cfg, { held: held || pressed, pressed, released }, FIXED_DT);
-    out.awards.push(...scoreTick(sc, state, cfg).awards);
+    out.awards.push(...scoreTick(sc, state, cfg, FIXED_DT).awards);
     if (!state.capture && !state.ending.active && state.ship.x > fb.right) {
       out.crossedBarrier = true;
     }
@@ -152,7 +152,7 @@ describe('the anomaly bonus', () => {
     sc.streak = 999;
     const state = createInitialState(DEFAULT_CONFIG);
     state.chargedT = DEFAULT_CONFIG.chargedSecs;
-    scoreTick(sc, state, DEFAULT_CONFIG);
+    scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
     expect(sc.multiplier).toBeCloseTo(DEFAULT_SCORE_CONFIG.streakMax, 6);
   });
 

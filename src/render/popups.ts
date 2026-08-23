@@ -23,6 +23,30 @@ const LIFE = 1.15;
 const LIFE_SUPER = 1.6;
 const LIFE_SHOUT = 1.4;
 /**
+ * A burn lives longer than the others, because its number has to count.
+ *
+ * Long enough that the roll below finishes well before the fade starts: the fade
+ * takes the last 45% of the life, so at 1.7s it begins at 0.94s and the roll lands
+ * at 0.8s.
+ */
+const LIFE_BURN = 1.7;
+
+/**
+ * Seconds a burn's number spends counting up to its total.
+ *
+ * The count happens AFTER the drag, not during it. A live tally beside the ship
+ * was built and taken out again — see PORT_NOTES 51 — and the reason it lost is
+ * that a number climbing next to a ship that is inches from a wall competes with
+ * the decision the player is actually making. Afterwards there is nothing left to
+ * decide and the number has the moment to itself.
+ *
+ * 0.8s against a drag that runs 0.45s at the median: the tally deliberately takes
+ * longer than the thing it is counting, so it reads as a total being tallied up
+ * rather than as a replay of the drag in real time.
+ */
+const ROLL = 0.8;
+
+/**
  * The closing tally of a charged window. Longest-lived thing that floats.
  *
  * It arrives as the frenzy ends, when nothing else is coming, and it is the one
@@ -76,7 +100,24 @@ const STACK_GAP = 20;
  */
 const STACK_X = 80;
 
-import { HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+import { BURN_WORD, HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+
+/**
+ * The dark rim that keeps text legible over planets and stars.
+ *
+ * Thinner and lighter than it was — 3px at .55 alpha, which was sized for a text
+ * colour that no longer exists. `ROUTINE` used to be a dark grey that needed
+ * separating from a dark sky by force; it is a near-white now, and the rim only
+ * has to keep it off the occasional bright star. A heavy black outline under pale
+ * text reads as a sticker.
+ */
+const RIM_WIDTH = 2;
+const RIM = 'rgba(0,0,0,.38)';
+
+function easeOutCubic(u: number): number {
+  const k = 1 - u;
+  return 1 - k * k * k;
+}
 
 interface Popup {
   x: number;
@@ -87,6 +128,8 @@ interface Popup {
   points: number | null;
   praise: Praise | null;
   shout: string | null;
+  /** Seconds the number spends counting up to `points`. 0 shows it at once. */
+  roll: number;
   /** A hop inside a charged window: off the rarity ladder, purple. */
   hop: boolean;
   /** The closing tally of a window. Drawn large, and without a `+`. */
@@ -114,14 +157,16 @@ export class Popups {
    */
   spawn(award: ScoreAward, x: number, y: number): void {
     const praise = praiseFor(award);
+    const burning = award.kind === 'burn';
     this.live.push({
       x,
       y: this.freeY(x, y),
       t: 0,
-      life: praise?.category === 'super' ? LIFE_SUPER : LIFE,
+      life: burning ? LIFE_BURN : praise?.category === 'super' ? LIFE_SUPER : LIFE,
       points: award.points,
       praise,
       shout: null,
+      roll: burning ? ROLL : 0,
       hop: award.kind === 'hop',
       tally: false,
     });
@@ -162,6 +207,7 @@ export class Popups {
       hop: false,
       tally: false,
       shout: shout.word,
+      roll: 0,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -188,6 +234,7 @@ export class Popups {
       hop: false,
       tally: true,
       shout: null,
+      roll: 0,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -224,8 +271,8 @@ export class Popups {
         // thing on screen and, at that size, the hardest to read over anything
         // else in the air.
         ctx.font = `600 ${SHOUT.size * s}px ui-monospace, monospace`;
-        ctx.lineWidth = 3 * s;
-        ctx.strokeStyle = 'rgba(0,0,0,.55)';
+        ctx.lineWidth = RIM_WIDTH * s;
+        ctx.strokeStyle = RIM;
         ctx.strokeText(p.shout, x, y);
         ctx.fillStyle = SHOUT.color;
         ctx.fillText(p.shout, x, y);
@@ -235,17 +282,25 @@ export class Popups {
       // A hop is off the ladder: it pays flat, so there is no quality for a
       // rarity colour to report. See `HOP` in `accolade.ts`.
       const style = p.tally ? HOP_TALLY : p.hop ? HOP : p.praise ? LEVEL[p.praise.level] : ROUTINE;
+      const burning = p.praise?.category === 'burn';
+      // The ember is the WORD's, never the number's.
+      const wordColor = burning ? BURN_WORD.color : style.color;
+      // And a burn's number is always the default grey, whether or not it earned a
+      // word. Letting it take a ladder colour meant a drag that scored well turned
+      // BLUE next to an orange word — two hues on one two-line popup, neither of
+      // them fire. Size still climbs with the rung, so how good it was is not lost.
+      const numberColor = burning ? ROUTINE.color : style.color;
 
       if (p.praise) {
         // A brief overshoot on the way in. Only the top of the ladder gets it —
         // on an ordinary word it reads as a wobble rather than as emphasis.
         const pop = p.praise.level === 'exceptional' ? 1 + 0.35 * Math.max(0, 1 - u * 6) : 1;
         ctx.font = `600 ${style.size * pop * s}px ui-monospace, monospace`;
-        ctx.fillStyle = style.color;
+        ctx.fillStyle = wordColor;
         // A dark rim rather than a filled plate: the word sits over planets and
         // stars, and a box that size would punch a hole in the scene.
-        ctx.lineWidth = 3 * s;
-        ctx.strokeStyle = 'rgba(0,0,0,.55)';
+        ctx.lineWidth = RIM_WIDTH * s;
+        ctx.strokeStyle = RIM;
         ctx.strokeText(p.praise.word, x, y);
         ctx.fillText(p.praise.word, x, y);
       }
@@ -254,15 +309,20 @@ export class Popups {
       if (p.points === null) continue;
       const numY = y + (p.praise ? style.size + 2 : 0) * s;
       ctx.font = `600 ${(p.praise ? style.size - 2 : style.size) * s}px ui-monospace, monospace`;
-      ctx.fillStyle = style.color;
-      ctx.lineWidth = 3 * s;
-      ctx.strokeStyle = 'rgba(0,0,0,.55)';
+      ctx.fillStyle = numberColor;
+      ctx.lineWidth = RIM_WIDTH * s;
+      ctx.strokeStyle = RIM;
       // Always a gain: nothing takes points away.
       //
+      // A rolling number decelerates into its total rather than arriving at a
+      // constant rate: the last digits settling slowly is what makes it read as a
+      // tally coming to rest instead of a counter that was cut off.
+      const shownPoints =
+        p.roll > 0 ? Math.round(p.points * easeOutCubic(Math.min(1, p.t / p.roll))) : p.points;
       // The tally is the one thing here that is not a payment — it restates what
       // the window's hops already banked — so it drops the `+`. A fourth `+500`
       // arriving as the total of three would read as a fourth award.
-      const text = p.tally ? formatScore(p.points) : `+${formatScore(p.points)}`;
+      const text = p.tally ? formatScore(p.points) : `+${formatScore(shownPoints)}`;
       ctx.strokeText(text, x, numY);
       ctx.fillText(text, x, numY);
     }

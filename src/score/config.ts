@@ -28,7 +28,10 @@
  * The exceptions, which carry their own measured rationale and should not be
  * moved on feel: `closeSpan`, `flybyCloseBonus` (why closeness and not speed),
  * `flybyBase` and `streakStep` (both retuned against a recorded speed run),
- * and `streakMax` (which has already been mis-tuned once on too small a sample).
+ * `streakMax` (which has already been mis-tuned once on too small a sample), and
+ * all three `burn*` keys — calibrated on the 159 dead-zone drags in the corpus,
+ * with `burnEdgeSpan` pinned by a test to the hazard band's own width rather than
+ * chosen at all.
  */
 export interface ScoreConfig {
   // --- what one capture-and-release is worth ---
@@ -121,6 +124,59 @@ export interface ScoreConfig {
    */
   aimSharpness: number;
   timingSharpness: number;
+
+  // --- the burn ---
+  /**
+   * Distance from the lethal side line, in px, at which dead-zone heat reaches
+   * zero. The inner edge of the red band.
+   *
+   * MUST MATCH `RenderConfig.hazardZoneWidth`, and `test/score.test.ts` pins the
+   * two together. The flame's intensity is meant to track the red gradient the
+   * player can already see; a fire that peaked somewhere other than where the red
+   * does would be teaching a line that is not the line.
+   */
+  burnEdgeSpan: number;
+  /**
+   * Points per heat-second of dragging the dead zone.
+   *
+   * Derived from the drags that SURVIVE, because those are the only ones that
+   * ever pay — a death drops the banked flare entire. Their median integrates
+   * 0.153 heat-seconds, so 555 puts it at ~85 points, the band `closeBonus` 150
+   * and `nerveBonus` 200 already occupy. The best on record lands at ~510.
+   *
+   * Re-derived when `burnMinHeat` dropped to the band's edge: lighting on the
+   * shallow grazes too pulled the median integral down, so the same points band
+   * needs more rate behind it.
+   *
+   * Worth noticing that this is a THIRD of the rate the reentry burn used, for
+   * the same points: an edge-drag lasts four to ten times longer than a periapsis
+   * flare, so the same payout needs far less rate behind it.
+   */
+  burnRate: number;
+  /**
+   * Heat below which the ship is not burning: no flame, and no points.
+   *
+   * It brackets the flare — a burn award is owed when heat falls back under this
+   * — so it decides what counts as one drag rather than two, and it withholds the
+   * points from a smoulder too faint to draw. A weight, not a constant, because
+   * it changes what a session scores.
+   *
+   * As close to the band's outer edge as a weight is allowed to sit. "The second
+   * they enter the dangerous red zone" is the brief, and the honest value for that
+   * is zero — heat is exactly 0 outside the band or while drifting, so `heat > 0`
+   * already brackets a drag perfectly and needs no threshold at all.
+   *
+   * It is 0.01 rather than 0 for a mechanical reason worth writing down:
+   * `test/score.test.ts` proves a weight is live by trying it at 0, half and
+   * double, and every one of those is 0 when the value is 0 — so a zero weight
+   * reads as a dead one and fails a test that is right to exist. 0.01 is 0.6px
+   * inside a 60px band: the same instant, and still a number.
+   *
+   * At the old 0.10 the fire kindled 54px out, and 7% of band entries grazed the
+   * outer strip and left without ever lighting — visibly in the red with nothing
+   * happening, which is precisely what the brief was about.
+   */
+  burnMinHeat: number;
 
   // --- the streak ---
   /**
@@ -228,20 +284,29 @@ export interface ScoreConfig {
  *   grab  = (close + nerve)                      x multiplier   at periapsis
  *   link  = (base + climb + timing + aim)        x multiplier   at the release
  *   flyby = (base + close)                       x multiplier   at closest approach
+ *   burn  = (dead-zone depth, integrated)        x multiplier   when the fire dies
  *
- * Three events, because they are settled at different moments and describe
+ * Four events, because they are settled at different moments and describe
  * different acts. The grab is judged on how the ship arrived and pays when the
  * dive swings through the bottom — not at the press, so a tap that never gets
  * there earns nothing and tapping beside a planet is not a faucet. The link is
  * judged on how it left. The flyby is judged on a pass that was never a capture
  * at all, and pays at the bottom of it for the same reason the grab does.
  *
- * The flyby is the newest and the one whose real payload is not in the line
- * above: it steps the streak. Before it, the ladder counted links, so the only
- * way to reach a large multiplier was to stop at bodies — and a life measured
- * covering 3.1x the ground per second earned a fifteenth as much per pixel as a
- * chained one, capped at x2 while the chained life ran at x5-x7. Speed was
- * already the harder thing to do and was the thing the score could not see.
+ * The flyby's real payload is not in the line above: it steps the streak. Before
+ * it, the ladder counted links, so the only way to reach a large multiplier was to
+ * stop at bodies — and a life measured covering 3.1x the ground per second earned
+ * a fifteenth as much per pixel as a chained one, capped at x2 while the chained
+ * life ran at x5-x7. Speed was already the harder thing to do and was the thing
+ * the score could not see.
+ *
+ * The burn is judged on a stretch of the ride: how long the ship spent inside the
+ * dead zone at the field's edge while hanging off a planet, and how deep it went.
+ * It is the only one that accrues rather than being read off an instant, the only
+ * one that can pay twice in one capture, and the only one a DEATH can cancel —
+ * `endLife` drops the banked flare, so the 78% of edge-drags that end in the wall
+ * pay nothing at all. The fire on those is a warning, not an award. Only pulling
+ * out alive collects: the drama is free and the rescue is what scores.
  *
  * `close` is how near you let the body get before committing to the grab.
  * `cap.tightness` was the obvious candidate and is the wrong one — it saturates
@@ -276,6 +341,10 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   flybyCloseBonus: 300,
   aimSharpness: 3,
   timingSharpness: 2,
+
+  burnEdgeSpan: 60,
+  burnRate: 555,
+  burnMinHeat: 0.01,
 
   streakStep: 0.4,
   streakMax: 5,

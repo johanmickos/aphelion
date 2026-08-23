@@ -49,6 +49,20 @@ export class Scene {
   private readonly deps: SceneDeps;
 
   /**
+   * The flame's own heat, chasing the scorer's.
+   *
+   * Two reasons it is not drawn straight from `score.burnHeat`. It is sampled on
+   * the simulation tick, and a hot pass is only about ten of them — on a 120Hz
+   * screen an un-smoothed flame would visibly step through a dozen sizes beside a
+   * ship that interpolates. And fire has thermal inertia: it should catch fast and
+   * die slowly, so the asymmetric rates below are the look, not just a filter.
+   *
+   * Render-only state. The scorer's value is untouched, and nothing here can
+   * reach the simulation.
+   */
+  private burn = 0;
+
+  /**
    * The charged storm's closing animation. See `drawNebula`.
    *
    * Seconds since the window ended, or -1 when nothing is playing. Render state
@@ -164,11 +178,20 @@ export class Scene {
     if (!opts.paused) {
       this.popups.update(opts.frameDt);
       this.fuelWarning.update(opts.frameDt);
+      // Catches in ~0.03s and dies over ~0.25s. The rise is deliberately quicker
+      // than it first was: a flare runs about 0.2s, so a follower that needed a
+      // tenth of that to catch was shaving the peak off the very thing it draws.
+      // A pause holds the flame where it was, for the same reason it holds the
+      // popups: nothing should burn down behind the overlay.
+      const target = opts.score.burnHeat;
+      const rate = target > this.burn ? 30 : 4;
+      this.burn += (target - this.burn) * Math.min(1, opts.frameDt * rate);
+      if (this.burn < 0.002) this.burn = 0;
     }
 
     this.trail.draw(ctx, cam, snap.x, snap.y);
     drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
-    drawShip(ctx, cam, snap, opts.score.hopped.length);
+    drawShip(ctx, cam, snap, opts.score.hopped.length, this.burn, opts.timeMs);
 
     // Above the ship and its wake, below the HUD: it belongs to the world, but
     // nothing in the world should ever cover it.

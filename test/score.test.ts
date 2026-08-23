@@ -15,7 +15,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
-import { createBodies } from '../src/sim/world.ts';
+import { createBodies, fieldBounds, inAnomalyField } from '../src/sim/world.ts';
+import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { grabTarget } from '../src/sim/capture.ts';
 import { hypot } from '../src/sim/orbit.ts';
 import { fingerprint } from '../src/sim/serialize.ts';
@@ -32,6 +33,8 @@ import {
   shoutWord,
   CLOSE_PX,
   DEFAULT_SCORE_CONFIG,
+  edgeHeat,
+  reentryHeat,
   PEAK,
   WORDS,
   createScoreState,
@@ -86,7 +89,7 @@ function play(
     if (released) held = false;
     stepSim(state, cfg, { held: held || pressed, pressed, released } as Input, FIXED_DT);
     if (score) {
-      const out = scoreTick(sc, state, cfg, scfg);
+      const out = scoreTick(sc, state, cfg, FIXED_DT, scfg);
       awards.push(...out.awards);
       shouts.push(...out.shouts);
     }
@@ -159,7 +162,7 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
     }
 
     stepSim(state, cfg, { held: held || pressed, pressed, released }, FIXED_DT);
-    const out = scoreTick(sc, state, cfg, scfg);
+    const out = scoreTick(sc, state, cfg, FIXED_DT, scfg);
     awards.push(...out.awards);
     shouts.push(...out.shouts);
     if (sc.score === 0 && prevScore > 0) lives.push(prevScore);
@@ -235,6 +238,23 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
       [260, 0],
     ],
     ticks: 420,
+  },
+  /**
+   * Dragged along the dead zone while hanging off a planet.
+   *
+   * Here for the same reason as the nerve grab above: without it `burnEdgeSpan`
+   * measures as inert, because none of the other sessions ever takes the ship
+   * into the red band while captured — a blind spot in the fixture, not a dead
+   * weight. Real play does it 2.5 times a session; this battery did it never.
+   *
+   * Starts 20px inside the right wall (which is at x=565.5) falling at 120px/s,
+   * and grabs once the swing has begun. Worth 152 ticks inside the band.
+   */
+  {
+    name: 'dragged along the dead zone',
+    ship: { x: 545.5, y: 200, vx: 0, vy: -120 },
+    edges: [[90, 1]],
+    ticks: 900,
   },
   // holds through the settle and releases mid-decay
   {
@@ -599,6 +619,7 @@ const grab = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   skim: 40,
   defl: 3,
   timing: 0,
+  heat: 0,
   aim: 0,
   climb: 0,
   ...over,
@@ -617,6 +638,7 @@ const link = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   timing: REAL.timing.med,
   aim: REAL.aim.med,
   climb: 400,
+  heat: 0,
   ...over,
 });
 
@@ -863,11 +885,11 @@ describe('the reckless shout', () => {
       for (const d of deflections) {
         state.capture = capAt(d);
         state.tick = tick++;
-        shouts.push(...scoreTick(sc, state, cfg).shouts);
+        shouts.push(...scoreTick(sc, state, cfg, FIXED_DT).shouts);
       }
       state.capture = null;
       state.tick = tick++;
-      shouts.push(...scoreTick(sc, state, cfg).shouts);
+      shouts.push(...scoreTick(sc, state, cfg, FIXED_DT).shouts);
     };
 
     /**
@@ -894,11 +916,11 @@ describe('the reckless shout', () => {
       state.ship.vx = speed;
       state.ship.vy = 0;
       state.tick = tick++;
-      scoreTick(sc, state, cfg); // a drift tick, so `lastDrift` carries the speed
+      scoreTick(sc, state, cfg, FIXED_DT); // a drift tick, so `lastDrift` carries the speed
       state.ending.active = true;
       state.ending.reason = reason;
       state.tick = tick++;
-      shouts.push(...scoreTick(sc, state, cfg).shouts);
+      shouts.push(...scoreTick(sc, state, cfg, FIXED_DT).shouts);
       state.ending.active = false;
     };
 
@@ -1129,6 +1151,12 @@ describe('a flyby that stays a flyby', () => {
     //
     // Both pay `flybyBase` and no closeness: 400px to the side is far outside
     // `closeSpan`, which is the point — the floor is not a closeness test.
+    //
+    // Filtered to flyby awards, and that is not tidiness: this line starts 37.9px
+    // from the left wall, which is inside the 60px dead zone, so a captured ship
+    // on it also earns a BURN. That award is correct and has nothing to do with
+    // the floor being tested here — the assertion just has to say which kind it
+    // is talking about.
     const paid = (speed: number): ScoreAward[] =>
       play(
         [
@@ -1146,11 +1174,10 @@ describe('a flyby that stays a flyby', () => {
           vx: 0,
           vy: -speed,
         },
-      ).awards;
+      ).awards.filter((a) => a.kind === 'flyby');
     expect(paid(140), 'a flyby below the floor was paid').toHaveLength(0);
     const fast = paid(160);
     expect(fast, 'the control pass stopped reaching a flyby — see FAR_BODY').toHaveLength(1);
-    expect(fast[0]!.kind).toBe('flyby');
     expect(fast[0]!.points).toBe(DEFAULT_SCORE_CONFIG.flybyBase);
   });
 
@@ -1222,7 +1249,7 @@ describe('the grab award lands at periapsis, not at the press', () => {
       if (released) held = false;
       stepSim(st, cfg, { held: held || pressed, pressed, released } as Input, FIXED_DT);
       if (freeze < 0 && st.capture?.passedPeri) freeze = t;
-      for (const a of scoreTick(sc, st, cfg).awards)
+      for (const a of scoreTick(sc, st, cfg, FIXED_DT).awards)
         if (a.kind === 'grab' && paid < 0) paid = a.tick;
     }
     expect(freeze, 'the capture never reached periapsis').toBeGreaterThan(240);
@@ -1284,3 +1311,183 @@ describe('the grab award lands at periapsis, not at the press', () => {
     expect(l.clearance).toBe(Infinity);
   });
 });
+
+// ------------------------------------------------------------------------ burn
+
+/**
+ * The burn's guarantees.
+ *
+ * The mechanic is three conditions at once — inside the red band at the field's
+ * edge, captured, and not sheltered by an anomaly bubble — and each is here
+ * because dropping it breaks the fantasy in a specific way. Drifting through the
+ * band is not "barely hanging on", it is just dying; and inside a bubble the wall
+ * is switched off, so there is nothing to hang on against.
+ */
+describe('the burn', () => {
+  const bodies = createBodies(DEFAULT_CONFIG);
+  const field = fieldBounds(DEFAULT_CONFIG, bodies);
+
+  /** Read the heat for a ship parked at a world x, captured or not. */
+  const heatAt = (x: number, captured: boolean): number =>
+    edgeHeat(x, 0, field, bodies, captured, DEFAULT_SCORE_CONFIG);
+
+  it('burns hotter the deeper into the dead zone the ship is', () => {
+    const span = DEFAULT_SCORE_CONFIG.burnEdgeSpan;
+    expect(heatAt(field.left, true)).toBeCloseTo(1, 5);
+    expect(heatAt(field.left + span / 2, true)).toBeCloseTo(0.5, 5);
+    expect(heatAt(field.left + span, true)).toBeCloseTo(0, 5);
+    // Both walls, not just the one the arithmetic was written against.
+    expect(heatAt(field.right, true)).toBeCloseTo(1, 5);
+  });
+
+  it('lights the moment the ship crosses into the red band', () => {
+    // "From the second they enter the dangerous red zone." At the old threshold of
+    // 0.10 the fire kindled 54px out, and 7% of band entries grazed the outer strip
+    // and left without ever lighting — the player visibly in the red with nothing
+    // happening, which is the whole thing that was being complained about.
+    const span = DEFAULT_SCORE_CONFIG.burnEdgeSpan;
+    expect(heatAt(field.left + span - 1, true)).toBeGreaterThan(DEFAULT_SCORE_CONFIG.burnMinHeat);
+    // And nothing at all a pixel outside it.
+    expect(heatAt(field.left + span + 1, true)).toBe(0);
+  });
+
+  it('does not burn in mid-field, however the ship got there', () => {
+    expect(heatAt((field.left + field.right) / 2, true)).toBe(0);
+  });
+
+  it('does not burn while drifting, even at the lethal line', () => {
+    // 11018 ticks of the corpus are exactly this. A ship drifting through the
+    // band is not hanging on to anything — it is about to die, and that is not
+    // the thing being dramatised.
+    expect(heatAt(field.left, false)).toBe(0);
+    expect(heatAt(field.left, true)).toBeGreaterThan(0);
+  });
+
+  it('does not burn inside an anomaly bubble, where the wall is switched off', () => {
+    // The bubble SUSPENDS the side boundary — that is the entire anomaly
+    // mechanic. Burning there would promise a danger the simulation has
+    // explicitly turned off.
+    const a = bodies.find((b) => b.kind === 'anomaly');
+    expect(a, 'the default field should contain an anomaly').toBeDefined();
+    const anomaly = a!;
+    const wall = anomaly.x < (field.left + field.right) / 2 ? field.left : field.right;
+    expect(inAnomalyField(wall, anomaly.y, bodies)).toBe(true);
+    expect(edgeHeat(wall, anomaly.y, field, bodies, true, DEFAULT_SCORE_CONFIG)).toBe(0);
+  });
+
+  it('pays for a drag that is pulled out of, and nothing for one that hits the wall', () => {
+    // The shape of the whole mechanic: the fire is free drama on the way out and
+    // an award only if the ship survives. `endLife` drops the bank, so a death
+    // cannot pay — which matters, because 78% of real edge-drags end in one.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+
+    /** Hold the ship in the band for `ticks`, then either let go or die. */
+    const drag = (sc: ScoreState, ticks: number, kill: boolean): ScoreAward[] => {
+      const out: ScoreAward[] = [];
+      // Positioned through the capture's body-relative offset, NOT `state.ship`:
+      // during a capture the scorer reads `shipWorldPos`, and `state.ship` is
+      // stale. Writing the wrong one here silently measured zero heat.
+      const anchor = state.bodies[0]!;
+      for (let i = 0; i < ticks; i++) {
+        state.tick++;
+        state.capture = fakeCapture();
+        state.capture.rx = f.left + 10 - anchor.x;
+        state.capture.ry = -anchor.y;
+        out.push(...scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT).awards);
+      }
+      state.tick++;
+      if (kill) state.ending.active = true;
+      else state.capture = null;
+      out.push(...scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT).awards);
+      return out.filter((a) => a.kind === 'burn');
+    };
+
+    const survived = createScoreState();
+    const paid = drag(survived, 30, false);
+    expect(paid).toHaveLength(1);
+    expect(paid[0]!.points).toBeGreaterThan(0);
+    expect(survived.burnBank).toBe(0);
+
+    state.ending.active = false;
+    state.capture = null;
+    const dying = createScoreState();
+    expect(drag(dying, 30, true)).toHaveLength(0);
+    expect(dying.burnBank).toBe(0);
+  });
+
+  it('matches the red band the player can actually see', () => {
+    // Two modules, one number. The flame is meant to track the hazard gradient,
+    // so a fire peaking somewhere other than where the red does would teach a
+    // line that is not the line. `src/score/` may not import `src/render/`, so
+    // nothing but a test can hold the two together.
+    expect(DEFAULT_SCORE_CONFIG.burnEdgeSpan).toBe(DEFAULT_RENDER_CONFIG.hazardZoneWidth);
+  });
+
+  it('keeps the reentry model working even though nothing is wired to it', () => {
+    // Retained for a future atmosphere effect, and kept exercised so it cannot
+    // rot. The property under test is the one that makes it worth having: a
+    // parked orbit is slow, so depth alone must not light it.
+    //
+    // The bound is a closed form, not a sample — sqrt(GM/minR) around the
+    // smallest body the generator makes. A recording once suggested 342px/s and
+    // the true ceiling is 345.8; a gate set to the sample burns while parked.
+    let smallest = Infinity;
+    for (let seed = 0; seed < 400; seed++) {
+      for (const b of createBodies({ ...DEFAULT_CONFIG, worldSeed: seed })) {
+        smallest = Math.min(smallest, b.R);
+      }
+    }
+    const parkedCeiling = Math.sqrt(DEFAULT_CONFIG.GM / (smallest + DEFAULT_CONFIG.minOrbitGap));
+    expect(reentryHeat(0, parkedCeiling)).toBe(0);
+    // Same place, dive speed: burns. Fast but high: does not. Both terms required.
+    expect(reentryHeat(0, 480)).toBeGreaterThan(0);
+    expect(reentryHeat(500, 480)).toBe(0);
+  });
+});
+
+/** A capture the scorer only ever reads for "is one happening". */
+function fakeCapture(): NonNullable<SimState['capture']> {
+  return {
+    phase: 'orbit',
+    planet: 0,
+    rx: 0,
+    ry: 0,
+    vx: 0,
+    vy: 0,
+    grabR: 100,
+    minR: 50,
+    prevR: 100,
+    prevDR: 0,
+    passedPeri: true,
+    periR: 100,
+    apoR: 100,
+    clearFramesLeft: 0,
+    clearDvx: 0,
+    clearDvy: 0,
+    whipE: undefined,
+    orbit: null,
+    theta: 0,
+    phaseSpeed: 0,
+    phaseSpeedReal: 0,
+    phaseMul: 1,
+    Lfrozen: undefined,
+    rPeri: 100,
+    settleT: 1,
+    settleProgress: 1,
+    tightness: 1,
+    boostFull: 0,
+    boost: 0,
+    boostT: 0,
+    settleSweep: 0,
+    refuel: 0,
+    approachR0: 0,
+    approachVR: 0,
+    settleDur: 1,
+    zipped: false,
+    puttered: false,
+    brakeSpent: 0,
+    lastAngle: 0,
+    defl: 0,
+  };
+}

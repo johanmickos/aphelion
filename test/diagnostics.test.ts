@@ -514,7 +514,7 @@ describe('a report that survives its own replay diverging', () => {
       if (released) held = false;
       recorder.recordInput(state.tick, pressed, released);
       stepSim(state, cfg, { held: held || pressed, pressed, released }, FIXED_DT);
-      recorder.recordAwards(scoreTick(score, state, cfg).awards);
+      recorder.recordAwards(scoreTick(score, state, cfg, FIXED_DT).awards);
       recorder.recordTick(state);
     }
     return { recorder, state, score };

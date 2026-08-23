@@ -2425,6 +2425,339 @@ scoring is an observer and nothing under `src/sim/` changed. See "Scoring is not
 
 ---
 
+### 49 — Closeness is given away, so the burn had to be paid for in speed
+
+`src/score/burn.ts` · **[ADDED]** · requested as "a fire-like flare and red point
+boost when I pull really close to the edge while capturing a planet, and I want
+the points to roll up while the ship is burning"
+
+Read literally, "really close to the edge" is altitude, and altitude is the one
+thing in this game that cannot be earned. The clearance correction (note 18)
+deliberately steers every dive down onto `minR`. Measured over the 1386 captures
+in `diagnostics/`, by phase, the share of captures bottoming out under 0.5px of
+clearance:
+
+```
+dive (clear)    17%
+settle          54%
+orbit (parked)  68%
+```
+
+Two thirds of settled orbits sit at EXACTLY zero. A burn gated on depth would
+have paid most for holding still on the floor — the idle faucet the grab award
+already refuses to open by paying at periapsis rather than at the press.
+
+**Speed is what separates a hot pass from parking, and it separates it cleanly.**
+A parked minimum orbit is a slow circle: across the whole corpus its speed never
+exceeds 342px/s, while a dive whipping through periapsis reaches 430-570. So heat
+is `depth * speed` with the speed term starting at 360, just above everything
+parking can reach, and of the captures that flare, **zero flare while parked**.
+That is also the physics the flame is drawing — heating goes as density times
+speed cubed — so the honest mechanic and the legible picture turned out to be the
+same one.
+
+**The objection, and the measurement that answered it.** A fast periapsis needs an
+eccentric orbit, so the burn looked like it would reward being stretched far out —
+paying for the lazy distant grab that `closeBonus` exists to discourage. It does
+the opposite. Peak heat against grab clearance correlates **-0.36**, against
+apoapsis **-0.43**. A grab from 200px+ out flares 19% of the time; an apoapsis of
+400-800px flares **1%**, because a stretched approach arrives as a flyby that has
+to be braked, and braking sheds exactly the speed the heat is made of. What burns
+is the middle: apoapsis 100-200px, grabbed 25-100px out.
+
+So it does not double-pay `close`, it complements it at the opposite extreme — a
+grab from inside 10px flares **0%** of the time, having no dive left to build
+speed with, and that is precisely where `close` and the nerve bonus pay most.
+
+**The burn is a flash, and no amount of tuning makes it a burn.** Median flare
+0.17s over 760 real ones, p90 0.28s. Widening the hot zone from 30px to 80px moved
+the median to 0.18s — the speed term bounds the flare, not the altitude. A tally
+cannot be read in 0.17s, so the fire stays the length it really is and the
+READOUT is what lingers: the points are settled the instant the flame dies, and
+the popup rolls an already-decided number up over 0.8s. It is an animation of a
+finished total, not a meter that keeps earning.
+
+**What is red and what is not.** The flame is red because it is fire. The points
+and the word ride the rarity ladder like every other award, because colour on an
+award means how good it was and nothing else — see `src/render/accolade.ts`. The
+alternative was a second exception to that rule alongside the reckless shout, for
+a cue that already has a shape, a size and a position nothing else in the game
+uses.
+
+Thresholds are percentiles of the same corpus. The word fires at peak heat 0.68
+(p70 of flares, about one capture in six) and its better rung at 0.94 (p90, about
+one in eighteen); 45% of captures flare at all, and most of those earn points and
+no name. `burnRate` 1125 puts a median capture's burn at ~84 points and the best
+on record at ~182 — the band `closeBonus` and `nerveBonus` already occupy.
+
+**Retuned once, on the first playtest**, reported as "I didn't see any red glow or
+flare or counter rolling up as I hugged the edge". Both cues were in fact working
+— replayed through the real render path, the flame drew and the popup counted
+`+10 -> +163  SINGED`. They were calibrated into invisibility, and in two separate
+ways:
+
+- **The speed ramp was twice as wide as it should have been.** 360-560 came from
+  the p99 of low passes, but a typical skim runs 370-400 — the bottom fifth of
+  that ramp — so speed swamped depth and a genuine 2px graze scored heat 0.15.
+  Narrowed to 355-520: the same graze now reads 0.21, and the session's best pass
+  went 0.63 -> 0.79. Narrower was tried and overshoots — at 430 the median flare
+  saturates at 0.90 and the ladder has nothing left to grade.
+- **The flame was drawn linearly in heat.** `drawBurn` now renders `sqrt(heat)`,
+  which is presentation and not physics: heat stays exactly what the scorer
+  integrated. A mid flare went from a 27px plume at 21% alpha to 42px at 34%.
+  `burnMinHeat` rose 0.05 -> 0.10 to meet it, so the faintest fire that can exist
+  is one you can see — before, a heat-0.05 flare paid `+1` and drew nothing, which
+  is the worst of both.
+
+**Third pass, and the actual defect: fire that was not bright and not red.**
+Reported as "no flames or redness or red text counting my score", on a session
+whose replay is bit-exact against the build — so it was not a stale bundle. Three
+things were true at once and only one of them was the bug:
+
+- The flame was NOT too brief, which was asserted here in between and was wrong.
+  Heat cleared the ignition floor for only 3-7 ticks, but the ember decay stretched
+  each episode to 65-77 frames — 1.08 to 1.28 SECONDS on screen, three times.
+- It was too dim and the wrong colour. Opacity was linear in `vis`, on the
+  assumption that heat near 1.0 would be typical. It is not: a real skim scores
+  about 0.25, so `vis` sat near 0.5 and every flame drew at half strength —
+  measured, peak alpha 0.37 against a near-white (255,236,190) core, which over
+  black is RGB (94,87,70). A warm grey smudge, no brighter than the trail that is
+  always there.
+- So heat now drives SIZE and COLOUR TEMPERATURE and only gently drives opacity:
+  `alpha = 0.58 + 0.42*vis`, and the white-hot core is reserved for a flare that
+  earned it (`white = vis^2`) so everything below reads as orange-red. At the
+  player's own heat of 0.26 the core goes from (95,88,71) to (174,119,57) at
+  double the alpha — red:green 1.46 against 1.08, which is to say from grey to
+  orange. A small fire is still a fire.
+
+`test/canvas-stub.ts` now records `addColorStop` instead of swallowing it. A
+gradient IS the colour of the thing being drawn, and a stub that discards them
+cannot tell a red flame from a grey one — which is why two rounds of render tests
+passed over this defect.
+
+**And the bound that was nearly got wrong.** The retune wanted `burnSpeed0` at
+345, on the grounds that the corpus never parked faster than 342px/s. That is a
+sample, and the quantity has a closed form: a settled capture is a circle at
+radius >= `minR`, so its speed is `sqrt(GM/minR)`, largest around the smallest
+body the generator makes — **345.8px/s**. A gate at 345 would have burned while
+parked on any field containing that planet, reopening the exact faucet this
+mechanic was designed around. The gate is 355 and `test/score.test.ts` now pins it
+against the closed form rather than against a recording. Sample the physics, not
+the recordings, wherever the physics can be solved.
+
+Nothing under `src/sim/` changed: heat is read off `Capture` by an observer, the
+gate stayed at exactly zero, and no golden was recaptured.
+
+---
+
+### 50 — The fire moved to the wall
+
+`src/score/burn.ts` · **[CHANGED]** · "I only want the flames to show up when the
+ship is along the left or right edge near the red dead zone... like they're
+dragging through, barely hanging on to a distant planet to rescue them from
+explosion"
+
+Note 49's burn fired on a fast, low periapsis pass — an atmosphere model. It looked
+right and fired at the wrong moment. The trigger is now three conditions at once:
+
+1. inside the red band at the field's left or right edge
+2. CAPTURED — hanging off a planet rather than drifting
+3. not sheltered by an anomaly bubble
+
+Each clause is half of the sentence being dramatised. Without (2) there is nothing
+holding you: a ship drifting through the band is not barely hanging on, it is
+simply about to die, and **11018 ticks** of the corpus are exactly that. (3) is
+not in the brief and belongs anyway — a bubble SUSPENDS the side boundary, so
+inside one there is no wall to be saved from, and burning there would promise a
+danger the simulation has explicitly switched off (**3106 ticks**).
+
+Heat is depth into the band, 0 at its inner edge and 1 at the lethal line, so the
+flame tracks the red gradient the player can already see. `burnEdgeSpan` and
+`RenderConfig.hazardZoneWidth` are the same 60px and `test/score.test.ts` pins
+them together, because `src/score/` may not import `src/render/` and nothing else
+could hold them in step.
+
+**This is a far better fit than the old trigger, and the durations are why.**
+Measured over 58 sessions: 147 drags, 2.5 per session, 4.7% of all captured time.
+Median **0.42s**, p90 0.87s, longest 1.45s — four to ten times a periapsis flare,
+which is what finally makes "the points roll up while the ship is burning" a thing
+that can literally happen rather than a readout outliving a 0.17s flash.
+
+**78% of them end in death, and that is the mechanic rather than a flaw.** A death
+drops the whole banked flare (`endLife`), so a drag into the wall pays exactly
+nothing: the fire on those is a warning. Only the 22% that pull out alive collect.
+The drama is free; the rescue is what scores. No code was needed for this — it
+falls out of the bank being cleared by a death — but it is the reason the burn is
+the only award a death can cancel.
+
+That split also decided the word thresholds. Calibrating peak depth over all 147
+would be useless: the 114 that die all reach the line, so peak reads **1.00 at
+every percentile from p10 up**. The axis only has spread inside the population
+that can be praised — survivors run p25 0.27, p50 0.44, p70 0.57, p90 0.83 — so
+the tiers are drawn from those 33 alone.
+
+`burnRate` fell 1125 -> 425 for the same points band, which is just arithmetic: a
+drag lasts several times longer than a flare, so the same payout needs far less
+rate behind it.
+
+**The reentry model is kept and unwired**, at the author's request ("very good
+effect, like there's an atmosphere, I might want to use this in the future"). Its
+constants moved out of `ScoreConfig` — every key there must change some session's
+outcome, and an unwired weight cannot — and `test/score.test.ts` still exercises
+the property that makes it worth having, so it cannot rot into something that no
+longer works.
+
+One fixture note, and it is the second time this file has recorded it: adding the
+burn made `burnEdgeSpan` measure as inert, because no session in the scoring
+battery ever took the ship into the band while captured. A knob can read as dead
+because no scenario reaches the part of the run it governs — the same blind spot
+that made `nerveBonus` look dead. Real play does this 2.5 times a session; the
+battery did it never, until a scenario was added that does.
+
+---
+
+### 51 — Two red channels reverted, and the one word that kept its colour
+
+`src/render/burn-tally.ts` · **[REVERTED]** · asked for as "I want the time spent
+in the red zone, burning, to tally up a red text near the ship rolling upwards",
+withdrawn one playtest later as "the way you had it before was better (rolling up
+at the end)"
+
+Recorded because the argument for it was good and it still lost, which is the kind
+of thing that otherwise gets re-proposed every six months.
+
+The case for counting live: every other award is settled before a number appears —
+a grab pays at periapsis, a link at the release, and the popup reports something
+already over. A drag is not like that. The ship is in the red band with a wall a
+few pixels away and the question is live: hold on for more, or get out with what I
+have. A number that only arrives afterwards cannot be part of that decision. It
+had become buildable, too — a periapsis flare ran 0.17s, about four frames of a
+changing number, where a drag runs 0.45s at the median and up to 1.47s.
+
+What that argument missed is that the decision does not want help. Inches from a
+wall, a number climbing in peripheral vision competes with the thing the player is
+actually doing rather than informing it — and the fire is already saying
+everything the tally would, on a channel that costs no reading. Afterwards there
+is nothing left to decide and the number has the moment to itself.
+
+So the roll is back where it was: the popup counts 0 to the total over 0.8s once
+the drag is over, deliberately taking longer than the 0.45s drag it is summing so
+that it reads as a tally rather than as a replay in real time.
+
+Alongside it, and reverted with it, went a RED TEXT CHANNEL for the burn — its own
+colour whether or not the drag earned a word, in three shades of fire taken from
+the flame rather than from the band. Asked for as "all text should be shades of
+deep orange or red or black, to match the singe of fire", withdrawn as "I even
+preferred your original gray plus points".
+
+Which leaves `accolade.ts`'s one rule unbroken after all: **colour means how good
+it was**, the word says what, and the only thing red in this feature is the fire.
+A burn under the word threshold is `ROUTINE` grey like any other routine award,
+which is the commonest thing a burn is.
+
+Worth recording what the red channel got wrong, because the argument for it looked
+sound. It was defended as a STATE rather than a category — the ship is on fire, the
+band is red, the number is red, and nobody has to learn the hue. That is true and
+it is not the whole test. The band and the flame are already saying "you are
+burning" in a way that costs no reading at all; a third instance of the same signal
+adds nothing and spends the one channel the player uses to ask how good it was.
+`SHOUT` earns its off-ladder colour because it pays no points and therefore has no
+"how good" to report. A burn does.
+
+The measurement that survives is the one that made it awkward: every fire shade
+lands within dE 14-26 of some step of `FUEL_RAMP`, and nothing in the family does
+better, because `FUEL_RAMP` IS a fire gradient. Any future attempt to give a
+burning ship its own text colour runs into that and should expect to lose to it.
+
+**What did survive, on the third pass, is the word and only the word.** SINGED,
+SEARED, SCORCHED, BLAZING, INFERNO, METEOR now draw in a dark ember `#c04018`;
+the NUMBER beside them stays on the rarity ladder, grey when the drag earned no
+word and a ladder colour when it did.
+
+That is the narrow version of the exception, and it survives where the wide one
+did not because it does not spend the "how good" channel. The word is already
+about fire — the vocabulary names a thing that has a colour — and ladder blue is
+the one case where the ladder actively fights the word it is colouring. Nothing
+has to be learned; the player is reading the word FIRE while the ship is on fire.
+
+Two corrections came out of looking at it on a phone.
+
+**Red, and lit — after two wrong turns in opposite directions.** `#c04018` read as
+ketchup: G/R 0.33, but L* only 46, so it was dark AND brown. The fix lifted the
+lightness and the orange together (`#d9601f`, G/R 0.44, L* 55) and overshot into
+satsuma.
+
+The two knobs are separable, and that is the lesson: ketchup is a LIGHTNESS problem
+and orange is a HUE one. `#ee3f2c` takes the orange back out — G/R 0.26, redder
+than the brick ever was — while keeping the lightness that stopped it being brick:
+L* 54, contrast 5.4:1. A flame's own red, once it is not being drawn in mud.
+
+**The number is grey, always.** It followed the rarity ladder at first, so a drag
+that scored well turned the number BLUE next to an orange word: two hues on one
+two-line popup, neither of them fire. A burn's colour now lives entirely in its
+word, and size still climbs the rung, so how good it was is not lost.
+
+**And the default text was quiet in the wrong way.** `ROUTINE` sat at 3.6:1
+against the starfield — the least legible text in the game and the one shown most
+often, which is the wrong way round. Lightening it ran straight into the ladder:
+by `#838c9c` it was L* 58 against `good` at 66, and one more step would have closed
+that to 5 when the rungs above are 11 and 10 apart. dE had already fallen 41 -> 34,
+making it the closest pair in a table whose whole point was separation.
+
+**Lightness was the wrong axis.** A near-white at 66% alpha —
+`rgba(232,240,255,.66)`, effective (153,158,168) on black — is recessive because it
+has NO HUE, which leaves lightness free to be whatever legibility wants: L* 65 and
+7.8:1. Chroma is 5.8 against 42, 64 and 78 for the three rungs above it, so the
+ladder still climbs monotonically, now in saturation, and climbs harder than it
+ever did in light: 5.8 -> 42 is a bigger first step than 43 -> 66 was.
+
+It never had to be ranked against `good` in isolation anyway. A ROUTINE popup
+carries a number and NO WORD; the absence of the word is the signal, and the colour
+only has to look unremarkable while staying readable.
+
+The transparency is load-bearing rather than decorative: it is what stops a
+near-white being the brightest thing on a dark screen, and it lets the starfield
+through the strokes, which is what makes it read as a readout instead of a label
+pasted over the scene. The rim came down with it — 3px at .55 alpha was sized for
+a dark grey that needed forcing apart from a dark sky, and under pale text a heavy
+black outline reads as a sticker. 2px at .38 now.
+
+The general lesson, since it cost three passes: when a colour has to be quiet AND
+legible, those pull against each other only if quiet is spelled "dark". Spelled
+"colourless", they stop competing.
+
+It costs one piece of awkwardness worth knowing about: the score band draws points,
+multiplier and word as a single centred string, so a burn has to lay out two runs
+from the left edge of the pair to keep them centred as a unit. `test/render.test.ts`
+pins that, because if it drifts the band and the popup are back to answering the
+same question in two different colours.
+
+An industrial treatment for the word was tried on top of all this and reverted
+immediately — 700-weight, an ember glow, and the same corner brackets the LOST box
+uses, on the theory that the burn is the other moment the ship's computer would
+have something to say. It was too much decoration on a word that is already the
+loudest thing in the frame while a ship is on fire beside it. Plain text, fire
+colour.
+
+One thing from the attempt was kept, because it was a separate request that
+happened to arrive in the same breath:
+
+**It lights at the band's edge, not 6px inside it.** `burnMinHeat` was 0.10, which
+put ignition 54px from the lethal line — and 7% of band entries grazed the outer
+strip and left without ever lighting, which is the player visibly in the red with
+nothing happening. The honest value is 0: heat is exactly zero outside the band or
+while drifting, so `heat > 0` already brackets a drag and needs no threshold. It is
+0.01 rather than 0 only because `test/score.test.ts` proves a weight is live by
+trying it at 0, half and double — all of which are 0 when the value is 0, so a zero
+weight reads as a dead one. 0.01 is 0.6px into a 60px band.
+
+Lighting on the shallow grazes changed the population the weights are calibrated
+against — 159 drags rather than 147, survivors 44 rather than 33 — so `burnRate`
+went 425 -> 555 and the word tiers 0.57/0.83 -> 0.52/0.70. Same frequency targets,
+re-measured quantity.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -2447,11 +2780,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 98 · camera 55
+tests    port-equality 11 · invariants 32 · render 105 · camera 55
          diagnostics 25 · backtrack 15 · world 23 · tune 7 · clearance 14
-         score 66 · input 8 · grab-target 8 · link-fuel 6
+         score 74 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         charged 26 · attract 13 · 452 total
+         charged 26 · attract 13 · 467 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

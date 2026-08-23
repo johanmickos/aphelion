@@ -30,7 +30,7 @@ import {
 import { FUEL_WARNING, FuelWarning, pulseAlpha } from '../src/render/fuel-warning.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
-import { LEVEL, SHOUT } from '../src/render/accolade.ts';
+import { BURN_WORD, LEVEL, ROUTINE, SHOUT } from '../src/render/accolade.ts';
 import { FUEL_RAMP } from '../src/render/hud.ts';
 import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
 import {
@@ -360,6 +360,110 @@ describe('scene', () => {
     }
   });
 
+  it('draws fire on the ship while it is burning, and none when it is not', () => {
+    // The scene tests above all run on a fresh score state, where nothing is ever
+    // alight — so without this the flame path would never be drawn at all.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
+    centerCamera(c, snap.x, snap.y, f, null);
+
+    const frames = (burnHeat: number) => {
+      const scene = new Scene(
+        { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
+        99,
+      );
+      const r = recordingContext();
+      // Several frames, because the flame chases the scorer's heat rather than
+      // snapping to it — one frame in, it has barely caught.
+      for (let i = 0; i < 20; i++) {
+        r.reset();
+        scene.draw(r.ctx, c, snap, {
+          timeMs: i * 16.67,
+          paused: false,
+          viewportW: 390,
+          viewportH: 844,
+          headerBottom: 0,
+          frameDt: 1 / 60,
+          score: { ...createScoreState(), burnHeat },
+        });
+      }
+      return r;
+    };
+
+    const hot = frames(0.9);
+    const cold = frames(0);
+    // The wake is the only linear gradient the ship draws. The stub records a
+    // gradient factory under a '=' prefix, like a property set.
+    expect(hot.calls('=createLinearGradient').length).toBeGreaterThan(
+      cold.calls('=createLinearGradient').length,
+    );
+    for (const op of hot.ops) {
+      for (const arg of op.slice(1)) {
+        if (typeof arg === 'number') expect(Number.isFinite(arg)).toBe(true);
+      }
+    }
+  });
+
+  it('burns orange even when the burn is faint', () => {
+    // The defect this pins: opacity and colour both scaled linearly with heat, so
+    // a typical real skim — which scores around 0.25, not 1.0 — drew a near-white
+    // core at 37% alpha. Over black that is RGB (94,87,70): a warm grey smudge no
+    // brighter than the trail. Reported from a phone as "no flames or redness".
+    //
+    // Fire has to look like fire at the BOTTOM of its range, which is where nearly
+    // all of it happens.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
+    centerCamera(c, snap.x, snap.y, f, null);
+
+    const scene = new Scene(
+      { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
+      99,
+    );
+    const r = recordingContext();
+    for (let i = 0; i < 20; i++) {
+      r.reset();
+      scene.draw(r.ctx, c, snap, {
+        timeMs: i * 16.67,
+        paused: false,
+        viewportW: 390,
+        viewportH: 844,
+        headerBottom: 0,
+        frameDt: 1 / 60,
+        score: { ...createScoreState(), burnHeat: 0.25 },
+      });
+    }
+
+    const stops = r.calls('addColorStop').map((o) => String(o[2]));
+    const rgba = stops
+      .map((c) => /rgba?\((\d+),(\d+),(\d+),([\d.]+)\)/.exec(c))
+      .filter((m): m is RegExpExecArray => m !== null)
+      .map((m) => ({
+        r: Number(m[1]),
+        g: Number(m[2]),
+        b: Number(m[3]),
+        a: Number(m[4]),
+      }));
+
+    // The flame's opaque stops, ignoring the transparent tail every gradient ends
+    // on and the other gradients in the scene, which are not red.
+    const fire = rgba.filter((c) => c.a > 0.2 && c.r > c.g && c.g >= c.b);
+    expect(fire.length).toBeGreaterThan(0);
+
+    const brightest = fire.reduce((a, b) => (a.a > b.a ? a : b));
+    // Actually bright: the old code peaked at 0.37 here.
+    expect(brightest.a).toBeGreaterThan(0.5);
+    // Actually orange: red must clearly dominate. The old near-white core sat at
+    // a red:green ratio of 1.08, which is grey by any useful measure.
+    expect(brightest.r / brightest.g).toBeGreaterThan(1.3);
+  });
+
   it('draws the ship and at least one body on a normal frame', () => {
     const state = createInitialState(DEFAULT_CONFIG);
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
@@ -615,11 +719,36 @@ describe('floating score popups', () => {
       timing: 0.1,
       aim: 0.2,
       climb: 400,
+      heat: 0,
       ...over,
     }) as Parameters<Popups['spawn']>[0];
 
   const texts = (r: ReturnType<typeof recordingContext>) =>
     (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+
+  it('keeps the routine colour quiet by chroma, not by darkness', () => {
+    // The rule that is easy to undo by reaching for a darker grey. ROUTINE was a
+    // dark grey once and it was the least legible text in the game while being the
+    // one shown most often. It is a near-white now, and what makes it recessive is
+    // having no hue — which leaves the ladder free to climb in saturation instead
+    // of in light.
+    const m = /rgba\((\d+),(\d+),(\d+),([\d.]+)\)/.exec(ROUTINE.color);
+    expect(m, 'ROUTINE should be an rgba near-white').not.toBeNull();
+    const [r, g, b, a] = [1, 2, 3, 4].map((i) => Number(m![i])) as [number, number, number, number];
+    // Near-white: bright, and close to neutral.
+    expect(Math.min(r, g, b)).toBeGreaterThan(200);
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThan(40);
+    // Slightly transparent, so it cannot be the brightest thing on a dark screen
+    // and the starfield shows through the strokes.
+    expect(a).toBeGreaterThan(0.4);
+    expect(a).toBeLessThan(0.85);
+
+    // And every rung above it is saturated, so the ladder is a chroma ladder.
+    for (const level of [LEVEL.good, LEVEL.great, LEVEL.exceptional]) {
+      const [lr, lg, lb] = [1, 3, 5].map((i) => parseInt(level.color.slice(i, i + 2), 16));
+      expect(Math.max(lr!, lg!, lb!) - Math.min(lr!, lg!, lb!)).toBeGreaterThan(80);
+    }
+  });
 
   it('shows the points for a routine link, with no word', () => {
     const p = new Popups();
@@ -641,6 +770,74 @@ describe('floating score popups', () => {
     const words = texts(r).filter((t) => !t.startsWith('+'));
     expect(words.length).toBeGreaterThan(0);
     expect(WORDS.aim[1]).toContain(words[0]);
+  });
+
+  it("rolls a burn's number up after the drag, not during it", () => {
+    // A live tally beside the ship was built and taken back out — see PORT_NOTES
+    // 51. The count belongs after the act: while the drag is happening the player
+    // is inches from a wall and deciding whether to hold on, and a number climbing
+    // in their peripheral vision competes with that. Afterwards it has the moment
+    // to itself.
+    const p = new Popups();
+    p.spawn(award({ kind: 'burn' as const, points: 200, heat: 0.9 }), 195, 0);
+    const shown = (): number => {
+      const r = recordingContext();
+      p.draw(r.ctx, cam());
+      const n = texts(r).find((t) => t.startsWith('+'))!;
+      return Number(n.slice(1).replace(/,/g, ''));
+    };
+
+    expect(shown()).toBe(0);
+    p.update(0.2);
+    const mid = shown();
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(200);
+    p.update(0.3);
+    expect(shown()).toBeGreaterThan(mid);
+    p.update(0.4); // past the 0.8s roll
+    expect(shown()).toBe(200);
+  });
+
+  it('burns the WORD in ember and leaves the number the default grey', () => {
+    // The narrow exception in `accolade.ts`: SINGED / SCORCHED / INFERNO name a
+    // thing that has a colour, and ladder blue is the one case where the ladder
+    // fights the word it is colouring.
+    //
+    // The number does NOT follow it, and does not follow the ladder either. This
+    // assertion wanted `LEVEL.great` for one build, and the ladder is exactly what
+    // went wrong: a drag that scored well turned the number BLUE beside an orange
+    // word — two hues on one two-line popup, neither of them fire. Grey always,
+    // with size still climbing the rung, so how good it was is not lost.
+    const p = new Popups();
+    // heat 0.8 clears BURN.tier2, so this one earns a word.
+    p.spawn(award({ kind: 'burn' as const, points: 180, heat: 0.8 }), 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    const fills = r.calls('=fillStyle').map((o) => String(o[1]));
+    expect(fills).toContain(BURN_WORD.color);
+    expect(fills).toContain(ROUTINE.color);
+    expect(fills).not.toContain(LEVEL.great.color);
+    expect(fills).not.toContain(LEVEL.good.color);
+
+    const words = texts(r).filter((t) => !t.startsWith('+'));
+    expect(WORDS.burn.flat()).toContain(words[0]);
+  });
+
+  it('draws a burn on the rarity ladder, like every other award', () => {
+    // This pinned the opposite for one build. A red channel for the burn — its own
+    // colour whether or not it earned a word — was asked for, built, and taken back
+    // out: "I even preferred your original gray plus points."
+    //
+    // So the rule in `accolade.ts` stands unbroken after all: colour means HOW GOOD,
+    // the word says WHAT, and the only thing red in this feature is the fire itself.
+    // A burn under the word threshold is grey, exactly like any other routine award,
+    // and that is the commonest thing a burn is.
+    const p = new Popups();
+    // heat 0.2 is well under BURN.tier1, so this one earns no word.
+    p.spawn(award({ kind: 'burn' as const, points: 40, heat: 0.2 }), 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    expect(r.calls('=fillStyle').map((o) => String(o[1]))).toContain(ROUTINE.color);
   });
 
   it('rises and then expires', () => {
@@ -836,6 +1033,7 @@ describe('the score band', () => {
     timing: 0.91,
     aim: 0.96,
     climb: 412,
+    heat: 0,
     ...over,
   });
 
@@ -873,6 +1071,26 @@ describe('the score band', () => {
     expect(detail).toContain('91');
     expect(detail).toContain('96');
     expect(detail).not.toContain('CLOSE');
+  });
+
+  it("splits a burn's band line so the word is ember and the number is not", () => {
+    // The band draws points, multiplier and word as ONE centred string, so a burn
+    // needs two runs to colour only the word. Easy to get wrong in a way nothing
+    // else notices — and if it drifts, the band and the popup are back to
+    // answering the same question in two different colours, which is the whole
+    // reason `accolade.ts` is one table.
+    const r = recordingContext();
+    const burn = award({ kind: 'burn' as const, points: 180, heat: 0.8, multiplier: 2 });
+    drawScore(r.ctx, cam(), scoreWith({ score: 900, lastAward: burn }), snapAt(110));
+
+    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    const fills = r.calls('=fillStyle').map((o) => String(o[1]));
+    expect(fills).toContain(BURN_WORD.color);
+
+    // The number and the word are drawn separately, not as one string.
+    const head = texts.find((t) => t.startsWith('+180'))!;
+    expect(head).not.toContain('SCORCHED');
+    expect(texts.some((t) => WORDS.burn.flat().some((w) => t.includes(w)))).toBe(true);
   });
 
   it('never announces a grab as a coasting penalty', () => {

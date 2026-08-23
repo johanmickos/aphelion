@@ -45,6 +45,14 @@ export interface Frame {
   /** First sample after a grab: its deflection is a measurement artifact. */
   firstOfCapture: boolean;
   clearance: number | null;
+  /**
+   * Reentry heat this tick, 0..1 and 0 when nothing is alight.
+   *
+   * Recorded per frame because the question a burn report has to answer is not
+   * how hot it got but how LONG it was lit — a flare of three ticks is invisible
+   * however hot its peak, and the peak alone cannot say so.
+   */
+  burnHeat: number;
   /** Floor clamps accumulated so far this session. */
   floorTotal: number;
   fp: string;
@@ -142,7 +150,7 @@ export function replayReport(report: DiagReport): Analysis {
     if (released) held = false;
     const input: Input = { held: held || pressed, pressed, released };
     stepSim(state, cfg, input, report.dt);
-    const scored = scoreTick(score, state, cfg);
+    const scored = scoreTick(score, state, cfg, report.dt);
     awards.push(...scored.awards);
     shouts.push(...scored.shouts);
 
@@ -185,6 +193,7 @@ export function replayReport(report: DiagReport): Analysis {
       tightness: cap ? cap.tightness : 0,
       firstOfCapture: isFirst,
       clearance: cap ? Math.hypot(cap.rx, cap.ry) - cap.minR : null,
+      burnHeat: score.burnHeat,
       floorTotal: state.telemetry.floorSubstepsTotal,
       fp: fingerprintHex(state),
     });
@@ -277,9 +286,34 @@ export function replayReport(report: DiagReport): Analysis {
   // nothing about how the session went.
   findings.push(
     `best life scored ${score.best} (${score.score} standing at the end) — ` +
-      `${score.grabs} grab(s), ${score.links} link(s), ${score.flybys} flyby(s), ` +
+      `${score.grabs} grab(s), ${score.links} link(s), ` +
+      `${score.flybys} flyby(s), ${score.burns} burn(s), ` +
       `best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,
   );
+  if (score.burns > 0) {
+    const burns = awards.filter((a) => a.kind === 'burn');
+    const paid = burns.reduce((n, a) => n + a.points, 0);
+    const hottest = Math.max(...burns.map((a) => a.heat));
+    // Captures counted from the frames, NOT from `score.grabs` — that is the
+    // number of grab AWARDS, and a grab from far out pays nothing and is not
+    // counted. A session of nine captures was reporting "over 0 capture(s)".
+    const captures = frames.filter((f, i) => f.r !== null && frames[i - 1]?.r == null).length;
+    // How long the fire was actually lit is the number that matters and the one
+    // that was missing: a flare has to survive long enough to be SEEN, and heat
+    // just over the ignition floor clears it for only a frame or two.
+    const hotTicks = frames.filter((f) => f.burnHeat > 0).length;
+    findings.push(
+      `${score.burns} burn(s) over ${captures} capture(s) — worth ${paid}, ` +
+        `hottest ${hottest.toFixed(2)}, alight for ${hotTicks} tick(s) ` +
+        `(${(hotTicks * report.dt).toFixed(2)}s of the session)`,
+    );
+    // Deliberately NOT an inference about visibility. It says how long the burn
+    // was PAYING, which is what these ticks are. The flame outlives them by a wide
+    // margin — the renderer's ember decay stretched a 7-tick pass to 77 frames on
+    // a real session — so reading "3 ticks" as "you cannot have seen it" is wrong,
+    // and was briefly asserted here. What a report can honestly say is how much of
+    // the session earned burn points.
+  }
   if (score.links > 0) {
     const links = awards.filter((a) => a.kind === 'link');
     const mean = (pick: (a: ScoreAward) => number): string =>
@@ -363,12 +397,27 @@ const AWARD_KIND: Record<AwardRecord[1], ScoreAward['kind']> = {
   l: 'link',
   h: 'hop',
   f: 'flyby',
+  b: 'burn',
 };
 
 export function recordedAwards(report: DiagReport): ScoreAward[] | null {
   if (!report.awards?.length) return null;
   return report.awards.map(
-    ([tick, kind, points, multiplier, close, clearance, skim, defl, timing, aim, climb, body]) => ({
+    ([
+      tick,
+      kind,
+      points,
+      multiplier,
+      close,
+      clearance,
+      skim,
+      defl,
+      timing,
+      aim,
+      climb,
+      body,
+      heat,
+    ]) => ({
       tick,
       kind: AWARD_KIND[kind],
       points,
@@ -381,6 +430,10 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       timing,
       aim,
       climb,
+      // Appended after the field existed, so every report recorded before the
+      // burn shipped is missing it. Zero is the truth for those: nothing burned,
+      // because nothing could.
+      heat: heat ?? 0,
     }),
   );
 }
@@ -407,7 +460,8 @@ export function awardAgreement(
       r.kind === p.kind &&
       r.points === Math.round(p.points) &&
       Math.abs(r.timing - Math.round(p.timing * 100) / 100) < 1e-9 &&
-      Math.abs(r.aim - Math.round(p.aim * 100) / 100) < 1e-9;
+      Math.abs(r.aim - Math.round(p.aim * 100) / 100) < 1e-9 &&
+      Math.abs(r.heat - Math.round(p.heat * 100) / 100) < 1e-9;
     if (!same) return { matched, firstDisagreement: r.tick };
     matched++;
   }
@@ -584,14 +638,15 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
       out.push('  score — RECOMPUTED (this report predates recorded awards)');
     }
     out.push(
-      '    tick  ev     what      points   mult   close   peak    aim   defl   climb  earned',
+      '    tick  ev     what      points   mult   close   heat   peak    aim   defl   climb  earned',
     );
     for (const w of shown.slice(0, 24)) {
       out.push(
         `    ${String(w.tick).padStart(5)}  ${w.kind.padEnd(5)}  ` +
           `${w.body.padEnd(10)}` +
           `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
-          `${(w.kind === 'link' ? '  · ' : w.close.toFixed(2)).padStart(5)}  ` +
+          `${(w.kind === 'link' || w.kind === 'burn' ? '  · ' : w.close.toFixed(2)).padStart(5)}  ` +
+          `${(w.kind === 'burn' ? w.heat.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.aim.toFixed(2) : '  · ').padStart(5)}  ` +
           `${w.defl.toFixed(0).padStart(4)}  ` +

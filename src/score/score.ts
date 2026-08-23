@@ -35,7 +35,10 @@
 import type { SimConfig } from '../sim/config.ts';
 import type { Capture, SimState } from '../sim/types.ts';
 import { hypot } from '../sim/orbit.ts';
+import { fieldBounds } from '../sim/world.ts';
+import { shipWorldPos } from '../sim/step.ts';
 import { readAim } from './aim.ts';
+import { edgeHeat } from './burn.ts';
 import { isNerveGrab } from './praise.ts';
 import {
   BONK_SPEED,
@@ -88,6 +91,10 @@ export function createScoreState(): ScoreState {
     grabs: 0,
     links: 0,
     flybys: 0,
+    burns: 0,
+    burnHeat: 0,
+    burnBank: 0,
+    burnPeak: 0,
     lastAward: null,
     pending: null,
     climbFromY: null,
@@ -170,6 +177,12 @@ function endLife(sc: ScoreState): void {
   // total for a frenzy that ended in a crash.
   sc.wasCharged = false;
   sc.hopTotal = 0;
+  // A flare still burning at the moment of death is dropped rather than paid.
+  // Flying into the ground is how a hot pass goes wrong, and the score it would
+  // have banked is exactly what the death is taking.
+  sc.burnHeat = 0;
+  sc.burnBank = 0;
+  sc.burnPeak = 0;
 }
 
 /**
@@ -217,6 +230,7 @@ export function scoreTick(
   sc: ScoreState,
   state: SimState,
   cfg: SimConfig,
+  dt: number,
   scfg: ScoreConfig = DEFAULT_SCORE_CONFIG,
 ): ScoreTick {
   const awards: ScoreAward[] = [];
@@ -246,6 +260,45 @@ export function scoreTick(
   }
   sc.endingSeen = false;
   if (sc.climbFromY === null) sc.climbFromY = state.highWaterY;
+
+  // ---- the burn: heat integrated over a hot pass, paid when the fire dies
+  //
+  // Ahead of the release below, and deliberately: a hot pass happens during the
+  // ride, so when a release ends a flare the two awards land on the same tick and
+  // the one that describes the earlier moment should be the earlier of the pair.
+  //
+  // Both ends of a flare are edges on the same quantity, so a flare is exactly
+  // one continuous stretch above the ignition heat — no separate latch to get out
+  // of step with the fire the player is watching. A settle that dips through the
+  // hot zone on two passes pays twice, which is right: it burned twice.
+  //
+  // Placed outside the capture branch so a release mid-burn settles here too.
+  // Otherwise letting go at the hottest instant — which is a thing a player will
+  // do on purpose, because it is also the best boost — would silently forfeit the
+  // whole flare.
+  {
+    // Position from `shipWorldPos`, which resolves a capture's body-relative
+    // coordinates — `state.ship` is stale during one, and a burn is by definition
+    // something that only happens during one.
+    const p = shipWorldPos(state);
+    const heat = edgeHeat(
+      p.x,
+      p.y,
+      fieldBounds(cfg, state.bodies),
+      state.bodies,
+      state.capture !== null,
+      scfg,
+    );
+    if (heat > scfg.burnMinHeat) {
+      sc.burnHeat = heat;
+      sc.burnBank += heat * dt * scfg.burnRate;
+      if (heat > sc.burnPeak) sc.burnPeak = heat;
+    } else {
+      sc.burnHeat = 0;
+      const burn = awardBurn(sc, state, scfg);
+      if (burn) awards.push(burn);
+    }
+  }
 
   // ---- a charged window opened: the hop log describes the window in progress
   //
@@ -527,10 +580,12 @@ function awardGrab(
     skim: sc.grabSkim,
     defl: sc.maxDefl,
     // Release qualities are not this event's business and must read as absent
-    // rather than as zero-scoring.
+    // rather than as zero-scoring. The burn is not this event's business either:
+    // the arrival is one instant, and heat is a stretch of the ride after it.
     timing: 0,
     aim: 0,
     climb: 0,
+    heat: 0,
   };
   const body = state.bodies[cap.planet];
 
@@ -575,6 +630,58 @@ function awardGrab(
   award.points = Math.round(raw * multiplier);
   sc.score += award.points;
   sc.grabs++;
+  return award;
+}
+
+/**
+ * Pay for a hot pass, once the fire is out.
+ *
+ * Returns null when nothing was burning, which is the common case — this is
+ * called on every tick the ship is not alight, purely to catch the falling edge.
+ *
+ * The bank is committed in ONE award rather than a slice a tick, even though it
+ * was accumulated a slice a tick. Paying continuously would break the promise
+ * `test/score.test.ts` pins — that awards inside a life sum to the score — and
+ * with it `tools/replay.ts`, which reconstructs a session from its award list and
+ * would come up short by every burn. The player sees the number climb afterwards
+ * instead: the popup rolls it up over 0.8s, deliberately longer than the 0.45s
+ * drag it is summing, so it reads as a tally rather than a replay.
+ */
+function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAward | null {
+  if (sc.burnBank <= 0) return null;
+  const raw = sc.burnBank;
+  const peak = sc.burnPeak;
+  sc.burnBank = 0;
+  sc.burnPeak = 0;
+
+  const multiplier = multiplierFor(sc, scfg);
+  const points = Math.round(raw * multiplier);
+  // A flare so faint it rounds to nothing pays nothing and says nothing: a `+0`
+  // floating off the ship is worse than silence, the same rule `awardGrab` keeps.
+  if (points <= 0) return null;
+
+  const cap = state.capture;
+  const award: ScoreAward = {
+    tick: state.tick,
+    kind: 'burn',
+    points,
+    multiplier,
+    // The body it burned against, or the one it just left — a release can end a
+    // flare, and by then the capture is already gone.
+    body: (cap ? state.bodies[cap.planet]?.name : sc.pending?.body) ?? '?',
+    // Arrival and release qualities both belong to other events. Reported as
+    // absent so nothing downstream can pay or praise them a second time.
+    close: 0,
+    clearance: Infinity,
+    skim: Infinity,
+    defl: 0,
+    timing: 0,
+    aim: 0,
+    climb: 0,
+    heat: peak,
+  };
+  sc.score += points;
+  sc.burns++;
   return award;
 }
 
@@ -645,6 +752,9 @@ function awardFlyby(
     timing: 0,
     aim: 0,
     climb: 0,
+    // Nor is it a burn: a flyby is not captured, and only a captured ship can be
+    // dragged along the dead zone.
+    heat: 0,
   };
   sc.score += award.points;
   sc.flybys++;
@@ -684,6 +794,7 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
     timing: p.timing,
     aim: p.aim,
     climb,
+    heat: 0,
   };
   award.points = Math.round(raw * multiplier);
   sc.score += award.points;

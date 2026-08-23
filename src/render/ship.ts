@@ -109,6 +109,102 @@ export function shipPath(ctx: CanvasRenderingContext2D, s: number): void {
 }
 
 /**
+ * Reentry fire, drawn in ship-local space with the nose along +x.
+ *
+ * A bow shock ahead of the nose and a wake streaming behind it, because that is
+ * where the heat actually is — a plume out of the back alone would read as a
+ * thruster, which is the one thing this must not look like: the ship has no
+ * engine, and the whole game is about not having one.
+ *
+ * RED, AND ONLY HERE. Colour on an award means how good it was and nothing else —
+ * the rarity ladder in `accolade.ts` owns that, and the burn's points and word
+ * ride it like every other award. This is not an award. It is the ship being on
+ * fire, and fire is the one thing in the game allowed to be the colour of fire.
+ * It is kept clear of the amber `flyby` outline by being redder, much larger, and
+ * soft-edged where that cue is a 1.6px stroke.
+ *
+ * The flicker is driven by `timeMs`, which render may read and the simulation may
+ * not. Nothing here feeds back: the flame is a picture of `heat`, and `heat` came
+ * from the scorer, which is an observer.
+ */
+function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs: number): void {
+  // Two out-of-phase waves rather than one, so the flame breathes instead of
+  // pulsing on a period the eye can lock onto and start reading as a countdown.
+  const flick = 0.86 + 0.1 * Math.sin(timeMs * 0.033) + 0.06 * Math.sin(timeMs * 0.071 + 1.3);
+
+  // PRESENTATION CURVE, not a change to the physics. `heat` stays exactly the
+  // number the scorer integrated; what it drives here is a picture, and the two
+  // do not have to be linear in each other.
+  //
+  // They were, and the flame lost the bottom half of its range to it: a real 2px
+  // graze scores heat around 0.25, which drew a 27px plume at 21% alpha over a
+  // moving starfield — reported, accurately, as no flare at all. The square root
+  // lifts that to 0.5, and leaves the top of the range where it was. Paired with
+  // `burnMinHeat`, it means the faintest fire that can exist is one you can see.
+  const vis = Math.sqrt(heat);
+  const h = flick;
+  const reach = (18 + 52 * vis) * s;
+
+  // BRIGHTNESS DOES NOT SCALE TO NOTHING, and that was the bug the first two
+  // attempts at this shared. Opacity was linear in `vis`, on the assumption that
+  // heat near 1.0 would be the common case. It is not — a typical real skim scores
+  // around 0.25, so `vis` sits near 0.5 and every flame rendered at half strength:
+  // measured off a real session, peak alpha 0.37 against a near-white core, which
+  // over black is RGB (94,87,70). A warm grey smudge, no brighter than the trail
+  // that is always there. Reported as "no flames or redness".
+  //
+  // So heat drives SIZE and COLOUR TEMPERATURE, and only gently drives opacity. A
+  // small fire is still a fire.
+  const alpha = 0.58 + 0.42 * vis;
+
+  // Colour temperature climbs with heat, which is both how fire works and what
+  // keeps a faint one legible: the white-hot core is reserved for a flare that
+  // earned it, and everything below reads as unmistakable orange-red rather than
+  // washing out to cream. Squared, so white is the top of the range and not its
+  // middle.
+  const white = vis * vis;
+  const cr = 255;
+  const cg = Math.round(150 + 94 * white);
+  const cb = Math.round(38 + 176 * white);
+
+  ctx.save();
+  // Additive, so overlapping tongues brighten toward white at the core the way a
+  // real flame does, and so the ship's own fill shows through the thin edges of
+  // it rather than being covered by a flat orange shape.
+  ctx.globalCompositeOperation = 'lighter';
+
+  // ---- the wake: a tapered tongue streaming off the tail
+  const wake = ctx.createLinearGradient(-3 * s, 0, -reach, 0);
+  wake.addColorStop(0, `rgba(${cr},${cg},${cb},${(alpha * h).toFixed(3)})`);
+  wake.addColorStop(0.3, `rgba(255,116,26,${(0.72 * alpha * h).toFixed(3)})`);
+  wake.addColorStop(0.68, `rgba(228,34,14,${(0.4 * alpha * h).toFixed(3)})`);
+  wake.addColorStop(1, 'rgba(150,16,8,0)');
+  ctx.fillStyle = wake;
+  ctx.beginPath();
+  ctx.moveTo(-2 * s, -5.4 * s);
+  // Two long curves meeting at a point, drawn with the control handles pulled
+  // outward so the tongue swells just behind the hull before it narrows.
+  ctx.quadraticCurveTo(-reach * 0.45, -7 * s * (0.6 + 0.5 * vis), -reach, 0);
+  ctx.quadraticCurveTo(-reach * 0.45, 7 * s * (0.6 + 0.5 * vis), -2 * s, 5.4 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  // ---- the bow shock: a hot crescent standing off the nose
+  const nose = 9 * s;
+  const shockR = (10 + 6 * vis) * s;
+  const shock = ctx.createRadialGradient(nose, 0, 0, nose, 0, shockR);
+  shock.addColorStop(0, `rgba(${cr},${cg},${cb},${(0.8 * alpha * h).toFixed(3)})`);
+  shock.addColorStop(0.45, `rgba(255,104,24,${(0.5 * alpha * h).toFixed(3)})`);
+  shock.addColorStop(1, 'rgba(210,26,10,0)');
+  ctx.fillStyle = shock;
+  ctx.beginPath();
+  ctx.arc(nose, 0, shockR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
  * Arcs thrown off a charged hull. See `SimConfig.chargedSecs`.
  *
  * Drawn OUTSIDE the silhouette rather than on it, and that is the whole reason
@@ -181,6 +277,8 @@ export function drawShip(
   snap: RenderSnapshot,
   /** Bodies hopped to in the current charged window. Drives how hot the arcs are. */
   hops = 0,
+  burn = 0,
+  timeMs = 0,
 ): void {
   const x = toScreenX(cam, snap.x);
   const y = toScreenY(cam, snap.y);
@@ -209,6 +307,9 @@ export function drawShip(
     drawArcs(ctx, s, snap.tick, snap.chargedFrac, hops);
   }
   ctx.rotate(ang);
+  // Under the hull, so the silhouette stays readable through the brightest part
+  // of the fire — the ship is what the player is steering.
+  if (burn > 0) drawBurn(ctx, burn, s, timeMs);
   shipPath(ctx, s);
   ctx.fillStyle = snap.held ? '#fff' : '#cfdcf2';
   ctx.fill();

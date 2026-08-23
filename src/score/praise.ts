@@ -47,7 +47,7 @@ import { mulberry32 } from '../sim/rng.ts';
 import type { ScoreAward } from './types.ts';
 
 /** Which quality earned the word. `super` is two or more at once. */
-export type PraiseCategory = 'close' | 'aim' | 'peak' | 'nerve' | 'super';
+export type PraiseCategory = 'close' | 'aim' | 'peak' | 'nerve' | 'burn' | 'super';
 
 /**
  * How good it was, on one ladder shared by every category.
@@ -83,6 +83,27 @@ export interface Praise {
 export const CLOSE_PX = Object.freeze({ tier1: 59, tier2: 48 });
 export const AIM = Object.freeze({ tier1: 0.94, tier2: 0.98 });
 export const PEAK = Object.freeze({ tier1: 0.85, tier2: 0.94 });
+
+/**
+ * Deepest point of a dead-zone drag, 0 at the red band's inner edge and 1 at the
+ * lethal line.
+ *
+ * MEASURED ON THE DRAGS THAT SURVIVE, which is the only population that can ever
+ * see a word: a drag ending in the wall drops its whole banked flare with the
+ * life, so it pays nothing and names nothing. Over 58 sessions, 44 of 159 drags
+ * pulled out alive, and their peak depths run p25 0.11, p50 0.34, p70 0.52,
+ * p90 0.70.
+ *
+ * Calibrating on all 147 instead would have been useless in a way worth
+ * recording: the 115 that die all reach the line, so peak depth reads 1.00 at
+ * every percentile from p50 up. A threshold drawn from that distribution puts
+ * every tier at 1.0 and names nothing — the axis only has spread inside the
+ * subpopulation that can actually be praised.
+ *
+ * So tier1 is the p70 survivor and tier2 the p90: about a third of survived drags
+ * earn a word, and about a tenth earn the better one.
+ */
+export const BURN = Object.freeze({ tier1: 0.52, tier2: 0.7 });
 
 /**
  * The nerve grab: already boring in, and you waited.
@@ -126,6 +147,12 @@ export const NERVE_SKIM_PX = 0;
  *   nerve    composure    — you were going to hit it and you waited. BRINK, CLUTCH.
  *   aim      marksmanship — you pointed it. BULLSEYE, THREADED, DEADEYE.
  *   peak     launch       — you let go at the right instant. SLINGSHOT, REDLINE.
+ *   burn     fire         — you dragged the dead zone and lived. SEARED, INFERNO.
+ *
+ * `burn` and `close` are the pair to watch here, because a shared register would
+ * collapse them. Proximity and fire are far enough apart in English that they do
+ * not — and the events no longer even touch: `close` is about a planet's surface
+ * and `burn` is about the wall at the edge of the field.
  *
  * The two that must never blur are `aim` and `peak`, because they are the two
  * that can fire on the same event. Marksmanship and launch are about as far apart
@@ -154,6 +181,14 @@ export const WORDS: Readonly<
     ['TIMED', 'SNAPPED', 'WHIPPED'],
     ['SLINGSHOT', 'REDLINE', 'CATAPULT'],
   ],
+  // REDLINE is a `peak` word and stays one: it is engine-rev, not fire. Nothing
+  // here is about heat in a figurative sense for the same reason — the ship is
+  // literally burning, and the words should mean it. They are also all about
+  // SURVIVING it, because a drag that ends in the wall never reaches a word.
+  burn: [
+    ['SINGED', 'SEARED', 'SCORCHED'],
+    ['BLAZING', 'INFERNO', 'METEOR'],
+  ],
   // The two slots here are the two EVENTS, not two rungs — the only entry where
   // that is true. A superlative arrival and a superlative departure are different
   // achievements and used to share one gold word, which made the rarest thing in
@@ -172,6 +207,10 @@ const ORDINAL: Record<PraiseCategory, number> = {
   peak: 3,
   nerve: 4,
   super: 5,
+  // Appended rather than slotted in beside `close`, where it belongs
+  // thematically. The ordinal is a hash input: renumbering an existing category
+  // changes which synonym every past session's replay prints, for no gain.
+  burn: 6,
 };
 
 /**
@@ -228,10 +267,31 @@ export function isNerveGrab(award: ScoreAward): boolean {
 export function praiseFor(award: ScoreAward): Praise | null {
   if (award.kind === 'grab') return praiseGrab(award);
   if (award.kind === 'link') return praiseRelease(award);
+  if (award.kind === 'burn') return praiseBurn(award);
   // A hop earns no word, and that is not an omission. Every hop inside a charged
   // window pays the same flat `hopBonus`, so there is no quality for a word to
   // name — and the popup already says what it is by being purple.
   return null;
+}
+
+/**
+ * How hot the pass got.
+ *
+ * No `super` rung, unlike the grab and the release. Those two each judge a pair
+ * of independent qualities and reserve gold for landing both at once; a burn has
+ * one quality, so a gold word here would mean nothing more than "even hotter" —
+ * which is what the ladder's colour already says.
+ */
+function praiseBurn(award: ScoreAward): Praise | null {
+  const heat = tierOf(award.heat, BURN.tier1, BURN.tier2);
+  // Nothing to guard against a dying drag reaching here: `endLife` drops the bank
+  // before the award is ever built, so every burn that gets a word was survived.
+  if (heat === 0) return null;
+  return {
+    category: 'burn',
+    level: heat === 2 ? 'great' : 'good',
+    word: pick(WORDS.burn[heat - 1]!, award.tick, 'burn'),
+  };
 }
 
 /**

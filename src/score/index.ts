@@ -6,6 +6,7 @@
  * (config, seed, inputLog) alone.
  */
 export * from './aim.ts';
+export * from './burn.ts';
 export * from './config.ts';
 export * from './praise.ts';
 export * from './reckless.ts';

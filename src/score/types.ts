@@ -32,8 +32,13 @@ export interface ScoreAward {
    * capture does so BEFORE its periapsis (conversion needs bound and inbound), so
    * by the time the radius bottoms out the phase is `clear` and the grab award is
    * the one that fires. Nothing is paid twice.
+   *
+   * `burn` is the odd one out of all of them: the only award that ACCRUES rather
+   * than being read off an instant. It integrates how deep into the edge dead zone
+   * a captured ship is and pays when the fire goes out, one capture can raise two
+   * of them, and a DEATH cancels one outright — see `endLife`.
    */
-  kind: 'grab' | 'link' | 'hop' | 'flyby';
+  kind: 'grab' | 'link' | 'hop' | 'flyby' | 'burn';
   /** Points actually applied. Never negative — nothing takes points away. */
   points: number;
   /** The multiplier in force. */
@@ -92,6 +97,15 @@ export interface ScoreAward {
   aim: number;
   /** World pixels of climb banked into this link. */
   climb: number;
+  /**
+   * Deepest the drag got into the dead zone, 0..1. Burn only.
+   *
+   * The PEAK rather than the integral, because it is what the word is chosen on
+   * and a word describes the moment, not the invoice. Two drags worth the same
+   * points can be a long shallow graze and a brief plunge at the line; only the
+   * second deserves to be called an inferno.
+   */
+  heat: number;
 }
 
 /**
@@ -155,6 +169,15 @@ export interface ScoreState {
   grabs: number;
   links: number;
   flybys: number;
+  burns: number;
+  /**
+   * Dead-zone heat this tick, 0..1, and 0 whenever the ship is not burning.
+   *
+   * The renderer's only input for the flame. Published on the score state rather
+   * than derived a second time from the snapshot, so the fire and the points
+   * cannot disagree about how hot it is — see `src/score/burn.ts`.
+   */
+  burnHeat: number;
   /** The most recent award, for the HUD to flash. */
   lastAward: ScoreAward | null;
 
@@ -220,6 +243,17 @@ export interface ScoreState {
    * as one rule: pay at the moment the act finished being reversible.
    */
   pendingFlyby: PendingFlyby | null;
+  /**
+   * Points banked by the flare currently burning, before the multiplier.
+   *
+   * Fractional and un-rounded: heat is integrated a tick at a time and rounding
+   * each slice would lose most of a short flare. It is committed to the score in
+   * one award when the fire goes out, so the invariant that awards sum to the
+   * score inside a life still holds.
+   */
+  burnBank: number;
+  /** Hottest instant of the flare currently burning. 0 when nothing is. */
+  burnPeak: number;
   /** Ticks left before the grab award lands. -1 once it has. */
   grabDue: number;
   /** Names of anomalies already claimed this life. Cleared by `endLife`. */

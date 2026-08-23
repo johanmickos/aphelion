@@ -72,7 +72,7 @@ function fly(
     if (!charged && wasCharged) closedAtTick = t;
     wasCharged = charged;
     hook?.(t, state, sc);
-    const out = scoreTick(sc, state, cfg);
+    const out = scoreTick(sc, state, cfg, FIXED_DT);
     awards.push(...out.awards);
     if (out.tally) tallies.push(out.tally);
   }
@@ -396,7 +396,7 @@ describe('the closing tally', () => {
     const tallies: Tally[] = [];
     for (let t = 0; t < 30; t++) {
       stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
-      const out = scoreTick(sc, state, DEFAULT_CONFIG);
+      const out = scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
       if (out.tally) tallies.push(out.tally);
     }
     expect(state.ending.active, 'the ship died before the window expired').toBe(false);
@@ -454,7 +454,7 @@ describe('the closing tally', () => {
     let tallies = 0;
     for (let t = 0; t < 200; t++) {
       stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
-      if (scoreTick(sc, state, DEFAULT_CONFIG).tally) tallies++;
+      if (scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT).tally) tallies++;
     }
     expect(state.chargedT).toBe(0);
     expect(tallies).toBe(0);
@@ -467,7 +467,7 @@ describe('the closing tally', () => {
     let tallies = 0;
     for (let t = 0; t < 30; t++) {
       stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
-      if (scoreTick(sc, state, DEFAULT_CONFIG).tally) tallies++;
+      if (scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT).tally) tallies++;
     }
     expect(state.chargedT).toBe(0);
     expect(tallies).toBe(0);

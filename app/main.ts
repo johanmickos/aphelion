@@ -303,7 +303,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // Popups are raised here, on the tick the award lands, and read the ship's
     // position at that instant — after a release that is the point it let go
     // from, which is exactly the act being praised.
-    const scored = scoreTick(score, state, sim);
+    const scored = scoreTick(score, state, sim, dt);
     // Recorded as well as shown. A replay recomputes these, but only while it is
     // still reproducing the run — and past a divergence it recomputes a different
     // session's. These are what the player was actually paid.
