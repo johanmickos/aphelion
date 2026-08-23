@@ -45,6 +45,32 @@ Sometimes the user gets lazy and may need to be punished. If they coast past pla
 - Extra points for skimming the edge (getting close for a longer time and then surviving)
 - Extra points for blowing by a planet extremely close without capturing
 
+### Performance testing and regressions (parked 2026-08-23)
+
+Asked for after a session showed "slowdown due to rendering, slowing my ship and
+the animations down at times". The specific cause that time was the scar's
+prediction and is fixed (PORT_NOTES 57), but nothing in the repo would have caught
+it — the gate proves correctness and says nothing about time.
+
+What a harness would need to be worth having:
+
+- **Per-tick and per-frame budgets, measured on the corpus.** The units that
+  matter are p99 and max, not mean: note 57 exists because a mean over calls that
+  mostly return early hid a 46ms outlier. One slow tick drops a frame; a good
+  average does not save it.
+- **A regression gate that can run in CI.** Wall-clock thresholds are machine
+  dependent, so the honest version counts WORK — simulated ticks, substeps, state
+  clones — which is deterministic and comparable across machines. Time can then be
+  a local-only check, the way `golden:check` already is.
+- **The renderer too.** The report above blamed rendering and was right that the
+  frame was late, wrong about which half. A harness that only measures the
+  simulation would have agreed with the wrong half.
+
+Remaining known cost: one full `rescueScar` lands inside a single tick, roughly
+once every seventeen seconds of edge play. The structural fix is to spread the
+press evaluations across ticks — sound for the same reason `advanceScar` is sound
+— and it should be built behind the harness rather than in front of it.
+
 ### Making an award readable (parked 2026-08-23)
 
 The rescue award (PORT_NOTES 53) pays correctly and is close to invisible. Three

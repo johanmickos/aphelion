@@ -3016,6 +3016,10 @@ object instead of to text. The mark scales between 0.62x and 1.42x of its
 configured size instead, so a big fat scar is a big fire and a thin one is a
 formality, while faint still means only one thing.
 
+**The cost figure quoted below was later found to be misreported** — it was a mean
+over calls that mostly return early, and a call that actually simulates costs about
+seven times it. See note 57, which fixes the consequence.
+
 **Layering is what shaped the implementation.** Pricing a trajectory needs
 `burnRate` and `burnEdgeSpan`, which are `ScoreConfig`, and `src/sim/` may import
 nothing outside itself — `pnpm portable` proves it. So `rescueScar` returns the
@@ -3217,6 +3221,86 @@ badges that speak should not be set in two typefaces.
 `fuel-warning.ts`'s reasoning about badges that become part of the ship's
 silhouette. The skull is exempt because the wall ends it inside a median 0.85s;
 SAFE has no such deadline, so it needs the count.
+
+---
+
+### 57 — The prediction was costing frames, and the mean was hiding it
+
+`src/sim/rescue.ts` · `app/main.ts` · **[FIXED]** · reported as "I saw slowdown due
+to rendering, slowing my ship and the animations down at times... I _think_ it was
+more noticeable at the edges, possibly due to our new prediction code"
+
+**The report was right, and the diagnosis was in the phrase "at the edges".**
+`rescueScar` takes a cheap arithmetic refusal unless a wall is within reach, so
+the edges are precisely where it stops being free and starts forward-simulating.
+
+**Note 54 recorded the cost as "0.3-0.5ms a call" and that number was wrong** —
+not measured wrong, reported wrong. It was the mean over ALL calls, 88% of which
+take the refusal at 0.005ms. The statistic that matters for a dropped frame is
+what a call costs when it does the work, and what the worst one costs:
+
+```
+  calls that actually simulate    median 2.25ms   p90 5.93   p99 12.02   max 45.73
+  a phone is 3-5x slower          median 7-11ms   p90 18-30  max 137-229
+  frame budget                    16.7ms at 60Hz, 8.3ms at 120Hz
+```
+
+Running that ten times a second at the edges is the reported stutter. A mean is
+the wrong statistic for a spike, and this is the second time in these notes that
+averaging hid a tail — see note 51 on `ROUTINE` being the least legible text in
+the game and the one shown most often.
+
+**Three fixes, in ascending order of how much they mattered.**
+
+`captureBudget` 900 -> 360. Every evaluation that neither dies nor turns pays the
+whole budget, and a winning flight runs a median 89 ticks and 223 at p90, so six
+seconds is already far past anything real.
+
+`maxSamples`, new, at 40. The stride now widens to fit the drift instead of being
+fixed at 3 ticks, so a six-second approach is sampled coarsely rather than being
+evaluated 121 times. Holes get blockier on long approaches; nothing else changes.
+
+The state copies. `track` kept a full `cloneState` — bodies array included — at
+every projected tick, 361 of them on a long approach, for the 40 that were ever
+resumed from. The projection now walks the drift twice, once to find the ending
+and once to evaluate, cloning only where it stops. Walking twice is far cheaper
+than copying 360 times.
+
+Together: worst call 45.7ms -> 20.5ms, median 2.25 -> 1.66.
+
+**Then the fix that actually mattered, which is not an optimisation at all.**
+
+A DRIFT TAKES NO INPUT. The projection a call produces stays true as the ship
+flies along it: every sample is a world point with a fixed verdict, and the cross
+is a place rather than a countdown. So recomputing ten times a second was not
+expensive work, it was the SAME work, repeated. `advanceScar` carries a projection
+forward by arithmetic — drop the samples now behind, subtract the elapsed time —
+and `app/main.ts` runs the simulation only when the projection can no longer be
+trusted: on a capture transition, on a respawn, and on a 30-tick backstop.
+
+```
+  per-tick cost of the whole path   median 0.000ms   p99 0.027   p99.9 3.72   max 18.85
+```
+
+From a 1.66ms median every sixth tick to a p99 of 0.027ms. The spike survives, but
+it went from several times a second to roughly once every seventeen seconds.
+
+**Why the backstop is 30 ticks and not 60.** A fresh call re-derives its stride
+from the drift that is LEFT, so a shorter remaining approach is sampled more finely
+and can find a live press inside a hole the coarser pass stepped over. Carried half
+a second, 554 of 558 comparisons across the corpus agreed to the pixel and the 99th
+percentile of the difference was zero; carried a full second the 99th was 15px. The
+physics does not drift — the resolution does. Neither window ever disagreed about
+whether a cross exists at all.
+
+**Still open, and filed rather than built.** The remaining spike is one full
+computation landing inside one tick. The structural answer is to evaluate a few
+press-points per tick instead of all of them at once — sound for exactly the reason
+`advanceScar` is sound, since a press-point's verdict does not depend on when it is
+asked — so a full picture would assemble over ~10 ticks and no tick would ever do
+more than a few captures. That is a redesign of the search rather than a tuning
+pass, and it wants a performance harness in front of it, which the author has
+scoped separately.
 
 ---
 

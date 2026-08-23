@@ -11,7 +11,7 @@ import { KNOBS } from '../src/app/tune.ts';
 import { isGrabKey, keydownAction } from '../src/app/input.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
-import { rescueScar } from '../src/sim/rescue.ts';
+import { advanceScar, rescueScar } from '../src/sim/rescue.ts';
 import type { Input } from '../src/sim/types.ts';
 import { createLoop } from '../src/app/loop.ts';
 import { anomalyFocus, barrierRelax, frozenOrbit, orbitLock } from '../src/render/camera.ts';
@@ -297,9 +297,33 @@ resize();
 
 rearm();
 
-/** Ticks between recomputes of the point of no return. 6 is ~0.1s. */
+/**
+ * Ticks between refreshes of the point of no return, and between full recomputes.
+ *
+ * A drift takes no input, so a computed projection stays true as the ship flies
+ * along it — see `advanceScar`. The refresh is therefore arithmetic and the full
+ * simulation runs only when the projection can no longer be trusted: on every
+ * capture transition, on a respawn, and on this timer as a backstop for anything
+ * neither of those catches.
+ *
+ * Measured, a full call runs a median 1.4ms and up to 19ms here, three to five
+ * times that on a phone. Running one ten times a second was what the author saw
+ * as slowdown at the edges.
+ *
+ * The backstop is 30 ticks and not 60 because of what a fresh call does
+ * differently: it re-derives its sampling stride from the drift that is LEFT, so a
+ * shorter remaining approach is sampled more finely and can find a live press
+ * inside a hole the coarser pass stepped over. Carried half a second, 554 of 558
+ * comparisons across the corpus agreed to the pixel and the 99th percentile of the
+ * difference was zero; carried a full second the 99th was 15px. The physics does
+ * not drift — the resolution does.
+ */
 const SCAR_EVERY = 6;
+const SCAR_RECOMPUTE = 30;
 let scarSkip = SCAR_EVERY;
+let scarAge = SCAR_RECOMPUTE;
+let scarCache: ReturnType<typeof rescueScar> = null;
+let scarWasCaptured = false;
 
 const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
   step(dt) {
@@ -348,8 +372,10 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       // message about a run that is over.
       scene.fuelWarning.clear();
       // Same for the scar: it is a world-space mark against a wall this ship has
-      // never approached.
+      // never approached, and the projection behind it describes a dead run.
       scene.scar.clear();
+      scarCache = null;
+      scarAge = SCAR_RECOMPUTE;
       centerCamera(cam, curr.x, curr.y, field, backtrackFloorY(sim, curr.highWaterY));
     }
 
@@ -362,9 +388,28 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // Skipped entirely during the ending hold, which freezes the mark where it
     // was: the receding cross is the explanation of the death being shown, and
     // an explanation must not fade out behind the notice it belongs to.
+    // A capture starting or ending is the one thing that invalidates a projection,
+    // because it is the one thing that changes the ship's velocity.
+    const capturedNow = state.capture !== null;
+    if (capturedNow !== scarWasCaptured) {
+      scarCache = null;
+      scarAge = SCAR_RECOMPUTE;
+      scarWasCaptured = capturedNow;
+    }
+
     scarSkip++;
+    scarAge++;
     if (!state.ending.active && scarSkip >= SCAR_EVERY) {
-      const scar = rescueScar(state, sim, dt);
+      const elapsed = dt * scarSkip;
+      const stale = scarAge >= SCAR_RECOMPUTE;
+      const carried = scarCache && !stale ? advanceScar(scarCache, elapsed) : null;
+      if (carried) {
+        scarCache = carried;
+      } else {
+        scarCache = rescueScar(state, sim, dt);
+        scarAge = 0;
+      }
+      const scar = scarCache;
       // How much fire the ship would fly into if the press were made at the
       // cross. The predictor hands back the flight and the scorer prices it,
       // because `src/sim/` may not know what a point is. Deliberately NOT the
@@ -374,7 +419,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       const prize = scar
         ? previewBurn(scar.flight, field, state.bodies, DEFAULT_SCORE_CONFIG, dt)
         : 0;
-      scene.scar.observe(scar, prize, rcfg, dt * scarSkip);
+      scene.scar.observe(scar, prize, rcfg, elapsed);
       scarSkip = 0;
     }
 
