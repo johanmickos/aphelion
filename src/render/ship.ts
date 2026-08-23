@@ -131,8 +131,19 @@ function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs
   // Two out-of-phase waves rather than one, so the flame breathes instead of
   // pulsing on a period the eye can lock onto and start reading as a countdown.
   const flick = 0.86 + 0.1 * Math.sin(timeMs * 0.033) + 0.06 * Math.sin(timeMs * 0.071 + 1.3);
-  const h = heat * flick;
-  const reach = (16 + 46 * heat) * s;
+
+  // PRESENTATION CURVE, not a change to the physics. `heat` stays exactly the
+  // number the scorer integrated; what it drives here is a picture, and the two
+  // do not have to be linear in each other.
+  //
+  // They were, and the flame lost the bottom half of its range to it: a real 2px
+  // graze scores heat around 0.25, which drew a 27px plume at 21% alpha over a
+  // moving starfield — reported, accurately, as no flare at all. The square root
+  // lifts that to 0.5, and leaves the top of the range where it was. Paired with
+  // `burnMinHeat`, it means the faintest fire that can exist is one you can see.
+  const vis = Math.sqrt(heat);
+  const h = vis * flick;
+  const reach = (18 + 52 * vis) * s;
 
   ctx.save();
   // Additive, so overlapping tongues brighten toward white at the core the way a
@@ -151,8 +162,8 @@ function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs
   ctx.moveTo(-2 * s, -5.4 * s);
   // Two long curves meeting at a point, drawn with the control handles pulled
   // outward so the tongue swells just behind the hull before it narrows.
-  ctx.quadraticCurveTo(-reach * 0.45, -7 * s * (0.6 + 0.5 * heat), -reach, 0);
-  ctx.quadraticCurveTo(-reach * 0.45, 7 * s * (0.6 + 0.5 * heat), -2 * s, 5.4 * s);
+  ctx.quadraticCurveTo(-reach * 0.45, -7 * s * (0.6 + 0.5 * vis), -reach, 0);
+  ctx.quadraticCurveTo(-reach * 0.45, 7 * s * (0.6 + 0.5 * vis), -2 * s, 5.4 * s);
   ctx.closePath();
   ctx.fill();
 

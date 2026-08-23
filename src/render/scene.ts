@@ -121,11 +121,13 @@ export class Scene {
     if (!opts.paused) {
       this.popups.update(opts.frameDt);
       this.fuelWarning.update(opts.frameDt);
-      // Catches in ~0.05s and dies over ~0.25s. A pause holds the flame where it
-      // was, for the same reason it holds the popups: nothing should burn down
-      // behind the overlay.
+      // Catches in ~0.03s and dies over ~0.25s. The rise is deliberately quicker
+      // than it first was: a flare runs about 0.2s, so a follower that needed a
+      // tenth of that to catch was shaving the peak off the very thing it draws.
+      // A pause holds the flame where it was, for the same reason it holds the
+      // popups: nothing should burn down behind the overlay.
       const target = opts.score.burnHeat;
-      const rate = target > this.burn ? 20 : 4;
+      const rate = target > this.burn ? 30 : 4;
       this.burn += (target - this.burn) * Math.min(1, opts.frameDt * rate);
       if (this.burn < 0.002) this.burn = 0;
     }

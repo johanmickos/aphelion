@@ -85,19 +85,24 @@ export const AIM = Object.freeze({ tier1: 0.94, tier2: 0.98 });
 export const PEAK = Object.freeze({ tier1: 0.85, tier2: 0.94 });
 
 /**
- * Peak heat of a flare. Percentiles of the 760 flares in `diagnostics/`.
+ * Peak heat of a flare. Percentiles of the flares in `diagnostics/`.
  *
  * Measured against the frequency of the thing being named, not against the 0..1
  * scale, because the scale is not the question — how often the word should appear
  * is. tier1 is the p70 flare and tier2 the p90, which puts a burn word on about
- * one capture in six and the better word on about one in eighteen.
+ * one capture in six (16.2%) and the better word on about one in eighteen (5.5%).
  *
- * Read those as shares of ALL captures, not of flares: 55% of captures flare at
+ * Read those as shares of ALL captures, not of flares: 45% of captures flare at
  * all, and most of those are a faint scrape that earns its points and no name.
  * Naming them too would make the commonest event in the game a celebrated one,
  * which is the mistake the 15-degree kink line made.
+ *
+ * RE-MEASURED when the speed ramp was narrowed to 355-520. The frequency targets
+ * are the same; the heat values that hit them moved, because the quantity under
+ * them changed shape. A threshold calibrated on a stale feel is worse than an
+ * unmeasured one, because it looks defensible.
  */
-export const BURN = Object.freeze({ tier1: 0.53, tier2: 0.75 });
+export const BURN = Object.freeze({ tier1: 0.68, tier2: 0.94 });
 
 /**
  * The nerve grab: already boring in, and you waited.

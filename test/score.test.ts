@@ -1187,14 +1187,32 @@ describe('the burn', () => {
   });
 
   it('keeps the parked orbit below the speed the burn starts at', () => {
-    // The measurement the threshold came from: over the whole diagnostics corpus
-    // a parked minimum orbit never exceeded 342 px/s, against a burn gate of 360.
-    // This is what makes depth-plus-speed discriminate where depth alone does not.
     const { samples } = trace(PARK, 2400);
     const parked = samples.filter((s) => s.phase === 'orbit');
     expect(parked.length).toBeGreaterThan(60);
     const fastest = Math.max(...parked.map((s) => s.speed));
     expect(fastest).toBeLessThan(DEFAULT_SCORE_CONFIG.burnSpeed0);
+  });
+
+  it('gates the burn above the fastest orbit that could ever be parked in', () => {
+    // THE ONE ABOVE IS NOT ENOUGH, and this is the lesson: it samples one capture
+    // on one field, and the burn's whole meaning rests on no parked orbit ever
+    // reaching the gate. That bound does not need sampling — a settled capture is
+    // a circle at radius >= minR, so its speed is sqrt(GM/minR), largest around
+    // the SMALLEST body the world generator can produce.
+    //
+    // The corpus said 342 px/s and a gate of 345 was very nearly shipped on the
+    // strength of it. The closed form says 345.8: those recordings simply never
+    // parked on the smallest planet, and on the field where they did, parking
+    // would have been a points faucet.
+    let smallest = Infinity;
+    for (let seed = 0; seed < 400; seed++) {
+      for (const b of createBodies({ ...DEFAULT_CONFIG, worldSeed: seed })) {
+        smallest = Math.min(smallest, b.R);
+      }
+    }
+    const fastestPossible = Math.sqrt(DEFAULT_CONFIG.GM / (smallest + DEFAULT_CONFIG.minOrbitGap));
+    expect(DEFAULT_SCORE_CONFIG.burnSpeed0).toBeGreaterThan(fastestPossible);
   });
 
   it('lights on a fast low pass, and pays what it burned', () => {

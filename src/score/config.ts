@@ -88,21 +88,43 @@ export interface ScoreConfig {
    * measured across 1386 real captures, 68% of settled orbits sit at EXACTLY zero
    * clearance. A burn gated on depth alone would pay most for parking.
    *
-   * A parked minimum orbit is slow, though: its speed tops out at 342 px/s over
-   * the whole corpus, while a dive whipping through periapsis reaches 430-570. So
-   * 360 sits just above everything a parked orbit can reach, and the result is
-   * that of the captures that flare, ZERO flare while parked.
+   * A parked minimum orbit is slow, though. How slow is not a matter of sampling:
+   * a settled capture is a circle at radius >= `minR`, so its speed is
+   * sqrt(GM/minR), maximised by the smallest body in the field. Under
+   * DEFAULT_CONFIG that is R=34 and a gap of 12, giving a hard ceiling of
+   * **345.8 px/s** that no parked orbit anywhere can exceed.
+   *
+   * 355 sits above that closed form with margin to spare. It is deliberately NOT
+   * the 342 px/s the diagnostics corpus happened to top out at — that sample
+   * never parked on the smallest planet, and a gate set to it would have burned
+   * while parked on the one field where it mattered. Sample the physics, not the
+   * recordings, where the physics can be solved.
    */
   burnSpeed0: number;
-  /** Speed at which the heat term saturates. 560 is the p99 of real low passes. */
+  /**
+   * Speed at which the heat term saturates.
+   *
+   * This started at the p99 of real low passes, 560, and that was too wide by
+   * half. It made the ramp 200px/s across when a typical skim runs 370-400 — the
+   * bottom fifth of it — so speed swamped depth and a beautiful 2px graze read as
+   * heat 0.15, which is a plume too faint to see and 14 points. Reported as "I
+   * didn't see any red glow or flare or counter rolling up as I hugged the edge",
+   * on a session that did exactly that.
+   *
+   * 520 keeps the spread the ladder needs — peak heat p25 0.25, p50 0.44, p75
+   * 0.73, p90 0.92 — without saturating the middle. Narrower was tried: at 430
+   * the median flare saturates at 0.90 and the rarity ladder has nothing left to
+   * grade.
+   */
   burnSpeed1: number;
   /**
    * Points per heat-second.
    *
    * Heat is `depth * speed`, both 0..1, so a whole second held at full heat pays
-   * this — which never happens: the hot pass is a flash. Measured against real
-   * play, 1500 puts a median capture's burn at ~84 points and the best on record
-   * at ~205, which is the band `closeBonus` and `nerveBonus` already occupy.
+   * this — which never happens: the hot pass is a flash. Derived, not picked: the
+   * median capture that burns integrates 0.0747 heat-seconds, so 1125 is what
+   * puts it at the ~84 points the band was chosen for, alongside `closeBonus` 150
+   * and `nerveBonus` 200. The best capture on record lands at ~182.
    */
   burnRate: number;
   /**
@@ -112,6 +134,12 @@ export interface ScoreConfig {
    * — so it decides what counts as one pass rather than two, and it withholds the
    * points from a smoulder too faint to draw. A weight, not a constant, because
    * it changes what a session scores.
+   *
+   * Raised from 0.05 once the flame got its presentation curve, and the two are
+   * one decision: `drawBurn` renders sqrt(heat), so 0.10 is the point at which
+   * the fire becomes plainly visible. Below it there was nothing to see and a
+   * couple of points to collect, which is the worst of both — a payout with no
+   * picture. Now every burn that pays is a burn you watched.
    */
   burnMinHeat: number;
 
@@ -251,10 +279,10 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   timingSharpness: 2,
 
   burnSpan: 30,
-  burnSpeed0: 360,
-  burnSpeed1: 560,
-  burnRate: 1500,
-  burnMinHeat: 0.05,
+  burnSpeed0: 355,
+  burnSpeed1: 520,
+  burnRate: 1125,
+  burnMinHeat: 0.1,
 
   streakStep: 0.25,
   streakMax: 5,

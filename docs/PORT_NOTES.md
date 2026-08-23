@@ -2113,11 +2113,40 @@ alternative was a second exception to that rule alongside the reckless shout, fo
 a cue that already has a shape, a size and a position nothing else in the game
 uses.
 
-Thresholds are percentiles of the same corpus. The word fires at peak heat 0.53
-(p70 of flares, about one capture in six) and its better rung at 0.75 (p90, about
-one in eighteen); 55% of captures flare at all, and most of those earn points and
-no name. `burnRate` 1500 puts a median capture's burn at ~84 points and the best
-on record at ~205 — the band `closeBonus` and `nerveBonus` already occupy.
+Thresholds are percentiles of the same corpus. The word fires at peak heat 0.68
+(p70 of flares, about one capture in six) and its better rung at 0.94 (p90, about
+one in eighteen); 45% of captures flare at all, and most of those earn points and
+no name. `burnRate` 1125 puts a median capture's burn at ~84 points and the best
+on record at ~182 — the band `closeBonus` and `nerveBonus` already occupy.
+
+**Retuned once, on the first playtest**, reported as "I didn't see any red glow or
+flare or counter rolling up as I hugged the edge". Both cues were in fact working
+— replayed through the real render path, the flame drew and the popup counted
+`+10 -> +163  SINGED`. They were calibrated into invisibility, and in two separate
+ways:
+
+- **The speed ramp was twice as wide as it should have been.** 360-560 came from
+  the p99 of low passes, but a typical skim runs 370-400 — the bottom fifth of
+  that ramp — so speed swamped depth and a genuine 2px graze scored heat 0.15.
+  Narrowed to 355-520: the same graze now reads 0.21, and the session's best pass
+  went 0.63 -> 0.79. Narrower was tried and overshoots — at 430 the median flare
+  saturates at 0.90 and the ladder has nothing left to grade.
+- **The flame was drawn linearly in heat.** `drawBurn` now renders `sqrt(heat)`,
+  which is presentation and not physics: heat stays exactly what the scorer
+  integrated. A mid flare went from a 27px plume at 21% alpha to 42px at 34%.
+  `burnMinHeat` rose 0.05 -> 0.10 to meet it, so the faintest fire that can exist
+  is one you can see — before, a heat-0.05 flare paid `+1` and drew nothing, which
+  is the worst of both.
+
+**And the bound that was nearly got wrong.** The retune wanted `burnSpeed0` at
+345, on the grounds that the corpus never parked faster than 342px/s. That is a
+sample, and the quantity has a closed form: a settled capture is a circle at
+radius >= `minR`, so its speed is `sqrt(GM/minR)`, largest around the smallest
+body the generator makes — **345.8px/s**. A gate at 345 would have burned while
+parked on any field containing that planet, reopening the exact faucet this
+mechanic was designed around. The gate is 355 and `test/score.test.ts` now pins it
+against the closed form rather than against a recording. Sample the physics, not
+the recordings, wherever the physics can be solved.
 
 Nothing under `src/sim/` changed: heat is read off `Capture` by an observer, the
 gate stayed at exactly zero, and no golden was recaptured.
@@ -2148,9 +2177,9 @@ golden baseline               golden/physics-v1.json
 
 tests    port-equality 11 · invariants 32 · render 100 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
-         score 66 · input 8 · grab-target 8 · link-fuel 6
+         score 67 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 433 total
+         zip-charge 8 · attract 13 · 434 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
