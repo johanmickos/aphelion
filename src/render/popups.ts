@@ -91,7 +91,7 @@ const STACK_GAP = 20;
  */
 const STACK_X = 80;
 
-import { BURN, BURN_WORD, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+import { LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 function easeOutCubic(u: number): number {
   const k = 1 - u;
@@ -109,8 +109,6 @@ interface Popup {
   shout: string | null;
   /** Seconds the number spends counting up to `points`. 0 shows it at once. */
   roll: number;
-  /** On the burn's own red channel — see `BURN` in `accolade.ts`. */
-  burn: boolean;
 }
 
 export class Popups {
@@ -144,7 +142,6 @@ export class Popups {
       praise,
       shout: null,
       roll: burning ? ROLL : 0,
-      burn: burning,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -182,7 +179,6 @@ export class Popups {
       praise: null,
       shout: shout.word,
       roll: 0,
-      burn: false,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -227,20 +223,14 @@ export class Popups {
         continue;
       }
 
-      // A burn keeps its own colour whether or not it earned a word: the red is
-      // saying WHICH CHANNEL this is, not how good it was, and it has to match
-      // the tally the number was just counting up in beside the ship.
-      const style = p.burn ? BURN : p.praise ? LEVEL[p.praise.level] : ROUTINE;
-      // A burn's word runs a step deeper into the orange than its number: two
-      // shades of one fire rather than two colours. Everything else uses one.
-      const wordStyle = p.burn ? BURN_WORD : style;
+      const style = p.praise ? LEVEL[p.praise.level] : ROUTINE;
 
       if (p.praise) {
         // A brief overshoot on the way in. Only the top of the ladder gets it —
         // on an ordinary word it reads as a wobble rather than as emphasis.
         const pop = p.praise.level === 'exceptional' ? 1 + 0.35 * Math.max(0, 1 - u * 6) : 1;
-        ctx.font = `600 ${wordStyle.size * pop * s}px ui-monospace, monospace`;
-        ctx.fillStyle = wordStyle.color;
+        ctx.font = `600 ${style.size * pop * s}px ui-monospace, monospace`;
+        ctx.fillStyle = style.color;
         // A dark rim rather than a filled plate: the word sits over planets and
         // stars, and a box that size would punch a hole in the scene.
         ctx.lineWidth = 3 * s;
@@ -251,7 +241,7 @@ export class Popups {
 
       // The number sits below the word, always, praised or not.
       if (p.points === null) continue;
-      const numY = y + (p.praise ? wordStyle.size + 2 : 0) * s;
+      const numY = y + (p.praise ? style.size + 2 : 0) * s;
       ctx.font = `600 ${(p.praise ? style.size - 2 : style.size) * s}px ui-monospace, monospace`;
       ctx.fillStyle = style.color;
       ctx.lineWidth = 3 * s;

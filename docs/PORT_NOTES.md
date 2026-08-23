@@ -2245,7 +2245,7 @@ battery did it never, until a scenario was added that does.
 
 ---
 
-### 51 — A live tally, built and taken back out
+### 51 — A live tally and a red channel, both built and taken back out
 
 `src/render/burn-tally.ts` · **[REVERTED]** · asked for as "I want the time spent
 in the red zone, burning, to tally up a red text near the ship rolling upwards",
@@ -2273,29 +2273,33 @@ So the roll is back where it was: the popup counts 0 to the total over 0.8s once
 the drag is over, deliberately taking longer than the 0.45s drag it is summing so
 that it reads as a tally rather than as a replay in real time.
 
-Two things from the attempt were kept, because they were separate requests that
-happened to arrive together:
+Alongside it, and reverted with it, went a RED TEXT CHANNEL for the burn — its own
+colour whether or not the drag earned a word, in three shades of fire taken from
+the flame rather than from the band. Asked for as "all text should be shades of
+deep orange or red or black, to match the singe of fire", withdrawn as "I even
+preferred your original gray plus points".
 
-**The text is fire.** Three shades and nothing else — number `#ff3b2e`, word
-`#ff7a1e` a step deeper into the orange, detail line `#c2521f`, black rim. Taken
-from the FLAME rather than from the hazard band: the band's red is pink-leaning
-(`rgba(255,70,90)`, B=90) and beside an actual fire it reads as a different
-material, while `drawBurn` builds its core from (255, 150+, 38+). Number and word
-sit dE 30 apart — one fire, two shades.
+Which leaves `accolade.ts`'s one rule unbroken after all: **colour means how good
+it was**, the word says what, and the only thing red in this feature is the fire.
+A burn under the word threshold is `ROUTINE` grey like any other routine award,
+which is the commonest thing a burn is.
 
-This is also the first colour off the rarity ladder that is not a shout, and the
-reason it is allowed: it is a STATE, not a category. Nobody has to learn the hue;
-the player is looking at a red band, a burning ship and a red number at once.
+Worth recording what the red channel got wrong, because the argument for it looked
+sound. It was defended as a STATE rather than a category — the ship is on fire, the
+band is red, the number is red, and nobody has to learn the hue. That is true and
+it is not the whole test. The band and the flame are already saying "you are
+burning" in a way that costs no reading at all; a third instance of the same signal
+adds nothing and spends the one channel the player uses to ask how good it was.
+`SHOUT` earns its off-ladder colour because it pays no points and therefore has no
+"how good" to report. A burn does.
 
-Every shade lands within dE 14-26 of some step of `FUEL_RAMP`, and nothing in the
-fire family does better, because `FUEL_RAMP` IS a fire gradient — red at empty
-through amber to green. There is no orange-red that says "burning" and does not
-also look like a tank in trouble. So it is named rather than dodged: this game's
-danger palette is fire-coloured, and out of fuel, inside the dead zone and on fire
-are three ways of being about to die. They separate by form and position — the
-fuel badge is a pill glyph and the word EMPTY on a plate below the ship — and the
-dE discipline in `accolade.ts` exists so a RANK can be read off a hue, which is not
-a question anyone asks between "burning" and "out of fuel".
+The measurement that survives is the one that made it awkward: every fire shade
+lands within dE 14-26 of some step of `FUEL_RAMP`, and nothing in the family does
+better, because `FUEL_RAMP` IS a fire gradient. Any future attempt to give a
+burning ship its own text colour runs into that and should expect to lose to it.
+
+One thing from the attempt was kept, because it was a separate request that
+happened to arrive in the same breath:
 
 **It lights at the band's edge, not 6px inside it.** `burnMinHeat` was 0.10, which
 put ignition 54px from the lethal line — and 7% of band entries grazed the outer
@@ -2335,11 +2339,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 105 · camera 55
+tests    port-equality 11 · invariants 32 · render 101 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
          score 68 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 439 total
+         zip-charge 8 · attract 13 · 436 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

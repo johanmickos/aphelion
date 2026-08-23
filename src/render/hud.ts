@@ -13,7 +13,7 @@ import type { ScoreAward, ScoreState } from '../score/types.ts';
 import type { Praise } from '../score/index.ts';
 import { praiseFor } from '../score/index.ts';
 import type { AccoladeStyle } from './accolade.ts';
-import { BURN, LEVEL, ROUTINE } from './accolade.ts';
+import { LEVEL, ROUTINE } from './accolade.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
@@ -142,10 +142,8 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     detail: `${a.body}  PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
   }),
-  burn: (a) => ({
-    // Its own channel, word or not — the same rule the popup follows, from the
-    // same table, so the band and the floating number cannot drift apart.
-    style: BURN,
+  burn: (a, p) => ({
+    style: p ? LEVEL[p.level] : ROUTINE,
     // The peak, which is what the word was chosen on — reporting the integral
     // here would caption a word the number does not explain.
     detail: `${a.body}  BURN · HEAT ${pct(a.heat)}`,

@@ -28,7 +28,7 @@ import {
 import { FUEL_WARNING, FuelWarning, pulseAlpha } from '../src/render/fuel-warning.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
-import { BURN, BURN_WORD, LEVEL, ROUTINE, SHOUT } from '../src/render/accolade.ts';
+import { LEVEL, ROUTINE, SHOUT } from '../src/render/accolade.ts';
 import { FUEL_RAMP } from '../src/render/hud.ts';
 import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
 import {
@@ -723,29 +723,21 @@ describe('floating score popups', () => {
     expect(shown()).toBe(200);
   });
 
-  it('draws a burn on its own red channel, word or no word', () => {
-    // The tally beside the ship is red and this is the same number letting go of
-    // it, so a popup that reverted to the rarity ladder would change colour
-    // mid-thought. Below the word threshold it would land on ROUTINE grey, which
-    // is where the burn was indistinguishable from a routine link.
+  it('draws a burn on the rarity ladder, like every other award', () => {
+    // This pinned the opposite for one build. A red channel for the burn — its own
+    // colour whether or not it earned a word — was asked for, built, and taken back
+    // out: "I even preferred your original gray plus points."
+    //
+    // So the rule in `accolade.ts` stands unbroken after all: colour means HOW GOOD,
+    // the word says WHAT, and the only thing red in this feature is the fire itself.
+    // A burn under the word threshold is grey, exactly like any other routine award,
+    // and that is the commonest thing a burn is.
     const p = new Popups();
-    // heat 0.2 is well under BURN.tier1, so this one earns no word at all.
+    // heat 0.2 is well under BURN.tier1, so this one earns no word.
     p.spawn(award({ kind: 'burn' as const, points: 40, heat: 0.2 }), 195, 0);
     const r = recordingContext();
     p.draw(r.ctx, cam());
-    const fills = r.calls('=fillStyle').map((o) => String(o[1]));
-    expect(fills).toContain(BURN.color);
-    expect(fills).not.toContain(ROUTINE.color);
-  });
-
-  it("shows a link's points at once, with no roll", () => {
-    // Only the burn rolls. A link is settled at the instant it is paid and a
-    // counting animation on it would invent a duration the event does not have.
-    const p = new Popups();
-    p.spawn(award({ points: 240 }), 195, 0);
-    const r = recordingContext();
-    p.draw(r.ctx, cam());
-    expect(texts(r)).toContain('+240');
+    expect(r.calls('=fillStyle').map((o) => String(o[1]))).toContain(ROUTINE.color);
   });
 
   it('rises and then expires', () => {
@@ -1885,32 +1877,5 @@ describe('the fuel warning beside the ship', () => {
       w.update(FIXED_DT);
     }
     expect(fired).toEqual(['low', 'empty']);
-  });
-});
-
-describe('the burn palette', () => {
-  it('is only ever fire — deep orange, red, or black', () => {
-    // "All text should be shades of deep orange or red or black, to match the
-    // singe of fire." Anything that reaches the burn channel has to satisfy that,
-    // and the cheap way to break it is to reach for a ladder colour when a drag
-    // earns no word.
-    const hexes = [BURN.color, BURN.labelColor, BURN_WORD.color, BURN_WORD.labelColor];
-    for (const hex of hexes) {
-      const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-      expect(m, `${hex} should be a plain hex so it can be checked`).not.toBeNull();
-      const [r, g, b] = [1, 2, 3].map((i) => parseInt(m![i]!, 16)) as [number, number, number];
-      // Red leads, blue trails: that is what makes it fire rather than pink,
-      // amber or anything on the rarity ladder.
-      expect(r, `${hex} red should lead`).toBeGreaterThan(g);
-      expect(g, `${hex} green should lead blue`).toBeGreaterThan(b);
-      // Not washed out toward white or amber — a singe is saturated.
-      expect(r - b, `${hex} should be saturated`).toBeGreaterThan(100);
-    }
-  });
-
-  it('keeps the word and the number in one family but tells them apart', () => {
-    // Two shades of one fire, not two colours. Close enough to read as a pair,
-    // far enough not to look like a mistake.
-    expect(BURN.color).not.toBe(BURN_WORD.color);
   });
 });
