@@ -337,6 +337,24 @@ export class Scar {
   }
 
   /**
+   * Drop the mark outright, leaving no ghost.
+   *
+   * For a press too brief to have been a decision — see `RenderConfig.scarTapSecs`.
+   * A press hides the scar and leaves the mark fading where the cross was, so a
+   * burst of taps leaves a burst of marks; this takes the mark away instead of
+   * handing it to the ghost slot to fade.
+   *
+   * The ghost is left alone. It belongs to an older mark, and a tap says nothing
+   * about that one.
+   */
+  dropMark(): void {
+    this.mark = null;
+    this.target = null;
+    this.path = [];
+    this.lead = Infinity;
+  }
+
+  /**
    * Forget everything. Called on a respawn: a new run is a new world, and a mark
    * pinned to a wall that is no longer there is a lie in world coordinates.
    */

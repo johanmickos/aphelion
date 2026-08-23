@@ -324,6 +324,8 @@ let scarSkip = SCAR_EVERY;
 let scarAge = SCAR_RECOMPUTE;
 let scarCache: ReturnType<typeof rescueScar> = null;
 let scarWasCaptured = false;
+/** Tick the running capture began on, for the tap test. */
+let captureStart = 0;
 
 const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
   step(dt) {
@@ -335,6 +337,14 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
 
     const wasCaptured = state.capture !== null;
     stepSim(state, sim, input, dt);
+    // How long this capture has run, for the tap test below.
+    if (!wasCaptured && state.capture) captureStart = state.tick;
+    // A press too brief to have been a decision leaves no mark behind. Before the
+    // scar is next observed, so the mark is taken away rather than handed to the
+    // ghost slot to fade — see `RenderConfig.scarTapSecs`.
+    if (wasCaptured && !state.capture && (state.tick - captureStart) * dt <= rcfg.scarTapSecs) {
+      scene.scar.dropMark();
+    }
     // A new capture begins, so the previous one's receipt is finished and the
     // awards raised below open a fresh one. Before `scoreTick`, deliberately: a
     // grab landing on this very tick belongs to the capture that just started.

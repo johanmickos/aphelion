@@ -173,6 +173,26 @@ export interface RenderConfig {
    * carries on from the alpha it already had instead of blinking down to it.
    */
   scarGhostSecs: number;
+  /**
+   * A capture this short leaves no mark behind at all, in seconds.
+   *
+   * Asked for as "only show it if the user holds it for just a few frames, to
+   * avoid spamming". A press hides the scar and leaves the mark fading where the
+   * cross was, so a burst of taps leaves a burst of marks — and a tap is not a
+   * decision worth recording.
+   *
+   * MEASURED, because real captures are not as short as they feel. Over the
+   * corpus a capture runs a median 1.32s, with p5 at 0.300s and p1 at 0.100s.
+   * There is no gap in the distribution to cut at, but there is a distinct tail:
+   * 0.18 catches 2% of all captures and sits comfortably between p1 and p5, so it
+   * never reaches ordinary play. In a tapping burst it catches nearly all of them,
+   * which is the point — it targets the burst rather than the average.
+   *
+   * NOT the game's own idea of a tap. `ScoreAward` calls a press that never
+   * reached periapsis one, because it earns nothing; measured, that is 48% of all
+   * captures at a median of 0.72s, which is most of the game rather than a tap.
+   */
+  scarTapSecs: number;
   /** Half-length of the crossbar, and of the arm stub kept after the cross is passed. */
   scarBarHalf: number;
   scarStubHalf: number;
@@ -375,6 +395,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarFullSecs: 1.65,
   scarFadeOutSecs: 1.6,
   scarGhostSecs: 0.3,
+  scarTapSecs: 0.18,
   scarBarHalf: 13,
   scarStubHalf: 17,
   scarPrizeMin: 0.62,

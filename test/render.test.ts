@@ -692,6 +692,58 @@ describe('scene', () => {
     expect(rcfg.scarGhostSecs).toBeLessThan(rcfg.scarFadeOutSecs);
   });
 
+  it('leaves no mark behind for a press too brief to have been a decision', () => {
+    // A press hides the scar and leaves the mark fading where the cross was, so a
+    // burst of taps leaves a burst of marks. `dropMark` takes it away rather than
+    // handing it to the ghost slot, so a tap leaves nothing at all.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, state.ship.x, state.ship.y, f, null);
+
+    const drew = (mark: Scar): boolean => {
+      const r = recordingContext();
+      mark.draw(r.ctx, c, rcfg);
+      return r.ops.some(
+        (op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90'),
+      );
+    };
+
+    // A press leaves the mark behind, fading.
+    const held = new Scar();
+    held.observe(scar, 0, rcfg, FIXED_DT);
+    held.update(1, rcfg);
+    held.observe(null, 0, rcfg, FIXED_DT);
+    expect(drew(held), 'a real capture leaves its mark').toBe(true);
+
+    // The same, then told the press was a tap.
+    const tapped = new Scar();
+    tapped.observe(scar, 0, rcfg, FIXED_DT);
+    tapped.update(1, rcfg);
+    tapped.observe(null, 0, rcfg, FIXED_DT);
+    tapped.dropMark();
+    expect(drew(tapped), 'a tap leaves nothing').toBe(false);
+
+    // And it does not take an older, unrelated ghost with it: a tap says nothing
+    // about the mark before it.
+    const withGhost = new Scar();
+    withGhost.observe(scar, 0, rcfg, FIXED_DT);
+    withGhost.update(1, rcfg);
+    withGhost.observe(null, 0, rcfg, FIXED_DT);
+    withGhost.observe(
+      { ...scar, cross: { ...scar.cross!, x: scar.cross!.x + 400 } },
+      0,
+      rcfg,
+      FIXED_DT,
+    );
+    withGhost.update(1 / 60, rcfg);
+    withGhost.dropMark();
+    expect(drew(withGhost), 'the older ghost is left alone').toBe(true);
+  });
+
   it('never draws an arm longer than the clamp, however far away the cross is', () => {
     // The cross sits a median 432px ahead and 1551px at p90, against a 390-wide
     // viewport — so without the clamp the common case is a line across the map.
