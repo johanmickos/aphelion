@@ -2245,7 +2245,7 @@ battery did it never, until a scenario was added that does.
 
 ---
 
-### 51 — A live tally and a red channel, both built and taken back out
+### 51 — Two red channels reverted, and the one word that kept its colour
 
 `src/render/burn-tally.ts` · **[REVERTED]** · asked for as "I want the time spent
 in the red zone, burning, to tally up a red text near the ship rolling upwards",
@@ -2298,6 +2298,28 @@ lands within dE 14-26 of some step of `FUEL_RAMP`, and nothing in the family doe
 better, because `FUEL_RAMP` IS a fire gradient. Any future attempt to give a
 burning ship its own text colour runs into that and should expect to lose to it.
 
+**What did survive, on the third pass, is the word and only the word.** SINGED,
+SEARED, SCORCHED, BLAZING, INFERNO, METEOR now draw in a dark ember `#c04018`;
+the NUMBER beside them stays on the rarity ladder, grey when the drag earned no
+word and a ladder colour when it did.
+
+That is the narrow version of the exception, and it survives where the wide one
+did not because it does not spend the "how good" channel. The word is already
+about fire — the vocabulary names a thing that has a colour — and ladder blue is
+the one case where the ladder actively fights the word it is colouring. Nothing
+has to be learned; the player is reading the word FIRE while the ship is on fire.
+
+Dark turns out to be affordable, which was the surprise. Measured against the
+starfield the ember is 4.0:1, BETTER than the `ROUTINE` grey it sits above at
+3.6:1 — the game already asks people to read something dimmer than this. Over the
+hazard band it holds 3.2:1 and the popup's black rim carries the rest.
+
+It costs one piece of awkwardness worth knowing about: the score band draws points,
+multiplier and word as a single centred string, so a burn has to lay out two runs
+from the left edge of the pair to keep them centred as a unit. `test/render.test.ts`
+pins that, because if it drifts the band and the popup are back to answering the
+same question in two different colours.
+
 One thing from the attempt was kept, because it was a separate request that
 happened to arrive in the same breath:
 
@@ -2339,11 +2361,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 101 · camera 55
+tests    port-equality 11 · invariants 32 · render 103 · camera 55
          diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
          score 68 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 436 total
+         zip-charge 8 · attract 13 · 438 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

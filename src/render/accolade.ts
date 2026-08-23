@@ -55,6 +55,37 @@ export const ROUTINE: AccoladeStyle = {
 };
 
 /**
+ * The word a survived dead-zone drag earns — and ONLY the word.
+ *
+ * The one place a category is allowed to take a colour, and the exception is
+ * narrow on purpose. The rule in this file still holds where it matters: the
+ * NUMBER stays on the rarity ladder, so "how good was that" is still answered in
+ * the channel that answers it for every other award. This colours the six words
+ * in `WORDS.burn` and nothing else.
+ *
+ * What earns the exception is that the word is already about fire. SINGED,
+ * SCORCHED, INFERNO — the vocabulary names a thing that has a colour, and drawing
+ * it in ladder blue is the one case where the ladder actively fights the word it
+ * is colouring. Nothing has to be learned: the player is reading the word FIRE
+ * while the ship is on fire.
+ *
+ * A whole red channel for the burn was tried twice before this and reverted both
+ * times — see PORT_NOTES 51. What went wrong there was colouring the number too,
+ * which spent the "how good" channel on a fact the flame was already shouting.
+ *
+ * DARK, and dark is affordable. Measured against the starfield this is 4.0:1,
+ * which is BETTER than the `ROUTINE` grey it sits above at 3.6:1 — so the ember
+ * reads as dim without being less legible than what the game already asks people
+ * to read. Over the hazard band (`rgba(255,70,90,.22)` on black) it holds 3.2:1,
+ * and the black rim on the popup carries it the rest of the way.
+ */
+export const BURN_WORD: AccoladeStyle = {
+  color: '#c04018',
+  labelColor: '#8f2d12',
+  size: 15,
+};
+
+/**
  * The shout: off the ladder too, and on its own channel — see
  * `src/score/reckless.ts`.
  *

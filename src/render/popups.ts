@@ -91,7 +91,7 @@ const STACK_GAP = 20;
  */
 const STACK_X = 80;
 
-import { LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+import { BURN_WORD, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 function easeOutCubic(u: number): number {
   const k = 1 - u;
@@ -224,13 +224,16 @@ export class Popups {
       }
 
       const style = p.praise ? LEVEL[p.praise.level] : ROUTINE;
+      // Only the word, and only for a burn. The number keeps the ladder below, so
+      // the ember says WHAT and the ladder still says how good — see `BURN_WORD`.
+      const wordColor = p.praise?.category === 'burn' ? BURN_WORD.color : style.color;
 
       if (p.praise) {
         // A brief overshoot on the way in. Only the top of the ladder gets it —
         // on an ordinary word it reads as a wobble rather than as emphasis.
         const pop = p.praise.level === 'exceptional' ? 1 + 0.35 * Math.max(0, 1 - u * 6) : 1;
         ctx.font = `600 ${style.size * pop * s}px ui-monospace, monospace`;
-        ctx.fillStyle = style.color;
+        ctx.fillStyle = wordColor;
         // A dark rim rather than a filled plate: the word sits over planets and
         // stars, and a box that size would punch a hole in the scene.
         ctx.lineWidth = 3 * s;

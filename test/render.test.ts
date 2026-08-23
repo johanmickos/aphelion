@@ -28,7 +28,7 @@ import {
 import { FUEL_WARNING, FuelWarning, pulseAlpha } from '../src/render/fuel-warning.ts';
 import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
-import { LEVEL, ROUTINE, SHOUT } from '../src/render/accolade.ts';
+import { BURN_WORD, LEVEL, ROUTINE, SHOUT } from '../src/render/accolade.ts';
 import { FUEL_RAMP } from '../src/render/hud.ts';
 import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
 import {
@@ -723,6 +723,28 @@ describe('floating score popups', () => {
     expect(shown()).toBe(200);
   });
 
+  it('burns the WORD in ember while the number keeps the ladder', () => {
+    // The narrow exception in `accolade.ts`: SINGED / SCORCHED / INFERNO name a
+    // thing that has a colour, and ladder blue is the one case where the ladder
+    // fights the word it is colouring. The number is untouched, so "how good was
+    // that" is still answered where it is answered for every other award.
+    //
+    // Two whole red channels for the burn were tried and reverted before this
+    // (PORT_NOTES 51); what went wrong both times was colouring the number too.
+    const p = new Popups();
+    // heat 0.8 clears BURN.tier2, so this one earns a word.
+    p.spawn(award({ kind: 'burn' as const, points: 180, heat: 0.8 }), 195, 0);
+    const r = recordingContext();
+    p.draw(r.ctx, cam());
+    const fills = r.calls('=fillStyle').map((o) => String(o[1]));
+    expect(fills).toContain(BURN_WORD.color);
+    // The number is on the ladder, not the ember.
+    expect(fills).toContain(LEVEL.great.color);
+
+    const words = texts(r).filter((t) => !t.startsWith('+'));
+    expect(WORDS.burn.flat()).toContain(words[0]);
+  });
+
   it('draws a burn on the rarity ladder, like every other award', () => {
     // This pinned the opposite for one build. A red channel for the burn — its own
     // colour whether or not it earned a word — was asked for, built, and taken back
@@ -971,6 +993,26 @@ describe('the score band', () => {
     expect(detail).toContain('91');
     expect(detail).toContain('96');
     expect(detail).not.toContain('CLOSE');
+  });
+
+  it("splits a burn's band line so the word is ember and the number is not", () => {
+    // The band draws points, multiplier and word as ONE centred string, so a burn
+    // needs two runs to colour only the word. Easy to get wrong in a way nothing
+    // else notices — and if it drifts, the band and the popup are back to
+    // answering the same question in two different colours, which is the whole
+    // reason `accolade.ts` is one table.
+    const r = recordingContext();
+    const burn = award({ kind: 'burn' as const, points: 180, heat: 0.8, multiplier: 2 });
+    drawScore(r.ctx, cam(), scoreWith({ score: 900, lastAward: burn }), snapAt(110));
+
+    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    const fills = r.calls('=fillStyle').map((o) => String(o[1]));
+    expect(fills).toContain(BURN_WORD.color);
+
+    // The number and the word are drawn separately, not as one string.
+    const head = texts.find((t) => t.startsWith('+180'))!;
+    expect(head).not.toContain('SCORCHED');
+    expect(texts.some((t) => WORDS.burn.flat().some((w) => t.includes(w)))).toBe(true);
   });
 
   it('never announces a grab as a coasting penalty', () => {
