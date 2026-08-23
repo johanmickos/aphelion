@@ -170,11 +170,20 @@ export interface ScoreConfig {
    * distribution it puts a tight press at 0.88, the median press at 0.46 and a
    * lazy one at nearly nothing, which is spread rather than a cliff.
    *
-   * PROVISIONAL, and it should be re-measured. Every press in that sample was
-   * made BLIND — the scar did not exist — so the distribution describes players
-   * who could not see the line they are now being scored against. The direction
-   * of the error is knowable in advance: presses will move later, the median
-   * quality will rise, and the span will want to shrink.
+   * MEASURED AGAINST SIGHTED PLAY, and the prediction that used to stand here was
+   * wrong. It said presses would move later once the cross was drawable, the
+   * median quality would rise, and the span would want shrinking. A 237s session
+   * flown with the scar says otherwise: quality came out p25 0.42, median 0.59,
+   * p75 0.74, p90 0.78 against the blind p25 0.30, median 0.56, p75 0.78, p90
+   * 0.86. The centre did not move. The TAILS tightened — fewer very early presses
+   * and fewer very late ones — which is the more sensible reading: a visible
+   * deadline says how much room there is as clearly as how little.
+   *
+   * So 2.4 stands. It is still only one sighted session against sixty-two blind
+   * ones, and the two populations are not strictly comparable — recorded quality
+   * exists only for rescues that PAID — so this wants confirming rather than
+   * re-deriving. What moved instead was behaviour: presses already past the cross
+   * fell from 23% of wall-committed presses to 7%.
    */
   rescueSpan: number;
   /**

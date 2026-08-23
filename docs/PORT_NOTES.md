@@ -3518,6 +3518,61 @@ rewarded for, and the words are the part that tells them.
 
 ---
 
+### 60 — The scar did not make presses later, it made them steadier
+
+`src/score/config.ts` · **[MEASURED]** · the first session flown with the cross
+visible, 2026-08-23T22-43-27, 237s
+
+Note 53 and `rescueSpan` both carried a prediction: every threshold behind the
+scar was calibrated on blind play, so presses would move later, the median quality
+would rise, and the span would want shrinking. **The prediction was wrong**, and
+recording that is the point of this note — it was stated confidently enough that a
+later session would have acted on it.
+
+```
+  rescue quality      n     p25    median   p75    p90
+    sighted          39    0.42    0.59    0.74   0.78
+    blind           224    0.30    0.56    0.78   0.86
+```
+
+The centre did not move. The TAILS tightened, at both ends: fewer very early
+presses and fewer very late ones. In hindsight that is the more sensible reading —
+a visible deadline says how much room there is as clearly as how little, so it
+buys consistency rather than daring.
+
+**What did move is behaviour, and it moved a long way.** Over the stretch the
+replay is faithful for:
+
+```
+  presses committed to a wall        52% sighted   against   37% blind
+  of those, already PAST the cross    7% sighted   against   23% blind
+```
+
+Doomed presses fell by about two thirds. That is the thing the scar was built to
+change, and the only number here big enough to believe on one session.
+
+**Nothing was retuned.** One sighted session against sixty-two blind ones is not
+enough to move a p75, and the two populations are not strictly comparable: recorded
+quality exists only for rescues that PAID, while the blind figures are re-scored
+over every rescue a replay produces. Changing a measured constant on that would be
+exactly the "calibrated on a stale feel, and worse for looking defensible" failure
+AGENTS warns about.
+
+**A METHOD NOTE THAT OUTLIVES THIS SESSION.** A long chained session is the shape
+that diverges — note 16's remaining `sin`/`cos`/`atan2`, amplified by captures and
+reset by respawns — and this one was faithful for 133s of 237s. So re-simulation
+covered 56% of it. `report.awards` did not: it is what the session actually paid,
+carries the rescue quality in its `timing` field, and is immune to divergence
+entirely.
+
+**For threshold work, prefer the recorded awards to a replay.** A replay is the
+right tool for asking what the simulation did; the award list is the right one for
+asking what the player was paid, and a percentile of real play is the second
+question. It is also the only one that survives the exact sessions worth measuring:
+the long, chained, well-played ones.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
