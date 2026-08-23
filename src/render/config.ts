@@ -157,6 +157,35 @@ export interface RenderConfig {
   /** Half-length of the crossbar, and of the arm stub kept after the cross is passed. */
   scarBarHalf: number;
   scarStubHalf: number;
+  /**
+   * How much the mark shrinks and grows with the fire waiting at the cross.
+   *
+   * SIZE AND NOT BRIGHTNESS, and that is the whole reason this is a separate key
+   * rather than a term folded into `scarAlpha`. Alpha already carries how close
+   * the deadline is — it ramps in with time-to-cross and fades out once the mark
+   * is passed — so a prize term there would make a dim cross mean either "small
+   * fire" or "still far away", with no way to tell which. Note 51's lesson about
+   * spending one channel on two signals, applied to a world object instead of to
+   * text.
+   *
+   * The mark scales between these two multiples of its configured size, so a big
+   * fat scar is a big fire and a thin one is a formality.
+   */
+  scarPrizeMin: number;
+  scarPrizeMax: number;
+  /**
+   * Predicted burn, in raw bank points, at which the mark reaches full size.
+   *
+   * Measured over the 548 committed approaches in `diagnostics/`: the fire
+   * waiting at the cross runs p25 280, median 402, p75 613, p90 857. 860 is that
+   * p90 — the mark saturates only on the top tenth, so the middle of real play
+   * spends its time in the middle of the scale rather than pinned at the top.
+   *
+   * Only 3% of crosses have no fire at all, which was the surprise: the flight
+   * AFTER the press carries the ship deeper than the cross itself, so nearly every
+   * rescue burns. The scale is about how much, not whether.
+   */
+  scarPrizeFull: number;
   /** Peak half-width of the long arm and of the crossbar, in design units. */
   scarArmWidth: number;
   scarBarWidth: number;
@@ -270,6 +299,9 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarFadeOutSecs: 1.6,
   scarBarHalf: 13,
   scarStubHalf: 17,
+  scarPrizeMin: 0.62,
+  scarPrizeMax: 1.42,
+  scarPrizeFull: 860,
   scarArmWidth: 1.3,
   scarBarWidth: 1.7,
   scarAlpha: 0.5,

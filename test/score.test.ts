@@ -34,6 +34,7 @@ import {
   CLOSE_PX,
   DEFAULT_SCORE_CONFIG,
   edgeHeat,
+  previewBurn,
   reentryHeat,
   PEAK,
   WORDS,
@@ -474,6 +475,61 @@ describe('scoring weights', () => {
 });
 
 // ------------------------------------------------------------------ behaviour
+
+describe('the fire a cross is offering', () => {
+  const cfg = DEFAULT_CONFIG;
+  const state = createInitialState(cfg);
+  const field = fieldBounds(cfg, state.bodies);
+  const bodies = state.bodies;
+  const DT = FIXED_DT;
+
+  /** A straight run of ticks at a fixed distance inside the right wall. */
+  const hold = (inset: number, ticks: number) =>
+    Array.from({ length: ticks }, () => ({ x: field.right - inset, y: 0 }));
+
+  it('is zero for a flight that never enters the band', () => {
+    expect(previewBurn(hold(400, 200), field, bodies, DEFAULT_SCORE_CONFIG, DT)).toBe(0);
+  });
+
+  it('pays more for deeper and for longer, on the same curve the burn uses', () => {
+    const shallow = previewBurn(hold(50, 60), field, bodies, DEFAULT_SCORE_CONFIG, DT);
+    const deep = previewBurn(hold(10, 60), field, bodies, DEFAULT_SCORE_CONFIG, DT);
+    const longer = previewBurn(hold(10, 120), field, bodies, DEFAULT_SCORE_CONFIG, DT);
+    expect(deep).toBeGreaterThan(shallow);
+    expect(longer).toBeGreaterThan(deep);
+    // Twice the ticks at a constant depth is exactly twice the bank: it is an
+    // integral, not a peak reading.
+    expect(longer / deep).toBeCloseTo(2, 6);
+  });
+
+  it('is the same integral the burn is paid on, weight for weight', () => {
+    // The promise that matters: if these two ever stop agreeing, the mark is
+    // sizing itself off a fire the scorer would not pay for. Doubling the rate
+    // doubles the preview, and the span it is compared against is in these units.
+    const flight = hold(20, 90);
+    const base = previewBurn(flight, field, bodies, DEFAULT_SCORE_CONFIG, DT);
+    const twice = previewBurn(
+      flight,
+      field,
+      bodies,
+      { ...DEFAULT_SCORE_CONFIG, burnRate: DEFAULT_SCORE_CONFIG.burnRate * 2 },
+      DT,
+    );
+    expect(twice / base).toBeCloseTo(2, 6);
+
+    // And it obeys the same ignition floor, so a graze that would not light a
+    // fire does not promise one either.
+    const graze = hold(DEFAULT_SCORE_CONFIG.burnEdgeSpan - 0.2, 90);
+    expect(previewBurn(graze, field, bodies, DEFAULT_SCORE_CONFIG, DT)).toBe(0);
+  });
+
+  it('promises nothing inside an anomaly bubble, where there is no wall', () => {
+    const anomaly = bodies.find((b) => b.kind === 'anomaly');
+    expect(anomaly, 'the default field has anomalies').toBeTruthy();
+    const inside = Array.from({ length: 90 }, () => ({ x: anomaly!.x, y: anomaly!.y }));
+    expect(previewBurn(inside, field, bodies, DEFAULT_SCORE_CONFIG, DT)).toBe(0);
+  });
+});
 
 describe('what a rescue is worth', () => {
   /** A drift at the right wall, pressed `at` ticks in. */

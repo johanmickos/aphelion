@@ -21,7 +21,12 @@ import { Scene } from '../src/render/scene.ts';
 import { createAttractLoop, drawAttractLoop } from '../src/render/attract.ts';
 import { captureSnapshot, lerpSnapshot } from '../src/render/snapshot.ts';
 import { RunRecorder } from '../src/app/recorder.ts';
-import { createScoreState, scoreTick } from '../src/score/index.ts';
+import {
+  DEFAULT_SCORE_CONFIG,
+  createScoreState,
+  previewBurn,
+  scoreTick,
+} from '../src/score/index.ts';
 import { buildReport, serializeReport, summarize } from '../src/app/report.ts';
 
 /**
@@ -359,7 +364,17 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // an explanation must not fade out behind the notice it belongs to.
     scarSkip++;
     if (!state.ending.active && scarSkip >= SCAR_EVERY) {
-      scene.scar.observe(rescueScar(state, sim, dt), rcfg, dt * scarSkip);
+      const scar = rescueScar(state, sim, dt);
+      // How much fire the ship would fly into if the press were made at the
+      // cross. The predictor hands back the flight and the scorer prices it,
+      // because `src/sim/` may not know what a point is. Deliberately NOT the
+      // payout — it runs out at the turn-away and the real burn is a median 2.21x
+      // it — and it is never shown as a number, only as how big the mark draws.
+      // See `previewBurn`.
+      const prize = scar
+        ? previewBurn(scar.flight, field, state.bodies, DEFAULT_SCORE_CONFIG, dt)
+        : 0;
+      scene.scar.observe(scar, prize, rcfg, dt * scarSkip);
       scarSkip = 0;
     }
 

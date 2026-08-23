@@ -40,7 +40,7 @@
 import type { SimConfig } from './config.ts';
 import type { Capture, SimState } from './types.ts';
 import { NO_INPUT } from './types.ts';
-import { stepSim } from './step.ts';
+import { shipWorldPos, stepSim } from './step.ts';
 import { fieldBounds } from './world.ts';
 
 /** One point on the projected path, and whether a press there still saves you. */
@@ -72,6 +72,17 @@ export interface RescueScar {
   cross: { x: number; y: number; t: number } | null;
   /** The projected drift path, ship first, ending where the run would. */
   path: ScarSample[];
+  /**
+   * Where the ship would fly if it pressed AT the cross and held: one world
+   * position per tick, from the press to the moment it turns away.
+   *
+   * Empty when there is no cross. It exists so a consumer can measure something
+   * about the rescue this mark is offering — what the fire would be worth, in
+   * `src/score/` — without simulating the same flight a second time, and without
+   * `src/sim/` having to learn what a point is. The simulation hands over a
+   * trajectory; scoring is somebody else's word for it.
+   */
+  flight: Array<{ x: number; y: number }>;
 }
 
 export interface ScarOptions {
@@ -152,10 +163,15 @@ function rescues(
   dt: number,
   side: 1 | -1,
   budget: number,
+  record: Array<{ x: number; y: number }> | null = null,
 ): boolean {
   const s = cloneState(from);
   stepSim(s, cfg, PRESS, dt);
   for (let i = 0; i < budget; i++) {
+    if (record) {
+      const p = shipWorldPos(s);
+      record.push({ x: p.x, y: p.y });
+    }
     if (s.ending.active) return false;
     if (worldVx(s) * side <= 0) return true;
     stepSim(s, cfg, HOLD, dt);
@@ -235,6 +251,7 @@ export function rescueScar(
   // ---- refine the last live tick to the tick, so the cross is a stable world
   // point rather than one that hops by a stride as the ship advances into it
   let cross: RescueScar['cross'] = null;
+  const flight: Array<{ x: number; y: number }> = [];
   if (lastLive >= 0) {
     let lo = lastLive;
     let hi = firstDeadAfter >= 0 ? firstDeadAfter : Math.min(endTick, lastLive + opts.stride);
@@ -245,7 +262,12 @@ export function rescueScar(
     }
     const at = track[lo]!;
     cross = { x: at.ship.x, y: at.ship.y, t: lo * dt };
+    // One more flight, this time kept. It is the rescue the mark is offering, and
+    // re-flying it costs a single capture against the dozens the search already
+    // ran — much less than making every evaluation carry an array it would throw
+    // away.
+    rescues(at, cfg, dt, side, opts.captureBudget, flight);
   }
 
-  return { side, tEnd: endTick * dt, cross, path };
+  return { side, tEnd: endTick * dt, cross, path, flight };
 }

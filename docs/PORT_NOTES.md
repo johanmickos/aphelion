@@ -3000,6 +3000,79 @@ presses; the battery did it never. The new scenario drifts at the right wall fro
 
 ---
 
+### 54 — The mark grows with the fire, because brightness was already spoken for
+
+`src/sim/rescue.ts` · `src/score/burn.ts` · `src/render/scar.ts` · **[NEW]** ·
+asked for as "I wonder if we could predict how deep/long of a fire burn the
+trajectory would have. If so, we could scale the intensify of the cross by the
+possible points to get"
+
+**Size, not intensity, and that was a correction to the request.** Alpha on the
+mark already carries how close the deadline is: it ramps in with time-to-cross and
+fades out once the mark is passed. A prize term on the same channel would make a
+dim cross mean either "small fire" or "still far away", with no way to tell which
+— note 51's lesson about spending one channel on two signals, applied to a world
+object instead of to text. The mark scales between 0.62x and 1.42x of its
+configured size instead, so a big fat scar is a big fire and a thin one is a
+formality, while faint still means only one thing.
+
+**Layering is what shaped the implementation.** Pricing a trajectory needs
+`burnRate` and `burnEdgeSpan`, which are `ScoreConfig`, and `src/sim/` may import
+nothing outside itself — `pnpm portable` proves it. So `rescueScar` returns the
+FLIGHT it simulated for the press at the cross, one world position a tick, and
+`previewBurn` in `src/score/` runs the same integral `scoreTick` runs on the real
+thing. The simulation hands over a trajectory; pricing it is somebody else's word.
+Recording costs one extra capture flight against the dozens the search already
+runs, and only for the winning press — much less than making every evaluation
+carry an array it would throw away.
+
+**There is more fire out there than expected.** Measured over 548 committed
+approaches:
+
+```
+  predicted burn is zero        17 of 548  (3%)
+  raw bank waiting at the cross  p25 280   median 402   p75 613   p90 857   max 2754
+```
+
+Only 3% of crosses offer no fire at all, which contradicts the guess that would
+have been made from the band alone — 41% of crosses sit inside the 60px band, but
+the flight AFTER the press carries the ship deeper than the cross itself, so nearly
+every rescue burns. The scale is about how much, not whether. `scarPrizeFull` is
+860, that p90: the mark saturates only on the top tenth, and the top of the
+distribution is three times it, so a mark that tracked the maximum would be a
+smear.
+
+**IT IS NOT THE PAYOUT, and the measurement is the reason that is written in
+capitals at the function.** The flight ends where `rescueScar`'s promise ends, at
+the turn-away — but the fire does not. The ship is still deep in the band at that
+moment and burns all the way back out through it:
+
+```
+  actual burn / promised   p10 1.94   p25 2.04   median 2.21   p75 2.51   p90 3.01
+  within 25% of promised   5 of 513
+```
+
+A systematic 2.2x under-count, not noise. That is fine for the one thing it is
+used for — sizing a mark, where what matters is that a bigger fire draws a bigger
+scar and where `scarPrizeFull` is calibrated in these same units — and it is NOT
+fine for showing the player a number or paying one. Anything that needs the real
+total has to keep flying past the turn-away until the heat drops below the floor,
+which is a longer flight than `rescueScar` has any reason to simulate for its own
+purposes. The first draft of this note claimed the promise and the payout "cannot
+describe different events"; they describe different INTERVALS of the same event,
+and the measurement is what caught it.
+
+**What pins it.** `test/score.test.ts` proves `previewBurn` is the burn's own
+integral rather than a lookalike: doubling `burnRate` doubles it exactly, twice
+the ticks at a constant depth is exactly twice the bank, it respects the same
+ignition floor, and it promises nothing inside an anomaly's bubble where there is
+no wall to burn against. `test/render.test.ts` proves the mark grows with the
+prize and saturates past the span. The scene battery now prices its scar the way
+`app/main.ts` does, so the sizing path is exercised by every frame of the
+wall-drift scenario rather than only by the one test that looks at it.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

@@ -48,6 +48,18 @@ interface Mark {
   age: number;
   /** Seconds since this mark appeared, so nothing ever pops into existence. */
   born: number;
+  /**
+   * How big the mark draws, as a multiple of its configured size.
+   *
+   * Set from the fire waiting at the cross. Carried on the mark rather than
+   * recomputed at draw time so a ghost keeps the size it had when it was
+   * abandoned — it is a record of what was on offer then, not a live reading.
+   */
+  scale: number;
+}
+
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
 function smoothstep(u: number): number {
@@ -137,8 +149,8 @@ export class Scar {
    */
   private mark: Mark | null = null;
 
-  /** Where the prediction currently says the cross is. */
-  private target: { x: number; y: number; dx: number; dy: number } | null = null;
+  /** Where the prediction currently says the cross is, and how big it is worth. */
+  private target: { x: number; y: number; dx: number; dy: number; scale: number } | null = null;
 
   /**
    * A mark that has been abandoned, fading where it stood.
@@ -161,7 +173,7 @@ export class Scar {
    * of a straight drift, so recomputing it faster than it can change buys
    * nothing but heat. `dt` is the time since the last call.
    */
-  observe(scar: RescueScar | null, rcfg: RenderConfig, dt: number): void {
+  observe(scar: RescueScar | null, prize: number, rcfg: RenderConfig, dt: number): void {
     if (this.ghost) {
       this.ghost.age += dt;
       this.ghost.born += dt;
@@ -195,19 +207,30 @@ export class Scar {
       // born where the answer now is. Nothing slides across the field, and the
       // distinction is a FACT — this mark has been interrupted — rather than a
       // distance threshold that a mark could drift across.
+      // How much fire is waiting, mapped onto how big the mark draws. A prize
+      // above `scarPrizeFull` saturates rather than growing without limit: the top
+      // percentile of the measured distribution is three times its p90, and a mark
+      // that tracked it would be a smear across the screen.
+      const scale =
+        rcfg.scarPrizeMin +
+        (rcfg.scarPrizeMax - rcfg.scarPrizeMin) *
+          clamp01(prize / Math.max(1e-6, rcfg.scarPrizeFull));
+
       if (!this.mark || this.mark.age >= 0) {
         if (this.mark) {
           this.mark.age = Math.max(0, this.mark.age);
           this.ghost = this.mark;
         }
-        this.mark = { x: c.x, y: c.y, dx, dy, age: -c.t, born: 0 };
+        this.mark = { x: c.x, y: c.y, dx, dy, age: -c.t, born: 0, scale };
       } else {
         this.mark.age = -c.t;
       }
       // Uninterrupted, the mark eases toward this in `update`, per frame. Setting
       // it here and moving there is what stops the mark stepping at the 10Hz the
-      // prediction is recomputed at.
-      this.target = { x: c.x, y: c.y, dx, dy };
+      // prediction is recomputed at. The size rides along for the same reason: the
+      // prize changes as the ship moves, and a mark that resized in steps would
+      // flicker exactly where a mark that moved in steps used to jump.
+      this.target = { x: c.x, y: c.y, dx, dy, scale };
       this.lead = c.t;
       this.path = upto;
       return;
@@ -250,6 +273,7 @@ export class Scar {
     m.y += (this.target.y - m.y) * k;
     m.dx += (this.target.dx - m.dx) * k;
     m.dy += (this.target.dy - m.dy) * k;
+    m.scale += (this.target.scale - m.scale) * k;
     const dl = hypot(m.dx, m.dy) || 1;
     m.dx /= dl;
     m.dy /= dl;
@@ -299,6 +323,10 @@ export class Scar {
             )));
     if (alpha <= 0.004) return;
 
+    // Every length in the glyph moves together, so the mark grows as one thing
+    // rather than becoming a differently-proportioned mark.
+    const stub = rcfg.scarStubHalf * m.scale;
+
     ctx.save();
 
     // ---- the long arm, from the ship along its own projected path
@@ -334,14 +362,18 @@ export class Scar {
       const total = run[run.length - 1]! - base;
       // The mark is the peak, and the arm runs a stub past it so the shape reads
       // as a cross rather than as a sword hilt.
-      const span = total + rcfg.scarStubHalf;
+      const span = total + stub;
       const uc = span > 0 ? total / span : 1;
       for (let i = first; i < path.length; i++) {
         const s = path[i]!;
         pts.push({
           x: toScreenX(cam, s.x),
           y: toScreenY(cam, s.y),
-          w: armWidth(span > 0 ? (run[i]! - base) / span : 0, uc, rcfg.scarArmWidth * cam.scale),
+          w: armWidth(
+            span > 0 ? (run[i]! - base) / span : 0,
+            uc,
+            rcfg.scarArmWidth * cam.scale * m.scale,
+          ),
           a: alpha * (s.live ? 1 : rcfg.scarDeadFrac),
         });
       }
@@ -357,9 +389,9 @@ export class Scar {
       for (let i = 1; i <= N; i++) {
         const u = i / N;
         pts.push({
-          x: toScreenX(cam, m.x + m.dx * rcfg.scarStubHalf * u),
-          y: toScreenY(cam, m.y + m.dy * rcfg.scarStubHalf * u),
-          w: armWidth(uc + (1 - uc) * u, uc, rcfg.scarArmWidth * cam.scale),
+          x: toScreenX(cam, m.x + m.dx * stub * u),
+          y: toScreenY(cam, m.y + m.dy * stub * u),
+          w: armWidth(uc + (1 - uc) * u, uc, rcfg.scarArmWidth * cam.scale * m.scale),
           a: alpha * rcfg.scarDeadFrac,
         });
       }
@@ -370,11 +402,11 @@ export class Scar {
       bar(
         ctx,
         cam,
-        m.x - m.dx * rcfg.scarStubHalf,
-        m.y - m.dy * rcfg.scarStubHalf,
-        m.x + m.dx * rcfg.scarStubHalf,
-        m.y + m.dy * rcfg.scarStubHalf,
-        rcfg.scarArmWidth,
+        m.x - m.dx * stub,
+        m.y - m.dy * stub,
+        m.x + m.dx * stub,
+        m.y + m.dy * stub,
+        rcfg.scarArmWidth * m.scale,
         alpha,
       );
     }
@@ -382,14 +414,15 @@ export class Scar {
     // ---- the crossbar
     const px = -m.dy;
     const py = m.dx;
+    const barHalf = rcfg.scarBarHalf * m.scale;
     bar(
       ctx,
       cam,
-      m.x - px * rcfg.scarBarHalf,
-      m.y - py * rcfg.scarBarHalf,
-      m.x + px * rcfg.scarBarHalf,
-      m.y + py * rcfg.scarBarHalf,
-      rcfg.scarBarWidth,
+      m.x - px * barHalf,
+      m.y - py * barHalf,
+      m.x + px * barHalf,
+      m.y + py * barHalf,
+      rcfg.scarBarWidth * m.scale,
       alpha,
     );
 
