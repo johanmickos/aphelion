@@ -10,6 +10,7 @@ import { configDelta, configFromReport, summarize } from '../src/app/report.ts';
 import { DEFAULT_CONFIG, SIM_VERSION } from '../src/sim/config.ts';
 import { KNOBS } from '../src/app/tune.ts';
 import type { DiagReport } from '../src/app/report.ts';
+import type { AwardRecord } from '../src/app/recorder.ts';
 import { KINK_THRESHOLD_DEG, createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
 import { fieldBounds } from '../src/sim/world.ts';
@@ -19,6 +20,16 @@ import type { ScoreAward, ScoreState, Shout } from '../src/score/index.ts';
 
 /** The keys the tune panel can move. A difference in one of these is a choice. */
 const TUNED_KEYS = new Set<string>(KNOBS.map((k) => k.key));
+
+/**
+ * Keys the dev server always sets, which are therefore never build skew.
+ *
+ * Dev sessions are where diagnostics reports come from, so classifying one of
+ * these as skew would raise "THIS REPORT CAME FROM A DIFFERENT BUILD" on every
+ * report ever filed — which is exactly the crying-wolf failure the three-way
+ * split was introduced to end.
+ */
+const DEV_KEYS = new Set<string>(['anomalyAtSpawn']);
 
 export interface Frame {
   tick: number;
@@ -275,7 +286,8 @@ export function replayReport(report: DiagReport): Analysis {
   // nothing about how the session went.
   findings.push(
     `best life scored ${score.best} (${score.score} standing at the end) — ` +
-      `${score.grabs} grab(s), ${score.links} link(s), ${score.burns} burn(s), ` +
+      `${score.grabs} grab(s), ${score.links} link(s), ` +
+      `${score.flybys} flyby(s), ${score.burns} burn(s), ` +
       `best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,
   );
   if (score.burns > 0) {
@@ -309,6 +321,23 @@ export function replayReport(report: DiagReport): Analysis {
     findings.push(
       `release quality, averaged over ${links.length} link(s): ` +
         `boost peak ${mean((a) => a.timing)} · aim ${mean((a) => a.aim)}  (0-1 each)`,
+    );
+  }
+  const hopAwards = awards.filter((a) => a.kind === 'hop');
+  if (hopAwards.length > 0) {
+    // Windows are counted by gaps between hops: two hops more than `chargedSecs`
+    // apart cannot have come from one window. Approximate on purpose — the exact
+    // count would mean recording window openings, and this is a finding, not a
+    // fingerprint.
+    const gap = Math.round(cfg.chargedSecs / report.dt);
+    let windows = hopAwards.length > 0 ? 1 : 0;
+    for (let i = 1; i < hopAwards.length; i++) {
+      if (hopAwards[i]!.tick - hopAwards[i - 1]!.tick > gap) windows++;
+    }
+    findings.push(
+      `${hopAwards.length} hop(s) across ~${windows} charged window(s), ` +
+        `${(hopAwards.length / windows).toFixed(1)} per window on average — ` +
+        `worth ${hopAwards.reduce((n, a) => n + a.points, 0)} flat`,
     );
   }
   if (shouts.length > 0) {
@@ -355,6 +384,22 @@ export function replayReport(report: DiagReport): Analysis {
  * before the field existed return null and the caller falls back to recomputing,
  * which is what it always did.
  */
+/**
+ * The inverse of `AWARD_CODE` in `src/app/recorder.ts`.
+ *
+ * A table rather than a ternary chain, so an unrecognised letter cannot quietly
+ * become whichever kind happened to be on the last branch — a report is the only
+ * evidence a phone session leaves, and silently relabelling one of its awards is
+ * the kind of error that reads as a scoring bug for an afternoon.
+ */
+const AWARD_KIND: Record<AwardRecord[1], ScoreAward['kind']> = {
+  g: 'grab',
+  l: 'link',
+  h: 'hop',
+  f: 'flyby',
+  b: 'burn',
+};
+
 export function recordedAwards(report: DiagReport): ScoreAward[] | null {
   if (!report.awards?.length) return null;
   return report.awards.map(
@@ -374,7 +419,7 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       heat,
     ]) => ({
       tick,
-      kind: kind === 'g' ? ('grab' as const) : kind === 'b' ? ('burn' as const) : ('link' as const),
+      kind: AWARD_KIND[kind],
       points,
       multiplier,
       body,
@@ -451,16 +496,21 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   // was recorded is missing from `report.config`, and printing "session ran
   // undefined" hides the value the session actually behaved as.
   const delta = configDelta(configFromReport(report), DEFAULT_CONFIG);
-  // Three ways a config can differ from the defaults, and only one of them is a
+  // Four ways a config can differ from the defaults, and only one of them is a
   // reason to distrust the report. A key the player TUNED is a deliberate
   // experiment; a field the player RANDOMISED is a different world, not a
-  // different build. Everything else is skew — the session ran code that is no
-  // longer what this checkout does — and that is what the banner is for. Lumping
-  // all three together made the banner fire on ordinary play and then blame the
-  // knob for a divergence it had nothing to do with.
+  // different build; a DEV key is what the dev server always sets, and since dev
+  // sessions are where reports come from, treating it as skew would fire the
+  // banner on every single one. Everything else is skew — the session ran code
+  // that is no longer what this checkout does — and that is what the banner is
+  // for. Lumping them together made the banner fire on ordinary play and then
+  // blame the knob for a divergence it had nothing to do with.
   const tuned = delta.filter((d) => TUNED_KEYS.has(d.key));
   const field = delta.find((d) => d.key === 'worldSeed');
-  const skew = delta.filter((d) => !TUNED_KEYS.has(d.key) && d.key !== 'worldSeed');
+  const dev = delta.filter((d) => DEV_KEYS.has(d.key));
+  const skew = delta.filter(
+    (d) => !TUNED_KEYS.has(d.key) && d.key !== 'worldSeed' && !DEV_KEYS.has(d.key),
+  );
   out.push(
     `  config     ${skew.length ? `${skew.length} value(s) differ from current defaults` : 'matches current defaults'}` +
       (tuned.length ? ` · ${tuned.length} tuned in the panel` : ''),
@@ -471,6 +521,9 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   }
   for (const d of tuned) {
     out.push(`  tuned      ${d.key}: ${d.theirs} (default ${d.ours})`);
+  }
+  for (const d of dev) {
+    out.push(`  dev        ${d.key}: ${d.theirs} — dev-server default, not build skew`);
   }
   const skewed = report.simVersion !== SIM_VERSION || skew.length > 0;
   if (skewed) {
@@ -592,7 +645,7 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
         `    ${String(w.tick).padStart(5)}  ${w.kind.padEnd(5)}  ` +
           `${w.body.padEnd(10)}` +
           `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
-          `${(w.kind === 'grab' ? w.close.toFixed(2) : '  · ').padStart(5)}  ` +
+          `${(w.kind === 'link' || w.kind === 'burn' ? '  · ' : w.close.toFixed(2)).padStart(5)}  ` +
           `${(w.kind === 'burn' ? w.heat.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.aim.toFixed(2) : '  · ').padStart(5)}  ` +

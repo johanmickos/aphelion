@@ -2052,6 +2052,377 @@ worse, not better, because the subject then snaps back toward the ship: at 2x,
 3x, 5x, 8x the ease the press-tick movement runs 1325, 1705, 2426, 3412px/s
 against 933 at the plain rate.
 
+
+### 49 — The anomaly's reward was received, not spent
+
+`src/sim/types.ts` · `src/sim/capture.ts` · `src/sim/step.ts` ·
+`src/sim/config.ts` · `src/score/` · `src/render/` · **[CHANGED]** · asked for as
+"a 5s timer during which the player can zip to the next planet… each hop should
+provide a purple point boost… the ship electrified, as if infected by the purple
+anomaly"
+
+Leaving an anomaly used to grant two things, and neither of them asked anything of
+the player once earned:
+
+- **one `zip` charge** (note 47), with no expiry, spent whenever you next felt
+  like it;
+- **a ten-second x2 scoring window**, which paid out simply for continuing to fly
+  the way you already were.
+
+Both are replaced by one thing that has to be **spent under a clock**:
+`SimConfig.chargedSecs`, five seconds during which *every* grab zips. What a
+window is worth is now a question about how fast you can fly it.
+
+**The window is simulation, not score, and that was forced.** `bonusUntil` was
+legal in `ScoreState` because it only ever multiplied points. A window that
+decides whether a grab dives or glides changes what the ship can physically do,
+and `pnpm portable` forbids `src/sim/` from importing `src/score/` — a simulation
+that asked the scorer for permission would stop being a pure function of
+`(config, seed, inputLog)` and diagnostics replay would go with it. So it moved:
+`SimState.chargedT`, seconds drained by `dt`, which is how every other duration in
+the simulation is kept (`ending.t`, `boostT`, `settleT`). The scorer's windows are
+tick deadlines instead, because a scorer must not assume how often it is called;
+nothing inside `stepSim` has that problem.
+
+**The drain runs at the top of the tick, before the input edges.** Both halves of
+that matter. A grab arriving exactly as the window runs out dives rather than
+zipping, and a release that opens a window does not immediately lose a slice of it
+to the tick it was born in — measured, `chargedT` reads exactly 5.00 the tick
+after the release, and the window closes 300 ticks later.
+
+**A hop is read off `cap.zipped`, never off the live window.** A zip is committed
+at the press, and the 0.45s glide it buys can outlast the countdown. Re-checking
+at the arrival would mean a hop begun legally inside the window silently paid
+nothing because it landed a tick late — punishing the player for the one thing the
+window is asking of them, which is to hurry.
+
+**`hopBonus` is flat, and it is the only award in the game that is.** Every other
+one ends in `raw * multiplier`. Reaching an anomaly is hard and usually costs the
+streak on the way out to it, so a reward that shrank exactly when it was hardest
+to earn would be the wrong shape. It also *replaces* the grab award rather than
+adding to it — one clean number at the busiest moment in the game. Nothing about
+flying well is lost: the link at the release is untouched and still scores aim,
+timing and climb with the full multiplier, so the skill is still paid, at the
+other end of the same capture.
+
+**Once per body per window**, cleared on the rising edge of the window. Without
+it, the optimal line inside a frenzy is to bounce on one planet: a
+press-glide-release cycle is about 1.2s, so the same body would pay three times
+without the ship going anywhere, in a game whose whole subject is climbing. The
+zip is never refused — it simply stops minting.
+
+**An anomaly is never a hop, even when zipped to.** Arriving at one is what
+`anomalyBonus` exists to pay for, and it opens the next window; calling that a hop
+would replace the largest award in the game with a flat 500 and quietly make
+chaining anomalies worth less than chaining planets.
+
+**The purple is a fourth channel in `accolade.ts`, not a category colour.** The
+ladder means how good, and re-adding a category hue is banned for reasons recorded
+at that file. A hop is not an answer to "how good was that?" — every hop pays the
+same — so there is no quality for a rarity colour to report. What the colour says
+is which MODE the game is in, which is legitimate where a category is not: a
+category has to be learned, whereas the player is already looking at an
+electrified ship and a draining purple bar. `SHOUT` established the precedent of
+an off-ladder channel; this is the second. The hue is the anomaly's own
+`rgba(168,92,255)`, and it was measured like the ladder was — **dE 45.8** to its
+nearest neighbour, against this set's existing closest pair at **dE 41.0**
+(`ROUTINE` vs `good`).
+
+**The arcs are drawn outside the silhouette**, and that is the whole reason they
+read: the hull is nine design pixels long and both markings it already carries
+live on its outline — amber for a braking flyby, purple for a held grab. A third
+treatment there would have to compete with those; the space around the ship is
+empty and free. They are seeded from the tick rather than `Math.random`, so a
+replay shows the crackle the player saw.
+
+**The web goes forward.** Reported from a faithful replay as "when we have our
+anomaly charged, it should never grab the same planet that the player is coming
+from — it should really feel like Spider-Man sending sticky web forward and
+pulling us ahead". Measured in that session: of five presses inside one window,
+**three zipped straight back onto the planet just released from**, because after a
+release you are still well inside `grabRange` of it and it is the nearest thing
+there is. The claim log stopped them minting points, which was the wrong defence —
+the movement was the problem, not the payment.
+
+Excluding `cameFrom` was necessary and **not sufficient**. With only that, the
+same session went P17, P18, P19, P18, P17: the ship stopped repeating a body and
+started walking DOWN the field one neighbour at a time. On both backward grabs
+there were two bodies above and within range, so a forward preference would have
+redirected them and refused nothing — which is what it now does. The window went
+from two hops to four, climbing P17 → P18 → P19 → P20.
+
+**A preference, not a gate.** `nearestBody` records why a heading cone was
+refused: a threshold is a cliff the player falls off as a body drifts across an
+arbitrary line. Nothing here is ever forbidden — with no takeable body ahead, the
+ordinary nearest one is still offered, minus the one you came from — so the rule
+cannot waste a press or let a window expire on a refusal. It only decides WHICH
+body a press takes when there is a real choice. "Forward" is up, which is not an
+arbitrary axis in this game: the field is a vertical climb, the score pays for
+altitude, and falling behind the trailing floor is what ends a run.
+
+**One orbit, every hop.** A zip used to land on the orbit the dive would have
+reached — `max(minR, predictedCaptureOrbit().periapsis)` — on the reasoning above
+that aim should still decide where the ship ends up. Reported as "I sometimes got
+high orbits and sometimes low", and measured across 108,000 approach geometries
+that is not a gradient but a lottery:
+
+| | ×minR | px above minR |
+| --- | --- | --- |
+| min | 1.00 | 0 |
+| median | 1.36 | 20 |
+| p75 | 3.13 | 123 |
+| p90 | 4.78 | 210 |
+| max | 8.13 | 330 |
+
+43% pin exactly at the floor and the top quartile sits 3.1x to 8.1x above it,
+with no way for the player to tell in advance which they will get. A frenzy is a
+rhythm and a rhythm needs every beat the same, so `chargedOrbitR` is now an
+absolute 90: identical height AND period on every body — 247px/s, 2.29s a lap.
+Absolute rather than a multiple of `minR` because that is what makes it literally
+fixed, and it is the idiom `anomalyOrbitR` already uses, which is part of why a
+rest stop reads as a place rather than as a result. Clamped above `minR` at the
+point of use, so a body large enough can never orbit inside itself. Scoring is
+untouched: a zipped grab is paid on press distance, not on the orbit it reaches.
+
+**Numbers.** 500 a hop, about four hops in seven seconds — a hop cycle is the
+0.45s glide, plus `boostArmTime` before a release earns its boost, plus the
+crossing to the next body. Started at five seconds, which measured at three hops and read as a
+repeat rather than a rhythm. So ~2000 a window, against the ~2500-3000 the x2
+window was reckoned at, and an anomaly is deliberately worth somewhat less than it was.
+The difference is made up where the hops leave you: four planets of altitude is
+~280 raw climb banked into the next link, paid by machinery that already existed.
+
+**The charge system is gone.** `src/sim/charges.ts`, `ChargeKind`,
+`SimState.charges` and `test/zip-charge.test.ts` all went with it — the window is
+the only gate now, so the ledger had neither a source nor a consumer. Keeping it
+dormant against a future pickup was considered and declined: speculative
+infrastructure for something that does not exist is the same bet as a knob that
+does nothing. Git remembers note 47 if a pickup ever wants it, and it should be
+rebuilt against whatever the paradigms are then.
+
+**The storm.** While a window runs the sky around the ship becomes a purple
+nebula. Lightning was tried and cut: forked bolts over a moving starfield read as
+tacky decoration and competed with the ship's own arcs, which are the cue that
+means something.
+
+It went through three shapes. A screen-space wash was a filter laid over the
+picture and read as the game changing its mind about the palette. A single radial
+gradient centred on the ship fixed that and was completely dead — the same smooth
+blob at every moment, with no structure to move past, so flying through it felt
+like carrying a lamp. What is there now is a field of overlapping clouds hashed
+from a coarse WORLD grid: they parallax with the starfield, they differ from one
+another in size and in how far they lean pink against deep violet, and the gaps
+between them stay near black, which is where the light and dark areas come from.
+Nothing darkens anything — the sky underneath is already black, so a dark area is
+simply a place no cloud is lighting. The ship is always inside the storm because
+cells are drawn around wherever it is; WHICH cloud it is inside changes as it
+flies.
+
+**And then it had no direction.** A field of soft blobs reads as fog: reported as
+"I don't really see any northern lights effects and I can't quite discern the
+purple". So the clouds were demoted to texture and the aurora proper was added on
+top — long wavy curtains anchored on world y, sweeping down past the ship as it
+climbs. **A stroke stack cannot be a blur, and two attempts at one proved it.** Three
+hand-listed passes at 86/44/16 looked drawn on — reported as "the waves look kind
+of tacky" — so they became eight passes on an `exp(-2.6t²)` Gaussian profile, on
+the theory that finer steps would stop the banding. A screenshot from a phone
+settled it: the terraces were still plainly visible as concentric lines fanning
+out of every band. They always would be. Every stroke is solid with a hard
+boundary, so N passes draw N terraces however their alphas are weighted; more
+passes only makes the contour map finer.
+
+So the curtains are now rendered into an offscreen canvas at 1/`DOWNSCALE` and
+drawn back up to full size with image smoothing on. The bilinear filter blurs
+across every step for free. `DOWNSCALE` is the blur radius in disguise — the
+upscale interpolates over that many screen pixels — and 8 is where the softness
+stops improving and the ribbon starts losing the wave, whose features are only a
+few tens of pixels across.
+
+It is also much cheaper than what it replaced: three strokes over 1/64th of the
+pixels plus one composite, against nineteen full-resolution strokes up to 184px
+wide. `ctx.filter = 'blur()'` is the direct alternative and stays declined — it
+forces an offscreen rasterisation of its own on every draw call, its cost scales
+with the blurred area rather than with the geometry, and it would have to be
+applied once per curtain rather than once per frame.
+
+The buffer is injectable, and `test/render.test.ts` supplies one. Without that the
+suite finds no `document`, takes the hard-stroke fallback, and covers a renderer
+that never ships; the charged scene now asserts that a composite actually
+happened.
+
+**It shipped broken once, and the cast is why.** `this.target()` returns the
+buffer's CONTEXT, and the composite was written as
+`ctx.drawImage(buf as unknown as CanvasImageSource, …)` — passing the context
+rather than the canvas. A browser throws a `TypeError` for that, which aborted
+`Scene.draw` before the starfield, the bodies or the ship were reached, leaving
+the black fill and the sky wash and nothing else. Reported from a phone as "the
+whole screen goes purple when I release from the anomaly, all other objects
+disappear, ship and planets and all" — which is exactly what a half-finished
+scene draw looks like from the outside, and reads nothing like a type error.
+
+Two things let it through. The blanket cast turned the one argument the compiler
+could have checked into `unknown`, and the recording stub in `test/canvas-stub.ts`
+accepted any argument to `drawImage`, so 446 tests stayed green. The stub now
+throws on anything without a numeric `width`, the way a browser does — verified by
+reintroducing the bug and watching the charged scene fail with the same
+`TypeError`. A cast that silences the compiler needs a runtime check standing
+behind it, or it is just a way of not being told. The wave is two summed sines of different periods, because
+one reads as a drawn ripple and two look blown.
+
+Intensity went up with it — roughly a third across the sky floor, the clouds and
+the curtain spine.
+
+**Then they read as horizontal snakes.** Two numbers were wrong together. The band
+was too thin — 104px at its widest, which is a line rather than a ribbon — and the
+undulation too shallow: 40-130 of amplitude over a 260-580 wavelength never
+exceeded a slope of about 0.5, so a curtain lay along the screen instead of
+climbing and diving across it. Now 184px wide, with 130-240 of amplitude over a
+200-360 wavelength, for slopes of 0.36 to 1.20.
+
+Those cannot be tuned independently. A band 184 wide swinging 240 either way spans
+664 world units, against a viewport 651 tall — so `BAND` went 320 to 480 and the
+keep rate up to 0.85 to compensate, or the sky would have gone back to being a
+wash. Fewer, larger ribbons: 2.4 on screen at once rather than 3.3, and cheaper
+for it. The first pass at "less intense" had overcorrected to the point
+where the effect was hard to see at all.
+
+Off-screen clouds are culled before a gradient is touched. `REACH` is 760 world
+units in every direction and the viewport is a tall narrow slice of that, so most
+of the grid is behind the camera's back — measured, the cull takes a frame from
+about 29 gradient fills to a mean of 12 and a worst case of 14, and each one that
+survives costs up to a full-viewport alpha blend. Curtains are culled vertically
+for the same reason, and add a mean of 19 strokes — about 2.4 curtains on screen
+at once, eight passes each.
+
+The first version scaled the whole effect by the window's remaining fraction, so
+it dimmed linearly to nothing and the end of the best moment in the game arrived
+with no signal — reported as "it kind of fizzles". Intensity now HOLDS, the last
+fifth agitates (a faster, deeper pulse without the room getting darker), and the
+close is a bloom-and-collapse that pulls the storm into the ship. The collapse is
+cubic over 1.05s rather than linear over 0.5s: asked for as "a hair longer, so it
+exhales", and the shape matters as much as the length — the length belongs in the
+release, not the attack, so the bloom stayed brief. The countdown is
+the gauge's job; this one's is atmosphere and an ending. That animation is clocked
+by `Scene`, not by the drawing, because it describes a window that has already
+ended and `chargedFrac` is 0 throughout it.
+
+The ship's glow and arc count build with `hopped.length`, capped at four: past
+that the arcs stop reading as separate discharges and become a fuzzy ring.
+
+**The per-hop number is small and the total is large.** `HOP` dropped to 11px:
+three or four arrive inside seven seconds, on top of whatever else is in the air,
+and at a praise word's size they were the loudest thing on screen for the least
+interesting reason — every one is the same number. They are receipts. The closing
+`Tally` is the headline at 26px, and it is DISPLAY ONLY: every point in it was
+banked as its hop landed. Paying again there would double the window; holding the
+points back until there would mean dying mid-window cost the player everything
+they had already earned. It drops the `+` so a fourth number arriving as the total
+of three does not read as a fourth award, and `endLife` clears the edge so a
+frenzy that ends in a wall gets no consolation total.
+
+**A dev-only anomaly at the bottom of the field.** `anomalyAtSpawn` drags the
+first anomaly level with the opening body so the window can be reached in seconds
+rather than after a minute of climbing. A config key and not an
+`import.meta.env.DEV` branch inside world generation, for two reasons: `src/sim/`
+may not read bundler syntax, and a run is `(config, seed, inputLog)` — as a key it
+is recorded in the report, so a dev session still replays exactly. `app/main.ts`
+sets it, which is where knowing about the bundler is legal. The position is
+overridden inside the placement loop rather than branched around it, so `rnd()` is
+called the same number of times in the same order and the corridor a seed produces
+is untouched — pinned by a test.
+
+That needed a FOURTH case in the replay header's config classification. Dev
+sessions are where reports come from, so leaving `anomalyAtSpawn` in the skew
+bucket would have raised "THIS REPORT CAME FROM A DIFFERENT BUILD" on every report
+ever filed — precisely the crying-wolf failure the three-way split existed to end.
+It prints as `dev` instead.
+
+`SIM_VERSION` 19 → 20, goldens recaptured. `chargedSecs` is 0 in
+`PROTOTYPE_CONFIG`, so the equality gate stayed at exactly zero throughout.
+### 50 — Speed had no way to be paid for being speed
+
+`src/score/score.ts` · `src/score/config.ts` · `src/score/types.ts` ·
+`src/render/hud.ts` · `src/app/recorder.ts` · **[CHANGED]** · asked for as "I
+tried to be as fast as possible… I want there to be multiple ways to reach high
+scores of 100k".
+
+One 170-second session carried three lives flown two different ways, which is
+what made this measurable rather than a matter of taste. It was recorded before
+note 49, so its multiplier still had the anomaly window's x2 on top — that is
+where the x7 below comes from, and nothing else in the table depends on it:
+
+```
+life        dur    points   links   climb    px/s   maxMult   pts per px
+chained    126s   113,697      43  11,599      92      x7          9.80
+fast        28s     5,224       5   7,952     287      x2          0.66
+```
+
+The fast life covered **3.1x the ground per second** and was paid **a fifteenth
+as much per pixel**. The cause was not that climb went unpaid — `climbPerPx` was
+working and was 76% of that life's points. **The cause was the multiplier**: the
+streak ladder counted LINKS, and a run that crosses the field fast does not stop
+at bodies. 43 links buys the ceiling; 5 links buys x2. That single factor is
+nearly the whole gap.
+
+Which is also why the obvious fix does not work. Raising `climbPerPx` pays the
+chained life MORE — it climbed 11,599px at x5 — so anything that rewards distance
+rewards the wrong style. **A speed reward has to key on rate, not distance.**
+
+**So a flyby is now a scoring event.** Hold a pass through its closest approach
+and it pays, and it steps the streak. Nothing needs to detect "was that fast",
+because density does it for free: replayed out of `diagnostics/`, an ordinary
+chained life makes **2.7 unconverted flybys a minute** and the fast life above
+made **upward of 38**.
+
+**The gate that was asked for measured useless, and that is the finding worth
+keeping.** Speed at closest approach was the natural axis and cannot discriminate:
+an unconverted flyby is unbound BY DEFINITION, so its speed is pinned near escape
+velocity — across 167 recorded passages p10 149px/s, p50 314, p90 400, with 90% of
+them inside one 250px/s band. Clearance over the same passages runs 0 to 318px
+with a median of 60, which is real spread and is a choice. `FLYBY_SPEED_MIN` still
+exists at 150px/s but it is a floor under a dead tail — the puttered-out flyby
+waiting to be dropped — not a bar that selects anything. The distribution is empty
+between p10 and p15, so any value in [150, 243) selects the identical 90%.
+
+**Paid when the pass ends, not at the closest approach.** Paying at the bottom
+looked right by symmetry with the grab award and is wrong: a flyby can bottom out
+unbound, arc back on the brake and convert into the capture that pays a grab, so
+one press would be paid twice and step the ladder twice — for what is usually an
+overshoot, grabbed too fast and braked back. A fumble recovered is not a fast
+pass. Measured across 361 synthetic approaches that become flybys, it would have
+double-paid **83% of presses at 420px/s, 80% at 340, 42% at 260, 76% overall.**
+
+Owing the award at the bottom and paying it when the pass ends STILL BEING A PASS
+fixes it, and makes the events one rule: **pay at the moment the act finished
+being reversible.** Converting clears the debt, so a converted pass pays only its
+grab.
+
+The defect was originally caught by `test/zip-charge.test.ts`, which pinned a zip
+as worth exactly what the flown capture was worth: paying at the bottom made
+zipping strictly worse than flying on every fast approach, because a zip glides
+straight to the parked orbit and skips the overshoot. Note 49 has since deleted
+that file along with the charge system, and a zipped arrival inside a window now
+pays a flat `hopBonus` instead — so that pin is gone and the argument no longer
+rests on it. It is recorded because it is how the error was found, and because the
+double-pay measurement above is the reason the decision outlives the pin.
+
+**No praise word, deliberately.** The vocabulary in `src/score/praise.ts` is
+calibrated on rarity, and a word firing 38 times a minute names nothing. The
+multiplier climbing is the feedback.
+
+Measured against every recording in `diagnostics/`: session totals rise a median
+of 13.8% (max 47%), and the increase is smallest exactly where a chained run is
+strongest — at `streakMax` the extra steps buy no multiplier, only the flat
+points, so the 126s chained life above gains about 8%. Re-measured after note 49
+landed, against the same 52 recordings: unchanged to the decimal. Reconstructed from the
+recorded checkpoints, the same 28-second fast life scores 21,593 instead of
+5,224, which extrapolates to **~98k over a 126-second life against the chained
+route's 113,697** — from 5% of it to 87% of it.
+
+The equality gate is untouched at exactly zero and the golden did not move:
+scoring is an observer and nothing under `src/sim/` changed. See "Scoring is not
+`SimConfig`" in AGENTS.md.
+
 ---
 
 ### 49 — Closeness is given away, so the burn had to be paid for in speed
@@ -2409,11 +2780,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 103 · camera 55
-         diagnostics 25 · backtrack 15 · world 20 · tune 7 · clearance 14
-         score 68 · input 8 · grab-target 8 · link-fuel 6
+tests    port-equality 11 · invariants 32 · render 105 · camera 55
+         diagnostics 25 · backtrack 15 · world 23 · tune 7 · clearance 14
+         score 74 · input 8 · grab-target 8 · link-fuel 6
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         zip-charge 8 · attract 13 · 438 total
+         charged 26 · attract 13 · 467 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

@@ -25,10 +25,11 @@
  * the commonest award has to be told from the next one up. Size climbs with it for
  * the same reason.
  *
- * The closest pair is `ROUTINE` vs `good` at dE 36. It was 41 until the grey was
- * lightened; the ladder gave up 5 dE of hue separation to buy 1.7 stops of
- * contrast on the thing the player reads most often, which is a good trade and not
- * one to repeat.
+ * The closest pair in the whole table is `ROUTINE` vs `good`, at dE 36.6. It was
+ * 41 while `ROUTINE` was a dark grey; the ladder gave up that separation to buy
+ * 2.2 stops of contrast on the text the player reads most often. It can afford to,
+ * because those two never appear on the same popup: `ROUTINE` means no word was
+ * earned, so the two are alternatives rather than neighbours.
  */
 import type { PraiseLevel } from '../score/index.ts';
 
@@ -118,6 +119,48 @@ export const BURN_WORD: AccoladeStyle = {
   color: '#ee3f2c',
   labelColor: '#b8341f',
   size: 15,
+};
+
+/**
+ * A hop inside a charged window — see `SimConfig.chargedSecs`.
+ *
+ * Off the ladder, like `SHOUT`, and for the same structural reason: it is not an
+ * answer to "how good was that?". Every hop pays the same flat `hopBonus`, so
+ * there is no quality for a rarity colour to report, and putting one on it would
+ * be inventing a distinction the award does not have.
+ *
+ * What the colour says instead is WHICH MODE the game is in, which is legitimate
+ * where a category colour was not: a category has to be learned before it means
+ * anything, whereas the player is already looking at an electrified ship and a
+ * draining purple bar. The hue is the anomaly's own — `rgba(168,92,255)`, the
+ * centre of the bubble it projects — so the popup is visibly the same substance
+ * that infected the ship.
+ *
+ * Measured, as the ladder was: dE 45.8 to its nearest neighbour (`SHOUT`), which
+ * clears this set's closest pair — `ROUTINE` vs `good` at dE 36.6.
+ */
+export const HOP: AccoladeStyle = {
+  color: '#a85cff',
+  labelColor: 'rgba(168,124,220,.85)',
+  // Small on purpose, and smaller than anything else that floats. Three or four
+  // of these arrive inside seven seconds, on top of whatever else is in the air:
+  // at a praise word's size they were the loudest thing on screen during the
+  // busiest moment in the game, for the least interesting reason — every one is
+  // the same number. They are receipts. `HOP_TALLY` is the headline.
+  size: 11,
+};
+
+/**
+ * The closing tally of a charged window — see `Tally` in `src/score/score.ts`.
+ *
+ * The same purple, deliberately: it is the same channel, summing the same events,
+ * and a second hue would imply a second kind of thing happened. What separates it
+ * is size, which is the one dimension the small per-hop numbers left free.
+ */
+export const HOP_TALLY: AccoladeStyle = {
+  color: '#c89aff',
+  labelColor: 'rgba(200,154,255,.9)',
+  size: 26,
 };
 
 /**

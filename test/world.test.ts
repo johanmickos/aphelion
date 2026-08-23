@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { createBodies, fieldBounds, inAnomalyField, DESIGN_W } from '../src/sim/world.ts';
 import { DEFAULT_CONFIG, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
+import type { Body } from '../src/sim/types.ts';
 import { mulberry32 } from '../src/sim/rng.ts';
 import { hypot } from '../src/sim/orbit.ts';
 import type { Anomaly } from '../src/sim/types.ts';
@@ -377,5 +378,38 @@ describe('anomalies', () => {
       const off = createBodies({ ...DEFAULT_CONFIG, worldSeed: seed, anomalyCount: 0 });
       expect(off, `seed ${seed.toString(16)}`).toEqual(on);
     }
+  });
+});
+
+describe('the dev-server anomaly (anomalyAtSpawn)', () => {
+  const off = createBodies(DEFAULT_CONFIG);
+  const on = createBodies({ ...DEFAULT_CONFIG, anomalyAtSpawn: true });
+  const anomalies = (bs: readonly Body[]) => bs.filter((b) => b.kind === 'anomaly');
+
+  it('is off in the shipped config, and only the dev shell turns it on', () => {
+    // `placeAnomalies` skips the bottom eighth of the field on purpose: an anomaly
+    // beside the opening bodies asks for the commit before the player has a
+    // corridor rhythm to break away from.
+    expect(DEFAULT_CONFIG.anomalyAtSpawn).toBe(false);
+    expect(PROTOTYPE_CONFIG.anomalyAtSpawn).toBe(false);
+  });
+
+  it('brings the first anomaly level with the opening body', () => {
+    const opener = off.find((b) => b.name === 'P1')!;
+    expect(anomalies(off)[0]!.y).toBeLessThan(opener.y - 1000);
+    expect(anomalies(on)[0]!.y).toBeCloseTo(opener.y, 6);
+    // Still outside the corridor: it is a dev convenience, not a different body.
+    expect(Math.abs(anomalies(on)[0]!.x - opener.x)).toBeGreaterThan(200);
+  });
+
+  it('leaves the corridor and the other anomalies exactly where they were', () => {
+    // The whole reason the position is overridden inside the loop rather than
+    // branched around it: `rnd()` must be called the same number of times in the
+    // same order, or the flag silently generates a different field.
+    const planets = (bs: readonly Body[]) => bs.filter((b) => b.kind === 'planet');
+    expect(planets(on)).toEqual(planets(off));
+    expect(anomalies(on).slice(1)).toEqual(anomalies(off).slice(1));
+    // And the moved one differs in nothing but its height.
+    expect({ ...anomalies(on)[0]!, y: 0 }).toEqual({ ...anomalies(off)[0]!, y: 0 });
   });
 });

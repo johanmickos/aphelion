@@ -205,6 +205,66 @@ function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs
 }
 
 /**
+ * Arcs thrown off a charged hull. See `SimConfig.chargedSecs`.
+ *
+ * Drawn OUTSIDE the silhouette rather than on it, and that is the whole reason
+ * this reads at all: the hull is nine design pixels long, and both markings it
+ * already carries live on its outline — amber for a braking flyby, purple for a
+ * held grab. A third treatment there would have to compete with those; the space
+ * around the ship is empty and free.
+ *
+ * Seeded from the tick, not `Math.random`, so a replay shows the crackle the
+ * player saw. Render may reach for a wall clock — `src/render/world.ts` does, for
+ * the anomaly pulse — but a report that reproduced everything except what the
+ * screen looked like would be a strange thing to hand someone debugging feel.
+ *
+ * Fades with the window: the arcs thin out as the time does, so the effect is
+ * telling you the same thing the gauge is.
+ */
+function drawArcs(
+  ctx: CanvasRenderingContext2D,
+  s: number,
+  tick: number,
+  frac: number,
+  hops: number,
+): void {
+  // The charge builds as the chain does. Each body taken adds arcs and brightness,
+  // so a window that is going well is visibly hotter than one that is not — the
+  // ship reports the streak, which no countdown can.
+  //
+  // Capped, because the effect has to stay legible at the point it matters most:
+  // past about four the arcs stop reading as separate discharges and start
+  // reading as a fuzzy ring.
+  const heat = Math.min(1, hops / 4);
+  const n = 5 + Math.round(heat * 7);
+  ctx.lineCap = 'round';
+  for (let i = 0; i < n; i++) {
+    // A cheap integer hash of (tick, i). The arcs must jump rather than sweep —
+    // a smoothly rotating spark reads as a propeller — so this is re-rolled on a
+    // slow beat instead of every frame.
+    const beat = (tick / 4) | 0;
+    let h = (beat * 2654435761 + i * 40503) >>> 0;
+    h ^= h >>> 13;
+    h = (h * 1274126177) >>> 0;
+    const a = ((h >>> 8) / 0x1000000) * Math.PI * 2;
+    const len = (5 + ((h >>> 4) & 7)) * (1 + heat * 0.7) * s;
+    const r0 = 6 * s;
+    const cosA = Math.cos(a);
+    const sinA = Math.sin(a);
+    // One kink per arc, so it is a discharge rather than a whisker.
+    const midR = r0 + len * 0.55;
+    const kink = (((h >>> 20) & 15) / 15 - 0.5) * 0.9;
+    ctx.beginPath();
+    ctx.moveTo(cosA * r0, sinA * r0);
+    ctx.lineTo(Math.cos(a + kink) * midR, Math.sin(a + kink) * midR);
+    ctx.lineTo(cosA * (r0 + len), sinA * (r0 + len));
+    ctx.strokeStyle = `rgba(214,164,255,${((0.35 + 0.45 * frac) * (0.7 + 0.3 * heat)).toFixed(3)})`;
+    ctx.lineWidth = (1.1 + heat * 0.7) * s;
+    ctx.stroke();
+  }
+}
+
+/**
  * The ship, rotated to its velocity.
  *
  * It now carries phase. The prototype distinguished only held-vs-not, so `flyby`
@@ -215,6 +275,8 @@ export function drawShip(
   ctx: CanvasRenderingContext2D,
   cam: Camera,
   snap: RenderSnapshot,
+  /** Bodies hopped to in the current charged window. Drives how hot the arcs are. */
+  hops = 0,
   burn = 0,
   timeMs = 0,
 ): void {
@@ -226,6 +288,24 @@ export function drawShip(
 
   ctx.save();
   ctx.translate(x, y);
+  // The arcs are drawn before the rotation, in the ship's own frame but unturned:
+  // a discharge has no nose, and rotating it made the whole effect appear to spin
+  // with the ship every time it swung through a capture.
+  if (snap.chargedFrac > 0) {
+    // A glow under the arcs, growing with the chain. It is what makes the ramp
+    // visible at a glance — arc COUNT is only countable when you are not flying.
+    const heat = Math.min(1, hops / 4);
+    const r = (10 + heat * 14) * s;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    const a = (0.16 + 0.3 * heat) * snap.chargedFrac;
+    g.addColorStop(0, `rgba(198,150,255,${a.toFixed(3)})`);
+    g.addColorStop(1, 'rgba(168,92,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    drawArcs(ctx, s, snap.tick, snap.chargedFrac, hops);
+  }
   ctx.rotate(ang);
   // Under the hull, so the silhouette stays readable through the brightest part
   // of the fire — the ship is what the player is steering.

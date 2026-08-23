@@ -4,6 +4,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { recordingContext } from './canvas-stub.ts';
+import type { RecordingContext } from './canvas-stub.ts';
+import type { OffscreenTarget } from '../src/render/nebula.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import {
   centerCamera,
@@ -258,15 +260,47 @@ describe('scene', () => {
       ticks: 260,
       ship: { x: ANOMALY.x - 300, y: ANOMALY.y - 70, vx: 344, vy: 0 },
     },
+    // A charged window is a whole set of drawing paths nothing else reaches: the
+    // nebula and its lightning, the ship's glow and arcs, the countdown gauge and
+    // the closing tally. Without this scene every one of them is dead code as far
+    // as the suite is concerned.
+    {
+      name: 'charged, hopping',
+      press: 5,
+      release: 200,
+      ticks: 260,
+      ship: { x: ANOMALY.x - 300, y: ANOMALY.y - 70, vx: 344, vy: 0 },
+      charged: true,
+    },
   ];
+
+  /**
+   * An offscreen buffer for the charged storm's curtains.
+   *
+   * Injected so the suite exercises the COMPOSITED path — the low-resolution buffer
+   * plus `drawImage` upscale that produces the blur. Without it `Nebula` finds no
+   * `document`, falls back to stroking straight onto the canvas, and every test
+   * here would be covering a renderer that never ships.
+   */
+  function bufferFactory(): { make: () => OffscreenTarget; rec: RecordingContext } {
+    const rec = recordingContext();
+    const canvas: OffscreenTarget = {
+      width: 0,
+      height: 0,
+      getContext: () => rec.ctx,
+    };
+    return { make: () => canvas, rec };
+  }
 
   it.each(SCENES)('$name renders every tick without error', (sc) => {
     const state = createInitialState(DEFAULT_CONFIG);
     if (sc.ship) Object.assign(state.ship, sc.ship);
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const buf = bufferFactory();
     const scene = new Scene(
       { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
       99,
+      buf.make,
     );
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
@@ -274,6 +308,11 @@ describe('scene', () => {
 
     let held = false;
     let drawn = 0;
+    let compositedFrames = 0;
+    // The ship's glow ramps with how many bodies the window has taken, so the
+    // charged scene has to exercise a non-empty log as well as an empty one.
+    const chargedScore = createScoreState();
+    if (sc.charged) chargedScore.hopped.push('P1', 'P2', 'P3', 'P4', 'P5');
     for (let i = 0; i < sc.ticks; i++) {
       const pressed = i === sc.press;
       const released = i === sc.release;
@@ -281,6 +320,11 @@ describe('scene', () => {
       if (released) held = false;
       stepSim(state, DEFAULT_CONFIG, { held: held || pressed, pressed, released }, FIXED_DT);
 
+      // Force the window on for the charged scene, and let it drain to zero
+      // partway through so the fade-out and the tally both get drawn.
+      if (sc.charged && state.chargedT <= 0 && i < 150) {
+        state.chargedT = DEFAULT_CONFIG.chargedSecs * (1 - i / 200);
+      }
       const snap = captureSnapshot(state, held, DEFAULT_CONFIG);
       scene.trail.sample(snap.x, snap.y);
       centerCamera(c, snap.x, snap.y, f, null);
@@ -293,9 +337,10 @@ describe('scene', () => {
         viewportH: 844,
         headerBottom: 0,
         frameDt: 1 / 60,
-        score: createScoreState(),
+        score: chargedScore,
       });
       drawn++;
+      if (sc.charged && snap.chargedFrac > 0) compositedFrames += r.calls('drawImage').length;
 
       // no NaN or Infinity ever reaches the canvas
       for (const op of r.ops) {
@@ -307,6 +352,12 @@ describe('scene', () => {
       }
     }
     expect(drawn).toBe(sc.ticks);
+    if (sc.charged) {
+      // The blur IS the composite: without it the curtains are a stack of hard
+      // strokes, which is the thing this replaced. A charged frame that never
+      // reaches `drawImage` is drawing the fallback renderer.
+      expect(compositedFrames, 'the curtain buffer was never composited').toBeGreaterThan(0);
+    }
   });
 
   it('draws fire on the ship while it is burning, and none when it is not', () => {

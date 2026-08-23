@@ -163,7 +163,15 @@ function placeAnomalies(
   let side = rnd() < 0.5 ? -1 : 1;
   for (let i = 0; i < cfg.anomalyCount; i++) {
     const t = 0.125 + ((i + 0.5) / cfg.anomalyCount) * 0.875;
-    const y = bottomY - span * t;
+    // The first one may be dragged down level with the opening body, for testing
+    // the charged window without climbing to reach one. See `anomalyAtSpawn` —
+    // it is off in both configs and turned on only by the dev shell.
+    //
+    // Placed by overriding the position rather than by branching around the loop,
+    // so `rnd()` is called the same number of times in the same order: the field a
+    // seed produces is otherwise a different field, and the flag would quietly
+    // change the corridor it was supposed to leave alone.
+    const y = cfg.anomalyAtSpawn && i === 0 ? bottomY : bottomY - span * t;
     const x = side < 0 ? wallL - cfg.anomalyOffset : wallR + cfg.anomalyOffset;
     out.push({
       kind: 'anomaly',

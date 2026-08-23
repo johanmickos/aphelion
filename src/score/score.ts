@@ -51,7 +51,7 @@ import {
 import type { Shout } from './reckless.ts';
 import type { ScoreConfig } from './config.ts';
 import { DEFAULT_SCORE_CONFIG } from './config.ts';
-import type { PendingLink, ScoreAward, ScoreState } from './types.ts';
+import type { PendingFlyby, PendingLink, ScoreAward, ScoreState } from './types.ts';
 
 /**
  * Ticks between periapsis and the grab award landing.
@@ -62,16 +62,35 @@ import type { PendingLink, ScoreAward, ScoreState } from './types.ts';
  */
 const GRAB_AWARD_DELAY = 2;
 
+/**
+ * Speed at closest approach below which a flyby pays nothing, in px/s.
+ *
+ * Measured, and the measurement is the interesting part: it is a FLOOR under a
+ * dead tail, not a bar that selects fast passes. Across 167 unconverted flyby
+ * closest approaches replayed out of `diagnostics/`, speed runs p10 149, p25 290,
+ * p50 314, p90 400 — because an unconverted flyby is unbound by definition, so
+ * its speed is pinned near escape velocity and cannot say who was going fast.
+ * What the bottom decile IS is the puttered-out flyby: braked below
+ * `flybyBrakeMinSpeed`, going nowhere, waiting to be dropped. That is what this
+ * excludes.
+ *
+ * Any value in [150, 243) selects exactly the same 90% — the distribution is
+ * empty between p10 and p15 — so the number is legible rather than fitted to the
+ * last pixel. What decides who gets paid is how MANY of these a life strings
+ * together, which is the density the streak already reads: 2.7 a minute in
+ * ordinary play against upward of 38 in a fast one.
+ */
+export const FLYBY_SPEED_MIN = 150;
+
 export function createScoreState(): ScoreState {
   return {
     score: 0,
     best: 0,
     streak: 0,
     multiplier: 1,
-    bonusActive: false,
-    bonusFrac: 0,
     grabs: 0,
     links: 0,
+    flybys: 0,
     burns: 0,
     burnHeat: 0,
     burnBank: 0,
@@ -87,14 +106,18 @@ export function createScoreState(): ScoreState {
     maxDefl: 0,
     periSeen: false,
     grabDue: -1,
+    flybyR: Infinity,
+    flybyFalling: false,
+    pendingFlyby: null,
     recklessStreak: 0,
     capKinked: false,
     inKink: false,
     inHardKink: false,
     putterOuts: 0,
-    bonusUntil: -1,
-    bonusArmed: false,
     claimed: [],
+    hopped: [],
+    wasCharged: false,
+    hopTotal: 0,
   };
 }
 
@@ -103,18 +126,15 @@ function clamp01(v: number): number {
 }
 
 /**
- * The live multiplier: the streak ladder, plus any anomaly bonus ON TOP of the
- * ceiling.
+ * The live multiplier: the streak ladder, and nothing else.
  *
- * Deliberately outside the `min`. Inside it — `min(streakMax, 1 + step*streak +
- * bonus)` — the bonus does literally nothing to a maxed streak, which is exactly
- * the player who earned the right to go and fetch it. The ceiling being
- * breakable is the whole reward: a strong run otherwise spends its last third at
- * x5 with nothing left to climb toward.
+ * An anomaly used to raise the ceiling here for ten seconds. It no longer does —
+ * the anomaly's reward is the charged window, which is spent rather than
+ * received, and a hop pays flat outside this function entirely. See
+ * `ScoreConfig.hopBonus`.
  */
-function multiplierFor(sc: ScoreState, scfg: ScoreConfig, tick: number): number {
-  const streak = Math.min(scfg.streakMax, 1 + scfg.streakStep * sc.streak);
-  return streak + (sc.bonusUntil >= tick ? scfg.anomalyBonusMult : 0);
+function multiplierFor(sc: ScoreState, scfg: ScoreConfig): number {
+  return Math.min(scfg.streakMax, 1 + scfg.streakStep * sc.streak);
 }
 
 /**
@@ -138,6 +158,7 @@ function multiplierFor(sc: ScoreState, scfg: ScoreConfig, tick: number): number 
 function endLife(sc: ScoreState): void {
   sc.score = 0;
   sc.pending = null;
+  sc.pendingFlyby = null;
   sc.streak = 0;
   // A death ends a reckless run too. Flying like that into the ground is not the
   // same as getting away with it three times.
@@ -146,13 +167,16 @@ function endLife(sc: ScoreState): void {
   sc.inKink = false;
   sc.inHardKink = false;
   sc.climbFromY = null;
-  // A death takes the bonus with the points. The claim log clears too, so a new
-  // life may take an anomaly it already took in the last one — the once-only rule
-  // exists to stop a bonus being refreshed by re-grabbing the same body in one
-  // flight, not to retire it from the field.
-  sc.bonusUntil = -1;
-  sc.bonusArmed = false;
+  // The claim log clears, so a new life may take an anomaly it already took in
+  // the last one — the once-only rule exists to stop a window being refreshed by
+  // re-grabbing the same body in one flight, not to retire it from the field.
   sc.claimed.length = 0;
+  sc.hopped.length = 0;
+  // A death ends the window without a tally. Left set, the falling edge would be
+  // seen on the first tick after the respawn and the player would be shown a
+  // total for a frenzy that ended in a crash.
+  sc.wasCharged = false;
+  sc.hopTotal = 0;
   // A flare still burning at the moment of death is dropped rather than paid.
   // Flying into the ground is how a hot pass goes wrong, and the score it would
   // have banked is exactly what the death is taking.
@@ -168,19 +192,39 @@ function endLife(sc: ScoreState): void {
  * ship is being flown and cost nothing — see `src/score/reckless.ts` for why they
  * are not the same thing.
  */
+/**
+ * A charged window closing, and what its hops came to.
+ *
+ * Display only. Every point in it was banked as its hop landed — this restates
+ * the window's total so the small per-hop numbers can be receipts and the finale
+ * can be the headline. It is emphatically NOT a fourth award: paying here as well
+ * would double the window, and holding the points back until here would mean
+ * dying mid-window cost you everything you had already earned.
+ */
+export interface Tally {
+  tick: number;
+  /** Points already paid across this window's hops. */
+  points: number;
+  /** How many bodies were hopped to. */
+  hops: number;
+}
+
 export interface ScoreTick {
   awards: ScoreAward[];
   shouts: Shout[];
+  /** At most one window can close on a tick. */
+  tally: Tally | null;
 }
 
 /**
- * Advance the score by one tick. Call immediately after `stepSim`, with the SAME
- * `dt`.
+ * Advance the score by one tick. Call immediately after `stepSim`.
  *
- * `dt` is threaded rather than read from `FIXED_DT` for the reason that constant
- * states itself: it is passed as a parameter, never read globally. The scorer now
- * owns a duration — the anomaly bonus window — and a duration that assumed the
- * timestep would silently re-tune itself if the timestep ever moved.
+ * It used to take `dt`, because it owned a duration: the ten-second anomaly bonus
+ * window, which would have silently re-tuned itself if the timestep ever moved.
+ * That window is now the simulation's — it grants an ability, not points, so it
+ * had to be — and the scorer owns no duration at all again. A parameter kept
+ * against a future need is a parameter every caller has to be told to ignore, so
+ * it is gone; `state.tick` remains the only clock anything here reads.
  */
 export function scoreTick(
   sc: ScoreState,
@@ -191,6 +235,7 @@ export function scoreTick(
 ): ScoreTick {
   const awards: ScoreAward[] = [];
   const shouts: Shout[] = [];
+  let tally: Tally | null = null;
 
   // ---- the ending hold: nothing is scored, and the life is over
   if (state.ending.active) {
@@ -210,13 +255,8 @@ export function scoreTick(
       endLife(sc);
     }
     sc.putterOuts = state.telemetry.putterOuts;
-    sc.multiplier = multiplierFor(sc, scfg, state.tick);
-    sc.bonusActive = sc.bonusUntil >= state.tick;
-    const span = Math.max(1, Math.round(scfg.anomalyBonusSecs / dt));
-    sc.bonusFrac = sc.bonusActive
-      ? Math.max(0, Math.min(1, (sc.bonusUntil - state.tick) / span))
-      : 0;
-    return { awards, shouts };
+    sc.multiplier = multiplierFor(sc, scfg);
+    return { awards, shouts, tally };
   }
   sc.endingSeen = false;
   if (sc.climbFromY === null) sc.climbFromY = state.highWaterY;
@@ -260,6 +300,23 @@ export function scoreTick(
     }
   }
 
+  // ---- a charged window opened: the hop log describes the window in progress
+  //
+  // Edge-detected off the simulation's own countdown rather than off the release
+  // that opened it, so there is one definition of "a window is running" and the
+  // scorer is reading it rather than keeping a second copy in step.
+  const charged = state.chargedT > 0;
+  if (charged && !sc.wasCharged) {
+    sc.hopped.length = 0;
+    sc.hopTotal = 0;
+  }
+  // The window ran out. Not a death — `endLife` clears `wasCharged`, so a crash
+  // mid-frenzy never reaches here.
+  if (!charged && sc.wasCharged && sc.hopTotal > 0) {
+    tally = { tick: state.tick, points: sc.hopTotal, hops: sc.hopped.length };
+  }
+  sc.wasCharged = charged;
+
   // ---- ran dry mid-circularisation: a failure, not a release
   if (state.telemetry.putterOuts > sc.putterOuts) {
     sc.putterOuts = state.telemetry.putterOuts;
@@ -272,18 +329,20 @@ export function scoreTick(
   // A release that never reached a frozen orbit — a dive abandoned early, or a
   // flyby let go of — is not a failure, it is a non-event. It pays nothing and
   // costs nothing, and in particular it does not break a streak.
+  // ---- the pass ended still being a pass: pay the flyby it was
+  //
+  // Ahead of the release below, so a flyby's award lands before anything the same
+  // tick might do with the streak it just stepped.
+  if (sc.pendingFlyby && !state.capture) {
+    const f = sc.pendingFlyby;
+    sc.pendingFlyby = null;
+    awards.push(awardFlyby(sc, state, scfg, f));
+  }
+
   if (sc.pending && !state.capture) {
     const p = sc.pending;
     sc.pending = null;
     if (p.earned) awards.push(awardLink(sc, state, scfg, p));
-    // The anomaly bonus starts HERE, as the ship leaves — not at the grab. It
-    // starts whether or not the release earned a link, because the achievement it
-    // pays for was arriving, and a player who fumbles the exit of the hardest
-    // thing in the game has already been punished by the link they did not get.
-    if (sc.bonusArmed) {
-      sc.bonusArmed = false;
-      sc.bonusUntil = state.tick + Math.round(scfg.anomalyBonusSecs / dt);
-    }
   }
 
   const cap = state.capture;
@@ -321,6 +380,38 @@ export function scoreTick(
       sc.maxDefl = 0;
       sc.periSeen = false;
       sc.grabDue = -1;
+      sc.flybyR = Infinity;
+      sc.flybyFalling = false;
+      sc.pendingFlyby = null;
+    }
+
+    // ---- the flyby award: owed at the bottom of the pass, paid when it ends
+    //
+    // The bottom is where a pass is decided, so that is where its qualities are
+    // read — but it is not yet where the pass has finished being one. See
+    // `PendingFlyby`: a flyby can bottom out unbound, arc back on the brake and
+    // convert, and paying here would pay a single press twice.
+    //
+    // `stepSim` does not find this periapsis itself — its detection is gated on
+    // `phase !== 'flyby'`, because a flyby has no orbit to freeze — so the
+    // observer runs the same rising-edge test on the radius it can already see.
+    if (cap.phase === 'flyby') {
+      const r = hypot(cap.rx, cap.ry);
+      const dR = r - sc.flybyR;
+      if (sc.flybyFalling && dR >= 0) {
+        // Cleared on the edge whether or not anything was owed, or the test stays
+        // true for every remaining tick of the outbound leg and fires once a tick.
+        sc.flybyFalling = false;
+        sc.pendingFlyby ??= readPendingFlyby(sc, state, scfg, cap, r);
+      } else if (dR < 0) sc.flybyFalling = true;
+      sc.flybyR = r;
+    } else {
+      // It converted. The pass became a capture, so the grab award is the one
+      // that describes it and the flyby is owed nothing — that is what stops one
+      // press paying twice, and what keeps a zip from being a discount.
+      sc.flybyR = Infinity;
+      sc.flybyFalling = false;
+      sc.pendingFlyby = null;
     }
 
     // ---- the grab award: owed once the dive swings through periapsis
@@ -387,13 +478,10 @@ export function scoreTick(
   }
   sc.wasCaptured = cap !== null;
 
-  sc.multiplier = multiplierFor(sc, scfg, state.tick);
-  sc.bonusActive = sc.bonusUntil >= state.tick;
-  const span = Math.max(1, Math.round(scfg.anomalyBonusSecs / dt));
-  sc.bonusFrac = sc.bonusActive ? Math.max(0, Math.min(1, (sc.bonusUntil - state.tick) / span)) : 0;
+  sc.multiplier = multiplierFor(sc, scfg);
   if (sc.score > sc.best) sc.best = sc.score;
   if (awards.length > 0) sc.lastAward = awards[awards.length - 1]!;
-  return { awards, shouts };
+  return { awards, shouts, tally };
 }
 
 /**
@@ -480,7 +568,7 @@ function awardGrab(
   cap: Capture,
 ): ScoreAward | null {
   const close = clamp01(1 - sc.grabClearance / scfg.closeSpan);
-  const multiplier = multiplierFor(sc, scfg, state.tick);
+  const multiplier = multiplierFor(sc, scfg);
   const award: ScoreAward = {
     tick: state.tick,
     kind: 'grab',
@@ -499,16 +587,41 @@ function awardGrab(
     climb: 0,
     heat: 0,
   };
-  // An anomaly pays its own flat award on top of whatever the arrival was worth,
-  // and arms the bonus window for the release. Once per life: without the claim
-  // log a player could orbit out and back to refresh the window indefinitely,
-  // which is the same faucet the grab award already refuses to open by paying at
-  // the press.
   const body = state.bodies[cap.planet];
+
+  // ---- a hop: a zipped arrival at a planet, inside a charged window
+  //
+  // Read off `cap.zipped` and NOT off the live window, and that difference is the
+  // rule: a zip is committed at the press, and the 0.45s glide it buys can easily
+  // outlast the countdown. Re-checking here would mean a hop begun legally inside
+  // the window silently paid nothing because it landed a tick late — punishing the
+  // player for the one thing the window is asking them to do, which is hurry.
+  //
+  // An anomaly is never a hop even when zipped to. Arriving at one is the thing
+  // `anomalyBonus` exists to pay for, and it opens the next window; calling that a
+  // hop would replace the largest award in the game with a flat 500 and quietly
+  // make chaining anomalies worth less than chaining planets.
+  if (cap.zipped && body && body.kind !== 'anomaly' && !sc.hopped.includes(body.name)) {
+    sc.hopped.push(body.name);
+    award.kind = 'hop';
+    // Flat. The only award in the game that does not take the multiplier — see
+    // `ScoreConfig.hopBonus` — so it carries the multiplier it was actually paid
+    // at rather than the one in force, which the popup would otherwise print.
+    award.multiplier = 1;
+    award.points = scfg.hopBonus;
+    sc.score += award.points;
+    sc.hopTotal += award.points;
+    sc.grabs++;
+    return award;
+  }
+
+  // An anomaly pays its own flat award on top of whatever the arrival was worth.
+  // Once per life: without the claim log a player could orbit out and back to
+  // refresh the window indefinitely, which is the same faucet the grab award
+  // already refuses to open by paying at the press.
   let anomaly = 0;
   if (body?.kind === 'anomaly' && !sc.claimed.includes(body.name)) {
     sc.claimed.push(body.name);
-    sc.bonusArmed = true;
     anomaly = scfg.anomalyBonus;
   }
 
@@ -530,10 +643,9 @@ function awardGrab(
  * was accumulated a slice a tick. Paying continuously would break the promise
  * `test/score.test.ts` pins — that awards inside a life sum to the score — and
  * with it `tools/replay.ts`, which reconstructs a session from its award list and
- * would come up short by every burn. The player still sees the number climb: the
- * popup rolls it up over 0.8s, outliving the flame it is counting, because the
- * flame itself is only about 0.17s long and a number that resolved in 0.17s would
- * be a flicker rather than a tally.
+ * would come up short by every burn. The player sees the number climb afterwards
+ * instead: the popup rolls it up over 0.8s, deliberately longer than the 0.45s
+ * drag it is summing, so it reads as a tally rather than a replay.
  */
 function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAward | null {
   if (sc.burnBank <= 0) return null;
@@ -542,7 +654,7 @@ function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
   sc.burnBank = 0;
   sc.burnPeak = 0;
 
-  const multiplier = multiplierFor(sc, scfg, state.tick);
+  const multiplier = multiplierFor(sc, scfg);
   const points = Math.round(raw * multiplier);
   // A flare so faint it rounds to nothing pays nothing and says nothing: a `+0`
   // floating off the ship is worse than silence, the same rule `awardGrab` keeps.
@@ -573,6 +685,83 @@ function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
   return award;
 }
 
+/**
+ * Pay for a pass that was never a capture.
+ *
+ * Owed at the closest approach, which is where the pass was decided, and paid
+ * when the pass ends still being one — see `PendingFlyby` for why those are two
+ * different moments and what went wrong when they were the same one. Paying at
+ * the press would be paying for the intention, exactly as it would for a grab.
+ *
+ * AND IT STEPS THE STREAK, which is the larger half of what this award does. The
+ * ladder was a count of links, so it could only be climbed by stopping at bodies
+ * — a life measured covering 3.1x the ground per second was stuck at x2 while a
+ * chained one ran at x5-x7, and earned a fifteenth as much per pixel climbed for
+ * flying the harder line. Nothing about that was a decision anyone made; the
+ * counter simply could not see the style.
+ *
+ * Whether the pass qualified at all is settled by `readPendingFlyby`; by the time
+ * this runs the award is owed and pays.
+ */
+function readPendingFlyby(
+  sc: ScoreState,
+  state: SimState,
+  scfg: ScoreConfig,
+  cap: Capture,
+  r: number,
+): PendingFlyby | null {
+  // A flyby braked below this is not going fast past anything — it has puttered
+  // out and is waiting to be dropped. See `FLYBY_SPEED_MIN`, and note it is a
+  // floor under a dead tail rather than a bar that picks out fast passes: it
+  // cannot be one, because every unconverted flyby is fast by definition.
+  if (hypot(cap.vx, cap.vy) < FLYBY_SPEED_MIN) return null;
+  const clearance = Math.max(0, r - cap.minR);
+  return {
+    body: state.bodies[cap.planet]?.name ?? '?',
+    // Measured HERE, not at the press: a flyby's press is not the choice, the
+    // pass is. See `close` in `./types.ts`.
+    close: clamp01(1 - clearance / scfg.closeSpan),
+    clearance,
+    // The approach line the press was made on, which means the same thing for a
+    // flyby as for a grab. It names nothing here — `isNerveGrab` is gated on the
+    // kind — but it is real and measured, so it travels into the report.
+    skim: sc.grabSkim,
+    defl: sc.maxDefl,
+  };
+}
+
+function awardFlyby(
+  sc: ScoreState,
+  state: SimState,
+  scfg: ScoreConfig,
+  p: PendingFlyby,
+): ScoreAward {
+  const raw = scfg.flybyBase + p.close * scfg.flybyCloseBonus;
+  const multiplier = multiplierFor(sc, scfg);
+  const award: ScoreAward = {
+    tick: state.tick,
+    kind: 'flyby',
+    points: Math.round(raw * multiplier),
+    multiplier,
+    body: p.body,
+    close: p.close,
+    clearance: p.clearance,
+    skim: p.skim,
+    defl: p.defl,
+    // Release qualities. There is no release: the ship never stopped.
+    timing: 0,
+    aim: 0,
+    climb: 0,
+    // Nor is it a burn: a flyby is not captured, and only a captured ship can be
+    // dragged along the dead zone.
+    heat: 0,
+  };
+  sc.score += award.points;
+  sc.flybys++;
+  sc.streak++;
+  return award;
+}
+
 function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: PendingLink): ScoreAward {
   // Climb is measured on `highWaterY` rather than on release positions: it only
   // ratchets, so a dip inside an orbit cannot bank negative ground, and the
@@ -587,7 +776,7 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
   const raw =
     scfg.linkBase + climb * scfg.climbPerPx + timing * scfg.timingBonus + aim * scfg.aimBonus;
 
-  const multiplier = multiplierFor(sc, scfg, state.tick);
+  const multiplier = multiplierFor(sc, scfg);
   // Built once so the nerve test sees the finished award rather than a copy of
   // its own inputs — one definition of what a nerve grab is, in praise.ts.
   const award: ScoreAward = {

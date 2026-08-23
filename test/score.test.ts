@@ -183,6 +183,35 @@ const ANOMALY = createBodies(DEFAULT_CONFIG).find((b) => b.kind === 'anomaly' &&
 const ANOMALY_PRESS = 88;
 
 /**
+ * The body the flyby session below sails past, and the line it sails past it on.
+ *
+ * Found by name rather than by index so a layout change moves the fixture with
+ * the field instead of silently pointing it at whatever body inherited the slot.
+ * 500px/s straight up the field from 800px out, offset 160px to the side: fast
+ * enough that the grab is unbound and therefore a flyby, offset enough that
+ * gravity bends it past rather than into the surface. It bottoms out 49px above
+ * the minimum orbit, which is mid-range for a real one — measured over 167
+ * recorded passages the median is 60px — so the pass exercises `flybyCloseBonus`
+ * somewhere other than at its ends.
+ *
+ * Robust to the release tick: 120 through 320 all produce the same single award,
+ * because the award is OWED at the closest approach and only paid at the release.
+ */
+const FLYBY_BODY = createBodies(DEFAULT_CONFIG).find((b) => b.name === 'P14')!;
+const FLYBY_SHIP = { x: FLYBY_BODY.x - 160, y: FLYBY_BODY.y + 800, vx: 0, vy: -500 };
+
+/**
+ * A small body used for the one pass in the suite that bottoms out SLOWLY.
+ *
+ * Escape speed falls off with distance, so 400px to the side of a 35px-radius
+ * planet is the corner of the world where an unbound grab can still be moving at
+ * 140px/s — everywhere else a flyby that slow is bound, and a bound inbound flyby
+ * converts into a capture instead. It is the only way to put `FLYBY_SPEED_MIN`
+ * under test with the speed as the only variable.
+ */
+const FAR_BODY = createBodies(DEFAULT_CONFIG).find((b) => b.name === 'P18')!;
+
+/**
  * The sessions every weight is measured against.
  *
  * One is not enough, for the same reason `test/tune.test.ts` needs several: a
@@ -274,6 +303,24 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
    * ends — which is what happened to the previous numbers when the anomaly
    * approach stopped taking two seconds and every tick after the press moved.
    */
+  /**
+   * Past a planet too fast to be caught by it, then let go.
+   *
+   * Here for the same reason the nerve grab and the anomaly are: nothing else in
+   * the battery produces one, and without it both `flyby*` weights measure as
+   * inert — a blind spot in the fixture rather than a dead weight. The pilot
+   * cannot supply it either; it only presses inside 300px and at drift speed,
+   * which is a capture every time.
+   */
+  {
+    name: 'straight past, too fast to hold',
+    ship: FLYBY_SHIP,
+    edges: [
+      [1, 1],
+      [200, 0],
+    ],
+    ticks: 400,
+  },
   {
     name: 'out to an anomaly and back',
     ship: { x: ANOMALY.x - 520, y: ANOMALY.y - 70, vx: 320, vy: 0 },
@@ -1019,6 +1066,131 @@ describe('the reckless shout', () => {
       for (let t = 0; t < 400; t++) seen.add(bonkWord(t));
       expect(seen.size).toBe(BONKS.length);
     });
+  });
+});
+
+// -------------------------------------------------------------- the flyby award
+
+describe('a flyby that stays a flyby', () => {
+  /** The fixture pass, released at `releaseAt`. */
+  function pass(releaseAt = 200, ticks = 400) {
+    return play(
+      [
+        [1, 1],
+        [releaseAt, 0],
+      ],
+      ticks,
+      DEFAULT_CONFIG,
+      DEFAULT_SCORE_CONFIG,
+      true,
+      FLYBY_SHIP,
+    );
+  }
+
+  it('pays for a pass held through its closest approach', () => {
+    const { awards, score } = pass();
+    const f = awards.filter((a) => a.kind === 'flyby');
+    expect(f, 'the fixture no longer reaches a flyby — see FLYBY_BODY').toHaveLength(1);
+    expect(f[0]!.points).toBeGreaterThan(0);
+    expect(score.flybys).toBe(1);
+    // A pass is not a capture and not a release: neither of the other two events
+    // may fire for it, or one press would be paid twice.
+    expect(awards.filter((a) => a.kind !== 'flyby')).toHaveLength(0);
+  });
+
+  it('is owed at the bottom and paid at the release', () => {
+    // The distinguishing property, and the reason it is not simply paid at the
+    // closest approach like a grab: see `PendingFlyby`. Moving the release moves
+    // the award and changes nothing about what it is worth.
+    for (const rel of [120, 200, 320]) {
+      const f = pass(rel, 600).awards.filter((a) => a.kind === 'flyby');
+      expect(f, `released at ${rel}`).toHaveLength(1);
+      expect(f[0]!.tick, `released at ${rel}`).toBe(rel + 1);
+      expect(f[0]!.points, `released at ${rel}`).toBe(151);
+    }
+  });
+
+  it('steps the streak, so speed can climb the ladder at all', () => {
+    // The larger half of what this award does. Before it the ladder counted
+    // links, so it could only be climbed by stopping at bodies — and a life
+    // covering 3.1x the ground per second was stuck at x2 while a chained one ran
+    // at x5-x7.
+    const { score } = pass();
+    expect(score.streak).toBe(1);
+    expect(score.multiplier).toBeCloseTo(1 + DEFAULT_SCORE_CONFIG.streakStep, 6);
+  });
+
+  it('pays nothing for a press let go of before the pass got anywhere', () => {
+    // The same rule the grab award keeps by paying at periapsis: a tap that never
+    // reaches the bottom of anything is worth nothing, or pressing beside a body
+    // is a faucet.
+    const { awards } = pass(4, 400);
+    expect(awards).toHaveLength(0);
+  });
+
+  it('pays nothing once the pass has puttered out below the floor', () => {
+    // `FLYBY_SPEED_MIN` is a floor under a dead tail, not a bar that selects fast
+    // passes — every unconverted flyby is fast, so the bar could not select one.
+    // What it excludes is the flyby that has stopped going anywhere.
+    //
+    // The pair below is one line past one body at two speeds, which is the only
+    // honest way to test a floor: everything except the speed at the bottom is
+    // held constant, so nothing else can be what separated them. Far out past a
+    // small body, escape speed is low enough that 140px/s is still unbound — the
+    // one corner where a flyby CAN bottom out slowly. It bottoms out at 139 and
+    // pays nothing; the same pass at 160px/s bottoms out at 158 and pays.
+    //
+    // Both pay `flybyBase` and no closeness: 400px to the side is far outside
+    // `closeSpan`, which is the point — the floor is not a closeness test.
+    //
+    // Filtered to flyby awards, and that is not tidiness: this line starts 37.9px
+    // from the left wall, which is inside the 60px dead zone, so a captured ship
+    // on it also earns a BURN. That award is correct and has nothing to do with
+    // the floor being tested here — the assertion just has to say which kind it
+    // is talking about.
+    const paid = (speed: number): ScoreAward[] =>
+      play(
+        [
+          [1, 1],
+          // The award is paid at the release, so the pass has to be let go of.
+          [400, 0],
+        ],
+        600,
+        DEFAULT_CONFIG,
+        DEFAULT_SCORE_CONFIG,
+        true,
+        {
+          x: FAR_BODY.x - 400,
+          y: FAR_BODY.y + 540,
+          vx: 0,
+          vy: -speed,
+        },
+      ).awards.filter((a) => a.kind === 'flyby');
+    expect(paid(140), 'a flyby below the floor was paid').toHaveLength(0);
+    const fast = paid(160);
+    expect(fast, 'the control pass stopped reaching a flyby — see FAR_BODY').toHaveLength(1);
+    expect(fast[0]!.points).toBe(DEFAULT_SCORE_CONFIG.flybyBase);
+  });
+
+  it('pays a grab and not a flyby once the pass converts', () => {
+    // One press, one award. A flyby can bottom out unbound, arc back on the brake
+    // and become a capture, and paying at the bottom would have paid that press
+    // twice and stepped the ladder twice — for an overshoot. Braking eight times
+    // as hard makes the fixture convert, and the flyby it was owed is dropped.
+    const slow = { ...DEFAULT_CONFIG, flybyBrake: DEFAULT_CONFIG.flybyBrake * 8 };
+    const { awards } = play(
+      [
+        [1, 1],
+        [200, 0],
+      ],
+      400,
+      slow,
+      DEFAULT_SCORE_CONFIG,
+      true,
+      FLYBY_SHIP,
+    );
+    expect(awards.filter((a) => a.kind === 'flyby')).toHaveLength(0);
+    expect(awards.length, 'the converted pass paid nothing at all').toBeGreaterThan(0);
   });
 });
 

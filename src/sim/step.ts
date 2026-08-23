@@ -31,7 +31,8 @@ export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
     highWaterY: 0,
     ending: { active: false, t: 0, x: 0, y: 0, reason: 'impact' },
     holdConsumed: false,
-    charges: { zip: 0 },
+    chargedT: 0,
+    cameFrom: -1,
     telemetry: { lastGrab: null, floorSubsteps: 0, floorSubstepsTotal: 0, putterOuts: 0 },
   };
   respawn(state, cfg);
@@ -56,9 +57,10 @@ export function respawn(state: SimState, cfg: SimConfig): void {
   // The prototype cleared its input flag here; input is an input, so the
   // equivalent fact is recorded in state. See docs/PORT_NOTES.md note 7.
   state.holdConsumed = true;
-  // Charges die with the ship. They are earned by flying, and carrying one across
+  // The charge dies with the ship. It is earned by flying, and carrying it across
   // a death would pay the next run for the last one's work.
-  state.charges.zip = 0;
+  state.chargedT = 0;
+  state.cameFrom = -1;
 }
 
 /** The ship's world position, wherever it currently lives. */
@@ -101,6 +103,16 @@ function endRun(state: SimState, reason: EndingReason, x: number, y: number): vo
 
 /** Advance one simulation tick. Mutates `state` in place. */
 export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: number): void {
+  // ---- the charged window drains first, before anything reads it
+  //
+  // Ahead of the input edges deliberately. A grab this tick is judged against the
+  // window as it stands NOW, so one that arrives exactly as the window runs out
+  // dives rather than zipping; and a release this tick opens a full window that
+  // this tick does not immediately take a slice out of. Between them that makes
+  // the window exactly `chargedSecs` of simulated time long, measured from the
+  // release — which is what the config key promises.
+  if (state.chargedT > 0) state.chargedT = Math.max(0, state.chargedT - dt);
+
   // ---- input edges, applied before the frame as the prototype's handlers were
   if (input.pressed) {
     state.holdConsumed = false;

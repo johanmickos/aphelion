@@ -268,6 +268,9 @@ export function praiseFor(award: ScoreAward): Praise | null {
   if (award.kind === 'grab') return praiseGrab(award);
   if (award.kind === 'link') return praiseRelease(award);
   if (award.kind === 'burn') return praiseBurn(award);
+  // A hop earns no word, and that is not an omission. Every hop inside a charged
+  // window pays the same flat `hopBonus`, so there is no quality for a word to
+  // name — and the popup already says what it is by being purple.
   return null;
 }
 

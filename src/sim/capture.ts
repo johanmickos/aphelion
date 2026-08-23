@@ -45,7 +45,6 @@ import {
   naturalPeriapsis,
   predictedCaptureOrbit,
 } from './orbit.ts';
-import { grantCharge, spendCharge } from './charges.ts';
 
 export type { GrabResult } from './types.ts';
 
@@ -63,13 +62,24 @@ export type { GrabResult } from './types.ts';
  * Displacing the query point is continuous in both position and velocity, and it
  * costs nothing at rest — a ship that is not moving has no next planet, and gets
  * the nearest one.
+ *
+ * `skip` excludes exactly one body by index, which is the same reasoning wearing
+ * different clothes: "the one I just let go of" is a fact, not a threshold, so it
+ * cannot drift across a line. See `SimState.cameFrom`.
  */
-export function nearestBody(state: SimState, lead = 0): number {
+export function nearestBody(
+  state: SimState,
+  lead = 0,
+  skip = -1,
+  allow: ((i: number) => boolean) | null = null,
+): number {
   const x = state.ship.x + state.ship.vx * lead;
   const y = state.ship.y + state.ship.vy * lead;
   let best = -1;
   let bd = 1e9;
   for (let i = 0; i < state.bodies.length; i++) {
+    if (i === skip) continue;
+    if (allow && !allow(i)) continue;
     const p = state.bodies[i]!;
     const d = hypot(x - p.x, y - p.y);
     if (d < bd) {
@@ -132,7 +142,7 @@ export function inCrashCone(cfg: SimConfig, state: SimState, body: Body): boolea
  */
 export function grabTarget(state: SimState, cfg: SimConfig): { index: number; result: GrabResult } {
   if (state.fuel <= 0.5) return { index: -1, result: 'refused-no-fuel' };
-  const pi = nearestBody(state, cfg.grabLeadTime);
+  const pi = state.chargedT > 0 ? chargedTarget(state, cfg) : nearestBody(state, cfg.grabLeadTime);
   if (pi < 0) return { index: -1, result: 'refused-no-body' };
   const p = state.bodies[pi]!;
   if (cfg.grabRange > 0) {
@@ -141,6 +151,58 @@ export function grabTarget(state: SimState, cfg: SimConfig): { index: number; re
   }
   if (inCrashCone(cfg, state, p)) return { index: -1, result: 'refused-crash-cone' };
   return { index: pi, result: 'captured' };
+}
+
+/**
+ * Targeting inside a charged window: throw the web FORWARD.
+ *
+ * Reported as "when we have our anomaly charged, it should never grab the same
+ * planet that the player is coming from — it should really feel like Spider-Man
+ * sending sticky web forward and pulling us ahead."
+ *
+ * Excluding the body just released from is necessary and was not sufficient.
+ * Measured on the session that reported it: of five presses in one window, three
+ * zipped straight back onto the planet just left. Excluding it fixed one of the
+ * three and the ship then walked DOWN the field instead — P17, P18, P19, P18,
+ * P17 — because after a release the neighbour behind is routinely the nearest
+ * thing there is. On both of those backward grabs there were two bodies above and
+ * within range, so preferring upward would have redirected them and refused
+ * nothing.
+ *
+ * A PREFERENCE, NOT A GATE, and that distinction is the whole design. `nearestBody`
+ * records why a heading cone was refused: a threshold is a cliff the player falls
+ * off. Here nothing is ever forbidden — if there is no takeable body ahead, the
+ * ordinary nearest one is still offered, minus the one you came from. So the rule
+ * can never waste a press or make a window run out on a refusal; it only decides
+ * WHICH body a press takes when there is a genuine choice.
+ *
+ * "Forward" is up, which is not an arbitrary axis in this game: the field is a
+ * vertical climb, the score pays for altitude, and falling behind the trailing
+ * floor is what ends a run.
+ */
+function chargedTarget(state: SimState, cfg: SimConfig): number {
+  const from = state.cameFrom;
+  // Only bodies that would actually be taken if chosen — range and the crash cone
+  // included. Without that a preferred body sitting just out of reach would refuse
+  // the press while a perfectly good one behind it went unoffered.
+  const takeable = (i: number): boolean => {
+    const b = state.bodies[i]!;
+    if (cfg.grabRange > 0 && hypot(state.ship.x - b.x, state.ship.y - b.y) > cfg.grabRange) {
+      return false;
+    }
+    return !inCrashCone(cfg, state, b);
+  };
+  const ahead = nearestBody(
+    state,
+    cfg.grabLeadTime,
+    from,
+    (i) => state.bodies[i]!.y < state.ship.y && takeable(i),
+  );
+  if (ahead >= 0) return ahead;
+  // Nothing ahead worth taking. Fall back to the ordinary rule, still without the
+  // body just released from — a backward grab is a poor outcome, a zip straight
+  // back where you started is a wasted one.
+  return nearestBody(state, cfg.grabLeadTime, from);
 }
 
 /**
@@ -303,18 +365,38 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
  * is a physically correct orbit and not an authored pace. `settleSweep` then
  * carries exactly what `stepPhase` would have eased toward on its own.
  *
- * Spends the charge as a side effect, and only once it is certain the zip will
- * happen — a charge burned on a grab that was refused would be a charge stolen.
+ * Gated on the charged window rather than on a resource. There is nothing to
+ * spend and nothing to run out of: inside the window every grab zips, and how
+ * many you get is a question about how fast you fly, not about a counter.
  */
 function zipOrbit(state: SimState, cfg: SimConfig, cap: Capture, body: Body): AuthoredOrbit | null {
-  if (cfg.zipDur <= 0 || state.charges.zip <= 0) return null;
-  const predicted = predictedCaptureOrbit(cfg, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR);
-  // A hyperbola still has a periapsis and it is still where the ship was headed,
-  // so a zip rescues a flyby as readily as it shortcuts a dive. What it must not
-  // do is aim inside the surface.
-  const r = Math.max(cap.minR, predicted.periapsis);
+  if (cfg.zipDur <= 0 || state.chargedT <= 0) return null;
+  // One orbit for every hop, whatever the approach was.
+  //
+  // It used to be the orbit the dive WOULD have reached —
+  // `max(minR, predictedCaptureOrbit().periapsis)` — on the reasoning in note 47
+  // that aim should still decide where the ship ends up. Measured across 108,000
+  // approach geometries that is not a gradient, it is a lottery: 43% pin exactly
+  // at `minR` and the top quartile sits 3.1x to 8.1x above it, a spread of 0 to
+  // 330px. Reported as "I sometimes got high orbits and sometimes low".
+  //
+  // A frenzy is a rhythm, and a rhythm needs every beat to be the same. Absolute
+  // rather than a multiple of `minR`, so height AND period are literally
+  // identical on every body — which is how an anomaly already authors its own
+  // rest stop (`anomalyOrbitR`), and the reason that reads as a place rather than
+  // as a result.
+  //
+  // Clamped above `minR` because a body big enough would otherwise put this orbit
+  // underground: bodies run R 34-56, so `minR` reaches 68 against this 90, and a
+  // future larger body must not silently start orbiting inside itself.
+  const r =
+    cfg.chargedOrbitR > 0
+      ? Math.max(cap.minR, cfg.chargedOrbitR)
+      : Math.max(
+          cap.minR,
+          predictedCaptureOrbit(cfg, cap.rx, cap.ry, cap.vx, cap.vy, cap.minR).periapsis,
+        );
   if (!Number.isFinite(r) || r <= 0) return null;
-  if (!spendCharge(state, 'zip')) return null;
   void body;
   return {
     orbitR: r,
@@ -471,6 +553,11 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
   if (!cap) return { boostApplied: 0, weak };
   const body = state.bodies[cap.planet]!;
 
+  // Where the ship is leaving from, so a charged press cannot reel it straight
+  // back. Recorded on EVERY release, weak ones included: a putter-out leaves you
+  // beside the body just as surely as a good release does.
+  state.cameFrom = cap.planet;
+
   const earned = !weak && cap.orbit !== null && cap.passedPeri && cap.phase !== 'flyby';
   const add = earned ? cap.boost || 0 : 0;
 
@@ -482,16 +569,17 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
     const peakFrac = Math.max(0, Math.min(1, cap.boost / cap.boostFull));
     state.fuel = Math.min(cfg.fuelMax, state.fuel + cfg.linkFuelReward * peakFrac);
   }
-  // Leaving a rest stop pays for the ride home.
+  // Leaving a rest stop leaves you charged.
   //
-  // Granted at the RELEASE, not at the grab, for the same reason the score's
-  // anomaly window is: the achievement is arriving, and the charge is for what
-  // comes next. Granted even on a weak release — a player who fumbles the exit of
-  // the hardest thing in the game has been punished by the link they did not get.
+  // Opened at the RELEASE, not at the grab: converting the flyby, settling and
+  // waiting for a release angle costs 1.5-2s that would otherwise burn a third of
+  // the window inside an orbit going nowhere — and would mean holding a tighter,
+  // better orbit actively cost you window. Starting here makes `chargedSecs` the
+  // number the player experiences.
   //
-  // This is a source, and it knows nothing about what a zip does. See
-  // `src/sim/charges.ts`.
-  if (cfg.zipDur > 0 && body.kind === 'anomaly') grantCharge(state, 'zip');
+  // Opened even on a weak release. A player who fumbles the exit of the hardest
+  // thing in the game has already been punished by the link they did not get.
+  if (cfg.chargedSecs > 0 && body.kind === 'anomaly') state.chargedT = cfg.chargedSecs;
 
   const spd = hypot(cap.vx, cap.vy) || 1;
   const bx = cap.vx / spd;

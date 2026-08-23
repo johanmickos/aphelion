@@ -13,7 +13,7 @@ import type { ScoreAward, ScoreState } from '../score/types.ts';
 import type { Praise } from '../score/index.ts';
 import { praiseFor } from '../score/index.ts';
 import type { AccoladeStyle } from './accolade.ts';
-import { BURN_WORD, LEVEL, ROUTINE } from './accolade.ts';
+import { BURN_WORD, HOP, LEVEL, ROUTINE } from './accolade.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
@@ -142,9 +142,26 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     detail: `${a.body}  PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
   }),
+  // Never carries a praise word: a hop pays flat, so there is no quality to
+  // praise, and no multiplier either — every one is worth the same.
+  hop: (a) => ({
+    style: HOP,
+    detail: `${a.body}  ZIP`,
+    mult: '',
+  }),
+  // No praise word either, and for a different reason: `praiseFor` returns null
+  // for this kind because a fast life makes upward of 38 of these a minute where
+  // a chained one makes 2.7. A word on each would be the loudest thing on screen
+  // for the player it is meant to reward, and the vocabulary in `praise.ts` is
+  // calibrated on rarity. The multiplier climbing IS the feedback.
+  flyby: (a) => ({
+    style: ROUTINE,
+    detail: `${a.body}  FLYBY · CLOSE ${pct(a.close)}`,
+    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
+  }),
   burn: (a) => ({
-    // Always the default grey, word or not — the same rule the popup follows. A
-    // burn's colour lives entirely in its word; the number is deliberately quiet.
+    // Always the default, word or not — the same rule the popup follows. A burn's
+    // colour lives entirely in its word; the number is deliberately quiet.
     style: ROUTINE,
     // The peak, which is what the word was chosen on — reporting the integral
     // here would caption a word the number does not explain.
@@ -446,41 +463,44 @@ export function drawScore(
   ctx.fillStyle = 'rgba(214,228,250,.92)';
   ctx.fillText(formatScore(score.score), cx, cam.offsetY + SCORE.y * s);
 
+  const multY = cam.offsetY + SCORE.multY * s;
   if (score.multiplier > 1) {
     // Warms toward the ceiling, so a streak reads as heat rather than as a number
     // you have to compare against a maximum you cannot see.
     //
-    // Purple while an anomaly bonus is running, because `heat` SATURATES at the
-    // streak ceiling: the bonus adds on top of that cap, so without this the one
-    // gauge that shows the multiplier would show a boosted x7 and an unboosted x5
-    // in exactly the same colour. The colour is a state — bonus live — not a
-    // rarity, so it stays out of the accolade ladder.
+    // No longer recoloured for a bonus. The anomaly's window stopped touching the
+    // multiplier when it became a charged window, so this number means exactly one
+    // thing again: how long your chain of links is.
     const heat = Math.min(1, (score.multiplier - 1) / 4);
-    const col = score.bonusActive
-      ? [206, 150, 255]
-      : lerpColor([120, 210, 255], [255, 170, 60], heat);
-    // Bigger while boosted, not only recoloured. Reported as "the bonus and
-    // multiplier weren't very obvious": a 12px readout that changes hue is easy
-    // to miss on a phone in the middle of flying, and the boost is the largest
-    // thing that has ever happened to this number.
-    const size = score.bonusActive ? 17 : 12;
-    ctx.font = `600 ${size * s}px ui-monospace, monospace`;
+    const col = lerpColor([120, 210, 255], [255, 170, 60], heat);
+    ctx.font = `600 ${12 * s}px ui-monospace, monospace`;
     ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
-    const multY = cam.offsetY + SCORE.multY * s;
     ctx.fillText(`x${score.multiplier.toFixed(2)}`, cx, multY);
+  }
 
-    if (score.bonusActive) {
-      // A draining bar, because the window is the part of the reward the player
-      // has to ACT on and a colour cannot say how long is left. Ten seconds is
-      // long enough that "is it still running?" is a real question mid-flight.
-      const w = 64 * s;
-      const h = 3 * s;
-      const y = multY + 5 * s;
-      ctx.fillStyle = 'rgba(206,150,255,.22)';
-      ctx.fillRect(cx - w / 2, y, w, h);
-      ctx.fillStyle = 'rgba(214,164,255,.9)';
-      ctx.fillRect(cx - w / 2, y, w * score.bonusFrac, h);
-    }
+  // The charged window: a draining bar, because the window is the part of the
+  // reward the player has to ACT on, and no colour can say how long is left.
+  //
+  // Read from the SNAPSHOT, not from the score. The window belongs to the
+  // simulation now — it grants an ability rather than points — so the scorer does
+  // not own it and must not be asked about it, or there would be two answers to
+  // how much time is left.
+  //
+  // Drawn whatever the multiplier is doing. It used to be nested inside the
+  // `multiplier > 1` branch because it was part of the multiplier's story; a
+  // player who reaches an anomaly on a broken streak now still sees their window.
+  //
+  // Uncaptioned on purpose: the ship is arcing and the popups are this same
+  // purple, so a word here would be a fourth cue saying what three already say.
+  // See the note on `HOP` in `accolade.ts`.
+  if (snap.chargedFrac > 0) {
+    const w = 64 * s;
+    const h = 3 * s;
+    const y = multY + 5 * s;
+    ctx.fillStyle = 'rgba(168,92,255,.22)';
+    ctx.fillRect(cx - w / 2, y, w, h);
+    ctx.fillStyle = 'rgba(214,164,255,.9)';
+    ctx.fillRect(cx - w / 2, y, w * snap.chargedFrac, h);
   }
 
   const a = score.lastAward;

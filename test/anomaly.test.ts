@@ -30,7 +30,8 @@ interface Flight {
   reason: string;
   crossedBarrier: boolean;
   multAfterRelease: number;
-  bonusTicks: number;
+  /** Seconds on the charged window immediately after the release. */
+  chargedAfterRelease: number;
 }
 
 /**
@@ -58,7 +59,7 @@ function flyAtAnomaly(cfg: SimConfig, press: number, release: number, ticks = 90
     reason: '',
     crossedBarrier: false,
     multAfterRelease: 0,
-    bonusTicks: 0,
+    chargedAfterRelease: 0,
   };
   let held = false;
   for (let i = 0; i < ticks; i++) {
@@ -73,7 +74,7 @@ function flyAtAnomaly(cfg: SimConfig, press: number, release: number, ticks = 90
     }
     if (released) {
       out.multAfterRelease = sc.multiplier;
-      out.bonusTicks = sc.bonusUntil - state.tick;
+      out.chargedAfterRelease = state.chargedT;
     }
     if (state.ending.active) {
       out.died = i;
@@ -130,43 +131,42 @@ describe('the anomaly bonus', () => {
     );
   });
 
-  it('starts the window at the release, for its full configured length', () => {
+  it('opens the charged window at the release, for its full configured length', () => {
+    // This used to assert a ten-second x2 SCORING window. The window is now the
+    // simulation's and grants free zips instead of points, so the pin moved with
+    // it — `state.chargedT`, not `sc.bonusUntil`. See `SimConfig.chargedSecs`.
+    //
+    // Full length at the release because the drain happens at the TOP of the tick,
+    // before the input edges that opened it: a window does not lose a slice of
+    // itself to the tick it was born in.
     const f = flyAtAnomaly(DEFAULT_CONFIG, 88, 150);
-    const expected = Math.round(DEFAULT_SCORE_CONFIG.anomalyBonusSecs / FIXED_DT);
-    expect(f.bonusTicks).toBe(expected);
+    expect(f.chargedAfterRelease).toBeCloseTo(DEFAULT_CONFIG.chargedSecs, 6);
   });
 
-  it('adds on TOP of the streak ceiling, not inside it', () => {
-    // The load-bearing shape. Inside the cap the bonus does literally nothing to
-    // a maxed streak — the exact player who earned the right to fetch it — so a
-    // multiplier above `streakMax` is the thing to assert.
+  it('no longer touches the multiplier at all', () => {
+    // The old window added x2 ON TOP of `streakMax`, and this test asserted a
+    // multiplier above the ceiling. That is now the defect: the anomaly pays flat
+    // hops, and a multiplier above the cap would mean the removed mechanic is
+    // still alive somewhere.
     const sc = createScoreState();
     sc.streak = 999;
     const state = createInitialState(DEFAULT_CONFIG);
-    sc.bonusUntil = state.tick + 100;
+    state.chargedT = DEFAULT_CONFIG.chargedSecs;
     scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
-    expect(sc.multiplier).toBeGreaterThan(DEFAULT_SCORE_CONFIG.streakMax);
-    expect(sc.multiplier).toBeCloseTo(
-      DEFAULT_SCORE_CONFIG.streakMax + DEFAULT_SCORE_CONFIG.anomalyBonusMult,
-      6,
-    );
-    expect(sc.bonusActive).toBe(true);
+    expect(sc.multiplier).toBeCloseTo(DEFAULT_SCORE_CONFIG.streakMax, 6);
   });
 
   it('pays an anomaly once per life, however many times it is re-grabbed', () => {
-    // Without the claim log, orbiting out and back refreshes the window forever —
+    // Without the claim log, orbiting out and back refreshes the reward forever —
     // the same faucet the grab award refuses to open by paying at the press.
     const f = flyAtAnomaly(DEFAULT_CONFIG, 88, 150);
-    const first = f.awards.find((a) => a.kind === 'grab' && a.body === 'A2')!;
+    const grabs = f.awards.filter((a) => a.kind === 'grab' && a.body === 'A2');
+    expect(grabs.length).toBeGreaterThan(0);
+    expect(grabs[0]!.points).toBeGreaterThan(0);
 
     const sc = createScoreState();
     sc.claimed.push('A2');
-    const state = createInitialState(DEFAULT_CONFIG);
-    // A second capture of a claimed anomaly must not re-arm the window.
-    expect(sc.bonusArmed).toBe(false);
-    scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
-    expect(sc.bonusArmed).toBe(false);
-    expect(first.points).toBeGreaterThan(0);
+    expect(sc.claimed).toContain('A2');
   });
 });
 

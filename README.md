@@ -246,6 +246,61 @@ Between them they are paid on:
 times a streak multiplier that rises with consecutive links and is lost to a
 putter-out or a death.
 
+### The charged window
+
+Releasing from an anomaly's orbit leaves the ship **charged** for
+`chargedSecs` — seven seconds during which _every_ grab zips: the press is the
+arrival, and a glide carries you onto the destination orbit instead of diving to
+it. The ship arcs with the anomaly's own purple for the duration, and a bar drains
+under the score.
+
+Each **hop** onto a fresh body pays a flat `hopBonus`. Flat is deliberate and it
+is the only award in the game that ignores the multiplier: reaching an anomaly is
+hard and usually costs the streak on the way out to it, so a reward that shrank
+exactly when it was hardest to earn would be the wrong shape. A hop replaces the
+grab award rather than stacking on it — one number at the busiest moment in the
+game — and nothing about flying well is lost, because the link at the release is
+untouched and still scores aim, timing and climb at full multiplier.
+
+Charged, a press **throws the web forward**: the body you just released from is
+never on offer, and a body ahead of you is preferred over a nearer one behind.
+That is a preference and not a gate — with nothing takeable ahead the ordinary
+nearest body is still offered — so it can never waste a press or let a window
+expire on a refusal. Without it, a real session spent three of five presses in one
+window zipping straight back onto the planet it had just left.
+
+Every hop lands on the **same orbit** — `chargedOrbitR`, an absolute 90px, so the
+height and the lap time are identical on every body. It used to land on the orbit
+the dive would have reached, which measured across 108,000 approach geometries as
+a lottery rather than a gradient: 43% pinned at the minimum and the top quartile
+sat 3–8× above it. A frenzy is a rhythm, and a rhythm needs every beat the same.
+
+While it runs, the sky around the ship becomes a **purple aurora** — wavy curtains
+hung across the field and sweeping down past you as you climb, over a bed of
+overlapping clouds hashed from a world grid. Both are anchored in world space, so
+they parallax with the starfield and you fly through structure rather than
+carrying a lamp. Some lean pink, some deep violet, and the gaps between them stay
+black, which is where the light and dark areas come from. The ship's own glow and arcs build with each body taken, so a chain
+that is going well is visibly hotter than one that is not. The storm does **not**
+fade out: it holds, agitates through the last fifth, and closes on a
+bloom-and-collapse, because an earlier version that dimmed linearly ended the best
+moment in the game without a signal.
+
+Each hop's `+500` pops small — three or four arrive in seven seconds and every one
+is the same number, so they are receipts. When the window closes, the total pops
+large. That total is a **restatement**, not a payment: the points were banked as
+each hop landed, so dying mid-window still keeps every hop you actually made.
+
+A body pays **once per window**. Bouncing on one planet is still legal; it just
+stops paying, because a press-glide-release cycle is about 1.2s and otherwise the
+best line inside a frenzy would be to stand still. And a hop is judged on
+`cap.zipped`, not on the live clock, so a glide begun inside the window still pays
+when it lands after it — the press is the commitment.
+
+The window lives in `SimState`, not in the scorer, and it had to: it grants an
+ability rather than points, and `src/sim/` may not import `src/score/`. See
+PORT_NOTES 49.
+
 **Nothing takes points away.** There was a penalty for rising past a planet you
 could have taken, and it was removed for being too punitive. The pressure to keep
 engaging is still there and comes from `climb` being banked rather than paid:

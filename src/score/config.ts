@@ -60,6 +60,38 @@ export interface ScoreConfig {
    */
   nerveBonus: number;
   /**
+   * Paid for any flyby held through its closest approach, before closeness.
+   *
+   * A flat floor rather than the whole award, because the act being paid for is
+   * committing to the pass at all: pressing on a body you are already too fast to
+   * hold, and staying on it while the brake burns fuel and gravity decides
+   * whether it catches you. What you do with the pass is `flybyCloseBonus`.
+   *
+   * SIZED AGAINST THE STREAK, not against a link. The points are the smaller half
+   * of what a flyby is worth — the larger half is that it steps the ladder, which
+   * is what a fast run could not previously do at all. Measured over the sessions
+   * in `diagnostics/`, an ordinary chained life makes 2.7 unconverted flybys a
+   * minute and a fast one makes upward of 38, so this is paid ~14x more often to
+   * the style it is meant to reward without needing to know which style it is
+   * looking at. Make it much larger and the density stops being a multiplier
+   * story and starts being a faucet.
+   */
+  flybyBase: number;
+  /**
+   * Full bonus for a flyby that shaves the minimum orbit, decaying to zero over
+   * `closeSpan` exactly as a grab's closeness does.
+   *
+   * Closeness and not speed, and that is a measurement rather than a preference.
+   * Speed at closest approach was the obvious axis and discriminates nothing: an
+   * unconverted flyby is unbound BY DEFINITION, so its speed is pinned near
+   * escape velocity — p50 314px/s, p10 149, and 90% of every flyby ever recorded
+   * sits in a band 250px/s wide. Clearance over the same 167 passages runs 0px to
+   * 318px with a median of 60, which is real spread and is a choice the player
+   * makes on the way past. Same reasoning that put grab clearance ahead of
+   * `cap.tightness`.
+   */
+  flybyCloseBonus: number;
+  /**
    * Shaping exponents. The underlying measures are generous ramps — alignment is
    * linear over a full 90 degrees, the boost envelope over ~1.8 seconds — which
    * is right for a gauge you read at a glance and far too soft for a reward.
@@ -173,28 +205,27 @@ export interface ScoreConfig {
    */
   anomalyBonus: number;
   /**
-   * Added to the multiplier while an anomaly bonus is running, ON TOP of
-   * `streakMax` — see `multiplierFor`.
+   * What one hop inside a charged window pays. See `SimConfig.chargedSecs`.
    *
-   * At a maxed streak this is x5 -> x7 for the window's duration, worth roughly
-   * 2500-3000 across the four links it covers. Set against dying and losing a
-   * 16-link streak, that is the arithmetic that has to make going worth it.
+   * FLAT, and the only award in the game that is. Every other one ends in
+   * `raw * multiplier`; this one does not, so an anomaly found on a cold run pays
+   * exactly what one found at x5 pays. That is deliberate: reaching an anomaly is
+   * hard and usually costs the streak on the way out to it, and a reward that
+   * shrank precisely when it was hardest to earn would be the wrong shape.
+   *
+   * It also REPLACES the grab award for the capture it lands on, rather than
+   * adding to it — a hop is one clean number. Nothing about flying well is lost:
+   * the link at the release is untouched and still scores aim, timing and climb
+   * with the full multiplier, so the skill is still paid, just at the other end of
+   * the capture.
+   *
+   * 500 against three hops in a five-second window is ~1500 a frenzy. Sized
+   * against the x2 window this replaced, which was reckoned at 2500-3000 — so an
+   * anomaly is worth somewhat less than it was, and the difference is made up by
+   * where the hops leave you: four planets of altitude is ~280 raw climb banked
+   * into the next link, and climb is paid by the mechanism that already exists.
    */
-  anomalyBonusMult: number;
-  /**
-   * Seconds the bonus runs, starting at the RELEASE from the anomaly.
-   *
-   * From the release and not the grab because converting the flyby, settling and
-   * waiting for a release angle costs 1.5-2s that would otherwise burn a fifth of
-   * the window inside an orbit going nowhere — and would mean holding a tighter,
-   * better orbit actively cost bonus time. Starting at the release makes the
-   * number here the number the player experiences.
-   *
-   * This is a weight, not a constant: it multiplies how many links the bonus is
-   * paid on, so it changes what the bonus is worth and belongs with the rest of
-   * them. See the note on `ScoreConfig` about what does and does not live here.
-   */
-  anomalyBonusSecs: number;
+  hopBonus: number;
 }
 
 /**
@@ -202,24 +233,32 @@ export interface ScoreConfig {
  *
  * The shape of the model, which is the part worth arguing about:
  *
- *   grab = (close + nerve)                       x multiplier   at periapsis
- *   burn = (dead-zone depth, integrated)          x multiplier   when the fire dies
- *   link = (base + climb + timing + aim)          x multiplier   at the release
+ *   grab  = (close + nerve)                      x multiplier   at periapsis
+ *   link  = (base + climb + timing + aim)        x multiplier   at the release
+ *   flyby = (base + close)                       x multiplier   at closest approach
+ *   burn  = (dead-zone depth, integrated)        x multiplier   when the fire dies
  *
- * Three events, because they are settled at different moments and describe
+ * Four events, because they are settled at different moments and describe
  * different acts. The grab is judged on how the ship arrived and pays when the
  * dive swings through the bottom — not at the press, so a tap that never gets
  * there earns nothing and tapping beside a planet is not a faucet. The link is
- * judged on how it left. The burn is judged on a stretch of the ride: how long
- * the ship spent inside the dead zone at the field's edge while hanging off a
- * planet, and how deep it went.
+ * judged on how it left. The flyby is judged on a pass that was never a capture
+ * at all, and pays at the bottom of it for the same reason the grab does.
  *
- * The burn is the only one that accrues rather than being read off an instant,
- * the only one that can pay twice in one capture, and the only one a DEATH can
- * cancel — `endLife` drops the banked flare, so the 78% of edge-drags that end
- * in the wall pay nothing at all. The fire on those is a warning, not an award.
- * Only pulling out alive collects, which is the whole shape of the mechanic: the
- * drama is free and the rescue is what scores.
+ * The flyby's real payload is not in the line above: it steps the streak. Before
+ * it, the ladder counted links, so the only way to reach a large multiplier was to
+ * stop at bodies — and a life measured covering 3.1x the ground per second earned
+ * a fifteenth as much per pixel as a chained one, capped at x2 while the chained
+ * life ran at x5-x7. Speed was already the harder thing to do and was the thing
+ * the score could not see.
+ *
+ * The burn is judged on a stretch of the ride: how long the ship spent inside the
+ * dead zone at the field's edge while hanging off a planet, and how deep it went.
+ * It is the only one that accrues rather than being read off an instant, the only
+ * one that can pay twice in one capture, and the only one a DEATH can cancel —
+ * `endLife` drops the banked flare, so the 78% of edge-drags that end in the wall
+ * pay nothing at all. The fire on those is a warning, not an award. Only pulling
+ * out alive collects: the drama is free and the rescue is what scores.
  *
  * `close` is how near you let the body get before committing to the grab.
  * `cap.tightness` was the obvious candidate and is the wrong one — it saturates
@@ -250,6 +289,8 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   timingBonus: 250,
   aimBonus: 200,
   nerveBonus: 200,
+  flybyBase: 60,
+  flybyCloseBonus: 120,
   aimSharpness: 3,
   timingSharpness: 2,
 
@@ -260,6 +301,5 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   streakStep: 0.25,
   streakMax: 5,
   anomalyBonus: 800,
-  anomalyBonusMult: 2,
-  anomalyBonusSecs: 10,
+  hopBonus: 500,
 } satisfies ScoreConfig);

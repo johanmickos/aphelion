@@ -46,6 +46,15 @@ const LIFE_BURN = 1.7;
  */
 const ROLL = 0.8;
 
+/**
+ * The closing tally of a charged window. Longest-lived thing that floats.
+ *
+ * It arrives as the frenzy ends, when nothing else is coming, and it is the one
+ * number summarising the seven seconds the player just spent — so it is allowed
+ * to hang there and be read.
+ */
+const LIFE_TALLY = 2.2;
+
 /** World units risen over a full life. */
 const RISE = 34;
 /**
@@ -91,6 +100,8 @@ const STACK_GAP = 20;
  */
 const STACK_X = 80;
 
+import { BURN_WORD, HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+
 /**
  * The dark rim that keeps text legible over planets and stars.
  *
@@ -102,8 +113,6 @@ const STACK_X = 80;
  */
 const RIM_WIDTH = 2;
 const RIM = 'rgba(0,0,0,.38)';
-
-import { BURN_WORD, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 function easeOutCubic(u: number): number {
   const k = 1 - u;
@@ -121,6 +130,10 @@ interface Popup {
   shout: string | null;
   /** Seconds the number spends counting up to `points`. 0 shows it at once. */
   roll: number;
+  /** A hop inside a charged window: off the rarity ladder, purple. */
+  hop: boolean;
+  /** The closing tally of a window. Drawn large, and without a `+`. */
+  tally: boolean;
 }
 
 export class Popups {
@@ -154,6 +167,8 @@ export class Popups {
       praise,
       shout: null,
       roll: burning ? ROLL : 0,
+      hop: award.kind === 'hop',
+      tally: false,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -189,7 +204,36 @@ export class Popups {
       life: LIFE_SHOUT,
       points: null,
       praise: null,
+      hop: false,
+      tally: false,
       shout: shout.word,
+      roll: 0,
+    });
+    while (this.live.length > MAX_LIVE) this.live.shift();
+  }
+
+  /**
+   * Raise the closing tally of a charged window.
+   *
+   * Not routed through `spawn`, for the reason `shout` is not: there is no award
+   * behind it. Every point in it was banked as its hop landed, and inventing an
+   * award to carry it would put a number into the score band that the score has
+   * already counted once.
+   *
+   * Lives longer than a popup and rises from higher up, because nothing else is
+   * arriving by then — the window is over — so it has the screen to itself.
+   */
+  tally(points: number, x: number, y: number): void {
+    this.live.push({
+      x,
+      y: y - SPAWN_LIFT * 1.6,
+      t: 0,
+      life: LIFE_TALLY,
+      points,
+      praise: null,
+      hop: false,
+      tally: true,
+      shout: null,
       roll: 0,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
@@ -235,7 +279,9 @@ export class Popups {
         continue;
       }
 
-      const style = p.praise ? LEVEL[p.praise.level] : ROUTINE;
+      // A hop is off the ladder: it pays flat, so there is no quality for a
+      // rarity colour to report. See `HOP` in `accolade.ts`.
+      const style = p.tally ? HOP_TALLY : p.hop ? HOP : p.praise ? LEVEL[p.praise.level] : ROUTINE;
       const burning = p.praise?.category === 'burn';
       // The ember is the WORD's, never the number's.
       const wordColor = burning ? BURN_WORD.color : style.color;
@@ -273,7 +319,10 @@ export class Popups {
       // tally coming to rest instead of a counter that was cut off.
       const shownPoints =
         p.roll > 0 ? Math.round(p.points * easeOutCubic(Math.min(1, p.t / p.roll))) : p.points;
-      const text = `+${formatScore(shownPoints)}`;
+      // The tally is the one thing here that is not a payment — it restates what
+      // the window's hops already banked — so it drops the `+`. A fourth `+500`
+      // arriving as the total of three would read as a fourth award.
+      const text = p.tally ? formatScore(p.points) : `+${formatScore(shownPoints)}`;
       ctx.strokeText(text, x, numY);
       ctx.fillText(text, x, numY);
     }
