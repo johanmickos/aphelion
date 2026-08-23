@@ -275,6 +275,20 @@ the dive would have reached, which measured across 108,000 approach geometries a
 a lottery rather than a gradient: 43% pinned at the minimum and the top quartile
 sat 3–8× above it. A frenzy is a rhythm, and a rhythm needs every beat the same.
 
+While it runs, the sky around the ship becomes a **purple nebula that travels with
+you** — anchored on the ship, not on the screen, so the starfield parallaxes
+through it and it reads as a volume you are inside of rather than a filter over
+the picture. The ship's own glow and arcs build with each body taken, so a chain
+that is going well is visibly hotter than one that is not. The storm does **not**
+fade out: it holds, agitates through the last fifth, and closes on a
+bloom-and-collapse, because an earlier version that dimmed linearly ended the best
+moment in the game without a signal.
+
+Each hop's `+500` pops small — three or four arrive in seven seconds and every one
+is the same number, so they are receipts. When the window closes, the total pops
+large. That total is a **restatement**, not a payment: the points were banked as
+each hop landed, so dying mid-window still keeps every hop you actually made.
+
 A body pays **once per window**. Bouncing on one planet is still legal; it just
 stops paying, because a press-glide-release cycle is about 1.2s and otherwise the
 best line inside a frenzy would be to stand still. And a hop is judged on

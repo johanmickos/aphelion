@@ -2200,6 +2200,36 @@ infrastructure for something that does not exist is the same bet as a knob that
 does nothing. Git remembers note 47 if a pickup ever wants it, and it should be
 rebuilt against whatever the paradigms are then.
 
+**The storm.** While a window runs the sky around the ship becomes a purple
+nebula, anchored on the SHIP and not on the viewport — a screen-space wash is a
+filter laid over the picture, and the starfield parallaxing through a
+ship-anchored gradient is what makes it a volume the ship is inside of. Lightning
+was tried and cut: forked bolts over a moving starfield read as tacky decoration
+and competed with the ship's own arcs, which are the cue that means something.
+
+The first version scaled the whole effect by the window's remaining fraction, so
+it dimmed linearly to nothing and the end of the best moment in the game arrived
+with no signal — reported as "it kind of fizzles". Intensity now HOLDS, the last
+fifth agitates (a faster, deeper pulse without the room getting darker), and the
+close is a bloom-and-collapse that pulls the storm into the ship. The countdown is
+the gauge's job; this one's is atmosphere and an ending. That animation is clocked
+by `Scene`, not by the drawing, because it describes a window that has already
+ended and `chargedFrac` is 0 throughout it.
+
+The ship's glow and arc count build with `hopped.length`, capped at four: past
+that the arcs stop reading as separate discharges and become a fuzzy ring.
+
+**The per-hop number is small and the total is large.** `HOP` dropped to 11px:
+three or four arrive inside seven seconds, on top of whatever else is in the air,
+and at a praise word's size they were the loudest thing on screen for the least
+interesting reason — every one is the same number. They are receipts. The closing
+`Tally` is the headline at 26px, and it is DISPLAY ONLY: every point in it was
+banked as its hop landed. Paying again there would double the window; holding the
+points back until there would mean dying mid-window cost the player everything
+they had already earned. It drops the `+` so a fourth number arriving as the total
+of three does not read as a fourth award, and `endLife` clears the edge so a
+frenzy that ends in a wall gets no consolation total.
+
 **A dev-only anomaly at the bottom of the field.** `anomalyAtSpawn` drags the
 first anomaly level with the opening body so the window can be reached in seconds
 rather than after a minute of climbing. A config key and not an

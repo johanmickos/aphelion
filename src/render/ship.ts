@@ -125,8 +125,22 @@ export function shipPath(ctx: CanvasRenderingContext2D, s: number): void {
  * Fades with the window: the arcs thin out as the time does, so the effect is
  * telling you the same thing the gauge is.
  */
-function drawArcs(ctx: CanvasRenderingContext2D, s: number, tick: number, frac: number): void {
-  const n = 5;
+function drawArcs(
+  ctx: CanvasRenderingContext2D,
+  s: number,
+  tick: number,
+  frac: number,
+  hops: number,
+): void {
+  // The charge builds as the chain does. Each body taken adds arcs and brightness,
+  // so a window that is going well is visibly hotter than one that is not — the
+  // ship reports the streak, which no countdown can.
+  //
+  // Capped, because the effect has to stay legible at the point it matters most:
+  // past about four the arcs stop reading as separate discharges and start
+  // reading as a fuzzy ring.
+  const heat = Math.min(1, hops / 4);
+  const n = 5 + Math.round(heat * 7);
   ctx.lineCap = 'round';
   for (let i = 0; i < n; i++) {
     // A cheap integer hash of (tick, i). The arcs must jump rather than sweep —
@@ -137,7 +151,7 @@ function drawArcs(ctx: CanvasRenderingContext2D, s: number, tick: number, frac: 
     h ^= h >>> 13;
     h = (h * 1274126177) >>> 0;
     const a = ((h >>> 8) / 0x1000000) * Math.PI * 2;
-    const len = (5 + ((h >>> 4) & 7)) * s;
+    const len = (5 + ((h >>> 4) & 7)) * (1 + heat * 0.7) * s;
     const r0 = 6 * s;
     const cosA = Math.cos(a);
     const sinA = Math.sin(a);
@@ -148,8 +162,8 @@ function drawArcs(ctx: CanvasRenderingContext2D, s: number, tick: number, frac: 
     ctx.moveTo(cosA * r0, sinA * r0);
     ctx.lineTo(Math.cos(a + kink) * midR, Math.sin(a + kink) * midR);
     ctx.lineTo(cosA * (r0 + len), sinA * (r0 + len));
-    ctx.strokeStyle = `rgba(214,164,255,${(0.35 + 0.45 * frac).toFixed(3)})`;
-    ctx.lineWidth = 1.1 * s;
+    ctx.strokeStyle = `rgba(214,164,255,${((0.35 + 0.45 * frac) * (0.7 + 0.3 * heat)).toFixed(3)})`;
+    ctx.lineWidth = (1.1 + heat * 0.7) * s;
     ctx.stroke();
   }
 }
@@ -161,7 +175,13 @@ function drawArcs(ctx: CanvasRenderingContext2D, s: number, tick: number, frac: 
  * — where you are burning fuel hard to brake an unbound approach — looked exactly
  * like a normal capture, and the only cue was HUD text.
  */
-export function drawShip(ctx: CanvasRenderingContext2D, cam: Camera, snap: RenderSnapshot): void {
+export function drawShip(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  snap: RenderSnapshot,
+  /** Bodies hopped to in the current charged window. Drives how hot the arcs are. */
+  hops = 0,
+): void {
   const x = toScreenX(cam, snap.x);
   const y = toScreenY(cam, snap.y);
   const ang = Math.atan2(snap.vy, snap.vx);
@@ -173,7 +193,21 @@ export function drawShip(ctx: CanvasRenderingContext2D, cam: Camera, snap: Rende
   // The arcs are drawn before the rotation, in the ship's own frame but unturned:
   // a discharge has no nose, and rotating it made the whole effect appear to spin
   // with the ship every time it swung through a capture.
-  if (snap.chargedFrac > 0) drawArcs(ctx, s, snap.tick, snap.chargedFrac);
+  if (snap.chargedFrac > 0) {
+    // A glow under the arcs, growing with the chain. It is what makes the ramp
+    // visible at a glance — arc COUNT is only countable when you are not flying.
+    const heat = Math.min(1, hops / 4);
+    const r = (10 + heat * 14) * s;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    const a = (0.16 + 0.3 * heat) * snap.chargedFrac;
+    g.addColorStop(0, `rgba(198,150,255,${a.toFixed(3)})`);
+    g.addColorStop(1, 'rgba(168,92,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    drawArcs(ctx, s, snap.tick, snap.chargedFrac, hops);
+  }
   ctx.rotate(ang);
   shipPath(ctx, s);
   ctx.fillStyle = snap.held ? '#fff' : '#cfdcf2';

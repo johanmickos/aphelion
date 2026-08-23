@@ -22,6 +22,14 @@ import { formatScore } from './hud.ts';
 const LIFE = 1.15;
 const LIFE_SUPER = 1.6;
 const LIFE_SHOUT = 1.4;
+/**
+ * The closing tally of a charged window. Longest-lived thing that floats.
+ *
+ * It arrives as the frenzy ends, when nothing else is coming, and it is the one
+ * number summarising the seven seconds the player just spent — so it is allowed
+ * to hang there and be read.
+ */
+const LIFE_TALLY = 2.2;
 
 /** World units risen over a full life. */
 const RISE = 34;
@@ -68,7 +76,7 @@ const STACK_GAP = 20;
  */
 const STACK_X = 80;
 
-import { HOP, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+import { HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 interface Popup {
   x: number;
@@ -81,6 +89,8 @@ interface Popup {
   shout: string | null;
   /** A hop inside a charged window: off the rarity ladder, purple. */
   hop: boolean;
+  /** The closing tally of a window. Drawn large, and without a `+`. */
+  tally: boolean;
 }
 
 export class Popups {
@@ -113,6 +123,7 @@ export class Popups {
       praise,
       shout: null,
       hop: award.kind === 'hop',
+      tally: false,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -149,7 +160,34 @@ export class Popups {
       points: null,
       praise: null,
       hop: false,
+      tally: false,
       shout: shout.word,
+    });
+    while (this.live.length > MAX_LIVE) this.live.shift();
+  }
+
+  /**
+   * Raise the closing tally of a charged window.
+   *
+   * Not routed through `spawn`, for the reason `shout` is not: there is no award
+   * behind it. Every point in it was banked as its hop landed, and inventing an
+   * award to carry it would put a number into the score band that the score has
+   * already counted once.
+   *
+   * Lives longer than a popup and rises from higher up, because nothing else is
+   * arriving by then — the window is over — so it has the screen to itself.
+   */
+  tally(points: number, x: number, y: number): void {
+    this.live.push({
+      x,
+      y: y - SPAWN_LIFT * 1.6,
+      t: 0,
+      life: LIFE_TALLY,
+      points,
+      praise: null,
+      hop: false,
+      tally: true,
+      shout: null,
     });
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
@@ -196,7 +234,7 @@ export class Popups {
 
       // A hop is off the ladder: it pays flat, so there is no quality for a
       // rarity colour to report. See `HOP` in `accolade.ts`.
-      const style = p.hop ? HOP : p.praise ? LEVEL[p.praise.level] : ROUTINE;
+      const style = p.tally ? HOP_TALLY : p.hop ? HOP : p.praise ? LEVEL[p.praise.level] : ROUTINE;
 
       if (p.praise) {
         // A brief overshoot on the way in. Only the top of the ladder gets it —
@@ -220,7 +258,11 @@ export class Popups {
       ctx.lineWidth = 3 * s;
       ctx.strokeStyle = 'rgba(0,0,0,.55)';
       // Always a gain: nothing takes points away.
-      const text = `+${formatScore(p.points)}`;
+      //
+      // The tally is the one thing here that is not a payment — it restates what
+      // the window's hops already banked — so it drops the `+`. A fourth `+500`
+      // arriving as the total of three would read as a fourth award.
+      const text = p.tally ? formatScore(p.points) : `+${formatScore(p.points)}`;
       ctx.strokeText(text, x, numY);
       ctx.fillText(text, x, numY);
     }

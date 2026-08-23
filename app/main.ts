@@ -318,6 +318,12 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       const at = shipWorldPos(state);
       scene.popups.shout(shout, at.x, at.y);
     }
+    // The window's closing tally. Display only — every point in it was banked as
+    // its hop landed, so this restates rather than pays. See `Tally`.
+    if (scored.tally) {
+      const at = shipWorldPos(state);
+      scene.popups.tally(scored.tally.points, at.x, at.y);
+    }
 
     prev = curr;
     curr = captureSnapshot(state, held, sim);

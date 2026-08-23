@@ -86,6 +86,7 @@ export function createScoreState(): ScoreState {
     claimed: [],
     hopped: [],
     wasCharged: false,
+    hopTotal: 0,
   };
 }
 
@@ -139,6 +140,11 @@ function endLife(sc: ScoreState): void {
   // re-grabbing the same body in one flight, not to retire it from the field.
   sc.claimed.length = 0;
   sc.hopped.length = 0;
+  // A death ends the window without a tally. Left set, the falling edge would be
+  // seen on the first tick after the respawn and the player would be shown a
+  // total for a frenzy that ended in a crash.
+  sc.wasCharged = false;
+  sc.hopTotal = 0;
 }
 
 /**
@@ -148,9 +154,28 @@ function endLife(sc: ScoreState): void {
  * ship is being flown and cost nothing — see `src/score/reckless.ts` for why they
  * are not the same thing.
  */
+/**
+ * A charged window closing, and what its hops came to.
+ *
+ * Display only. Every point in it was banked as its hop landed — this restates
+ * the window's total so the small per-hop numbers can be receipts and the finale
+ * can be the headline. It is emphatically NOT a fourth award: paying here as well
+ * would double the window, and holding the points back until here would mean
+ * dying mid-window cost you everything you had already earned.
+ */
+export interface Tally {
+  tick: number;
+  /** Points already paid across this window's hops. */
+  points: number;
+  /** How many bodies were hopped to. */
+  hops: number;
+}
+
 export interface ScoreTick {
   awards: ScoreAward[];
   shouts: Shout[];
+  /** At most one window can close on a tick. */
+  tally: Tally | null;
 }
 
 /**
@@ -171,6 +196,7 @@ export function scoreTick(
 ): ScoreTick {
   const awards: ScoreAward[] = [];
   const shouts: Shout[] = [];
+  let tally: Tally | null = null;
 
   // ---- the ending hold: nothing is scored, and the life is over
   if (state.ending.active) {
@@ -191,7 +217,7 @@ export function scoreTick(
     }
     sc.putterOuts = state.telemetry.putterOuts;
     sc.multiplier = multiplierFor(sc, scfg);
-    return { awards, shouts };
+    return { awards, shouts, tally };
   }
   sc.endingSeen = false;
   if (sc.climbFromY === null) sc.climbFromY = state.highWaterY;
@@ -202,7 +228,15 @@ export function scoreTick(
   // that opened it, so there is one definition of "a window is running" and the
   // scorer is reading it rather than keeping a second copy in step.
   const charged = state.chargedT > 0;
-  if (charged && !sc.wasCharged) sc.hopped.length = 0;
+  if (charged && !sc.wasCharged) {
+    sc.hopped.length = 0;
+    sc.hopTotal = 0;
+  }
+  // The window ran out. Not a death — `endLife` clears `wasCharged`, so a crash
+  // mid-frenzy never reaches here.
+  if (!charged && sc.wasCharged && sc.hopTotal > 0) {
+    tally = { tick: state.tick, points: sc.hopTotal, hops: sc.hopped.length };
+  }
   sc.wasCharged = charged;
 
   // ---- ran dry mid-circularisation: a failure, not a release
@@ -327,7 +361,7 @@ export function scoreTick(
   sc.multiplier = multiplierFor(sc, scfg);
   if (sc.score > sc.best) sc.best = sc.score;
   if (awards.length > 0) sc.lastAward = awards[awards.length - 1]!;
-  return { awards, shouts };
+  return { awards, shouts, tally };
 }
 
 /**
@@ -454,6 +488,7 @@ function awardGrab(
     award.multiplier = 1;
     award.points = scfg.hopBonus;
     sc.score += award.points;
+    sc.hopTotal += award.points;
     sc.grabs++;
     return award;
   }

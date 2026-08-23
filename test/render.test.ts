@@ -258,6 +258,18 @@ describe('scene', () => {
       ticks: 260,
       ship: { x: ANOMALY.x - 300, y: ANOMALY.y - 70, vx: 344, vy: 0 },
     },
+    // A charged window is a whole set of drawing paths nothing else reaches: the
+    // nebula and its lightning, the ship's glow and arcs, the countdown gauge and
+    // the closing tally. Without this scene every one of them is dead code as far
+    // as the suite is concerned.
+    {
+      name: 'charged, hopping',
+      press: 5,
+      release: 200,
+      ticks: 260,
+      ship: { x: ANOMALY.x - 300, y: ANOMALY.y - 70, vx: 344, vy: 0 },
+      charged: true,
+    },
   ];
 
   it.each(SCENES)('$name renders every tick without error', (sc) => {
@@ -274,6 +286,10 @@ describe('scene', () => {
 
     let held = false;
     let drawn = 0;
+    // The ship's glow ramps with how many bodies the window has taken, so the
+    // charged scene has to exercise a non-empty log as well as an empty one.
+    const chargedScore = createScoreState();
+    if (sc.charged) chargedScore.hopped.push('P1', 'P2', 'P3', 'P4', 'P5');
     for (let i = 0; i < sc.ticks; i++) {
       const pressed = i === sc.press;
       const released = i === sc.release;
@@ -281,6 +297,11 @@ describe('scene', () => {
       if (released) held = false;
       stepSim(state, DEFAULT_CONFIG, { held: held || pressed, pressed, released }, FIXED_DT);
 
+      // Force the window on for the charged scene, and let it drain to zero
+      // partway through so the fade-out and the tally both get drawn.
+      if (sc.charged && state.chargedT <= 0 && i < 150) {
+        state.chargedT = DEFAULT_CONFIG.chargedSecs * (1 - i / 200);
+      }
       const snap = captureSnapshot(state, held, DEFAULT_CONFIG);
       scene.trail.sample(snap.x, snap.y);
       centerCamera(c, snap.x, snap.y, f, null);
@@ -293,7 +314,7 @@ describe('scene', () => {
         viewportH: 844,
         headerBottom: 0,
         frameDt: 1 / 60,
-        score: createScoreState(),
+        score: chargedScore,
       });
       drawn++;
 

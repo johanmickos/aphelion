@@ -151,8 +151,17 @@ export interface ScoreState {
    * stops paying, which keeps the ability honest and the points earned.
    */
   hopped: string[];
-  /** Last observed `chargedT`, to edge-detect a window opening. */
+  /** Last observed `chargedT`, to edge-detect a window opening and closing. */
   wasCharged: boolean;
+  /**
+   * Hop points banked in the current charged window, for the closing tally.
+   *
+   * A running sum of points ALREADY PAID, never a pot waiting to be paid. Hops
+   * bank as they land, so a death mid-window keeps every one the player actually
+   * landed; the tally at the end is a receipt, not a payment. Cleared with the
+   * window and by `endLife`.
+   */
+  hopTotal: number;
   /**
    * Consecutive captures that were flown recklessly. See `src/score/reckless.ts`.
    *

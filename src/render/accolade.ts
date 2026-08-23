@@ -75,7 +75,25 @@ export const ROUTINE: AccoladeStyle = {
 export const HOP: AccoladeStyle = {
   color: '#a85cff',
   labelColor: 'rgba(168,124,220,.85)',
-  size: 15,
+  // Small on purpose, and smaller than anything else that floats. Three or four
+  // of these arrive inside seven seconds, on top of whatever else is in the air:
+  // at a praise word's size they were the loudest thing on screen during the
+  // busiest moment in the game, for the least interesting reason — every one is
+  // the same number. They are receipts. `HOP_TALLY` is the headline.
+  size: 11,
+};
+
+/**
+ * The closing tally of a charged window — see `Tally` in `src/score/score.ts`.
+ *
+ * The same purple, deliberately: it is the same channel, summing the same events,
+ * and a second hue would imply a second kind of thing happened. What separates it
+ * is size, which is the one dimension the small per-hop numbers left free.
+ */
+export const HOP_TALLY: AccoladeStyle = {
+  color: '#c89aff',
+  labelColor: 'rgba(200,154,255,.9)',
+  size: 26,
 };
 
 /**

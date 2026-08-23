@@ -13,7 +13,7 @@ import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { grabTarget } from '../src/sim/capture.ts';
 import { createBodies } from '../src/sim/world.ts';
-import type { ScoreAward, ScoreState } from '../src/score/index.ts';
+import type { ScoreAward, ScoreState, Tally } from '../src/score/index.ts';
 import { DEFAULT_SCORE_CONFIG, createScoreState, scoreTick } from '../src/score/index.ts';
 
 const ANOMALY = createBodies(DEFAULT_CONFIG).find((b) => b.kind === 'anomaly' && b.x > 195)!;
@@ -35,6 +35,7 @@ const EDGES = new Map<number, 0 | 1>([
 interface Flight {
   score: ScoreState;
   awards: ScoreAward[];
+  tallies: Tally[];
   /** Was the capture opened by the second press a zip? */
   secondZipped: boolean;
   /** Seconds on the window the tick after the anomaly release. */
@@ -51,6 +52,7 @@ function fly(
   Object.assign(state.ship, { x: ANOMALY.x - 520, y: ANOMALY.y - 70, vx: 320, vy: 0 });
   const sc = createScoreState();
   const awards: ScoreAward[] = [];
+  const tallies: Tally[] = [];
   let held = false;
   let secondZipped = false;
   let openedWith = 0;
@@ -70,9 +72,11 @@ function fly(
     if (!charged && wasCharged) closedAtTick = t;
     wasCharged = charged;
     hook?.(t, state, sc);
-    awards.push(...scoreTick(sc, state, cfg).awards);
+    const out = scoreTick(sc, state, cfg);
+    awards.push(...out.awards);
+    if (out.tally) tallies.push(out.tally);
   }
-  return { score: sc, awards, secondZipped, openedWith, closedAtTick };
+  return { score: sc, awards, tallies, secondZipped, openedWith, closedAtTick };
 }
 
 const hops = (f: Flight) => f.awards.filter((a) => a.kind === 'hop');
@@ -368,6 +372,105 @@ describe('the orbit a hop lands on', () => {
     const r = zipRadius(cfg, 1.1, 300, 0.6);
     expect(r).not.toBeNull();
     expect(r!).toBeGreaterThan(10);
+  });
+});
+
+describe('the closing tally', () => {
+  /**
+   * A window about to expire over a ship that will survive it.
+   *
+   * Constructed rather than flown: the flight above dies before its window runs
+   * out, so an expiry cannot be observed on it — and a test that quietly measured
+   * the crash instead would pass for the wrong reason.
+   */
+  function expire(hopTotal: number, hopped: string[]) {
+    const state = createInitialState(DEFAULT_CONFIG);
+    const sc = createScoreState();
+    state.ship.vx = 0;
+    state.ship.vy = -DEFAULT_CONFIG.cruise;
+    state.chargedT = 0.05;
+    sc.wasCharged = true;
+    sc.hopTotal = hopTotal;
+    sc.hopped.push(...hopped);
+    sc.score = 4242;
+    const tallies: Tally[] = [];
+    for (let t = 0; t < 30; t++) {
+      stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
+      const out = scoreTick(sc, state, DEFAULT_CONFIG);
+      if (out.tally) tallies.push(out.tally);
+    }
+    expect(state.ending.active, 'the ship died before the window expired').toBe(false);
+    return { sc, tallies };
+  }
+
+  it('reports the window total when the timer runs out', () => {
+    const { tallies } = expire(1500, ['P1', 'P2', 'P3']);
+    expect(tallies).toHaveLength(1);
+    expect(tallies[0]!.points).toBe(1500);
+    expect(tallies[0]!.hops).toBe(3);
+  });
+
+  it('restates points already banked, and pays nothing itself', () => {
+    // Display only. Paying here as well would double the window; holding the
+    // points back until here would mean dying mid-window cost the player
+    // everything they had already earned.
+    const { sc, tallies } = expire(1500, ['P1', 'P2', 'P3']);
+    expect(tallies).toHaveLength(1);
+    expect(sc.score, 'the tally moved the score').toBe(4242);
+  });
+
+  it('fires once, not on every tick after the window', () => {
+    const { tallies } = expire(1500, ['P1']);
+    expect(tallies).toHaveLength(1);
+  });
+
+  it('is the sum of the hops actually paid, in a real window', () => {
+    // The integration half: whatever the flight manages, the running total must
+    // equal what the hop awards came to.
+    const f = fly(DEFAULT_CONFIG, 700);
+    const paid = hops(f).reduce((n, a) => n + a.points, 0);
+    expect(paid).toBeGreaterThan(0);
+    // `hopTotal` is cleared by the death that ends this flight, so it is sampled
+    // while the window is still running.
+    let during = 0;
+    fly(DEFAULT_CONFIG, 700, (t, _state, sc) => {
+      if (t === 400) during = sc.hopTotal;
+    });
+    expect(during).toBe(paid);
+  });
+
+  it('says nothing when the window ends in a crash', () => {
+    // A total for a frenzy that ended in a wall is a consolation prize nobody
+    // asked for. `endLife` clears the edge so the falling edge is never seen.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const sc = createScoreState();
+    state.chargedT = DEFAULT_CONFIG.chargedSecs;
+    sc.wasCharged = true;
+    sc.hopTotal = 1500;
+    sc.hopped.push('P1', 'P2', 'P3');
+    // Straight down past the trailing floor.
+    Object.assign(state.ship, { x: 190, y: 4000, vx: 0, vy: 600 });
+    state.highWaterY = -4000;
+    let tallies = 0;
+    for (let t = 0; t < 200; t++) {
+      stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
+      if (scoreTick(sc, state, DEFAULT_CONFIG).tally) tallies++;
+    }
+    expect(state.chargedT).toBe(0);
+    expect(tallies).toBe(0);
+  });
+
+  it('says nothing for a window in which nothing was hopped', () => {
+    const state = createInitialState(DEFAULT_CONFIG);
+    const sc = createScoreState();
+    state.chargedT = 0.05;
+    let tallies = 0;
+    for (let t = 0; t < 30; t++) {
+      stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
+      if (scoreTick(sc, state, DEFAULT_CONFIG).tally) tallies++;
+    }
+    expect(state.chargedT).toBe(0);
+    expect(tallies).toBe(0);
   });
 });
 
