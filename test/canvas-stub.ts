@@ -29,6 +29,19 @@ export function recordingContext(): RecordingContext {
           return gradient;
         };
       if (k === 'canvas') return { width: 0, height: 0 };
+      // A real browser throws a TypeError when `drawImage` is handed anything
+      // that is not a CanvasImageSource. Reproduced deliberately: a blanket
+      // `as unknown as CanvasImageSource` once let a CONTEXT be passed here, and
+      // because this stub accepted it, the suite stayed green while the phone
+      // aborted its whole scene draw and rendered a blank purple screen.
+      if (k === 'drawImage')
+        return (src: unknown, ...a: unknown[]) => {
+          const w = (src as { width?: unknown } | null)?.width;
+          if (typeof w !== 'number') {
+            throw new TypeError('drawImage: argument 1 is not a CanvasImageSource');
+          }
+          ops.push(['drawImage', src, ...a]);
+        };
       if (k in t) return t[k];
       return (...a: unknown[]) => {
         ops.push([k, ...a]);

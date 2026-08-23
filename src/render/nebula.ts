@@ -371,10 +371,17 @@ export class Nebula {
       }
     }
 
-    if (!buf || !drew) return;
+    if (!buf || !drew || !this.buf) return;
     // Up to full size, smoothed. This is where the blur happens.
+    //
+    // `this.buf` and NOT the context that was drawn into. Passing the context
+    // throws a TypeError, which aborts the whole scene draw before the starfield,
+    // the bodies or the ship are reached — the screen keeps the black fill and
+    // the sky wash and nothing else, which is what "everything goes purple and
+    // all the objects disappear" looks like from the outside. A blanket cast on
+    // the argument is what let it compile.
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(buf as unknown as CanvasImageSource, 0, 0, viewportW, viewportH);
+    ctx.drawImage(this.buf as unknown as CanvasImageSource, 0, 0, viewportW, viewportH);
   }
 }

@@ -2248,7 +2248,25 @@ applied once per curtain rather than once per frame.
 The buffer is injectable, and `test/render.test.ts` supplies one. Without that the
 suite finds no `document`, takes the hard-stroke fallback, and covers a renderer
 that never ships; the charged scene now asserts that a composite actually
-happened. The wave is two summed sines of different periods, because
+happened.
+
+**It shipped broken once, and the cast is why.** `this.target()` returns the
+buffer's CONTEXT, and the composite was written as
+`ctx.drawImage(buf as unknown as CanvasImageSource, …)` — passing the context
+rather than the canvas. A browser throws a `TypeError` for that, which aborted
+`Scene.draw` before the starfield, the bodies or the ship were reached, leaving
+the black fill and the sky wash and nothing else. Reported from a phone as "the
+whole screen goes purple when I release from the anomaly, all other objects
+disappear, ship and planets and all" — which is exactly what a half-finished
+scene draw looks like from the outside, and reads nothing like a type error.
+
+Two things let it through. The blanket cast turned the one argument the compiler
+could have checked into `unknown`, and the recording stub in `test/canvas-stub.ts`
+accepted any argument to `drawImage`, so 446 tests stayed green. The stub now
+throws on anything without a numeric `width`, the way a browser does — verified by
+reintroducing the bug and watching the charged scene fail with the same
+`TypeError`. A cast that silences the compiler needs a runtime check standing
+behind it, or it is just a way of not being told. The wave is two summed sines of different periods, because
 one reads as a drawn ripple and two look blown.
 
 Intensity went up with it — roughly a third across the sky floor, the clouds and
