@@ -224,9 +224,14 @@ export class Popups {
       }
 
       const style = p.praise ? LEVEL[p.praise.level] : ROUTINE;
-      // Only the word, and only for a burn. The number keeps the ladder below, so
-      // the ember says WHAT and the ladder still says how good — see `BURN_WORD`.
-      const wordColor = p.praise?.category === 'burn' ? BURN_WORD.color : style.color;
+      const burning = p.praise?.category === 'burn';
+      // The ember is the WORD's, never the number's.
+      const wordColor = burning ? BURN_WORD.color : style.color;
+      // And a burn's number is always the default grey, whether or not it earned a
+      // word. Letting it take a ladder colour meant a drag that scored well turned
+      // BLUE next to an orange word — two hues on one two-line popup, neither of
+      // them fire. Size still climbs with the rung, so how good it was is not lost.
+      const numberColor = burning ? ROUTINE.color : style.color;
 
       if (p.praise) {
         // A brief overshoot on the way in. Only the top of the ladder gets it —
@@ -246,7 +251,7 @@ export class Popups {
       if (p.points === null) continue;
       const numY = y + (p.praise ? style.size + 2 : 0) * s;
       ctx.font = `600 ${(p.praise ? style.size - 2 : style.size) * s}px ui-monospace, monospace`;
-      ctx.fillStyle = style.color;
+      ctx.fillStyle = numberColor;
       ctx.lineWidth = 3 * s;
       ctx.strokeStyle = 'rgba(0,0,0,.55)';
       // Always a gain: nothing takes points away.

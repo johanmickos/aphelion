@@ -19,10 +19,16 @@
  * because it says so — see `WORDS` in `src/score/praise.ts`.
  *
  * The ladder is the rarity convention — grey, blue, green, gold — because it
- * arrives already learned from a hundred other games. Measured, the closest pair
- * anywhere in this set is dE 41, against 25 before; and L* climbs 43 -> 66 -> 77
- * -> 87, so the order survives for a player who cannot separate the hues. Size
- * climbs with it for the same reason.
+ * arrives already learned from a hundred other games. L* climbs 53 -> 66 -> 77 ->
+ * 87, so the order survives for a player who cannot separate the hues, and the
+ * rungs are 13, 11 and 10 apart — the widest gap is the one at the bottom, where
+ * the commonest award has to be told from the next one up. Size climbs with it for
+ * the same reason.
+ *
+ * The closest pair is `ROUTINE` vs `good` at dE 36. It was 41 until the grey was
+ * lightened; the ladder gave up 5 dE of hue separation to buy 1.7 stops of
+ * contrast on the thing the player reads most often, which is a good trade and not
+ * one to repeat.
  */
 import type { PraiseLevel } from '../score/index.ts';
 
@@ -45,12 +51,17 @@ export const LEVEL: Record<PraiseLevel, AccoladeStyle> = {
  * Points with no word.
  *
  * Deliberately the dimmest thing that floats: a routine grab is worth noting and
- * not worth celebrating, and the old value sat 25 dE from the superlative, which
+ * not worth celebrating, and an older value sat 25 dE from the superlative, which
  * made the rarest award in the game look like the commonest event in it.
+ *
+ * Dimmest is not the same as dim. At `#5f6673` this was 3.6:1 against the
+ * starfield — the least legible text in the game, and the one shown most often,
+ * which is the wrong way round. `#78808f` is 5.3:1 and still the dimmest rung by a
+ * wide margin: the next one up, `good`, is 7.9:1.
  */
 export const ROUTINE: AccoladeStyle = {
-  color: '#5f6673',
-  labelColor: 'rgba(95,102,115,.85)',
+  color: '#78808f',
+  labelColor: 'rgba(125,133,148,.85)',
   size: 13,
 };
 
@@ -73,15 +84,15 @@ export const ROUTINE: AccoladeStyle = {
  * times — see PORT_NOTES 51. What went wrong there was colouring the number too,
  * which spent the "how good" channel on a fact the flame was already shouting.
  *
- * DARK, and dark is affordable. Measured against the starfield this is 4.0:1,
- * which is BETTER than the `ROUTINE` grey it sits above at 3.6:1 — so the ember
- * reads as dim without being less legible than what the game already asks people
- * to read. Over the hazard band (`rgba(255,70,90,.22)` on black) it holds 3.2:1,
- * and the black rim on the popup carries it the rest of the way.
+ * EMBER, NOT BRICK. This was `#c04018` first, which is dark and low in orange —
+ * G/R 0.33 — and reads as ketchup rather than as fire. `#d9601f` lifts both: G/R
+ * 0.44, L* 46 -> 55, contrast 4.0:1 -> 5.6:1 against the starfield. Still deep
+ * enough to be an ember rather than a highlight, and now unmistakably on the
+ * orange side of red, which is where flame lives and where dried blood does not.
  */
 export const BURN_WORD: AccoladeStyle = {
-  color: '#c04018',
-  labelColor: '#8f2d12',
+  color: '#d9601f',
+  labelColor: '#a8461a',
   size: 15,
 };
 

@@ -142,8 +142,10 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     detail: `${a.body}  PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
   }),
-  burn: (a, p) => ({
-    style: p ? LEVEL[p.level] : ROUTINE,
+  burn: (a) => ({
+    // Always the default grey, word or not — the same rule the popup follows. A
+    // burn's colour lives entirely in its word; the number is deliberately quiet.
+    style: ROUTINE,
     // The peak, which is what the word was chosen on — reporting the integral
     // here would caption a word the number does not explain.
     detail: `${a.body}  BURN · HEAT ${pct(a.heat)}`,

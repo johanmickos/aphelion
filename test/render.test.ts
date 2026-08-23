@@ -723,14 +723,16 @@ describe('floating score popups', () => {
     expect(shown()).toBe(200);
   });
 
-  it('burns the WORD in ember while the number keeps the ladder', () => {
+  it('burns the WORD in ember and leaves the number the default grey', () => {
     // The narrow exception in `accolade.ts`: SINGED / SCORCHED / INFERNO name a
     // thing that has a colour, and ladder blue is the one case where the ladder
-    // fights the word it is colouring. The number is untouched, so "how good was
-    // that" is still answered where it is answered for every other award.
+    // fights the word it is colouring.
     //
-    // Two whole red channels for the burn were tried and reverted before this
-    // (PORT_NOTES 51); what went wrong both times was colouring the number too.
+    // The number does NOT follow it, and does not follow the ladder either. This
+    // assertion wanted `LEVEL.great` for one build, and the ladder is exactly what
+    // went wrong: a drag that scored well turned the number BLUE beside an orange
+    // word — two hues on one two-line popup, neither of them fire. Grey always,
+    // with size still climbing the rung, so how good it was is not lost.
     const p = new Popups();
     // heat 0.8 clears BURN.tier2, so this one earns a word.
     p.spawn(award({ kind: 'burn' as const, points: 180, heat: 0.8 }), 195, 0);
@@ -738,8 +740,9 @@ describe('floating score popups', () => {
     p.draw(r.ctx, cam());
     const fills = r.calls('=fillStyle').map((o) => String(o[1]));
     expect(fills).toContain(BURN_WORD.color);
-    // The number is on the ladder, not the ember.
-    expect(fills).toContain(LEVEL.great.color);
+    expect(fills).toContain(ROUTINE.color);
+    expect(fills).not.toContain(LEVEL.great.color);
+    expect(fills).not.toContain(LEVEL.good.color);
 
     const words = texts(r).filter((t) => !t.startsWith('+'));
     expect(WORDS.burn.flat()).toContain(words[0]);

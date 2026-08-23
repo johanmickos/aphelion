@@ -2309,16 +2309,40 @@ about fire — the vocabulary names a thing that has a colour — and ladder blu
 the one case where the ladder actively fights the word it is colouring. Nothing
 has to be learned; the player is reading the word FIRE while the ship is on fire.
 
-Dark turns out to be affordable, which was the surprise. Measured against the
-starfield the ember is 4.0:1, BETTER than the `ROUTINE` grey it sits above at
-3.6:1 — the game already asks people to read something dimmer than this. Over the
-hazard band it holds 3.2:1 and the popup's black rim carries the rest.
+Two corrections came out of looking at it on a phone.
+
+**Ember, not brick.** `#c04018` was the first pick and it reads as ketchup: dark,
+and low in orange at G/R 0.33. `#d9601f` lifts both — G/R 0.44, L* 46 -> 55,
+contrast 4.0:1 -> 5.6:1 — which keeps it an ember rather than a highlight while
+putting it unmistakably on the orange side of red, where flame lives and dried
+blood does not.
+
+**The number is grey, always.** It followed the rarity ladder at first, so a drag
+that scored well turned the number BLUE next to an orange word: two hues on one
+two-line popup, neither of them fire. A burn's colour now lives entirely in its
+word, and size still climbs the rung, so how good it was is not lost.
+
+**And the default grey was too dark to be the default.** `ROUTINE` sat at 3.6:1
+against the starfield — the least legible text in the game, and the one shown most
+often, which is the wrong way round. `#78808f` is 5.3:1 and still the dimmest rung
+by a wide margin, `good` being 7.9:1. The ladder gave up 5 dE of hue separation
+for it — `ROUTINE` vs `good` goes 41 -> 36, which makes it the closest pair in the
+table — and 1.7 stops of contrast on the most-read text is worth that once. L*
+still climbs 53 -> 66 -> 77 -> 87, with the widest gap at the bottom where the
+commonest award has to be told from the next one up.
 
 It costs one piece of awkwardness worth knowing about: the score band draws points,
 multiplier and word as a single centred string, so a burn has to lay out two runs
 from the left edge of the pair to keep them centred as a unit. `test/render.test.ts`
 pins that, because if it drifts the band and the popup are back to answering the
 same question in two different colours.
+
+An industrial treatment for the word was tried on top of all this and reverted
+immediately — 700-weight, an ember glow, and the same corner brackets the LOST box
+uses, on the theory that the burn is the other moment the ship's computer would
+have something to say. It was too much decoration on a word that is already the
+loudest thing in the frame while a ship is on fire beside it. Plain text, fire
+colour.
 
 One thing from the attempt was kept, because it was a separate request that
 happened to arrive in the same breath:
