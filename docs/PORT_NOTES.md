@@ -2201,17 +2201,37 @@ does nothing. Git remembers note 47 if a pickup ever wants it, and it should be
 rebuilt against whatever the paradigms are then.
 
 **The storm.** While a window runs the sky around the ship becomes a purple
-nebula, anchored on the SHIP and not on the viewport — a screen-space wash is a
-filter laid over the picture, and the starfield parallaxing through a
-ship-anchored gradient is what makes it a volume the ship is inside of. Lightning
-was tried and cut: forked bolts over a moving starfield read as tacky decoration
-and competed with the ship's own arcs, which are the cue that means something.
+nebula. Lightning was tried and cut: forked bolts over a moving starfield read as
+tacky decoration and competed with the ship's own arcs, which are the cue that
+means something.
+
+It went through three shapes. A screen-space wash was a filter laid over the
+picture and read as the game changing its mind about the palette. A single radial
+gradient centred on the ship fixed that and was completely dead — the same smooth
+blob at every moment, with no structure to move past, so flying through it felt
+like carrying a lamp. What is there now is a field of overlapping clouds hashed
+from a coarse WORLD grid: they parallax with the starfield, they differ from one
+another in size and in how far they lean pink against deep violet, and the gaps
+between them stay near black, which is where the light and dark areas come from.
+Nothing darkens anything — the sky underneath is already black, so a dark area is
+simply a place no cloud is lighting. The ship is always inside the storm because
+cells are drawn around wherever it is; WHICH cloud it is inside changes as it
+flies.
+
+Off-screen clouds are culled before a gradient is touched. `REACH` is 760 world
+units in every direction and the viewport is a tall narrow slice of that, so most
+of the grid is behind the camera's back — measured, the cull takes a frame from
+about 29 gradient fills to a mean of 11 and a worst case of 16, and each one that
+survives costs up to a full-viewport alpha blend.
 
 The first version scaled the whole effect by the window's remaining fraction, so
 it dimmed linearly to nothing and the end of the best moment in the game arrived
 with no signal — reported as "it kind of fizzles". Intensity now HOLDS, the last
 fifth agitates (a faster, deeper pulse without the room getting darker), and the
-close is a bloom-and-collapse that pulls the storm into the ship. The countdown is
+close is a bloom-and-collapse that pulls the storm into the ship. The collapse is
+cubic over 1.05s rather than linear over 0.5s: asked for as "a hair longer, so it
+exhales", and the shape matters as much as the length — the length belongs in the
+release, not the attack, so the bloom stayed brief. The countdown is
 the gauge's job; this one's is atmosphere and an ending. That animation is clocked
 by `Scene`, not by the drawing, because it describes a window that has already
 ended and `chargedFrac` is 0 throughout it.

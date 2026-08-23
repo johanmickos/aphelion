@@ -275,10 +275,11 @@ the dive would have reached, which measured across 108,000 approach geometries a
 a lottery rather than a gradient: 43% pinned at the minimum and the top quartile
 sat 3–8× above it. A frenzy is a rhythm, and a rhythm needs every beat the same.
 
-While it runs, the sky around the ship becomes a **purple nebula that travels with
-you** — anchored on the ship, not on the screen, so the starfield parallaxes
-through it and it reads as a volume you are inside of rather than a filter over
-the picture. The ship's own glow and arcs build with each body taken, so a chain
+While it runs, the sky around the ship becomes a **purple nebula** — a field of
+overlapping clouds hashed from a world grid, so they parallax with the starfield
+and you fly through structure rather than carrying a lamp. Some lean pink, some
+deep violet, and the gaps between them stay black, which is where the light and
+dark areas come from. The ship's own glow and arcs build with each body taken, so a chain
 that is going well is visibly hotter than one that is not. The storm does **not**
 fade out: it holds, agitates through the last fifth, and closes on a
 bloom-and-collapse, because an earlier version that dimmed linearly ended the best
