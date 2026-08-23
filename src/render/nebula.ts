@@ -41,6 +41,17 @@ const REACH = 760;
 const CELL = 300;
 
 /**
+ * World spacing between aurora curtains.
+ *
+ * The clouds give the storm volume but no direction, and a field of soft blobs
+ * reads as fog rather than as an aurora — reported as "I don't really see any
+ * northern lights effects". These are the northern lights: long wavy ribbons
+ * hung across the field, anchored in world y so they sweep past as the ship
+ * climbs.
+ */
+const BAND = 320;
+
+/**
  * Seconds the closing bloom-and-collapse runs for.
  *
  * Long enough to exhale rather than snap: at 0.5 the collapse read as the effect
@@ -116,7 +127,7 @@ export function drawNebula(
   // A floor of colour across the sky, so the clouds have no hard edge where they
   // run out. Deliberately faint — the structure is the point, and a strong flat
   // layer under it is what made the first version read as a filter.
-  const skyA = Math.min(0.4, (0.05 + 0.02 * pulse) * strength);
+  const skyA = Math.min(0.4, (0.1 + 0.035 * pulse) * strength);
   ctx.fillStyle = `rgba(58,18,104,${skyA.toFixed(3)})`;
   ctx.fillRect(0, 0, viewportW, viewportH);
 
@@ -162,7 +173,7 @@ export function drawNebula(
       // Clouds overlap, and alpha compositing stacks: four at 0.13 reach about
       // 0.40 together, which is where the densest part of the field lands. The cap
       // is what stops the outro's bloom turning the screen into a flat sheet.
-      const a = Math.min(0.42, 0.13 * near * near * own * strength * (0.7 + 0.5 * pink));
+      const a = Math.min(0.46, 0.24 * near * near * own * strength * (0.7 + 0.5 * pink));
       if (a < 0.004) continue;
 
       const px = toScreenX(cam, wx);
@@ -182,5 +193,96 @@ export function drawNebula(
     }
   }
 
+  drawCurtains(ctx, cam, snap, t, viewportH, strength, swell);
+
   ctx.restore();
+}
+
+/**
+ * The northern lights: wavy curtains hung across the field.
+ *
+ * Drawn as a stack of strokes of decreasing width and increasing alpha rather
+ * than as a blurred shape — `ctx.filter` is expensive and inconsistent across
+ * engines, and three strokes give the same soft-edged glow for a fraction of the
+ * cost. The widest pass is the haze, the narrowest is the bright spine.
+ *
+ * Anchored on world y and drifting in x, so a curtain sweeps down past the ship
+ * as it climbs and never sits still on the screen. The wave is two summed sines
+ * of different periods, because a single one reads as a drawn ripple; two make it
+ * look like it is being blown.
+ */
+function drawCurtains(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  snap: RenderSnapshot,
+  t: number,
+  viewportH: number,
+  strength: number,
+  swell: number,
+): void {
+  const s = cam.scale;
+  const b0 = Math.floor((snap.y - REACH) / BAND);
+  const b1 = Math.floor((snap.y + REACH) / BAND);
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (let bi = b0; bi <= b1; bi++) {
+    const h = hash(bi, 0x51ed);
+    // Gaps between curtains, so they arrive rather than parade.
+    if (unit(h, 24) > 0.78) continue;
+
+    const baseY = (bi + 0.2 + unit(h, 0) * 0.6) * BAND;
+    const near = 1 - Math.min(1, Math.abs(baseY - snap.y) / REACH);
+    if (near <= 0.02) continue;
+
+    const amp = (40 + unit(h, 4) * 90) * swell;
+    const wave = 260 + unit(h, 8) * 320;
+    const drift = t * (14 + unit(h, 12) * 22) * (unit(h, 20) < 0.5 ? -1 : 1);
+    const pink = unit(h, 16);
+    const r = Math.round(112 + 130 * pink);
+    const g = Math.round(30 + 42 * pink);
+    const b = Math.round(186 + 56 * pink);
+
+    // Enough span to cross the widest field with room to spare, in world units.
+    const halfSpan = 900;
+    const step = 60;
+    const y = (wx: number): number =>
+      baseY +
+      Math.sin((wx + drift) / wave) * amp +
+      Math.sin((wx - drift * 0.6) / (wave * 0.43)) * amp * 0.35;
+
+    ctx.beginPath();
+    let first = true;
+    for (let wx = snap.x - halfSpan; wx <= snap.x + halfSpan; wx += step) {
+      const px = toScreenX(cam, wx);
+      const py = toScreenY(cam, y(wx));
+      if (first) {
+        ctx.moveTo(px, py);
+        first = false;
+      } else {
+        ctx.lineTo(px, py);
+      }
+    }
+
+    // Vertical cull: a curtain whose whole band is off-screen still costs three
+    // wide strokes, and most bands in range are above or below the viewport.
+    const mid = toScreenY(cam, baseY);
+    const reachPx = (amp + 90) * s;
+    if (mid + reachPx < 0 || mid - reachPx > viewportH) continue;
+
+    const lit = near * near * strength;
+    const passes: ReadonlyArray<readonly [number, number]> = [
+      [86, 0.07],
+      [44, 0.1],
+      [16, 0.16],
+    ];
+    for (const [w, a] of passes) {
+      const alpha = Math.min(0.5, a * lit);
+      if (alpha < 0.004) continue;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+      ctx.lineWidth = w * s * swell;
+      ctx.stroke();
+    }
+  }
 }

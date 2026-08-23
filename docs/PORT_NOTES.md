@@ -2218,11 +2218,27 @@ simply a place no cloud is lighting. The ship is always inside the storm because
 cells are drawn around wherever it is; WHICH cloud it is inside changes as it
 flies.
 
+**And then it had no direction.** A field of soft blobs reads as fog: reported as
+"I don't really see any northern lights effects and I can't quite discern the
+purple". So the clouds were demoted to texture and the aurora proper was added on
+top — long wavy curtains anchored on world y, sweeping down past the ship as it
+climbs. Each is drawn as a stack of three strokes of decreasing width and
+increasing alpha rather than as a blurred shape: `ctx.filter` is expensive and
+inconsistent across engines, and three strokes give the same soft-edged glow for a
+fraction of the cost. The wave is two summed sines of different periods, because
+one reads as a drawn ripple and two look blown.
+
+Intensity went up with it — roughly a third across the sky floor, the clouds and
+the curtain spine. The first pass at "less intense" had overcorrected to the point
+where the effect was hard to see at all.
+
 Off-screen clouds are culled before a gradient is touched. `REACH` is 760 world
 units in every direction and the viewport is a tall narrow slice of that, so most
 of the grid is behind the camera's back — measured, the cull takes a frame from
-about 29 gradient fills to a mean of 11 and a worst case of 16, and each one that
-survives costs up to a full-viewport alpha blend.
+about 29 gradient fills to a mean of 12 and a worst case of 14, and each one that
+survives costs up to a full-viewport alpha blend. Curtains are culled vertically
+for the same reason, and add a mean of 10 strokes — about 3.3 curtains on screen
+at once.
 
 The first version scaled the whole effect by the window's remaining fraction, so
 it dimmed linearly to nothing and the end of the best moment in the game arrived
