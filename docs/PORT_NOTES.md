@@ -2179,6 +2179,72 @@ gate stayed at exactly zero, and no golden was recaptured.
 
 ---
 
+### 50 — The fire moved to the wall
+
+`src/score/burn.ts` · **[CHANGED]** · "I only want the flames to show up when the
+ship is along the left or right edge near the red dead zone... like they're
+dragging through, barely hanging on to a distant planet to rescue them from
+explosion"
+
+Note 49's burn fired on a fast, low periapsis pass — an atmosphere model. It looked
+right and fired at the wrong moment. The trigger is now three conditions at once:
+
+1. inside the red band at the field's left or right edge
+2. CAPTURED — hanging off a planet rather than drifting
+3. not sheltered by an anomaly bubble
+
+Each clause is half of the sentence being dramatised. Without (2) there is nothing
+holding you: a ship drifting through the band is not barely hanging on, it is
+simply about to die, and **11018 ticks** of the corpus are exactly that. (3) is
+not in the brief and belongs anyway — a bubble SUSPENDS the side boundary, so
+inside one there is no wall to be saved from, and burning there would promise a
+danger the simulation has explicitly switched off (**3106 ticks**).
+
+Heat is depth into the band, 0 at its inner edge and 1 at the lethal line, so the
+flame tracks the red gradient the player can already see. `burnEdgeSpan` and
+`RenderConfig.hazardZoneWidth` are the same 60px and `test/score.test.ts` pins
+them together, because `src/score/` may not import `src/render/` and nothing else
+could hold them in step.
+
+**This is a far better fit than the old trigger, and the durations are why.**
+Measured over 58 sessions: 147 drags, 2.5 per session, 4.7% of all captured time.
+Median **0.42s**, p90 0.87s, longest 1.45s — four to ten times a periapsis flare,
+which is what finally makes "the points roll up while the ship is burning" a thing
+that can literally happen rather than a readout outliving a 0.17s flash.
+
+**78% of them end in death, and that is the mechanic rather than a flaw.** A death
+drops the whole banked flare (`endLife`), so a drag into the wall pays exactly
+nothing: the fire on those is a warning. Only the 22% that pull out alive collect.
+The drama is free; the rescue is what scores. No code was needed for this — it
+falls out of the bank being cleared by a death — but it is the reason the burn is
+the only award a death can cancel.
+
+That split also decided the word thresholds. Calibrating peak depth over all 147
+would be useless: the 114 that die all reach the line, so peak reads **1.00 at
+every percentile from p10 up**. The axis only has spread inside the population
+that can be praised — survivors run p25 0.27, p50 0.44, p70 0.57, p90 0.83 — so
+the tiers are drawn from those 33 alone.
+
+`burnRate` fell 1125 -> 425 for the same points band, which is just arithmetic: a
+drag lasts several times longer than a flare, so the same payout needs far less
+rate behind it.
+
+**The reentry model is kept and unwired**, at the author's request ("very good
+effect, like there's an atmosphere, I might want to use this in the future"). Its
+constants moved out of `ScoreConfig` — every key there must change some session's
+outcome, and an unwired weight cannot — and `test/score.test.ts` still exercises
+the property that makes it worth having, so it cannot rot into something that no
+longer works.
+
+One fixture note, and it is the second time this file has recorded it: adding the
+burn made `burnEdgeSpan` measure as inert, because no session in the scoring
+battery ever took the ship into the band while captured. A knob can read as dead
+because no scenario reaches the part of the run it governs — the same blind spot
+that made `nerveBonus` look dead. Real play does this 2.5 times a session; the
+battery did it never, until a scenario was added that does.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

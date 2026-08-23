@@ -71,75 +71,39 @@ export interface ScoreConfig {
 
   // --- the burn ---
   /**
-   * Clearance, in px above the minimum orbit, at which reentry heat reaches zero.
+   * Distance from the lethal side line, in px, at which dead-zone heat reaches
+   * zero. The inner edge of the red band.
    *
-   * The span is narrow on purpose. Widening it does not lengthen the burn — the
-   * speed term is what bounds it — it only lets a slow, shallow pass smoulder.
-   * Measured: at a span of 30 the median flare runs 0.17s, and at 80 it runs
-   * 0.18s.
+   * MUST MATCH `RenderConfig.hazardZoneWidth`, and `test/score.test.ts` pins the
+   * two together. The flame's intensity is meant to track the red gradient the
+   * player can already see; a fire that peaked somewhere other than where the red
+   * does would be teaching a line that is not the line.
    */
-  burnSpan: number;
+  burnEdgeSpan: number;
   /**
-   * Planet-relative speed, in px/s, below which nothing burns however low it is.
+   * Points per heat-second of dragging the dead zone.
    *
-   * THIS IS THE KEY THAT MAKES THE BURN MEAN ANYTHING, and it is why heat is not
-   * simply altitude. The simulation actively steers every dive down onto `minR`
-   * — that is the clearance fix — so being at the floor is not an achievement:
-   * measured across 1386 real captures, 68% of settled orbits sit at EXACTLY zero
-   * clearance. A burn gated on depth alone would pay most for parking.
+   * Derived from the drags that SURVIVE, because those are the only ones that
+   * ever pay — a death drops the banked flare entire. Their median integrates
+   * 0.199 heat-seconds, so 425 puts it at ~85 points, the band `closeBonus` 150
+   * and `nerveBonus` 200 already occupy. The best on record lands at ~390.
    *
-   * A parked minimum orbit is slow, though. How slow is not a matter of sampling:
-   * a settled capture is a circle at radius >= `minR`, so its speed is
-   * sqrt(GM/minR), maximised by the smallest body in the field. Under
-   * DEFAULT_CONFIG that is R=34 and a gap of 12, giving a hard ceiling of
-   * **345.8 px/s** that no parked orbit anywhere can exceed.
-   *
-   * 355 sits above that closed form with margin to spare. It is deliberately NOT
-   * the 342 px/s the diagnostics corpus happened to top out at — that sample
-   * never parked on the smallest planet, and a gate set to it would have burned
-   * while parked on the one field where it mattered. Sample the physics, not the
-   * recordings, where the physics can be solved.
-   */
-  burnSpeed0: number;
-  /**
-   * Speed at which the heat term saturates.
-   *
-   * This started at the p99 of real low passes, 560, and that was too wide by
-   * half. It made the ramp 200px/s across when a typical skim runs 370-400 — the
-   * bottom fifth of it — so speed swamped depth and a beautiful 2px graze read as
-   * heat 0.15, which is a plume too faint to see and 14 points. Reported as "I
-   * didn't see any red glow or flare or counter rolling up as I hugged the edge",
-   * on a session that did exactly that.
-   *
-   * 520 keeps the spread the ladder needs — peak heat p25 0.25, p50 0.44, p75
-   * 0.73, p90 0.92 — without saturating the middle. Narrower was tried: at 430
-   * the median flare saturates at 0.90 and the rarity ladder has nothing left to
-   * grade.
-   */
-  burnSpeed1: number;
-  /**
-   * Points per heat-second.
-   *
-   * Heat is `depth * speed`, both 0..1, so a whole second held at full heat pays
-   * this — which never happens: the hot pass is a flash. Derived, not picked: the
-   * median capture that burns integrates 0.0747 heat-seconds, so 1125 is what
-   * puts it at the ~84 points the band was chosen for, alongside `closeBonus` 150
-   * and `nerveBonus` 200. The best capture on record lands at ~182.
+   * Worth noticing that this is a THIRD of the rate the reentry burn used, for
+   * the same points: an edge-drag lasts four to ten times longer than a periapsis
+   * flare, so the same payout needs far less rate behind it.
    */
   burnRate: number;
   /**
    * Heat below which the ship is not burning: no flame, and no points.
    *
    * It brackets the flare — a burn award is owed when heat falls back under this
-   * — so it decides what counts as one pass rather than two, and it withholds the
+   * — so it decides what counts as one drag rather than two, and it withholds the
    * points from a smoulder too faint to draw. A weight, not a constant, because
    * it changes what a session scores.
    *
-   * Raised from 0.05 once the flame got its presentation curve, and the two are
-   * one decision: `drawBurn` renders sqrt(heat), so 0.10 is the point at which
-   * the fire becomes plainly visible. Below it there was nothing to see and a
-   * couple of points to collect, which is the worst of both — a payout with no
-   * picture. Now every burn that pays is a burn you watched.
+   * At 0.10 the fire kindles 54px from the lethal line, which is 6px inside the
+   * red band — so it catches almost exactly as the ship enters the red, and the
+   * two cues agree about when the danger starts.
    */
   burnMinHeat: number;
 
@@ -224,27 +188,23 @@ export interface ScoreConfig {
  * The shape of the model, which is the part worth arguing about:
  *
  *   grab = (close + nerve)                       x multiplier   at periapsis
- *   burn = (heat integrated over the pass)       x multiplier   when the fire dies
- *   link = (base + climb + timing + aim)         x multiplier   at the release
+ *   burn = (dead-zone depth, integrated)          x multiplier   when the fire dies
+ *   link = (base + climb + timing + aim)          x multiplier   at the release
  *
  * Three events, because they are settled at different moments and describe
  * different acts. The grab is judged on how the ship arrived and pays when the
  * dive swings through the bottom — not at the press, so a tap that never gets
  * there earns nothing and tapping beside a planet is not a faucet. The link is
- * judged on how it left. The burn is judged on the ride between them.
+ * judged on how it left. The burn is judged on a stretch of the ride: how long
+ * the ship spent inside the dead zone at the field's edge while hanging off a
+ * planet, and how deep it went.
  *
  * The burn is the only one that accrues rather than being read off an instant,
- * and the only one that can pay twice in one capture — a settle that dips through
- * the hot zone on two successive passes lights twice, because it did.
- *
- * It does NOT double-pay `close`, which is the obvious worry. `close` is settled
- * at the press and the burn at periapsis, and measured over 1386 real captures
- * they are ANTI-correlated: peak heat against grab clearance is -0.36, against
- * apoapsis -0.43. A grab from inside 10px flares 0% of the time — there is no
- * dive left to build speed with — which is exactly where `close` pays most. The
- * far, stretched grab does not burn either: it arrives as a flyby that has to be
- * braked, and braking sheds the speed the heat is made of. What burns is the
- * middle: a moderate orbit, dived hard.
+ * the only one that can pay twice in one capture, and the only one a DEATH can
+ * cancel — `endLife` drops the banked flare, so the 78% of edge-drags that end
+ * in the wall pay nothing at all. The fire on those is a warning, not an award.
+ * Only pulling out alive collects, which is the whole shape of the mechanic: the
+ * drama is free and the rescue is what scores.
  *
  * `close` is how near you let the body get before committing to the grab.
  * `cap.tightness` was the obvious candidate and is the wrong one — it saturates
@@ -278,10 +238,8 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   aimSharpness: 3,
   timingSharpness: 2,
 
-  burnSpan: 30,
-  burnSpeed0: 355,
-  burnSpeed1: 520,
-  burnRate: 1125,
+  burnEdgeSpan: 60,
+  burnRate: 425,
   burnMinHeat: 0.1,
 
   streakStep: 0.25,

@@ -35,8 +35,10 @@
 import type { SimConfig } from '../sim/config.ts';
 import type { Capture, SimState } from '../sim/types.ts';
 import { hypot } from '../sim/orbit.ts';
+import { fieldBounds } from '../sim/world.ts';
+import { shipWorldPos } from '../sim/step.ts';
 import { readAim } from './aim.ts';
-import { burnHeat } from './burn.ts';
+import { edgeHeat } from './burn.ts';
 import { isNerveGrab } from './praise.ts';
 import {
   BONK_SPEED,
@@ -235,8 +237,18 @@ export function scoreTick(
   // do on purpose, because it is also the best boost — would silently forfeit the
   // whole flare.
   {
-    const cap = state.capture;
-    const heat = cap ? burnHeat(hypot(cap.rx, cap.ry) - cap.minR, hypot(cap.vx, cap.vy), scfg) : 0;
+    // Position from `shipWorldPos`, which resolves a capture's body-relative
+    // coordinates — `state.ship` is stale during one, and a burn is by definition
+    // something that only happens during one.
+    const p = shipWorldPos(state);
+    const heat = edgeHeat(
+      p.x,
+      p.y,
+      fieldBounds(cfg, state.bodies),
+      state.bodies,
+      state.capture !== null,
+      scfg,
+    );
     if (heat > scfg.burnMinHeat) {
       sc.burnHeat = heat;
       sc.burnBank += heat * dt * scfg.burnRate;

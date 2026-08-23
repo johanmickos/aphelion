@@ -15,7 +15,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
-import { createBodies } from '../src/sim/world.ts';
+import { createBodies, fieldBounds, inAnomalyField } from '../src/sim/world.ts';
+import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { grabTarget } from '../src/sim/capture.ts';
 import { hypot } from '../src/sim/orbit.ts';
 import { fingerprint } from '../src/sim/serialize.ts';
@@ -32,6 +33,8 @@ import {
   shoutWord,
   CLOSE_PX,
   DEFAULT_SCORE_CONFIG,
+  edgeHeat,
+  reentryHeat,
   PEAK,
   WORDS,
   createScoreState,
@@ -206,6 +209,23 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
       [260, 0],
     ],
     ticks: 420,
+  },
+  /**
+   * Dragged along the dead zone while hanging off a planet.
+   *
+   * Here for the same reason as the nerve grab above: without it `burnEdgeSpan`
+   * measures as inert, because none of the other sessions ever takes the ship
+   * into the red band while captured — a blind spot in the fixture, not a dead
+   * weight. Real play does it 2.5 times a session; this battery did it never.
+   *
+   * Starts 20px inside the right wall (which is at x=565.5) falling at 120px/s,
+   * and grabs once the swing has begun. Worth 152 ticks inside the band.
+   */
+  {
+    name: 'dragged along the dead zone',
+    ship: { x: 545.5, y: 200, vx: 0, vy: -120 },
+    edges: [[90, 1]],
+    ticks: 900,
   },
   // holds through the settle and releases mid-decay
   {
@@ -1114,152 +1134,168 @@ describe('the grab award lands at periapsis, not at the press', () => {
 // ------------------------------------------------------------------------ burn
 
 /**
- * The burn's guarantee, and the only one worth pinning at this level.
+ * The burn's guarantees.
  *
- * "Close to the edge" cannot be altitude, because the simulation gives altitude
- * away: the clearance correction steers every dive onto `minR`, and measured over
- * 1386 real captures, 68% of settled orbits sit at EXACTLY zero clearance. What
- * separates a hot pass from parking is SPEED, and `burnSpeed0` is set above
- * everything a parked orbit can reach.
- *
- * If that ever stops being true the burn becomes an idle faucet — points for
- * holding still on the floor — which is the same failure the grab award refuses
- * by paying at periapsis instead of at the press.
+ * The mechanic is three conditions at once — inside the red band at the field's
+ * edge, captured, and not sheltered by an anomaly bubble — and each is here
+ * because dropping it breaks the fantasy in a specific way. Drifting through the
+ * band is not "barely hanging on", it is just dying; and inside a bubble the wall
+ * is switched off, so there is nothing to hang on against.
  */
 describe('the burn', () => {
-  /** Step a session, sampling what the burn saw on every tick. */
-  function trace(edges: Edges, ticks: number, scfg: ScoreConfig = DEFAULT_SCORE_CONFIG) {
-    const cfg = DEFAULT_CONFIG;
-    const state = createInitialState(cfg);
-    const sc = createScoreState();
-    const awards: ScoreAward[] = [];
-    const samples: Array<{
-      tick: number;
-      phase: string;
-      clearance: number;
-      speed: number;
-      heat: number;
-    }> = [];
-    const map = new Map(edges);
-    let held = false;
+  const bodies = createBodies(DEFAULT_CONFIG);
+  const field = fieldBounds(DEFAULT_CONFIG, bodies);
 
-    for (let t = 0; t < ticks; t++) {
-      const e = map.get(t);
-      const pressed = e === 1;
-      const released = e === 0;
-      if (pressed) held = true;
-      if (released) held = false;
-      stepSim(state, cfg, { held: held || pressed, pressed, released } as Input, FIXED_DT);
-      awards.push(...scoreTick(sc, state, cfg, FIXED_DT, scfg).awards);
-      const cap = state.capture;
-      if (cap) {
-        samples.push({
-          tick: state.tick,
-          phase: cap.phase,
-          clearance: hypot(cap.rx, cap.ry) - cap.minR,
-          speed: hypot(cap.vx, cap.vy),
-          heat: sc.burnHeat,
-        });
+  /** Read the heat for a ship parked at a world x, captured or not. */
+  const heatAt = (x: number, captured: boolean): number =>
+    edgeHeat(x, 0, field, bodies, captured, DEFAULT_SCORE_CONFIG);
+
+  it('burns hotter the deeper into the dead zone the ship is', () => {
+    const span = DEFAULT_SCORE_CONFIG.burnEdgeSpan;
+    expect(heatAt(field.left, true)).toBeCloseTo(1, 5);
+    expect(heatAt(field.left + span / 2, true)).toBeCloseTo(0.5, 5);
+    expect(heatAt(field.left + span, true)).toBeCloseTo(0, 5);
+    // Both walls, not just the one the arithmetic was written against.
+    expect(heatAt(field.right, true)).toBeCloseTo(1, 5);
+  });
+
+  it('does not burn in mid-field, however the ship got there', () => {
+    expect(heatAt((field.left + field.right) / 2, true)).toBe(0);
+  });
+
+  it('does not burn while drifting, even at the lethal line', () => {
+    // 11018 ticks of the corpus are exactly this. A ship drifting through the
+    // band is not hanging on to anything — it is about to die, and that is not
+    // the thing being dramatised.
+    expect(heatAt(field.left, false)).toBe(0);
+    expect(heatAt(field.left, true)).toBeGreaterThan(0);
+  });
+
+  it('does not burn inside an anomaly bubble, where the wall is switched off', () => {
+    // The bubble SUSPENDS the side boundary — that is the entire anomaly
+    // mechanic. Burning there would promise a danger the simulation has
+    // explicitly turned off.
+    const a = bodies.find((b) => b.kind === 'anomaly');
+    expect(a, 'the default field should contain an anomaly').toBeDefined();
+    const anomaly = a!;
+    const wall = anomaly.x < (field.left + field.right) / 2 ? field.left : field.right;
+    expect(inAnomalyField(wall, anomaly.y, bodies)).toBe(true);
+    expect(edgeHeat(wall, anomaly.y, field, bodies, true, DEFAULT_SCORE_CONFIG)).toBe(0);
+  });
+
+  it('pays for a drag that is pulled out of, and nothing for one that hits the wall', () => {
+    // The shape of the whole mechanic: the fire is free drama on the way out and
+    // an award only if the ship survives. `endLife` drops the bank, so a death
+    // cannot pay — which matters, because 78% of real edge-drags end in one.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+
+    /** Hold the ship in the band for `ticks`, then either let go or die. */
+    const drag = (sc: ScoreState, ticks: number, kill: boolean): ScoreAward[] => {
+      const out: ScoreAward[] = [];
+      // Positioned through the capture's body-relative offset, NOT `state.ship`:
+      // during a capture the scorer reads `shipWorldPos`, and `state.ship` is
+      // stale. Writing the wrong one here silently measured zero heat.
+      const anchor = state.bodies[0]!;
+      for (let i = 0; i < ticks; i++) {
+        state.tick++;
+        state.capture = fakeCapture();
+        state.capture.rx = f.left + 10 - anchor.x;
+        state.capture.ry = -anchor.y;
+        out.push(...scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT).awards);
       }
-    }
-    return { score: sc, awards, samples };
-  }
+      state.tick++;
+      if (kill) state.ending.active = true;
+      else state.capture = null;
+      out.push(...scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT).awards);
+      return out.filter((a) => a.kind === 'burn');
+    };
 
-  /**
-   * Grab early and never let go: the dive circularises and parks a hair off the
-   * floor — measured at 1.03px of clearance, which `closeSpan` would score as a
-   * near-perfect 0.99 and which a depth-only burn would pay full marks for.
-   */
-  const PARK: Edges = [[150, 1]];
+    const survived = createScoreState();
+    const paid = drag(survived, 30, false);
+    expect(paid).toHaveLength(1);
+    expect(paid[0]!.points).toBeGreaterThan(0);
+    expect(survived.burnBank).toBe(0);
 
-  it('pays nothing for parking on the minimum-orbit floor', () => {
-    const { samples, awards } = trace(PARK, 2400);
-    const parked = samples.filter((s) => s.phase === 'orbit' && s.clearance < 2);
-    // The scenario has to actually get there, or this proves nothing.
-    expect(parked.length).toBeGreaterThan(60);
-    // Skimming the floor for over a thousand ticks, and stone cold for all of it.
-    expect(parked.every((s) => s.heat === 0)).toBe(true);
-    // And the ledger agrees. The DIVE into this orbit does burn, and should — it
-    // was a fast low pass. What pays nothing is the parking afterwards, however
-    // long it is held and however close to the floor it sits.
-    const settled = samples.find((s) => s.phase === 'orbit')!.tick;
-    expect(awards.filter((a) => a.kind === 'burn' && a.tick > settled)).toHaveLength(0);
+    state.ending.active = false;
+    state.capture = null;
+    const dying = createScoreState();
+    expect(drag(dying, 30, true)).toHaveLength(0);
+    expect(dying.burnBank).toBe(0);
   });
 
-  it('keeps the parked orbit below the speed the burn starts at', () => {
-    const { samples } = trace(PARK, 2400);
-    const parked = samples.filter((s) => s.phase === 'orbit');
-    expect(parked.length).toBeGreaterThan(60);
-    const fastest = Math.max(...parked.map((s) => s.speed));
-    expect(fastest).toBeLessThan(DEFAULT_SCORE_CONFIG.burnSpeed0);
+  it('matches the red band the player can actually see', () => {
+    // Two modules, one number. The flame is meant to track the hazard gradient,
+    // so a fire peaking somewhere other than where the red does would teach a
+    // line that is not the line. `src/score/` may not import `src/render/`, so
+    // nothing but a test can hold the two together.
+    expect(DEFAULT_SCORE_CONFIG.burnEdgeSpan).toBe(DEFAULT_RENDER_CONFIG.hazardZoneWidth);
   });
 
-  it('gates the burn above the fastest orbit that could ever be parked in', () => {
-    // THE ONE ABOVE IS NOT ENOUGH, and this is the lesson: it samples one capture
-    // on one field, and the burn's whole meaning rests on no parked orbit ever
-    // reaching the gate. That bound does not need sampling — a settled capture is
-    // a circle at radius >= minR, so its speed is sqrt(GM/minR), largest around
-    // the SMALLEST body the world generator can produce.
+  it('keeps the reentry model working even though nothing is wired to it', () => {
+    // Retained for a future atmosphere effect, and kept exercised so it cannot
+    // rot. The property under test is the one that makes it worth having: a
+    // parked orbit is slow, so depth alone must not light it.
     //
-    // The corpus said 342 px/s and a gate of 345 was very nearly shipped on the
-    // strength of it. The closed form says 345.8: those recordings simply never
-    // parked on the smallest planet, and on the field where they did, parking
-    // would have been a points faucet.
+    // The bound is a closed form, not a sample — sqrt(GM/minR) around the
+    // smallest body the generator makes. A recording once suggested 342px/s and
+    // the true ceiling is 345.8; a gate set to the sample burns while parked.
     let smallest = Infinity;
     for (let seed = 0; seed < 400; seed++) {
       for (const b of createBodies({ ...DEFAULT_CONFIG, worldSeed: seed })) {
         smallest = Math.min(smallest, b.R);
       }
     }
-    const fastestPossible = Math.sqrt(DEFAULT_CONFIG.GM / (smallest + DEFAULT_CONFIG.minOrbitGap));
-    expect(DEFAULT_SCORE_CONFIG.burnSpeed0).toBeGreaterThan(fastestPossible);
-  });
-
-  it('lights on a fast low pass, and pays what it burned', () => {
-    const { score, awards } = pilot(4000);
-    const burns = awards.filter((a) => a.kind === 'burn');
-    expect(burns.length).toBeGreaterThan(0);
-    expect(burns).toHaveLength(score.burns);
-    for (const b of burns) {
-      // A flare that rounds to nothing is dropped rather than floated as `+0`.
-      expect(b.points).toBeGreaterThan(0);
-      expect(b.heat).toBeGreaterThan(DEFAULT_SCORE_CONFIG.burnMinHeat);
-      expect(b.heat).toBeLessThanOrEqual(1);
-    }
-  });
-
-  it('reports no arrival or release quality, so nothing is paid or praised twice', () => {
-    const burns = pilot(4000).awards.filter((a) => a.kind === 'burn');
-    expect(burns.length).toBeGreaterThan(0);
-    for (const b of burns) {
-      expect(b.close).toBe(0);
-      expect(b.timing).toBe(0);
-      expect(b.aim).toBe(0);
-      expect(b.climb).toBe(0);
-    }
-  });
-
-  it('pays in proportion to the heat it integrated', () => {
-    const base = pilot(4000).awards.filter((a) => a.kind === 'burn');
-    const doubled = pilot(4000, DEFAULT_CONFIG, {
-      ...DEFAULT_SCORE_CONFIG,
-      burnRate: DEFAULT_SCORE_CONFIG.burnRate * 2,
-    }).awards.filter((a) => a.kind === 'burn');
-    expect(base.length).toBeGreaterThan(0);
-    expect(doubled).toHaveLength(base.length);
-    for (let i = 0; i < base.length; i++) {
-      // Rounding is applied after the multiplier, so allow a point of slack
-      // rather than demanding exactly twice.
-      expect(Math.abs(doubled[i]!.points - 2 * base[i]!.points)).toBeLessThanOrEqual(2);
-    }
-  });
-
-  it('leaves nothing banked when a life ends mid-flare', () => {
-    // Whatever the run did, a death must not leave a half-integrated flare behind
-    // to be paid into the NEXT life — the score it would have banked is exactly
-    // what the death is taking.
-    const { score } = pilot(4000);
-    expect(score.burnBank).toBe(0);
-    expect(score.burnPeak).toBe(0);
+    const parkedCeiling = Math.sqrt(DEFAULT_CONFIG.GM / (smallest + DEFAULT_CONFIG.minOrbitGap));
+    expect(reentryHeat(0, parkedCeiling)).toBe(0);
+    // Same place, dive speed: burns. Fast but high: does not. Both terms required.
+    expect(reentryHeat(0, 480)).toBeGreaterThan(0);
+    expect(reentryHeat(500, 480)).toBe(0);
   });
 });
+
+/** A capture the scorer only ever reads for "is one happening". */
+function fakeCapture(): NonNullable<SimState['capture']> {
+  return {
+    phase: 'orbit',
+    planet: 0,
+    rx: 0,
+    ry: 0,
+    vx: 0,
+    vy: 0,
+    grabR: 100,
+    minR: 50,
+    prevR: 100,
+    prevDR: 0,
+    passedPeri: true,
+    periR: 100,
+    apoR: 100,
+    clearFramesLeft: 0,
+    clearDvx: 0,
+    clearDvy: 0,
+    whipE: undefined,
+    orbit: null,
+    theta: 0,
+    phaseSpeed: 0,
+    phaseSpeedReal: 0,
+    phaseMul: 1,
+    Lfrozen: undefined,
+    rPeri: 100,
+    settleT: 1,
+    settleProgress: 1,
+    tightness: 1,
+    boostFull: 0,
+    boost: 0,
+    boostT: 0,
+    settleSweep: 0,
+    refuel: 0,
+    approachR0: 0,
+    approachVR: 0,
+    settleDur: 1,
+    zipped: false,
+    puttered: false,
+    brakeSpent: 0,
+    lastAngle: 0,
+    defl: 0,
+  };
+}

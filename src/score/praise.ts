@@ -85,24 +85,25 @@ export const AIM = Object.freeze({ tier1: 0.94, tier2: 0.98 });
 export const PEAK = Object.freeze({ tier1: 0.85, tier2: 0.94 });
 
 /**
- * Peak heat of a flare. Percentiles of the flares in `diagnostics/`.
+ * Deepest point of a dead-zone drag, 0 at the red band's inner edge and 1 at the
+ * lethal line.
  *
- * Measured against the frequency of the thing being named, not against the 0..1
- * scale, because the scale is not the question — how often the word should appear
- * is. tier1 is the p70 flare and tier2 the p90, which puts a burn word on about
- * one capture in six (16.2%) and the better word on about one in eighteen (5.5%).
+ * MEASURED ON THE DRAGS THAT SURVIVE, which is the only population that can ever
+ * see a word: a drag ending in the wall drops its whole banked flare with the
+ * life, so it pays nothing and names nothing. Over 58 sessions, 33 of 147 drags
+ * pulled out alive, and their peak depths run p25 0.27, p50 0.44, p70 0.57,
+ * p90 0.83.
  *
- * Read those as shares of ALL captures, not of flares: 45% of captures flare at
- * all, and most of those are a faint scrape that earns its points and no name.
- * Naming them too would make the commonest event in the game a celebrated one,
- * which is the mistake the 15-degree kink line made.
+ * Calibrating on all 147 instead would have been useless in a way worth
+ * recording: the 114 that die all reach the line, so peak depth reads 1.00 at
+ * every percentile from p10 up. A threshold drawn from that distribution puts
+ * every tier at 1.0 and names nothing — the axis only has spread inside the
+ * subpopulation that can actually be praised.
  *
- * RE-MEASURED when the speed ramp was narrowed to 355-520. The frequency targets
- * are the same; the heat values that hit them moved, because the quantity under
- * them changed shape. A threshold calibrated on a stale feel is worse than an
- * unmeasured one, because it looks defensible.
+ * So tier1 is the p70 survivor and tier2 the p90: about a third of survived drags
+ * earn a word, and about a tenth earn the better one.
  */
-export const BURN = Object.freeze({ tier1: 0.68, tier2: 0.94 });
+export const BURN = Object.freeze({ tier1: 0.57, tier2: 0.83 });
 
 /**
  * The nerve grab: already boring in, and you waited.
@@ -146,12 +147,12 @@ export const NERVE_SKIM_PX = 0;
  *   nerve    composure    — you were going to hit it and you waited. BRINK, CLUTCH.
  *   aim      marksmanship — you pointed it. BULLSEYE, THREADED, DEADEYE.
  *   peak     launch       — you let go at the right instant. SLINGSHOT, REDLINE.
- *   burn     fire         — you came in low and fast enough to cook. SEARED, INFERNO.
+ *   burn     fire         — you dragged the dead zone and lived. SEARED, INFERNO.
  *
- * `burn` and `close` are the pair to watch here, because both are about being
- * near a planet and a shared register would collapse them. Proximity and fire are
- * far enough apart in English that they do not — and the events themselves barely
- * overlap anyway, since a grab from point blank has no dive left to heat up with.
+ * `burn` and `close` are the pair to watch here, because a shared register would
+ * collapse them. Proximity and fire are far enough apart in English that they do
+ * not — and the events no longer even touch: `close` is about a planet's surface
+ * and `burn` is about the wall at the edge of the field.
  *
  * The two that must never blur are `aim` and `peak`, because they are the two
  * that can fire on the same event. Marksmanship and launch are about as far apart
@@ -182,7 +183,8 @@ export const WORDS: Readonly<
   ],
   // REDLINE is a `peak` word and stays one: it is engine-rev, not fire. Nothing
   // here is about heat in a figurative sense for the same reason — the ship is
-  // literally burning, and the words should mean it.
+  // literally burning, and the words should mean it. They are also all about
+  // SURVIVING it, because a drag that ends in the wall never reaches a word.
   burn: [
     ['SINGED', 'SEARED', 'SCORCHED'],
     ['BLAZING', 'INFERNO', 'METEOR'],
@@ -279,6 +281,8 @@ export function praiseFor(award: ScoreAward): Praise | null {
  */
 function praiseBurn(award: ScoreAward): Praise | null {
   const heat = tierOf(award.heat, BURN.tier1, BURN.tier2);
+  // Nothing to guard against a dying drag reaching here: `endLife` drops the bank
+  // before the award is ever built, so every burn that gets a word was survived.
   if (heat === 0) return null;
   return {
     category: 'burn',
