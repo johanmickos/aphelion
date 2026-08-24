@@ -51,7 +51,24 @@ export class Starfield {
    *
    * Downward and parallel, because the game is flat. See the streak block below.
    */
-  draw(ctx: CanvasRenderingContext2D, cam: Camera, cfg: RenderConfig, warp = 0): void {
+  draw(
+    ctx: CanvasRenderingContext2D,
+    cam: Camera,
+    cfg: RenderConfig,
+    warp = 0,
+    /**
+     * Seconds into the warp, for the scroll.
+     *
+     * WITHOUT THIS THE WARP IS A STILL LIFE. Stretching each star into a streak
+     * makes a picture OF speed; it does not make motion. The camera is frozen with
+     * the ship during the ceremony, so every parallax position it feeds is frozen
+     * too, and the first version drew long static lines that simply sat there —
+     * reported as "it stops animating on FIELD CLEARED". The streaks have to be
+     * scrolled by something, and the only honest clock available is the one the
+     * simulation is already advancing through the hold.
+     */
+    warpT = 0,
+  ): void {
     const { starParallaxMin: lo, starParallaxMax: hi, starParallaxHorizFrac: hf } = cfg;
     const w = cam.designW * cam.scale;
     const h = cam.viewH * cam.scale;
@@ -92,14 +109,23 @@ export class Starfield {
       // a tier moves together, downward, because the ship is going up. Length is
       // per tier rather than per star for exactly that reason — within one plane
       // there is nothing to make one star faster than its neighbour.
-      const gain = warp * (18 + t * 46) * cam.scale;
+      // Shorter than the first attempt, which drew a lattice rather than a sky:
+      // at full length every tier overlapped the next and the screen read as
+      // ruled lines. Length is a hint of travel per frame, not a measure of it.
+      const gain = warp * (9 + t * 22) * cam.scale;
+      // Nearer tiers stream faster — the same parallax ordering the still field
+      // uses, which is why the warp can be built out of it rather than beside it.
+      const stream = warpT * (150 + t * 430) * cam.scale;
       ctx.strokeStyle = tier.color;
       ctx.lineWidth = size;
       ctx.lineCap = 'butt';
+      // A streak is already brighter than a dot simply by covering more pixels.
+      // Holding the dot's alpha made the field close up into a wall.
+      ctx.globalAlpha *= 0.62;
       ctx.beginPath();
       for (const s of stars) {
         const p = lo + s.z * (hi - lo);
-        const y = mod(s.y * h - cam.centerY * p * cam.scale, h);
+        const y = mod(s.y * h - cam.centerY * p * cam.scale + stream, h);
         const x = mod(s.x * w - cam.left * p * hf * cam.scale, w);
         ctx.moveTo(cam.offsetX + x, cam.offsetY + y);
         ctx.lineTo(cam.offsetX + x, cam.offsetY + y + gain);

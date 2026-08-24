@@ -642,6 +642,22 @@ describe('the ceremony', () => {
     }
   });
 
+  it('keeps moving after the warp has spooled up', () => {
+    // REPORTED: "it stops animating on FIELD CLEARED". Stretching a star into a
+    // streak makes a picture OF speed; it does not make motion. The camera is
+    // frozen with the ship, so every parallax position it feeds is frozen too,
+    // and the first version drew long static lines that simply sat there. The
+    // scroll is what moves them, and `warp` is pinned at 1 by then — so if a
+    // future change ever drives the animation from `warp` alone, this fails.
+    const at = (t: number) => {
+      const r = recordingContext();
+      new Starfield(rcfg, 7).draw(r.ctx, cam(), rcfg, 1, t);
+      return (r.calls('moveTo') as Array<[string, number, number]>).map((o) => o[2]);
+    };
+    expect(at(3)).not.toEqual(at(3.25));
+    expect(at(9)).not.toEqual(at(9.25));
+  });
+
   it('streaks by tier speed, which is the parallax it already has', () => {
     // Within one plane nothing makes a star faster than its neighbour, so length
     // is per TIER, not per star. Three tiers, three lengths — the same depth cue
@@ -652,6 +668,45 @@ describe('the ceremony', () => {
     const to = r.calls('lineTo') as Array<[string, number, number]>;
     const lengths = new Set(from.map((m, i) => Math.round((to[i]![2] - m[2]) * 100)));
     expect(lengths.size, 'one length per tier').toBe(3);
+  });
+});
+
+describe('the ceremony takes the instruments down', () => {
+  function frame(reason: string) {
+    const r = recordingContext();
+    const c = cam();
+    const state = createInitialState(DEFAULT_CONFIG);
+    const snap = {
+      ...captureSnapshot(state, false, DEFAULT_CONFIG),
+      ending: { active: true, t: 2, x: 195, y: 0, reason: reason as 'cleared' },
+    };
+    // No canvas factory: the nebula falls back to its no-`document` path, which
+    // is irrelevant here — this is only reading what text the HUD prints.
+    const scene = new Scene({ sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field }, 3);
+    scene.draw(r.ctx, c, snap, {
+      timeMs: 0,
+      paused: false,
+      viewportW: 390,
+      viewportH: 844,
+      headerBottom: 0,
+      frameDt: 1 / 60,
+      score: createScoreState(),
+    });
+    return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+  }
+
+  it('drops the boxed notice, which the sky is already saying better', () => {
+    expect(frame('cleared').some((t) => t.includes('FIELD CLEARED'))).toBe(false);
+  });
+
+  it('still explains the endings that ARE failures', () => {
+    // The guard against this leaking onto every ending: a crash needs its notice.
+    expect(frame('impact').some((t) => t.includes('CRASHED'))).toBe(true);
+  });
+
+  it('drops the fuel gauge, which reports a resource nobody is spending', () => {
+    expect(frame('cleared').some((t) => t === 'FUEL')).toBe(false);
+    expect(frame('impact').some((t) => t === 'FUEL')).toBe(true);
   });
 });
 

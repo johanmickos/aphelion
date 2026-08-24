@@ -172,7 +172,7 @@ export class Scene {
       this.outroT >= 0 ? Math.min(1, this.outroT / OUTRO_SECS) : null,
     );
 
-    this.stars.draw(ctx, cam, render, cer ? cer.warp : 0);
+    this.stars.draw(ctx, cam, render, cer ? cer.warp : 0, cer ? cer.t : 0);
     drawHazardZones(ctx, cam, render, field);
     drawBacktrackFloor(ctx, cam, sim, render, snap.highWaterY);
     // Under the line it feeds into, so the chequers stay the brightest thing in
@@ -284,13 +284,28 @@ export class Scene {
       finishY,
     );
 
-    drawEndingNotice(ctx, cam, sim, snap);
-
-    // HUD sits inside the clip too: it is laid out in design space, so it must
-    // never be drawn over a letterbox bar.
-    drawFuelGauge(ctx, cam, sim, snap, opts.timeMs);
+    // THE INSTRUMENTS BELONG TO A RUN, AND THE RUN IS OVER.
+    //
+    // The boxed notice explains a failure and there is none; the gauge reports a
+    // resource that is no longer being spent; the readout narrates a manoeuvre
+    // that has finished. Left up, they are three pieces of flight furniture
+    // sitting on top of a curtain call — and the notice in particular says FIELD
+    // CLEARED in a small industrial box while the whole sky is already saying it
+    // much better.
+    //
+    // The score band stays. It is the number the sheet is about to be built
+    // around, and cutting it at the crossing only to bring it back a beat later
+    // would be a flicker rather than a transition.
+    if (!cer) {
+      drawEndingNotice(ctx, cam, sim, snap);
+      // HUD sits inside the clip too: it is laid out in design space, so it must
+      // never be drawn over a letterbox bar.
+      drawFuelGauge(ctx, cam, sim, snap, opts.timeMs);
+    }
     drawScore(ctx, cam, opts.score, snap);
-    drawReadout(ctx, cam, readoutLines(sim, snap, canAffordCircularise(sim, snap)), opts.timeMs);
+    if (!cer) {
+      drawReadout(ctx, cam, readoutLines(sim, snap, canAffordCircularise(sim, snap)), opts.timeMs);
+    }
 
     ctx.restore();
 
