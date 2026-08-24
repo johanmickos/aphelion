@@ -162,25 +162,36 @@ export function drawFinishLine(
 }
 
 /**
- * The run-in to the finish: a sea of faint arrows rolling up toward the line.
+ * The run-in to the finish: chevrons rolling up toward the line.
  *
  * The last stretch of the field was empty, and empty is the wrong feeling for the
- * approach to a finish — the ceremony that follows is about speed, and the run-up
- * to it read as a lull. This is the runway: arrows sweeping upward, thickening
- * and brightening as the line gets closer, so the field itself looks like it is
- * accelerating into the crossing.
+ * approach to a finish — the ceremony that follows is about speed and the run-up
+ * to it read as a lull. This is the runway.
  *
- * ON THE RENDER CLOCK, NOT THE TICK. Nothing here is simulated and nothing here
- * is recorded; two players crossing the same line with the same input log see the
- * arrows at different phases and the runs are still identical. That is the whole
- * reason it can be animated at all — `src/sim/` may never read a wall clock, and
- * this is not in `src/sim/`.
+ * SHORT ON PURPOSE. It covers roughly the last two rows of the field, so it
+ * arrives as the final planets do rather than announcing itself from a third of
+ * the climb away. A long runway makes the finish feel distant; a short one makes
+ * it feel imminent, which is the job.
  *
- * THE JITTER IS A HASH, NOT A RANDOM. Rows have to look scattered rather than
- * ruled, but a `Math.random` per row would reshuffle the whole carpet every
- * frame — a boiling mess rather than a sea. Deriving the offset from the row's
- * own index gives a fixed, arbitrary-looking arrangement that scrolls as one
- * piece, which is what makes it read as a surface moving past.
+ * ON THE RENDER CLOCK, WHICH IS ONLY LEGAL BECAUSE OF WHERE THIS LIVES. Nothing
+ * here is simulated and nothing here is recorded, so two players crossing the
+ * same line with the same input log see the chevrons at different phases and the
+ * runs stay identical. `src/sim/` may never read a wall clock; this is not it.
+ *
+ * THE HASH IS KEYED TO THE WORLD ROW, NOT THE SCREEN ROW, and that distinction is
+ * the whole difference between a surface and a mess. Keyed to the loop index, the
+ * arrangement is stable only until the scroll phase wraps — at which point row `i`
+ * inherits the position row `i-1` had while keeping its own jitter, and the entire
+ * pattern snaps to a different layout once per cycle. Reported as "jump around",
+ * and it is not a fade problem: it is the same twelve chevrons teleporting. Adding
+ * the absolute scroll count to the index gives each row an identity that travels
+ * with it, so a row keeps its offset for as long as it is on screen.
+ *
+ * EVERY ROW FADES IN AND OUT over the runway rather than popping at its ends, and
+ * the count per row is FIXED for the same reason — varying it with distance made
+ * chevrons wink in and out mid-flight as their row drifted across a rounding
+ * boundary. Density changes are carried by size and opacity, which can be
+ * interpolated; a count cannot.
  */
 export function drawSpeedCarpet(
   ctx: CanvasRenderingContext2D,
@@ -192,54 +203,59 @@ export function drawSpeedCarpet(
   if (finishY === null) return;
 
   const view = visibleWorldY(cam);
-  // How far back down the field the runway reaches. Beyond this there is nothing
-  // to draw and the common case — the whole rest of the run — costs one compare.
-  const runway = 1400;
+  /** About two rows of the field — see `SimConfig.bodySpacing`. */
+  const runway = 560;
   if (finishY > view.bottom || finishY + runway < view.top) return;
 
   const s = cam.scale;
-  const gap = 78;
-  const perRow = 5;
-  // Upward: the phase subtracts, so a row's y decreases as time passes and the
-  // whole surface sweeps toward the line.
-  const phase = ((timeMs * 0.13) % gap) * -1;
+  const gap = 84;
+  const perRow = 3;
+  const rows = Math.ceil(runway / gap);
+  // Absolute scroll, in rows. The integer part names the world row; the fraction
+  // is where between two rows the surface currently sits.
+  const scroll = (timeMs * 0.00135 * 60) / gap;
+  const phase = (scroll % 1) * gap;
   const left = field.left;
   const span = field.right - field.left;
 
   ctx.save();
-  ctx.beginPath();
-  let drew = false;
-  for (let i = 0; i * gap < runway; i++) {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (let i = 0; i <= rows; i++) {
     const wy = finishY + runway - i * gap + phase;
     if (wy < view.top - gap || wy > view.bottom + gap) continue;
-    // 1 at the line, 0 at the far end of the runway — the thickening the eye
-    // reads as acceleration.
-    const nearness = Math.max(0, Math.min(1, 1 - (wy - finishY) / runway));
-    // Sparse at the back, full width at the front, so the sea narrows into the
-    // line rather than running at constant density up to it.
-    const count = Math.max(1, Math.round(perRow * (0.35 + 0.65 * nearness)));
-    for (let j = 0; j < count; j++) {
-      // Hash of (row, column): arbitrary, stable, and different per row.
-      const h = Math.sin(i * 12.9898 + j * 78.233) * 43758.5453;
-      const jitter = h - Math.floor(h);
-      const wx = left + span * ((j + 0.5) / count + (jitter - 0.5) * 0.16);
+
+    // 0 at the back of the runway, 1 at the line.
+    const t = Math.max(0, Math.min(1, 1 - (wy - finishY) / runway));
+    // In and out, so a chevron is never drawn at an alpha it did not arrive at.
+    // It dissolves INTO the line rather than reaching it at full strength — the
+    // chequers are what the eye should land on there.
+    const fade = Math.sin(Math.PI * t);
+    if (fade <= 0.01) continue;
+
+    const w = (9 + 5 * t) * s;
+    const h = (6 + 4 * t) * s;
+
+    ctx.beginPath();
+    for (let j = 0; j < perRow; j++) {
+      // Keyed to the WORLD row, so the arrangement travels with the surface.
+      const k = i + Math.floor(scroll);
+      const hash = Math.sin(k * 12.9898 + j * 78.233) * 43758.5453;
+      const jitter = hash - Math.floor(hash);
+      const wx = left + span * ((j + 0.5) / perRow + (jitter - 0.5) * 0.22);
       const x = toScreenX(cam, wx);
       const y = toScreenY(cam, wy);
-      const w = (5 + 4 * nearness) * s;
-      const hgt = (7 + 6 * nearness) * s;
-      ctx.moveTo(x, y - hgt);
-      ctx.lineTo(x + w, y + hgt * 0.35);
-      ctx.lineTo(x, y - hgt * 0.15);
-      ctx.lineTo(x - w, y + hgt * 0.35);
-      ctx.closePath();
-      drew = true;
+      ctx.moveTo(x - w, y + h);
+      ctx.lineTo(x, y - h);
+      ctx.lineTo(x + w, y + h);
     }
-  }
-  if (drew) {
-    // Faint on purpose. It is a texture the ship flies over, not a thing to read;
-    // the moment it competes with the line it is pointing at, it has failed.
-    ctx.fillStyle = withAlpha(FINISH, 0.22);
-    ctx.fill();
+    // Chunky and stroked rather than a filled arrowhead: a chevron is a stroke
+    // with a corner in it, and drawing it as one keeps the weight even instead of
+    // tapering to a point the way a triangle does.
+    ctx.lineWidth = (3.4 + 1.6 * t) * s;
+    ctx.strokeStyle = withAlpha(FINISH, 0.34 * fade);
+    ctx.stroke();
   }
   ctx.restore();
 }

@@ -359,10 +359,13 @@ describe('the speed carpet', () => {
   });
 
   it('stays fainter than the line it feeds', () => {
+    // Reads strokeStyle, not fillStyle. The chevrons are stroked, so a fill-based
+    // check passes over an empty list and proves nothing — which is exactly what
+    // it did for one commit after the shape changed.
     const carpet = draw(-200, 0, 0);
     // `fillStyle` also carries gradient objects, which have no `startsWith`.
-    const alphaOf = (r: RecordingContext) =>
-      (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, unknown]>)
+    const alphaOf = (r: RecordingContext, prop: '=fillStyle' | '=strokeStyle') =>
+      (r.ops.filter((o) => o[0] === prop) as Array<[string, unknown]>)
         .map((o) => o[1])
         .filter((v): v is string => typeof v === 'string' && v.startsWith('rgba(92,226,140'))
         .map((v) => Number(v.split(',')[3]!.replace(')', '')));
@@ -371,7 +374,48 @@ describe('the speed carpet', () => {
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
     centerCamera(c, 195, 0, field, null);
     drawFinishLine(lineR.ctx, c, field, -200);
-    expect(Math.max(...alphaOf(carpet))).toBeLessThan(Math.max(...alphaOf(lineR)));
+    const carpetAlphas = alphaOf(carpet, '=strokeStyle');
+    expect(carpetAlphas.length, 'the carpet actually drew something').toBeGreaterThan(0);
+    expect(Math.max(...carpetAlphas)).toBeLessThan(Math.max(...alphaOf(lineR, '=fillStyle')));
+  });
+
+  it('fades in and out instead of popping at the runway ends', () => {
+    // Every row is drawn at its own alpha, and the faintest ones sit at the two
+    // extremes. A single alpha for the whole carpet is what made rows appear and
+    // vanish at full strength.
+    const alphas = (
+      draw(-3000, -2600, 0).ops.filter((o) => o[0] === '=strokeStyle') as Array<[string, unknown]>
+    )
+      .map((o) => o[1])
+      .filter((v): v is string => typeof v === 'string')
+      .map((v) => Number(v.split(',')[3]!.replace(')', '')));
+    expect(new Set(alphas).size, 'rows differ in opacity').toBeGreaterThan(1);
+    expect(Math.min(...alphas)).toBeGreaterThan(0);
+  });
+
+  it('scrolls as one surface rather than resnapping when the phase wraps', () => {
+    // THE REPORTED BUG. Keyed to the loop index, a row's jitter is stable only
+    // until the scroll wraps — then row `i` inherits row `i-1`'s position while
+    // keeping its own offset, and every chevron on screen teleports at once.
+    // Keyed to the absolute world row, an offset travels with the row that owns
+    // it, so consecutive frames differ only by whatever entered or left.
+    const xsAt = (t: number) =>
+      (draw(-3000, -2600, t).calls('moveTo') as Array<[string, number, number]>)
+        .map((o) => Math.round(o[1]))
+        .sort((a, b) => a - b);
+
+    let worstChurn = 0;
+    let prev = xsAt(0);
+    for (let t = 16; t <= 3000; t += 16) {
+      const now = xsAt(t);
+      const before = new Set(prev);
+      // How many positions are new this frame. One row entering is `perRow` of
+      // them; a resnap is every row at once.
+      const churn = now.filter((x) => !before.has(x)).length;
+      if (churn > worstChurn) worstChurn = churn;
+      prev = now;
+    }
+    expect(worstChurn, 'at most a row or so changes between frames').toBeLessThanOrEqual(6);
   });
 });
 
