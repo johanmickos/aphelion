@@ -22,6 +22,7 @@ import {
   drawSpeedCarpet,
 } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
+import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from '../src/render/ceremony.ts';
 import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
 import { rescueScar } from '../src/sim/rescue.ts';
@@ -523,6 +524,134 @@ describe('edge markers clear the score band', () => {
     // DOM element, and the score is drawn on the canvas, so the one thing they
     // most needed to clear was invisible to the calculation.
     expect(SCORE_BAND_BOTTOM).toBeGreaterThan(rcfg.edgeMarkerInset);
+  });
+});
+
+describe('the ceremony', () => {
+  const ended = (reason: string, t: number) => ({
+    ...captureSnapshot(createInitialState(DEFAULT_CONFIG), false, DEFAULT_CONFIG),
+    ending: { active: true, t, x: 0, y: 0, reason: reason as 'cleared' },
+  });
+
+  it('fires for a clear and for nothing else', () => {
+    // Gilding a death would be the cruellest possible misreading of the moment,
+    // and every other ending already has its own notice.
+    expect(ceremonyPhase(ended('cleared', 0.5))).not.toBeNull();
+    for (const r of ['impact', 'out-of-bounds', 'fell-behind']) {
+      expect(ceremonyPhase(ended(r, 0.5)), r).toBeNull();
+    }
+  });
+
+  it('says nothing while the run is still being flown', () => {
+    const live = captureSnapshot(createInitialState(DEFAULT_CONFIG), false, DEFAULT_CONFIG);
+    expect(ceremonyPhase(live)).toBeNull();
+  });
+
+  it('spools up and then holds, rather than looping', () => {
+    // The panel arrives on top of a warp that is still running. If this ever
+    // wrapped, the sky would visibly restart underneath the results.
+    const w = (t: number) => ceremonyPhase(ended('cleared', t))!.warp;
+    expect(w(0)).toBe(0);
+    expect(w(0.4)).toBeGreaterThan(0);
+    expect(w(0.4)).toBeLessThan(1);
+    expect(w(2)).toBe(1);
+    expect(w(30), 'still full warp half a minute later').toBe(1);
+  });
+
+  it('is clocked by the simulation, not by a wall clock', () => {
+    // `ending.t` is ticks times dt. Two snapshots at the same tick must produce
+    // the same frame however much real time passed between them — which is what
+    // lets a replay of a cleared run age identically.
+    const a = ceremonyPhase(ended('cleared', 0.37))!;
+    const b = ceremonyPhase(ended('cleared', 0.37))!;
+    expect(a).toEqual(b);
+  });
+
+  it('carries the ship to the middle and leaves it there', () => {
+    const c = cam();
+    const cx = c.offsetX + c.designW * 0.5 * c.scale;
+    const at = (t: number) => ceremonyShipPos(c, ceremonyPhase(ended('cleared', t))!, 40, 700);
+    expect(at(0).x, 'starts where the ship crossed').toBeCloseTo(40, 6);
+    expect(at(5).x, 'ends in the middle').toBeCloseTo(cx, 6);
+    // Monotone, so the ship never doubles back on its way in.
+    const xs = [0, 0.15, 0.3, 0.45, 0.6].map((t) => at(t).x);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]!).toBeGreaterThanOrEqual(xs[i - 1]!);
+  });
+
+  it('washes gold, over a green that fades as it goes', () => {
+    // The player crosses a GREEN line into a GOLD sky, and the two overlap for a
+    // moment rather than one cutting to the other.
+    const r = recordingContext();
+    drawCeremonyWash(r.ctx, cam(), ceremonyPhase(ended('cleared', 0.3))!);
+    const stops = (r.calls('addColorStop') as Array<[string, number, string]>).map((o) => o[2]);
+    expect(
+      stops.some((v) => v.startsWith('rgba(255,214,51')),
+      'gold',
+    ).toBe(true);
+    expect(
+      stops.some((v) => v.startsWith('rgba(92,226,140')),
+      'green afterglow',
+    ).toBe(true);
+
+    const late = recordingContext();
+    drawCeremonyWash(late.ctx, cam(), ceremonyPhase(ended('cleared', 4))!);
+    const lateStops = (late.calls('addColorStop') as Array<[string, number, string]>).map(
+      (o) => o[2],
+    );
+    expect(
+      lateStops.some((v) => v.startsWith('rgba(92,226,140')),
+      'green is gone',
+    ).toBe(false);
+  });
+
+  it('stretches the same stars rather than swapping in new ones', () => {
+    // A warp that fades one star field into another reads as a cut. What sells
+    // the effect is recognising the sky you were just looking at.
+    const plain = recordingContext();
+    const warped = recordingContext();
+    const c = cam();
+    const stars = new Starfield(rcfg, 7);
+    stars.draw(plain.ctx, c, rcfg, 0);
+    stars.draw(warped.ctx, c, rcfg, 1);
+    expect(plain.calls('fillRect').length, 'dots when still').toBeGreaterThan(0);
+    expect(plain.calls('lineTo').length).toBe(0);
+    expect(warped.calls('fillRect').length, 'streaks when warping').toBe(0);
+    expect(warped.calls('lineTo').length).toBeGreaterThan(0);
+    // Same count either way: the field is the field.
+    expect(warped.calls('moveTo').length).toBe(plain.calls('fillRect').length);
+  });
+
+  it('streaks fall straight down, parallel, because the game is flat', () => {
+    // This pin used to assert the OPPOSITE — that streaks radiate from a
+    // vanishing point — on the reasoning that parallel lines are rain and
+    // perspective is what makes a warp. True of a cockpit looking down its flight
+    // axis; false here. Aphelion has never implied depth: the camera is side-on,
+    // the field is flat, and the only third dimension its starfield expresses is
+    // parallax — tiers scrolling at different SPEEDS across one plane. A cone puts
+    // a horizon in a game with no horizon, and it reads instantly as a different
+    // space. Reported from the seat as "too three dimensional whereas the whole
+    // game has been 2D".
+    const r = recordingContext();
+    new Starfield(rcfg, 7).draw(r.ctx, cam(), rcfg, 1);
+    const from = r.calls('moveTo') as Array<[string, number, number]>;
+    const to = r.calls('lineTo') as Array<[string, number, number]>;
+    expect(from.length).toBeGreaterThan(0);
+    for (let i = 0; i < from.length; i++) {
+      expect(to[i]![1], 'no horizontal component at all').toBeCloseTo(from[i]![1], 9);
+      expect(to[i]![2], 'and every one of them falls').toBeGreaterThan(from[i]![2]);
+    }
+  });
+
+  it('streaks by tier speed, which is the parallax it already has', () => {
+    // Within one plane nothing makes a star faster than its neighbour, so length
+    // is per TIER, not per star. Three tiers, three lengths — the same depth cue
+    // the still field uses, stated harder.
+    const r = recordingContext();
+    new Starfield(rcfg, 7).draw(r.ctx, cam(), rcfg, 1);
+    const from = r.calls('moveTo') as Array<[string, number, number]>;
+    const to = r.calls('lineTo') as Array<[string, number, number]>;
+    const lengths = new Set(from.map((m, i) => Math.round((to[i]![2] - m[2]) * 100)));
+    expect(lengths.size, 'one length per tier').toBe(3);
   });
 });
 

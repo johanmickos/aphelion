@@ -8,7 +8,7 @@ import type { SimConfig } from '../sim/config.ts';
 import type { Body } from '../sim/types.ts';
 import type { FieldBounds } from '../sim/world.ts';
 import type { Camera } from './camera.ts';
-import { clipToWindow } from './camera.ts';
+import { clipToWindow, toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import { Starfield } from './starfield.ts';
 import {
@@ -27,6 +27,7 @@ import { Scar } from './scar.ts';
 import { drawVerdict } from './verdict.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
+import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from './ceremony.ts';
 import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
 import { drawEdgeMarkers } from './edge-markers.ts';
@@ -126,6 +127,9 @@ export class Scene {
     // Derived once and shared by the line and the arrow that points at it, so the
     // two can never disagree about where the finish is.
     const finishY = sim.clearAtTop ? field.crest - sim.grabRange : null;
+    // Null unless the field has just been cleared. Everything the ceremony
+    // touches reads it, so "is this the victory frame" is asked once.
+    const cer = ceremonyPhase(snap);
 
     // the bars
     ctx.fillStyle = '#05070d';
@@ -168,13 +172,18 @@ export class Scene {
       this.outroT >= 0 ? Math.min(1, this.outroT / OUTRO_SECS) : null,
     );
 
-    this.stars.draw(ctx, cam, render);
+    this.stars.draw(ctx, cam, render, cer ? cer.warp : 0);
     drawHazardZones(ctx, cam, render, field);
     drawBacktrackFloor(ctx, cam, sim, render, snap.highWaterY);
     // Under the line it feeds into, so the chequers stay the brightest thing in
     // that part of the sky.
-    drawSpeedCarpet(ctx, cam, field, finishY, sim.finishFunnelDepth, opts.timeMs);
-    drawFinishLine(ctx, cam, field, finishY);
+    // Both stand down once the ship is through: a runway and a finish line are
+    // instructions for a race that is over, and leaving them lit would have the
+    // ceremony still pointing at something behind it.
+    if (!cer) {
+      drawSpeedCarpet(ctx, cam, field, finishY, sim.finishFunnelDepth, opts.timeMs);
+      drawFinishLine(ctx, cam, field, finishY);
+    }
     this.bodyRenderer.draw(
       ctx,
       cam,
@@ -221,9 +230,38 @@ export class Scene {
       if (this.burn < 0.002) this.burn = 0;
     }
 
+    // The gold, over the world and under the ship: it should tint the sky the
+    // ship is flying through, never the ship itself.
+    if (cer) drawCeremonyWash(ctx, cam, cer);
+
+    // During the ceremony the ship is drawn away from where the simulation left
+    // it, easing to the middle. A translate rather than a position argument,
+    // because the trail has to travel with it — they are one object, and moving
+    // only the hull would leave the wake behind at the crossing point.
+    let shifted = false;
+    if (cer) {
+      const sx = toScreenX(cam, snap.x);
+      const sy = toScreenY(cam, snap.y);
+      const to = ceremonyShipPos(cam, cer, sx, sy);
+      if (to.x !== sx || to.y !== sy) {
+        ctx.save();
+        ctx.translate(to.x - sx, to.y - sy);
+        shifted = true;
+      }
+    }
     this.trail.draw(ctx, cam, snap.x, snap.y);
     drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
-    drawShip(ctx, cam, snap, opts.score.hopped.length, this.burn, opts.timeMs);
+    // Nose up through the ceremony. See `drawShip`'s `heading`.
+    drawShip(
+      ctx,
+      cam,
+      snap,
+      opts.score.hopped.length,
+      this.burn,
+      opts.timeMs,
+      cer ? -Math.PI / 2 : undefined,
+    );
+    if (shifted) ctx.restore();
 
     // Above the ship and its wake, below the HUD: it belongs to the world, but
     // nothing in the world should ever cover it.

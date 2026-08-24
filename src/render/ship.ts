@@ -280,10 +280,20 @@ export function drawShip(
   hops = 0,
   burn = 0,
   timeMs = 0,
+  /**
+   * Heading in radians, when the velocity cannot supply one.
+   *
+   * `endRun` zeroes the velocity, and `atan2(0, 0)` is 0 — so at the end of every
+   * run the ship silently snaps to pointing RIGHT, whatever it was doing a tick
+   * earlier. Harmless while the frame is held for a fraction of a second over a
+   * crash; not harmless when the ceremony holds that frame and flies the sky past
+   * it for several seconds.
+   */
+  heading?: number,
 ): void {
   const x = toScreenX(cam, snap.x);
   const y = toScreenY(cam, snap.y);
-  const ang = Math.atan2(snap.vy, snap.vx);
+  const ang = heading ?? Math.atan2(snap.vy, snap.vx);
   const s = cam.scale;
   const phase = snap.capture?.phase;
 
