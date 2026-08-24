@@ -290,6 +290,20 @@ export function replayReport(report: DiagReport): Analysis {
       `${score.flybys} flyby(s), ${score.burns} burn(s), ` +
       `best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,
   );
+  {
+    // How late the presses were is the whole point of the award, so the finding
+    // reports the quality rather than only the money: a run can be paid well for
+    // rescues and still be leaving most of every window on the table.
+    const rescues = awards.filter((a) => a.kind === 'rescue');
+    if (rescues.length > 0) {
+      const paid = rescues.reduce((n, a) => n + a.points, 0);
+      const late = rescues.reduce((n, a) => n + a.timing, 0) / rescues.length;
+      findings.push(
+        `${rescues.length} rescue(s) worth ${paid} — ` +
+          `window spent, on average ${(100 * late).toFixed(0)}% (1.00 is a press at the cross)`,
+      );
+    }
+  }
   if (score.burns > 0) {
     const burns = awards.filter((a) => a.kind === 'burn');
     const paid = burns.reduce((n, a) => n + a.points, 0);
@@ -398,6 +412,7 @@ const AWARD_KIND: Record<AwardRecord[1], ScoreAward['kind']> = {
   h: 'hop',
   f: 'flyby',
   b: 'burn',
+  r: 'rescue',
 };
 
 export function recordedAwards(report: DiagReport): ScoreAward[] | null {
@@ -644,16 +659,16 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
       out.push('  score — RECOMPUTED (this report predates recorded awards)');
     }
     out.push(
-      '    tick  ev     what      points   mult   close   heat   peak    aim   defl   climb  earned',
+      '    tick  ev      what      points   mult   close   heat   peak    aim   defl   climb  earned',
     );
     for (const w of shown.slice(0, 24)) {
       out.push(
-        `    ${String(w.tick).padStart(5)}  ${w.kind.padEnd(5)}  ` +
+        `    ${String(w.tick).padStart(5)}  ${w.kind.padEnd(6)}  ` +
           `${w.body.padEnd(10)}` +
           `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
-          `${(w.kind === 'link' || w.kind === 'burn' ? '  · ' : w.close.toFixed(2)).padStart(5)}  ` +
+          `${(w.kind === 'link' || w.kind === 'burn' || w.kind === 'rescue' ? '  · ' : w.close.toFixed(2)).padStart(5)}  ` +
           `${(w.kind === 'burn' ? w.heat.toFixed(2) : '  · ').padStart(5)}  ` +
-          `${(w.kind === 'link' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +
+          `${(w.kind === 'link' || w.kind === 'rescue' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.aim.toFixed(2) : '  · ').padStart(5)}  ` +
           `${w.defl.toFixed(0).padStart(4)}  ` +
           `${w.climb.toFixed(0).padStart(5)}  ` +

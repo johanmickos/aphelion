@@ -40,7 +40,7 @@
 import type { SimConfig } from './config.ts';
 import type { Capture, SimState } from './types.ts';
 import { NO_INPUT } from './types.ts';
-import { stepSim } from './step.ts';
+import { shipWorldPos, stepSim } from './step.ts';
 import { fieldBounds } from './world.ts';
 
 /** One point on the projected path, and whether a press there still saves you. */
@@ -72,6 +72,17 @@ export interface RescueScar {
   cross: { x: number; y: number; t: number } | null;
   /** The projected drift path, ship first, ending where the run would. */
   path: ScarSample[];
+  /**
+   * Where the ship would fly if it pressed AT the cross and held: one world
+   * position per tick, from the press to the moment it turns away.
+   *
+   * Empty when there is no cross. It exists so a consumer can measure something
+   * about the rescue this mark is offering — what the fire would be worth, in
+   * `src/score/` — without simulating the same flight a second time, and without
+   * `src/sim/` having to learn what a point is. The simulation hands over a
+   * trajectory; scoring is somebody else's word for it.
+   */
+  flight: Array<{ x: number; y: number }>;
 }
 
 export interface ScarOptions {
@@ -82,13 +93,37 @@ export interface ScarOptions {
    * a different question.
    */
   horizon: number;
-  /** Ticks between evaluated press-points. Sets the resolution of the holes. */
+  /**
+   * Smallest gap between evaluated press-points, in ticks. Sets the finest
+   * resolution the holes can be drawn at.
+   */
   stride: number;
   /**
-   * Ticks a hypothetical capture is followed before it is given up on. Reached
-   * only by a capture that neither dies nor turns, which is a shape that should
-   * not exist; resolving it as NOT rescued is the conservative direction, and
-   * conservative pulls the cross earlier.
+   * Most press-points to evaluate, however long the drift is.
+   *
+   * A cost bound, and the one that matters most: each evaluation is a whole
+   * simulated capture, and the drift ahead of a shallow approach can be six
+   * seconds long. Unbounded, the worst call in the corpus evaluated 121 presses
+   * and took 46ms — three frames at 60Hz on a desktop, and the author reported the
+   * consequence as "slowdown due to rendering... more noticeable at the edges",
+   * which is exactly where this stops taking its cheap refusal.
+   *
+   * The stride widens to fit rather than the path being truncated, so a long
+   * approach is sampled coarsely rather than only near the ship. Holes get
+   * blockier on those; nothing else changes.
+   */
+  maxSamples: number;
+  /**
+   * Ticks a hypothetical capture is followed before it is given up on.
+   *
+   * Reached only by a capture that neither dies nor turns, which is a shape that
+   * should not exist; resolving it as NOT rescued is the conservative direction,
+   * and conservative pulls the cross earlier.
+   *
+   * 360 and not the 900 it started at. Measured, a winning flight runs a median
+   * 89 ticks and 223 at p90, so six seconds is far past anything real — and every
+   * evaluation that neither dies nor turns pays the whole budget, which made it
+   * the second-largest term in the worst call.
    */
   captureBudget: number;
 }
@@ -96,7 +131,8 @@ export interface ScarOptions {
 export const DEFAULT_SCAR_OPTIONS: Readonly<ScarOptions> = Object.freeze({
   horizon: 6,
   stride: 3,
-  captureBudget: 900,
+  maxSamples: 40,
+  captureBudget: 360,
 });
 
 const PRESS = Object.freeze({ held: true, pressed: true, released: false });
@@ -152,15 +188,59 @@ function rescues(
   dt: number,
   side: 1 | -1,
   budget: number,
+  record: Array<{ x: number; y: number }> | null = null,
 ): boolean {
   const s = cloneState(from);
   stepSim(s, cfg, PRESS, dt);
   for (let i = 0; i < budget; i++) {
+    if (record) {
+      const p = shipWorldPos(s);
+      record.push({ x: p.x, y: p.y });
+    }
     if (s.ending.active) return false;
     if (worldVx(s) * side <= 0) return true;
     stepSim(s, cfg, HOLD, dt);
   }
   return false;
+}
+
+/**
+ * The same answer, `secs` later, without simulating anything again.
+ *
+ * A DRIFT TAKES NO INPUT, so the projection a call produced stays true as the
+ * ship flies along it: every sample is a world point with a fixed verdict, and
+ * the cross is a place rather than a countdown. What changes as the ship advances
+ * is only which samples are still ahead of it and how long is left.
+ *
+ * That makes a full recompute per tick almost pure waste, and the waste was
+ * measurable: a simulating call runs a median 1.4ms and up to 19ms on a desktop,
+ * three to five times that on a phone, which is what the author saw as "slowdown
+ * ... more noticeable at the edges". The edges are where the cheap refusal stops
+ * applying.
+ *
+ * Returns null once the projection is spent — the ending it was describing is now
+ * behind, so there is nothing left to advance and the caller must ask again.
+ *
+ * IT DOES NOT KNOW WHEN IT IS WRONG. Anything that changes the ship's velocity —
+ * a press, a release, a respawn — invalidates the projection, and the caller is
+ * responsible for noticing. `app/main.ts` recomputes on every capture transition
+ * and on a timer besides.
+ */
+export function advanceScar(scar: RescueScar, secs: number): RescueScar | null {
+  const tEnd = scar.tEnd - secs;
+  if (tEnd <= 0) return null;
+  const path = scar.path.filter((p) => p.t - secs >= 0).map((p) => ({ ...p, t: p.t - secs }));
+  const crossT = scar.cross ? scar.cross.t - secs : 0;
+  return {
+    side: scar.side,
+    tEnd,
+    // A cross the ship has reached is a cross it is now past, which is the same
+    // thing `rescueScar` reports by returning none: the last press that could
+    // have worked is behind.
+    cross: scar.cross && crossT >= 0 ? { ...scar.cross, t: crossT } : null,
+    path,
+    flight: scar.flight,
+  };
 }
 
 /**
@@ -193,39 +273,54 @@ export function rescueScar(
     (Math.abs(state.ship.burstX) * Math.min(opts.horizon, cfg.boostBurstDecay)) / 2;
   if (state.ship.x - reach > fb.left && state.ship.x + reach < fb.right) return null;
 
-  // ---- project the drift, keeping a resumable copy at every tick
+  // ---- project the drift once, keeping positions per tick and states sparsely
+  //
+  // A state copy costs a structural clone including the bodies array, and only
+  // the sampled ticks are ever resumed from — keeping one at every tick was 361
+  // copies for the 40 that got used. The first pass finds the ending and nothing
+  // else; the second walks the same drift again and clones only where it stops.
+  // Walking twice is far cheaper than copying 360 times.
   const maxTicks = Math.ceil(opts.horizon / dt);
-  const track: SimState[] = [cloneState(state)];
   const s = cloneState(state);
   let endTick = -1;
+  let endReason: SimState['ending']['reason'] = 'impact';
+  let endX = 0;
   for (let i = 1; i <= maxTicks; i++) {
     stepSim(s, cfg, NO_INPUT, dt);
-    track.push(cloneState(s));
     if (s.ending.active) {
       endTick = i;
+      endReason = s.ending.reason;
+      endX = s.ending.x;
       break;
     }
   }
   if (endTick < 0) return null; // nothing ahead worth marking
-  if (track[endTick]!.ending.reason !== 'out-of-bounds') return null;
+  if (endReason !== 'out-of-bounds') return null;
 
   // Which wall, read off where the run actually ended rather than off the
   // heading: `outX` and `outY` share one ending, and a ship that left over the
   // top while drifting sideways has no side deadline to mark.
-  const endX = track[endTick]!.ending.x;
   const side: 1 | -1 | 0 = endX > fb.right ? 1 : endX < fb.left ? -1 : 0;
   if (side === 0) return null;
 
-  // ---- evaluate a press at every `stride`th tick along it
+  // ---- evaluate a press at each sampled tick, re-walking the drift as we go
+  //
+  // The stride widens so the whole approach is covered by at most `maxSamples`
+  // evaluations. A six-second drift is then sampled every 9 ticks rather than
+  // every 3, which costs resolution in the holes and bounds the work.
+  const stride = Math.max(opts.stride, Math.ceil((endTick + 1) / opts.maxSamples));
   const path: ScarSample[] = [];
   let lastLive = -1;
+  let lastLiveState: SimState | null = null;
   let firstDeadAfter = -1;
-  for (let i = 0; i <= endTick; i += opts.stride) {
-    const at = track[i]!;
-    const live = rescues(at, cfg, dt, side, opts.captureBudget);
-    path.push({ t: i * dt, x: at.ship.x, y: at.ship.y, live });
+  const walk = cloneState(state);
+  for (let i = 0; i <= endTick; i += stride) {
+    while (walk.tick - state.tick < i) stepSim(walk, cfg, NO_INPUT, dt);
+    const live = rescues(walk, cfg, dt, side, opts.captureBudget);
+    path.push({ t: i * dt, x: walk.ship.x, y: walk.ship.y, live });
     if (live) {
       lastLive = i;
+      lastLiveState = cloneState(walk);
       firstDeadAfter = -1;
     } else if (firstDeadAfter < 0) {
       firstDeadAfter = i;
@@ -235,17 +330,28 @@ export function rescueScar(
   // ---- refine the last live tick to the tick, so the cross is a stable world
   // point rather than one that hops by a stride as the ship advances into it
   let cross: RescueScar['cross'] = null;
-  if (lastLive >= 0) {
-    let lo = lastLive;
-    let hi = firstDeadAfter >= 0 ? firstDeadAfter : Math.min(endTick, lastLive + opts.stride);
-    while (hi - lo > 1) {
-      const mid = (lo + hi) >> 1;
-      if (rescues(track[mid]!, cfg, dt, side, opts.captureBudget)) lo = mid;
-      else hi = mid;
+  const flight: Array<{ x: number; y: number }> = [];
+  if (lastLive >= 0 && lastLiveState) {
+    // Walk the tick or two past the last live sample rather than bisecting into a
+    // table of stored states. The gap is one stride, so this is a handful of
+    // evaluations either way, and it needs no clone of every tick to index into.
+    const hi = firstDeadAfter >= 0 ? firstDeadAfter : Math.min(endTick, lastLive + stride);
+    let best = lastLiveState;
+    let bestTick = lastLive;
+    const probe = cloneState(lastLiveState);
+    for (let i = lastLive + 1; i < hi; i++) {
+      stepSim(probe, cfg, NO_INPUT, dt);
+      if (!rescues(probe, cfg, dt, side, opts.captureBudget)) break;
+      best = cloneState(probe);
+      bestTick = i;
     }
-    const at = track[lo]!;
-    cross = { x: at.ship.x, y: at.ship.y, t: lo * dt };
+    cross = { x: best.ship.x, y: best.ship.y, t: bestTick * dt };
+    // One more flight, this time kept. It is the rescue the mark is offering, and
+    // re-flying it costs a single capture against the dozens the search already
+    // ran — much less than making every evaluation carry an array it would throw
+    // away.
+    rescues(best, cfg, dt, side, opts.captureBudget, flight);
   }
 
-  return { side, tEnd: endTick * dt, cross, path };
+  return { side, tEnd: endTick * dt, cross, path, flight };
 }

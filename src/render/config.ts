@@ -154,9 +154,103 @@ export interface RenderConfig {
    * behind the notice the player is reading.
    */
   scarFadeOutSecs: number;
+  /**
+   * How long a DISPLACED mark gets instead, in seconds.
+   *
+   * Reported as "we should fade old crosses a bit faster if the user taps more.
+   * The scars add clutter, and it's only the most recent one that matters." Both
+   * halves of that are right, and they pull in opposite directions on one number:
+   * the mark left behind at a death is the explanation of the death and wants the
+   * long fade, while a mark shoved aside by a fresh answer is stale the instant it
+   * is replaced.
+   *
+   * So the duration belongs to the MARK and not to the class. A mark keeps
+   * `scarFadeOutSecs` for as long as it is the current one, and is cut to this the
+   * moment another takes its place. Tapping through the band replaces marks fast,
+   * which is exactly when the clutter appears and exactly when this bites.
+   *
+   * Applied as a rescale rather than a jump — see `Scar.observe` — so a ghost
+   * carries on from the alpha it already had instead of blinking down to it.
+   */
+  scarGhostSecs: number;
+  /**
+   * A capture this short leaves no mark behind at all, in seconds.
+   *
+   * Asked for as "only show it if the user holds it for just a few frames, to
+   * avoid spamming". A press hides the scar and leaves the mark fading where the
+   * cross was, so a burst of taps leaves a burst of marks — and a tap is not a
+   * decision worth recording.
+   *
+   * MEASURED, because real captures are not as short as they feel. Over the
+   * corpus a capture runs a median 1.32s, with p5 at 0.300s and p1 at 0.100s.
+   * There is no gap in the distribution to cut at, but there is a distinct tail:
+   * 0.18 catches 2% of all captures and sits comfortably between p1 and p5, so it
+   * never reaches ordinary play. In a tapping burst it catches nearly all of them,
+   * which is the point — it targets the burst rather than the average.
+   *
+   * NOT the game's own idea of a tap. `ScoreAward` calls a press that never
+   * reached periapsis one, because it earns nothing; measured, that is 48% of all
+   * captures at a median of 0.72s, which is most of the game rather than a tap.
+   */
+  scarTapSecs: number;
   /** Half-length of the crossbar, and of the arm stub kept after the cross is passed. */
   scarBarHalf: number;
   scarStubHalf: number;
+  /**
+   * How much the mark shrinks and grows with the fire waiting at the cross.
+   *
+   * SIZE AND NOT BRIGHTNESS, and that is the whole reason this is a separate key
+   * rather than a term folded into `scarAlpha`. Alpha already carries how close
+   * the deadline is — it ramps in with time-to-cross and fades out once the mark
+   * is passed — so a prize term there would make a dim cross mean either "small
+   * fire" or "still far away", with no way to tell which. Note 51's lesson about
+   * spending one channel on two signals, applied to a world object instead of to
+   * text.
+   *
+   * The mark scales between these two multiples of its configured size, so a big
+   * fat scar is a big fire and a thin one is a formality.
+   *
+   * THEY COMPOUND WITH `scarNearWidth`, which is what made the mark read as too
+   * thick: a big prize and a press right on the cross used to multiply out to
+   * 1.99x, near double. Both were brought in together rather than either alone —
+   * the two signals are independent and each still has to be legible on its own,
+   * so the fix was the product and not one of the factors.
+   */
+  scarPrizeMin: number;
+  scarPrizeMax: number;
+  /**
+   * Predicted burn, in raw bank points, at which the mark reaches full size.
+   *
+   * Measured over the 548 committed approaches in `diagnostics/`: the fire
+   * waiting at the cross runs p25 280, median 402, p75 613, p90 857. 860 is that
+   * p90 — the mark saturates only on the top tenth, so the middle of real play
+   * spends its time in the middle of the scale rather than pinned at the top.
+   *
+   * Only 3% of crosses have no fire at all, which was the surprise: the flight
+   * AFTER the press carries the ship deeper than the cross itself, so nearly every
+   * rescue burns. The scale is about how much, not whether.
+   */
+  scarPrizeFull: number;
+
+  // --- the skull ---
+  /**
+   * Peak alpha of the doom skull.
+   *
+   * Louder than the scar's 0.5: the scar is something to read while deciding, and
+   * this is the announcement that there is nothing left to decide.
+   */
+  doomAlpha: number;
+  /**
+   * Seconds a tick represents, for the verdict badges that beat on the tick.
+   *
+   * Here rather than imported from `SimConfig` because it is a RENDER fact — how
+   * fast a pulse looks — and because nothing in `src/render/` should be reaching
+   * into the simulation's timestep to animate itself. If the two ever disagree a
+   * badge beats at the wrong speed, which is a cosmetic bug; reading `FIXED_DT`
+   * here would make the renderer's animation a function of physics tuning, which
+   * is a worse one.
+   */
+  verdictTickSecs: number;
   /** Peak half-width of the long arm and of the crossbar, in design units. */
   scarArmWidth: number;
   scarBarWidth: number;
@@ -170,6 +264,38 @@ export interface RenderConfig {
    */
   scarAlpha: number;
   scarDeadFrac: number;
+  /**
+   * What the mark reaches, in alpha and in width, when a press lands right on it.
+   *
+   * THE COMPASS'S OWN IDIOM. Its rings run `(0.15 + 0.5 * align)` on alpha and
+   * `(2 + 2 * align)` on width, so both rise together as the sweep lines up, and
+   * the author named it: "I like how we do the compass by making the color
+   * brighter when the ship is in the window." Here `align` is how close the ship
+   * is to the cross, so the mark tightens and burns brighter over the last stretch
+   * exactly as the decision gets sharper.
+   *
+   * IT REPLACED A LABEL, AND IS BETTER THAN ONE. Two badges were tried and cut on
+   * sight — SAFE for the recovery, then Nice! for the press that dared it — with
+   * "it's too crowded and the anticipation is fun" and "the 'nice!' is a bit
+   * cluttered". An instrument reacting is worth more than a word about the
+   * instrument, and it costs no threshold: how close a press was is a number, not
+   * a category.
+   *
+   * KEYED TO THE PRESS, not to the approach. It rose continuously with proximity
+   * for one session and lit on every approach, including the ones the player was
+   * going to sail straight past — ambience rather than an answer. `Mark.glow` is
+   * frozen at the press instead, so a mark the ship drifted past never lights.
+   *
+   * The width half compounds with `scarPrizeMax`, and together they reached 1.99x
+   * — reported as looking "a bit thick". Both came down; see the note there.
+   *
+   * 0.95 first, reported as "there are times that the cross glows a bit too
+   * bright". The lift matters more than the ceiling: half again over `scarAlpha`
+   * is plainly legible as the mark sharpening, where nearly double read as the
+   * mark shouting. The scar is meant to be faint enough to fly past.
+   */
+  scarNearAlpha: number;
+  scarNearWidth: number;
   /**
    * How fast the scar reacts to a change, per second: both how the mark follows
    * a moved cross and how a new mark fades in. One rate, because they are one
@@ -268,14 +394,24 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   scarFadeInSecs: 3.67,
   scarFullSecs: 1.65,
   scarFadeOutSecs: 1.6,
+  scarGhostSecs: 0.3,
+  scarTapSecs: 0.18,
   scarBarHalf: 13,
   scarStubHalf: 17,
+  scarPrizeMin: 0.62,
+  scarPrizeMax: 1.18,
+  scarPrizeFull: 860,
+
+  doomAlpha: 0.78,
+  verdictTickSecs: 1 / 60,
   scarArmWidth: 1.3,
   scarBarWidth: 1.7,
   scarAlpha: 0.5,
   scarDeadFrac: 0.18,
+  scarNearAlpha: 0.74,
+  scarNearWidth: 1.15,
   scarSettleRate: 9,
-  scarArmMaxPx: 260,
+  scarArmMaxPx: 150,
 
   boostGlowMin: 13,
   boostGlowMax: 42,

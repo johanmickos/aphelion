@@ -100,6 +100,23 @@ const STACK_GAP = 20;
  */
 const STACK_X = 80;
 
+/**
+ * How long a receipt stays open past its last award, in seconds.
+ *
+ * ONE POPUP PER CAPTURE, and this is what makes it possible. A capture pays two
+ * awards at least — a grab at periapsis and a link at the release — and up to
+ * four, with the burn arriving after the fire dies, which is usually after the
+ * ship has let go. Measured over the corpus, consecutive awards inside one
+ * capture land a median 1.07s apart and 1.80s at p90, so a 1.8s tail holds about
+ * nine in ten of them on the same receipt.
+ *
+ * It is a CAP as much as a window. The capture rule on its own is exact — every
+ * award belongs to the capture that was running when it was earned, and the
+ * corpus produces no orphans — but a capture held through a long settle can span
+ * eighteen seconds, and a popup open that long is furniture rather than feedback.
+ */
+const RECEIPT_TAIL = 1.8;
+
 import { BURN_WORD, HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 /**
@@ -139,8 +156,33 @@ interface Popup {
 export class Popups {
   private live: Popup[] = [];
 
+  /**
+   * The receipt currently collecting this capture's awards, or null.
+   *
+   * A reference into `live`, so ageing it out and drawing it need no special
+   * case: it is an ordinary popup that happens to still be accepting entries.
+   */
+  private receipt: Popup | null = null;
+
   clear(): void {
     this.live = [];
+    this.receipt = null;
+  }
+
+  /**
+   * A new capture has begun, so the last one's receipt is finished.
+   *
+   * Called from `app/main.ts` on the press that takes, and on a death. The
+   * grouping this gives is EXACT rather than a guess: a link lands at the release
+   * and a burn when the fire goes out, both after the capture is over but both
+   * before the next press, so "everything since the last capture began" collects
+   * them and nothing else. Measured over the corpus it produces no orphans at all.
+   *
+   * The popup itself is not touched — it lives out its tail and fades where it is.
+   * Only its willingness to accept more is withdrawn.
+   */
+  settleReceipt(): void {
+    this.receipt = null;
   }
 
   /** For tests and for the HUD; not part of drawing. */
@@ -158,8 +200,43 @@ export class Popups {
   spawn(award: ScoreAward, x: number, y: number): void {
     const praise = praiseFor(award);
     const burning = award.kind === 'burn';
-    this.live.push({
+
+    // Into the open receipt, if there is one still on screen AND this award has
+    // nothing of its own to say.
+    //
+    // Reported as "there are so many at so many different points that the user
+    // doesn't know what they're being rewarded for" — measured at 31.7 things a
+    // minute, with 51% landing while the previous popup was still up. The same
+    // measurement says where the noise is: 74% of awards carry nothing but a
+    // number. Those are what merges.
+    //
+    // A WORD ALWAYS KEEPS ITS OWN POPUP, and that is not a nicety. `praise.ts`
+    // gives a superlative arrival and a superlative departure disjoint word lists
+    // precisely because they once shared one gold word, "which made the rarest
+    // thing in the game the only one that could not say what it was for". A merge
+    // that kept the better of two words would rebuild that, on the rarest and most
+    // expressive events the game has. So the receipt collects the numbers and
+    // every word still speaks for itself.
+    const open = this.receipt;
+    if (!praise && open && open.t < open.life && this.live.includes(open)) {
+      open.points = (open.points ?? 0) + award.points;
+      // The number counts up to the new total rather than jumping to it, which is
+      // the treatment `awardBurn` already chose for a figure that arrives all at
+      // once: it reads as a tally rather than as a replay.
+      open.roll = ROLL;
+      open.hop = open.hop || award.kind === 'hop';
+      // The clock restarts, so the receipt lives its tail past its LAST entry
+      // rather than past its first.
+      open.t = 0;
+      open.life = RECEIPT_TAIL;
+      return;
+    }
+
+    const popup: Popup = {
       x,
+      // Where the FIRST award of the capture landed, and it stays there. A receipt
+      // that chased the ship would jump each time it grew, and the capture
+      // happened at the planet the first award names.
       y: this.freeY(x, y),
       t: 0,
       life: burning ? LIFE_BURN : praise?.category === 'super' ? LIFE_SUPER : LIFE,
@@ -169,7 +246,9 @@ export class Popups {
       roll: burning ? ROLL : 0,
       hop: award.kind === 'hop',
       tally: false,
-    });
+    };
+    this.live.push(popup);
+    this.receipt = popup;
     while (this.live.length > MAX_LIVE) this.live.shift();
   }
 

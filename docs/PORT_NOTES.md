@@ -2919,6 +2919,660 @@ should be judged on its own. `docs/IDEAS.md`.
 
 ---
 
+### 53 — The rescue pays for the decision, because the burn already pays for the depth
+
+`src/score/score.ts` · `src/score/config.ts` · **[NEW]** · asked for as "I want to
+reward the player for pressing/rescuing themselves, with more points for tighter,
+last minute rescues"
+
+**Timing, not margin, and that is the whole design.** How CLOSE to the wall a
+rescue came is already paid, continuously and precisely: `burnBank` integrates
+`edgeHeat` over the fire, so a later press is already worth more because it starts
+deeper and burns longer. A margin bonus would be note 29 in points form — one act
+collecting twice. What the score did not know is how much of the available window
+the player CHOSE to spend, and the cross is what makes that quantity visible and
+therefore aimable. So the award reads the press and nothing else.
+
+**It is armed at the press and paid at the outcome.** The quality is a property of
+the instant the button went down, and one tick later the drift it was measured
+against no longer exists — `sc.lastDrift` is the state `beginCapture` actually
+read, and is not interchangeable with the capture's own `rx`/`ry`, which
+`stepCapture` has already advanced by a tick on that same tick. But the press
+alone cannot tell a rescue from a death: a press past the cross looks identical
+until the ship fails to come back. So the points settle when the ship's velocity
+toward the wall reaches zero, which is exactly what `src/render/scar.ts` draws.
+Being doomed and being lazy both pay nothing, for the same reason.
+
+**Once per body per life**, the same shape as `claimed`. The rule is not
+hypothetical: the author's own report of the scar was *"I can tap a bunch to
+extend my burn through the red zone"*, and every one of those taps is a press with
+almost no window left that does turn the ship away. Without the latch the tightest
+possible rescue would also be the most repeatable one, several times a second —
+the faucet `ScoreAward` already documents for tap-in-place grabs. Per BODY rather
+than per press, so rescuing yourself onto a different planet still pays: that is a
+new decision about a new body.
+
+**The span is measured, and is provisional in a knowable direction.** Over the
+507 presses in the corpus made while committed to a wall:
+
+```
+  window left at the press   p10 0.28s   median 1.30s   p75 2.37s   p90 3.90s
+```
+
+`rescueSpan` is 2.4 — that p75, chosen the way `closeSpan` was, to span real play.
+Every press in that sample was made BLIND, though: the scar did not exist, so the
+distribution describes players who could not see the line they are now scored
+against. Presses will move later, the median quality will rise, and the span will
+want to shrink. Re-measure rather than adjusting on feel.
+
+What it comes to, replaying the corpus under the new rule:
+
+```
+  rescues paid            224 over 62 sessions   (3.6 a session, 15 sessions had none)
+  points from rescues     8.7% of everything awarded, mean 435 each
+  quality actually paid   p25 0.30   median 0.56   p75 0.78   p90 0.86
+```
+
+A rescue is worth about what a link is worth, which is the intended size: saving
+the run at the last moment should rank with the thing the game is otherwise about,
+not above it. The quality distribution is the number that matters — it sits across
+the middle of its range rather than pinned at either end, so the scale is being
+used rather than saturated.
+
+**No praise word, deliberately, and this is the second time that call has been
+made.** Every threshold in `praise.ts` is a measured percentile of real play, and
+exactly one recording has ever been flown with the cross visible. A word gated on
+blind play would be calibrated on a game where the line was invisible. The band
+caption says `RESCUE · LATE 0.87`, which reads as praise the moment it is high and
+needs no vocabulary behind it; the word waits for play to measure it on.
+
+**Cost.** `armRescue` runs `rescueScar`, which forward-simulates — affordable only
+because it runs once per capture and because 63% of presses take the predictor's
+cheap refusal without ever reaching the projection. `test/score.test.ts` went 1.7s
+to 2.8s for the whole file.
+
+**A fixture blind spot, for the third time.** `rescueBonus` and `rescueSpan` both
+measured as inert at first, because no session in the battery ever pressed while
+committed to a side boundary — the same shape as the `nerveBonus` and
+`burnEdgeSpan` gaps recorded beside their scenarios. Real play does it on 37% of
+presses; the battery did it never. The new scenario drifts at the right wall from
+400px out, which gives a 1.7s window, and pressing at tick 60 spends 0.71 of it.
+
+---
+
+### 54 — The mark grows with the fire, because brightness was already spoken for
+
+`src/sim/rescue.ts` · `src/score/burn.ts` · `src/render/scar.ts` · **[NEW]** ·
+asked for as "I wonder if we could predict how deep/long of a fire burn the
+trajectory would have. If so, we could scale the intensify of the cross by the
+possible points to get"
+
+**Size, not intensity, and that was a correction to the request.** Alpha on the
+mark already carries how close the deadline is: it ramps in with time-to-cross and
+fades out once the mark is passed. A prize term on the same channel would make a
+dim cross mean either "small fire" or "still far away", with no way to tell which
+— note 51's lesson about spending one channel on two signals, applied to a world
+object instead of to text. The mark scales between 0.62x and 1.42x of its
+configured size instead, so a big fat scar is a big fire and a thin one is a
+formality, while faint still means only one thing.
+
+**The cost figure quoted below was later found to be misreported** — it was a mean
+over calls that mostly return early, and a call that actually simulates costs about
+seven times it. See note 57, which fixes the consequence.
+
+**Layering is what shaped the implementation.** Pricing a trajectory needs
+`burnRate` and `burnEdgeSpan`, which are `ScoreConfig`, and `src/sim/` may import
+nothing outside itself — `pnpm portable` proves it. So `rescueScar` returns the
+FLIGHT it simulated for the press at the cross, one world position a tick, and
+`previewBurn` in `src/score/` runs the same integral `scoreTick` runs on the real
+thing. The simulation hands over a trajectory; pricing it is somebody else's word.
+Recording costs one extra capture flight against the dozens the search already
+runs, and only for the winning press — much less than making every evaluation
+carry an array it would throw away.
+
+**There is more fire out there than expected.** Measured over 548 committed
+approaches:
+
+```
+  predicted burn is zero        17 of 548  (3%)
+  raw bank waiting at the cross  p25 280   median 402   p75 613   p90 857   max 2754
+```
+
+Only 3% of crosses offer no fire at all, which contradicts the guess that would
+have been made from the band alone — 41% of crosses sit inside the 60px band, but
+the flight AFTER the press carries the ship deeper than the cross itself, so nearly
+every rescue burns. The scale is about how much, not whether. `scarPrizeFull` is
+860, that p90: the mark saturates only on the top tenth, and the top of the
+distribution is three times it, so a mark that tracked the maximum would be a
+smear.
+
+**IT IS NOT THE PAYOUT, and the measurement is the reason that is written in
+capitals at the function.** The flight ends where `rescueScar`'s promise ends, at
+the turn-away — but the fire does not. The ship is still deep in the band at that
+moment and burns all the way back out through it:
+
+```
+  actual burn / promised   p10 1.94   p25 2.04   median 2.21   p75 2.51   p90 3.01
+  within 25% of promised   5 of 513
+```
+
+A systematic 2.2x under-count, not noise. That is fine for the one thing it is
+used for — sizing a mark, where what matters is that a bigger fire draws a bigger
+scar and where `scarPrizeFull` is calibrated in these same units — and it is NOT
+fine for showing the player a number or paying one. Anything that needs the real
+total has to keep flying past the turn-away until the heat drops below the floor,
+which is a longer flight than `rescueScar` has any reason to simulate for its own
+purposes. The first draft of this note claimed the promise and the payout "cannot
+describe different events"; they describe different INTERVALS of the same event,
+and the measurement is what caught it.
+
+**What pins it.** `test/score.test.ts` proves `previewBurn` is the burn's own
+integral rather than a lookalike: doubling `burnRate` doubles it exactly, twice
+the ticks at a constant depth is exactly twice the bank, it respects the same
+ignition floor, and it promises nothing inside an anomaly's bubble where there is
+no wall to burn against. `test/render.test.ts` proves the mark grows with the
+prize and saturates past the span. The scene battery now prices its scar the way
+`app/main.ts` does, so the sizing path is exercised by every frame of the
+wall-drift scenario rather than only by the one test that looks at it.
+
+---
+
+### 55 — The skull: the trigger that was right beat the trigger that was useful
+
+`src/render/doom.ts` · `src/score/score.ts` · **[NEW]** · asked for as "adding a
+pulsing skull next to the ship if they grab and hold too late"
+
+**"Too late" has two readings and they measure very differently.** Both were run
+against all 251 deaths in the corpus:
+
+```
+  PRESS made past the cross     108 of 251 deaths (43%)   lead median 0.85s p90 1.72
+                                fatal 94% of the time — ~7 of 115 such presses lived
+  HOLDING from here ends the run 94 of 251 deaths (37%)   lead median 0.83s p90 2.18
+                                true-then-recovered 141 times against 94 real deaths
+```
+
+The live one loses, and the reason is worth keeping: RELEASING is the escape, so
+"holding kills you" is right about the hold and wrong about the fate. A
+death's-head that is wrong more often than right teaches the player to ignore it.
+The press test is an omen and is almost always correct; the hold test would make a
+good "let go" cue, which is a different cue and should be built as one if it is
+built.
+
+The first version of that measurement was worthless and the mistake is easy to
+repeat: it asked the hold question on EVERY tick, including drifting ones. A held
+button does nothing while drifting — `stepSim` starts a capture on the pressed
+edge alone — so the test was reporting "this drift ends badly", which is true of
+every approach the player later presses out of, and it produced 754 false alarms
+instead of 141.
+
+**The scorer already knew, so the renderer does not ask again.** `armRescue` calls
+`rescueScar` at the press for the rescue award; whether a cross existed is the
+same question this needs, on the same tick. `ScoreState.doomed` carries it —
+observability, like `burnHeat`, which the flame already reads. A second forward
+simulation of the same press would be both waste and a second place for the answer
+to live.
+
+That reordering exposed something: the once-per-body rescue latch used to
+short-circuit before the scar was computed, which would have hidden the omen on a
+body already paid. Whether the run is lost is not a question about whether it has
+already been paid, so the scar is asked first and the latch applies only to the
+payout.
+
+**It may stand rather than flash, and that is a departure from `fuel-warning.ts`**
+— which argues, correctly, that a permanent badge beside the ship becomes part of
+the ship's silhouette, having measured its own condition riding along for 4.7% of
+a session. This one cannot: it lives a median 0.85s, p90 1.72s, appears about 1.7
+times a session, and 94% of the time the thing that ends it is the run ending. It
+is a countdown, not a status.
+
+**On the side away from the wall**, so it never draws over the hazard gradient or
+the receding scar — both red, both already in that space — and so the one thing on
+screen that is not the wall sits where an escape would be. Below the ship was
+taken by the fuel badge and above it is the lane the popups rise through.
+
+**It hands over at the death rather than surviving it.** `endLife` clears the flag
+on the ending tick and `drawDoom` refuses to draw during the ending hold, so the
+skull stops exactly where the `LOST — OFF COURSE` notice starts. The scar's mark
+does the opposite — it freezes and stays through the hold — and the difference is
+deliberate: the mark is evidence of where the line was, the skull is a countdown,
+and a countdown that continues after the thing it was counting to is noise.
+
+**It is withdrawn when the prediction is beaten.** 6% of presses past the cross
+turn away anyway, because the search is conservative by construction. When one
+does, the omen clears on the same event that pays the rescue at the top of its
+scale — the two are one moment, read two ways.
+
+---
+
+### 56 — SAFE, and the threshold that turned out not to be one **[SUPERSEDED by 58]**
+
+`src/render/verdict.ts` · `src/score/score.ts` · **[NEW]** · asked for as "can we
+add a similar pulsing icon for when the player pressed really close to the last
+second, indicating it was a tight rescue"
+
+**The definition arrived after the design question and made it moot.** The
+question put was where to set "really close", offered as a percentile of the
+measured quality distribution — p90 at 0.86, about 0.36 firings a session, with
+the honest caveat that all of it was blind play and would want re-measuring. The
+answer was not a percentile: *"by 'tight' I mean that the player would've been in
+the flames section of the side"*.
+
+That is a FACT and not a threshold. `burnHeat` is already a quantity the scorer
+keeps, and being alight is the definition rather than a percentile of one, so
+`ScoreState.tight` is set at the moment a rescue pays if the ship is on fire then.
+Nothing to calibrate, nothing to re-measure when play changes, and no
+`ScoreConfig` key — a value that decides WHEN something is judged and never what
+it costs is a constant next to its code, and this one is not even that.
+
+The two readings very nearly agree on rarity, which is why the percentile looked
+plausible:
+
+```
+  rescues paid                       224 over 62 sessions
+    alight at the moment they paid    26  (12%)  -> 0.4 a session
+  quality of the press
+    alight     p25 0.53   median 0.81   p75 0.91
+    cold       p25 0.24   median 0.54   p75 0.75
+```
+
+0.4 a session against the 0.36 the p90 would have given. The author's reading gets
+there without a number, and it is about the thing the player actually felt rather
+than about where they landed in a distribution.
+
+Worth noting what the same table says about the ORDER of events: "alight when it
+paid" and "the capture caught fire at all" are the same 26. A rescue capture that
+burns is always burning at the turn-away, because the turn-away IS the deepest
+point of the dive. So the badge cannot miss one by asking at the wrong moment.
+
+**One slot, two verdicts.** `fuel-warning.ts` owns the space below the ship and
+the popups own the lane above it, so there is one place left beside it, and both
+marks answer the same question. They cannot collide: `doomed` clears on the very
+tick `tight` is set, which is the 6% case where a press past the cross turns away
+anyway — the slot changes its mind at the moment the ship does. `doom.ts` became
+`verdict.ts` for that reason.
+
+**It was a spark first, and the correction is the useful part of this note.** The
+glyph was four tapered points borrowing the scar's own crossed spindles, on the
+theory that the mark you aimed at should flash back at you. Reported on sight:
+*"the spark isn't intuitive enough. I think it should say 'safe'"*.
+
+The fix was not to caption the spark. `accolade.ts` already records the rule —
+a vocabulary that needs a caption is a vocabulary that has not been chosen
+carefully enough — and a spark that has to be labelled SAFE is a spark that was not
+saying SAFE. The label became the whole mark.
+
+So the pair now mixes a glyph and a word, which is worth defending rather than
+tidying: a skull already means what it means, to everyone, with no game to learn it
+in. There is no equivalent universal sign for "you got away with it", and the first
+attempt is what discovered that. Do not replace SAFE with a symbol again without
+finding one that needs no caption.
+
+**Colourless, and that is the whole colour reasoning.** Every hue in the frame is
+spoken for: red is the wall, `#ee3f2c` is fire, purple is an anomaly, and the
+rarity ladder owns "how good" for text. Note 51 found the remaining channel the
+hard way — a near-white is recessive because it has NO hue, which leaves lightness
+free to be whatever legibility wants. Red would say danger and ember would say
+burning; this says neither. Set in `600 ui-monospace` at `fuel-warning.ts`'s own
+label size, because that is the other badge that speaks beside the ship and two
+badges that speak should not be set in two typefaces.
+
+**It flashes where the skull may stand.** Three pulses and gone, on
+`fuel-warning.ts`'s reasoning about badges that become part of the ship's
+silhouette. The skull is exempt because the wall ends it inside a median 0.85s;
+SAFE has no such deadline, so it needs the count.
+
+**SAFE is gone — see note 58.** The confirmation moved into the praise vocabulary
+as an `escape` axis, beside the points it confirms, asked for as "a small red
+verbal confirmation ... just like we do for tight planetary captures and exits".
+What survives from this note is the part that was never about where it was drawn:
+the trigger is being ALIGHT, which is a fact and not a percentile, and it fires
+0.4 times a session.
+
+---
+
+### 57 — The prediction was costing frames, and the mean was hiding it
+
+`src/sim/rescue.ts` · `app/main.ts` · **[FIXED]** · reported as "I saw slowdown due
+to rendering, slowing my ship and the animations down at times... I _think_ it was
+more noticeable at the edges, possibly due to our new prediction code"
+
+**The report was right, and the diagnosis was in the phrase "at the edges".**
+`rescueScar` takes a cheap arithmetic refusal unless a wall is within reach, so
+the edges are precisely where it stops being free and starts forward-simulating.
+
+**Note 54 recorded the cost as "0.3-0.5ms a call" and that number was wrong** —
+not measured wrong, reported wrong. It was the mean over ALL calls, 88% of which
+take the refusal at 0.005ms. The statistic that matters for a dropped frame is
+what a call costs when it does the work, and what the worst one costs:
+
+```
+  calls that actually simulate    median 2.25ms   p90 5.93   p99 12.02   max 45.73
+  a phone is 3-5x slower          median 7-11ms   p90 18-30  max 137-229
+  frame budget                    16.7ms at 60Hz, 8.3ms at 120Hz
+```
+
+Running that ten times a second at the edges is the reported stutter. A mean is
+the wrong statistic for a spike, and this is the second time in these notes that
+averaging hid a tail — see note 51 on `ROUTINE` being the least legible text in
+the game and the one shown most often.
+
+**Three fixes, in ascending order of how much they mattered.**
+
+`captureBudget` 900 -> 360. Every evaluation that neither dies nor turns pays the
+whole budget, and a winning flight runs a median 89 ticks and 223 at p90, so six
+seconds is already far past anything real.
+
+`maxSamples`, new, at 40. The stride now widens to fit the drift instead of being
+fixed at 3 ticks, so a six-second approach is sampled coarsely rather than being
+evaluated 121 times. Holes get blockier on long approaches; nothing else changes.
+
+The state copies. `track` kept a full `cloneState` — bodies array included — at
+every projected tick, 361 of them on a long approach, for the 40 that were ever
+resumed from. The projection now walks the drift twice, once to find the ending
+and once to evaluate, cloning only where it stops. Walking twice is far cheaper
+than copying 360 times.
+
+Together: worst call 45.7ms -> 20.5ms, median 2.25 -> 1.66.
+
+**Then the fix that actually mattered, which is not an optimisation at all.**
+
+A DRIFT TAKES NO INPUT. The projection a call produces stays true as the ship
+flies along it: every sample is a world point with a fixed verdict, and the cross
+is a place rather than a countdown. So recomputing ten times a second was not
+expensive work, it was the SAME work, repeated. `advanceScar` carries a projection
+forward by arithmetic — drop the samples now behind, subtract the elapsed time —
+and `app/main.ts` runs the simulation only when the projection can no longer be
+trusted: on a capture transition, on a respawn, and on a 30-tick backstop.
+
+```
+  per-tick cost of the whole path   median 0.000ms   p99 0.027   p99.9 3.72   max 18.85
+```
+
+From a 1.66ms median every sixth tick to a p99 of 0.027ms. The spike survives, but
+it went from several times a second to roughly once every seventeen seconds.
+
+**Why the backstop is 30 ticks and not 60.** A fresh call re-derives its stride
+from the drift that is LEFT, so a shorter remaining approach is sampled more finely
+and can find a live press inside a hole the coarser pass stepped over. Carried half
+a second, 554 of 558 comparisons across the corpus agreed to the pixel and the 99th
+percentile of the difference was zero; carried a full second the 99th was 15px. The
+physics does not drift — the resolution does. Neither window ever disagreed about
+whether a cross exists at all.
+
+**Still open, and filed rather than built.** The remaining spike is one full
+computation landing inside one tick. The structural answer is to evaluate a few
+press-points per tick instead of all of them at once — sound for exactly the reason
+`advanceScar` is sound, since a press-point's verdict does not depend on when it is
+asked — so a full picture would assemble over ~10 ticks and no tick would ever do
+more than a few captures. That is a redesign of the search rather than a tuning
+pass, and it wants a performance harness in front of it, which the author has
+scoped separately.
+
+---
+
+### 58 — The escape: a reward that was taxing the thing it rewarded
+
+`src/sim/step.ts` · `src/sim/capture.ts` · `src/sim/config.ts` · `src/score/praise.ts`
+· **[NEW]** · asked for as "add a velocity boost (temporary that fades) to explode
+out of a successful fire burning rescue... with a smaller permanent boost as a
+reward", then corrected twice in play
+
+**The simulation defines the trigger for itself, because it must.** What is being
+rewarded is a scoring idea — the rescue, the burn — and `src/score/` is an observer
+the simulation may not know exists. So `escapeShove` reads only what physics
+already knows: captured, within `escapeBandWidth` of a boundary, not sheltered by
+an anomaly, and no longer moving toward it. Armed on the way in and spent on the
+way out, so a capture already leaving when it enters the band was never in trouble
+and is owed nothing. The scorer recognises the same instant for its own purposes
+and the two agree because they read the same arithmetic, never because one asks
+the other.
+
+The price is a third copy of the band width — `SimConfig.escapeBandWidth` beside
+`ScoreConfig.burnEdgeSpan` and `RenderConfig.hazardZoneWidth`. `test/score.test.ts`
+pins all three. It is one copy more than anybody wants and there was no
+alternative: the layering that makes a score a pure function of
+`(config, seed, inputLog)` is the same layering that stops the simulation reading
+the number from the scorer.
+
+**IT WAS A MID-ARC KICK FIRST, AND THAT WAS WRONG TWICE OVER.** The speed was
+added the instant the ship stopped closing on the wall, on the theory that
+exploding out of the fire should happen in the fire. Reported after one session as
+*"the kick during arc doesn't feel good"* — and the corpus agreed for a reason
+that was not obvious from the feel:
+
+```
+  within the capture that escaped, kick-at-the-arc versus nothing
+    link points   -64%      burn points  +42%      net  -1409 over 22 captures
+```
+
+Speed added mid-capture is speed the capture then has to shed to convert and
+settle, so the reward was quietly cancelling the link it was meant to celebrate.
+Moving the whole thing to the release fixed it, and the fix is provable rather
+than statistical: with the fling paid at the release, every tick up to the release
+is BIT-IDENTICAL to the feature being off. `test/escape.test.ts` asserts exactly
+that, fingerprint by fingerprint, and it is the promise the rest of the design
+rests on.
+
+```
+  same comparison, fling at the release
+    link points    +7%      net  +5995      and on each session's FIRST escape,
+                                            burn / hot ticks / rescue all exactly 0
+```
+
+**It rides the release's own split**, so `boostPermFrac` and `boostPunch` give the
+punchy transient and the smaller permanent carry without inventing either. That is
+also the only place a fading component can live at all: `ship.burstX/burstY` is
+read by `stepDrift` and nowhere else, so there is no mechanism for one mid-capture
+even in principle.
+
+**NOT gated on `earned`, unlike the boost beside it.** 81% of escapes are released
+while still a flyby, and a flyby earns no boost — gating this the same way would
+pay nothing to four escapes in five. It survives a weak release for the same
+reason: a ship that ran dry on the way out of the fire still got out of the fire.
+
+**The fuel refund, and how it avoids being note 29 again.** An escape costs a
+median 34 fuel between the press and the turn-away, p90 59, and leaves a quarter
+of them under 25 in the tank — a mechanic that punishes the player for surviving
+it. `escapeRefund` hands half of it back, chosen on note 29's own criterion that a
+rescue which WORKS should cost about what a capture costs: the median escape nets
+17 against a median capture burn of 18-20.
+
+```
+  refund   fuel back   median fuel bottom after   putter-outs
+    0.00       0.0              38.0                   5
+    0.25       7.2              51.1                   4
+    0.50      15.6              57.7                   4
+    0.75      23.0              70.3                   4
+```
+
+It pays only for fuel NOBODY HAS REFUNDED YET, which is the whole of the
+arithmetic: `flybyConvertRefund` already returns half the brake to a flyby that
+converts, and note 29 is titled "A rescue paid for itself twice". `Capture`
+tracks `fuelSpent` and `fuelBack` apart so this can pay for what is genuinely
+still out of pocket. It matters less than it sounds only because 67% of escapes
+never reach the first refund at all — 46% are released while still a flyby and 21%
+never braked.
+
+**What a rescue says went around the houses, and the destination is the point.**
+Four attempts, each cut on sight, and the sequence is worth keeping because every
+one of them looked reasonable when it was proposed:
+
+```
+  a spark beside the ship        "the spark isn't intuitive enough"
+  the word SAFE beside the ship  "it's too crowded and the anticipation is fun"
+  a DOUSED / CLEARED praise word "we already have the point reward from going
+                                  through flames"
+  the word Nice! at the press    "the 'nice!' is a bit cluttered"
+```
+
+Read together they say one thing: the good news does not need to be announced. The
+scar already says where the line is, the flames say the ship is on it, and the
+points say what it was worth — so a badge or a word at the moment of resolution is
+a fourth voice on a subject already covered, and it spends the two seconds the game
+is at its most tense.
+
+**What replaced them is not a label at all.** The CROSS ITSELF brightens and
+thickens, named by the author: *"I like how we do the compass by making the color
+brighter when the ship is in the window."* The compass rings run
+`(0.15 + 0.5 * align)` on alpha and `(2 + 2 * align)` on width, both rising
+together as the sweep lines up; `scarNearAlpha` and `scarNearWidth` are the same
+gesture.
+
+**Keyed to the PRESS, not to the approach**, which was the correction after one
+session. Rising with proximity alone, it lit on every approach — including the ones
+the player was going to sail straight past — so it was ambience rather than an
+answer, and it also read as too bright at 0.95. Asked for as *"maybe we can only
+make it glow if the user presses close to it? so the glow is proximity+press
+based"*. `Mark.glow` is frozen at the press and read for the rest of the mark's
+life, so a mark the ship merely drifted past never lights and a press right on the
+cross lights it fully.
+
+The renderer can tell the two apart without being told: a null scar means the ship
+is captured, so a press happened; a scar that still exists with no cross left means
+the ship drifted past. Two different calls, already distinct for other reasons.
+
+It also costs no threshold, which is why it could replace `NICE_QUALITY` outright.
+That constant was the only measured percentile in any of this and the only thing
+here that would have gone stale as play changed. A continuous ramp never has to
+decide what counts as a good press.
+
+The half of the ramp that already existed saturated at `scarFullSecs`, 1.65s out —
+so the brightening was entirely spent before the part of the approach worth aiming
+at. This is the second half of the same gesture, and the mark now peaks at 0.95
+alpha and 1.5x weight at the cross itself.
+
+**A bug fell out of building it, at the worst possible moment.** `upto` holds the
+path samples up to the cross, and the heading was read from its last two entries.
+When the cross sits inside the first sample there is only one, both ends resolved
+to it, the heading came out (0, 0), the crossbar had zero length — and the mark
+vanished silently exactly as the ship arrived at it. `test/render.test.ts` pins it.
+
+**The arm was capped again, 260px to 150.** Reported as "there are some times where
+the line to the cross is really long, multiple centimeters to my eye". A little
+over a third of the viewport width still reads as a lead-in pointing at the mark
+and stops being a line the eye has to follow.
+
+**`SIM_VERSION` 20 -> 21**, and the golden was recaptured twice as keys were added
+— three lines each time, no numbers. The equality gate never moved off zero,
+because `escapeFling` and `escapeRefund` are 0 in `PROTOTYPE_CONFIG` and the band
+is inert without them.
+
+---
+
+### 59 — The receipt: one popup a capture, except for anything that speaks
+
+`src/render/popups.ts` · `app/main.ts` · **[CHANGED]** · reported as "we need to
+revisit the various popups and numbers we're showing, because right now there are
+so many at so many different points that the user doesn't know what they're being
+rewarded for"
+
+**Measured before anything moved**, over 65 minutes of real play:
+
+```
+  things appearing                       31.7 a minute, one every 1.9s
+  landing while the previous was still up  51%   (median 1 live, p90 3, max 6)
+  score-band lines overwritten early       68%   (median line gets 1.08s)
+  awards carrying nothing but a number     74%   (1416 of 1917)
+  composition   link 36%  grab 32%  rescue 11%  flyby 10%  shouts 7%  burn 4%
+```
+
+The cause is structural rather than a matter of any one popup being wrong: a
+capture pays at least twice — a grab at periapsis and a link at the release — and
+up to four times with a flyby, a burn and a rescue, all inside about two seconds,
+in one lane. Three quarters of those events are not answering "what am I being
+rewarded for" at all; they are spending attention to say a number.
+
+**Grouping by capture is exact, which is why it is the rule.** A link lands at the
+release and a burn when the fire dies — both after the capture is over, both
+before the next press — so "everything since the last capture began" collects them
+and nothing else. Across the corpus it produces zero orphans. `app/main.ts` calls
+`settleReceipt()` on the press that takes, before `scoreTick` runs, so a grab
+landing on that very tick belongs to the capture it started.
+
+`RECEIPT_TAIL` is a cap rather than the rule. Consecutive awards inside one
+capture land a median 1.07s apart and 1.80s at p90, so 1.8 holds about nine in ten
+of them together — and it stops a capture held through a long settle from keeping
+one popup open for the eighteen seconds the longest in the corpus would have.
+
+**A WORD ALWAYS KEEPS ITS OWN POPUP, and that is the correction that matters.**
+The first version merged everything and kept the better of two words, which
+`test/render.test.ts` caught immediately: `praise.ts` gives a superlative arrival
+and a superlative departure disjoint word lists precisely because they once shared
+one gold word, "which made the rarest thing in the game the only one that could not
+say what it was for". A merge that discarded one would have rebuilt exactly that,
+on the rarest and most expressive events in the game.
+
+So the receipt collects the NUMBERS and every word still speaks for itself, which
+is also what the measurement pointed at — the noise was never the words.
+
+```
+  popups a minute   29.5 -> 22.1
+  mute popups       1416 -> 935
+```
+
+A 25% cut in count and a 34% cut in the mute ones, where a full merge would have
+reached 15.3 a minute. The difference is the price of keeping every word, and it
+is worth paying: the complaint was that the player cannot tell what they are being
+rewarded for, and the words are the part that tells them.
+
+---
+
+### 60 — The scar did not make presses later, it made them steadier
+
+`src/score/config.ts` · **[MEASURED]** · the first session flown with the cross
+visible, 2026-08-23T22-43-27, 237s
+
+Note 53 and `rescueSpan` both carried a prediction: every threshold behind the
+scar was calibrated on blind play, so presses would move later, the median quality
+would rise, and the span would want shrinking. **The prediction was wrong**, and
+recording that is the point of this note — it was stated confidently enough that a
+later session would have acted on it.
+
+```
+  rescue quality      n     p25    median   p75    p90
+    sighted          39    0.42    0.59    0.74   0.78
+    blind           224    0.30    0.56    0.78   0.86
+```
+
+The centre did not move. The TAILS tightened, at both ends: fewer very early
+presses and fewer very late ones. In hindsight that is the more sensible reading —
+a visible deadline says how much room there is as clearly as how little, so it
+buys consistency rather than daring.
+
+**What did move is behaviour, and it moved a long way.** Over the stretch the
+replay is faithful for:
+
+```
+  presses committed to a wall        52% sighted   against   37% blind
+  of those, already PAST the cross    7% sighted   against   23% blind
+```
+
+Doomed presses fell by about two thirds. That is the thing the scar was built to
+change, and the only number here big enough to believe on one session.
+
+**Nothing was retuned.** One sighted session against sixty-two blind ones is not
+enough to move a p75, and the two populations are not strictly comparable: recorded
+quality exists only for rescues that PAID, while the blind figures are re-scored
+over every rescue a replay produces. Changing a measured constant on that would be
+exactly the "calibrated on a stale feel, and worse for looking defensible" failure
+AGENTS warns about.
+
+**A METHOD NOTE THAT OUTLIVES THIS SESSION.** A long chained session is the shape
+that diverges — note 16's remaining `sin`/`cos`/`atan2`, amplified by captures and
+reset by respawns — and this one was faithful for 133s of 237s. So re-simulation
+covered 56% of it. `report.awards` did not: it is what the session actually paid,
+carries the rescue quality in its `timing` field, and is immune to divergence
+entirely.
+
+**For threshold work, prefer the recorded awards to a replay.** A replay is the
+right tool for asking what the simulation did; the award list is the right one for
+asking what the player was paid, and a percentile of real play is the second
+question. It is also the only one that survives the exact sessions worth measuring:
+the long, chained, well-played ones.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

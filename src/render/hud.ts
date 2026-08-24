@@ -175,6 +175,19 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     detail: `${a.body}  BURN · HEAT ${pct(a.heat)}`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
   }),
+  // No praise word yet, and deliberately: every threshold in `praise.ts` is a
+  // measured percentile of real play, and the only sessions that have ever been
+  // flown with the cross visible amount to one recording. The points ship first;
+  // the word is measured once there is play to measure it on.
+  //
+  // LATE is the quality on the axis the award is about — how little of the rescue
+  // window was left — and reads as praise the moment it is high, which is what a
+  // caption should do without needing a vocabulary behind it.
+  rescue: (a) => ({
+    style: ROUTINE,
+    detail: `${a.body}  RESCUE · LATE ${pct(a.timing)}`,
+    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
+  }),
 };
 
 function lerpColor(

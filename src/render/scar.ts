@@ -48,6 +48,36 @@ interface Mark {
   age: number;
   /** Seconds since this mark appeared, so nothing ever pops into existence. */
   born: number;
+  /**
+   * How close to the cross the press that ended this mark was, 0..1, or 0 if it
+   * was not ended by a press at all.
+   *
+   * Frozen at the moment of the press and read for the rest of the mark's life,
+   * which is what makes the glow a reward rather than an ambience: it says "you
+   * pressed there", and a mark the ship merely drifted past never lights.
+   */
+  glow: number;
+  /**
+   * Seconds this mark's fade-out runs for.
+   *
+   * Per-mark rather than a constant, because the two kinds want opposite things:
+   * the mark left behind at a death is explaining the death and wants the long
+   * fade, and a mark displaced by a fresher answer is stale the moment it is
+   * replaced. See `RenderConfig.scarGhostSecs`.
+   */
+  fade: number;
+  /**
+   * How big the mark draws, as a multiple of its configured size.
+   *
+   * Set from the fire waiting at the cross. Carried on the mark rather than
+   * recomputed at draw time so a ghost keeps the size it had when it was
+   * abandoned — it is a record of what was on offer then, not a live reading.
+   */
+  scale: number;
+}
+
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
 function smoothstep(u: number): number {
@@ -137,8 +167,8 @@ export class Scar {
    */
   private mark: Mark | null = null;
 
-  /** Where the prediction currently says the cross is. */
-  private target: { x: number; y: number; dx: number; dy: number } | null = null;
+  /** Where the prediction currently says the cross is, and how big it is worth. */
+  private target: { x: number; y: number; dx: number; dy: number; scale: number } | null = null;
 
   /**
    * A mark that has been abandoned, fading where it stood.
@@ -161,11 +191,11 @@ export class Scar {
    * of a straight drift, so recomputing it faster than it can change buys
    * nothing but heat. `dt` is the time since the last call.
    */
-  observe(scar: RescueScar | null, rcfg: RenderConfig, dt: number): void {
+  observe(scar: RescueScar | null, prize: number, rcfg: RenderConfig, dt: number): void {
     if (this.ghost) {
       this.ghost.age += dt;
       this.ghost.born += dt;
-      if (this.ghost.age >= rcfg.scarFadeOutSecs) this.ghost = null;
+      if (this.ghost.age >= this.ghost.fade) this.ghost = null;
     }
 
     if (scar?.cross) {
@@ -175,8 +205,16 @@ export class Scar {
       // arm must lie along the ship's heading where the mark is.
       const upto = scar.path.filter((s) => s.t <= c.t);
       const n = upto.length;
+      // Two DISTINCT samples, or the heading collapses to nothing.
+      //
+      // Taking `upto[n - 1]` and `upto[n - 2]` reads well and is wrong at the one
+      // moment that matters: when the cross is inside the first sample there is
+      // only one entry, both ends resolve to it, and the heading comes out (0, 0)
+      // — so the crossbar has zero length and the whole mark silently disappears
+      // exactly as the ship arrives at it. Falling back to the projection's own
+      // first step keeps a direction whatever the filter left.
       const prev = n > 1 ? upto[n - 2]! : scar.path[0]!;
-      const last = n > 0 ? upto[n - 1]! : scar.path[Math.min(1, scar.path.length - 1)]!;
+      const last = n > 1 ? upto[n - 1]! : scar.path[Math.min(1, scar.path.length - 1)]!;
       let dx = last.x - prev.x;
       let dy = last.y - prev.y;
       const len = hypot(dx, dy) || 1;
@@ -195,19 +233,52 @@ export class Scar {
       // born where the answer now is. Nothing slides across the field, and the
       // distinction is a FACT — this mark has been interrupted — rather than a
       // distance threshold that a mark could drift across.
+      // How much fire is waiting, mapped onto how big the mark draws. A prize
+      // above `scarPrizeFull` saturates rather than growing without limit: the top
+      // percentile of the measured distribution is three times its p90, and a mark
+      // that tracked it would be a smear across the screen.
+      const scale =
+        rcfg.scarPrizeMin +
+        (rcfg.scarPrizeMax - rcfg.scarPrizeMin) *
+          clamp01(prize / Math.max(1e-6, rcfg.scarPrizeFull));
+
       if (!this.mark || this.mark.age >= 0) {
         if (this.mark) {
-          this.mark.age = Math.max(0, this.mark.age);
-          this.ghost = this.mark;
+          const old = this.mark;
+          old.age = Math.max(0, old.age);
+          // Cut short, because something fresher has taken its place and only the
+          // most recent mark is about the decision in front of the player.
+          //
+          // RESCALED rather than jumped: the alpha comes from `age / fade`, so
+          // shrinking both together leaves the ghost exactly as bright as it was
+          // and only shortens what is left of it. Setting the age alone would
+          // blink it down to a tenth on the frame it was displaced.
+          if (old.fade > rcfg.scarGhostSecs) {
+            old.age *= rcfg.scarGhostSecs / old.fade;
+            old.fade = rcfg.scarGhostSecs;
+          }
+          this.ghost = old;
         }
-        this.mark = { x: c.x, y: c.y, dx, dy, age: -c.t, born: 0 };
+        this.mark = {
+          x: c.x,
+          y: c.y,
+          dx,
+          dy,
+          age: -c.t,
+          born: 0,
+          scale,
+          glow: 0,
+          fade: rcfg.scarFadeOutSecs,
+        };
       } else {
         this.mark.age = -c.t;
       }
       // Uninterrupted, the mark eases toward this in `update`, per frame. Setting
       // it here and moving there is what stops the mark stepping at the 10Hz the
-      // prediction is recomputed at.
-      this.target = { x: c.x, y: c.y, dx, dy };
+      // prediction is recomputed at. The size rides along for the same reason: the
+      // prize changes as the ship moves, and a mark that resized in steps would
+      // flicker exactly where a mark that moved in steps used to jump.
+      this.target = { x: c.x, y: c.y, dx, dy, scale };
       this.lead = c.t;
       this.path = upto;
       return;
@@ -220,6 +291,15 @@ export class Scar {
     // capture makes the prediction null for as long as it lasts — so a hard
     // clear here made a rapid tap blink the mark out and back.
     if (this.mark) {
+      // WHICH of the two it is decides whether the mark glows, and the caller has
+      // already told us: a null scar means the ship is captured, so a press
+      // happened; a scar that still exists but has no cross left means the ship
+      // drifted past without pressing. The glow is for the press.
+      if (this.mark.age < 0) {
+        this.mark.glow = scar
+          ? 0
+          : clamp01(1 - Math.max(0, this.lead) / Math.max(1e-6, rcfg.scarFullSecs));
+      }
       if (this.mark.age < 0) this.mark.age = 0;
       this.mark.age += dt;
       // The arm is dropped even though the mark is not: it is anchored to the
@@ -250,9 +330,28 @@ export class Scar {
     m.y += (this.target.y - m.y) * k;
     m.dx += (this.target.dx - m.dx) * k;
     m.dy += (this.target.dy - m.dy) * k;
+    m.scale += (this.target.scale - m.scale) * k;
     const dl = hypot(m.dx, m.dy) || 1;
     m.dx /= dl;
     m.dy /= dl;
+  }
+
+  /**
+   * Drop the mark outright, leaving no ghost.
+   *
+   * For a press too brief to have been a decision — see `RenderConfig.scarTapSecs`.
+   * A press hides the scar and leaves the mark fading where the cross was, so a
+   * burst of taps leaves a burst of marks; this takes the mark away instead of
+   * handing it to the ghost slot to fade.
+   *
+   * The ghost is left alone. It belongs to an older mark, and a tap says nothing
+   * about that one.
+   */
+  dropMark(): void {
+    this.mark = null;
+    this.target = null;
+    this.path = [];
+    this.lead = Infinity;
   }
 
   /**
@@ -287,17 +386,40 @@ export class Scar {
     // rate as the follower, because both answer "how fast does the scar react to
     // a change": one for where it is, one for whether it is there at all.
     const born = 1 - Math.exp(-rcfg.scarSettleRate * m.born);
+
+    // THE GLOW IS PROXIMITY TIMES A PRESS, and both halves are load-bearing.
+    //
+    // The compass's own gesture — its rings run `(0.15 + 0.5 * align)` on alpha
+    // and `(2 + 2 * align)` on width, both rising together as the sweep lines up —
+    // but keyed to the press rather than to the approach. It rose continuously
+    // with proximity for one session and that was too much: it lit on every
+    // approach, including the ones the player was going to sail straight past, so
+    // it was ambience rather than an answer. Asked for as "maybe we can only make
+    // it glow if the user presses close to it? so the glow is proximity+press
+    // based".
+    //
+    // `m.glow` is frozen at the press, so a mark the ship drifted past never
+    // lights, and a press right on the cross lights it fully. It costs no
+    // threshold either way: how close is a number, not a category.
+    const peak = rcfg.scarAlpha + (rcfg.scarNearAlpha - rcfg.scarAlpha) * m.glow;
+
     const alpha =
       born *
       (m.age >= 0
-        ? rcfg.scarAlpha * (1 - smoothstep(m.age / Math.max(1e-6, rcfg.scarFadeOutSecs)))
-        : rcfg.scarAlpha *
+        ? peak * (1 - smoothstep(m.age / Math.max(1e-6, m.fade)))
+        : peak *
           (1 -
             smoothstep(
               (this.lead - rcfg.scarFullSecs) /
                 Math.max(1e-6, rcfg.scarFadeInSecs - rcfg.scarFullSecs),
             )));
+    // Width rises with it, the compass's second half.
+    const weight = m.scale * (1 + (rcfg.scarNearWidth - 1) * m.glow);
     if (alpha <= 0.004) return;
+
+    // Every length in the glyph moves together, so the mark grows as one thing
+    // rather than becoming a differently-proportioned mark.
+    const stub = rcfg.scarStubHalf * m.scale;
 
     ctx.save();
 
@@ -334,14 +456,18 @@ export class Scar {
       const total = run[run.length - 1]! - base;
       // The mark is the peak, and the arm runs a stub past it so the shape reads
       // as a cross rather than as a sword hilt.
-      const span = total + rcfg.scarStubHalf;
+      const span = total + stub;
       const uc = span > 0 ? total / span : 1;
       for (let i = first; i < path.length; i++) {
         const s = path[i]!;
         pts.push({
           x: toScreenX(cam, s.x),
           y: toScreenY(cam, s.y),
-          w: armWidth(span > 0 ? (run[i]! - base) / span : 0, uc, rcfg.scarArmWidth * cam.scale),
+          w: armWidth(
+            span > 0 ? (run[i]! - base) / span : 0,
+            uc,
+            rcfg.scarArmWidth * cam.scale * weight,
+          ),
           a: alpha * (s.live ? 1 : rcfg.scarDeadFrac),
         });
       }
@@ -357,9 +483,9 @@ export class Scar {
       for (let i = 1; i <= N; i++) {
         const u = i / N;
         pts.push({
-          x: toScreenX(cam, m.x + m.dx * rcfg.scarStubHalf * u),
-          y: toScreenY(cam, m.y + m.dy * rcfg.scarStubHalf * u),
-          w: armWidth(uc + (1 - uc) * u, uc, rcfg.scarArmWidth * cam.scale),
+          x: toScreenX(cam, m.x + m.dx * stub * u),
+          y: toScreenY(cam, m.y + m.dy * stub * u),
+          w: armWidth(uc + (1 - uc) * u, uc, rcfg.scarArmWidth * cam.scale * weight),
           a: alpha * rcfg.scarDeadFrac,
         });
       }
@@ -370,11 +496,11 @@ export class Scar {
       bar(
         ctx,
         cam,
-        m.x - m.dx * rcfg.scarStubHalf,
-        m.y - m.dy * rcfg.scarStubHalf,
-        m.x + m.dx * rcfg.scarStubHalf,
-        m.y + m.dy * rcfg.scarStubHalf,
-        rcfg.scarArmWidth,
+        m.x - m.dx * stub,
+        m.y - m.dy * stub,
+        m.x + m.dx * stub,
+        m.y + m.dy * stub,
+        rcfg.scarArmWidth * weight,
         alpha,
       );
     }
@@ -382,14 +508,15 @@ export class Scar {
     // ---- the crossbar
     const px = -m.dy;
     const py = m.dx;
+    const barHalf = rcfg.scarBarHalf * m.scale;
     bar(
       ctx,
       cam,
-      m.x - px * rcfg.scarBarHalf,
-      m.y - py * rcfg.scarBarHalf,
-      m.x + px * rcfg.scarBarHalf,
-      m.y + py * rcfg.scarBarHalf,
-      rcfg.scarBarWidth,
+      m.x - px * barHalf,
+      m.y - py * barHalf,
+      m.x + px * barHalf,
+      m.y + py * barHalf,
+      rcfg.scarBarWidth * weight,
       alpha,
     );
 

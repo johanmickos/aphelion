@@ -166,6 +166,56 @@ export interface ScoreConfig {
    * does would be teaching a line that is not the line.
    */
   burnEdgeSpan: number;
+
+  // --- the rescue: pressing at the last moment that still works ---
+  /**
+   * Full bonus for a press made with no rescue window left at all.
+   *
+   * Paid when the rescue COMPLETES — the instant the ship's velocity toward the
+   * wall reaches zero, which is the exact promise `src/render/scar.ts` draws. A
+   * press that never turns pays nothing, so a doomed one cannot collect, and the
+   * award describes the outcome rather than the intention.
+   *
+   * WHY TIMING AND NOT MARGIN. How CLOSE to the wall the rescue came is already
+   * paid, continuously and precisely, by the burn: `burnBank` integrates depth
+   * into the band over time, so a later press is already worth more because it
+   * starts deeper and burns longer. Paying again for the same closeness would be
+   * note 29 in points form. What the score does not otherwise know is how much of
+   * the available window the player CHOSE to spend, and that is the quantity the
+   * cross makes visible and therefore aimable.
+   *
+   * Sized against `nerveBonus` (200), which pays for the planet-side version of
+   * the same nerve: a late press on a line already boring in. The wall version
+   * asks for more — a nerve grab is judged against a surface you can see, this
+   * against a deadline you have to read.
+   */
+  rescueBonus: number;
+  /**
+   * Seconds of window left at which the rescue bonus has decayed to zero.
+   *
+   * Measured over the 507 presses in `diagnostics/` that were made while
+   * committed to a wall: the window left at the press runs p10 0.28s, median
+   * 1.30s, p75 2.37s, p90 3.90s. 2.4 is that p75 — chosen the way `closeSpan`
+   * was, to span real play rather than to be a round number. Across the measured
+   * distribution it puts a tight press at 0.88, the median press at 0.46 and a
+   * lazy one at nearly nothing, which is spread rather than a cliff.
+   *
+   * MEASURED AGAINST SIGHTED PLAY, and the prediction that used to stand here was
+   * wrong. It said presses would move later once the cross was drawable, the
+   * median quality would rise, and the span would want shrinking. A 237s session
+   * flown with the scar says otherwise: quality came out p25 0.42, median 0.59,
+   * p75 0.74, p90 0.78 against the blind p25 0.30, median 0.56, p75 0.78, p90
+   * 0.86. The centre did not move. The TAILS tightened — fewer very early presses
+   * and fewer very late ones — which is the more sensible reading: a visible
+   * deadline says how much room there is as clearly as how little.
+   *
+   * So 2.4 stands. It is still only one sighted session against sixty-two blind
+   * ones, and the two populations are not strictly comparable — recorded quality
+   * exists only for rescues that PAID — so this wants confirming rather than
+   * re-deriving. What moved instead was behaviour: presses already past the cross
+   * fell from 23% of wall-committed presses to 7%.
+   */
+  rescueSpan: number;
   /**
    * Points per heat-second of dragging the dead zone.
    *
@@ -378,6 +428,9 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   burnEdgeSpan: 60,
   burnRate: 555,
   burnMinHeat: 0.01,
+
+  rescueBonus: 320,
+  rescueSpan: 2.4,
 
   streakStep: 0.4,
   streakMax: 5,

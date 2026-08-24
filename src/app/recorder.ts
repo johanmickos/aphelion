@@ -22,8 +22,8 @@ export type InputRecord = [number, 0 | 1];
  * One scoring event exactly as the phone paid it.
  *
  * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body, heat, turn]`
- * with `kind` 'g' for a grab, 'l' for a link, 'h' for a hop, 'f' for a flyby and
- * 'b' for a burn.
+ * with `kind` 'g' for a grab, 'l' for a link, 'h' for a hop, 'f' for a flyby,
+ * 'r' for a rescue and 'b' for a burn.
  *
  * `heat` and `turn` are last and optional because they were added after the
  * format was in use: reports recorded before the burn shipped simply end at
@@ -53,7 +53,7 @@ export type InputRecord = [number, 0 | 1];
  */
 export type AwardRecord = [
   number,
-  'g' | 'l' | 'h' | 'f' | 'b',
+  'g' | 'l' | 'h' | 'f' | 'b' | 'r',
   number,
   number,
   number,
@@ -82,6 +82,7 @@ const AWARD_CODE: Record<ScoreAward['kind'], AwardRecord[1]> = {
   hop: 'h',
   flyby: 'f',
   burn: 'b',
+  rescue: 'r',
 };
 
 /**

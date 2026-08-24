@@ -12,7 +12,7 @@ import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import type { Input, SimState } from '../src/sim/types.ts';
-import { DEFAULT_SCAR_OPTIONS, rescueScar } from '../src/sim/rescue.ts';
+import { DEFAULT_SCAR_OPTIONS, advanceScar, rescueScar } from '../src/sim/rescue.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 
 const PRESS: Input = { held: true, pressed: true, released: false };
@@ -100,6 +100,46 @@ describe('the point of no return', () => {
         `sample at t=${s.t.toFixed(2)} claims live=${s.live}`,
       ).toBe(s.live);
     }
+  });
+
+  it('carries forward to the same answer a fresh call would give', () => {
+    // The whole reason a projection can be reused: a drift takes no input, so
+    // every sample is a world point with a fixed verdict and the cross is a place
+    // rather than a countdown. If this is wrong the scar lies while the ship
+    // coasts, which is exactly when it is being read.
+    const state = driftingAtTheWall(cfg);
+    const base = rescueScar(state, cfg, FIXED_DT)!;
+    expect(base.cross).not.toBeNull();
+
+    const CARRY = 20;
+    const carried = advanceScar(base, CARRY * FIXED_DT)!;
+    const fresh = rescueScar(driftFor(state, cfg, CARRY), cfg, FIXED_DT)!;
+
+    expect(carried, 'the projection is still alive after the carry').not.toBeNull();
+    expect(carried.side).toBe(fresh.side);
+    expect(carried.cross, 'and still has a cross').not.toBeNull();
+    // The same WORLD POINT, which is the claim. The time left shrinks by exactly
+    // the time that passed; the place does not move.
+    expect(carried.cross!.x).toBeCloseTo(fresh.cross!.x, 6);
+    expect(carried.cross!.y).toBeCloseTo(fresh.cross!.y, 6);
+    expect(carried.cross!.t).toBeCloseTo(base.cross!.t - CARRY * FIXED_DT, 9);
+    expect(carried.tEnd).toBeCloseTo(base.tEnd - CARRY * FIXED_DT, 9);
+
+    // Samples the ship has already flown past are dropped rather than left with
+    // negative times, so the arm starts at the ship and not behind it.
+    expect(carried.path.every((p) => p.t >= 0)).toBe(true);
+    expect(carried.path.length).toBeLessThan(base.path.length);
+  });
+
+  it('expires rather than describing an ending that has already happened', () => {
+    const state = driftingAtTheWall(cfg);
+    const base = rescueScar(state, cfg, FIXED_DT)!;
+    expect(advanceScar(base, base.tEnd + 0.001), 'past its own ending').toBeNull();
+    // And a cross the ship has reached reads as passed, which is the same thing
+    // `rescueScar` reports by returning none.
+    const past = advanceScar(base, base.cross!.t + 0.001)!;
+    expect(past).not.toBeNull();
+    expect(past.cross, 'the last press that could work is behind us now').toBeNull();
   });
 
   it('says nothing while captured, or once the run has ended', () => {

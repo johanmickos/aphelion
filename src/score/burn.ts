@@ -76,6 +76,58 @@ export function edgeHeat(
 }
 
 /**
+ * How much fire the ship would fly INTO, for a rescue that has not happened yet.
+ *
+ * `rescueScar` hands over the flight it simulated for the press at the cross —
+ * one world position a tick — and this runs the same integral `scoreTick` runs on
+ * the real thing: the same `edgeHeat`, the same `burnRate`, the same ignition
+ * floor. One definition, now three consumers, which is the rule the header of
+ * this file exists for.
+ *
+ * IT IS NOT THE PAYOUT, AND MUST NOT BE PRESENTED AS ONE. The flight ends where
+ * `rescueScar`'s promise ends — at the turn-away — but the fire does not: the ship
+ * is still deep in the band at that moment and burns all the way back out through
+ * it. Measured over 513 approaches in the corpus, what actually burns is a median
+ * 2.21x this number (p10 1.94, p90 3.01), and only 5 of the 513 landed within 25%.
+ * So this is the fire on the way IN, and the bias is systematic rather than noisy.
+ *
+ * That is good enough for the one thing it is used for — sizing the mark in
+ * `src/render/scar.ts`, where what matters is that a bigger fire draws a bigger
+ * scar, and where `RenderConfig.scarPrizeFull` is calibrated in these same units.
+ * It is NOT good enough to show the player a number, or to pay one. Anything that
+ * needs the real total has to keep flying past the turn-away until the heat drops
+ * below the floor, which is a longer flight than `rescueScar` has any reason to
+ * simulate for its own purposes.
+ *
+ * IT LIVES IN `src/score/` AND NOT BESIDE THE PREDICTOR because a point is not a
+ * thing the simulation is allowed to know about. `src/sim/` may import nothing
+ * outside itself — `pnpm portable` proves it — so the predictor returns a
+ * trajectory and pricing it is somebody else's word.
+ *
+ * Returns the RAW bank, before any multiplier: the multiplier is a property of
+ * the streak at the moment of payment, and this is a promise about a press that
+ * has not been made.
+ *
+ * Every sample is captured by construction — the flight begins at a press — so
+ * `captured` is true throughout. A flight that never enters the band scores zero,
+ * which happens on just 3% of crosses.
+ */
+export function previewBurn(
+  flight: ReadonlyArray<{ x: number; y: number }>,
+  field: FieldBounds,
+  bodies: readonly Body[],
+  scfg: ScoreConfig,
+  dt: number,
+): number {
+  let bank = 0;
+  for (const p of flight) {
+    const heat = edgeHeat(p.x, p.y, field, bodies, true, scfg);
+    if (heat > scfg.burnMinHeat) bank += heat * dt * scfg.burnRate;
+  }
+  return bank;
+}
+
+/**
  * Reentry heat: low AND fast, the atmospheric-friction model.
  *
  * NOT WIRED TO ANYTHING. Kept at the author's request — "very good effect, like

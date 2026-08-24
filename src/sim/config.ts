@@ -162,6 +162,68 @@ export interface SimConfig {
   boostBurstDecay: number;
   releaseFlingBoost: number;
 
+  // --- escaping the dead zone ---
+  /**
+   * Extra fling handed to a release that got out of the danger band alive, in
+   * world units per second. 0 turns the whole thing off, which is what
+   * `PROTOTYPE_CONFIG` holds.
+   *
+   * AT THE RELEASE, AND NOT AT THE ESCAPE, which is a correction. It was a shove
+   * applied the instant the ship stopped closing on the wall, on the theory that
+   * exploding out of the fire should happen in the fire. Reported as "the kick
+   * during arc doesn't feel good", and the measurement agreed for a reason that
+   * was not obvious: speed added mid-capture is speed the capture has to shed to
+   * convert and settle, so across the 22 escapes in the corpus it cost 56-64% of
+   * the link points those captures used to earn. The reward was quietly taxing
+   * the manoeuvre it was rewarding.
+   *
+   * Split by `boostPermFrac` and `boostPunch` exactly as the release splits every
+   * other boost, so this is a punchy transient plus a smaller permanent carry
+   * without inventing either. That is also the only place a FADING component can
+   * live: `ship.burstX/burstY` is read by `stepDrift` and nowhere else.
+   *
+   * NOT gated on `earned`, unlike the boost it rides alongside. 81% of escapes
+   * are released while still a flyby, and a flyby earns no boost at all — gating
+   * this the same way would pay nothing to four escapes in five.
+   *
+   * THE SIMULATION DEFINES THE TRIGGER FOR ITSELF, and has to. What is being
+   * rewarded is a scoring idea — the rescue, the burn — and `src/score/` is an
+   * observer the simulation may not know exists. So the rule is stated in pure
+   * simulation terms; see `escapeShove`. The scorer recognises the same instant
+   * for its own purposes, and the two agree because they read the same arithmetic.
+   */
+  escapeFling: number;
+  /**
+   * Fraction of this capture's unrefunded fuel handed back at the escape.
+   *
+   * An escape costs a median 34 fuel between the press and the turn-away, p90 59,
+   * and leaves a quarter of them under 25 in the tank — a mechanic that punishes
+   * the player for surviving it. Half is the value note 29 measured for the brake
+   * refund, on the reasoning that a rescue which WORKS should cost about what a
+   * capture costs; the median escape nets 17 against a median capture burn of
+   * 18-20, so the same number lands in the same place here.
+   *
+   * UNREFUNDED, and that word is load-bearing. `flybyConvertRefund` already
+   * returns half the brake to a flyby that converts, and paying a fraction of the
+   * gross on top would be note 29 happening again — the note is titled "A rescue
+   * paid for itself twice". `Capture.fuelSpent` and `fuelBack` are tracked apart
+   * so this can pay for what is genuinely still out of pocket. It matters less
+   * than it sounds only because 67% of escapes never reach the first refund at
+   * all: 46% are released while still a flyby, and 21% never braked.
+   */
+  escapeRefund: number;
+  /**
+   * How far inside a boundary counts as the danger band, in world units.
+   *
+   * MUST MATCH `ScoreConfig.burnEdgeSpan` and `RenderConfig.hazardZoneWidth`, and
+   * `test/score.test.ts` pins all three. Three copies is one more than anybody
+   * wants, and the alternative was worse: the simulation cannot import the scorer,
+   * so a band it must recognise has to be stated here, and the renderer has always
+   * needed its own to paint the gradient. Pinned, they cannot drift; unpinned, a
+   * player would be paid for escaping a fire that started somewhere else.
+   */
+  escapeBandWidth: number;
+
   // --- fuel ---
   fuelMax: number;
   fuelRegen: number;
@@ -631,6 +693,12 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   boostBurstDecay: 1.3,
   releaseFlingBoost: 1.0,
 
+  // Off. The prototype has no dead-zone burn to escape from, and a fling here
+  // would move the equality gate off zero for a mechanic it never had.
+  escapeFling: 0,
+  escapeRefund: 0,
+  escapeBandWidth: 60,
+
   fuelMax: 100,
   fuelRegen: 15,
   fuelPerSec: 18,
@@ -800,6 +868,20 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   boostHoldsThroughSettle: true,
   grabLeadTime: 0.2,
   crashConeSeverityFloor: 0,
+  /**
+   * Sized against `boostMax` (60), since it is split by the same two knobs and
+   * arrives at the same moment: a little over half a full boost, so a rescue
+   * leaves noticeably harder than an ordinary release without out-running the
+   * whip, which is still where speed properly comes from.
+   *
+   * 34, then 48, then 64, then this, on three reports that it should be stronger.
+   * A feel knob: nothing measures it, and nothing can. Worth knowing at this size
+   * — it is now above `boostMax` (60), so a rescue leaves harder than a perfectly
+   * timed ordinary release does. That is defensible for the rarest manoeuvre in
+   * the game and would not be for anything commoner.
+   */
+  escapeFling: 86,
+  escapeRefund: 0.5,
 } satisfies SimConfig);
 
 /**
@@ -809,7 +891,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 20;
+export const SIM_VERSION = 21;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

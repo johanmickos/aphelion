@@ -219,6 +219,27 @@ export interface Capture {
    */
   brakeSpent: number;
 
+  /**
+   * Fuel this capture has actually DEDUCTED, brake and settle together, and how
+   * much of it has already been handed back.
+   *
+   * Gross and returned are tracked separately so the escape refund can pay only
+   * for fuel nobody has refunded yet — `flybyConvertRefund` already returns half
+   * the brake on a conversion, and note 29 is titled "A rescue paid for itself
+   * twice" for a reason. What was DEDUCTED and not what was quoted, for the reason
+   * `brakeSpent` records: a brake held against a near-empty tank must not convert
+   * into more fuel than the tank ever had.
+   */
+  fuelSpent: number;
+  fuelBack: number;
+  /**
+   * The wall this capture is closing on from inside the danger band: -1 left,
+   * +1 right, 0 when it is not. Armed on entering the band while still closing,
+   * and spent the moment the closing stops. See `SimConfig.escapeKick`.
+   */
+  escapeSide: number;
+  /** This capture has already been paid for one escape. Once per capture. */
+  escaped: boolean;
   /** Per-sample heading deflection, for the trace recorder. Not physics. */
   lastAngle: number;
   defl: number;

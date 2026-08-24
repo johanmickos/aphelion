@@ -38,7 +38,7 @@ export interface ScoreAward {
    * a captured ship is and pays when the fire goes out, one capture can raise two
    * of them, and a DEATH cancels one outright — see `endLife`.
    */
-  kind: 'grab' | 'link' | 'hop' | 'flyby' | 'burn';
+  kind: 'grab' | 'link' | 'hop' | 'flyby' | 'burn' | 'rescue';
   /** Points actually applied. Never negative — nothing takes points away. */
   points: number;
   /** The multiplier in force. */
@@ -291,6 +291,44 @@ export interface ScoreState {
   grabDue: number;
   /** Names of anomalies already claimed this life. Cleared by `endLife`. */
   claimed: string[];
+  /**
+   * A rescue armed at a press and waiting on its outcome, or null.
+   *
+   * Read once, on the first tick of a capture, from the drift state the press was
+   * made in — and never again, because the answer is a property of that instant.
+   */
+  rescue: { side: 1 | -1; quality: number; body: string } | null;
+  /**
+   * A press made AFTER the last one that could still have turned the ship away,
+   * or null. Set at the press, cleared if the ship turns away regardless.
+   *
+   * Observability, not scoring — nothing here pays or withholds a point. It is
+   * here rather than recomputed by the renderer because the scorer already asks
+   * `rescueScar` this exact question on this exact tick, and a second forward
+   * simulation of the same press is both waste and a second place for the answer
+   * to live. `burnHeat` is the precedent: a field the simulation never reads,
+   * kept by the observer, consumed by the drawing.
+   *
+   * Measured over the corpus, a press past the cross is fatal 94% of the time and
+   * precedes 43% of all deaths by a median 0.85s. The 6% that live are why this
+   * clears on the turn-away rather than persisting to the end of the capture.
+   */
+  doomed: { side: 1 | -1; tick: number } | null;
+  /**
+   * Bodies a rescue has already been paid against this life. Cleared by `endLife`.
+   *
+   * The same shape as `claimed`, for the same reason it exists there. A drag along
+   * the wall is spent hanging off ONE distant planet, and the author's own
+   * playtest found the behaviour it guards against — "I can tap a bunch to extend
+   * my burn through the red zone". Every one of those taps is a press with almost
+   * no window left that does turn the ship away, so without this the tightest
+   * possible rescue would also be the most repeatable one, several times a second.
+   *
+   * Per body rather than per press, so rescuing yourself onto a DIFFERENT planet
+   * still pays: that is a new decision about a new body, not the same one
+   * collected twice.
+   */
+  rescued: string[];
   /**
    * Bodies already hopped to in the CURRENT charged window.
    *

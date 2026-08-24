@@ -201,6 +201,77 @@ function stepCapture(state: SimState, cfg: SimConfig, holding: boolean, dt: numb
   const cap = state.capture!;
   if (cap.phase === 'clear' || cap.phase === 'flyby') stepPhysical(state, cfg, holding, dt);
   else stepPhase(state, cfg, holding, dt);
+  escapeShove(state, cfg);
+}
+
+/**
+ * Notice that a captured ship has got out of the dead zone alive.
+ *
+ * STATED ENTIRELY IN SIMULATION TERMS, and it has to be. What is being rewarded
+ * is a scoring idea — a rescue, a burn — and `src/score/` is an observer the
+ * simulation may not know exists. So the rule reads only what physics already
+ * knows: captured, within `escapeBandWidth` of a boundary, not sheltered by an
+ * anomaly, and no longer moving toward it. The scorer recognises the same instant
+ * for its own purposes and the two agree because they read the same arithmetic,
+ * never because one asks the other.
+ *
+ * ARMED ON THE WAY IN, SPENT ON THE WAY OUT. A capture that is already leaving
+ * when it enters the band was never in trouble and is owed nothing; `escapeSide`
+ * records that the ship was genuinely closing, which is the thing being rewarded
+ * for surviving. Once per capture, so a settled orbit grazing the band lap after
+ * lap cannot draw a wage from it.
+ *
+ * IT CHANGES NOTHING HERE. An earlier version added the speed at this instant and
+ * it was wrong twice over: reported as "the kick during arc doesn't feel good",
+ * and measured as costing 56-64% of the link points those captures earned, because
+ * speed added mid-capture is speed the capture must shed to convert and settle.
+ * The flag is spent by `releaseCapture` instead. Leaving the velocity alone also
+ * means the phase clock is no longer a problem — `stepPhase` overwrites `cap.vx`
+ * every tick, so a settle could never have kept a shove anyway.
+ */
+function escapeShove(state: SimState, cfg: SimConfig): void {
+  const cap = state.capture;
+  if (!cap || cap.escaped || cfg.escapeFling <= 0) return;
+
+  const pos = shipWorldPos(state);
+  const fb = fieldBounds(cfg, state.bodies);
+  const toLeft = pos.x - fb.left;
+  const toRight = fb.right - pos.x;
+  const side = toRight < toLeft ? 1 : -1;
+  const gap = Math.min(toLeft, toRight);
+
+  // Outside the band, or standing where the boundary does not kill, there is
+  // nothing to escape — and the arming is dropped so a later approach is judged
+  // on its own closing rather than on this one.
+  if (gap > cfg.escapeBandWidth || inAnomalyField(pos.x, pos.y, state.bodies)) {
+    cap.escapeSide = 0;
+    return;
+  }
+
+  if (cap.vx * side > 0) {
+    cap.escapeSide = side;
+    return;
+  }
+  if (cap.escapeSide !== side) return;
+  cap.escaped = true;
+  cap.escapeSide = 0;
+
+  // Some of the fuel back. An escape costs a median 34 fuel to buy and leaves a
+  // quarter of them under 25 in the tank, which is the shape of a mechanic that
+  // punishes you for surviving it.
+  //
+  // Paid on fuel NOBODY HAS REFUNDED YET, which is the whole of the arithmetic
+  // here: `flybyConvertRefund` already returns half the brake to a flyby that
+  // converts, and note 29 is titled "A rescue paid for itself twice". Measured,
+  // 67% of escapes never reach that refund — 46% are released while still a
+  // flyby and 21% never braked at all — so this covers the ones it misses and
+  // tops up the ones it does not.
+  if (cfg.escapeRefund > 0) {
+    const owed = Math.max(0, cap.fuelSpent - cap.fuelBack);
+    const back = cfg.escapeRefund * owed;
+    state.fuel = Math.min(cfg.fuelMax, state.fuel + back);
+    cap.fuelBack += back;
+  }
 }
 
 /** Real softened-gravity integration: the physical dive and slingshot. */
@@ -343,6 +414,7 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
         // an empty tank, and a brake the tank could not pay for must not earn a
         // refund for fuel that was never there.
         cap.brakeSpent += before - state.fuel;
+        cap.fuelSpent += before - state.fuel;
       }
     }
 
@@ -362,7 +434,9 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
         // the capture that is about to burn fuel — arriving at the release would
         // be after the putter-out it exists to prevent. See `flybyConvertRefund`.
         if (cfg.flybyConvertRefund > 0 && cap.brakeSpent > 0) {
-          state.fuel = Math.min(cfg.fuelMax, state.fuel + cfg.flybyConvertRefund * cap.brakeSpent);
+          const back = cfg.flybyConvertRefund * cap.brakeSpent;
+          state.fuel = Math.min(cfg.fuelMax, state.fuel + back);
+          cap.fuelBack += back;
           cap.brakeSpent = 0;
         }
       }
@@ -512,7 +586,9 @@ function stepPhase(state: SimState, cfg: SimConfig, holding: boolean, dt: number
   // cost the tank. Gated on `u >= 1` so it is the settled orbit that pays, not
   // the circularization on the way in.
   if (holding && !authored && (u < 1 || cap.phaseMul !== 1)) {
+    const beforeSettle = state.fuel;
     state.fuel = burn(state.fuel, cfg.fuelPerSec, dt);
+    cap.fuelSpent += beforeSettle - state.fuel;
     if (state.fuel <= 0 && u < 1) cap.puttered = true;
   } else if (!holding) {
     state.fuel = regen(cfg, state.fuel, dt);

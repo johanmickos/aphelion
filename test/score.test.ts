@@ -12,7 +12,7 @@
  * change any score is not a weight, it is decoration.
  */
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
+import { DEFAULT_CONFIG, PROTOTYPE_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { createBodies, fieldBounds, inAnomalyField } from '../src/sim/world.ts';
@@ -35,6 +35,7 @@ import {
   DEFAULT_SCORE_CONFIG,
   FLYBY_TURN_MIN,
   edgeHeat,
+  previewBurn,
   reentryHeat,
   PEAK,
   WORDS,
@@ -257,6 +258,24 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
     edges: [[90, 1]],
     ticks: 900,
   },
+  /**
+   * Drifting at the right wall, pressed while the cross is still ahead.
+   *
+   * Here for the same reason as the two above: without it `rescueBonus` and
+   * `rescueSpan` measure as inert, because no other session in the battery ever
+   * presses while committed to a side boundary — a blind spot in the fixture, not
+   * a dead weight. Real play does it on 37% of presses.
+   *
+   * The right wall is at x=565.5. Starting 400px short of it at 150px/s across
+   * gives a 1.7s window at the spawn, and pressing at tick 60 spends 0.71 of it —
+   * neither 0 nor 1, so both weights move the payout.
+   */
+  {
+    name: 'rescued off the right wall',
+    ship: { x: 165.5, y: 150, vx: 150, vy: -60 },
+    edges: [[60, 1]],
+    ticks: 600,
+  },
   // holds through the settle and releases mid-decay
   {
     name: 'held long, released in the decay',
@@ -457,6 +476,300 @@ describe('scoring weights', () => {
 });
 
 // ------------------------------------------------------------------ behaviour
+
+describe('the fire a cross is offering', () => {
+  const cfg = DEFAULT_CONFIG;
+  const state = createInitialState(cfg);
+  const field = fieldBounds(cfg, state.bodies);
+  const bodies = state.bodies;
+  const DT = FIXED_DT;
+
+  /** A straight run of ticks at a fixed distance inside the right wall. */
+  const hold = (inset: number, ticks: number) =>
+    Array.from({ length: ticks }, () => ({ x: field.right - inset, y: 0 }));
+
+  it('is zero for a flight that never enters the band', () => {
+    expect(previewBurn(hold(400, 200), field, bodies, DEFAULT_SCORE_CONFIG, DT)).toBe(0);
+  });
+
+  it('pays more for deeper and for longer, on the same curve the burn uses', () => {
+    const shallow = previewBurn(hold(50, 60), field, bodies, DEFAULT_SCORE_CONFIG, DT);
+    const deep = previewBurn(hold(10, 60), field, bodies, DEFAULT_SCORE_CONFIG, DT);
+    const longer = previewBurn(hold(10, 120), field, bodies, DEFAULT_SCORE_CONFIG, DT);
+    expect(deep).toBeGreaterThan(shallow);
+    expect(longer).toBeGreaterThan(deep);
+    // Twice the ticks at a constant depth is exactly twice the bank: it is an
+    // integral, not a peak reading.
+    expect(longer / deep).toBeCloseTo(2, 6);
+  });
+
+  it('is the same integral the burn is paid on, weight for weight', () => {
+    // The promise that matters: if these two ever stop agreeing, the mark is
+    // sizing itself off a fire the scorer would not pay for. Doubling the rate
+    // doubles the preview, and the span it is compared against is in these units.
+    const flight = hold(20, 90);
+    const base = previewBurn(flight, field, bodies, DEFAULT_SCORE_CONFIG, DT);
+    const twice = previewBurn(
+      flight,
+      field,
+      bodies,
+      { ...DEFAULT_SCORE_CONFIG, burnRate: DEFAULT_SCORE_CONFIG.burnRate * 2 },
+      DT,
+    );
+    expect(twice / base).toBeCloseTo(2, 6);
+
+    // And it obeys the same ignition floor, so a graze that would not light a
+    // fire does not promise one either.
+    const graze = hold(DEFAULT_SCORE_CONFIG.burnEdgeSpan - 0.2, 90);
+    expect(previewBurn(graze, field, bodies, DEFAULT_SCORE_CONFIG, DT)).toBe(0);
+  });
+
+  it('promises nothing inside an anomaly bubble, where there is no wall', () => {
+    const anomaly = bodies.find((b) => b.kind === 'anomaly');
+    expect(anomaly, 'the default field has anomalies').toBeTruthy();
+    const inside = Array.from({ length: 90 }, () => ({ x: anomaly!.x, y: anomaly!.y }));
+    expect(previewBurn(inside, field, bodies, DEFAULT_SCORE_CONFIG, DT)).toBe(0);
+  });
+});
+
+describe('what a rescue is worth', () => {
+  /** A drift at the right wall, pressed `at` ticks in. */
+  const WALL_DRIFT = { x: 165.5, y: 150, vx: 150, vy: -60 };
+  const rescueRun = (at: number, scfg: ScoreConfig = DEFAULT_SCORE_CONFIG) =>
+    play([[at, 1]], 600, DEFAULT_CONFIG, scfg, true, WALL_DRIFT);
+
+  it('pays for turning away from the wall, and pays more the later you press', () => {
+    const early = rescueRun(20).awards.filter((a) => a.kind === 'rescue');
+    const late = rescueRun(100).awards.filter((a) => a.kind === 'rescue');
+    expect(early.length, 'an early press still rescues').toBe(1);
+    expect(late.length, 'so does a late one').toBe(1);
+    expect(late[0]!.timing, 'the later press spent more of its window').toBeGreaterThan(
+      early[0]!.timing,
+    );
+    expect(late[0]!.points, 'and is paid more for it').toBeGreaterThan(early[0]!.points);
+  });
+
+  it('pays nothing when the weight is zero, and more when the span shrinks', () => {
+    const full = rescueRun(60).awards.filter((a) => a.kind === 'rescue');
+    expect(full.length).toBe(1);
+
+    const off = rescueRun(60, { ...DEFAULT_SCORE_CONFIG, rescueBonus: 0 });
+    expect(
+      off.awards.some((a) => a.kind === 'rescue'),
+      'rescueBonus pays nothing at 0',
+    ).toBe(false);
+
+    // A shorter span is a harsher scale: the same press keeps less of the bonus.
+    const tight = rescueRun(60, { ...DEFAULT_SCORE_CONFIG, rescueSpan: 1.2 }).awards.filter(
+      (a) => a.kind === 'rescue',
+    );
+    expect(tight[0]!.points).toBeLessThan(full[0]!.points);
+  });
+
+  it('pays once per body per life, so tapping at the wall cannot farm it', () => {
+    // Press, release, press again on the same planet — the shape the author
+    // reported as "I can tap a bunch to extend my burn through the red zone".
+    // Every one of those taps turns the ship away, so only the once-per-body rule
+    // stops the tightest rescue also being the most repeatable one.
+    const tapped = play(
+      [
+        [60, 1],
+        [130, 0],
+        [136, 1],
+        [190, 0],
+        [196, 1],
+      ],
+      600,
+      DEFAULT_CONFIG,
+      DEFAULT_SCORE_CONFIG,
+      true,
+      WALL_DRIFT,
+    );
+    const paid = tapped.awards.filter((a) => a.kind === 'rescue');
+    const bodies = new Set(paid.map((a) => a.body));
+    expect(paid.length, 'one rescue per body, however many presses').toBe(bodies.size);
+  });
+
+  it('pays nothing for a press that was not headed at a wall', () => {
+    // The ordinary case: 63% of real presses never reach the projection at all.
+    const ordinary = pilot(2000).awards.filter((a) => a.kind === 'rescue');
+    for (const a of ordinary) expect(a.timing).toBeGreaterThan(0);
+    const straight = play(
+      [
+        [18, 1],
+        [150, 0],
+      ],
+      400,
+    );
+    expect(
+      straight.awards.some((a) => a.kind === 'rescue'),
+      'a mid-field grab is not a rescue',
+    ).toBe(false);
+  });
+
+  it('reports no arrival or release quality of its own', () => {
+    // Those belong to the grab and the link. Reported as absent so nothing
+    // downstream can pay or praise them a second time.
+    const a = rescueRun(60).awards.find((w) => w.kind === 'rescue')!;
+    expect(a.close).toBe(0);
+    expect(a.aim).toBe(0);
+    expect(a.climb).toBe(0);
+    expect(a.heat).toBe(0);
+    expect(a.clearance).toBe(Infinity);
+  });
+});
+
+describe('the skull: a press made past the last chance', () => {
+  const WALL_DRIFT = { x: 165.5, y: 150, vx: 150, vy: -60 };
+
+  /** Press `at` ticks in and report what the scorer knew, tick by tick. */
+  const run = (at: number, ticks = 400) => {
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, WALL_DRIFT);
+    const sc = createScoreState();
+    const seen: Array<{ tick: number; doomed: boolean }> = [];
+    let held = false;
+    for (let t = 0; t < ticks; t++) {
+      const pressed = t === at;
+      if (pressed) held = true;
+      stepSim(
+        state,
+        DEFAULT_CONFIG,
+        { held: held || pressed, pressed, released: false } as Input,
+        FIXED_DT,
+      );
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+      seen.push({ tick: t, doomed: sc.doomed !== null });
+      if (state.ending.active) break;
+    }
+    return { sc, seen, state };
+  };
+
+  it('lights on a press past the cross, and not on one before it', () => {
+    // Tick 100 spends 99% of the window on this fixture; tick 120 is past it.
+    const inTime = run(100);
+    expect(
+      inTime.seen.some((s) => s.doomed),
+      'a press in time owes no skull',
+    ).toBe(false);
+
+    const late = run(120);
+    expect(
+      late.seen.some((s) => s.doomed),
+      'a press past the cross owes one',
+    ).toBe(true);
+    expect(late.state.ending.reason, 'and the run really does end at the wall').toBe(
+      'out-of-bounds',
+    );
+  });
+
+  it('stays lit from the press until the wall', () => {
+    const late = run(120);
+    const first = late.seen.findIndex((s) => s.doomed);
+    expect(first, 'it lights on the press itself').toBe(120);
+    // Every tick from there to the end, with no flicker: it is a countdown, not
+    // a status that can be re-evaluated.
+    //
+    // Except the ending tick itself, where `endLife` clears it — the life is over
+    // and the LOST notice is the explanation from there. `drawDoom` refuses to
+    // draw during the ending hold for the same reason, so the two agree.
+    const after = late.seen.slice(first);
+    expect(after.slice(0, -1).every((s) => s.doomed)).toBe(true);
+    expect(after[after.length - 1]!.doomed, 'and it hands over at the death').toBe(false);
+    // And it is short. Measured over the corpus, a median 0.85s.
+    expect(after.length * FIXED_DT).toBeLessThan(3);
+  });
+
+  it('is withdrawn if the ship turns away regardless', () => {
+    // The prediction is conservative and 6% of these live. When one does, the
+    // omen is wrong and is taken back on the same event that pays the rescue.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, WALL_DRIFT);
+    const sc = createScoreState();
+    // Arm it by hand at a wall, then hand the scorer a capture that turns away.
+    sc.doomed = { side: 1, tick: 0 };
+    let held = false;
+    for (let t = 0; t < 200; t++) {
+      const pressed = t === 20;
+      if (pressed) held = true;
+      stepSim(
+        state,
+        DEFAULT_CONFIG,
+        { held: held || pressed, pressed, released: false } as Input,
+        FIXED_DT,
+      );
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+      if (sc.doomed === null && t > 20) break;
+    }
+    expect(sc.doomed, 'a ship that turned away owes no skull').toBeNull();
+  });
+
+  it('clears with the life, so a fresh ship is never born under it', () => {
+    const late = run(120, 600);
+    // The run above ended at the wall; drive on through the hold and respawn.
+    const state = late.state;
+    const sc = late.sc;
+    for (let t = 0; t < 200; t++) {
+      stepSim(
+        state,
+        DEFAULT_CONFIG,
+        { held: false, pressed: false, released: false } as Input,
+        FIXED_DT,
+      );
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+    }
+    expect(sc.doomed).toBeNull();
+  });
+});
+
+describe('what the ship says about a rescue', () => {
+  const WALL_DRIFT = { x: 165.5, y: 150, vx: 150, vy: -60 };
+  const run = (at: number) =>
+    play([[at, 1]], 600, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, WALL_DRIFT);
+
+  it('says nothing in words, and that took three attempts to arrive at', () => {
+    // A rescue had a praise axis (DOUSED, CLEARED), then a badge for the recovery
+    // (SAFE), then a badge for the press that dared it (Nice!). All three were cut
+    // on sight: "we already have the point reward from going through flames",
+    // "it's too crowded and the anticipation is fun", "the 'nice!' is a bit
+    // cluttered". What confirms a rescue now is the cross brightening as the ship
+    // closes on it, and then the points.
+    const a = run(60).awards.find((w) => w.kind === 'rescue');
+    expect(a, 'the fixture is meant to rescue itself').toBeTruthy();
+    expect(praiseFor(a!), 'a rescue speaks through the instrument, not the vocabulary').toBeNull();
+  });
+
+  it('still marks a press that was already too late', () => {
+    // The one thing nothing else can say: there is no award for being doomed.
+    //
+    // Watched tick by tick rather than read off the end, because a run that ends
+    // at the wall clears it — `endLife` does, and `drawVerdict` refuses to draw
+    // during the ending hold for the same reason. The flag exists between the
+    // press and the death, which is the whole of its life.
+    const everDoomed = (at: number): boolean => {
+      const state = createInitialState(DEFAULT_CONFIG);
+      Object.assign(state.ship, WALL_DRIFT);
+      const sc = createScoreState();
+      let held = false;
+      for (let t = 0; t < 400; t++) {
+        const pressed = t === at;
+        if (pressed) held = true;
+        stepSim(
+          state,
+          DEFAULT_CONFIG,
+          { held: held || pressed, pressed, released: false } as Input,
+          FIXED_DT,
+        );
+        scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+        if (sc.doomed) return true;
+        if (state.ending.active) break;
+      }
+      return false;
+    };
+    expect(everDoomed(120), 'a press past the cross').toBe(true);
+    expect(everDoomed(100), 'one that still works').toBe(false);
+  });
+});
 
 describe('what a link is worth', () => {
   it('pays more for a deeper, better-timed, better-aimed release', () => {
@@ -1506,11 +1819,17 @@ describe('the burn', () => {
   });
 
   it('matches the red band the player can actually see', () => {
-    // Two modules, one number. The flame is meant to track the hazard gradient,
-    // so a fire peaking somewhere other than where the red does would teach a
-    // line that is not the line. `src/score/` may not import `src/render/`, so
-    // nothing but a test can hold the two together.
+    // THREE modules, one number, and nothing but a test can hold them together:
+    // `src/score/` may not import `src/render/`, and `src/sim/` may import
+    // neither. The flame is meant to track the hazard gradient, so a fire peaking
+    // somewhere other than where the red does would teach a line that is not the
+    // line — and the simulation pays an escape for leaving the same band, so a
+    // third value drifting would pay for escaping a fire that started elsewhere.
     expect(DEFAULT_SCORE_CONFIG.burnEdgeSpan).toBe(DEFAULT_RENDER_CONFIG.hazardZoneWidth);
+    expect(DEFAULT_SCORE_CONFIG.burnEdgeSpan).toBe(DEFAULT_CONFIG.escapeBandWidth);
+    // The prototype has no burn, but it still has to agree with itself: the band
+    // is inert there only because `escapeFling` is 0, not because it is different.
+    expect(PROTOTYPE_CONFIG.escapeBandWidth).toBe(DEFAULT_CONFIG.escapeBandWidth);
   });
 
   it('keeps the reentry model working even though nothing is wired to it', () => {
@@ -1575,6 +1894,10 @@ function fakeCapture(): NonNullable<SimState['capture']> {
     settleDur: 1,
     zipped: false,
     puttered: false,
+    fuelSpent: 0,
+    fuelBack: 0,
+    escapeSide: 0,
+    escaped: false,
     brakeSpent: 0,
     lastAngle: 0,
     defl: 0,

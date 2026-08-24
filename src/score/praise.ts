@@ -271,6 +271,13 @@ export function praiseFor(award: ScoreAward): Praise | null {
   // A hop earns no word, and that is not an omission. Every hop inside a charged
   // window pays the same flat `hopBonus`, so there is no quality for a word to
   // name — and the popup already says what it is by being purple.
+  //
+  // Nor does a RESCUE, and that is a decision rather than an omission. It had an
+  // `escape` axis for one session — DOUSED, CLEARED, in the burn's ember — and it
+  // was withdrawn: "we already have the point reward from going through flames".
+  // The burn pays for the fire and says so in its own word; a second word on the
+  // same second, about the same fire, was the vocabulary competing with itself.
+  // What a rescue says now it says beside the ship, in `src/render/verdict.ts`.
   return null;
 }
 

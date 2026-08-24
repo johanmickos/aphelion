@@ -19,6 +19,7 @@ import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
 import { rescueScar } from '../src/sim/rescue.ts';
+import { DEFAULT_SCORE_CONFIG, previewBurn } from '../src/score/index.ts';
 import { Scar } from '../src/render/scar.ts';
 import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture.ts';
 import {
@@ -43,6 +44,7 @@ import {
   releaseAngleFor,
 } from '../src/score/aim.ts';
 import { createScoreState } from '../src/score/score.ts';
+import type { ScoreState } from '../src/score/types.ts';
 import { orbitRadius } from '../src/sim/orbit.ts';
 import { Trail } from '../src/render/ship.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
@@ -340,7 +342,15 @@ describe('scene', () => {
       // Fed on the tick at the app's own cadence, so the scar is exercised
       // through the same path `app/main.ts` drives it with.
       if (i % 6 === 0 && !state.ending.active) {
-        scene.scar.observe(rescueScar(state, DEFAULT_CONFIG, FIXED_DT), rcfg, FIXED_DT * 6);
+        // Priced the way `app/main.ts` prices it, so the scene test exercises the
+        // sizing path rather than always drawing a minimum-size mark.
+        const s = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
+        scene.scar.observe(
+          s,
+          s ? previewBurn(s.flight, f, state.bodies, DEFAULT_SCORE_CONFIG, FIXED_DT) : 0,
+          rcfg,
+          FIXED_DT * 6,
+        );
       }
       const snap = captureSnapshot(state, held, DEFAULT_CONFIG);
       scene.trail.sample(snap.x, snap.y);
@@ -418,7 +428,7 @@ describe('scene', () => {
     const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
     expect(scar, 'the fixture is meant to be committed to a wall').not.toBeNull();
     expect(scar!.cross, 'and to still have a way out').not.toBeNull();
-    scene.scar.observe(scar, rcfg, FIXED_DT);
+    scene.scar.observe(scar, 0, rcfg, FIXED_DT);
     frame();
     const ahead = scarFills();
     expect(ahead, 'the scar is drawn once it has been observed').toBeGreaterThan(0);
@@ -429,16 +439,16 @@ describe('scene', () => {
     for (let i = 0; i <= crossTick + 2; i++) {
       stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
     }
-    scene.scar.observe(rescueScar(state, DEFAULT_CONFIG, FIXED_DT), rcfg, FIXED_DT);
+    scene.scar.observe(rescueScar(state, DEFAULT_CONFIG, FIXED_DT), 0, rcfg, FIXED_DT);
     frame();
     expect(scarFills(), 'the mark stays behind after the cross is passed').toBeGreaterThan(0);
 
     // A grab answers the question, so the mark ages out rather than blinking:
     // a tap IS a capture, and a hard clear made tapping through the band strobe.
-    scene.scar.observe(null, rcfg, rcfg.scarFadeOutSecs * 0.25);
+    scene.scar.observe(null, 0, rcfg, rcfg.scarFadeOutSecs * 0.25);
     frame();
     expect(scarFills(), 'a brief capture does not blink the mark out').toBeGreaterThan(0);
-    scene.scar.observe(null, rcfg, rcfg.scarFadeOutSecs);
+    scene.scar.observe(null, 0, rcfg, rcfg.scarFadeOutSecs);
     frame();
     expect(scarFills(), 'but it does expire').toBe(0);
   });
@@ -457,11 +467,11 @@ describe('scene', () => {
 
     const first = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
     expect(first?.cross).toBeTruthy();
-    scar.observe(first, rcfg, FIXED_DT);
+    scar.observe(first, 0, rcfg, FIXED_DT);
     const born = { ...at()! };
 
     // An interruption: a capture makes the prediction null for as long as it lasts.
-    scar.observe(null, rcfg, FIXED_DT);
+    scar.observe(null, 0, rcfg, FIXED_DT);
     expect(at()!.x, 'the mark holds its ground while interrupted').toBeCloseTo(born.x, 6);
 
     // A different answer comes back, a long way off.
@@ -469,7 +479,7 @@ describe('scene', () => {
       ...first!,
       cross: { x: born.x + 400, y: born.y - 200, t: first!.cross!.t },
     };
-    scar.observe(far, rcfg, FIXED_DT);
+    scar.observe(far, 0, rcfg, FIXED_DT);
     scar.update(1, rcfg);
     expect(at()!.x, 'the new mark is born AT the new answer, not eased toward it').toBeCloseTo(
       far.cross.x,
@@ -482,11 +492,256 @@ describe('scene', () => {
       ...first!,
       cross: { x: far.cross.x + 40, y: far.cross.y, t: first!.cross!.t },
     };
-    scar.observe(nudged, rcfg, FIXED_DT);
+    scar.observe(nudged, 0, rcfg, FIXED_DT);
     scar.update(1 / 60, rcfg);
     const x = at()!.x;
     expect(x, 'an uninterrupted correction is followed, not snapped').toBeGreaterThan(far.cross.x);
     expect(x, 'and not covered in a single frame').toBeLessThan(nudged.cross.x - 1);
+  });
+
+  it('draws a bigger mark when a bigger fire is waiting at the cross', () => {
+    // The prize rides SIZE and not brightness, because alpha already carries how
+    // close the deadline is — a dim cross would otherwise mean either "small
+    // fire" or "still far away" with no way to tell which.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
+    expect(scar?.cross).toBeTruthy();
+
+    const spanOf = (prize: number): number => {
+      const mark = new Scar();
+      mark.observe(scar, prize, rcfg, FIXED_DT);
+      mark.update(1, rcfg);
+      const c = createCamera(rcfg);
+      fitCamera(c, { w: 390, h: 844, dpr: 1 });
+      centerCamera(c, state.ship.x, state.ship.y, fieldBounds(DEFAULT_CONFIG, state.bodies), null);
+      const r = recordingContext();
+      mark.draw(r.ctx, c, rcfg);
+      const xs: number[] = [];
+      const ys: number[] = [];
+      for (const op of r.ops) {
+        if (op[0] === 'moveTo' || op[0] === 'lineTo') {
+          xs.push(op[1] as number);
+          ys.push(op[2] as number);
+        }
+      }
+      return Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    };
+
+    const nothing = spanOf(0);
+    const middling = spanOf(rcfg.scarPrizeFull / 2);
+    const big = spanOf(rcfg.scarPrizeFull);
+    expect(middling, 'a middling fire draws a bigger mark than none').toBeGreaterThan(nothing);
+    expect(big, 'and a full one bigger still').toBeGreaterThan(middling);
+
+    // It saturates rather than growing without limit: the top of the measured
+    // distribution is three times the p90 the span is set to.
+    expect(spanOf(rcfg.scarPrizeFull * 10)).toBeCloseTo(big, 6);
+  });
+
+  it('shows the skull only when a press was made past the last chance', () => {
+    // Measured: a press past the cross is fatal 94% of the time and precedes 43%
+    // of deaths by a median 0.85s. It is drawn on the side AWAY from the wall, so
+    // it never sits over the hazard gradient or the receding scar.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const scene = new Scene(
+      { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
+      99,
+    );
+    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
+    centerCamera(c, snap.x, snap.y, f, null);
+
+    const drawWith = (verdict: Partial<ScoreState>) => {
+      const r = recordingContext();
+      scene.draw(r.ctx, c, snap, {
+        timeMs: 0,
+        paused: false,
+        viewportW: 390,
+        viewportH: 844,
+        headerBottom: 0,
+        frameDt: 1 / 60,
+        score: { ...createScoreState(), ...verdict },
+      });
+      const xs: number[] = [];
+      let skull = false;
+      for (const op of r.ops) {
+        // The skull is the only thing in the scene that punches holes back out.
+        if (op[0] === '=globalCompositeOperation' && op[1] === 'destination-out') skull = true;
+        if (skull && (op[0] === 'ellipse' || op[0] === 'fillRect' || op[0] === 'lineTo')) {
+          xs.push(op[1] as number);
+        }
+      }
+      return { skull, xs };
+    };
+
+    expect(drawWith({}).skull, 'nothing is drawn when nothing is owed').toBe(false);
+
+    const right = drawWith({ doomed: { side: 1, tick: snap.tick } });
+    expect(right.skull, 'the skull is drawn when a press was too late').toBe(true);
+    const left = drawWith({ doomed: { side: -1, tick: snap.tick } });
+    expect(left.skull).toBe(true);
+
+    // Away from the wall: heading at the RIGHT wall puts it left of the ship.
+    const shipX = toScreenX(c, snap.x);
+    expect(Math.min(...right.xs), 'right wall -> skull sits left of the ship').toBeLessThan(shipX);
+    expect(Math.max(...left.xs), 'left wall -> skull sits right of the ship').toBeGreaterThan(
+      shipX,
+    );
+  });
+
+  it('glows for a press close to the cross, and not for one that drifted past', () => {
+    // Proximity TIMES a press, and both halves matter. It rose with proximity
+    // alone for one session and lit on every approach, including the ones the
+    // player was going to sail straight past — ambience rather than an answer.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
+    expect(scar.cross).toBeTruthy();
+
+    /** Brightest red drawn after the mark stops being live. */
+    const glowOf = (lead: number, ended: 'press' | 'drifted'): number => {
+      const mark = new Scar();
+      mark.observe({ ...scar, cross: { ...scar.cross!, t: lead } }, 0, rcfg, FIXED_DT);
+      mark.update(1, rcfg);
+      // A null scar means captured — a press. A scar with no cross left means the
+      // ship drifted past without pressing.
+      mark.observe(ended === 'press' ? null : { ...scar, cross: null }, 0, rcfg, FIXED_DT);
+      const c = createCamera(rcfg);
+      fitCamera(c, { w: 390, h: 844, dpr: 1 });
+      centerCamera(c, state.ship.x, state.ship.y, f, null);
+      const r = recordingContext();
+      mark.draw(r.ctx, c, rcfg);
+      let peak = 0;
+      for (const op of r.ops) {
+        if (op[0] !== '=fillStyle') continue;
+        const m = /rgba\(255,70,90,([\d.]+)\)/.exec(String(op[1]));
+        if (m) peak = Math.max(peak, Number(m[1]));
+      }
+      return peak;
+    };
+
+    const onIt = glowOf(0.02, 'press');
+    const early = glowOf(rcfg.scarFullSecs, 'press');
+    const missed = glowOf(0.02, 'drifted');
+
+    expect(onIt, 'a press right on the cross lights it').toBeGreaterThan(early);
+    expect(onIt, 'up to the configured peak').toBeLessThanOrEqual(rcfg.scarNearAlpha + 1e-6);
+    expect(early, 'a press with the whole window left does not').toBeLessThanOrEqual(
+      rcfg.scarAlpha + 1e-6,
+    );
+    expect(missed, 'and drifting past it never lights, however close').toBeLessThanOrEqual(
+      rcfg.scarAlpha + 1e-6,
+    );
+  });
+
+  it('still draws the mark when the ship is right on top of it', () => {
+    // The bug this pins: `upto` holds one sample when the cross is inside the
+    // first, both ends of the heading resolved to it, the direction came out
+    // (0, 0), and the crossbar had zero length — so the mark vanished silently at
+    // the exact moment the ship reached it.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
+    const mark = new Scar();
+    mark.observe({ ...scar, cross: { ...scar.cross!, t: 0.005 } }, 0, rcfg, FIXED_DT);
+    mark.update(1, rcfg);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, state.ship.x, state.ship.y, f, null);
+    const r = recordingContext();
+    mark.draw(r.ctx, c, rcfg);
+    expect(
+      r.ops.some((op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90')),
+      'the mark is still there at the cross',
+    ).toBe(true);
+  });
+
+  it('cuts a displaced mark short, but not the one left behind at a death', () => {
+    // "We should fade old crosses a bit faster if the user taps more. The scars
+    // add clutter, and it's only the most recent one that matters." Both halves
+    // pull opposite ways on one number, so the duration belongs to the mark: the
+    // one explaining a death keeps the long fade, the one shoved aside does not.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
+    const peek = (m: Scar) =>
+      m as unknown as { mark: { fade: number } | null; ghost: { fade: number } | null };
+
+    const mark = new Scar();
+    mark.observe(scar, 0, rcfg, FIXED_DT);
+    expect(peek(mark).mark!.fade, 'a live mark gets the long fade').toBe(rcfg.scarFadeOutSecs);
+
+    // Passed without a press: still the most recent thing, so it keeps it. This
+    // is the mark that explains a death, and the fade deliberately outlasts the
+    // median 0.53s between the cross and the wall.
+    mark.observe({ ...scar, cross: null }, 0, rcfg, FIXED_DT);
+    expect(peek(mark).mark!.fade, 'the mark left behind keeps it').toBe(rcfg.scarFadeOutSecs);
+
+    // Displaced by a fresher answer: cut short.
+    mark.observe({ ...scar, cross: { ...scar.cross!, x: scar.cross!.x + 400 } }, 0, rcfg, FIXED_DT);
+    expect(peek(mark).ghost, 'the old one was let go').not.toBeNull();
+    expect(peek(mark).ghost!.fade, 'and is cut short').toBe(rcfg.scarGhostSecs);
+    expect(peek(mark).mark!.fade, 'while the new one gets the long fade').toBe(
+      rcfg.scarFadeOutSecs,
+    );
+    expect(rcfg.scarGhostSecs).toBeLessThan(rcfg.scarFadeOutSecs);
+  });
+
+  it('leaves no mark behind for a press too brief to have been a decision', () => {
+    // A press hides the scar and leaves the mark fading where the cross was, so a
+    // burst of taps leaves a burst of marks. `dropMark` takes it away rather than
+    // handing it to the ghost slot, so a tap leaves nothing at all.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, state.ship.x, state.ship.y, f, null);
+
+    const drew = (mark: Scar): boolean => {
+      const r = recordingContext();
+      mark.draw(r.ctx, c, rcfg);
+      return r.ops.some(
+        (op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90'),
+      );
+    };
+
+    // A press leaves the mark behind, fading.
+    const held = new Scar();
+    held.observe(scar, 0, rcfg, FIXED_DT);
+    held.update(1, rcfg);
+    held.observe(null, 0, rcfg, FIXED_DT);
+    expect(drew(held), 'a real capture leaves its mark').toBe(true);
+
+    // The same, then told the press was a tap.
+    const tapped = new Scar();
+    tapped.observe(scar, 0, rcfg, FIXED_DT);
+    tapped.update(1, rcfg);
+    tapped.observe(null, 0, rcfg, FIXED_DT);
+    tapped.dropMark();
+    expect(drew(tapped), 'a tap leaves nothing').toBe(false);
+
+    // And it does not take an older, unrelated ghost with it: a tap says nothing
+    // about the mark before it.
+    const withGhost = new Scar();
+    withGhost.observe(scar, 0, rcfg, FIXED_DT);
+    withGhost.update(1, rcfg);
+    withGhost.observe(null, 0, rcfg, FIXED_DT);
+    withGhost.observe(
+      { ...scar, cross: { ...scar.cross!, x: scar.cross!.x + 400 } },
+      0,
+      rcfg,
+      FIXED_DT,
+    );
+    withGhost.update(1 / 60, rcfg);
+    withGhost.dropMark();
+    expect(drew(withGhost), 'the older ghost is left alone').toBe(true);
   });
 
   it('never draws an arm longer than the clamp, however far away the cross is', () => {
@@ -511,7 +766,7 @@ describe('scene', () => {
     // The scar alone, not the whole scene: the hazard band and the trailing
     // floor are drawn in the same red family, and an extent measured over all of
     // it would be measuring the field, not the mark.
-    scene.scar.observe(scar, rcfg, FIXED_DT);
+    scene.scar.observe(scar, 0, rcfg, FIXED_DT);
     // A mark arrives rather than appearing, so it has to be allowed to finish
     // being born before there is anything to measure.
     scene.scar.update(1, rcfg);

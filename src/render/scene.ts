@@ -18,6 +18,7 @@ import { Nebula, OUTRO_SECS } from './nebula.ts';
 import type { CanvasFactory } from './nebula.ts';
 import { FuelWarning } from './fuel-warning.ts';
 import { Scar } from './scar.ts';
+import { drawVerdict } from './verdict.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
 import { drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
@@ -215,6 +216,9 @@ export class Scene {
     this.popups.draw(ctx, cam);
     // Under the ship, in the lane the rising popups leave clear.
     this.fuelWarning.draw(ctx, cam, snap);
+    // Beside the ship, on the side away from the wall — clear of the fuel badge
+    // below it and of the popups above it. See `verdict.ts`.
+    drawVerdict(ctx, cam, render, snap, opts.score);
 
     drawEdgeMarkers(ctx, cam, render, snap, bodies, opts.headerBottom);
 
