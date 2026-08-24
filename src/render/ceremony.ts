@@ -80,6 +80,18 @@ const SPOOL_DIST = 260;
  */
 const CRUISE = 900;
 
+/**
+ * Further travel, in design units, over which the sheet fades in once the warp is
+ * at full stretch.
+ *
+ * AFTER THE WARP, NOT WITH IT. The panel is the reward for the thing the warp is
+ * celebrating, and putting it up while the sky is still opening would make the
+ * spectacle the backdrop to a results screen rather than the point. Measured in
+ * distance like everything else here, so the whole ceremony is paced by one
+ * quantity and cannot develop a seam.
+ */
+const SHEET_DIST = 700;
+
 /** Seconds spent easing the ship from where it crossed to the middle. */
 const CENTRE = 0.8;
 
@@ -96,6 +108,8 @@ export interface Ceremony {
    * the bottom while the ship holds its place.
    */
   shift: number;
+  /** How far the results sheet has faded in, 0..1. */
+  sheet: number;
   /** Seconds since the crossing. */
   t: number;
 }
@@ -147,6 +161,7 @@ export function ceremonyPhase(
     t,
     shift,
     warp: ease((shift - cleared) / SPOOL_DIST),
+    sheet: ease((shift - cleared - SPOOL_DIST) / SHEET_DIST),
     centred: ease(t / CENTRE),
   };
 }

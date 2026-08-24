@@ -5,6 +5,7 @@
  * content can spill onto the letterbox bars.
  */
 import type { SimConfig } from '../sim/config.ts';
+import { FIXED_DT } from '../sim/config.ts';
 import type { Body } from '../sim/types.ts';
 import type { FieldBounds } from '../sim/world.ts';
 import type { Camera } from './camera.ts';
@@ -28,6 +29,7 @@ import { drawVerdict } from './verdict.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from './ceremony.ts';
+import { CLEARED_SHEET, drawSheet } from './sheet.ts';
 import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
 import { drawEdgeMarkers } from './edge-markers.ts';
@@ -322,6 +324,24 @@ export class Scene {
     drawScore(ctx, cam, opts.score, snap);
     if (!cer) {
       drawReadout(ctx, cam, readoutLines(sim, snap, canAffordCircularise(sim, snap)), opts.timeMs);
+    }
+
+    // Last, and over everything: the sheet is the only thing on screen the player
+    // is meant to be reading by this point. It reads `lastRun` rather than `run`
+    // — the live one was cleared by `endLife` on the tick the run ended, which is
+    // the trap `ScoreState.lastRun` exists to close.
+    if (cer && cer.sheet > 0 && opts.score.lastRun) {
+      drawSheet(
+        ctx,
+        cam,
+        CLEARED_SHEET,
+        opts.score.lastRun,
+        opts.score.sessionMax,
+        bodies,
+        FIXED_DT,
+        cer.sheet,
+        true,
+      );
     }
 
     ctx.restore();

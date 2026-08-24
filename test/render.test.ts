@@ -24,6 +24,15 @@ import {
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from '../src/render/ceremony.ts';
 import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
+import {
+  CLEARED_SHEET,
+  DEATH_SHEET,
+  SHEET_FIELD_FRACTION,
+  drawSheet,
+  earnsSheet,
+  planetsCleared,
+  sheetRows,
+} from '../src/render/sheet.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
 import { rescueScar } from '../src/sim/rescue.ts';
 import { DEFAULT_SCORE_CONFIG, previewBurn } from '../src/score/index.ts';
@@ -796,6 +805,114 @@ describe('the ceremony takes the instruments down', () => {
   it('drops the fuel gauge, which reports a resource nobody is spending', () => {
     expect(frame('cleared').some((t) => t === 'FUEL')).toBe(false);
     expect(frame('impact').some((t) => t === 'FUEL')).toBe(true);
+  });
+});
+
+describe('the sheet', () => {
+  const run = {
+    ticks: 1200,
+    topSpeed: 812,
+    distance: 9400,
+    peakChain: 9,
+    fireSecs: 3.4,
+    roughPasses: 2,
+    impacts: 0,
+    anomalies: 1,
+    score: 45000,
+    highWaterY: -6000,
+  };
+  const max = { ...run, topSpeed: 940, peakChain: 14, distance: 12000, fireSecs: 6.2 };
+  const bodies = createInitialState(DEFAULT_CONFIG).bodies;
+
+  function text(cleared: boolean, alpha = 1, style = CLEARED_SHEET) {
+    const r = recordingContext();
+    drawSheet(r.ctx, cam(), style, run, max, bodies, FIXED_DT, alpha, cleared);
+    return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+  }
+
+  it('draws nothing before it has faded in', () => {
+    expect(text(true, 0).length).toBe(0);
+  });
+
+  it('leads a clear with the clock, because speed is the only axis left', () => {
+    // Once the course is beaten the score has already been on screen all run;
+    // the time is the thing that can still be improved.
+    expect(text(true)).toContain('20.0s');
+  });
+
+  it('leads a death with how far it got, which is the thing to beat', () => {
+    const t = text(false, 1, DEATH_SHEET);
+    expect(
+      t.some((v) => /^\d+ \/ \d+$/.test(v)),
+      'a fraction of the field',
+    ).toBe(true);
+  });
+
+  it('shows every row against its session best', () => {
+    // The whole reason `sessionMax` exists. 812 means nothing until it sits
+    // beside the 940 from earlier in the session.
+    const t = text(true);
+    expect(t).toContain('TOP SPEED');
+    expect(t).toContain('812');
+    expect(t).toContain('940');
+    expect(t).toContain('LONGEST CHAIN');
+    expect(t).toContain('9');
+    expect(t).toContain('14');
+  });
+
+  it('carries the five measured rows and no more', () => {
+    // The playtest's finding was that this game over-stuffs its readouts. A
+    // full-screen panel has more room than a HUD strip, not unlimited room.
+    expect(sheetRows(run, max).length).toBe(5);
+  });
+
+  it('rolls kinks and impacts into one idea', () => {
+    // Roughness is "how badly was it flown", which is one question. The title
+    // above it is what interprets the number; the number alone is not a verdict.
+    const rows = sheetRows({ ...run, roughPasses: 2, impacts: 1 }, max);
+    expect(rows.find((r) => r.label === 'ROUGHNESS')!.value).toBe('3');
+  });
+
+  it('counts planets from the high-water mark, not from a tally', () => {
+    // Derived rather than counted per tick: it already IS a fact about
+    // `highWaterY` and the bodies, and counting it would be a second definition.
+    const bottom = planetsCleared({ ...run, highWaterY: 0 }, bodies);
+    const top = planetsCleared({ ...run, highWaterY: -99999 }, bodies);
+    expect(bottom.done).toBeLessThan(top.done);
+    expect(top.done).toBe(top.total);
+  });
+});
+
+describe('the worthiness gate', () => {
+  const bodies = createInitialState(DEFAULT_CONFIG).bodies;
+  const planets = bodies.filter((b) => b.kind === 'planet').length;
+
+  /** A run that reached `frac` of the way up the field. */
+  function reached(frac: number) {
+    const sorted = bodies
+      .filter((b) => b.kind === 'planet')
+      .map((b) => b.y)
+      .sort((a, b) => b - a);
+    const idx = Math.min(sorted.length - 1, Math.floor(frac * planets));
+    return { highWaterY: sorted[idx]! - 1 } as never;
+  }
+
+  it('turns a trivial run away', () => {
+    expect(earnsSheet(reached(0.05), bodies)).toBe(false);
+    expect(earnsSheet(reached(0.15), bodies)).toBe(false);
+  });
+
+  it('reports on a run that got most of the way', () => {
+    // "If I put in the effort only to die at 80%, I want to know that."
+    expect(earnsSheet(reached(0.8), bodies)).toBe(true);
+  });
+
+  it('sits where no trivial life in the corpus reaches', () => {
+    // Measured, not chosen: across 109 lives from the 63 diagnostics reports, the
+    // deepest sub-5-second life reached 0.265 of the field. 0.28 is the lowest
+    // bar that excludes every one of them.
+    expect(SHEET_FIELD_FRACTION).toBeGreaterThan(0.265);
+    expect(SHEET_FIELD_FRACTION).toBeLessThan(0.4);
   });
 });
 
