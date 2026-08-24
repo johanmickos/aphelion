@@ -155,51 +155,80 @@ describe('hazard zones', () => {
     expect(xs.some((x) => Math.abs(x - toScreenX(c, field.left)) < 1e-6)).toBe(true);
   });
 
-  /**
-   * The ceiling, which had no band at all until the 2026-08-23 playtest flew off
-   * the top of the field through 2.7 seconds of unmarked empty starfield.
-   *
-   * It needs its own camera: at the spawn the line is the length of the whole
-   * field overhead, and `drawCeiling` correctly draws nothing.
-   */
-  function ceilingCam() {
+  it('draws no band at the ceiling, which is a finish line and not a wall', () => {
+    // The ceiling briefly had one. `clearAtTop` turned that stretch into the
+    // finish, and a hazard band there paints red across the line the player is
+    // meant to fly through — reported as "too aggressive and threatening". The
+    // cue moved to a green FINISH arrow; nothing fences it off any more.
+    const r = recordingContext();
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
     centerCamera(c, 195, field.top + 200, field, null);
-    return c;
-  }
-
-  it('draws nothing at the ceiling while the ceiling is nowhere near', () => {
-    const r = recordingContext();
-    const c = cam();
     drawHazardZones(r.ctx, c, rcfg, field);
     const ys = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[2]);
     expect(ys.some((y) => Math.abs(y - toScreenY(c, field.top)) < 1e-6)).toBe(false);
   });
+});
 
-  it('warns BELOW the ceiling, where the ship can still be', () => {
+describe('the finish marker', () => {
+  /** Draw the markers with the ship `dist` below the finish line. */
+  function draw(dist: number | null, finish = true) {
     const r = recordingContext();
-    const c = ceilingCam();
-    drawHazardZones(r.ctx, c, rcfg, field);
-    const edge = toScreenY(c, field.top);
+    const c = cam();
+    const snap = {
+      ...captureSnapshot(createInitialState(DEFAULT_CONFIG), false, DEFAULT_CONFIG),
+      x: 195,
+      y: 0,
+    };
+    const finishY = finish ? -(dist ?? 0) : null;
+    drawEdgeMarkers(r.ctx, c, rcfg, snap, [], 0, finishY);
+    const text = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    return { r, text, label: text.find((t) => t.startsWith('FINISH')) };
+  }
 
-    const bands = (r.calls('fillRect') as Array<[string, number, number, number, number]>).filter(
-      // the side walls span the viewport; the ceiling band is the shorter one
-      ([, , , , h]) => h < c.viewH * c.scale,
-    );
-    expect(bands.length, 'the ceiling band is drawn').toBeGreaterThan(0);
-    for (const [, , y, , h] of bands) {
-      expect(y, 'no warned pixel sits above the lethal line').toBeGreaterThanOrEqual(edge - 1e-6);
-      expect(h).toBeGreaterThan(0);
-    }
+  it('says nothing when the field cannot be cleared', () => {
+    expect(draw(400, false).label).toBeUndefined();
   });
 
-  it('marks the hard limit at the ceiling itself', () => {
-    const r = recordingContext();
-    const c = ceilingCam();
-    drawHazardZones(r.ctx, c, rcfg, field);
-    const ys = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[2]);
-    expect(ys.some((y) => Math.abs(y - toScreenY(c, field.top)) < 1e-6)).toBe(true);
+  it('says nothing when the finish is already behind', () => {
+    // A line the ship has passed is not news, and an arrow pointing back down the
+    // climb is the clutter the whole marker system refuses to draw.
+    expect(draw(-400).label).toBeUndefined();
+  });
+
+  it('appears at the same range the bodies announce themselves at', () => {
+    expect(draw(rcfg.edgeMarkerRange + 200).label).toBeUndefined();
+    expect(draw(rcfg.edgeMarkerRange - 200).label).toBeDefined();
+  });
+
+  it('counts down the distance rather than just pointing', () => {
+    expect(draw(400).label).toBe('FINISH 400');
+    // Thousands are abbreviated exactly as a body's distance is. Kept inside
+    // `edgeMarkerRange` (1300) — beyond it there is no marker to read at all.
+    expect(draw(1200).label).toBe('FINISH 1.2k');
+  });
+
+  it('brightens as it closes', () => {
+    const alphaOf = (d: number) => {
+      const { r } = draw(d);
+      const fills = (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>)
+        .map((o) => o[1])
+        .filter((v) => v.startsWith('rgba(92,226,140'));
+      return Number(fills[0]!.split(',')[3]!.replace(')', ''));
+    };
+    expect(alphaOf(200)).toBeGreaterThan(alphaOf(1200));
+  });
+
+  it('draws in the finish green, not the ladder’s green', () => {
+    // Two colour systems that must not be merged: the arrows are category-coded
+    // and the ladder answers "how good was that". Sharing a value would make a
+    // ladder retune silently move a navigation cue.
+    const { r } = draw(400);
+    const fills = (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>).map(
+      (o) => o[1],
+    );
+    expect(fills.some((v) => v.startsWith('rgba(92,226,140'))).toBe(true);
+    expect(fills.some((v) => v.includes('92,214,122'))).toBe(false);
   });
 });
 

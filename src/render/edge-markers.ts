@@ -17,6 +17,7 @@ import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
+import { FINISH, withAlpha } from './palette.ts';
 
 export function drawEdgeMarkers(
   ctx: CanvasRenderingContext2D,
@@ -31,6 +32,17 @@ export function drawEdgeMarkers(
    * quietly stops matching.
    */
   headerBottom = 0,
+  /**
+   * World y of the line that ends the run as `cleared`, or null when the field
+   * cannot be cleared.
+   *
+   * A LINE, NOT A BODY, which is why it cannot join the loop below. Every marker
+   * there points at a place; this points at a latitude that spans the whole
+   * field, so its nearest point is always straight up and its arrow always sits
+   * on the top edge. Passing the y rather than recomputing it keeps the one
+   * definition of where the finish is in `stepSim`, where the run actually ends.
+   */
+  finishY: number | null = null,
 ): void {
   const s = cam.scale;
   const winL = cam.offsetX;
@@ -149,6 +161,65 @@ export function drawEdgeMarkers(
     ctx.textBaseline = 'middle';
     ctx.fillText(`${b.name} ${label}`, ex - dx * 20 * s, ey - dy * 20 * s);
   }
+  drawFinishMarker(ctx, rcfg, snap, finishY, cx, boxT, s);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
+}
+
+/**
+ * The finish line, signposted the way a planet is.
+ *
+ * GREEN, AND THE ONE PLACE THAT IS NOT THE RARITY LADDER'S GREEN. These arrows
+ * are category-coded — blue for a planet, purple for an anomaly — which is a
+ * different language from the award ladder, where colour means how good and
+ * green is rung three of four. A navigation cue is not an award, and green means
+ * finish line here for the same reason it does at a racetrack.
+ *
+ * It exists because the alternative was a wall. The ceiling used to be drawn as a
+ * hazard band, which stopped being true the moment clearing the field became the
+ * point of flying up there; a thing you are heading toward on purpose wants a
+ * pointer, not a fence.
+ *
+ * Always straight up, so it never rotates: the line spans the whole field, so the
+ * nearest part of it is directly overhead wherever the ship is. It rides `boxT`,
+ * the same inset the body arrows use, so it sits in their row rather than in the
+ * readout above them.
+ */
+function drawFinishMarker(
+  ctx: CanvasRenderingContext2D,
+  rcfg: RenderConfig,
+  snap: RenderSnapshot,
+  finishY: number | null,
+  cx: number,
+  boxT: number,
+  s: number,
+): void {
+  if (finishY === null) return;
+  const dist = snap.y - finishY;
+  // Behind us, or too far to be news yet. The same range the bodies use, so the
+  // finish announces itself at the distance everything else does.
+  if (dist <= 0 || dist > rcfg.edgeMarkerRange) return;
+
+  // Brightens as it closes, like the body arrows, so "near" is legible without
+  // reading the number.
+  const near = Math.max(0.35, Math.min(1, 1 - (dist - 200) / 1400));
+
+  ctx.save();
+  ctx.translate(cx, boxT);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = withAlpha(FINISH, 0.55 * near + 0.35);
+  ctx.beginPath();
+  ctx.moveTo(7 * s, 0);
+  ctx.lineTo(-4 * s, 4.5 * s);
+  ctx.lineTo(-4 * s, -4.5 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  const label = dist >= 1000 ? `${(dist / 1000).toFixed(1)}k` : String(Math.round(dist));
+  ctx.fillStyle = withAlpha(FINISH, 0.6 * near + 0.3);
+  ctx.font = `${8 * s}px ui-monospace, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`FINISH ${label}`, cx, boxT + 20 * s);
 }

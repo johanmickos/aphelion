@@ -137,6 +137,21 @@ export const LADDER_GREAT = '#5cd67a';
 export const LADDER_EXCEPTIONAL = '#ffd633';
 
 /**
+ * The finish line's marker, in the edge-arrow cue system.
+ *
+ * NOT ON THE RARITY LADDER, and it is worth being explicit because it is green
+ * and the ladder's third rung is also green. Those arrows are category-coded —
+ * blue for a planet, purple for an anomaly — and category is exactly what colour
+ * is NOT allowed to mean on an award. Two systems, two jobs: this one answers
+ * "what is that", the ladder answers "how good was that", and they never appear
+ * on the same glyph.
+ *
+ * Distinct from `LADDER_GREAT` on purpose rather than by accident. Sharing the
+ * value would make a later retune of the ladder silently move a navigation cue.
+ */
+export const FINISH: RGB = [92, 226, 140];
+
+/**
  * The summit gold, for the ceremony that fires when the field is cleared.
  *
  * DELIBERATELY THE LADDER'S TOP RUNG AND NOT A NEW COLOUR. Clearing the field is

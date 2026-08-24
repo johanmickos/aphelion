@@ -220,7 +220,15 @@ export class Scene {
     // below it and of the popups above it. See `verdict.ts`.
     drawVerdict(ctx, cam, render, snap, opts.score);
 
-    drawEdgeMarkers(ctx, cam, render, snap, bodies, opts.headerBottom);
+    drawEdgeMarkers(
+      ctx,
+      cam,
+      render,
+      snap,
+      bodies,
+      opts.headerBottom,
+      sim.clearAtTop ? field.crest - sim.grabRange : null,
+    );
 
     drawEndingNotice(ctx, cam, sim, snap);
 
