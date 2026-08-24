@@ -57,17 +57,24 @@ export class Starfield {
     cfg: RenderConfig,
     warp = 0,
     /**
-     * Seconds into the warp, for the scroll.
+     * How far the world has fallen since the ceremony began, in design units.
      *
-     * WITHOUT THIS THE WARP IS A STILL LIFE. Stretching each star into a streak
-     * makes a picture OF speed; it does not make motion. The camera is frozen with
-     * the ship during the ceremony, so every parallax position it feeds is frozen
-     * too, and the first version drew long static lines that simply sat there —
-     * reported as "it stops animating on FIELD CLEARED". The streaks have to be
-     * scrolled by something, and the only honest clock available is the one the
-     * simulation is already advancing through the hold.
+     * WITHOUT A SCROLL THE WARP IS A STILL LIFE. Stretching each star into a
+     * streak makes a picture OF speed; it does not make motion. The camera is
+     * frozen with the ship during the ceremony, so every parallax position it
+     * feeds is frozen too, and the first version drew long static lines that
+     * simply sat there — reported as "it stops animating on FIELD CLEARED".
+     *
+     * A DISTANCE, AND THE SAME ONE THE WORLD FALLS BY, which is what makes the
+     * transition continuous. Driven by a clock that only started at the handover,
+     * the stars would sit still through the coast and then JUMP by however much
+     * scroll had accumulated by the time the streaks appeared. Driven by the
+     * world's own fall, the very same dots that were on screen a moment ago are
+     * already moving before they elongate — the sky never restarts, it only
+     * changes shape. It is also the truer statement: the ship is climbing away,
+     * and the stars are what that looks like.
      */
-    warpT = 0,
+    scroll = 0,
   ): void {
     const { starParallaxMin: lo, starParallaxMax: hi, starParallaxHorizFrac: hf } = cfg;
     const w = cam.designW * cam.scale;
@@ -84,10 +91,15 @@ export class Starfield {
       ctx.globalAlpha = 0.3 + ((t + 0.5) / TIERS.length) * 0.6;
       const size = Math.max(1, tier.size * cam.scale);
 
+      // Parallax on the ceremony scroll, exactly as on the camera: a near tier
+      // sweeps past faster than a far one. Applied in BOTH branches, so a dot and
+      // the streak it becomes are drawn at the same place.
+      const stream = scroll * (0.18 + t * 0.34) * cam.scale;
+
       if (warp <= 0) {
         for (const s of stars) {
           const p = lo + s.z * (hi - lo);
-          const y = mod(s.y * h - cam.centerY * p * cam.scale, h);
+          const y = mod(s.y * h - cam.centerY * p * cam.scale + stream, h);
           const x = mod(s.x * w - cam.left * p * hf * cam.scale, w);
           ctx.fillRect(cam.offsetX + x, cam.offsetY + y, size, size);
         }
@@ -113,9 +125,6 @@ export class Starfield {
       // at full length every tier overlapped the next and the screen read as
       // ruled lines. Length is a hint of travel per frame, not a measure of it.
       const gain = warp * (9 + t * 22) * cam.scale;
-      // Nearer tiers stream faster — the same parallax ordering the still field
-      // uses, which is why the warp can be built out of it rather than beside it.
-      const stream = warpT * (150 + t * 430) * cam.scale;
       ctx.strokeStyle = tier.color;
       ctx.lineWidth = size;
       ctx.lineCap = 'butt';

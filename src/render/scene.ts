@@ -129,7 +129,7 @@ export class Scene {
     const finishY = sim.clearAtTop ? field.crest - sim.grabRange : null;
     // Null unless the field has just been cleared. Everything the ceremony
     // touches reads it, so "is this the victory frame" is asked once.
-    const cer = ceremonyPhase(snap);
+    const cer = ceremonyPhase(snap, cam, finishY);
 
     // the bars
     ctx.fillStyle = '#05070d';
@@ -172,7 +172,7 @@ export class Scene {
       this.outroT >= 0 ? Math.min(1, this.outroT / OUTRO_SECS) : null,
     );
 
-    this.stars.draw(ctx, cam, render, cer ? cer.warp : 0, cer ? cer.t : 0);
+    this.stars.draw(ctx, cam, render, cer ? cer.warp : 0, cer ? cer.shift : 0);
 
     // ---- the world falls away
     //

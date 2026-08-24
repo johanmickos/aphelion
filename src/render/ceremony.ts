@@ -29,6 +29,7 @@
  * could most easily have contradicted the rest of the game's grammar.
  */
 import type { Camera } from './camera.ts';
+import { toScreenY } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 import { FINISH, SUMMIT_RGB, withAlpha } from './palette.ts';
 
@@ -43,26 +44,41 @@ import { FINISH, SUMMIT_RGB, withAlpha } from './palette.ts';
  * line slides off the bottom of the screen, and only once it is gone does
  * anything else happen.
  */
-const COAST = 1.35;
+const COAST = 1.15;
 
 /**
  * How far the world falls away during the coast, in design units.
  *
- * Sized to carry the line off the bottom from anywhere it can be crossed. The
- * design window is 844 tall and the ship crosses somewhere in its upper half, so
- * a shade over one screen height clears it with margin at every camera position.
+ * Comfortably more than a screen height, because the warp is handed over by
+ * DISTANCE rather than by the clock — see `warp` below — and the remainder after
+ * the line has cleared is what the spool is measured against.
  */
-const COAST_DIST = 900;
+const COAST_DIST = 1500;
 
 /**
- * Seconds from the end of the coast to full warp.
+ * Design units of further travel, after the line has left, to reach full warp.
  *
- * Slower than it was. The warp used to reach full stretch in 1.15s measured from
- * the crossing itself, which arrived while the player was still reading the line;
- * it now starts after the coast and takes longer to get there, so the sky opens
- * up rather than snapping.
+ * A DISTANCE AND NOT A DURATION, which is the whole fix for the lag. The first
+ * version handed over on a fixed timer, so the warp began 1.35s after the
+ * crossing whether or not the chequers were still on screen — and since how far
+ * the line has to fall depends on where the ship happened to cross, it usually
+ * cleared early and left a hole. Reported as "once the finish line is off screen
+ * we can start the starfield; now there's a noticeable lag".
+ *
+ * Measuring both halves in the same units removes the seam: the sky begins to
+ * open at the exact moment the last of the chequers leaves the bottom of the
+ * screen, wherever that happens to be.
  */
-const SPOOL = 1.8;
+const SPOOL_DIST = 260;
+
+/**
+ * Design units per second the world keeps falling at once the coast is spent.
+ *
+ * Fast, because the ship is at lightspeed by then and this is what the sky is
+ * scrolled by. It is a speed rather than an easing because there is nothing left
+ * to ease toward: the ceremony holds here until the player taps.
+ */
+const CRUISE = 900;
 
 /** Seconds spent easing the ship from where it crossed to the middle. */
 const CENTRE = 0.8;
@@ -97,17 +113,40 @@ function ease(u: number): number {
  * post-mortem, and gilding a death would be the cruellest possible misreading of
  * the moment.
  */
-export function ceremonyPhase(snap: RenderSnapshot): Ceremony | null {
+export function ceremonyPhase(
+  snap: RenderSnapshot,
+  cam: Camera,
+  /** World y of the finish line, so the handover can be geometric. */
+  finishY: number | null,
+): Ceremony | null {
   if (!snap.ending.active || snap.ending.reason !== 'cleared') return null;
   const t = snap.ending.t;
+  // Eased, so the coast decelerates rather than stopping dead. The ship has just
+  // been accelerated by the funnel; a world that halted on a timer would undo
+  // that in one frame.
+  //
+  // AND IT KEEPS GROWING once the coast is spent. The ship is at warp; a world
+  // that stopped falling would leave the sky frozen — the starfield scrolls off
+  // this same number, so anything that stops it stops the animation with it.
+  const shift = COAST_DIST * ease(t / COAST) + CRUISE * Math.max(0, t - COAST);
+
+  // How far the world still has to fall before the last of the chequers is off
+  // the bottom of the screen. Derived from where the line actually is, so a ship
+  // that crossed high and one that crossed low hand over at the right moment
+  // instead of at the same moment.
+  let cleared = 0;
+  if (finishY !== null) {
+    const lineY = toScreenY(cam, finishY);
+    const bottom = cam.offsetY + cam.viewH * cam.scale;
+    // Half the chequer band plus its glow still hangs below the line itself.
+    const tail = 26 * cam.scale;
+    cleared = Math.max(0, (bottom - lineY + tail) / cam.scale);
+  }
+
   return {
     t,
-    // Eased, so the coast decelerates into the warp instead of stopping dead at
-    // the handover. The ship has just been accelerated by the funnel; a world
-    // that halts the instant the timer says so would undo that in one frame.
-    shift: COAST_DIST * ease(t / COAST),
-    // Nothing until the line is gone.
-    warp: ease((t - COAST) / SPOOL),
+    shift,
+    warp: ease((shift - cleared) / SPOOL_DIST),
     centred: ease(t / CENTRE),
   };
 }

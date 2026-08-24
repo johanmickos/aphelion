@@ -533,50 +533,84 @@ describe('the ceremony', () => {
     ending: { active: true, t, x: 0, y: 0, reason: reason as 'cleared' },
   });
 
+  /**
+   * The handover is geometric now, so a fixture has to say where the line is.
+   * -300 puts it above the ship, which is where a just-crossed line sits.
+   */
+  const phase = (reason: string, t: number, finishY: number | null = -300) =>
+    ceremonyPhase(ended(reason, t), cam(), finishY);
+
   it('fires for a clear and for nothing else', () => {
     // Gilding a death would be the cruellest possible misreading of the moment,
     // and every other ending already has its own notice.
-    expect(ceremonyPhase(ended('cleared', 0.5))).not.toBeNull();
+    expect(phase('cleared', 0.5)).not.toBeNull();
     for (const r of ['impact', 'out-of-bounds', 'fell-behind']) {
-      expect(ceremonyPhase(ended(r, 0.5)), r).toBeNull();
+      expect(phase(r, 0.5), r).toBeNull();
     }
   });
 
   it('says nothing while the run is still being flown', () => {
     const live = captureSnapshot(createInitialState(DEFAULT_CONFIG), false, DEFAULT_CONFIG);
-    expect(ceremonyPhase(live)).toBeNull();
+    expect(ceremonyPhase(live, cam(), -300)).toBeNull();
   });
 
   it('coasts first, so the finish line can be watched leaving', () => {
     // REPORTED: "the transition from finish line to the starfield is too fast".
     // The first version began stretching the stars on the tick the ship crossed,
     // so the chequers — the thing the whole runway exists to deliver the player
-    // to — were replaced before they could be looked at. Nothing but the coast
-    // happens for over a second now.
-    const p = (t: number) => ceremonyPhase(ended('cleared', t))!;
-    expect(p(0.5).warp, 'no warp while the line is still on screen').toBe(0);
-    expect(p(1.2).warp).toBe(0);
+    // to — were replaced before they could be looked at.
+    const p = (t: number) => phase('cleared', t, -300)!;
+    expect(p(0.3).warp, 'no warp while the line is still on screen').toBe(0);
     // ...and the world is meanwhile falling away, which is what carries it off.
-    expect(p(0.5).shift).toBeGreaterThan(0);
-    expect(p(1.2).shift).toBeGreaterThan(p(0.5).shift);
+    expect(p(0.3).shift).toBeGreaterThan(0);
+    expect(p(0.7).shift).toBeGreaterThan(p(0.3).shift);
   });
 
-  it('carries the line clear of the screen before the warp starts', () => {
-    // The design window is 844 tall and the ship crosses in its upper half, so
-    // the coast has to move the world more than a screen height to be sure the
-    // chequers are gone by the time anything replaces them.
-    const atWarpStart = ceremonyPhase(ended('cleared', 1.35))!;
-    expect(atWarpStart.shift).toBeGreaterThan(844);
-    expect(atWarpStart.warp).toBe(0);
+  it('hands over when the line has actually gone, not when a timer says so', () => {
+    // THE FIX FOR THE LAG, and the thing a duration could not express. How far
+    // the line has to fall depends on where the ship happened to cross it, so a
+    // fixed coast either cuts a low crossing off early or leaves a high one
+    // staring at an empty sky. A line with further to travel must hand over
+    // later than one that is nearly gone — at the same instant on the clock.
+    const t = 0.75;
+    const nearlyGone = phase('cleared', t, 300)!.warp;
+    const farToFall = phase('cleared', t, -700)!.warp;
+    expect(nearlyGone).toBeGreaterThan(farToFall);
+  });
+
+  it('never opens the sky while any of the chequers is still on screen', () => {
+    // Swept across every crossing height the camera can produce, because the
+    // failure this guards is exactly the one that only shows up at some of them.
+    for (let finishY = 400; finishY >= -900; finishY -= 100) {
+      for (let t = 0; t <= 2; t += 0.1) {
+        const p = phase('cleared', t, finishY)!;
+        if (p.warp > 0) {
+          const c = cam();
+          const lineScreenY = toScreenY(c, finishY) + p.shift * c.scale;
+          expect(
+            lineScreenY,
+            `warp began at t=${t.toFixed(1)} with the line still visible`,
+          ).toBeGreaterThan(c.offsetY + c.viewH * c.scale);
+          break;
+        }
+      }
+    }
+  });
+
+  it('keeps the world falling once the coast is spent, so the sky never freezes', () => {
+    // The starfield scrolls off `shift`, so a shift that stopped growing would
+    // stop the animation — the very bug the scroll was added to fix, arriving
+    // through the back door.
+    const p = (t: number) => phase('cleared', t, -700)!;
+    expect(p(6).shift).toBeGreaterThan(p(4).shift);
+    expect(p(30).shift).toBeGreaterThan(p(20).shift);
   });
 
   it('spools up and then holds, rather than looping', () => {
     // The panel arrives on top of a warp that is still running. If this ever
     // wrapped, the sky would visibly restart underneath the results.
-    const w = (t: number) => ceremonyPhase(ended('cleared', t))!.warp;
+    const w = (t: number) => phase('cleared', t, -700)!.warp;
     expect(w(0)).toBe(0);
-    expect(w(2.2)).toBeGreaterThan(0);
-    expect(w(2.2)).toBeLessThan(1);
     expect(w(4)).toBe(1);
     expect(w(30), 'still full warp half a minute later').toBe(1);
   });
@@ -585,15 +619,15 @@ describe('the ceremony', () => {
     // `ending.t` is ticks times dt. Two snapshots at the same tick must produce
     // the same frame however much real time passed between them — which is what
     // lets a replay of a cleared run age identically.
-    const a = ceremonyPhase(ended('cleared', 0.37))!;
-    const b = ceremonyPhase(ended('cleared', 0.37))!;
+    const a = phase('cleared', 0.37)!;
+    const b = phase('cleared', 0.37)!;
     expect(a).toEqual(b);
   });
 
   it('carries the ship to the middle and leaves it there', () => {
     const c = cam();
     const cx = c.offsetX + c.designW * 0.5 * c.scale;
-    const at = (t: number) => ceremonyShipPos(c, ceremonyPhase(ended('cleared', t))!, 40, 700);
+    const at = (t: number) => ceremonyShipPos(c, phase('cleared', t)!, 40, 700);
     expect(at(0).x, 'starts where the ship crossed').toBeCloseTo(40, 6);
     expect(at(5).x, 'ends in the middle').toBeCloseTo(cx, 6);
     // Monotone, so the ship never doubles back on its way in.
@@ -606,7 +640,10 @@ describe('the ceremony', () => {
     // moment rather than one cutting to the other.
     const r = recordingContext();
     // After the coast: the wash draws nothing before the warp begins.
-    drawCeremonyWash(r.ctx, cam(), ceremonyPhase(ended('cleared', 1.9))!);
+    // Mid-spool: far enough for gold, not yet far enough for the green to have
+    // finished fading. Chosen against a line with room to fall, so the window is
+    // wide enough to name.
+    drawCeremonyWash(r.ctx, cam(), phase('cleared', 0.95, -700)!);
     const stops = (r.calls('addColorStop') as Array<[string, number, string]>).map((o) => o[2]);
     expect(
       stops.some((v) => v.startsWith('rgba(255,214,51')),
@@ -618,7 +655,7 @@ describe('the ceremony', () => {
     ).toBe(true);
 
     const late = recordingContext();
-    drawCeremonyWash(late.ctx, cam(), ceremonyPhase(ended('cleared', 8))!);
+    drawCeremonyWash(late.ctx, cam(), phase('cleared', 8, -300)!);
     const lateStops = (late.calls('addColorStop') as Array<[string, number, string]>).map(
       (o) => o[2],
     );
@@ -666,6 +703,34 @@ describe('the ceremony', () => {
     }
   });
 
+  it('starts the streaks exactly where the dots were', () => {
+    // THE CONTINUITY THE WHOLE SCROLL EXISTS FOR. The stars used to move only in
+    // the streak branch, so at the instant warp crossed zero they jumped by
+    // however much scroll had piled up during the coast — the sky visibly
+    // restarting under a transition built to be seamless. Both branches take the
+    // same scroll now, so the dot and the streak it becomes share an origin.
+    const heads = (warp: number) => {
+      const r = recordingContext();
+      new Starfield(rcfg, 7).draw(r.ctx, cam(), rcfg, warp, 620);
+      return warp <= 0
+        ? (r.calls('fillRect') as Array<[string, number, number]>).map((o) => [o[1], o[2]])
+        : (r.calls('moveTo') as Array<[string, number, number]>).map((o) => [o[1], o[2]]);
+    };
+    // A hair either side of the handover: the marks must be in the same places.
+    expect(heads(0)).toEqual(heads(0.0001));
+  });
+
+  it('is already moving before it stretches', () => {
+    // The dots scroll through the coast, so the field is in motion by the time
+    // the streaks appear rather than springing to life with them.
+    const dotsAt = (scroll: number) => {
+      const r = recordingContext();
+      new Starfield(rcfg, 7).draw(r.ctx, cam(), rcfg, 0, scroll);
+      return (r.calls('fillRect') as Array<[string, number, number]>).map((o) => o[2]);
+    };
+    expect(dotsAt(0)).not.toEqual(dotsAt(180));
+  });
+
   it('keeps moving after the warp has spooled up', () => {
     // REPORTED: "it stops animating on FIELD CLEARED". Stretching a star into a
     // streak makes a picture OF speed; it does not make motion. The camera is
@@ -673,13 +738,13 @@ describe('the ceremony', () => {
     // and the first version drew long static lines that simply sat there. The
     // scroll is what moves them, and `warp` is pinned at 1 by then — so if a
     // future change ever drives the animation from `warp` alone, this fails.
-    const at = (t: number) => {
+    const at = (scroll: number) => {
       const r = recordingContext();
-      new Starfield(rcfg, 7).draw(r.ctx, cam(), rcfg, 1, t);
+      new Starfield(rcfg, 7).draw(r.ctx, cam(), rcfg, 1, scroll);
       return (r.calls('moveTo') as Array<[string, number, number]>).map((o) => o[2]);
     };
-    expect(at(3)).not.toEqual(at(3.25));
-    expect(at(9)).not.toEqual(at(9.25));
+    expect(at(2000)).not.toEqual(at(2200));
+    expect(at(9000)).not.toEqual(at(9200));
   });
 
   it('streaks by tier speed, which is the parallax it already has', () => {
