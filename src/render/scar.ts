@@ -24,10 +24,12 @@
  * an answer to the playtest's worst moment, where a run ended with full fuel and
  * two planets on screen and the failure read as arbitrary.
  *
- * WHY IT IS RED AND NOT THE FIRE'S RED. `rgba(255,70,90)` is the hazard band's
- * own colour, and the scar is a fact about that band. Note 51 spent three passes
- * establishing that `#ee3f2c` MEANS "this is about burning"; borrowing it here
- * would promise a fire that has not started. The scar separates from the wall by
+ * WHY IT IS RED AND NOT THE FIRE'S RED. `HAZARD` is the hazard band's own
+ * colour, and the scar is a fact about that band. Note 51 spent three passes
+ * establishing that `BURN` MEANS "this is about burning"; borrowing it here
+ * would promise a fire that has not started. Both live in `palette.ts` now, which
+ * this paragraph is the reason for: the agreement it describes was only ever
+ * written down here, in prose, about a number typed out in four other files. The scar separates from the wall by
  * FORM instead — the wall is straight, dashed and vertical, this is a lens lying
  * along your own path — which is the channel that was free.
  */
@@ -36,6 +38,7 @@ import { hypot } from '../sim/orbit.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
+import { HAZARD, withAlpha } from './palette.ts';
 
 /** The mark, once it is a place in the world rather than a prediction. */
 interface Mark {
@@ -125,7 +128,7 @@ function spindle(
     ny /= len;
     const a = (p.a + q.a) / 2;
     if (a <= 0.004) continue;
-    ctx.fillStyle = `rgba(255,70,90,${a})`;
+    ctx.fillStyle = withAlpha(HAZARD, a);
     ctx.beginPath();
     ctx.moveTo(p.x + nx * p.w, p.y + ny * p.w);
     ctx.lineTo(q.x + nx * q.w, q.y + ny * q.w);

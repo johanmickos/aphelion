@@ -5,6 +5,7 @@ import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
+import { BOOST_AMBER, FLAME_DEEP, FLAME_FADE, FLAME_HOT, FLAME_MID, withAlpha } from './palette.ts';
 
 /**
  * Trail.
@@ -176,8 +177,8 @@ function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs
   // ---- the wake: a tapered tongue streaming off the tail
   const wake = ctx.createLinearGradient(-3 * s, 0, -reach, 0);
   wake.addColorStop(0, `rgba(${cr},${cg},${cb},${(alpha * h).toFixed(3)})`);
-  wake.addColorStop(0.3, `rgba(255,116,26,${(0.72 * alpha * h).toFixed(3)})`);
-  wake.addColorStop(0.68, `rgba(228,34,14,${(0.4 * alpha * h).toFixed(3)})`);
+  wake.addColorStop(0.3, withAlpha(FLAME_HOT, (0.72 * alpha * h).toFixed(3)));
+  wake.addColorStop(0.68, withAlpha(FLAME_DEEP, (0.4 * alpha * h).toFixed(3)));
   wake.addColorStop(1, 'rgba(150,16,8,0)');
   ctx.fillStyle = wake;
   ctx.beginPath();
@@ -194,8 +195,8 @@ function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs
   const shockR = (10 + 6 * vis) * s;
   const shock = ctx.createRadialGradient(nose, 0, 0, nose, 0, shockR);
   shock.addColorStop(0, `rgba(${cr},${cg},${cb},${(0.8 * alpha * h).toFixed(3)})`);
-  shock.addColorStop(0.45, `rgba(255,104,24,${(0.5 * alpha * h).toFixed(3)})`);
-  shock.addColorStop(1, 'rgba(210,26,10,0)');
+  shock.addColorStop(0.45, withAlpha(FLAME_MID, (0.5 * alpha * h).toFixed(3)));
+  shock.addColorStop(1, withAlpha(FLAME_FADE, 0));
   ctx.fillStyle = shock;
   ctx.beginPath();
   ctx.arc(nose, 0, shockR, 0, Math.PI * 2);
@@ -316,7 +317,7 @@ export function drawShip(
 
   if (phase === 'flyby') {
     // braking an unbound approach: amber, matching the anchor line
-    ctx.strokeStyle = 'rgba(255,176,32,.95)';
+    ctx.strokeStyle = withAlpha(BOOST_AMBER, 0.95);
     ctx.lineWidth = 1.6 * s;
     ctx.stroke();
   } else if (snap.held) {

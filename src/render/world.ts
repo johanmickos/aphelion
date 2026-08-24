@@ -8,6 +8,7 @@ import { backtrackFloorY } from '../sim/world.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY, visibleWorldY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
+import { HAZARD_BAND_FROM, HAZARD_BAND_TO, HAZARD_EDGE } from './palette.ts';
 
 /**
  * Danger gradient at the field edges.
@@ -45,7 +46,7 @@ export function drawHazardZones(
   const height = cam.viewH * cam.scale;
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,70,90,.5)';
+  ctx.strokeStyle = HAZARD_EDGE;
   ctx.lineWidth = Math.max(1, 1.5 * cam.scale);
 
   for (const side of [-1, 1] as const) {
@@ -58,8 +59,8 @@ export function drawHazardZones(
     if (w < 0.5) continue;
 
     const g = ctx.createLinearGradient(xInner, 0, xEdge, 0);
-    g.addColorStop(0, 'rgba(255,70,90,0)');
-    g.addColorStop(1, 'rgba(255,70,90,.22)');
+    g.addColorStop(0, HAZARD_BAND_FROM);
+    g.addColorStop(1, HAZARD_BAND_TO);
     ctx.fillStyle = g;
     ctx.fillRect(x0, top, w, height);
 
@@ -103,8 +104,8 @@ function drawCeiling(
   const width = cam.designW * cam.scale;
 
   const g = ctx.createLinearGradient(0, yInner, 0, yEdge);
-  g.addColorStop(0, 'rgba(255,70,90,0)');
-  g.addColorStop(1, 'rgba(255,70,90,.22)');
+  g.addColorStop(0, HAZARD_BAND_FROM);
+  g.addColorStop(1, HAZARD_BAND_TO);
   ctx.fillStyle = g;
   ctx.fillRect(left, yEdge, width, yInner - yEdge);
 
@@ -145,12 +146,12 @@ export function drawBacktrackFloor(
   const width = cam.designW * cam.scale;
 
   const g = ctx.createLinearGradient(0, yInner, 0, yEdge);
-  g.addColorStop(0, 'rgba(255,70,90,0)');
-  g.addColorStop(1, 'rgba(255,70,90,.22)');
+  g.addColorStop(0, HAZARD_BAND_FROM);
+  g.addColorStop(1, HAZARD_BAND_TO);
   ctx.fillStyle = g;
   ctx.fillRect(left, yInner, width, yEdge - yInner);
 
-  ctx.strokeStyle = 'rgba(255,70,90,.5)';
+  ctx.strokeStyle = HAZARD_EDGE;
   ctx.setLineDash([6 * cam.scale, 6 * cam.scale]);
   ctx.lineWidth = Math.max(1, 1.5 * cam.scale);
   ctx.beginPath();

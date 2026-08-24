@@ -6,6 +6,14 @@ import type { EndingReason } from '../sim/types.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
+import {
+  HAZARD_NOTICE,
+  HAZARD_NOTICE_BORDER,
+  HAZARD_NOTICE_FILL,
+  IMPACT_NOTICE_BORDER,
+  IMPACT_NOTICE_FILL,
+  IMPACT_TEXT,
+} from './palette.ts';
 
 /**
  * The run-ended readout: a small industrial box at the point it happened, like
@@ -26,21 +34,21 @@ interface NoticeStyle {
 const NOTICE: Record<EndingReason, NoticeStyle> = {
   impact: {
     msg: '⚠ CRASHED',
-    fill: 'rgba(255,205,50,0.12)',
-    border: 'rgba(255,205,50,0.9)',
-    text: '#ffe27a',
+    fill: IMPACT_NOTICE_FILL,
+    border: IMPACT_NOTICE_BORDER,
+    text: IMPACT_TEXT,
   },
   'out-of-bounds': {
     msg: '⚠ LOST — OFF COURSE',
-    fill: 'rgba(255,70,90,0.14)',
-    border: 'rgba(255,70,90,0.9)',
-    text: '#ff9aa8',
+    fill: HAZARD_NOTICE_FILL,
+    border: HAZARD_NOTICE_BORDER,
+    text: HAZARD_NOTICE,
   },
   'fell-behind': {
     msg: '⚠ FELL BEHIND',
-    fill: 'rgba(255,70,90,0.14)',
-    border: 'rgba(255,70,90,0.9)',
-    text: '#ff9aa8',
+    fill: HAZARD_NOTICE_FILL,
+    border: HAZARD_NOTICE_BORDER,
+    text: HAZARD_NOTICE,
   },
 };
 

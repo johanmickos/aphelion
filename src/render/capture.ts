@@ -8,6 +8,7 @@ import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
+import { BOOST_AMBER, HAZARD_FUEL, withAlpha } from './palette.ts';
 
 /**
  * The frozen ellipse the phase clock is sweeping.
@@ -145,9 +146,9 @@ export function drawAnchorLine(
   // when in fact the pull is continuous — colour alone carries the meaning:
   // amber while braking a flyby, red when the tank cannot finish the job.
   if (cap.phase === 'flyby') {
-    ctx.strokeStyle = 'rgba(255,176,32,.7)';
+    ctx.strokeStyle = withAlpha(BOOST_AMBER, 0.7);
   } else if (!canAffordCircularise(sim, snap)) {
-    ctx.strokeStyle = 'rgba(255,90,110,.6)';
+    ctx.strokeStyle = withAlpha(HAZARD_FUEL, 0.6);
   } else {
     ctx.strokeStyle = 'rgba(150,170,205,.32)';
   }

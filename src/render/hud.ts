@@ -16,6 +16,7 @@ import type { AccoladeStyle } from './accolade.ts';
 import { BURN_WORD, HOP, LEVEL, ROUTINE } from './accolade.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
+import { HAZARD, HAZARD_FUEL, HAZARD_WARN, solid, withAlpha } from './palette.ts';
 
 export interface ReadoutLine {
   text: string;
@@ -256,7 +257,7 @@ export function drawFuelGauge(
   }
   ctx.globalAlpha = 1;
 
-  ctx.strokeStyle = low ? `rgba(255,70,90,${flash})` : 'rgba(150,170,205,.5)';
+  ctx.strokeStyle = low ? withAlpha(HAZARD, flash) : 'rgba(150,170,205,.5)';
   ctx.lineWidth = (low ? 2 : 1) * s;
   ctx.strokeRect(gx, gy, gw, gh);
 
@@ -264,10 +265,10 @@ export function drawFuelGauge(
   ctx.fillStyle = 'rgba(190,205,235,.7)';
   ctx.font = `${9 * s}px ui-monospace, monospace`;
   ctx.fillText('FUEL', gx + gw / 2, gy - 7 * s);
-  ctx.fillStyle = low ? 'rgb(255,90,110)' : 'rgba(190,205,235,.75)';
+  ctx.fillStyle = low ? solid(HAZARD_FUEL) : 'rgba(190,205,235,.75)';
   ctx.fillText(String(Math.round(snap.fuel)), gx + gw / 2, gbot + 14 * s);
   if (low) {
-    ctx.fillStyle = `rgba(255,70,90,${flash})`;
+    ctx.fillStyle = withAlpha(HAZARD, flash);
     ctx.font = `600 ${8 * s}px ui-monospace, monospace`;
     ctx.fillText('LOW', gx + gw / 2, gbot + 26 * s);
   }
@@ -328,8 +329,8 @@ const FLYBY_HARD = 0.7;
  * falling through to the wrong one.
  */
 const REFUSAL_LINE: Record<Exclude<GrabResult, 'captured'>, ReadoutLine> = {
-  'refused-crash-cone': { text: '✕ TOO LATE — crash course', color: '#ff5566', pulse: 1 },
-  'refused-no-fuel': { text: '✕ TANK EMPTY — cannot grab', color: '#ff5566', pulse: 1 },
+  'refused-crash-cone': { text: '✕ TOO LATE — crash course', color: HAZARD_WARN, pulse: 1 },
+  'refused-no-fuel': { text: '✕ TANK EMPTY — cannot grab', color: HAZARD_WARN, pulse: 1 },
   'refused-out-of-range': { text: '✕ TOO FAR — get closer', color: '#8fb8e8' },
   'refused-no-body': { text: '✕ nothing in range', color: '#8595b0' },
 };
@@ -352,7 +353,7 @@ export function readoutLines(
       // brake genuinely is not winning.
       const pct = Math.max(0, Math.round(cap.overEscape * 100));
       if (snap.fuel <= 0) {
-        out.push({ text: '⚠ OUT OF FUEL — sailing past', color: '#ff5566', pulse: 1 });
+        out.push({ text: '⚠ OUT OF FUEL — sailing past', color: HAZARD_WARN, pulse: 1 });
       } else if (cap.overEscape > FLYBY_HARD) {
         out.push({ text: `⚡ TOO FAST — ${pct}% over`, color: '#ffb020', pulse: 1 });
         out.push({ text: 'holding costs a lot of fuel', color: '#c8a86a' });
@@ -360,7 +361,7 @@ export function readoutLines(
         out.push({ text: `BRAKING — ${pct}% over`, color: '#8fb8e8' });
       }
     } else if (!canCircularise) {
-      out.push({ text: '⚠ LOW FUEL — will not round out', color: '#ff5566', pulse: 1 });
+      out.push({ text: '⚠ LOW FUEL — will not round out', color: HAZARD_WARN, pulse: 1 });
     }
 
     if (cap.boostFull > 1) {
@@ -376,7 +377,7 @@ export function readoutLines(
     }
   } else {
     if (snap.fuel <= 0.5) {
-      out.push({ text: '⚠ NO FUEL — recovering…', color: '#ff5566', pulse: 1 });
+      out.push({ text: '⚠ NO FUEL — recovering…', color: HAZARD_WARN, pulse: 1 });
     }
     const g = snap.lastGrab;
     if (g && g.result !== 'captured' && snap.tick - g.tick < REFUSAL_TICKS) {
@@ -388,7 +389,7 @@ export function readoutLines(
     out.push(
       snap.ending.reason === 'impact'
         ? { text: '⚠ CRASHED', color: '#ffcd32' }
-        : { text: '⚠ LOST — OFF COURSE', color: '#ff5566' },
+        : { text: '⚠ LOST — OFF COURSE', color: HAZARD_WARN },
     );
   }
 

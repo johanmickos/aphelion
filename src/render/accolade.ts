@@ -32,6 +32,7 @@
  * earned, so the two are alternatives rather than neighbours.
  */
 import type { PraiseLevel } from '../score/index.ts';
+import { BURN, LADDER_EXCEPTIONAL, LADDER_GOOD, LADDER_GREAT } from './palette.ts';
 
 export interface AccoladeStyle {
   /** Colour of the word and the number. */
@@ -43,9 +44,9 @@ export interface AccoladeStyle {
 }
 
 export const LEVEL: Record<PraiseLevel, AccoladeStyle> = {
-  good: { color: '#3aa8e8', labelColor: 'rgba(120,165,200,.75)', size: 13 },
-  great: { color: '#5cd67a', labelColor: 'rgba(130,190,145,.75)', size: 15 },
-  exceptional: { color: '#ffd633', labelColor: 'rgba(210,180,110,.8)', size: 18 },
+  good: { color: LADDER_GOOD, labelColor: 'rgba(120,165,200,.75)', size: 13 },
+  great: { color: LADDER_GREAT, labelColor: 'rgba(130,190,145,.75)', size: 15 },
+  exceptional: { color: LADDER_EXCEPTIONAL, labelColor: 'rgba(210,180,110,.8)', size: 18 },
 };
 
 /**
@@ -116,7 +117,7 @@ export const ROUTINE: AccoladeStyle = {
  * like once it is not being drawn in mud.
  */
 export const BURN_WORD: AccoladeStyle = {
-  color: '#ee3f2c',
+  color: BURN,
   labelColor: '#b8341f',
   size: 15,
 };

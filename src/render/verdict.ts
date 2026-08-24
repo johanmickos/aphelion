@@ -36,6 +36,7 @@ import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 import type { ScoreState } from '../score/types.ts';
 import type { ScarWall } from '../sim/rescue.ts';
+import { HAZARD, withAlpha } from './palette.ts';
 
 /** Design units from the ship the verdict sits at. */
 const OFFSET = 24;
@@ -71,7 +72,7 @@ function skull(
   r: number,
   alpha: number,
 ): void {
-  ctx.fillStyle = `rgba(255,70,90,${alpha})`;
+  ctx.fillStyle = withAlpha(HAZARD, alpha);
   // One filled path with the jaw hanging off it, so the glyph is a single
   // silhouette rather than a stack of shapes that can separate at small sizes.
   ctx.beginPath();
