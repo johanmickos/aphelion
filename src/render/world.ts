@@ -8,6 +8,7 @@ import { backtrackFloorY } from '../sim/world.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY, visibleWorldY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
+import { FINISH, withAlpha } from './palette.ts';
 import { HAZARD_BAND_FROM, HAZARD_BAND_TO, HAZARD_EDGE } from './palette.ts';
 
 /**
@@ -80,6 +81,83 @@ export function drawHazardZones(
     ctx.setLineDash([]);
   }
 
+  ctx.restore();
+}
+
+/**
+ * The finish line: a chequered band across the field at the clear line.
+ *
+ * A LINE YOU CROSS, not a pointer to one. The arrow in `edge-markers.ts` says the
+ * finish is coming while it is still off screen; this is the thing itself, and it
+ * exists because "you cleared the field" was otherwise an event with no place —
+ * the run simply stopped somewhere in empty sky and a notice appeared. Crossing
+ * something makes it a moment.
+ *
+ * CHEQUERS RATHER THAN A GRADIENT, deliberately. Every other line drawn across
+ * this field is a hazard — the walls, the trailing floor — and they all share one
+ * grammar: a wash that deepens toward a dashed limit, meaning "do not go past
+ * this". Reusing that grammar in green would still read as a barrier, because the
+ * shape is the part the eye learned. Chequers belong to a different idea
+ * entirely, one nobody has to be taught: this is the end of a race, and you are
+ * meant to go through it.
+ *
+ * Two offset rows, so it reads as a chequer at a glance rather than as a dashed
+ * line — one row of alternating squares is a dash, and a dash is what the hazard
+ * limits already are.
+ */
+export function drawFinishLine(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  field: FieldBounds,
+  finishY: number | null,
+): void {
+  if (finishY === null) return;
+  const view = visibleWorldY(cam);
+  const cell = 13;
+  if (finishY - cell * 2 > view.bottom || finishY + cell * 2 < view.top) return;
+
+  const s = cam.scale;
+  const y = toScreenY(cam, finishY);
+  const h = cell * s;
+  const left = toScreenX(cam, field.left);
+  const right = toScreenX(cam, field.right);
+  const cols = Math.max(1, Math.round((field.right - field.left) / cell));
+  const w = (right - left) / cols;
+
+  ctx.save();
+  // A soft glow under it, so the band sits in the world rather than on top of it —
+  // the same reason the anomaly blooms instead of being outlined.
+  const glow = ctx.createLinearGradient(0, y - h * 3, 0, y + h * 3);
+  glow.addColorStop(0, withAlpha(FINISH, 0));
+  glow.addColorStop(0.5, withAlpha(FINISH, 0.16));
+  glow.addColorStop(1, withAlpha(FINISH, 0));
+  ctx.fillStyle = glow;
+  ctx.fillRect(left, y - h * 3, right - left, h * 6);
+
+  // ONE PATH, ONE FILL, ONE BLUR. The band is about fifty cells across at the
+  // default field width, so shadowing each cell separately would be fifty blur
+  // operations a frame — on the device that already reported "slowdown due to
+  // rendering... more noticeable at the edges". Accumulating the cells into a
+  // single path and filling once costs exactly one, and looks identical: the glow
+  // is around the shape, and the shape is the whole chequer.
+  ctx.beginPath();
+  for (let row = 0; row < 2; row++) {
+    const ry = y - h + row * h;
+    for (let i = 0; i < cols; i++) {
+      if ((i + row) % 2 !== 0) continue;
+      ctx.rect(left + i * w, ry, w, h);
+    }
+  }
+  ctx.shadowColor = withAlpha(FINISH, 0.75);
+  ctx.shadowBlur = 9 * s;
+  ctx.fillStyle = withAlpha(FINISH, 0.85);
+  ctx.fill();
+  // A second pass through the same path, so the glow reads as light coming off
+  // the cells rather than as a soft edge on them. Cheap: the path is already
+  // built, and the blur is the only cost either pass pays.
+  ctx.shadowBlur = 20 * s;
+  ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.restore();
 }
 

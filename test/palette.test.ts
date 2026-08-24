@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BOOST_AMBER,
   BURN,
+  FINISH,
   FLAME_DEEP,
   FLAME_FADE,
   FLAME_HOT,
@@ -93,6 +94,15 @@ describe('the palette resolves to what was there before', () => {
     expect(LEVEL.great.color).toBe(LADDER_GREAT);
     expect(LEVEL.exceptional.color).toBe(LADDER_EXCEPTIONAL);
     expect(BURN_WORD.color).toBe(BURN);
+  });
+
+  it('keeps the finish green off the rarity ladder', () => {
+    // Two colour systems that must never be merged: the finish cues are
+    // category-coded — this is the finish — and the ladder answers "how good was
+    // that". Sharing a value would make a ladder retune silently move a
+    // navigation cue, and a finish retune silently restyle every great award.
+    expect(FINISH).toEqual([92, 226, 140]);
+    expect(solid(FINISH)).not.toBe(LADDER_GREAT);
   });
 
   it('puts the summit on the ladder’s top rung rather than beside it', () => {

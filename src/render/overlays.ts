@@ -13,8 +13,7 @@ import {
   IMPACT_NOTICE_BORDER,
   IMPACT_NOTICE_FILL,
   IMPACT_TEXT,
-  SUMMIT,
-  SUMMIT_RGB,
+  FINISH,
   withAlpha,
 } from './palette.ts';
 
@@ -25,8 +24,17 @@ import {
  *
  * Colour-matched to the cause so the reason is legible before the text is read:
  * yellow for an impact, red for leaving the field — the same red as the boundary
- * gradient that was warning you on the way out — and gold for clearing it, the
- * rarity ladder's top rung, which is the one outcome here that is not a failure.
+ * gradient that was warning you on the way out — and the finish green for
+ * clearing it, the one outcome here that is not a failure.
+ *
+ * GREEN AND NOT THE LADDER'S GOLD, decided by looking at it. Gold was the first
+ * choice and the argument for it was sound in isolation: clearing the field is
+ * the best thing a player can do, and gold is the rarity ladder's top rung. What
+ * that argument missed is that by the time this box appears the player has been
+ * following a green arrow and has just flown through a green chequered line. The
+ * notice is the third beat of THAT sentence, not the first beat of a new one.
+ * Colour still means rarity on an award; this is not an award, it is the finish
+ * telling you that you reached it.
  *
  * The gold one has no ⚠ and does not say what went wrong, because nothing did.
  * It is deliberately the plainest of the four: the ceremony is what celebrates a
@@ -54,9 +62,9 @@ const NOTICE: Record<EndingReason, NoticeStyle> = {
   },
   cleared: {
     msg: 'FIELD CLEARED',
-    fill: withAlpha(SUMMIT_RGB, 0.14),
-    border: withAlpha(SUMMIT_RGB, 0.9),
-    text: SUMMIT,
+    fill: withAlpha(FINISH, 0.14),
+    border: withAlpha(FINISH, 0.9),
+    text: withAlpha(FINISH, 1),
   },
   'fell-behind': {
     msg: '⚠ FELL BEHIND',

@@ -15,8 +15,9 @@ import {
   toScreenY,
 } from '../src/render/camera.ts';
 import { Starfield } from '../src/render/starfield.ts';
-import { BodyRenderer, drawHazardZones } from '../src/render/world.ts';
+import { BodyRenderer, drawFinishLine, drawHazardZones } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
+import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
 import { rescueScar } from '../src/sim/rescue.ts';
 import { DEFAULT_SCORE_CONFIG, previewBurn } from '../src/score/index.ts';
@@ -202,7 +203,7 @@ describe('the finish marker', () => {
   });
 
   it('counts down the distance rather than just pointing', () => {
-    expect(draw(400).label).toBe('FINISH 400');
+    expect(draw(600).label).toBe('FINISH 600');
     // Thousands are abbreviated exactly as a body's distance is. Kept inside
     // `edgeMarkerRange` (1300) — beyond it there is no marker to read at all.
     expect(draw(1200).label).toBe('FINISH 1.2k');
@@ -216,19 +217,101 @@ describe('the finish marker', () => {
         .filter((v) => v.startsWith('rgba(92,226,140'));
       return Number(fills[0]!.split(',')[3]!.replace(')', ''));
     };
-    expect(alphaOf(200)).toBeGreaterThan(alphaOf(1200));
+    expect(alphaOf(600)).toBeGreaterThan(alphaOf(1200));
+  });
+
+  it('stands down once the line itself is on screen', () => {
+    // The rule every body arrow follows: a marker pointing at something already
+    // visible is clutter drawn over the exact thing it points at. 300px up is
+    // inside a 844-tall viewport centred on the ship; 600 is not.
+    expect(draw(300).label, 'line visible — arrow stands down').toBeUndefined();
+    expect(draw(600).label, 'line off screen — arrow speaks').toBeDefined();
   });
 
   it('draws in the finish green, not the ladder’s green', () => {
     // Two colour systems that must not be merged: the arrows are category-coded
     // and the ladder answers "how good was that". Sharing a value would make a
     // ladder retune silently move a navigation cue.
-    const { r } = draw(400);
+    const { r } = draw(600);
     const fills = (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>).map(
       (o) => o[1],
     );
     expect(fills.some((v) => v.startsWith('rgba(92,226,140'))).toBe(true);
     expect(fills.some((v) => v.includes('92,214,122'))).toBe(false);
+  });
+});
+
+describe('the finish line', () => {
+  /** Draw the line with the camera looking at `at`. */
+  function draw(finishY: number | null, at = 0) {
+    const r = recordingContext();
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, 195, at, field, null);
+    drawFinishLine(r.ctx, c, field, finishY);
+    return r;
+  }
+
+  it('draws nothing when the field cannot be cleared', () => {
+    expect(draw(null).calls('rect').length).toBe(0);
+  });
+
+  it('draws nothing while it is nowhere near the screen', () => {
+    expect(draw(-9000, 0).calls('rect').length).toBe(0);
+  });
+
+  it('is chequered, not a dashed limit like every hazard here', () => {
+    // The grammar matters more than the colour. Walls and the trailing floor are
+    // all "wash deepening to a dashed line", and the eye learned that shape as
+    // "do not pass". Chequers say the opposite thing without being taught.
+    const r = draw(-200, 0);
+    // Cells are accumulated into one path and filled once — one blur instead of
+    // fifty — so they are `rect` calls, not `fillRect` ones.
+    expect(r.calls('rect').length, 'many cells, not one stroked line').toBeGreaterThan(8);
+    expect(r.calls('setLineDash').length, 'and no dashes at all').toBe(0);
+  });
+
+  it('spans the field it is the end of', () => {
+    const r = draw(-200, 0);
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, 195, 0, field, null);
+    const rects = r.calls('rect') as Array<[string, number, number, number, number]>;
+    const xs = rects.map(([, x]) => x);
+    const rights = rects.map(([, x, , w]) => x + w);
+    expect(Math.min(...xs)).toBeCloseTo(toScreenX(c, field.left), 4);
+    expect(Math.max(...rights)).toBeCloseTo(toScreenX(c, field.right), 4);
+  });
+
+  it('glows, in one blur rather than one per cell', () => {
+    // ~50 cells at the default field width. Shadowing each fill separately would
+    // be fifty blur operations a frame on a device that has already reported
+    // render slowdown; one path, filled twice, costs two.
+    const r = draw(-200, 0);
+    const blurs = (r.ops.filter((o) => o[0] === '=shadowBlur') as Array<[string, number]>)
+      .map((o) => o[1])
+      .filter((v) => v > 0);
+    expect(blurs.length, 'glow is applied').toBeGreaterThan(0);
+    expect(r.calls('fill').length, 'and the whole band fills as one shape').toBeLessThan(4);
+  });
+
+  it('is drawn in the same green as the arrow that points at it', () => {
+    const r = draw(-200, 0);
+    const fills = (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>).map(
+      (o) => o[1],
+    );
+    expect(fills.some((v) => typeof v === 'string' && v.startsWith('rgba(92,226,140'))).toBe(true);
+  });
+});
+
+describe('edge markers clear the score band', () => {
+  it('reaches below the score the HUD draws, not just the DOM header', () => {
+    // The 2026-08-22 playtest's loudest finding: planet labels drawn straight
+    // through the score, producing `P21 84P20 57 51` across the multiplier. The
+    // arrows were already avoiding `headerBottom` — but that is measured from a
+    // DOM element, and the score is drawn on the canvas, so the one thing they
+    // most needed to clear was invisible to the calculation.
+    expect(SCORE_BAND_BOTTOM).toBeGreaterThan(rcfg.edgeMarkerInset);
   });
 });
 

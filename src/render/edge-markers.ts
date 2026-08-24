@@ -14,7 +14,7 @@
 import type { Body } from '../sim/types.ts';
 import { hypot } from '../sim/orbit.ts';
 import type { Camera } from './camera.ts';
-import { toScreenX, toScreenY } from './camera.ts';
+import { toScreenX, toScreenY, visibleWorldY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 import { FINISH, withAlpha } from './palette.ts';
@@ -161,7 +161,7 @@ export function drawEdgeMarkers(
     ctx.textBaseline = 'middle';
     ctx.fillText(`${b.name} ${label}`, ex - dx * 20 * s, ey - dy * 20 * s);
   }
-  drawFinishMarker(ctx, rcfg, snap, finishY, cx, boxT, s);
+  drawFinishMarker(ctx, rcfg, snap, finishY, visibleWorldY(cam).top, cx, boxT, s);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
@@ -190,6 +190,7 @@ function drawFinishMarker(
   rcfg: RenderConfig,
   snap: RenderSnapshot,
   finishY: number | null,
+  viewTop: number,
   cx: number,
   boxT: number,
   s: number,
@@ -199,6 +200,10 @@ function drawFinishMarker(
   // Behind us, or too far to be news yet. The same range the bodies use, so the
   // finish announces itself at the distance everything else does.
   if (dist <= 0 || dist > rcfg.edgeMarkerRange) return;
+  // Once the line itself is on screen it says everything this does, and better.
+  // Same rule the body arrows follow — a marker pointing at something you can
+  // already see is clutter over the exact thing it was pointing at.
+  if (finishY >= viewTop) return;
 
   // Brightens as it closes, like the body arrows, so "near" is legible without
   // reading the number.

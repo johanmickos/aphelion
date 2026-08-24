@@ -107,6 +107,22 @@ const PILL_LIT = 1;
  */
 const SCORE = { bestY: 15, y: 34, multY: 49, awardY: 65, detailY: 77 } as const;
 
+/**
+ * How far down the score band reaches, in design units.
+ *
+ * Exported because nothing outside this file could previously know it, and the
+ * consequence was the playtest of 2026-08-22's loudest finding: planet labels
+ * drawn straight through the score, producing `P21 84P20 57 51` across the
+ * multiplier. `drawEdgeMarkers` was already trying to avoid the header — it takes
+ * a `headerBottom` — but that value is measured from a DOM element, and the score
+ * is drawn on the canvas, so the one thing the arrows most needed to clear was
+ * invisible to the calculation.
+ *
+ * It is `detailY` plus the descender room under it, not a guessed constant, so it
+ * follows the band if the layout above moves.
+ */
+export const SCORE_BAND_BOTTOM = SCORE.detailY + 6;
+
 /** Ticks an award stays on screen. 1.6s at 60Hz. */
 const AWARD_TICKS = 96;
 

@@ -11,7 +11,7 @@ import type { Camera } from './camera.ts';
 import { clipToWindow } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import { Starfield } from './starfield.ts';
-import { BodyRenderer, drawBacktrackFloor, drawHazardZones } from './world.ts';
+import { BodyRenderer, drawBacktrackFloor, drawFinishLine, drawHazardZones } from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
 import { Nebula, OUTRO_SECS } from './nebula.ts';
@@ -21,7 +21,7 @@ import { Scar } from './scar.ts';
 import { drawVerdict } from './verdict.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
-import { drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
+import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
 import { drawEdgeMarkers } from './edge-markers.ts';
 import { canAffordCircularise } from './capture.ts';
@@ -116,6 +116,10 @@ export class Scene {
     },
   ): void {
     const { sim, render, bodies, field } = this.deps;
+    // Where the run ends as `cleared`, or null when the field cannot be cleared.
+    // Derived once and shared by the line and the arrow that points at it, so the
+    // two can never disagree about where the finish is.
+    const finishY = sim.clearAtTop ? field.crest - sim.grabRange : null;
 
     // the bars
     ctx.fillStyle = '#05070d';
@@ -161,6 +165,7 @@ export class Scene {
     this.stars.draw(ctx, cam, render);
     drawHazardZones(ctx, cam, render, field);
     drawBacktrackFloor(ctx, cam, sim, render, snap.highWaterY);
+    drawFinishLine(ctx, cam, field, finishY);
     this.bodyRenderer.draw(
       ctx,
       cam,
@@ -226,8 +231,10 @@ export class Scene {
       render,
       snap,
       bodies,
-      opts.headerBottom,
-      sim.clearAtTop ? field.crest - sim.grabRange : null,
+      // The DOM header OR the canvas score band, whichever reaches further down.
+      // The arrows have to clear both, and only one of them was ever measured.
+      Math.max(opts.headerBottom, SCORE_BAND_BOTTOM),
+      finishY,
     );
 
     drawEndingNotice(ctx, cam, sim, snap);
