@@ -200,6 +200,16 @@ export interface FieldBounds {
   left: number;
   right: number;
   width: number;
+  /**
+   * The topmost body in the field — the last thing there is to fly to.
+   *
+   * Named rather than left implicit because two different lines hang off it and
+   * they mean opposite things: rising past THIS is clearing the course, and
+   * rising past `top`, 800px further on, is leaving the world. Before this
+   * existed the second was stored and the first had to be recovered by adding the
+   * 800 back on, which is a magic number in two places instead of one.
+   */
+  crest: number;
   /** Beyond this (climbing) the run ends. */
   top: number;
   /** Beyond this (falling) the run ends. */
@@ -262,6 +272,7 @@ export function fieldBounds(cfg: SimConfig, bodies: readonly Body[]): FieldBound
     left: cx - fw / 2,
     right: cx + fw / 2,
     width: fw,
+    crest: highest,
     top: highest - 800,
     bottom: SPAWN.y + DESIGN_H + 400,
   };

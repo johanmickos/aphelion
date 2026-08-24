@@ -246,7 +246,17 @@ export interface Capture {
 }
 
 /** Why a run ended. Drives which notice the player is shown. */
-export type EndingReason = 'impact' | 'out-of-bounds' | 'fell-behind';
+/**
+ * How a run ended.
+ *
+ * `cleared` is the only one that is not a failure: the ship rose past the topmost
+ * body, which means there is no more field to fly. It is an ENDING rather than a
+ * new state because everything downstream already knows how to stop for one —
+ * the scorer seals the run, the recorder closes the log, the renderer holds the
+ * frame — and inventing a parallel "finished" path would be four places agreeing
+ * to do the same thing under a second name.
+ */
+export type EndingReason = 'impact' | 'out-of-bounds' | 'fell-behind' | 'cleared';
 
 export interface EndingState {
   active: boolean;

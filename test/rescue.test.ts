@@ -196,8 +196,21 @@ describe('the point of no return', () => {
  * cheap refusal — which only measured horizontal reach — and then explicitly,
  * because the wall was a sign on the x axis and a top ending had no sign to give.
  */
+/**
+ * The ceiling, which had no cue of any kind until the 2026-08-23 playtest flew
+ * off the top of the field.
+ *
+ * RUN AGAINST `clearAtTop: false`, AND THAT IS THE POINT OF THE SUITE BELOW IT.
+ * Under the default config the ceiling is no longer reachable: rising past the
+ * crest ends the run as `cleared` 800px earlier, so there is no `out-of-bounds`
+ * ending up there for a scar to find. These cases therefore pin the MECHANISM —
+ * that `ScarWall` handles a boundary on the y axis at all — against a config that
+ * can still reach it, and `no ceiling scar once a clear ends the run first` pins
+ * the interaction that makes it unreachable in the game. Deleting either would
+ * lose half the truth.
+ */
 describe('the point of no return, at the ceiling', () => {
-  const cfg = DEFAULT_CONFIG;
+  const cfg: SimConfig = { ...DEFAULT_CONFIG, clearAtTop: false };
 
   /**
    * A ship climbing at the ceiling, `above` px past the topmost body.
@@ -294,6 +307,16 @@ describe('the point of no return, at the ceiling', () => {
     const before = JSON.stringify(state);
     rescueScar(state, cfg, FIXED_DT);
     expect(JSON.stringify(state), 'the prediction must not disturb the run').toBe(before);
+  });
+
+  it('offers no ceiling scar once a clear ends the run first', () => {
+    // The new truth, pinned where the old one used to be. Same fixture, same
+    // climb, default config: the projection now reaches `cleared` rather than
+    // `out-of-bounds`, and a cue whose entire subject is "this will kill you" has
+    // nothing to say about finishing the course. If this ever returns a scar, the
+    // game is drawing a death warning over its own victory.
+    const scar = rescueScar(climbingAtTheCeiling(DEFAULT_CONFIG, -150), DEFAULT_CONFIG, FIXED_DT);
+    expect(scar).toBeNull();
   });
 
   it('leaves the world it was asked about untouched', () => {

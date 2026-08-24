@@ -358,6 +358,24 @@ export interface SimConfig {
    */
   backtrackLimit: number;
   /**
+   * Rising past the topmost body ends the run as `cleared` — you beat the field.
+   *
+   * OFF IN THE PROTOTYPE CONFIG, which is the whole reason it is a flag. The
+   * prototype has no notion of finishing: its field is eight bodies and its only
+   * vertical ending is `out-of-bounds` 800px above the last of them. Turning this
+   * on there would end runs the prototype keeps flying and move the equality gate
+   * off zero, so it stays false and the proof stays intact.
+   *
+   * WHY THE LINE IS THE CREST AND NOT THE CEILING. `fieldBounds().top` sits 800px
+   * further up and is already a death. Firing the clear there would mean the
+   * player crosses a line that has been drawn in hazard red for the whole run and
+   * is congratulated for it — and, worse, that a session which flew the entire
+   * field could still be killed by the 800px of empty space above it, having
+   * already done everything the course asked. The 2026-08-23 capture died exactly
+   * there, in 2.7 seconds of nothing, having cleared all sixty bodies.
+   */
+  clearAtTop: boolean;
+  /**
    * A grab below escape speed is a capture, never a flyby.
    *
    * The prototype also called it a flyby when the ship was momentarily moving
@@ -714,6 +732,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   anomalyRefuel: 30,
   anomalySettleDur: 0.45,
   backtrackLimit: 0,
+  clearAtTop: false,
   boundGrabsCapture: false,
   // Inert here — but it is also what an older report replays under. See the key.
   outboundFlybyFrac: 1,
@@ -848,6 +867,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   bodyCount: 60,
   anomalyCount: 3,
   backtrackLimit: 700,
+  clearAtTop: true,
   holdClimbInCapture: true,
   boundGrabsCapture: true,
   outboundFlybyFrac: 0.65,
@@ -891,7 +911,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 21;
+export const SIM_VERSION = 22;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

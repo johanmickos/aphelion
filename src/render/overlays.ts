@@ -13,6 +13,9 @@ import {
   IMPACT_NOTICE_BORDER,
   IMPACT_NOTICE_FILL,
   IMPACT_TEXT,
+  SUMMIT,
+  SUMMIT_RGB,
+  withAlpha,
 } from './palette.ts';
 
 /**
@@ -20,9 +23,14 @@ import {
  * the ship's computer reporting. Non-modal and localised, which is why it reads
  * as information rather than punishment.
  *
- * Two variants, colour-matched to the cause so the reason is legible before the
- * text is read: yellow for an impact, red for leaving the field — the same red as
- * the boundary gradient that was warning you on the way out.
+ * Colour-matched to the cause so the reason is legible before the text is read:
+ * yellow for an impact, red for leaving the field — the same red as the boundary
+ * gradient that was warning you on the way out — and gold for clearing it, the
+ * rarity ladder's top rung, which is the one outcome here that is not a failure.
+ *
+ * The gold one has no ⚠ and does not say what went wrong, because nothing did.
+ * It is deliberately the plainest of the four: the ceremony is what celebrates a
+ * clear, and a box that shouted would be the second thing shouting.
  */
 interface NoticeStyle {
   msg: string;
@@ -43,6 +51,12 @@ const NOTICE: Record<EndingReason, NoticeStyle> = {
     fill: HAZARD_NOTICE_FILL,
     border: HAZARD_NOTICE_BORDER,
     text: HAZARD_NOTICE,
+  },
+  cleared: {
+    msg: 'FIELD CLEARED',
+    fill: withAlpha(SUMMIT_RGB, 0.14),
+    border: withAlpha(SUMMIT_RGB, 0.9),
+    text: SUMMIT,
   },
   'fell-behind': {
     msg: '⚠ FELL BEHIND',

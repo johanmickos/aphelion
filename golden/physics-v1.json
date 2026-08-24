@@ -52,6 +52,7 @@
   "anomalyRefuel": 30,
   "anomalySettleDur": 0.45,
   "backtrackLimit": 0,
+  "clearAtTop": false,
   "boundGrabsCapture": false,
   "outboundFlybyFrac": 1,
   "zipDur": 0,

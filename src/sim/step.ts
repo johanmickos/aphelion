@@ -131,7 +131,13 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // ---- ending hold: freeze so the player sees what happened, then respawn
   if (state.ending.active) {
     state.ending.t += dt;
-    if (state.ending.t >= cfg.crashPause) {
+    // A cleared field never respawns on its own. Every other ending is a failure
+    // the player wants to be over, so the hold is a beat and the game moves on;
+    // this one is the end of the course, and what happens next — a ceremony, a
+    // fresh field, a look at the numbers — is not the simulation's decision. It
+    // holds, and the caller ends it. `state.ending.t` keeps climbing either way,
+    // so anything that wants to age the moment still can.
+    if (state.ending.reason !== 'cleared' && state.ending.t >= cfg.crashPause) {
       state.ending.active = false;
       respawn(state, cfg);
     }
@@ -173,6 +179,16 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   const floorY = backtrackFloorY(cfg, state.highWaterY);
   if (floorY !== null && pos.y > floorY) {
     endRun(state, 'fell-behind', pos.x, pos.y);
+    state.tick++;
+    return;
+  }
+
+  // Past the last body there is no more field to fly, so the run is over and it
+  // is over having succeeded. Tested BEFORE the boundaries below, because the
+  // ceiling is only 800px further up and whichever fires first is the story the
+  // player gets told about what they just did.
+  if (cfg.clearAtTop && pos.y < fb.crest) {
+    endRun(state, 'cleared', pos.x, pos.y);
     state.tick++;
     return;
   }
