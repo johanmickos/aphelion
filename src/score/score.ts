@@ -101,12 +101,17 @@ export const FLYBY_SPEED_MIN = 150;
  * a non-event exactly as a dive abandoned early is, so it does not BREAK a
  * streak, it only fails to advance one.
  *
- * Eight degrees, measured. Sorted, the 206 paid flybys in `diagnostics/` have a
- * gap between 7.60 and 9.47 — every value in that band selects the identical 21
- * passes, 10.2% of the corpus, and none of the 13 whose replay was still bit-exact
- * where they happened. On the other side, synthetic taps aimed at closest approach
- * sweep p50 1.4-4.7 degrees and p90 3.0-9.4, so the floor sits above the tap
- * distribution and below every verified real pass, whose minimum was 15.3.
+ * Eight degrees, measured. Sorted, the 249 paid flybys in `diagnostics/` have a
+ * gap between 7.63 and 9.47 — every value in that band selects the identical 23
+ * passes, 9.6% of the corpus. On the other side, synthetic taps aimed at closest
+ * approach sweep p50 1.4-4.7 degrees and p90 3.0-9.4, so the floor sits above the
+ * tap distribution and below all but one verified real pass.
+ *
+ * The one session in the corpus that was actually PLAYED under the flyby award
+ * confirms the placement from the other direction: its shortest press, 7 ticks,
+ * swept 8.7 degrees and had been paid 442. It is the only pass in that session
+ * anywhere near this line, and the next shortest press up — 13 ticks, 10.1
+ * degrees — had been paid 977.
  */
 export const FLYBY_TURN_MIN = 8;
 

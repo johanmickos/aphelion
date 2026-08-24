@@ -128,21 +128,33 @@ export interface ScoreConfig {
    * read off geometry the ship already had, and `FLYBY_SPEED_MIN` cannot help
    * because an unconverted flyby is fast by definition.
    *
-   * Sixty degrees is p79 of the 206 paid flybys in `diagnostics/`, whose turn runs
-   * p10 7.6, p25 17.3, p50 31.2, p75 51.2, p90 79.2. So the median real pass
-   * collects about half and a strong one collects all of it.
+   * Sixty degrees is p73 of the 249 paid flybys in `diagnostics/`, whose swept
+   * turn runs p10 9.6, p25 17.8, p50 34.3, p75 63.5, p90 90.4. So the median real
+   * pass collects about half and a strong one collects all of it.
    *
-   * A SPAN AND NOT A FLOOR, which is the half a gate cannot do. Rescored across
-   * the corpus, the passes that pay wrongly are not the near-zero ones — those
-   * already pay 112-176 — but the mid band riding a ladder built out of them: 6.6
-   * degrees paying 850, 10.1 paying 1247, 17.7 paying 1439. No floor low enough to
-   * spare real play reaches those; a span does, and takes them to 0, 208 and 424
-   * while leaving a 64-degree pass at its full 1573.
+   * A SPAN AND NOT A FLOOR, which is the half a gate cannot do. The passes that
+   * pay wrongly are not the near-zero ones — those already pay 112-176 — but the
+   * mid band riding a ladder built out of them. No floor low enough to spare real
+   * play reaches those; a span does.
    *
-   * Total flyby income across the recorded corpus falls to 65% at this value, and
-   * that is the intended shape rather than a side effect: the missing 35% was
-   * being paid for passes that never bent the ship. The weights above were NOT
-   * raised to compensate, so a great pass still tops out where it always did.
+   * CALIBRATE THIS AGAINST THE ONE SESSION PLAYED UNDER THE AWARD, not against
+   * the corpus average, and the difference is large enough to matter. Most reports
+   * in `diagnostics/` predate the flyby award — their passes are reconstructions
+   * of what presses made for other reasons WOULD have scored — and rescoring those
+   * takes flyby income to 65-69%. The one session flown with the award on screen
+   * (2026-08-23T22-43, 4 minutes, 48 recorded flybys, 19% of its total score) is
+   * the only one where the presses were made to collect this, and it sweeps far
+   * harder: p50 58.9 degrees against 34.3. It loses 19%, not 35%.
+   *
+   * That session is also the evidence this span is aimed correctly. Every pass in
+   * it that had been paid 1400+ swept 36-197 degrees on a 19-63 tick hold, and all
+   * but one still collect in full — those are hard, close passes swung right
+   * around a planet, and nothing should be taken from them. What falls is exactly
+   * the short stuff: 7 ticks and 8.7 degrees goes 442 -> 64, 13 ticks and 10.1
+   * degrees goes 977 -> 165, 22 ticks and 11.9 degrees goes 574 -> 114.
+   *
+   * The weights above were NOT raised to compensate, so a great pass still tops
+   * out where it always did.
    */
   flybyTurnSpan: number;
   /**
