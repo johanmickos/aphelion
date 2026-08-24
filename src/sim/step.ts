@@ -78,12 +78,52 @@ export function shipVelocity(state: SimState): { vx: number; vy: number } {
 }
 
 /**
- * Ambient acceleration during drift. Empty today by design: the prototype's drift
- * is a literal straight line, and Stage 0 reproduces that exactly. Black holes
- * become contributors here rather than a new code path.
+ * Ambient acceleration during drift.
+ *
+ * Empty in the prototype config by design: its drift is a literal straight line
+ * and Stage 0 reproduces that exactly. This is the seam the file header reserved
+ * — "ambient attractors will enter as force contributors" — and the run-in funnel
+ * is the first thing to use it.
+ *
+ * THE FUNNEL. Inside `finishFunnelDepth` of the finish line, a drifting ship is
+ * steered toward the middle of the field and accelerated upward, ramping from
+ * nothing at the crest to full at the line. It exists so the ship ARRIVES at the
+ * ceremony centred and fast, rather than being teleported into position at the
+ * moment the player is watching hardest.
+ *
+ * Critically damped on the lateral axis. An undamped spring does not centre a
+ * ship, it swings it across the middle and out the other side — which at this
+ * point in a run would be a wall. `2*sqrt(k)` is the damping that arrives without
+ * overshooting, and it is derived rather than tuned so it stays correct if the
+ * stiffness moves.
+ *
+ * Nothing here fights a capture: this is called from `stepDrift` only, so an
+ * orbit at the last planet feels none of it.
  */
-function driftAccel(_state: SimState, _x: number, _y: number): { ax: number; ay: number } {
-  return { ax: 0, ay: 0 };
+function driftAccel(
+  state: SimState,
+  cfg: SimConfig,
+  x: number,
+  y: number,
+): { ax: number; ay: number } {
+  if (!cfg.clearAtTop || cfg.finishFunnelDepth <= 0) return { ax: 0, ay: 0 };
+
+  const fb = fieldBounds(cfg, state.bodies);
+  const finishY = fb.crest - cfg.grabRange;
+  const below = y - finishY;
+  if (below < 0 || below > cfg.finishFunnelDepth) return { ax: 0, ay: 0 };
+
+  // 0 at the crest, 1 at the line. Smoothed so the pull arrives rather than
+  // switching on — a step change in acceleration is a shove, and the player is
+  // still flying at this point.
+  const t = smootherstep(1 - below / cfg.finishFunnelDepth);
+  const cx = (fb.left + fb.right) / 2;
+  const k = cfg.finishFunnelPull;
+  const damping = 2 * Math.sqrt(k);
+  return {
+    ax: (k * (cx - x) - damping * state.ship.vx) * t,
+    ay: -cfg.finishFunnelBoost * t,
+  };
 }
 
 /** Freeze the ship and start the hold before respawn. */
@@ -702,7 +742,7 @@ function stepDrift(state: SimState, cfg: SimConfig, dt: number): boolean {
     }
   }
 
-  const { ax, ay } = driftAccel(state, ship.x, ship.y);
+  const { ax, ay } = driftAccel(state, cfg, ship.x, ship.y);
   ship.vx += ax * dt;
   ship.vy += ay * dt;
   ship.x += (ship.vx + bx) * dt;

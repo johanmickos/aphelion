@@ -315,12 +315,65 @@ describe('the speed carpet', () => {
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
     centerCamera(c, 195, at, field, null);
-    drawSpeedCarpet(r.ctx, c, field, finishY, timeMs);
+    drawSpeedCarpet(r.ctx, c, field, finishY, DEFAULT_CONFIG.finishFunnelDepth, timeMs);
     return r;
   }
 
   it('draws nothing when the field cannot be cleared', () => {
     expect(draw(null).calls('fill').length).toBe(0);
+  });
+
+  it('draws chevrons — six points with a notch, not a bent line', () => {
+    // The shape is the request. A stroked V has three points and gets its weight
+    // from lineWidth; this is a closed polygon whose ends are cut horizontally
+    // and whose underside is notched, which is what the icon actually is.
+    const r = draw(-3000, -2600, 0);
+    const moves = r.calls('moveTo').length;
+    const lines = r.calls('lineTo').length;
+    expect(moves, 'one subpath per chevron').toBeGreaterThan(0);
+    expect(lines / moves, 'five lineTo per moveTo').toBe(5);
+    expect(r.calls('closePath').length).toBe(moves);
+    expect(r.calls('stroke').length, 'filled, never stroked').toBe(0);
+  });
+
+  it('is taller than it is wide, so it reads as direction not shelter', () => {
+    // A wide, shallow `^` is a tent: the eye takes it as a roof over something.
+    // A steep one is an arrow. Measured on the drawn points rather than on the
+    // constants, so it stays true through the size ramp along the runway.
+    const r = draw(-3000, -2600, 0);
+    const pts = [
+      ...(r.calls('moveTo') as Array<[string, number, number]>),
+      ...(r.calls('lineTo') as Array<[string, number, number]>),
+    ];
+    expect(pts.length).toBeGreaterThan(0);
+    const xs = pts.map((o) => o[1]);
+    const ys = pts.map((o) => o[2]);
+    // One chevron's own extent: take the tightest cluster by using the first six
+    // points, which are one complete subpath in draw order.
+    const first = [
+      (r.calls('moveTo') as Array<[string, number, number]>)[0]!,
+      ...(r.calls('lineTo') as Array<[string, number, number]>).slice(0, 5),
+    ];
+    const width = Math.max(...first.map((o) => o[1])) - Math.min(...first.map((o) => o[1]));
+    const height = Math.max(...first.map((o) => o[2])) - Math.min(...first.map((o) => o[2]));
+    expect(height).toBeGreaterThan(width * 0.85);
+    expect(xs.length).toBe(ys.length);
+  });
+
+  it('is symmetric about its own apex', () => {
+    // The apex is the only point not paired with a mirror, so a chevron whose
+    // arms disagree shows up here rather than as something subtly lopsided that
+    // nobody can name.
+    const r = draw(-3000, -2600, 0);
+    const first = [
+      (r.calls('moveTo') as Array<[string, number, number]>)[0]!,
+      ...(r.calls('lineTo') as Array<[string, number, number]>).slice(0, 5),
+    ];
+    const xs = first.map((o) => o[1]).sort((a, b) => a - b);
+    const apexX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    // Outer tips and notch corners both mirror across the apex.
+    expect(xs[0]! + xs[5]!).toBeCloseTo(apexX * 2, 6);
+    expect(xs[1]! + xs[4]!).toBeCloseTo(apexX * 2, 6);
   });
 
   it('costs one compare for the whole rest of the run', () => {
@@ -363,9 +416,19 @@ describe('the speed carpet', () => {
     // check passes over an empty list and proves nothing — which is exactly what
     // it did for one commit after the shape changed.
     const carpet = draw(-200, 0, 0);
+    // Scans BOTH paint properties rather than naming one. These chevrons have
+    // been a stroked V and a filled polygon in successive commits, and each time
+    // a test that named the old primitive went on passing over an empty list —
+    // agreeing with whatever it found. What the assertion is about is the colour,
+    // so the colour is what it looks for.
+    //
     // `fillStyle` also carries gradient objects, which have no `startsWith`.
-    const alphaOf = (r: RecordingContext, prop: '=fillStyle' | '=strokeStyle') =>
-      (r.ops.filter((o) => o[0] === prop) as Array<[string, unknown]>)
+    const alphaOf = (r: RecordingContext) =>
+      (
+        r.ops.filter((o) => o[0] === '=fillStyle' || o[0] === '=strokeStyle') as Array<
+          [string, unknown]
+        >
+      )
         .map((o) => o[1])
         .filter((v): v is string => typeof v === 'string' && v.startsWith('rgba(92,226,140'))
         .map((v) => Number(v.split(',')[3]!.replace(')', '')));
@@ -374,9 +437,9 @@ describe('the speed carpet', () => {
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
     centerCamera(c, 195, 0, field, null);
     drawFinishLine(lineR.ctx, c, field, -200);
-    const carpetAlphas = alphaOf(carpet, '=strokeStyle');
+    const carpetAlphas = alphaOf(carpet);
     expect(carpetAlphas.length, 'the carpet actually drew something').toBeGreaterThan(0);
-    expect(Math.max(...carpetAlphas)).toBeLessThan(Math.max(...alphaOf(lineR, '=fillStyle')));
+    expect(Math.max(...carpetAlphas)).toBeLessThan(Math.max(...alphaOf(lineR)));
   });
 
   it('fades in and out instead of popping at the runway ends', () => {
@@ -384,10 +447,12 @@ describe('the speed carpet', () => {
     // extremes. A single alpha for the whole carpet is what made rows appear and
     // vanish at full strength.
     const alphas = (
-      draw(-3000, -2600, 0).ops.filter((o) => o[0] === '=strokeStyle') as Array<[string, unknown]>
+      draw(-3000, -2600, 0).ops.filter(
+        (o) => o[0] === '=fillStyle' || o[0] === '=strokeStyle',
+      ) as Array<[string, unknown]>
     )
       .map((o) => o[1])
-      .filter((v): v is string => typeof v === 'string')
+      .filter((v): v is string => typeof v === 'string' && v.startsWith('rgba(92,226,140'))
       .map((v) => Number(v.split(',')[3]!.replace(')', '')));
     expect(new Set(alphas).size, 'rows differ in opacity').toBeGreaterThan(1);
     expect(Math.min(...alphas)).toBeGreaterThan(0);

@@ -162,6 +162,40 @@ export function drawFinishLine(
 }
 
 /**
+ * One chevron: a filled `^` with square-cut ends and a notch under the apex.
+ *
+ * A FILLED POLYGON AND NOT A THICK STROKE, which is the whole difference between
+ * this and what it replaced. A stroked V is a line with a corner in it: its ends
+ * are caps — round or square to the line's own direction — and its apex is a
+ * join, so it reads as a bent ribbon. The icon shape has ENDS CUT HORIZONTALLY
+ * and a V notched out of the underside, and neither of those is something a
+ * stroke can be asked for.
+ *
+ * The inner edge is the outer edge translated straight down by `thick`, so the
+ * two are parallel and the arms keep an even weight along their whole length.
+ * Where that inner edge crosses the bottom cut is `w * (1 - thick / arm)` — the
+ * similar-triangles result, derived rather than eyeballed so the shape stays
+ * right at every size the runway scales it to.
+ */
+function chevron(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  arm: number,
+  thick: number,
+): void {
+  const inner = w * Math.max(0, 1 - thick / arm);
+  ctx.moveTo(x - w, y);
+  ctx.lineTo(x, y - arm);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + inner, y);
+  ctx.lineTo(x, y - arm + thick);
+  ctx.lineTo(x - inner, y);
+  ctx.closePath();
+}
+
+/**
  * The run-in to the finish: chevrons rolling up toward the line.
  *
  * The last stretch of the field was empty, and empty is the wrong feeling for the
@@ -198,13 +232,21 @@ export function drawSpeedCarpet(
   cam: Camera,
   field: FieldBounds,
   finishY: number | null,
+  /**
+   * `SimConfig.finishFunnelDepth` — the band the ship is actually being pulled
+   * through, not a number of this file's own choosing.
+   *
+   * THE PICTURE MUST NOT OUTLINE THE PHYSICS. The chevrons are the visible half
+   * of a real force; drawing them over a different span than the funnel acts on
+   * would show a runway that starts before the pull does, or keeps going after it
+   * stops. Same number, one owner.
+   */
+  runway: number,
   timeMs: number,
 ): void {
-  if (finishY === null) return;
+  if (finishY === null || runway <= 0) return;
 
   const view = visibleWorldY(cam);
-  /** About two rows of the field — see `SimConfig.bodySpacing`. */
-  const runway = 560;
   if (finishY > view.bottom || finishY + runway < view.top) return;
 
   const s = cam.scale;
@@ -234,8 +276,13 @@ export function drawSpeedCarpet(
     const fade = Math.sin(Math.PI * t);
     if (fade <= 0.01) continue;
 
-    const w = (9 + 5 * t) * s;
-    const h = (6 + 4 * t) * s;
+    // TALLER THAN WIDE. At a shallow pitch the shape reads as a tent rather than
+    // a chevron — the eye takes a wide, short `^` as a roof over something, and a
+    // steep one as a direction. The icon this is modelled on is roughly as tall as
+    // it is broad, so the arm outruns the half-width at every size.
+    const w = (12 + 5 * t) * s;
+    const arm = (24 + 11 * t) * s;
+    const thick = (8 + 3 * t) * s;
 
     ctx.beginPath();
     for (let j = 0; j < perRow; j++) {
@@ -245,17 +292,11 @@ export function drawSpeedCarpet(
       const jitter = hash - Math.floor(hash);
       const wx = left + span * ((j + 0.5) / perRow + (jitter - 0.5) * 0.22);
       const x = toScreenX(cam, wx);
-      const y = toScreenY(cam, wy);
-      ctx.moveTo(x - w, y + h);
-      ctx.lineTo(x, y - h);
-      ctx.lineTo(x + w, y + h);
+      const y = toScreenY(cam, wy) + arm * 0.5;
+      chevron(ctx, x, y, w, arm, thick);
     }
-    // Chunky and stroked rather than a filled arrowhead: a chevron is a stroke
-    // with a corner in it, and drawing it as one keeps the weight even instead of
-    // tapering to a point the way a triangle does.
-    ctx.lineWidth = (3.4 + 1.6 * t) * s;
-    ctx.strokeStyle = withAlpha(FINISH, 0.34 * fade);
-    ctx.stroke();
+    ctx.fillStyle = withAlpha(FINISH, 0.34 * fade);
+    ctx.fill();
   }
   ctx.restore();
 }

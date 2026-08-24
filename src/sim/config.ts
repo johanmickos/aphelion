@@ -376,6 +376,55 @@ export interface SimConfig {
    */
   clearAtTop: boolean;
   /**
+   * How far below the finish line the run-in funnel reaches. 0 disables it.
+   *
+   * Inside this band a drifting ship is steered toward the middle of the field
+   * and accelerated upward, so it arrives at the line centred and fast. That is
+   * not decoration: the ceremony on the other side is a warp, and a warp that
+   * begins with the ship drifting sideways at the edge of the corridor has to
+   * cheat — teleport it, or swing the camera off it — at the exact moment the
+   * player is watching hardest. Flying into the transition is the only version
+   * that does not lie.
+   *
+   * The band starts at the crest and ends at the line, so it begins exactly where
+   * the last planet is and never fights an approach to it. It also never fights
+   * an ORBIT: `driftAccel` is called from `stepDrift` only, so a captured ship
+   * feels nothing.
+   *
+   * `src/render/` reads this same key to size the chevron runway, so the picture
+   * cannot promise a pull the physics does not apply.
+   */
+  finishFunnelDepth: number;
+  /**
+   * Centring stiffness, in 1/s². Paired with critical damping, so the ship eases
+   * to the middle instead of oscillating across it.
+   *
+   * A spring rather than a constant sideways push, because the correction has to
+   * scale with how wrong the line is: a ship already centred should feel nothing
+   * at all, and one at the wall should feel a lot.
+   *
+   * MEASURED, and the measurement says the binding constraint is TIME rather than
+   * force. Swept across arrivals from 340px off-centre at 260-650px/s, the worst
+   * remaining offset at the line runs 71% of the half-field at stiffness 4, 44%
+   * at 14, 32% at 22 and 23% at 32 — a curve that flattens because a faster ship
+   * spends less of the funnel being pulled. Overshoot is zero at every one of
+   * them, which is the damping being derived rather than guessed.
+   *
+   * 32 is therefore chosen at the knee: it lands the worst case inside the middle
+   * quarter of the field, and buying the last 20% would need either a stiffness
+   * that snatches at a ship still being flown, or a deeper funnel than the
+   * runway is allowed to be.
+   */
+  finishFunnelPull: number;
+  /**
+   * Upward acceleration at the line, in px/s², ramping from zero at the crest.
+   *
+   * Sized to be felt rather than to dominate. What it is buying is a takeoff into
+   * the ceremony, not a speed record — the slingshot off the last planet is still
+   * what most of the arriving speed comes from.
+   */
+  finishFunnelBoost: number;
+  /**
    * A grab below escape speed is a capture, never a flyby.
    *
    * The prototype also called it a flyby when the ship was momentarily moving
@@ -733,6 +782,9 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   anomalySettleDur: 0.45,
   backtrackLimit: 0,
   clearAtTop: false,
+  finishFunnelDepth: 0,
+  finishFunnelPull: 0,
+  finishFunnelBoost: 0,
   boundGrabsCapture: false,
   // Inert here — but it is also what an older report replays under. See the key.
   outboundFlybyFrac: 1,
@@ -868,6 +920,9 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   anomalyCount: 3,
   backtrackLimit: 700,
   clearAtTop: true,
+  finishFunnelDepth: 560,
+  finishFunnelPull: 32,
+  finishFunnelBoost: 650,
   holdClimbInCapture: true,
   boundGrabsCapture: true,
   outboundFlybyFrac: 0.65,
@@ -911,7 +966,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 22;
+export const SIM_VERSION = 23;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

@@ -173,7 +173,7 @@ export class Scene {
     drawBacktrackFloor(ctx, cam, sim, render, snap.highWaterY);
     // Under the line it feeds into, so the chequers stay the brightest thing in
     // that part of the sky.
-    drawSpeedCarpet(ctx, cam, field, finishY, opts.timeMs);
+    drawSpeedCarpet(ctx, cam, field, finishY, sim.finishFunnelDepth, opts.timeMs);
     drawFinishLine(ctx, cam, field, finishY);
     this.bodyRenderer.draw(
       ctx,
