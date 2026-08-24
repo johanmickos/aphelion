@@ -325,6 +325,8 @@
       }
       #armedMap .ctl {
         letter-spacing: 0.14em;
+        /* Two controls sit here now, so they need air between them. */
+        margin: 0 3px;
       }
       /* Not a control, and deliberately quiet: it answers "which field is this?"
          for a report, and is never something to read before playing. */
@@ -394,6 +396,7 @@
         </div>
         <div id="armedMap">
           <button class="ctl" id="newMap">⟳ NEW MAP</button>
+          <button class="ctl" id="course">COURSE: FULL</button>
           <div id="armedSeed"></div>
         </div>
       </div>

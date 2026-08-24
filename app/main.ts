@@ -10,6 +10,7 @@ import { createLifecycle } from '../src/app/lifecycle.ts';
 import { KNOBS } from '../src/app/tune.ts';
 import { isGrabKey, keydownAction } from '../src/app/input.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
+import { COURSES, courseOf, withCourse } from '../src/sim/course.ts';
 import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
 import { advanceScar, rescueScar } from '../src/sim/rescue.ts';
 import type { Input } from '../src/sim/types.ts';
@@ -717,6 +718,33 @@ newMapBtn.addEventListener('click', (e) => {
   showSeed();
 });
 
+/**
+ * The course picker: how much field there is to fly.
+ *
+ * Armed-only like every other world control, and for the harder of the two
+ * reasons `rearm` is. Changing it mid-run would not merely be odd — it would
+ * rebuild the bodies under a ship already flying between them, and it would break
+ * the promise a run is `(config, seed, inputLog)`, since the config would no
+ * longer be one thing for the whole log.
+ *
+ * It exists because the ending is unreachable otherwise. Clearing sixty bodies
+ * takes about eighty-five seconds of good play, which is a slow way to look at a
+ * ceremony twenty times; twelve is about seventeen.
+ */
+const courseBtn = document.getElementById('course') as HTMLButtonElement;
+
+function showCourse(): void {
+  courseBtn.textContent = `COURSE: ${COURSES[courseOf(sim)].label}`;
+}
+
+courseBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (life.phase !== 'armed') return;
+  sim = withCourse(sim, courseOf(sim) === 'full' ? 'short' : 'full');
+  rearm();
+  showCourse();
+});
+
 function startRun(): void {
   life.phase = 'running';
   life.startedAtTick = state.tick;
@@ -820,3 +848,4 @@ tuneReset.addEventListener('click', (e) => {
 
 showArmed();
 showSeed();
+showCourse();

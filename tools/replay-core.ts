@@ -8,12 +8,14 @@
  */
 import { configDelta, configFromReport, summarize } from '../src/app/report.ts';
 import { DEFAULT_CONFIG, SIM_VERSION } from '../src/sim/config.ts';
+import type { SimConfig } from '../src/sim/config.ts';
 import { KNOBS } from '../src/app/tune.ts';
 import type { DiagReport } from '../src/app/report.ts';
 import type { AwardRecord } from '../src/app/recorder.ts';
 import { KINK_THRESHOLD_DEG, createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
 import { fieldBounds } from '../src/sim/world.ts';
+import { courseOf } from '../src/sim/course.ts';
 import type { GrabResult, Input, SimState } from '../src/sim/types.ts';
 import { createScoreState, praiseFor, scoreTick } from '../src/score/index.ts';
 import type { ScoreAward, ScoreState, Shout } from '../src/score/index.ts';
@@ -30,6 +32,18 @@ const TUNED_KEYS = new Set<string>(KNOBS.map((k) => k.key));
  * split was introduced to end.
  */
 const DEV_KEYS = new Set<string>(['anomalyAtSpawn']);
+
+/**
+ * Keys the armed screen's course picker sets.
+ *
+ * A fifth meaning, and it needed one: choosing the short course is not a feel
+ * tune, not a randomised field, and not a dev-server default — but it is also
+ * emphatically not build skew, and leaving it unclassified would fire the banner
+ * on every session played on it. The report says which course was flown, which is
+ * something a reader wants to know anyway: sixty bodies and twelve are not the
+ * same run, and a cadence figure from one says nothing about the other.
+ */
+export const COURSE_KEYS = new Set<string>(['bodyCount', 'anomalyCount']);
 
 export interface Frame {
   tick: number;
@@ -517,20 +531,26 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   // was recorded is missing from `report.config`, and printing "session ran
   // undefined" hides the value the session actually behaved as.
   const delta = configDelta(configFromReport(report), DEFAULT_CONFIG);
-  // Four ways a config can differ from the defaults, and only one of them is a
+  // Five ways a config can differ from the defaults, and only one of them is a
   // reason to distrust the report. A key the player TUNED is a deliberate
   // experiment; a field the player RANDOMISED is a different world, not a
-  // different build; a DEV key is what the dev server always sets, and since dev
-  // sessions are where reports come from, treating it as skew would fire the
-  // banner on every single one. Everything else is skew — the session ran code
-  // that is no longer what this checkout does — and that is what the banner is
-  // for. Lumping them together made the banner fire on ordinary play and then
-  // blame the knob for a divergence it had nothing to do with.
+  // different build; a COURSE is a different length of world, chosen on purpose;
+  // a DEV key is what the dev server always sets, and since dev sessions are
+  // where reports come from, treating it as skew would fire the banner on every
+  // single one. Everything else is skew — the session ran code that is no longer
+  // what this checkout does — and that is what the banner is for. Lumping them
+  // together made the banner fire on ordinary play and then blame the knob for a
+  // divergence it had nothing to do with.
   const tuned = delta.filter((d) => TUNED_KEYS.has(d.key));
   const field = delta.find((d) => d.key === 'worldSeed');
   const dev = delta.filter((d) => DEV_KEYS.has(d.key));
+  const course = delta.filter((d) => COURSE_KEYS.has(d.key));
   const skew = delta.filter(
-    (d) => !TUNED_KEYS.has(d.key) && d.key !== 'worldSeed' && !DEV_KEYS.has(d.key),
+    (d) =>
+      !TUNED_KEYS.has(d.key) &&
+      d.key !== 'worldSeed' &&
+      !DEV_KEYS.has(d.key) &&
+      !COURSE_KEYS.has(d.key),
   );
   out.push(
     `  config     ${skew.length ? `${skew.length} value(s) differ from current defaults` : 'matches current defaults'}` +
@@ -542,6 +562,13 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   }
   for (const d of tuned) {
     out.push(`  tuned      ${d.key}: ${d.theirs} (default ${d.ours})`);
+  }
+  if (course.length) {
+    const bodies = course.find((d) => d.key === 'bodyCount');
+    out.push(
+      `  course     ${courseOf(configFromReport(report) as SimConfig).toUpperCase()}` +
+        (bodies ? ` — ${bodies.theirs} bodies (default ${bodies.ours})` : ''),
+    );
   }
   for (const d of dev) {
     out.push(`  dev        ${d.key}: ${d.theirs} — dev-server default, not build skew`);
