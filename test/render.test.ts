@@ -15,7 +15,12 @@ import {
   toScreenY,
 } from '../src/render/camera.ts';
 import { Starfield } from '../src/render/starfield.ts';
-import { BodyRenderer, drawFinishLine, drawHazardZones } from '../src/render/world.ts';
+import {
+  BodyRenderer,
+  drawFinishLine,
+  drawHazardZones,
+  drawSpeedCarpet,
+} from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
@@ -301,6 +306,72 @@ describe('the finish line', () => {
       (o) => o[1],
     );
     expect(fills.some((v) => typeof v === 'string' && v.startsWith('rgba(92,226,140'))).toBe(true);
+  });
+});
+
+describe('the speed carpet', () => {
+  function draw(finishY: number | null, at = 0, timeMs = 0) {
+    const r = recordingContext();
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, 195, at, field, null);
+    drawSpeedCarpet(r.ctx, c, field, finishY, timeMs);
+    return r;
+  }
+
+  it('draws nothing when the field cannot be cleared', () => {
+    expect(draw(null).calls('fill').length).toBe(0);
+  });
+
+  it('costs one compare for the whole rest of the run', () => {
+    // The common case is every frame that is not near the finish. If this ever
+    // starts building a path there, it is doing it for the entire game.
+    expect(draw(-40000, 0).calls('moveTo').length).toBe(0);
+  });
+
+  it('sweeps upward as time passes', () => {
+    // Same camera, same line, different clock: the surface has to have moved, and
+    // moved TOWARD the line rather than away from it.
+    const yAt = (t: number) => {
+      const ops = draw(-500, 0, t).calls('moveTo') as Array<[string, number, number]>;
+      return Math.min(...ops.map((o) => o[2]));
+    };
+    expect(yAt(0)).not.toBeCloseTo(yAt(120), 3);
+  });
+
+  it('is a stable surface, not a per-frame reshuffle', () => {
+    // The jitter is a hash of the row, so the same clock always yields the same
+    // arrangement. A Math.random per row would boil instead of scrolling.
+    const a = draw(-500, 0, 250).calls('moveTo');
+    const b = draw(-500, 0, 250).calls('moveTo');
+    expect(a).toEqual(b);
+  });
+
+  it('thickens toward the line rather than running at constant density', () => {
+    // Compared across two CAMERA positions, not within one frame. A single
+    // viewport only ever sees a thin slice of the runway, where every row has
+    // nearly the same nearness — which is how this first "measured" a ramp as
+    // 18 against 19 and proved nothing.
+    const finishY = -3000;
+    const nearLine = draw(finishY, finishY + 300, 0).calls('moveTo').length;
+    const farBack = draw(finishY, finishY + 1200, 0).calls('moveTo').length;
+    expect(nearLine, 'more arrows per screen close to the line').toBeGreaterThan(farBack);
+  });
+
+  it('stays fainter than the line it feeds', () => {
+    const carpet = draw(-200, 0, 0);
+    // `fillStyle` also carries gradient objects, which have no `startsWith`.
+    const alphaOf = (r: RecordingContext) =>
+      (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, unknown]>)
+        .map((o) => o[1])
+        .filter((v): v is string => typeof v === 'string' && v.startsWith('rgba(92,226,140'))
+        .map((v) => Number(v.split(',')[3]!.replace(')', '')));
+    const lineR = recordingContext();
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, 195, 0, field, null);
+    drawFinishLine(lineR.ctx, c, field, -200);
+    expect(Math.max(...alphaOf(carpet))).toBeLessThan(Math.max(...alphaOf(lineR)));
   });
 });
 

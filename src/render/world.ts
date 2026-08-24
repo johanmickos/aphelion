@@ -162,6 +162,89 @@ export function drawFinishLine(
 }
 
 /**
+ * The run-in to the finish: a sea of faint arrows rolling up toward the line.
+ *
+ * The last stretch of the field was empty, and empty is the wrong feeling for the
+ * approach to a finish — the ceremony that follows is about speed, and the run-up
+ * to it read as a lull. This is the runway: arrows sweeping upward, thickening
+ * and brightening as the line gets closer, so the field itself looks like it is
+ * accelerating into the crossing.
+ *
+ * ON THE RENDER CLOCK, NOT THE TICK. Nothing here is simulated and nothing here
+ * is recorded; two players crossing the same line with the same input log see the
+ * arrows at different phases and the runs are still identical. That is the whole
+ * reason it can be animated at all — `src/sim/` may never read a wall clock, and
+ * this is not in `src/sim/`.
+ *
+ * THE JITTER IS A HASH, NOT A RANDOM. Rows have to look scattered rather than
+ * ruled, but a `Math.random` per row would reshuffle the whole carpet every
+ * frame — a boiling mess rather than a sea. Deriving the offset from the row's
+ * own index gives a fixed, arbitrary-looking arrangement that scrolls as one
+ * piece, which is what makes it read as a surface moving past.
+ */
+export function drawSpeedCarpet(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  field: FieldBounds,
+  finishY: number | null,
+  timeMs: number,
+): void {
+  if (finishY === null) return;
+
+  const view = visibleWorldY(cam);
+  // How far back down the field the runway reaches. Beyond this there is nothing
+  // to draw and the common case — the whole rest of the run — costs one compare.
+  const runway = 1400;
+  if (finishY > view.bottom || finishY + runway < view.top) return;
+
+  const s = cam.scale;
+  const gap = 78;
+  const perRow = 5;
+  // Upward: the phase subtracts, so a row's y decreases as time passes and the
+  // whole surface sweeps toward the line.
+  const phase = ((timeMs * 0.13) % gap) * -1;
+  const left = field.left;
+  const span = field.right - field.left;
+
+  ctx.save();
+  ctx.beginPath();
+  let drew = false;
+  for (let i = 0; i * gap < runway; i++) {
+    const wy = finishY + runway - i * gap + phase;
+    if (wy < view.top - gap || wy > view.bottom + gap) continue;
+    // 1 at the line, 0 at the far end of the runway — the thickening the eye
+    // reads as acceleration.
+    const nearness = Math.max(0, Math.min(1, 1 - (wy - finishY) / runway));
+    // Sparse at the back, full width at the front, so the sea narrows into the
+    // line rather than running at constant density up to it.
+    const count = Math.max(1, Math.round(perRow * (0.35 + 0.65 * nearness)));
+    for (let j = 0; j < count; j++) {
+      // Hash of (row, column): arbitrary, stable, and different per row.
+      const h = Math.sin(i * 12.9898 + j * 78.233) * 43758.5453;
+      const jitter = h - Math.floor(h);
+      const wx = left + span * ((j + 0.5) / count + (jitter - 0.5) * 0.16);
+      const x = toScreenX(cam, wx);
+      const y = toScreenY(cam, wy);
+      const w = (5 + 4 * nearness) * s;
+      const hgt = (7 + 6 * nearness) * s;
+      ctx.moveTo(x, y - hgt);
+      ctx.lineTo(x + w, y + hgt * 0.35);
+      ctx.lineTo(x, y - hgt * 0.15);
+      ctx.lineTo(x - w, y + hgt * 0.35);
+      ctx.closePath();
+      drew = true;
+    }
+  }
+  if (drew) {
+    // Faint on purpose. It is a texture the ship flies over, not a thing to read;
+    // the moment it competes with the line it is pointing at, it has failed.
+    ctx.fillStyle = withAlpha(FINISH, 0.22);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
  * The floor that trails the climb.
  *
  * Drawn like the side boundaries and for the same reason: the gradient builds

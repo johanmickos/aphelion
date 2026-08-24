@@ -11,7 +11,13 @@ import type { Camera } from './camera.ts';
 import { clipToWindow } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import { Starfield } from './starfield.ts';
-import { BodyRenderer, drawBacktrackFloor, drawFinishLine, drawHazardZones } from './world.ts';
+import {
+  BodyRenderer,
+  drawBacktrackFloor,
+  drawFinishLine,
+  drawHazardZones,
+  drawSpeedCarpet,
+} from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
 import { Trail, drawShip } from './ship.ts';
 import { Nebula, OUTRO_SECS } from './nebula.ts';
@@ -165,6 +171,9 @@ export class Scene {
     this.stars.draw(ctx, cam, render);
     drawHazardZones(ctx, cam, render, field);
     drawBacktrackFloor(ctx, cam, sim, render, snap.highWaterY);
+    // Under the line it feeds into, so the chequers stay the brightest thing in
+    // that part of the sky.
+    drawSpeedCarpet(ctx, cam, field, finishY, opts.timeMs);
     drawFinishLine(ctx, cam, field, finishY);
     this.bodyRenderer.draw(
       ctx,
