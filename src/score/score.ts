@@ -53,7 +53,7 @@ import {
 import type { Shout } from './reckless.ts';
 import type { ScoreConfig } from './config.ts';
 import { DEFAULT_SCORE_CONFIG } from './config.ts';
-import type { PendingFlyby, PendingLink, ScoreAward, ScoreState } from './types.ts';
+import type { PendingFlyby, PendingLink, RunStats, ScoreAward, ScoreState } from './types.ts';
 
 /**
  * Ticks between periapsis and the grab award landing.
@@ -155,7 +155,48 @@ export function createScoreState(): ScoreState {
     hopped: [],
     wasCharged: false,
     hopTotal: 0,
+    run: emptyRun(),
+    lastRun: null,
+    sessionMax: emptyRun(),
   };
+}
+
+/** A run that has measured nothing yet. */
+function emptyRun(): RunStats {
+  return {
+    ticks: 0,
+    topSpeed: 0,
+    distance: 0,
+    peakChain: 0,
+    fireSecs: 0,
+    roughPasses: 0,
+    impacts: 0,
+    anomalies: 0,
+    score: 0,
+    highWaterY: 0,
+  };
+}
+
+/**
+ * Fold a finished run into the session's element-wise maximum.
+ *
+ * Every field is a max, including the ones where a larger number is a worse
+ * pilot. See `sessionMax` for why that is deliberate rather than sloppy.
+ */
+function foldSessionMax(max: RunStats, run: RunStats): void {
+  max.ticks = Math.max(max.ticks, run.ticks);
+  max.topSpeed = Math.max(max.topSpeed, run.topSpeed);
+  max.distance = Math.max(max.distance, run.distance);
+  max.peakChain = Math.max(max.peakChain, run.peakChain);
+  max.fireSecs = Math.max(max.fireSecs, run.fireSecs);
+  max.roughPasses = Math.max(max.roughPasses, run.roughPasses);
+  // A session total rather than a maximum: a run either crashed or it did not,
+  // so a max over 0-or-1 would only ever say "you crashed at least once".
+  max.impacts += run.impacts;
+  max.anomalies = Math.max(max.anomalies, run.anomalies);
+  max.score = Math.max(max.score, run.score);
+  // Up is negative, so the furthest climb is the SMALLEST y.
+  max.highWaterY = Math.min(max.highWaterY, run.highWaterY);
 }
 
 function clamp01(v: number): number {
@@ -193,6 +234,9 @@ function multiplierFor(sc: ScoreState, scfg: ScoreConfig): number {
  * at 1x — but it no longer exists to argue about.)
  */
 function endLife(sc: ScoreState): void {
+  // The live run only. `lastRun` is a sealed copy taken by the caller before this
+  // point, and `sessionMax` outlives every life by construction.
+  sc.run = emptyRun();
   sc.score = 0;
   sc.pending = null;
   sc.pendingFlyby = null;
@@ -295,6 +339,17 @@ export function scoreTick(
           shouts.push({ tick: state.tick, word: bonkWord(state.tick), kind: 'bonk', streak: 0 });
         }
       }
+      // ---- seal the run BEFORE the reset that is two lines below
+      //
+      // Order is the whole point. `endLife` clears everything the sheet wants to
+      // report, and it runs on this same tick — so a summary read afterwards is a
+      // summary of nothing. Reading the final numbers here, into a copy that
+      // survives, is what makes a post-mortem possible.
+      sc.run.impacts = state.ending.reason === 'impact' ? 1 : 0;
+      sc.run.score = sc.score;
+      sc.run.highWaterY = state.highWaterY;
+      sc.lastRun = { ...sc.run };
+      foldSessionMax(sc.sessionMax, sc.lastRun);
       endLife(sc);
     }
     sc.putterOuts = state.telemetry.putterOuts;
@@ -303,6 +358,25 @@ export function scoreTick(
   }
   sc.endingSeen = false;
   if (sc.climbFromY === null) sc.climbFromY = state.highWaterY;
+
+  // ---- what this life is measuring about itself
+  //
+  // Here rather than scattered through the award paths, because none of it is
+  // about an award: these are facts about the flight that hold whether or not a
+  // single point was scored. The two that DO hang off events — a rough passage
+  // and an anomaly claim — are counted at their edges further down, next to the
+  // edge detection that already exists for them.
+  const flying = state.capture;
+  const vx = flying ? flying.vx : state.ship.vx;
+  const vy = flying ? flying.vy : state.ship.vy;
+  const speed = hypot(vx, vy);
+  sc.run.ticks++;
+  if (speed > sc.run.topSpeed) sc.run.topSpeed = speed;
+  // From speed, not from a position delta. A respawn teleports the ship the
+  // length of the field, and differencing positions would bank that jump as
+  // distance flown.
+  sc.run.distance += speed * dt;
+  if (sc.streak > sc.run.peakChain) sc.run.peakChain = sc.streak;
 
   // ---- the burn: heat integrated over a hot pass, paid when the fire dies
   //
@@ -334,6 +408,7 @@ export function scoreTick(
     );
     if (heat > scfg.burnMinHeat) {
       sc.burnHeat = heat;
+      sc.run.fireSecs += dt;
       sc.burnBank += heat * dt * scfg.burnRate;
       if (heat > sc.burnPeak) sc.burnPeak = heat;
     } else {
@@ -521,6 +596,10 @@ export function scoreTick(
     if (roughEdge && !sc.capKinked) {
       sc.capKinked = true;
       sc.recklessStreak++;
+      // The same edge, counted rather than streaked. `recklessStreak` resets on a
+      // smooth capture because it is asking "are you ON a tear"; this is asking
+      // "how rough was the whole run", so it only ever climbs.
+      sc.run.roughPasses++;
     }
     // At most one shout a tick, however both gates opened.
     if (hardEdge || (roughEdge && sc.recklessStreak >= RECKLESS_STREAK)) {
@@ -708,6 +787,7 @@ function awardGrab(
   let anomaly = 0;
   if (body?.kind === 'anomaly' && !sc.claimed.includes(body.name)) {
     sc.claimed.push(body.name);
+    sc.run.anomalies++;
     anomaly = scfg.anomalyBonus;
   }
 

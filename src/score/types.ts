@@ -368,4 +368,101 @@ export interface ScoreState {
   inHardKink: boolean;
   /** Last observed `telemetry.putterOuts`, to edge-detect a dry capture. */
   putterOuts: number;
+
+  // ------------------------------------------------------------------- stats
+  /**
+   * What the CURRENT life has measured about itself. Reset by `endLife`.
+   *
+   * Read `lastRun` instead if you want the run that just ended — see its note,
+   * which is the whole reason these are three fields and not one.
+   */
+  run: RunStats;
+  /**
+   * The run that just ended, sealed on the tick it ended.
+   *
+   * WITHOUT THIS THE SHEET SHOWS ZEROES. `endLife` fires on the FIRST tick of the
+   * ending hold, so by the time anything draws a summary the life it is
+   * summarising has already been reset — the same trap `AGENTS.md` records for
+   * the score itself ("a death zeroes it, so at the last tick of a recording it is
+   * usually zero, which will make any weight you are testing look dead"). Sealing
+   * a copy before the reset is what lets a post-mortem exist at all.
+   *
+   * Null until the first life ends.
+   */
+  lastRun: RunStats | null;
+  /**
+   * Element-wise maximum across every life this session, for the "· best 940"
+   * figure the sheet prints beside each row.
+   *
+   * MAX AND NOT "BEST", WHICH IS NOT THE SAME WORD FOR EVERY ROW. On top speed
+   * and chain a maximum is plainly an achievement; on `roughPasses` it is the
+   * worst you flew, not the best. Calling the field what it does — the largest
+   * value seen — keeps it honest, and lets the sheet choose its own wording per
+   * row rather than inheriting a judgement from the field name.
+   */
+  sessionMax: RunStats;
+}
+
+/**
+ * What one life measured about itself.
+ *
+ * Pure observation. Nothing here is read by the simulation, nothing here is a
+ * `ScoreConfig` weight, and nothing here feeds a points calculation — so adding a
+ * field costs no golden recapture and cannot reach `test/score.test.ts`'s proof
+ * that every weight moves some outcome.
+ *
+ * Several of these are DERIVED AT DISPLAY TIME rather than counted here. Planets
+ * cleared is a function of `highWaterY` and the field, so counting it per tick
+ * would be a second definition of a number the world already answers; the sheet
+ * asks the field instead.
+ */
+export interface RunStats {
+  /** Ticks the life lasted. Seconds are `ticks * dt` — never a wall clock. */
+  ticks: number;
+  /** Highest speed reached, px/s, captured or drifting. */
+  topSpeed: number;
+  /**
+   * Path length flown, px.
+   *
+   * Integrated from SPEED rather than summed from position deltas, which was the
+   * obvious way and is wrong: a respawn teleports the ship the length of the
+   * field, and a position-delta sum would bank that jump as distance travelled.
+   */
+  distance: number;
+  /**
+   * Longest chain the life reached.
+   *
+   * The number the live multiplier cannot show. `streakMax` binds at 5 — the
+   * 2026-08-23 capture sat pinned there for 63 of its 85 seconds — so the readout
+   * on screen stops moving long before the chain does, and everything the player
+   * did after that is invisible to them. This is the part that kept going.
+   */
+  peakChain: number;
+  /** Seconds spent inside the burn, integrated over every flare. */
+  fireSecs: number;
+  /**
+   * Passages flown roughly — `RECKLESS_DEG`, one count per passage.
+   *
+   * DELIBERATELY THE 27-DEGREE LINE AND NOT `KINK_THRESHOLD_DEG`. 15 degrees is
+   * the smoothness metric `tools/replay.ts` reports, and the playtest of
+   * 2026-08-22 measured it firing on 42% of captures — a statistic about the
+   * physics, not an achievement about the pilot. 27 is already defined as "was
+   * that rough", already edge-detected so one rough passage counts once however
+   * many ticks it spans, and already the line `recklessStreak` is built on.
+   */
+  roughPasses: number;
+  /** 1 if the life ended by flying into a planet, else 0. */
+  impacts: number;
+  /** Anomalies claimed. */
+  anomalies: number;
+  /** Points the life had banked when it ended. */
+  score: number;
+  /**
+   * Highest point reached, in world y (up is negative).
+   *
+   * The raw mark rather than a percentage, because the denominator belongs to the
+   * field and the field belongs to the caller. A sheet that knows the bodies can
+   * turn this into "48 / 60"; one that does not still has something true.
+   */
+  highWaterY: number;
 }
