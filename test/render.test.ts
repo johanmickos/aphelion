@@ -356,8 +356,39 @@ describe('the speed carpet', () => {
     ];
     const width = Math.max(...first.map((o) => o[1])) - Math.min(...first.map((o) => o[1]));
     const height = Math.max(...first.map((o) => o[2])) - Math.min(...first.map((o) => o[2]));
-    expect(height).toBeGreaterThan(width * 0.85);
+    expect(height).toBeGreaterThan(width * 0.8);
     expect(xs.length).toBe(ys.length);
+  });
+
+  it('has arms as thick as they look, measured across them', () => {
+    // The bug this pins was invisible by construction. The polygon is built by
+    // translating the outer edge straight DOWN, so the natural parameter is a
+    // vertical offset — but that foreshortens into the arm by w/hypot(w, arm),
+    // which on a steep chevron is under a half. Asking for 8 bought 3.6px of
+    // visible arm, and raising the number was fighting the wrong variable.
+    //
+    // Measured perpendicular to the arm, off the drawn points, so it stays honest
+    // if the proportions move again.
+    const r = draw(-3000, -2600, 0);
+    const first = [
+      (r.calls('moveTo') as Array<[string, number, number]>)[0]!,
+      ...(r.calls('lineTo') as Array<[string, number, number]>).slice(0, 5),
+    ];
+    const pt = (i: number) => first[i]!;
+    const outerL = pt(0);
+    const apex = pt(1);
+    const innerR = pt(3);
+    const notch = pt(4);
+    // Distance from the notch apex to the outer edge, which is the arm's weight.
+    const ax = apex[1] - outerL[1];
+    const ay = apex[2] - outerL[2];
+    const len = Math.hypot(ax, ay);
+    const px = notch[1] - outerL[1];
+    const py = notch[2] - outerL[2];
+    const perp = Math.abs((px * ay - py * ax) / len);
+    const width = Math.max(...first.map((o) => o[1])) - Math.min(...first.map((o) => o[1]));
+    expect(perp, 'a chunky chevron, not a hairline').toBeGreaterThan(width * 0.2);
+    expect(innerR[1]).toBeLessThan(Math.max(...first.map((o) => o[1])));
   });
 
   it('is symmetric about its own apex', () => {

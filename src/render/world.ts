@@ -9,6 +9,7 @@ import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY, visibleWorldY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import { FINISH, withAlpha } from './palette.ts';
+import { hypot } from '../sim/orbit.ts';
 import { HAZARD_BAND_FROM, HAZARD_BAND_TO, HAZARD_EDGE } from './palette.ts';
 
 /**
@@ -171,11 +172,18 @@ export function drawFinishLine(
  * and a V notched out of the underside, and neither of those is something a
  * stroke can be asked for.
  *
- * The inner edge is the outer edge translated straight down by `thick`, so the
- * two are parallel and the arms keep an even weight along their whole length.
- * Where that inner edge crosses the bottom cut is `w * (1 - thick / arm)` — the
- * similar-triangles result, derived rather than eyeballed so the shape stays
- * right at every size the runway scales it to.
+ * `weight` IS THE THICKNESS YOU SEE — measured across the arm, perpendicular to
+ * it — and that distinction is why this shape kept coming out thin. The polygon
+ * is built by translating the outer edge straight DOWN, so the natural parameter
+ * is a vertical offset; but a vertical offset foreshortens into the arm by
+ * `w / hypot(w, arm)`, which on a steep chevron is under a half. Asking for 8
+ * bought 3.6px of visible arm, and every attempt to fix it by raising the number
+ * was fighting the wrong variable. The conversion happens here instead, once, so
+ * the caller can ask for the weight it actually wants.
+ *
+ * Where the inner edge crosses the bottom cut is then `w * (1 - drop / arm)` —
+ * the similar-triangles result, derived rather than eyeballed so the shape holds
+ * at every size the runway scales it to.
  */
 function chevron(
   ctx: CanvasRenderingContext2D,
@@ -183,14 +191,15 @@ function chevron(
   y: number,
   w: number,
   arm: number,
-  thick: number,
+  weight: number,
 ): void {
-  const inner = w * Math.max(0, 1 - thick / arm);
+  const drop = (weight * hypot(w, arm)) / w;
+  const inner = w * Math.max(0, 1 - drop / arm);
   ctx.moveTo(x - w, y);
   ctx.lineTo(x, y - arm);
   ctx.lineTo(x + w, y);
   ctx.lineTo(x + inner, y);
-  ctx.lineTo(x, y - arm + thick);
+  ctx.lineTo(x, y - arm + drop);
   ctx.lineTo(x - inner, y);
   ctx.closePath();
 }
@@ -280,9 +289,10 @@ export function drawSpeedCarpet(
     // a chevron — the eye takes a wide, short `^` as a roof over something, and a
     // steep one as a direction. The icon this is modelled on is roughly as tall as
     // it is broad, so the arm outruns the half-width at every size.
-    const w = (12 + 5 * t) * s;
-    const arm = (24 + 11 * t) * s;
-    const thick = (8 + 3 * t) * s;
+    const w = (14 + 6 * t) * s;
+    const arm = (25 + 10 * t) * s;
+    // Perpendicular arm weight, which is what the eye calls thickness.
+    const weight = (7.5 + 3 * t) * s;
 
     ctx.beginPath();
     for (let j = 0; j < perRow; j++) {
@@ -293,7 +303,7 @@ export function drawSpeedCarpet(
       const wx = left + span * ((j + 0.5) / perRow + (jitter - 0.5) * 0.22);
       const x = toScreenX(cam, wx);
       const y = toScreenY(cam, wy) + arm * 0.5;
-      chevron(ctx, x, y, w, arm, thick);
+      chevron(ctx, x, y, w, arm, weight);
     }
     ctx.fillStyle = withAlpha(FINISH, 0.34 * fade);
     ctx.fill();
