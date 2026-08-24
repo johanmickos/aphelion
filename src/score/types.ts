@@ -1,5 +1,6 @@
 /** Scoring types. Nothing here is ever read by the simulation. */
 import type { Body } from '../sim/types.ts';
+import type { ScarWall } from '../sim/rescue.ts';
 
 /** One thing that happened to the score, on one tick. */
 export interface ScoreAward {
@@ -297,7 +298,7 @@ export interface ScoreState {
    * Read once, on the first tick of a capture, from the drift state the press was
    * made in — and never again, because the answer is a property of that instant.
    */
-  rescue: { side: 1 | -1; quality: number; body: string } | null;
+  rescue: { wall: ScarWall; quality: number; body: string } | null;
   /**
    * A press made AFTER the last one that could still have turned the ship away,
    * or null. Set at the press, cleared if the ship turns away regardless.
@@ -313,7 +314,7 @@ export interface ScoreState {
    * precedes 43% of all deaths by a median 0.85s. The 6% that live are why this
    * clears on the turn-away rather than persisting to the end of the capture.
    */
-  doomed: { side: 1 | -1; tick: number } | null;
+  doomed: { wall: ScarWall; tick: number } | null;
   /**
    * Bodies a rescue has already been paid against this life. Cleared by `endLife`.
    *

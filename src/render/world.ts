@@ -18,6 +18,21 @@ import type { RenderConfig } from './config.ts';
  *
  * Here the gradient builds INWARD from the edge, so it reads as pressure while
  * there is still time to turn, and the hard dashed line marks the actual limit.
+ *
+ * THREE EDGES, NOT TWO. The ceiling — `field.top`, 800px above the highest body —
+ * had no treatment at all until the playtest of 2026-08-23 flew into it: the
+ * session cleared the last planet in the field, coasted up through 2.7 seconds of
+ * empty starfield with nothing on screen to say a limit existed, and ended
+ * `LOST — OFF COURSE`. The two side walls had a gradient and a scar cross the
+ * whole time. This was never a decision that the top should be unmarked; it was
+ * the two horizontal bounds getting the attention and the vertical one being
+ * inherited from the prototype's screen-space test (PORT_NOTES 9) and forgotten.
+ *
+ * `field.bottom` stays unmarked deliberately. It is only reachable in the opening
+ * seconds, before `highWaterY` has moved, and after that the trailing floor — a
+ * `fell-behind` ending with its own band and its own burn — is always the nearer
+ * of the two. A second red line under the first would be warning about the wrong
+ * one.
  */
 export function drawHazardZones(
   ctx: CanvasRenderingContext2D,
@@ -28,6 +43,10 @@ export function drawHazardZones(
   const zone = cfg.hazardZoneWidth;
   const top = cam.offsetY;
   const height = cam.viewH * cam.scale;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,70,90,.5)';
+  ctx.lineWidth = Math.max(1, 1.5 * cam.scale);
 
   for (const side of [-1, 1] as const) {
     const edge = side < 0 ? field.left : field.right;
@@ -44,15 +63,57 @@ export function drawHazardZones(
     ctx.fillStyle = g;
     ctx.fillRect(x0, top, w, height);
 
-    ctx.strokeStyle = 'rgba(255,70,90,.5)';
     ctx.setLineDash([6 * cam.scale, 6 * cam.scale]);
-    ctx.lineWidth = Math.max(1, 1.5 * cam.scale);
     ctx.beginPath();
     ctx.moveTo(xEdge, top);
     ctx.lineTo(xEdge, top + height);
     ctx.stroke();
     ctx.setLineDash([]);
   }
+
+  drawCeiling(ctx, cam, cfg, field);
+  ctx.restore();
+}
+
+/**
+ * The ceiling band, drawn like the floor and for the same reason.
+ *
+ * The gradient builds UPWARD toward the lethal line, so the ship flies into
+ * deepening red rather than meeting a decorated region it cannot survive — the
+ * inward rule `drawHazardZones` records, applied to the one edge that never got
+ * it.
+ *
+ * Skipped entirely while the line is off the top of the screen, which is almost
+ * the whole game: the ceiling sits 800px above the highest body, so it is only
+ * ever visible to a ship that has run out of field.
+ */
+function drawCeiling(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  cfg: RenderConfig,
+  field: FieldBounds,
+): void {
+  const view = visibleWorldY(cam);
+  const band = cfg.hazardZoneWidth;
+  if (field.top + band < view.top) return; // still well above the screen
+
+  const yEdge = toScreenY(cam, field.top);
+  const yInner = toScreenY(cam, field.top + band);
+  const left = cam.offsetX;
+  const width = cam.designW * cam.scale;
+
+  const g = ctx.createLinearGradient(0, yInner, 0, yEdge);
+  g.addColorStop(0, 'rgba(255,70,90,0)');
+  g.addColorStop(1, 'rgba(255,70,90,.22)');
+  ctx.fillStyle = g;
+  ctx.fillRect(left, yEdge, width, yInner - yEdge);
+
+  ctx.setLineDash([6 * cam.scale, 6 * cam.scale]);
+  ctx.beginPath();
+  ctx.moveTo(left, yEdge);
+  ctx.lineTo(left + width, yEdge);
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 /**

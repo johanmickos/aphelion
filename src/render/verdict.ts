@@ -26,7 +26,7 @@
  * points do not — whether you are still alive — and they say it at the ship
  * rather than on the score.
  *
- * ON THE SIDE AWAY FROM THE WALL, so none of them draws over the hazard gradient
+ * ON THE SIDE AWAY FROM THE BOUNDARY, so none of them draws over the hazard gradient
  * or the receding scar — both red, both already in that space — and so the mark
  * sits where an escape would be.
  */
@@ -35,9 +35,21 @@ import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 import type { ScoreState } from '../score/types.ts';
+import type { ScarWall } from '../sim/rescue.ts';
 
-/** Design units to the side of the ship the verdict sits at. */
+/** Design units from the ship the verdict sits at. */
 const OFFSET = 24;
+/**
+ * Which way is "away from the boundary", per wall it could be.
+ *
+ * A unit direction rather than the old `-side` on x, because the ceiling's answer
+ * is on the other axis. Down-screen is +y, so fleeing the ceiling is +1 there.
+ */
+const DOOM_AWAY: Record<ScarWall, { x: number; y: number }> = {
+  left: { x: 1, y: 0 },
+  right: { x: -1, y: 0 },
+  top: { x: 0, y: 1 },
+};
 /** Cranium radius, in design units. */
 const R = 6.2;
 /** Seconds per pulse. The fuel warning's own rate, so every badge beats alike. */
@@ -127,9 +139,12 @@ export function drawVerdict(
   const alpha = rcfg.doomAlpha * (0.45 + 0.55 * beat((age % PULSE_SEC) / PULSE_SEC));
 
   const s = cam.scale;
-  // Away from the wall it is about to hit; `side` is +1 for the right boundary.
-  const x = toScreenX(cam, snap.x - doom.side * OFFSET);
-  const y = toScreenY(cam, snap.y);
+  // Away from the boundary it is about to cross, so the mark never sits between
+  // the ship and the thing about to kill it: beside the ship at a side wall,
+  // below it at the ceiling.
+  const away = DOOM_AWAY[doom.wall];
+  const x = toScreenX(cam, snap.x + away.x * OFFSET);
+  const y = toScreenY(cam, snap.y + away.y * OFFSET);
 
   ctx.save();
   skull(ctx, x, y, R * s, alpha);

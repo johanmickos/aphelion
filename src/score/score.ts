@@ -39,7 +39,7 @@ import { fieldBounds } from '../sim/world.ts';
 import { shipWorldPos } from '../sim/step.ts';
 import { readAim } from './aim.ts';
 import { edgeHeat } from './burn.ts';
-import { rescueScar } from '../sim/rescue.ts';
+import { rescueScar, turnedAway } from '../sim/rescue.ts';
 
 import { isNerveGrab } from './praise.ts';
 import {
@@ -540,7 +540,7 @@ export function scoreTick(
     // promises, so it is what the points are settled against.
     if (sc.rescue) {
       const r = sc.rescue;
-      if (cap.vx * r.side <= 0) {
+      if (turnedAway(cap, r.wall)) {
         sc.rescue = null;
         const award = awardRescue(sc, state, scfg, r);
         if (award) awards.push(award);
@@ -550,7 +550,7 @@ export function scoreTick(
     // A press past the cross that turned away anyway. Rare — 6% of them — and the
     // prediction was wrong about that one, so the omen is withdrawn rather than
     // left standing over a ship that is plainly fine.
-    if (sc.doomed && cap.vx * sc.doomed.side <= 0) sc.doomed = null;
+    if (sc.doomed && turnedAway(cap, sc.doomed.wall)) sc.doomed = null;
 
     sc.pending = readPending(state, cfg, scfg, cap, sc.grabSkim, sc.maxDefl);
   } else {
@@ -772,9 +772,9 @@ function armRescue(
   // pinned to the tick has earned the top of the scale. The omen is withdrawn on
   // the same event that pays it.
   if (!scar.cross) {
-    const doomed = { side: scar.side, tick: state.tick };
+    const doomed = { wall: scar.wall, tick: state.tick };
     if (sc.rescued.includes(body.name)) return { rescue: null, doomed };
-    return { rescue: { side: scar.side, quality: 1, body: body.name }, doomed };
+    return { rescue: { wall: scar.wall, quality: 1, body: body.name }, doomed };
   }
 
   // Once per body per life. A drag along the wall hangs off one distant planet,
@@ -782,7 +782,7 @@ function armRescue(
   if (sc.rescued.includes(body.name)) return none;
 
   const quality = clamp01(1 - scar.cross.t / Math.max(1e-6, scfg.rescueSpan));
-  return { rescue: { side: scar.side, quality, body: body.name }, doomed: null };
+  return { rescue: { wall: scar.wall, quality, body: body.name }, doomed: null };
 }
 
 /**

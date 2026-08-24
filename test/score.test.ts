@@ -687,7 +687,7 @@ describe('the skull: a press made past the last chance', () => {
     Object.assign(state.ship, WALL_DRIFT);
     const sc = createScoreState();
     // Arm it by hand at a wall, then hand the scorer a capture that turns away.
-    sc.doomed = { side: 1, tick: 0 };
+    sc.doomed = { wall: 'right', tick: 0 };
     let held = false;
     for (let t = 0; t < 200; t++) {
       const pressed = t === 20;

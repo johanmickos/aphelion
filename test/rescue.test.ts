@@ -13,6 +13,7 @@ import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import type { Input, SimState } from '../src/sim/types.ts';
 import { DEFAULT_SCAR_OPTIONS, advanceScar, rescueScar } from '../src/sim/rescue.ts';
+import type { ScarWall } from '../src/sim/rescue.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 
 const PRESS: Input = { held: true, pressed: true, released: false };
@@ -46,16 +47,28 @@ function driftFor(state: SimState, cfg: SimConfig, ticks: number): SimState {
 }
 
 /**
- * Press and hold from here. Returns whether the ship turned away from `side`
+ * Press and hold from here. Returns whether the ship turned away from `wall`
  * before the run ended — the definition `rescueScar` is claiming.
+ *
+ * The axis and sign are spelled out here rather than imported from `rescue.ts`,
+ * so this stays a second opinion. A test that borrowed the production table would
+ * agree with it by construction, including about the ceiling.
  */
-function holdAndSee(state: SimState, cfg: SimConfig, side: number): boolean {
+function holdAndSee(state: SimState, cfg: SimConfig, wall: ScarWall): boolean {
   const s = structuredClone(state) as SimState;
   stepSim(s, cfg, PRESS, FIXED_DT);
   for (let i = 0; i < DEFAULT_SCAR_OPTIONS.captureBudget; i++) {
     if (s.ending.active) return false;
-    const vx = s.capture ? s.capture.vx : s.ship.vx;
-    if (vx * side <= 0) return true;
+    const v =
+      wall === 'top'
+        ? s.capture
+          ? s.capture.vy
+          : s.ship.vy
+        : s.capture
+          ? s.capture.vx
+          : s.ship.vx;
+    const sign = wall === 'right' ? 1 : -1;
+    if (v * sign <= 0) return true;
     stepSim(s, cfg, HOLD, FIXED_DT);
   }
   return false;
@@ -67,7 +80,7 @@ describe('the point of no return', () => {
   it('finds a wall the drift is committed to', () => {
     const scar = rescueScar(driftingAtTheWall(cfg), cfg, FIXED_DT);
     expect(scar, 'a ship flying at the right wall has a scar').not.toBeNull();
-    expect(scar!.side).toBe(1);
+    expect(scar!.wall).toBe('right');
     expect(scar!.cross, 'and a press that still saves it').not.toBeNull();
   });
 
@@ -77,7 +90,7 @@ describe('the point of no return', () => {
     const crossTick = Math.round(scar.cross!.t / FIXED_DT);
 
     expect(
-      holdAndSee(driftFor(state, cfg, crossTick), cfg, scar.side),
+      holdAndSee(driftFor(state, cfg, crossTick), cfg, scar.wall),
       'holding at the cross rescues the ship',
     ).toBe(true);
 
@@ -85,7 +98,7 @@ describe('the point of no return', () => {
     // must fail. A wider margin here would let the cross drift late without the
     // test noticing, which is the direction that gets a player killed.
     expect(
-      holdAndSee(driftFor(state, cfg, crossTick + 1), cfg, scar.side),
+      holdAndSee(driftFor(state, cfg, crossTick + 1), cfg, scar.wall),
       'holding one tick later does not',
     ).toBe(false);
   });
@@ -96,7 +109,7 @@ describe('the point of no return', () => {
     for (const s of scar.path) {
       const at = driftFor(state, cfg, Math.round(s.t / FIXED_DT));
       expect(
-        holdAndSee(at, cfg, scar.side),
+        holdAndSee(at, cfg, scar.wall),
         `sample at t=${s.t.toFixed(2)} claims live=${s.live}`,
       ).toBe(s.live);
     }
@@ -116,7 +129,7 @@ describe('the point of no return', () => {
     const fresh = rescueScar(driftFor(state, cfg, CARRY), cfg, FIXED_DT)!;
 
     expect(carried, 'the projection is still alive after the carry').not.toBeNull();
-    expect(carried.side).toBe(fresh.side);
+    expect(carried.wall).toBe(fresh.wall);
     expect(carried.cross, 'and still has a cross').not.toBeNull();
     // The same WORLD POINT, which is the claim. The time left shrinks by exactly
     // the time that passed; the place does not move.
@@ -153,11 +166,134 @@ describe('the point of no return', () => {
     expect(rescueScar(dead, cfg, FIXED_DT)).toBeNull();
   });
 
-  it('says nothing about a ship that is not headed at a wall', () => {
+  // Was 'says nothing about a ship that is not headed at a wall', with this exact
+  // fixture. Climbing straight up from the bottom of the field IS headed at a wall
+  // now — the ceiling — so the old name asserted something that had stopped being
+  // true even though the expectation had not. What still holds, and is what the
+  // case was really covering, is the horizon: 200px/s for 6s is 1200px, and the
+  // ceiling is the length of the whole field away.
+  it('says nothing about a wall further off than the horizon', () => {
     const state = driftingAtTheWall(cfg);
     state.ship.vx = 0;
     state.ship.vy = -200;
     expect(rescueScar(state, cfg, FIXED_DT)).toBeNull();
+  });
+
+  it('says nothing about a ship headed at no boundary at all', () => {
+    const state = driftingAtTheWall(cfg);
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    expect(rescueScar(state, cfg, FIXED_DT)).toBeNull();
+  });
+});
+
+/**
+ * The ceiling, which had no cue of any kind until the 2026-08-23 playtest flew
+ * off the top of the field.
+ *
+ * These are the side-wall cases re-asked at the boundary that used to refuse
+ * them: `rescueScar` returned null for a top exit by construction, first at the
+ * cheap refusal — which only measured horizontal reach — and then explicitly,
+ * because the wall was a sign on the x axis and a top ending had no sign to give.
+ */
+describe('the point of no return, at the ceiling', () => {
+  const cfg = DEFAULT_CONFIG;
+
+  /**
+   * A ship climbing at the ceiling, `above` px past the topmost body.
+   *
+   * Derived from that body rather than written as a coordinate, so it survives
+   * any change to `bodyCount` or `bodySpacing`, and offset 90px across so the
+   * drift passes the planet instead of hitting it — a crash is an `impact`, which
+   * this cue correctly has no opinion about, and a fixture that produced one
+   * would be testing the refusal rather than the ceiling.
+   *
+   * `highWaterY` moves up with the ship so the trailing floor is not the nearer
+   * ending; without it the run is a `fell-behind` and the scar again says nothing.
+   */
+  function climbingAtTheCeiling(c: SimConfig, above: number): SimState {
+    const state = createInitialState(c);
+    let hiY = 0;
+    let hiX = 0;
+    for (const b of state.bodies)
+      if (b.y < hiY) {
+        hiY = b.y;
+        hiX = b.x;
+      }
+    state.ship.x = hiX + 90;
+    state.ship.y = hiY - above;
+    state.ship.vx = 20;
+    state.ship.vy = -260;
+    state.ship.burstX = 0;
+    state.ship.burstY = 0;
+    state.highWaterY = state.ship.y;
+    return state;
+  }
+
+  /** Still beside the last planet: a grab is on offer, so a rescue exists. */
+  const beside = () => climbingAtTheCeiling(cfg, -150);
+
+  it('finds the ceiling a climb is committed to', () => {
+    const scar = rescueScar(beside(), cfg, FIXED_DT);
+    expect(scar, 'a ship flying off the top of the field has a scar').not.toBeNull();
+    expect(scar!.wall).toBe('top');
+    expect(scar!.cross, 'and a press that still saves it').not.toBeNull();
+  });
+
+  it('every sample it marks live really is live', () => {
+    const state = beside();
+    const scar = rescueScar(state, cfg, FIXED_DT)!;
+    expect(
+      scar.path.some((p) => p.live),
+      'the fixture must offer some rescue',
+    ).toBe(true);
+    for (const s of scar.path) {
+      const at = driftFor(state, cfg, Math.round(s.t / FIXED_DT));
+      expect(
+        holdAndSee(at, cfg, scar.wall),
+        `sample at t=${s.t.toFixed(2)} claims live=${s.live}`,
+      ).toBe(s.live);
+    }
+  });
+
+  it('a press AT the cross turns away; one a few ticks later does not', () => {
+    // The side walls' promise on the other axis, and the reason `rescues` tests
+    // velocity rather than a settled orbit: a braked flyby that arcs back down is
+    // a rescue here exactly as it is sideways. Asserting a settle would call the
+    // same manoeuvre a death purely because it happened vertically.
+    const state = beside();
+    const scar = rescueScar(state, cfg, FIXED_DT)!;
+    const crossTick = Math.round(scar.cross!.t / FIXED_DT);
+    expect(
+      holdAndSee(driftFor(state, cfg, crossTick), cfg, 'top'),
+      'holding at the cross rescues the ship',
+    ).toBe(true);
+    expect(
+      holdAndSee(driftFor(state, cfg, crossTick + 1), cfg, 'top'),
+      'holding one tick later does not',
+    ).toBe(false);
+  });
+
+  it('marks the climb past the last planet as unsaveable, rather than lying', () => {
+    // The ceiling's own shape, and the thing that makes it different from a side
+    // wall: a ship 350px above the topmost body has left every gravity source
+    // behind, so no press can turn it around and every sample is honestly dead.
+    // The scar still exists — the player is told the deadline is real and already
+    // missed, which is the truth. If a cross ever appears here, something is
+    // promising a rescue that does not exist.
+    const scar = rescueScar(climbingAtTheCeiling(cfg, 350), cfg, FIXED_DT);
+    expect(scar, 'the ending is still found and still named').not.toBeNull();
+    expect(scar!.wall).toBe('top');
+    expect(scar!.path.every((p) => !p.live)).toBe(true);
+    expect(scar!.cross).toBeNull();
+    expect(scar!.flight).toEqual([]);
+  });
+
+  it('leaves the world it was asked about untouched', () => {
+    const state = beside();
+    const before = JSON.stringify(state);
+    rescueScar(state, cfg, FIXED_DT);
+    expect(JSON.stringify(state), 'the prediction must not disturb the run').toBe(before);
   });
 
   it('leaves the world it was asked about untouched', () => {

@@ -36,6 +36,15 @@
  * projection runs on and finds the real ending out the far side. Asking `stepSim`
  * where the run ends, instead of asking geometry where the wall is, gets the
  * anomaly rule for free and cannot fall out of step with it.
+ *
+ * NEITHER DID THE CEILING. This marked only the two side walls until the playtest
+ * of 2026-08-23 flew off the top of the field: the session cleared P60, the last
+ * body, and coasted up through 2.7 seconds of empty starfield with no gradient, no
+ * cross and no marker before ending `LOST — OFF COURSE` — the same arbitrary-death
+ * complaint this file was written to answer, at the one boundary it had not been
+ * pointed at. Extending it needed an axis and nothing else: "press and hold, and
+ * the velocity toward that wall reaches zero" is already the definition, and it
+ * was only ever `vx` because only `vx` had been asked about.
  */
 import type { SimConfig } from './config.ts';
 import type { Capture, SimState } from './types.ts';
@@ -60,9 +69,21 @@ export interface ScarSample {
   live: boolean;
 }
 
+/**
+ * Which boundary a drift is committed to.
+ *
+ * Named rather than signed, because there are three of them on two axes and a
+ * bare `-1` cannot say whether it means the left wall or the ceiling. The sign
+ * and the velocity component both hang off this in `WALL`.
+ *
+ * `field.bottom` is absent on purpose: the trailing floor is always the nearer
+ * ending below, and it is a `fell-behind` with its own cue.
+ */
+export type ScarWall = 'left' | 'right' | 'top';
+
 export interface RescueScar {
-  /** Which boundary the drift is committed to: -1 left, +1 right. */
-  side: -1 | 1;
+  /** Which boundary the drift is committed to. */
+  wall: ScarWall;
   /** Seconds until the run would end at it. */
   tEnd: number;
   /**
@@ -165,13 +186,38 @@ function cloneState(s: SimState): SimState {
   };
 }
 
-/** World x-velocity, wherever the ship currently keeps it. */
-function worldVx(s: SimState): number {
-  return s.capture ? s.capture.vx : s.ship.vx;
+/**
+ * Each wall as the pair that answers "am I still flying at it": the velocity
+ * component that carries the ship there, and the sign that component has while
+ * it still does.
+ *
+ * Turning away is `v * sign <= 0` for all three, which is why the top needed no
+ * new logic — only an axis. Up is negative y, so the ceiling's sign is -1 and a
+ * ship is rescued from it the moment `vy` reaches zero.
+ */
+const WALL: Record<ScarWall, { axis: 'vx' | 'vy'; sign: 1 | -1 }> = {
+  left: { axis: 'vx', sign: -1 },
+  right: { axis: 'vx', sign: 1 },
+  top: { axis: 'vy', sign: -1 },
+};
+
+/**
+ * Has a ship with this velocity stopped closing on `wall`?
+ *
+ * Exported because `src/score/` settles a rescue award on exactly this question
+ * and used to answer it with its own copy — `cap.vx * side <= 0`, which was
+ * correct only while every wall was on the x axis. Two implementations of a
+ * definition are two things that can drift apart, and this one had already
+ * started to: the scorer would have paid a ceiling rescue the moment the ship
+ * stopped moving sideways.
+ */
+export function turnedAway(v: { vx: number; vy: number }, wall: ScarWall): boolean {
+  const { axis, sign } = WALL[wall];
+  return v[axis] * sign <= 0;
 }
 
 /**
- * Does a press and hold from here turn away from `side` before the run ends?
+ * Does a press and hold from here turn away from `wall` before the run ends?
  *
  * The hold is held forever, which is both what a player does in this situation
  * and self-limiting: the flyby brake runs only while `fuel > 0`, so a low tank
@@ -186,7 +232,7 @@ function rescues(
   from: SimState,
   cfg: SimConfig,
   dt: number,
-  side: 1 | -1,
+  wall: ScarWall,
   budget: number,
   record: Array<{ x: number; y: number }> | null = null,
 ): boolean {
@@ -198,7 +244,7 @@ function rescues(
       record.push({ x: p.x, y: p.y });
     }
     if (s.ending.active) return false;
-    if (worldVx(s) * side <= 0) return true;
+    if (turnedAway(s.capture ?? s.ship, wall)) return true;
     stepSim(s, cfg, HOLD, dt);
   }
   return false;
@@ -232,7 +278,7 @@ export function advanceScar(scar: RescueScar, secs: number): RescueScar | null {
   const path = scar.path.filter((p) => p.t - secs >= 0).map((p) => ({ ...p, t: p.t - secs }));
   const crossT = scar.cross ? scar.cross.t - secs : 0;
   return {
-    side: scar.side,
+    wall: scar.wall,
     tEnd,
     // A cross the ship has reached is a cross it is now past, which is the same
     // thing `rescueScar` reports by returning none: the last press that could
@@ -249,8 +295,8 @@ export function advanceScar(scar: RescueScar, secs: number): RescueScar | null {
  * Null covers every case where the question is not being asked: mid-capture
  * (where the escape is a release, not a grab), during the ending hold, when the
  * drift reaches no ending inside `horizon`, and when the ending it reaches is not
- * a side wall — a ship about to hit a planet or fall behind the floor is dying of
- * something this cue has no opinion about.
+ * a wall this cue speaks for — a ship about to hit a planet or fall behind the
+ * floor is dying of something with its own signal.
  */
 export function rescueScar(
   state: SimState,
@@ -263,15 +309,22 @@ export function rescueScar(
   // ---- cheap refusal, so the common case never pays for the projection
   //
   // Drift is a straight line at constant velocity plus a burst that decays
-  // linearly to nothing, so the furthest the ship can travel sideways inside the
-  // horizon has a closed form. If neither wall is inside that reach there is no
-  // side ending to find, and this can only return null where the projection
-  // would have. It is an early-out, not a second opinion.
+  // linearly to nothing, so the furthest the ship can travel on either axis
+  // inside the horizon has a closed form. If no boundary is inside that reach
+  // there is no out-of-bounds ending to find, and this can only return null where
+  // the projection would have. It is an early-out, not a second opinion.
+  //
+  // The bound is loose on x, where gravity can pull the ship further than the
+  // drift alone would carry it, and tight on y at the only place the ceiling
+  // matters: `field.top` sits 800px above the highest body, so a ship close
+  // enough to leave over the top has already left every gravity source behind it.
   const fb = fieldBounds(cfg, state.bodies);
-  const reach =
-    Math.abs(state.ship.vx) * opts.horizon +
-    (Math.abs(state.ship.burstX) * Math.min(opts.horizon, cfg.boostBurstDecay)) / 2;
-  if (state.ship.x - reach > fb.left && state.ship.x + reach < fb.right) return null;
+  const decay = Math.min(opts.horizon, cfg.boostBurstDecay);
+  const reachX = Math.abs(state.ship.vx) * opts.horizon + (Math.abs(state.ship.burstX) * decay) / 2;
+  const reachY = Math.abs(state.ship.vy) * opts.horizon + (Math.abs(state.ship.burstY) * decay) / 2;
+  const nearSide = state.ship.x - reachX <= fb.left || state.ship.x + reachX >= fb.right;
+  const nearTop = state.ship.y - reachY <= fb.top;
+  if (!nearSide && !nearTop) return null;
 
   // ---- project the drift once, keeping positions per tick and states sparsely
   //
@@ -285,23 +338,35 @@ export function rescueScar(
   let endTick = -1;
   let endReason: SimState['ending']['reason'] = 'impact';
   let endX = 0;
+  let endY = 0;
   for (let i = 1; i <= maxTicks; i++) {
     stepSim(s, cfg, NO_INPUT, dt);
     if (s.ending.active) {
       endTick = i;
       endReason = s.ending.reason;
       endX = s.ending.x;
+      endY = s.ending.y;
       break;
     }
   }
   if (endTick < 0) return null; // nothing ahead worth marking
   if (endReason !== 'out-of-bounds') return null;
 
-  // Which wall, read off where the run actually ended rather than off the
-  // heading: `outX` and `outY` share one ending, and a ship that left over the
-  // top while drifting sideways has no side deadline to mark.
-  const side: 1 | -1 | 0 = endX > fb.right ? 1 : endX < fb.left ? -1 : 0;
-  if (side === 0) return null;
+  // Which boundary, read off where the run actually ended rather than off the
+  // heading: `outX` and `outY` share one ending, so a diagonal drift that leaves
+  // through a corner has to be resolved by position.
+  //
+  // Sides are tested first, and win a corner. Both readings are true there, and
+  // the side is the one with a gradient the player has been watching build for
+  // seconds — the ceiling only ever appears at the very top of the field, so
+  // naming it in a corner would move the mark to the less-expected wall.
+  //
+  // A drift below `field.bottom` still falls through to null. That ending is
+  // reachable only in the opening seconds, and the trailing floor is the nearer
+  // and better-signalled one everywhere after.
+  const wall: ScarWall | null =
+    endX > fb.right ? 'right' : endX < fb.left ? 'left' : endY < fb.top ? 'top' : null;
+  if (wall === null) return null;
 
   // ---- evaluate a press at each sampled tick, re-walking the drift as we go
   //
@@ -316,7 +381,7 @@ export function rescueScar(
   const walk = cloneState(state);
   for (let i = 0; i <= endTick; i += stride) {
     while (walk.tick - state.tick < i) stepSim(walk, cfg, NO_INPUT, dt);
-    const live = rescues(walk, cfg, dt, side, opts.captureBudget);
+    const live = rescues(walk, cfg, dt, wall, opts.captureBudget);
     path.push({ t: i * dt, x: walk.ship.x, y: walk.ship.y, live });
     if (live) {
       lastLive = i;
@@ -341,7 +406,7 @@ export function rescueScar(
     const probe = cloneState(lastLiveState);
     for (let i = lastLive + 1; i < hi; i++) {
       stepSim(probe, cfg, NO_INPUT, dt);
-      if (!rescues(probe, cfg, dt, side, opts.captureBudget)) break;
+      if (!rescues(probe, cfg, dt, wall, opts.captureBudget)) break;
       best = cloneState(probe);
       bestTick = i;
     }
@@ -350,8 +415,8 @@ export function rescueScar(
     // re-flying it costs a single capture against the dozens the search already
     // ran — much less than making every evaluation carry an array it would throw
     // away.
-    rescues(best, cfg, dt, side, opts.captureBudget, flight);
+    rescues(best, cfg, dt, wall, opts.captureBudget, flight);
   }
 
-  return { side, tEnd: endTick * dt, cross, path, flight };
+  return { wall, tEnd: endTick * dt, cross, path, flight };
 }

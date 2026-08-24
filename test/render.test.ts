@@ -154,6 +154,53 @@ describe('hazard zones', () => {
     const xs = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[1]);
     expect(xs.some((x) => Math.abs(x - toScreenX(c, field.left)) < 1e-6)).toBe(true);
   });
+
+  /**
+   * The ceiling, which had no band at all until the 2026-08-23 playtest flew off
+   * the top of the field through 2.7 seconds of unmarked empty starfield.
+   *
+   * It needs its own camera: at the spawn the line is the length of the whole
+   * field overhead, and `drawCeiling` correctly draws nothing.
+   */
+  function ceilingCam() {
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, 195, field.top + 200, field, null);
+    return c;
+  }
+
+  it('draws nothing at the ceiling while the ceiling is nowhere near', () => {
+    const r = recordingContext();
+    const c = cam();
+    drawHazardZones(r.ctx, c, rcfg, field);
+    const ys = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[2]);
+    expect(ys.some((y) => Math.abs(y - toScreenY(c, field.top)) < 1e-6)).toBe(false);
+  });
+
+  it('warns BELOW the ceiling, where the ship can still be', () => {
+    const r = recordingContext();
+    const c = ceilingCam();
+    drawHazardZones(r.ctx, c, rcfg, field);
+    const edge = toScreenY(c, field.top);
+
+    const bands = (r.calls('fillRect') as Array<[string, number, number, number, number]>).filter(
+      // the side walls span the viewport; the ceiling band is the shorter one
+      ([, , , , h]) => h < c.viewH * c.scale,
+    );
+    expect(bands.length, 'the ceiling band is drawn').toBeGreaterThan(0);
+    for (const [, , y, , h] of bands) {
+      expect(y, 'no warned pixel sits above the lethal line').toBeGreaterThanOrEqual(edge - 1e-6);
+      expect(h).toBeGreaterThan(0);
+    }
+  });
+
+  it('marks the hard limit at the ceiling itself', () => {
+    const r = recordingContext();
+    const c = ceilingCam();
+    drawHazardZones(r.ctx, c, rcfg, field);
+    const ys = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[2]);
+    expect(ys.some((y) => Math.abs(y - toScreenY(c, field.top)) < 1e-6)).toBe(true);
+  });
 });
 
 describe('trail', () => {
@@ -566,23 +613,38 @@ describe('scene', () => {
         score: { ...createScoreState(), ...verdict },
       });
       const xs: number[] = [];
+      const ys: number[] = [];
       let skull = false;
+      let inside = false;
       for (const op of r.ops) {
         // The skull is the only thing in the scene that punches holes back out.
-        if (op[0] === '=globalCompositeOperation' && op[1] === 'destination-out') skull = true;
-        if (skull && (op[0] === 'ellipse' || op[0] === 'fillRect' || op[0] === 'lineTo')) {
+        if (op[0] === '=globalCompositeOperation' && op[1] === 'destination-out') {
+          skull = true;
+          inside = true;
+        }
+        // ...and `drawVerdict` restores immediately after it. The window has to
+        // close, or every ellipse the rest of the frame draws lands in `ys` and
+        // the glyph's centre becomes the centre of whatever else was on screen.
+        if (inside && op[0] === 'restore') inside = false;
+        if (inside && (op[0] === 'ellipse' || op[0] === 'fillRect' || op[0] === 'lineTo')) {
           xs.push(op[1] as number);
+          ys.push(op[2] as number);
         }
       }
-      return { skull, xs };
+      // The glyph's own centre, so an assertion about where it SITS is not really
+      // an assertion about how wide a skull is.
+      const mid = (v: number[]) => (Math.min(...v) + Math.max(...v)) / 2;
+      return { skull, xs, ys, cx: mid(xs), cy: mid(ys) };
     };
 
     expect(drawWith({}).skull, 'nothing is drawn when nothing is owed').toBe(false);
 
-    const right = drawWith({ doomed: { side: 1, tick: snap.tick } });
+    const right = drawWith({ doomed: { wall: 'right', tick: snap.tick } });
     expect(right.skull, 'the skull is drawn when a press was too late').toBe(true);
-    const left = drawWith({ doomed: { side: -1, tick: snap.tick } });
+    const left = drawWith({ doomed: { wall: 'left', tick: snap.tick } });
     expect(left.skull).toBe(true);
+    const top = drawWith({ doomed: { wall: 'top', tick: snap.tick } });
+    expect(top.skull, 'including at the ceiling').toBe(true);
 
     // Away from the wall: heading at the RIGHT wall puts it left of the ship.
     const shipX = toScreenX(c, snap.x);
@@ -590,6 +652,13 @@ describe('scene', () => {
     expect(Math.max(...left.xs), 'left wall -> skull sits right of the ship').toBeGreaterThan(
       shipX,
     );
+
+    // And the ceiling flees on the other axis, which the old `-side * OFFSET`
+    // could not express: the skull sits BELOW the ship, never between it and the
+    // line it is about to cross, and is not displaced sideways at all.
+    const shipY = toScreenY(c, snap.y);
+    expect(top.cy, 'ceiling -> skull sits below the ship').toBeGreaterThan(shipY);
+    expect(top.cx, 'ceiling -> and stays over it').toBeCloseTo(shipX, 6);
   });
 
   it('glows for a press close to the cross, and not for one that drifted past', () => {
