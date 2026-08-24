@@ -187,7 +187,27 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // is over having succeeded. Tested BEFORE the boundaries below, because the
   // ceiling is only 800px further up and whichever fires first is the story the
   // player gets told about what they just did.
-  if (cfg.clearAtTop && pos.y < fb.crest) {
+  //
+  // NOT AT THE CREST ITSELF, which is where this first fired and was wrong in the
+  // most annoying possible way: `crest` is the topmost body's CENTRE, so the run
+  // ended the instant the ship's y crossed it — on the APPROACH, while the player
+  // was lining up to grab the last planet. The final body was unplayable. You
+  // reached for it and got a results screen.
+  //
+  // The line is therefore where that body goes OUT OF REACH. `grabRange` is the
+  // distance at which `grabTarget` stops offering a body at all, so above this
+  // there is provably nothing left to grab — which is the real meaning of "no
+  // more field", rather than a margin picked to look safe. Measured against it:
+  // settled captures of the topmost body reach at most ~265px above its centre,
+  // so the line clears every one of them with room to spare.
+  //
+  // AND NOT WHILE ATTACHED TO SOMETHING. A fast pass round the last planet can
+  // carry the ship past the line mid-flyby, and cutting a run off in the middle
+  // of a manoeuvre is the same defect as cutting off the approach — one hop
+  // later. Releasing is what says you are done with it. A ship that never lets go
+  // simply keeps orbiting, exactly as it would anywhere else in the field.
+  const clearY = fb.crest - cfg.grabRange;
+  if (cfg.clearAtTop && !state.capture && pos.y < clearY) {
     endRun(state, 'cleared', pos.x, pos.y);
     state.tick++;
     return;
@@ -199,7 +219,21 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // the very next tick and ends the run, which is the miss.
   const outX =
     (pos.x < fb.left - 4 || pos.x > fb.right + 4) && !inAnomalyField(pos.x, pos.y, state.bodies);
-  const outY = pos.y > fb.bottom || pos.y < fb.top;
+  // THE CEILING IS NOT A DEATH ONCE THE FIELD CAN BE CLEARED. With `clearAtTop`
+  // on, a drifting ship ends as `cleared` at `clearY` — 240px below `fb.top` —
+  // so it can only ever reach the ceiling while CAPTURED, and a ship captured up
+  // there is attached to the last planet rather than lost in the void the ceiling
+  // exists to catch.
+  //
+  // Found by the pin below it: a fast capture of the last body carries as far as
+  // 800px above its centre, which is exactly where the ceiling sits, so holding a
+  // good final slingshot killed the run it should have finished. Suppressing the
+  // clear while attached and not the ceiling turned "you cannot finish on the
+  // approach" into "you cannot finish on the release either".
+  //
+  // The floor below stays a death in every config: falling out of the bottom is
+  // not an achievement.
+  const outY = pos.y > fb.bottom || (!cfg.clearAtTop && pos.y < fb.top);
   if (outX || outY) {
     // Hold on the boundary the way an impact does, so leaving the field reads as
     // an event with a cause rather than a silent teleport back to the start.
