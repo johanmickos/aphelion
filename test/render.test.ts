@@ -24,6 +24,7 @@ import {
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from '../src/render/ceremony.ts';
 import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
+import { FINISH } from '../src/render/palette.ts';
 import {
   CLEARED_SHEET,
   DEATH_SHEET,
@@ -880,6 +881,40 @@ describe('the sheet', () => {
     const top = planetsCleared({ ...run, highWaterY: -99999 }, bodies);
     expect(bottom.done).toBeLessThan(top.done);
     expect(top.done).toBe(top.total);
+  });
+});
+
+describe('a death sheet and a clear sheet are told apart', () => {
+  const run = {
+    ticks: 900,
+    topSpeed: 500,
+    distance: 4000,
+    peakChain: 4,
+    fireSecs: 1,
+    roughPasses: 1,
+    impacts: 1,
+    anomalies: 0,
+    score: 9000,
+    highWaterY: -4000,
+  };
+  const bodies = createInitialState(DEFAULT_CONFIG).bodies;
+  const words = (style: typeof CLEARED_SHEET, cleared: boolean) => {
+    const r = recordingContext();
+    drawSheet(r.ctx, cam(), style, run, run, bodies, FIXED_DT, 1, cleared);
+    return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+  };
+
+  it('says what happened, in the right words', () => {
+    expect(words(CLEARED_SHEET, true)).toContain('FIELD CLEARED');
+    expect(words(DEATH_SHEET, false)).toContain('RUN ENDED');
+  });
+
+  it('commends a worthy death in the finish green, not the hazard red', () => {
+    // The sheet exists to say "you got a long way". Painting that in the colour
+    // of the wall it hit would be the sheet arguing with its own reason for
+    // existing.
+    expect(DEATH_SHEET.accentRGB).toEqual(FINISH);
+    expect(DEATH_SHEET.accent).not.toBe(CLEARED_SHEET.accent);
   });
 });
 

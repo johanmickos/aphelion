@@ -28,6 +28,7 @@ import {
   previewBurn,
   scoreTick,
 } from '../src/score/index.ts';
+import { earnsSheet } from '../src/render/sheet.ts';
 import { buildReport, serializeReport, summarize } from '../src/app/report.ts';
 
 /**
@@ -158,6 +159,13 @@ canvas.addEventListener('pointerdown', (e) => {
     startRun();
     return;
   }
+  // A tap that puts the sheet away is not a grab. Without this the same press
+  // both dismisses the results and starts a capture on the tick after it, which
+  // is a grab the player did not ask for at the worst possible moment.
+  if (sheet) {
+    dismissSheet();
+    return;
+  }
   held = true;
   pressedEdge = true;
 });
@@ -199,6 +207,10 @@ addEventListener('keydown', (e) => {
   e.preventDefault();
   if (action === 'start') {
     startRun();
+    return;
+  }
+  if (sheet) {
+    dismissSheet();
     return;
   }
   held = true;
@@ -328,9 +340,66 @@ let scarWasCaptured = false;
 /** Tick the running capture began on, for the tap test. */
 let captureStart = 0;
 
+/**
+ * A results sheet is up and the run is waiting on a tap.
+ *
+ * TWO KINDS, HELD TWO DIFFERENT WAYS, and the asymmetry is forced rather than
+ * chosen. A CLEAR is held by the simulation: `stepSim` never respawns a `cleared`
+ * ending, so the loop keeps stepping and the ceremony animates off `ending.t`. A
+ * worthy DEATH cannot be held there, because whether a death earned a sheet is a
+ * question about `ScoreState` — how far up the field it got — and `src/sim/` is
+ * not allowed to see the score. Teaching it would collapse the observer boundary
+ * that makes a score a pure function of (config, seed, inputLog).
+ *
+ * So the app holds that one itself, by not stepping, and runs the fade clock.
+ */
+let sheet: { kind: 'cleared' | 'death'; t: number } | null = null;
+
+/** Seconds a death sheet takes to fade in, once the ending notice has had its beat. */
+const DEATH_SHEET_DELAY = 0.55;
+const DEATH_SHEET_FADE = 0.4;
+
+/** 0 until the notice has been read, then rising. Always 0 for a clear. */
+function deathSheetAlpha(): number | null {
+  if (sheet?.kind !== 'death') return null;
+  const u = (sheet.t - DEATH_SHEET_DELAY) / DEATH_SHEET_FADE;
+  return u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
+}
+
+/**
+ * Put the sheet away and get back to flying.
+ *
+ * A CLEAR ENDS THE SESSION, because a session IS a field: `respawn` keeps the
+ * world, so every life this session was an attempt at the same sixty planets,
+ * and there is nothing left in them once the top has been reached. Back to armed
+ * with a fresh seed, which is also where the tuning and the course picker live.
+ *
+ * A DEATH just resumes. Clearing the flag lets the loop step again, and the hold
+ * the simulation had already started finishes on its own — `crashPause` was
+ * frozen along with everything else, not skipped.
+ */
+function dismissSheet(): void {
+  if (!sheet) return;
+  const wasCleared = sheet.kind === 'cleared';
+  sheet = null;
+  if (!wasCleared) return;
+  sim.worldSeed = (Math.random() * 2 ** 32) >>> 0;
+  life.phase = 'armed';
+  rearm();
+  showSeed();
+  showArmed();
+}
+
 const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
   step(dt) {
     if (paused || life.phase !== 'running') return;
+    if (sheet) {
+      sheet.t += dt;
+      // A death sheet freezes the run beneath it; a clear keeps stepping, because
+      // its ceremony is animated from `ending.t` and the simulation is the thing
+      // advancing that.
+      if (sheet.kind === 'death') return;
+    }
     const input: Input = { held, pressed: pressedEdge, released: releasedEdge };
     recorder.recordInput(state.tick, pressedEdge, releasedEdge);
     pressedEdge = false;
@@ -354,6 +423,25 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // position at that instant — after a release that is the point it let go
     // from, which is exactly the act being praised.
     const scored = scoreTick(score, state, sim, dt);
+
+    // ---- has this run earned a sheet?
+    //
+    // Asked here rather than inside `stepSim` for the reason `sheet` records: the
+    // answer depends on the score, and the simulation must not be able to see it.
+    // On the tick a run ends, `scoreTick` has already sealed `lastRun`, so the
+    // question can be asked immediately and the sheet raised without a frame of
+    // the world carrying on underneath a finished run.
+    if (state.ending.active && !sheet) {
+      if (state.ending.reason === 'cleared') {
+        sheet = { kind: 'cleared', t: 0 };
+      } else if (score.lastRun && earnsSheet(score.lastRun, state.bodies)) {
+        sheet = { kind: 'death', t: 0 };
+      }
+      // An unworthy death raises nothing at all and respawns as it always has.
+      // Failure staying cheap is what `src/app/lifecycle.ts` argues hardest for,
+      // and a results screen after a three-second flub is exactly the tax it
+      // warns against.
+    }
     // Recorded as well as shown. A replay recomputes these, but only while it is
     // still reproducing the run — and past a divergence it recomputes a different
     // session's. These are what the player was actually paid.
@@ -496,6 +584,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       headerBottom,
       frameDt,
       score,
+      deathSheet: deathSheetAlpha(),
     });
   },
 });

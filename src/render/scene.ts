@@ -29,7 +29,7 @@ import { drawVerdict } from './verdict.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from './ceremony.ts';
-import { CLEARED_SHEET, drawSheet } from './sheet.ts';
+import { CLEARED_SHEET, DEATH_SHEET, drawSheet } from './sheet.ts';
 import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
 import { drawEdgeMarkers } from './edge-markers.ts';
@@ -122,6 +122,17 @@ export class Scene {
        * part of it — see `src/score/score.ts`.
        */
       score: ScoreState;
+      /**
+       * Fade of a DEATH sheet, 0..1, or null when none is up.
+       *
+       * Clocked by the app rather than derived here, because a worthy death has
+       * no ceremony to hang a phase off — and it cannot borrow the simulation's
+       * hold either: whether a death earned a sheet is a question about
+       * `ScoreState`, which `src/sim/` must never be able to see. So the app
+       * stops stepping and runs this clock itself. A CLEAR needs no such field;
+       * its fade rides the ceremony, which the scene already has.
+       */
+      deathSheet?: number | null;
     },
   ): void {
     const { sim, render, bodies, field } = this.deps;
@@ -330,17 +341,18 @@ export class Scene {
     // is meant to be reading by this point. It reads `lastRun` rather than `run`
     // — the live one was cleared by `endLife` on the tick the run ended, which is
     // the trap `ScoreState.lastRun` exists to close.
-    if (cer && cer.sheet > 0 && opts.score.lastRun) {
+    const sheetAlpha = cer ? cer.sheet : (opts.deathSheet ?? 0);
+    if (sheetAlpha > 0 && opts.score.lastRun) {
       drawSheet(
         ctx,
         cam,
-        CLEARED_SHEET,
+        cer ? CLEARED_SHEET : DEATH_SHEET,
         opts.score.lastRun,
         opts.score.sessionMax,
         bodies,
         FIXED_DT,
-        cer.sheet,
-        true,
+        sheetAlpha,
+        cer !== null,
       );
     }
 
