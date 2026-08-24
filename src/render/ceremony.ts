@@ -33,22 +33,53 @@ import type { RenderSnapshot } from './snapshot.ts';
 import { FINISH, SUMMIT_RGB, withAlpha } from './palette.ts';
 
 /**
- * Seconds from the crossing to full warp.
+ * Seconds spent COASTING before the warp begins.
  *
- * Long enough to read as an acceleration rather than a cut, short enough that the
- * player is not waiting to be told what they scored. The panel arrives on top of
- * this, so it is a lead-in and not the whole show.
+ * THE FINISH LINE HAS TO LEAVE. The first version started stretching the stars on
+ * the tick the ship crossed, which meant the chequers — the thing the whole
+ * runway was built to deliver the player to — were replaced before they could be
+ * looked at. Reported as "the transition from finish line to the starfield is too
+ * fast". So the ceremony now opens by simply flying on: the world recedes, the
+ * line slides off the bottom of the screen, and only once it is gone does
+ * anything else happen.
  */
-const SPOOL = 1.15;
+const COAST = 1.35;
+
+/**
+ * How far the world falls away during the coast, in design units.
+ *
+ * Sized to carry the line off the bottom from anywhere it can be crossed. The
+ * design window is 844 tall and the ship crosses somewhere in its upper half, so
+ * a shade over one screen height clears it with margin at every camera position.
+ */
+const COAST_DIST = 900;
+
+/**
+ * Seconds from the end of the coast to full warp.
+ *
+ * Slower than it was. The warp used to reach full stretch in 1.15s measured from
+ * the crossing itself, which arrived while the player was still reading the line;
+ * it now starts after the coast and takes longer to get there, so the sky opens
+ * up rather than snapping.
+ */
+const SPOOL = 1.8;
 
 /** Seconds spent easing the ship from where it crossed to the middle. */
-const CENTRE = 0.55;
+const CENTRE = 0.8;
 
 export interface Ceremony {
   /** 0 before the crossing, climbing to 1 at full warp, then held. */
   warp: number;
   /** How far the ship has been drawn toward the middle of the screen, 0..1. */
   centred: number;
+  /**
+   * How far the WORLD has fallen away since the crossing, in design units.
+   *
+   * The ship is frozen, so this is what "flying on" is made of: the bodies, the
+   * runway and the finish line are all drawn shifted down by it, and slide off
+   * the bottom while the ship holds its place.
+   */
+  shift: number;
   /** Seconds since the crossing. */
   t: number;
 }
@@ -69,7 +100,16 @@ function ease(u: number): number {
 export function ceremonyPhase(snap: RenderSnapshot): Ceremony | null {
   if (!snap.ending.active || snap.ending.reason !== 'cleared') return null;
   const t = snap.ending.t;
-  return { t, warp: ease(t / SPOOL), centred: ease(t / CENTRE) };
+  return {
+    t,
+    // Eased, so the coast decelerates into the warp instead of stopping dead at
+    // the handover. The ship has just been accelerated by the funnel; a world
+    // that halts the instant the timer says so would undo that in one frame.
+    shift: COAST_DIST * ease(t / COAST),
+    // Nothing until the line is gone.
+    warp: ease((t - COAST) / SPOOL),
+    centred: ease(t / CENTRE),
+  };
 }
 
 /**

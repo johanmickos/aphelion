@@ -173,14 +173,29 @@ export class Scene {
     );
 
     this.stars.draw(ctx, cam, render, cer ? cer.warp : 0, cer ? cer.t : 0);
+
+    // ---- the world falls away
+    //
+    // The ship is frozen where it crossed, so "flying on" is the world receding
+    // rather than the ship advancing. Everything in world space is shifted down
+    // together — bodies, runway, chequers — and slides off the bottom while the
+    // ship holds its place. The ship and its trail are drawn AFTER this is
+    // restored, so they stay put while the field leaves.
+    const receding = cer !== null && cer.shift > 0;
+    if (receding) {
+      ctx.save();
+      ctx.translate(0, cer.shift * cam.scale);
+    }
     drawHazardZones(ctx, cam, render, field);
     drawBacktrackFloor(ctx, cam, sim, render, snap.highWaterY);
     // Under the line it feeds into, so the chequers stay the brightest thing in
     // that part of the sky.
-    // Both stand down once the ship is through: a runway and a finish line are
-    // instructions for a race that is over, and leaving them lit would have the
-    // ceremony still pointing at something behind it.
-    if (!cer) {
+    // Kept up THROUGH the coast, and only then dropped. Cutting them at the
+    // crossing meant the chequers — the thing the whole runway exists to deliver
+    // the player to — were gone before they could be looked at. They recede with
+    // the rest of the world instead, and by the time the warp starts they have
+    // left the screen on their own.
+    if (!cer || cer.warp < 1) {
       drawSpeedCarpet(ctx, cam, field, finishY, sim.finishFunnelDepth, opts.timeMs);
       drawFinishLine(ctx, cam, field, finishY);
     }
@@ -192,6 +207,8 @@ export class Scene {
       snap.capture ? snap.capture.planet : -1,
       opts.timeMs,
     );
+
+    if (receding) ctx.restore();
 
     const cap = snap.capture;
     if (cap) {

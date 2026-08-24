@@ -547,14 +547,37 @@ describe('the ceremony', () => {
     expect(ceremonyPhase(live)).toBeNull();
   });
 
+  it('coasts first, so the finish line can be watched leaving', () => {
+    // REPORTED: "the transition from finish line to the starfield is too fast".
+    // The first version began stretching the stars on the tick the ship crossed,
+    // so the chequers — the thing the whole runway exists to deliver the player
+    // to — were replaced before they could be looked at. Nothing but the coast
+    // happens for over a second now.
+    const p = (t: number) => ceremonyPhase(ended('cleared', t))!;
+    expect(p(0.5).warp, 'no warp while the line is still on screen').toBe(0);
+    expect(p(1.2).warp).toBe(0);
+    // ...and the world is meanwhile falling away, which is what carries it off.
+    expect(p(0.5).shift).toBeGreaterThan(0);
+    expect(p(1.2).shift).toBeGreaterThan(p(0.5).shift);
+  });
+
+  it('carries the line clear of the screen before the warp starts', () => {
+    // The design window is 844 tall and the ship crosses in its upper half, so
+    // the coast has to move the world more than a screen height to be sure the
+    // chequers are gone by the time anything replaces them.
+    const atWarpStart = ceremonyPhase(ended('cleared', 1.35))!;
+    expect(atWarpStart.shift).toBeGreaterThan(844);
+    expect(atWarpStart.warp).toBe(0);
+  });
+
   it('spools up and then holds, rather than looping', () => {
     // The panel arrives on top of a warp that is still running. If this ever
     // wrapped, the sky would visibly restart underneath the results.
     const w = (t: number) => ceremonyPhase(ended('cleared', t))!.warp;
     expect(w(0)).toBe(0);
-    expect(w(0.4)).toBeGreaterThan(0);
-    expect(w(0.4)).toBeLessThan(1);
-    expect(w(2)).toBe(1);
+    expect(w(2.2)).toBeGreaterThan(0);
+    expect(w(2.2)).toBeLessThan(1);
+    expect(w(4)).toBe(1);
     expect(w(30), 'still full warp half a minute later').toBe(1);
   });
 
@@ -574,7 +597,7 @@ describe('the ceremony', () => {
     expect(at(0).x, 'starts where the ship crossed').toBeCloseTo(40, 6);
     expect(at(5).x, 'ends in the middle').toBeCloseTo(cx, 6);
     // Monotone, so the ship never doubles back on its way in.
-    const xs = [0, 0.15, 0.3, 0.45, 0.6].map((t) => at(t).x);
+    const xs = [0, 0.2, 0.4, 0.6, 0.9].map((t) => at(t).x);
     for (let i = 1; i < xs.length; i++) expect(xs[i]!).toBeGreaterThanOrEqual(xs[i - 1]!);
   });
 
@@ -582,7 +605,8 @@ describe('the ceremony', () => {
     // The player crosses a GREEN line into a GOLD sky, and the two overlap for a
     // moment rather than one cutting to the other.
     const r = recordingContext();
-    drawCeremonyWash(r.ctx, cam(), ceremonyPhase(ended('cleared', 0.3))!);
+    // After the coast: the wash draws nothing before the warp begins.
+    drawCeremonyWash(r.ctx, cam(), ceremonyPhase(ended('cleared', 1.9))!);
     const stops = (r.calls('addColorStop') as Array<[string, number, string]>).map((o) => o[2]);
     expect(
       stops.some((v) => v.startsWith('rgba(255,214,51')),
@@ -594,7 +618,7 @@ describe('the ceremony', () => {
     ).toBe(true);
 
     const late = recordingContext();
-    drawCeremonyWash(late.ctx, cam(), ceremonyPhase(ended('cleared', 4))!);
+    drawCeremonyWash(late.ctx, cam(), ceremonyPhase(ended('cleared', 8))!);
     const lateStops = (late.calls('addColorStop') as Array<[string, number, string]>).map(
       (o) => o[2],
     );

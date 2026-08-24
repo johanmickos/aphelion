@@ -422,6 +422,19 @@ export interface SimConfig {
    * Sized to be felt rather than to dominate. What it is buying is a takeoff into
    * the ceremony, not a speed record — the slingshot off the last planet is still
    * what most of the arriving speed comes from.
+   *
+   * 650 -> 380, on a report that the crossing was "a touch too fast to appreciate
+   * the finish line". The measurement that decided the size of the cut is that
+   * the runway lasts 0.78-0.87s almost regardless of this value — a ship inside
+   * it is accelerating, so a bigger boost mostly buys a faster exit rather than a
+   * shorter stay. Cutting it therefore costs about 0.04s of runway and takes a
+   * 300px/s arrival across the line at 542 instead of 667: still nearly a
+   * doubling, and no longer a blur.
+   *
+   * The rest of that report was answered in the ceremony rather than here. What
+   * made the line hard to look at was that it vanished on the tick it was
+   * crossed; it now recedes down the screen through a coast phase before the warp
+   * starts. See `COAST` in `src/render/ceremony.ts`.
    */
   finishFunnelBoost: number;
   /**
@@ -922,7 +935,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   clearAtTop: true,
   finishFunnelDepth: 560,
   finishFunnelPull: 32,
-  finishFunnelBoost: 650,
+  finishFunnelBoost: 380,
   holdClimbInCapture: true,
   boundGrabsCapture: true,
   outboundFlybyFrac: 0.65,
