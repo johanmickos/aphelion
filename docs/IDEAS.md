@@ -137,6 +137,49 @@ Related and separate: `previewBurn` deliberately under-reports by a measured 2.2
 or paid, so any feature that wants to *display* the fire on offer has to extend
 the flight past the turn-away first.
 
+### Standing playtest findings, not yet acted on (parked 2026-08-25)
+
+Raised by `docs/PLAYTEST-2026-08-22.md` and `PLAYTEST-2026-08-23.md`, still true
+on the current build, and separate from the ones already written up above. Each
+carries the measurement it was found by, because re-finding it is most of the work.
+
+- **The chain says nothing for most of a run.** `streakMax` 5 at `streakStep` 0.4
+  binds on the 11th scoring event — about 22 seconds in — and then the most
+  prominent progression number on screen does not move again. Measured on the
+  2026-08-23 capture: x5.00 from 22s to 85s, 74% of the session. The 08-22 capture
+  showed the same defect at 27 seconds, and the fix applied afterwards
+  (`streakStep` 0.25 -> 0.4) made it strictly WORSE by reaching the cap sooner.
+  The measurement to run before touching it: rescore `diagnostics/` and report what
+  fraction of the seconds INSIDE each life sit at the ceiling. If a good run spends
+  most of its life pinned, the ceiling is the wrong shape and raising it is not the
+  answer — the question is whether the top of the ladder should stop being a number
+  that stops moving. `RunStats.peakChain` now records what the HUD could not show,
+  so the data exists.
+- **Two different quantities are both rendered `x5.00`, one line apart.** The
+  persistent chain and the multiplier an award was PAID at, in the same glyph and
+  the same face. Determining which was which required stepping through frames.
+  Playtest 2026-08-22 rec #2, listed there as needing no design call.
+- **The praise vocabulary is too deep to learn.** 37 words in `praise.ts` plus 8 in
+  `reckless.ts`. The 08-23 capture showed 14 distinct words in 85 seconds, almost
+  every one exactly once, so no word ever becomes a signal and colour does all the
+  work. Cutting to 1-2 per tier is a RE-MEASURE at coarser granularity, not a
+  re-pick: the thresholds are percentiles of real play.
+- **The game is silent.** `astats` over both captures: no game audio at all. Two
+  playtests running have called this the largest gameplay return per hour, and the
+  ceremony has made it conspicuous — a warp, a finish line and a slot-machine
+  roll-up, in silence. A pitch ramp through the boost arc peaking at the release
+  window would teach the core mechanic better than the arc gauge does.
+- **The field has no difficulty curve.** `createBodies` is stationary: radius
+  `34 + rnd()*22` at every height, constant `bodySpacing` and `bodyWeave`, and the
+  anomalies spread evenly. P1 and P59 are statistically identical draws, so after
+  the first ~25 seconds nothing gets harder — the only escalation is the player's
+  own accumulated speed, which is emergent rather than authored.
+- **The short course may be too narrow rather than the player careless.**
+  `fieldWidthFrac` is shared between courses, so SHORT flies 12 bodies down the
+  same 741px corridor as FULL's 60. Two of the three lives in the 2026-08-25
+  captures ended at a side wall inside 20 seconds. Worth measuring before assuming
+  it is a skill issue.
+
 ## Easter Eggs
 - Award for most orbits around single planet (award: 10 or more)
 - Award for bumping into planet (i.e. bumpy orbits due to coming straight on)
