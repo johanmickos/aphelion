@@ -62,7 +62,7 @@ import type { ScoreState } from '../src/score/types.ts';
 import type { EndingReason } from '../src/sim/types.ts';
 import { drawEndingNotice } from '../src/render/overlays.ts';
 import { WARNING_ORDER, drawWarnings } from '../src/render/warnings.ts';
-import { doomLight } from '../src/render/verdict.ts';
+import { DOOM_WORD, doomLight } from '../src/render/verdict.ts';
 import { orbitRadius } from '../src/sim/orbit.ts';
 import { Trail } from '../src/render/ship.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
@@ -1847,7 +1847,7 @@ describe('scene', () => {
         score: { ...createScoreState(), ...verdict },
       });
       const words = (r.calls('fillText') as Array<[string, string, number, number]>).filter(
-        (o) => o[1] === 'DOOMED',
+        (o) => o[1] === DOOM_WORD,
       );
       return { skull: words.length > 0, x: words[0]?.[2] ?? NaN, y: words[0]?.[3] ?? NaN };
     };

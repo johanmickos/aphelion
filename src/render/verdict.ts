@@ -162,15 +162,24 @@ export interface Doom {
  * condition is "no single press-and-hold from here turns the ship away" — it does
  * not consider releasing and grabbing a DIFFERENT body, which is a real escape
  * the player has and the projection never tries. So the light is a strong
- * prediction rather than a fact.
+ * prediction rather than a fact: over the corpus the drifting half is followed by
+ * an out-of-bounds ending 95% of the time, and the captured half 134 times out of
+ * 135.
  *
- * How strong: over the corpus the drifting half is followed by an out-of-bounds
- * ending 95% of the time, and the captured half 134 times out of 135. `DOOMED` is
- * fair at those odds — the word does not mean certainty in ordinary use — where
- * `LOST` would both claim more and simply repeat the ending notice, which already
- * says `LOST — BURNED UP` two thirds of the time.
+ * A DISTRESS CALL RATHER THAN A VERDICT, which is both shorter to read and more
+ * honest than the alternatives. `DOOMED` and `LOST` are both claims about the
+ * outcome, and at 95% neither is quite entitled to one — and `LOST` would have
+ * merely repeated the ending notice, which already says `LOST — BURNED UP` two
+ * thirds of the time. `SOS` asserts nothing except that the ship is in trouble,
+ * which is exactly what is known.
+ *
+ * Three characters also means the badge stays narrow enough to read at a glance,
+ * which is the whole reason a dashboard light has a word at all.
+ *
+ * Exported so the pins read it rather than repeating the literal — two copies of
+ * one string is how a rename leaves a test asserting the old one.
  */
-const DOOM_WORD = 'DOOMED';
+export const DOOM_WORD = 'SOS';
 
 /**
  * The doom light, or null when none is owed.
