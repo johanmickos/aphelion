@@ -37,27 +37,11 @@
  * anything receding behind the ship, but the track ahead of it is still there and
  * still in the way.
  */
-import type { Camera } from './camera.ts';
-import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
-import type { RenderSnapshot } from './snapshot.ts';
 import type { DeadlineWall } from '../sim/rescue.ts';
-import { HAZARD, withAlpha } from './palette.ts';
-import { hypot } from '../sim/orbit.ts';
+import { HAZARD, HAZARD_WARN } from './palette.ts';
+import type { WarningLight } from './warnings.ts';
 
-/** Design units from the ship the verdict sits at. */
-const OFFSET = 24;
-/**
- * Which way is "away from the boundary", per wall it could be.
- *
- * A unit direction rather than the old `-side` on x, because the ceiling's answer
- * is on the other axis. Down-screen is +y, so fleeing the ceiling is +1 there.
- */
-const DOOM_AWAY: Record<DeadlineWall, { x: number; y: number }> = {
-  left: { x: 1, y: 0 },
-  right: { x: -1, y: 0 },
-  top: { x: 0, y: 1 },
-};
 /**
  * Seconds per pulse. The fuel warning's own rate, so every badge beats alike.
  */
@@ -71,147 +55,77 @@ function beat(phase: number): number {
   return phase < 0.22 ? phase / 0.22 : 1 - (phase - 0.22) / 0.78;
 }
 
-/**
- * How far below centre the bones cross, in units of `r`.
- *
- * They used to cross THROUGH the cranium, and the problem was not the geometry —
- * it was the compositing. Bones and skull were two separate fills at the same
- * alpha, so every overlapping pixel came out at `1-(1-a)²` and the crossing read
- * brighter than either shape. Reported as "the crossbones and the skull overlay
- * in intensity".
- *
- * Both halves of that are fixed here, and the order matters: the single-path fill
- * below is what makes the intensity uniform, and this is what makes the
- * SILHOUETTE legible — bones behind a jaw are a shape, bones through a cranium
- * are a scribble at 11px.
- */
-const BONE_DROP = 0.46;
+/** Design units wide the skull draws. Height is the panel's row. */
+const GLYPH_W = 16;
 
 /**
- * Append one bone to the current path: a shaft, and two lobes at each end.
+ * The death's-head, in three features.
  *
- * APPENDS RATHER THAN DRAWS, which is the whole technique. Every piece of this
- * glyph goes into one path and is filled once, so overlapping pieces fill exactly
- * once — a stroked bone and a filled skull could not do that, however carefully
- * they were placed.
- */
-function bonePath(
-  ctx: CanvasRenderingContext2D,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  w: number,
-  k: number,
-): void {
-  let dx = x1 - x0;
-  let dy = y1 - y0;
-  const len = hypot(dx, dy) || 1;
-  dx /= len;
-  dy /= len;
-  const nx = -dy;
-  const ny = dx;
-  ctx.moveTo(x0 + nx * w, y0 + ny * w);
-  ctx.lineTo(x1 + nx * w, y1 + ny * w);
-  ctx.lineTo(x1 - nx * w, y1 - ny * w);
-  ctx.lineTo(x0 - nx * w, y0 - ny * w);
-  ctx.closePath();
-  for (const [ex, ey] of [
-    [x0, y0],
-    [x1, y1],
-  ] as const) {
-    for (const side of [1, -1] as const) {
-      const cx = ex + nx * k * side;
-      const cy = ey + ny * k * side;
-      // `moveTo` the arc's start, or the subpath draws a spoke in from the last
-      // point and the lobe fills as a wedge.
-      ctx.moveTo(cx + k, cy);
-      ctx.arc(cx, cy, k, 0, Math.PI * 2);
-    }
-  }
-}
-
-/**
- * The death's-head, over crossed bones.
+ * IT HAS BEEN DRAWN FOUR TIMES AND THIS IS THE FIRST ONE THAT IS NOT A DRAWING
+ * PROBLEM. The versions before it were bare red on whatever happened to be
+ * behind them, at 11px, on a moving ship, over a wake — and every attempt to fix
+ * that added detail, which at that size subtracts legibility. The verdicts, in
+ * order: "a bit bubbly and not immediately recognisable as death", then "too
+ * blocky/bulky, and near impossible to tell what it is due to the busy overlap of
+ * bones".
  *
- * DRAWN FOR ELEVEN PIXELS, which is the only design constraint that mattered.
- * The shape this replaced was described as "a bit bubbly and not immediately
- * recognisable as death", and the cause was feature count rather than proportion:
- * a round cranium, two small sockets, a nose and a tooth gap is five things
- * inside a glyph the size of a word's letter. This spends the pixels on fewer,
- * larger ones.
+ * What actually fixed it was not the path. It was the panel: a plate to sit on, a
+ * fixed place to sit, and a word beside it. POSITION AND CONTEXT CARRY THE
+ * IDENTITY NOW, so the glyph does not have to — which is exactly why a car's oil
+ * light can be an unreadable squiggle and still be understood instantly.
  *
- * THE SLANT IS THE WHOLE TRICK. Each socket's TOP edge runs downward toward the
- * nose, which is the difference between a skull and an angry one — it reads as a
- * brow. Everything else is silhouette: a flat crown, a cheekbone, a hard notch
- * under it, and a jaw tapered inward.
+ * So it is three features and nothing else: a cranium, and two sockets whose top
+ * edge slants down toward the nose. That slant is the only thing making it read
+ * as a skull rather than a lozenge, and it is the last detail worth spending
+ * pixels on. The crossbones, the nose and the tooth gap are all gone.
  *
- * ONE PATH, ONE FILL. Bones, cranium and jaw all append to a single path and are
- * filled once, so no overlap ever composites twice. Alpha is therefore uniform
- * across the whole mark whatever the pieces do, which is what a pulsing glyph
- * needs — the alternative was a mark whose crossing point flashed brighter than
- * its own head.
+ * THE VOIDS ARE FILLED, NOT PUNCHED. They used to use `destination-out`, which
+ * erased the game behind the badge rather than the badge itself — and cannot work
+ * at all once there is a plate underneath to erase too. Filling them in the
+ * plate's own colour is both correct and simpler.
  */
 function skull(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  r: number,
-  alpha: number,
+  w: number,
+  h: number,
+  color: string,
+  plate: string,
 ): void {
-  ctx.fillStyle = withAlpha(HAZARD, alpha);
+  const cx = x + w / 2;
+  const r = w / 2;
+  const top = y + h * 0.1;
+  const cheek = y + h * 0.62;
+  const bottom = y + h * 0.94;
+
+  ctx.fillStyle = color;
   ctx.beginPath();
-
-  // ---- the bones, behind and below
-  const by = y + r * BONE_DROP;
-  const L = r * 1.2;
-  for (const d of [1, -1] as const) {
-    bonePath(ctx, x - L * d, by + r * 0.62, x + L * d, by - r * 0.62, r * 0.12, r * 0.19);
-  }
-
-  // ---- cranium and jaw
-  const w = r * 1.04;
-  const top = y - r * 0.95;
-  const cheek = y + r * 0.16;
-  ctx.moveTo(x - w, top + r * 0.4);
-  ctx.quadraticCurveTo(x - w * 0.98, top - r * 0.14, x - w * 0.36, top - r * 0.16);
-  ctx.lineTo(x + w * 0.36, top - r * 0.16);
-  ctx.quadraticCurveTo(x + w * 0.98, top - r * 0.14, x + w, top + r * 0.4);
-  ctx.lineTo(x + w * 0.94, cheek);
-  ctx.lineTo(x + w * 0.44, cheek + r * 0.26);
-  ctx.lineTo(x + w * 0.4, cheek + r * 0.82);
-  ctx.lineTo(x - w * 0.4, cheek + r * 0.82);
-  ctx.lineTo(x - w * 0.44, cheek + r * 0.26);
-  ctx.lineTo(x - w * 0.94, cheek);
+  ctx.moveTo(cx - r, top + r * 0.42);
+  ctx.quadraticCurveTo(cx - r, top - r * 0.16, cx - r * 0.34, top - r * 0.16);
+  ctx.lineTo(cx + r * 0.34, top - r * 0.16);
+  ctx.quadraticCurveTo(cx + r, top - r * 0.16, cx + r, top + r * 0.42);
+  ctx.lineTo(cx + r * 0.92, cheek);
+  ctx.lineTo(cx + r * 0.42, cheek + (bottom - cheek) * 0.3);
+  ctx.lineTo(cx + r * 0.38, bottom);
+  ctx.lineTo(cx - r * 0.38, bottom);
+  ctx.lineTo(cx - r * 0.42, cheek + (bottom - cheek) * 0.3);
+  ctx.lineTo(cx - r * 0.92, cheek);
   ctx.closePath();
-
   ctx.fill();
 
-  // ---- the voids, punched back out to the sky
-  //
-  // Punched rather than filled dark, so the holes read against whatever is behind
-  // the ship instead of against an assumption about it. Two sockets, one nose,
-  // one jaw gap — and nothing else, because a tooth row at this size is a smudge.
-  ctx.globalCompositeOperation = 'destination-out';
-  const sy = y - r * 0.2;
+  ctx.fillStyle = plate;
+  const sy = top + r * 0.62;
   for (const d of [-1, 1] as const) {
-    const sx = x + d * r * 0.47;
+    const sx = cx + d * r * 0.44;
     ctx.beginPath();
-    ctx.moveTo(sx - d * r * 0.25, sy - r * 0.3);
-    ctx.lineTo(sx + d * r * 0.24, sy - r * 0.1);
-    ctx.lineTo(sx + d * r * 0.16, sy + r * 0.26);
-    ctx.lineTo(sx - d * r * 0.22, sy + r * 0.22);
+    ctx.moveTo(sx - d * r * 0.28, sy - r * 0.3);
+    ctx.lineTo(sx + d * r * 0.26, sy - r * 0.06);
+    ctx.lineTo(sx + d * r * 0.17, sy + r * 0.34);
+    ctx.lineTo(sx - d * r * 0.25, sy + r * 0.28);
     ctx.closePath();
     ctx.fill();
   }
-  ctx.beginPath();
-  ctx.moveTo(x, y + r * 0.16);
-  ctx.lineTo(x + r * 0.15, y + r * 0.44);
-  ctx.lineTo(x - r * 0.15, y + r * 0.44);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillRect(x - r * 0.08, cheek + r * 0.34, r * 0.16, r * 0.48);
-  ctx.globalCompositeOperation = 'source-over';
 }
 
 /**
@@ -242,37 +156,45 @@ export interface Doom {
 }
 
 /**
- * Draw the skull, if one is owed.
+ * The word beside the skull.
+ *
+ * MEASURED BEFORE IT WAS CHOSEN, because the obvious words all overclaim. The
+ * condition is "no single press-and-hold from here turns the ship away" — it does
+ * not consider releasing and grabbing a DIFFERENT body, which is a real escape
+ * the player has and the projection never tries. So the light is a strong
+ * prediction rather than a fact.
+ *
+ * How strong: over the corpus the drifting half is followed by an out-of-bounds
+ * ending 95% of the time, and the captured half 134 times out of 135. `DOOMED` is
+ * fair at those odds — the word does not mean certainty in ordinary use — where
+ * `LOST` would both claim more and simply repeat the ending notice, which already
+ * says `LOST — BURNED UP` two thirds of the time.
+ */
+const DOOM_WORD = 'DOOMED';
+
+/**
+ * The doom light, or null when none is owed.
  *
  * A pure function of its arguments — it holds no state, because the only thing it
  * would have to remember is a phase, and `age` already carries one from a clock
- * that stops when the game does. `fuel-warning.ts` keeps state because it counts
- * pulses from a transition it has to detect itself; this arrives resolved.
+ * that stops when the game does.
+ *
+ * NO LONGER DRAWS ITSELF. It used to place a mark at `OFFSET` design units on the
+ * "away from the boundary" axis, which is the same direction as the wake for
+ * every wall — so it was drawn over the ship's trail every single time. It is a
+ * row in `warnings.ts` now, and where a row goes is the panel's business.
  */
-export function drawVerdict(
-  ctx: CanvasRenderingContext2D,
-  cam: Camera,
-  rcfg: RenderConfig,
-  snap: RenderSnapshot,
-  doom: Doom | null,
-): void {
-  // Nothing during the ending hold: the `LOST — OFF COURSE` notice is the
-  // explanation from there, and a countdown that continues past the thing it was
-  // counting to is noise.
-  if (snap.ending.active) return;
-  if (!doom || doom.age < 0) return;
-
+export function doomLight(rcfg: RenderConfig, doom: Doom | null): WarningLight | null {
+  if (!doom || doom.age < 0) return null;
   const alpha = rcfg.doomAlpha * (0.45 + 0.55 * beat((doom.age % PULSE_SEC) / PULSE_SEC));
-
-  const s = cam.scale;
-  // Away from the boundary it is about to cross, so the mark never sits between
-  // the ship and the thing about to kill it: beside the ship at a side wall,
-  // below it at the ceiling.
-  const away = DOOM_AWAY[doom.wall];
-  const x = toScreenX(cam, snap.x + away.x * OFFSET);
-  const y = toScreenY(cam, snap.y + away.y * OFFSET);
-
-  ctx.save();
-  skull(ctx, x, y, rcfg.doomR * s, alpha);
-  ctx.restore();
+  if (alpha <= 0.004) return null;
+  return {
+    kind: 'doom',
+    alpha,
+    color: HAZARD_WARN,
+    word: DOOM_WORD,
+    glyphW: GLYPH_W,
+    glyph: (ctx, x, y, w, h, _s, plate) =>
+      skull(ctx, x, y, w, h, `rgb(${HAZARD[0]},${HAZARD[1]},${HAZARD[2]})`, plate),
+  };
 }

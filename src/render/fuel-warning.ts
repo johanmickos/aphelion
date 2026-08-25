@@ -19,9 +19,8 @@
  * `FUEL_RAMP`, so the badge and the gauge cannot drift apart.
  */
 import type { SimConfig } from '../sim/config.ts';
-import type { Camera } from './camera.ts';
-import { toScreenX, toScreenY } from './camera.ts';
 import { FUEL_LOW_FRAC, FUEL_RAMP } from './hud.ts';
+import type { WarningLight } from './warnings.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
 /** Yellow warns, red explains. */
@@ -49,21 +48,19 @@ const EMPTY_REARM = 0.5;
 const PULSES = 3;
 const PULSE_SEC = 0.36;
 
-/** Design units below the ship the badge sits at. */
-const DROP = 26;
-
 /**
- * Below, not above.
+ * The miniature gauge: the corner gauge, shrunk and drawn empty.
  *
- * Score popups rise from the ship at `SPAWN_LIFT` and keep rising, so anything
- * placed above it is in their lane — and a capture that runs the tank dry is
- * exactly the capture that is also raising a word. Two channels, two sides.
+ * Deliberately the same object rather than a new symbol to learn — the shape says
+ * "fuel", the colour says how bad, and the word says which.
+ *
+ * WHERE IT GOES IS NO LONGER HERE. It used to carry its own `DROP` below the ship
+ * and its own label metrics, with a note explaining that below is the only free
+ * direction because score popups rise straight up. That reasoning was right and
+ * has moved to `warnings.ts`, which now makes the decision once for every light
+ * instead of once per cue. `h` is gone with it: the panel sets the row height.
  */
-const GLYPH = { w: 9, h: 19, pills: 4, gap: 1.5, radius: 1.5 } as const;
-
-/** Gap between the glyph and its word, and the word's size, in design units. */
-const LABEL_GAP = 5;
-const LABEL_SIZE = 9;
+const GLYPH = { w: 9, pills: 4, gap: 1.5, radius: 1.5 } as const;
 
 interface Style {
   color: string;
@@ -179,65 +176,50 @@ export class FuelWarning {
   }
 
   /**
-   * Draw the badge under the ship.
+   * The light this badge is showing, or null when it is not flashing.
    *
-   * Anchored to the live ship position rather than to where the tank ran dry:
-   * this reports the state of the ship, and a marker left behind at speed reads
-   * as debris rather than as a warning.
+   * IT NO LONGER DRAWS ITSELF, and that is the point of the panel: where a
+   * warning goes, how wide its plate is and how its word is set are one decision
+   * made in one place, not a decision each cue makes again. What is left here is
+   * the only part that was ever this file's own — WHEN to warn, and what the
+   * miniature gauge looks like.
+   *
+   * Anchored to the live ship position rather than to where the tank ran dry —
+   * still true, and now `warnings.ts` is what anchors it: this reports the state
+   * of the ship, and a marker left behind at speed reads as debris rather than as
+   * a warning.
    */
-  draw(ctx: CanvasRenderingContext2D, cam: Camera, snap: RenderSnapshot): void {
-    if (this.kind === null) return;
+  light(): WarningLight | null {
+    if (this.kind === null) return null;
     const alpha = pulseAlpha(this.t);
-    if (alpha <= 0) return;
-
+    if (alpha <= 0) return null;
     const style = STYLE[this.kind];
-    const s = cam.scale;
-    const cx = toScreenX(cam, snap.x);
-    const cy = toScreenY(cam, snap.y + DROP);
-
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.font = `600 ${LABEL_SIZE * s}px ui-monospace, monospace`;
-
-    // Glyph and word are centred together, so the badge stays under the ship
-    // whichever word it is carrying.
-    const labelW = ctx.measureText(style.word).width;
-    const totalW = GLYPH.w * s + LABEL_GAP * s + labelW;
-    const gx = cx - totalW / 2;
-    const gy = cy - (GLYPH.h * s) / 2;
-
-    // A dark plate behind it: this lands over planets and starfield, and a thin
-    // outline alone disappears against a lit body.
-    ctx.fillStyle = 'rgba(0,0,0,.5)';
-    ctx.beginPath();
-    ctx.roundRect(gx - 4 * s, gy - 3 * s, totalW + 8 * s, GLYPH.h * s + 6 * s, 3 * s);
-    ctx.fill();
-
-    // The miniature gauge, drawn the way the real one is: pills that are lit or
-    // not, never a bar drawn part-height.
-    const slot = (GLYPH.h * s) / GLYPH.pills;
-    const pillH = slot - GLYPH.gap * s;
-    const bottom = gy + GLYPH.h * s;
-    for (let i = 0; i < GLYPH.pills; i++) {
-      ctx.globalAlpha = alpha * (i < style.lit ? 1 : 0.16);
-      ctx.fillStyle = style.color;
-      ctx.beginPath();
-      ctx.roundRect(gx, bottom - i * slot - pillH, GLYPH.w * s, pillH, GLYPH.radius * s);
-      ctx.fill();
-    }
-
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = style.color;
-    ctx.lineWidth = 1.4 * s;
-    ctx.strokeRect(gx, gy, GLYPH.w * s, GLYPH.h * s);
-
-    ctx.fillStyle = style.color;
-    ctx.fillText(style.word, gx + GLYPH.w * s + LABEL_GAP * s, cy);
-
-    ctx.globalAlpha = 1;
-    ctx.restore();
+    return {
+      kind: 'fuel',
+      alpha,
+      color: style.color,
+      word: style.word,
+      glyphW: GLYPH.w,
+      glyph: (ctx, x, y, w, h, s) => {
+        // The miniature gauge, drawn the way the real one is: pills that are lit
+        // or not, never a bar drawn part-height.
+        const slot = h / GLYPH.pills;
+        const pillH = slot - GLYPH.gap * s;
+        const bottom = y + h;
+        const was = ctx.globalAlpha;
+        for (let i = 0; i < GLYPH.pills; i++) {
+          ctx.globalAlpha = was * (i < style.lit ? 1 : 0.16);
+          ctx.fillStyle = style.color;
+          ctx.beginPath();
+          ctx.roundRect(x, bottom - i * slot - pillH, w, pillH, GLYPH.radius * s);
+          ctx.fill();
+        }
+        ctx.globalAlpha = was;
+        ctx.strokeStyle = style.color;
+        ctx.lineWidth = 1.4 * s;
+        ctx.strokeRect(x, y, w, h);
+      },
+    };
   }
 }
 
@@ -259,4 +241,4 @@ export function pulseAlpha(t: number): number {
   return 0;
 }
 
-export const FUEL_WARNING = { PULSES, PULSE_SEC, LOW_REARM_FRAC, EMPTY_REARM, DROP } as const;
+export const FUEL_WARNING = { PULSES, PULSE_SEC, LOW_REARM_FRAC, EMPTY_REARM } as const;

@@ -61,6 +61,8 @@ import { createScoreState } from '../src/score/score.ts';
 import type { ScoreState } from '../src/score/types.ts';
 import type { EndingReason } from '../src/sim/types.ts';
 import { drawEndingNotice } from '../src/render/overlays.ts';
+import { WARNING_ORDER, drawWarnings } from '../src/render/warnings.ts';
+import { doomLight } from '../src/render/verdict.ts';
 import { orbitRadius } from '../src/sim/orbit.ts';
 import { Trail } from '../src/render/ship.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
@@ -1622,7 +1624,12 @@ describe('scene', () => {
         .length,
       'the deadline leaves nothing behind once the cross is passed',
     ).toBe(0);
-    expect(deadlineFills(), 'but the skull has taken over — the run is fated').toBeGreaterThan(0);
+    // The skull now speaks in the panel below the ship, which is a different
+    // shape of red: an opaque fill on a plate rather than an alpha-blended mark.
+    const scenered = r.ops.filter(
+      (op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgb(255,70,90'),
+    ).length;
+    expect(scenered, 'but the skull has taken over — the run is fated').toBeGreaterThan(0);
   });
 
   it('leaves a brief confirm where a press landed, and nothing where one did not', () => {
@@ -1806,10 +1813,17 @@ describe('scene', () => {
     expect(spanOf(deadline!.flight)).toBeCloseTo(spanOf(huge), 6);
   });
 
-  it('shows the skull only when a press was made past the last chance', () => {
-    // Measured: a press past the cross is fatal 94% of the time and precedes 43%
-    // of deaths by a median 0.85s. It is drawn on the side AWAY from the wall, so
-    // it never sits over the hazard gradient or the receding deadline.
+  it('shows the skull in the panel, in the same place whatever wall it is', () => {
+    // THIS PIN IS INVERTED FROM WHAT IT WAS. The skull used to be placed on the
+    // "away from the boundary" axis, and asserted to sit left of the ship at the
+    // right wall, right of it at the left wall, and below it at the ceiling.
+    //
+    // Every one of those is the same direction as the WAKE — a ship heading at a
+    // wall trails behind it, which is exactly "away from the wall" — so the mark
+    // was drawn over the ship's own trail every single time rather than
+    // occasionally. Reported as "it often overlaps with the ship trail".
+    //
+    // It is a row in the warning panel now, so the wall does not move it at all.
     const state = createInitialState(DEFAULT_CONFIG);
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
     const c = createCamera(rcfg);
@@ -1832,53 +1846,30 @@ describe('scene', () => {
         frameDt: 1 / 60,
         score: { ...createScoreState(), ...verdict },
       });
-      const xs: number[] = [];
-      const ys: number[] = [];
-      let skull = false;
-      let inside = false;
-      for (const op of r.ops) {
-        // The skull is the only thing in the scene that punches holes back out.
-        if (op[0] === '=globalCompositeOperation' && op[1] === 'destination-out') {
-          skull = true;
-          inside = true;
-        }
-        // ...and `drawVerdict` restores immediately after it. The window has to
-        // close, or every ellipse the rest of the frame draws lands in `ys` and
-        // the glyph's centre becomes the centre of whatever else was on screen.
-        if (inside && op[0] === 'restore') inside = false;
-        if (inside && (op[0] === 'ellipse' || op[0] === 'fillRect' || op[0] === 'lineTo')) {
-          xs.push(op[1] as number);
-          ys.push(op[2] as number);
-        }
-      }
-      // The glyph's own centre, so an assertion about where it SITS is not really
-      // an assertion about how wide a skull is.
-      const mid = (v: number[]) => (Math.min(...v) + Math.max(...v)) / 2;
-      return { skull, xs, ys, cx: mid(xs), cy: mid(ys) };
+      const words = (r.calls('fillText') as Array<[string, string, number, number]>).filter(
+        (o) => o[1] === 'DOOMED',
+      );
+      return { skull: words.length > 0, x: words[0]?.[2] ?? NaN, y: words[0]?.[3] ?? NaN };
     };
 
     expect(drawWith({}).skull, 'nothing is drawn when nothing is owed').toBe(false);
 
     const right = drawWith({ doomed: { wall: 'right', tick: snap.tick } });
-    expect(right.skull, 'the skull is drawn when a press was too late').toBe(true);
     const left = drawWith({ doomed: { wall: 'left', tick: snap.tick } });
-    expect(left.skull).toBe(true);
     const top = drawWith({ doomed: { wall: 'top', tick: snap.tick } });
+    expect(right.skull, 'the skull is drawn when a press was too late').toBe(true);
+    expect(left.skull).toBe(true);
     expect(top.skull, 'including at the ceiling').toBe(true);
 
-    // Away from the wall: heading at the RIGHT wall puts it left of the ship.
-    const shipX = toScreenX(c, snap.x);
-    expect(Math.min(...right.xs), 'right wall -> skull sits left of the ship').toBeLessThan(shipX);
-    expect(Math.max(...left.xs), 'left wall -> skull sits right of the ship').toBeGreaterThan(
-      shipX,
-    );
-
-    // And the ceiling flees on the other axis, which the old `-side * OFFSET`
-    // could not express: the skull sits BELOW the ship, never between it and the
-    // line it is about to cross, and is not displaced sideways at all.
+    // Below the ship, which is the one direction the wake, the popups, the wall
+    // and the deadline's track have all left free.
     const shipY = toScreenY(c, snap.y);
-    expect(top.cy, 'ceiling -> skull sits below the ship').toBeGreaterThan(shipY);
-    expect(top.cx, 'ceiling -> and stays over it').toBeCloseTo(shipX, 6);
+    expect(top.y, 'it sits below the ship').toBeGreaterThan(shipY);
+
+    // And the wall no longer displaces it. That is the fix: one place to look.
+    expect(left.x, 'left and right walls put it in the same place').toBeCloseTo(right.x, 6);
+    expect(top.x, 'and so does the ceiling').toBeCloseTo(right.x, 6);
+    expect(left.y).toBeCloseTo(right.y, 6);
   });
 
   it('confirms a late press more strongly than an early one', () => {
@@ -2432,6 +2423,91 @@ describe('HUD', () => {
       expect(x + w).toBeLessThanOrEqual(winR + 1e-6);
     }
     expect((r.calls('fillText') as Array<[string, string]>).some((o) => o[1] === '42')).toBe(true);
+  });
+});
+
+describe('the warning panel', () => {
+  const panelCam = () => {
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    const state = createInitialState(DEFAULT_CONFIG);
+    centerCamera(c, 195, 300, fieldBounds(DEFAULT_CONFIG, state.bodies), null);
+    return c;
+  };
+  const shipSnap = (): RenderSnapshot => {
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 195, y: 300 });
+    return captureSnapshot(state, false, DEFAULT_CONFIG);
+  };
+  /**
+   * Where each row sits, read off its word's baseline.
+   *
+   * NOT off `roundRect`: the fuel glyph draws its four pills with rounded rects
+   * of its own, so counting those counts pills as rows. Every light in the panel
+   * carries a word, and a word is exactly one per row.
+   */
+  const rowTops = (r: ReturnType<typeof recordingContext>): number[] =>
+    (r.calls('fillText') as Array<[string, string, number, number]>).map((o) => o[3]);
+
+  it('puts the worse warning nearer the ship', () => {
+    // ORDER IS SEVERITY. Dying outranks running low, so the row a panicking
+    // player's eye reaches first is always the one that matters most.
+    expect(WARNING_ORDER.indexOf('doom')).toBeLessThan(WARNING_ORDER.indexOf('fuel'));
+
+    const fuel = new FuelWarning();
+    fuel.observe(shipSnap(), DEFAULT_CONFIG);
+    fuel.observe({ ...shipSnap(), fuel: 0 }, DEFAULT_CONFIG);
+    fuel.update(FUEL_WARNING.PULSE_SEC / 4);
+    const fuelLight = fuel.light();
+    expect(fuelLight, 'the fixture is meant to be flashing').not.toBeNull();
+    const doom = doomLight(rcfg, { wall: 'left', age: 0.1 })!;
+    expect(doom).not.toBeNull();
+
+    const c = panelCam();
+    const at = shipSnap();
+    const shipY = toScreenY(c, at.y);
+
+    // Both lit — the rare case, 1.8% of the time anything is lit at all.
+    const r = recordingContext();
+    drawWarnings(r.ctx, c, at, [fuelLight!, doom]);
+    const tops = rowTops(r);
+    expect(tops.length, 'two rows').toBe(2);
+    expect(tops[0], 'both are below the ship').toBeGreaterThan(shipY);
+    expect(tops[0], 'and doom is the nearer one, whatever order it was passed in').toBeLessThan(
+      tops[1]!,
+    );
+  });
+
+  it('gives a lone warning the good slot, whichever one it is', () => {
+    // FIRST-BEST, not reserved slots. Measured, two lights coincide for 3s in
+    // 71.8 minutes — so the common case gets the near row rather than having it
+    // held open for a light that is almost never there.
+    const c = panelCam();
+    const at = shipSnap();
+    const doom = doomLight(rcfg, { wall: 'left', age: 0.1 })!;
+
+    const r = recordingContext();
+    drawWarnings(r.ctx, c, at, [doom]);
+    const alone = rowTops(r);
+
+    const fuel = new FuelWarning();
+    fuel.observe(at, DEFAULT_CONFIG);
+    fuel.observe({ ...at, fuel: 0 }, DEFAULT_CONFIG);
+    fuel.update(FUEL_WARNING.PULSE_SEC / 4);
+    const r2 = recordingContext();
+    drawWarnings(r2.ctx, c, at, [fuel.light()!]);
+
+    expect(alone.length).toBe(1);
+    expect(rowTops(r2).length).toBe(1);
+    expect(rowTops(r2)[0], 'a lone fuel light sits exactly where a lone skull would').toBe(
+      alone[0],
+    );
+  });
+
+  it('draws nothing when nothing is lit', () => {
+    const r = recordingContext();
+    drawWarnings(r.ctx, panelCam(), shipSnap(), []);
+    expect(r.ops).toEqual([]);
   });
 });
 
@@ -3711,6 +3787,22 @@ describe('the fuel warning beside the ship', () => {
     expect(w.live()).toBe(null);
   });
 
+  /**
+   * The badge no longer draws itself — it hands a light to the panel, which owns
+   * where every ship-local warning goes. These pins are about the badge, so they
+   * go through the panel rather than around it: routing around would test a
+   * drawing path the game does not use.
+   */
+  const drawViaPanel = (
+    ctx: CanvasRenderingContext2D,
+    c: ReturnType<typeof cam>,
+    at: RenderSnapshot,
+    w: FuelWarning,
+  ): void => {
+    const l = w.light();
+    drawWarnings(ctx, c, at, l ? [l] : []);
+  };
+
   it('sits below the ship, clear of the lane the score popups rise through', () => {
     const w = new FuelWarning();
     const c = cam();
@@ -3719,7 +3811,7 @@ describe('the fuel warning beside the ship', () => {
     w.observe(at, sim);
     w.update(FUEL_WARNING.PULSE_SEC / 4); // past the attack ramp, which starts at zero
     const r = recordingContext();
-    w.draw(r.ctx, c, at);
+    drawViaPanel(r.ctx, c, at, w);
     const shipY = toScreenY(c, at.y);
     const ys = (r.calls('fillText') as Array<[string, string, number, number]>).map((o) => o[3]);
     expect(ys.length).toBeGreaterThan(0);
@@ -3732,7 +3824,7 @@ describe('the fuel warning beside the ship', () => {
       for (const f of fuels) w.observe(snap({ fuel: f }), sim);
       w.update(FUEL_WARNING.PULSE_SEC / 4);
       const r = recordingContext();
-      w.draw(r.ctx, cam(), snap({ x: 195, y: 0 }));
+      drawViaPanel(r.ctx, cam(), snap({ x: 195, y: 0 }), w);
       return (r.calls('=strokeStyle') as Array<[string, string]>).map((o) => o[1]);
     };
     expect(drawn([full, lowAt - 1])).toContain(FUEL_RAMP[3]);
@@ -3741,7 +3833,7 @@ describe('the fuel warning beside the ship', () => {
 
   it('draws nothing at all when there is no warning', () => {
     const r = recordingContext();
-    new FuelWarning().draw(r.ctx, cam(), snap());
+    drawViaPanel(r.ctx, cam(), snap(), new FuelWarning());
     expect(r.ops).toEqual([]);
   });
 

@@ -26,9 +26,11 @@ import { Nebula, OUTRO_SECS } from './nebula.ts';
 import type { CanvasFactory } from './nebula.ts';
 import { FuelWarning } from './fuel-warning.ts';
 import { Deadline } from './deadline.ts';
-import { drawVerdict } from './verdict.ts';
+import { doomLight } from './verdict.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
+import { drawWarnings } from './warnings.ts';
+import type { WarningLight } from './warnings.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash, drawFinishFlash } from './ceremony.ts';
 import type { Ceremony } from './ceremony.ts';
 import { CLEARED_SHEET, DEATH_SHEET, drawSheet } from './sheet.ts';
@@ -376,29 +378,29 @@ export class Scene {
     // nothing in the world should ever cover it.
     this.popups.draw(ctx, cam);
     // Under the ship, in the lane the rising popups leave clear.
-    this.fuelWarning.draw(ctx, cam, snap);
     // Beside the ship, on the side away from the wall — clear of the fuel badge
     // below it and of the popups above it. See `verdict.ts`.
-    // ---- resolve the skull's two disjoint sources into one
+    // ---- the warning panel: every ship-local light, in one place
     //
-    // Drifting, the deadline knows; captured, the scorer does. They cannot both
-    // be true — `rescueDeadline` returns null during a capture, and `doomed` is
-    // armed only at the start of one — so this is one meaning in two states
-    // rather than a priority between two opinions. Resolving it here leaves
-    // `drawVerdict` with a single input and no idea either source exists.
+    // The skull's two sources are resolved here. Drifting, the deadline knows;
+    // captured, the scorer does. They cannot both be true — `rescueDeadline`
+    // returns null during a capture, and `doomed` is armed only at the start of
+    // one — so this is one meaning in two states rather than a priority between
+    // two opinions, and `doomLight` never learns either source exists.
     const fated = this.deadline.fated;
     const doomed = opts.score.doomed;
-    drawVerdict(
-      ctx,
-      cam,
-      render,
-      snap,
-      fated
-        ? { wall: fated.wall, age: fated.age }
-        : doomed
-          ? { wall: doomed.wall, age: (snap.tick - doomed.tick) * render.verdictTickSecs }
-          : null,
-    );
+    const doom = fated
+      ? { wall: fated.wall, age: fated.age }
+      : doomed
+        ? { wall: doomed.wall, age: (snap.tick - doomed.tick) * render.verdictTickSecs }
+        : null;
+    // Nothing during the ending hold: the notice is the explanation from there,
+    // and a warning that outlives the thing it was warning about is noise.
+    const lights = [
+      snap.ending.active ? null : doomLight(render, doom),
+      this.fuelWarning.light(),
+    ].filter((l): l is WarningLight => l !== null);
+    drawWarnings(ctx, cam, snap, lights);
 
     drawEdgeMarkers(
       ctx,
