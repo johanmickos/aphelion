@@ -10,10 +10,15 @@
  * the outcome the instant it resolves spends the two seconds the game is at its
  * most tense.
  *
- * What replaced the praise is not a label at all: the CROSS ITSELF brightens and
- * thickens as the ship closes on it, the way the compass rings do as the sweep
- * lines up. See `src/render/deadline.ts`. An instrument reacting is worth more than a
- * word about the instrument.
+ * What replaced the praise is not a label at all: the DEADLINE'S OWN DOT lifts
+ * where the press landed, brighter the closer to the cross it was. See
+ * `src/render/deadline.ts`. An instrument reacting is worth more than a word
+ * about the instrument.
+ *
+ * It used to brighten continuously as the ship closed, the way the compass rings
+ * do as the sweep lines up, and that was cut: the track is anchored to the ship,
+ * so its length already says how close you are, and a second channel restating
+ * the first is how an instrument turns back into a smear.
  *
  * So the slot says only the thing nothing else can: a death that has not happened
  * yet. There is no award for being doomed.
@@ -26,9 +31,11 @@
  * points do not — whether you are still alive — and they say it at the ship
  * rather than on the score.
  *
- * ON THE SIDE AWAY FROM THE BOUNDARY, so none of them draws over the hazard gradient
- * or the receding deadline — both red, both already in that space — and so the mark
- * sits where an escape would be.
+ * ON THE SIDE AWAY FROM THE BOUNDARY, so none of them draws over the hazard
+ * gradient or the deadline's track — both red, both already in that space — and
+ * so the mark sits where an escape would be. The deadline no longer leaves
+ * anything receding behind the ship, but the track ahead of it is still there and
+ * still in the way.
  */
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';

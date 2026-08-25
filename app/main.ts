@@ -22,12 +22,7 @@ import { Scene } from '../src/render/scene.ts';
 import { createAttractLoop, drawAttractLoop } from '../src/render/attract.ts';
 import { captureSnapshot, lerpSnapshot } from '../src/render/snapshot.ts';
 import { RunRecorder } from '../src/app/recorder.ts';
-import {
-  DEFAULT_SCORE_CONFIG,
-  createScoreState,
-  previewBurn,
-  scoreTick,
-} from '../src/score/index.ts';
+import { createScoreState, scoreTick } from '../src/score/index.ts';
 import { buildReport, serializeReport, summarize } from '../src/app/report.ts';
 
 /**
@@ -336,8 +331,6 @@ let deadlineSkip = DEADLINE_EVERY;
 let deadlineAge = DEADLINE_RECOMPUTE;
 let deadlineCache: ReturnType<typeof rescueDeadline> = null;
 let deadlineWasCaptured = false;
-/** Tick the running capture began on, for the tap test. */
-let captureStart = 0;
 
 /**
  * A results sheet is up and the run is waiting on a tap.
@@ -450,14 +443,6 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
 
     const wasCaptured = state.capture !== null;
     stepSim(state, sim, input, dt);
-    // How long this capture has run, for the tap test below.
-    if (!wasCaptured && state.capture) captureStart = state.tick;
-    // A press too brief to have been a decision leaves no mark behind. Before the
-    // deadline is next observed, so the mark is taken away rather than handed to the
-    // ghost slot to fade — see `RenderConfig.deadlineTapSecs`.
-    if (wasCaptured && !state.capture && (state.tick - captureStart) * dt <= rcfg.deadlineTapSecs) {
-      scene.deadline.dropMark();
-    }
     // A new capture begins, so the previous one's receipt is finished and the
     // awards raised below open a fresh one. Before `scoreTick`, deliberately: a
     // grab landing on this very tick belongs to the capture that just started.
@@ -538,9 +523,9 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // `src/sim/rescue.ts` — and it is a property of a straight drift, so asking
     // faster than it can change buys nothing but heat.
     //
-    // Skipped entirely during the ending hold, which freezes the mark where it
-    // was: the receding cross is the explanation of the death being shown, and
-    // an explanation must not fade out behind the notice it belongs to.
+    // Skipped entirely during the ending hold. Nothing is left on screen to
+    // freeze any more — the mark goes the moment its question is answered — but
+    // recomputing a projection for a run that has ended is pure waste.
     // A capture starting or ending is the one thing that invalidates a projection,
     // because it is the one thing that changes the ship's velocity.
     const capturedNow = state.capture !== null;
@@ -562,17 +547,12 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
         deadlineCache = rescueDeadline(state, sim, dt);
         deadlineAge = 0;
       }
-      const deadline = deadlineCache;
-      // How much fire the ship would fly into if the press were made at the
-      // cross. The predictor hands back the flight and the scorer prices it,
-      // because `src/sim/` may not know what a point is. Deliberately NOT the
-      // payout — it runs out at the turn-away and the real burn is a median 2.21x
-      // it — and it is never shown as a number, only as how big the mark draws.
-      // See `previewBurn`.
-      const prize = deadline
-        ? previewBurn(deadline.flight, field, state.bodies, DEFAULT_SCORE_CONFIG, dt)
-        : 0;
-      scene.deadline.observe(deadline, prize, rcfg, elapsed);
+      // Whether the ship is captured is passed rather than inferred from a null
+      // deadline. The renderer needs to tell a press apart from a threat that
+      // simply stopped being one — only the first earns a confirm — and reading
+      // "null means captured" was right most of the time and silently wrong for
+      // a drift that curves away on its own.
+      scene.deadline.observe(deadlineCache, capturedNow, rcfg, elapsed);
       deadlineSkip = 0;
     }
 

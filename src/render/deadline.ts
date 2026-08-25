@@ -1,37 +1,45 @@
 /**
  * The deadline: where the last press that still saves you would have to happen.
  *
- * A spindle lying along the ship's own projected path, crossed at the point of no
- * return, every tip tapering to nothing. Drawn on the thing it describes, like
- * the compass and the orbit arc — the playtest of 2026-08-22 named that as the
- * strongest UI in the game and the bar the rest should be measured against.
+ * A track lying along the ship's own projected path, thickening into a dot at the
+ * point of no return. Drawn on the thing it describes, like the compass and the
+ * orbit arc — the playtest of 2026-08-22 named that as the strongest UI in the
+ * game and the bar the rest should be measured against.
  *
- * WHAT IT IS FOR, measured before it was drawn. Over the 62 recordings, a
- * drifting ship that dies at a side wall has been drifting a median 0.85s, and a
- * live cross is ahead of it for a median 0.13s of that — 40% of those deaths
- * never had one at all. So this is NOT a rescue prompt: the fatal decision was
- * the release, and by the time the ship is drifting it is usually already made.
+ * WHAT IT IS FOR, re-measured over all 64 recordings in `diagnostics/` on
+ * 2026-08-25. A drifting ship is not being offered a rescue: of 196 out-of-bounds
+ * deaths, only 63 ever had a live cross at all, so 68% of them were never in a
+ * position for this cue to say anything. It is NOT a rescue prompt.
  *
- * It is a RISK DIAL. 41% of crosses sit inside the 60px red band and the median
- * one is 90px from the lethal line, while `edgeHeat` pays only for time spent
- * captured inside that band — so the latest legal grab is also the longest,
- * hottest burn. The cross marks the maximum of the curve the burn already pays
- * out on, and the whole point is to be able to aim at it.
+ * It is a RISK DIAL. `edgeHeat` pays only for time spent CAPTURED inside the 60px
+ * band, so the latest legal grab is also the longest, hottest burn. The cross
+ * marks the maximum of the curve the burn already pays out on, and the whole
+ * point is to be able to aim at it. The reward for aiming well is not paid here
+ * and does not depend on this drawing: `burnBank` integrates depth over the run
+ * and `awardBurn` pays it when the fire dies, whether or not a mark was ever on
+ * screen. See `src/score/burn.ts`.
  *
- * And on the deaths it cannot prevent, the mark that stays behind is the payoff.
- * The ship flies past its own last chance and the cross recedes, which says the
- * release was the mistake — a truer lesson than a warning could have given, and
- * an answer to the playtest's worst moment, where a run ended with full fuel and
- * two planets on screen and the failure read as arbitrary.
+ * WHY NOTHING IS LEFT BEHIND. This used to leave a fading mark — a "scar", which
+ * is what the file was called — on the theory that a cross receding behind the
+ * ship said "the release was the mistake". Two things killed it. The author's:
+ * "I don't love the scars being left after all; they're cluttering the space."
+ * And the measurement: the residue could only ever appear on the 32% of
+ * out-of-bounds deaths that had a cross, so the arbitrary-death complaint it was
+ * built to answer went unanswered in the majority case regardless. That lesson
+ * moved to the debrief, which fires on all 196.
  *
- * WHY IT IS RED AND NOT THE FIRE'S RED. `HAZARD` is the hazard band's own
- * colour, and the deadline is a fact about that band. Note 51 spent three passes
- * establishing that `BURN` MEANS "this is about burning"; borrowing it here
- * would promise a fire that has not started. Both live in `palette.ts` now, which
- * this paragraph is the reason for: the agreement it describes was only ever
- * written down here, in prose, about a number typed out in four other files. The deadline separates from the wall by
- * FORM instead — the wall is straight, dashed and vertical, this is a lens lying
- * along your own path — which is the channel that was free.
+ * WHAT IT COSTS TO BE BRIEF. Split by outcome over 640 cross episodes: 74% end
+ * because the player PRESSED (median 0.50s on screen, 1.77s of lead), 24% because
+ * the ship passed the cross, 1% in death, 1% evaporated. So the cue is short-lived
+ * because it works, not because it flickers — and the confirm below is therefore
+ * the most important thing it draws.
+ *
+ * WHY IT IS RED AND NOT THE FIRE'S RED. `HAZARD` is the hazard band's own colour,
+ * and the deadline is a fact about that band. Note 51 spent three passes
+ * establishing that `BURN` MEANS "this is about burning"; borrowing it here would
+ * promise a fire that has not started. Both live in `palette.ts`. The deadline
+ * separates from the wall by FORM instead — the wall is straight, dashed and
+ * vertical, this lies along your own path — which is the channel that was free.
  */
 import type { RescueDeadline, DeadlineSample } from '../sim/rescue.ts';
 import { hypot } from '../sim/orbit.ts';
@@ -44,39 +52,34 @@ import { HAZARD, withAlpha } from './palette.ts';
 interface Mark {
   x: number;
   y: number;
-  /** Unit heading the path had at the cross; the arm lies along it. */
+  /** Unit heading the path had at the cross; the dot's core is oriented by it. */
   dx: number;
   dy: number;
-  /** Seconds since the ship passed it. Negative while it is still ahead. */
-  age: number;
+  /** Seconds until the ship reaches it. Negative once it is behind. */
+  lead: number;
   /** Seconds since this mark appeared, so nothing ever pops into existence. */
   born: number;
+}
+
+/**
+ * The confirm: what is left on screen after a press, and nothing else is.
+ *
+ * Separate from `Mark` because it outlives one — the mark is dropped the instant
+ * the question it asked is answered, and this is the answer.
+ */
+interface Confirm {
+  x: number;
+  y: number;
+  /** Seconds since the press. */
+  age: number;
   /**
-   * How close to the cross the press that ended this mark was, 0..1, or 0 if it
-   * was not ended by a press at all.
+   * How close to the cross the press was, 0..1.
    *
-   * Frozen at the moment of the press and read for the rest of the mark's life,
-   * which is what makes the glow a reward rather than an ambience: it says "you
-   * pressed there", and a mark the ship merely drifted past never lights.
+   * Frozen at the press, which is what makes this a reward rather than an
+   * ambience: it says "you pressed THERE". A mark the ship merely drifted past
+   * never produces a confirm at all.
    */
-  glow: number;
-  /**
-   * Seconds this mark's fade-out runs for.
-   *
-   * Per-mark rather than a constant, because the two kinds want opposite things:
-   * the mark left behind at a death is explaining the death and wants the long
-   * fade, and a mark displaced by a fresher answer is stale the moment it is
-   * replaced. See `RenderConfig.deadlineGhostSecs`.
-   */
-  fade: number;
-  /**
-   * How big the mark draws, as a multiple of its configured size.
-   *
-   * Set from the fire waiting at the cross. Carried on the mark rather than
-   * recomputed at draw time so a ghost keeps the size it had when it was
-   * abandoned — it is a record of what was on offer then, not a live reading.
-   */
-  scale: number;
+  strength: number;
 }
 
 function clamp01(v: number): number {
@@ -89,31 +92,13 @@ function smoothstep(u: number): number {
 }
 
 /**
- * Half-width of the arm at `u` of its LENGTH, peaking at `uc`.
- *
- * Parameterised by distance and not by time, deliberately: the stub past the
- * cross is a fixed number of pixels, so a time-based `u` would make the shape
- * change proportions with the ship's speed.
- *
- * The peak sits ON the cross rather than in the middle of the shape, so the
- * spindle thickens as it approaches the mark and the eye is carried to it. The
- * 0.6 exponent is what sharpens the ends into points instead of leaving them
- * rounded — a sine alone tapers too politely to read as a deadline.
- */
-function armWidth(u: number, uc: number, peak: number): number {
-  const half =
-    uc <= 0 ? 1 : uc >= 1 ? 0 : u <= uc ? (u / uc) * 0.5 : 0.5 + ((u - uc) / (1 - uc)) * 0.5;
-  return peak * Math.pow(Math.sin(Math.PI * half), 0.6);
-}
-
-/**
- * A tapered spindle through a polyline, one quad per segment.
+ * A variable-width ribbon through a polyline, one quad per segment.
  *
  * Per-segment rather than as a single polygon because each segment carries its
  * own alpha: over a stretch where a press would be refused the shape dims rather
- * than disappearing, so a holed approach still reads as one deadline.
+ * than disappearing, so a holed approach still reads as one track.
  */
-function spindle(
+function ribbon(
   ctx: CanvasRenderingContext2D,
   pts: ReadonlyArray<{ x: number; y: number; w: number; a: number }>,
 ): void {
@@ -139,83 +124,53 @@ function spindle(
   }
 }
 
-/** A straight spindle between two world points, tapering to a point at each end. */
-function bar(
-  ctx: CanvasRenderingContext2D,
-  cam: Camera,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  peak: number,
-  alpha: number,
-): void {
-  const N = 12;
-  const pts: Array<{ x: number; y: number; w: number; a: number }> = [];
-  for (let i = 0; i <= N; i++) {
-    const u = i / N;
-    pts.push({
-      x: toScreenX(cam, x0 + (x1 - x0) * u),
-      y: toScreenY(cam, y0 + (y1 - y0) * u),
-      w: peak * cam.scale * Math.pow(Math.sin(Math.PI * u), 0.6),
-      a: alpha,
-    });
-  }
-  spindle(ctx, pts);
-}
-
 export class Deadline {
-  /**
-   * Where the mark is DRAWN. Chases `target`, and is never the prediction itself.
-   */
+  /** Where the mark is DRAWN. Chases `target`, and is never the prediction itself. */
   private mark: Mark | null = null;
 
-  /** Where the prediction currently says the cross is, and how big it is worth. */
-  private target: { x: number; y: number; dx: number; dy: number; scale: number } | null = null;
+  /** Where the prediction currently says the cross is. */
+  private target: { x: number; y: number; dx: number; dy: number } | null = null;
 
-  /**
-   * A mark that has been abandoned, fading where it stood.
-   *
-   * One slot, because there is only ever one thing to let go of: the mark from
-   * before the last interruption.
-   */
-  private ghost: Mark | null = null;
+  /** The answer to the last mark, if it was answered by a press. */
+  private confirm: Confirm | null = null;
 
-  /** The path behind the current mark, ship-first. Empty once the cross is passed. */
+  /** The path behind the current mark, ship-first. */
   private path: DeadlineSample[] = [];
-
-  /** Seconds to the cross at the last observation, for the fade-in ramp. */
-  private lead = Infinity;
 
   /**
    * Take the latest prediction.
    *
    * Called on the simulation tick and not every frame: the answer is a property
-   * of a straight drift, so recomputing it faster than it can change buys
-   * nothing but heat. `dt` is the time since the last call.
+   * of a straight drift, so recomputing it faster than it can change buys nothing
+   * but heat. `dt` is the time since the last call.
+   *
+   * `captured` is passed rather than inferred. A null `deadline` used to be read
+   * as "the ship must have been captured, so a press happened", which is true
+   * most of the time and silently wrong when a drift simply stops threatening a
+   * wall — that case would have fired a confirm for a press nobody made.
    */
-  observe(deadline: RescueDeadline | null, prize: number, rcfg: RenderConfig, dt: number): void {
-    if (this.ghost) {
-      this.ghost.age += dt;
-      this.ghost.born += dt;
-      if (this.ghost.age >= this.ghost.fade) this.ghost = null;
+  observe(
+    deadline: RescueDeadline | null,
+    captured: boolean,
+    rcfg: RenderConfig,
+    dt: number,
+  ): void {
+    if (this.confirm) {
+      this.confirm.age += dt;
+      if (this.confirm.age >= rcfg.deadlineConfirmSecs) this.confirm = null;
     }
 
     if (deadline?.cross) {
       const c = deadline.cross;
       // Only as far as the cross. The heading comes from the end of THAT, not
       // from the end of the projection: the path continues to the wall, and the
-      // arm must lie along the ship's heading where the mark is.
+      // mark must sit on the ship's heading where the cross is.
       const upto = deadline.path.filter((s) => s.t <= c.t);
       const n = upto.length;
-      // Two DISTINCT samples, or the heading collapses to nothing.
-      //
-      // Taking `upto[n - 1]` and `upto[n - 2]` reads well and is wrong at the one
-      // moment that matters: when the cross is inside the first sample there is
-      // only one entry, both ends resolve to it, and the heading comes out (0, 0)
-      // — so the crossbar has zero length and the whole mark silently disappears
-      // exactly as the ship arrives at it. Falling back to the projection's own
-      // first step keeps a direction whatever the filter left.
+      // Two DISTINCT samples, or the heading collapses to nothing. Taking
+      // `upto[n-1]` and `upto[n-2]` reads well and is wrong at the one moment
+      // that matters: when the cross is inside the first sample there is only one
+      // entry, both ends resolve to it, and the heading comes out (0, 0).
       const prev = n > 1 ? upto[n - 2]! : deadline.path[0]!;
       const last = n > 1 ? upto[n - 1]! : deadline.path[Math.min(1, deadline.path.length - 1)]!;
       let dx = last.x - prev.x;
@@ -224,94 +179,58 @@ export class Deadline {
       dx /= len;
       dy /= len;
 
-      // A MARK THAT HAS STARTED AGEING IS NOT MOVED, IT IS REPLACED.
+      // THE BIRTH GATE. A cross that appears with less lead than a person can
+      // react in cannot inform the press it is asking for, and with no residue it
+      // now leaves nothing behind either — so it would be a red blink and nothing
+      // else. Measured, the cohort this removes is real: the 24% of episodes the
+      // ship sails through appear with a median 0.27s of lead, against p10 = 0.22s
+      // over all episodes.
       //
-      // Reported as "the cross kind of jumped forward a few times". On the
-      // session that reported it the deadline was absent for 3.9s — a capture — and
-      // the cross that came back sat 456px from the one that went away, which the
-      // follower then dragged across the screen in three visible steps.
-      //
-      // Those are two different situations and there is nothing continuous
-      // between them, so the old mark is let go where it stands and a new one is
-      // born where the answer now is. Nothing slides across the field, and the
-      // distinction is a FACT — this mark has been interrupted — rather than a
-      // distance threshold that a mark could drift across.
-      // How much fire is waiting, mapped onto how big the mark draws. A prize
-      // above `deadlinePrizeFull` saturates rather than growing without limit: the top
-      // percentile of the measured distribution is three times its p90, and a mark
-      // that tracked it would be a smear across the screen.
-      const scale =
-        rcfg.deadlinePrizeMin +
-        (rcfg.deadlinePrizeMax - rcfg.deadlinePrizeMin) *
-          clamp01(prize / Math.max(1e-6, rcfg.deadlinePrizeFull));
+      // A BIRTH gate and not a live one. Once a mark exists it stays through its
+      // own arrival; re-testing every observation would blink it out at the
+      // moment the player is closest to it.
+      if (!this.mark && c.t < rcfg.deadlineMinLeadSecs) return;
 
-      if (!this.mark || this.mark.age >= 0) {
-        if (this.mark) {
-          const old = this.mark;
-          old.age = Math.max(0, old.age);
-          // Cut short, because something fresher has taken its place and only the
-          // most recent mark is about the decision in front of the player.
-          //
-          // RESCALED rather than jumped: the alpha comes from `age / fade`, so
-          // shrinking both together leaves the ghost exactly as bright as it was
-          // and only shortens what is left of it. Setting the age alone would
-          // blink it down to a tenth on the frame it was displaced.
-          if (old.fade > rcfg.deadlineGhostSecs) {
-            old.age *= rcfg.deadlineGhostSecs / old.fade;
-            old.fade = rcfg.deadlineGhostSecs;
-          }
-          this.ghost = old;
-        }
-        this.mark = {
-          x: c.x,
-          y: c.y,
-          dx,
-          dy,
-          age: -c.t,
-          born: 0,
-          scale,
-          glow: 0,
-          fade: rcfg.deadlineFadeOutSecs,
-        };
+      // A MARK THAT HAS BEEN PASSED IS NOT MOVED, IT IS REPLACED. Reported as
+      // "the cross kind of jumped forward a few times". On the session that
+      // reported it the cue was absent for 3.9s — a capture — and the cross that
+      // came back sat 456px from the one that went away, which the follower then
+      // dragged across the screen in three visible steps. There is nothing
+      // continuous between those two situations.
+      if (!this.mark || this.mark.lead <= 0) {
+        this.mark = { x: c.x, y: c.y, dx, dy, lead: c.t, born: 0 };
       } else {
-        this.mark.age = -c.t;
+        this.mark.lead = c.t;
       }
       // Uninterrupted, the mark eases toward this in `update`, per frame. Setting
       // it here and moving there is what stops the mark stepping at the 10Hz the
-      // prediction is recomputed at. The size rides along for the same reason: the
-      // prize changes as the ship moves, and a mark that resized in steps would
-      // flicker exactly where a mark that moved in steps used to jump.
-      this.target = { x: c.x, y: c.y, dx, dy, scale };
-      this.lead = c.t;
+      // prediction is recomputed at.
+      this.target = { x: c.x, y: c.y, dx, dy };
       this.path = upto;
       return;
     }
 
-    // Nothing to mark: the cross is behind us, or a grab has answered the
-    // question. Either way the mark stays where it was and starts ageing out.
-    //
-    // Ageing rather than clearing, deliberately. A tap is a capture, and a
-    // capture makes the prediction null for as long as it lasts — so a hard
-    // clear here made a rapid tap blink the mark out and back.
+    // Nothing to mark. Two cases, and they end very differently.
     if (this.mark) {
-      // WHICH of the two it is decides whether the mark glows, and the caller has
-      // already told us: a null deadline means the ship is captured, so a press
-      // happened; a deadline that still exists but has no cross left means the ship
-      // drifted past without pressing. The glow is for the press.
-      if (this.mark.age < 0) {
-        this.mark.glow = deadline
-          ? 0
-          : clamp01(1 - Math.max(0, this.lead) / Math.max(1e-6, rcfg.deadlineFullSecs));
+      if (captured) {
+        // A press. This is the only thing that survives the mark, and it is
+        // scaled by how close the press was to the cross — the reward for timing
+        // it late, in the one channel that can still be read after the fact.
+        this.confirm = {
+          x: this.mark.x,
+          y: this.mark.y,
+          age: 0,
+          strength: clamp01(
+            1 - Math.max(0, this.mark.lead) / Math.max(1e-6, rcfg.deadlineFullSecs),
+          ),
+        };
       }
-      if (this.mark.age < 0) this.mark.age = 0;
-      this.mark.age += dt;
-      // The arm is dropped even though the mark is not: it is anchored to the
-      // ship, and with no live cross ahead it would flip round to point backwards
-      // at something the ship can no longer reach.
-      this.path = [];
+      // Either way the mark goes NOW. Nothing recedes, nothing fades in place:
+      // the question is answered and the space belongs to the game again.
+      this.mark = null;
     }
     this.target = null;
-    this.lead = 0;
+    this.path = [];
   }
 
   /**
@@ -319,42 +238,24 @@ export class Deadline {
    *
    * Separated from `observe` because the two run at different rates and only one
    * of them is about smoothness. The prediction is recomputed ten times a second;
-   * easing there meant `dt * deadlineSettleRate` was 0.9, so the mark covered 90% of
-   * any correction in a single step and then sat still for a tenth of a second —
-   * a follower in name only, and visibly a series of jumps.
+   * easing there meant `dt * deadlineSettleRate` was 0.9, so the mark covered 90%
+   * of any correction in a single step and then sat still for a tenth of a second
+   * — a follower in name only, and visibly a series of jumps.
    */
   update(frameDt: number, rcfg: RenderConfig): void {
+    if (this.confirm) this.confirm.age += frameDt;
     const m = this.mark;
-    if (m) m.born += frameDt;
-    if (this.ghost) this.ghost.born += frameDt;
-    if (!m || !this.target) return;
+    if (!m) return;
+    m.born += frameDt;
+    if (!this.target) return;
     const k = 1 - Math.exp(-rcfg.deadlineSettleRate * frameDt);
     m.x += (this.target.x - m.x) * k;
     m.y += (this.target.y - m.y) * k;
     m.dx += (this.target.dx - m.dx) * k;
     m.dy += (this.target.dy - m.dy) * k;
-    m.scale += (this.target.scale - m.scale) * k;
     const dl = hypot(m.dx, m.dy) || 1;
     m.dx /= dl;
     m.dy /= dl;
-  }
-
-  /**
-   * Drop the mark outright, leaving no ghost.
-   *
-   * For a press too brief to have been a decision — see `RenderConfig.deadlineTapSecs`.
-   * A press hides the deadline and leaves the mark fading where the cross was, so a
-   * burst of taps leaves a burst of marks; this takes the mark away instead of
-   * handing it to the ghost slot to fade.
-   *
-   * The ghost is left alone. It belongs to an older mark, and a tap says nothing
-   * about that one.
-   */
-  dropMark(): void {
-    this.mark = null;
-    this.target = null;
-    this.path = [];
-    this.lead = Infinity;
   }
 
   /**
@@ -364,164 +265,138 @@ export class Deadline {
   clear(): void {
     this.mark = null;
     this.target = null;
-    this.ghost = null;
+    this.confirm = null;
     this.path = [];
-    this.lead = Infinity;
   }
 
   draw(ctx: CanvasRenderingContext2D, cam: Camera, rcfg: RenderConfig): void {
-    // The abandoned one first, so a live mark always draws over it.
-    if (this.ghost) this.drawMark(ctx, cam, rcfg, this.ghost, null);
-    if (this.mark) this.drawMark(ctx, cam, rcfg, this.mark, this.path);
+    if (this.confirm) this.drawConfirm(ctx, cam, rcfg, this.confirm);
+    if (this.mark) this.drawMark(ctx, cam, rcfg, this.mark);
   }
 
-  private drawMark(
+  /**
+   * The dot, and only the dot.
+   *
+   * No track: the track described a decision that is now made, and redrawing it
+   * would say the deadline is still ahead. No width term either — the shipped
+   * glow moved alpha AND width together, which was tuned for a mark that then sat
+   * fading for 1.6 seconds. At a quarter of a second that same peak lands as a
+   * blink, reported as "REALLY visually loud". Shortening the duration means the
+   * peak comes down, not stays put.
+   */
+  private drawConfirm(
     ctx: CanvasRenderingContext2D,
     cam: Camera,
     rcfg: RenderConfig,
-    m: Mark,
-    path: DeadlineSample[] | null,
+    c: Confirm,
   ): void {
-    // Fading out behind the ship, or ramping in ahead of it. Never both.
-    //
-    // Times a birth ramp, so a mark that is BORN close to the ship — where the
-    // lead ramp is already at full strength — arrives rather than appears. Same
-    // rate as the follower, because both answer "how fast does the deadline react to
-    // a change": one for where it is, one for whether it is there at all.
-    const born = 1 - Math.exp(-rcfg.deadlineSettleRate * m.born);
-
-    // THE GLOW IS PROXIMITY TIMES A PRESS, and both halves are load-bearing.
-    //
-    // The compass's own gesture — its rings run `(0.15 + 0.5 * align)` on alpha
-    // and `(2 + 2 * align)` on width, both rising together as the sweep lines up —
-    // but keyed to the press rather than to the approach. It rose continuously
-    // with proximity for one session and that was too much: it lit on every
-    // approach, including the ones the player was going to sail straight past, so
-    // it was ambience rather than an answer. Asked for as "maybe we can only make
-    // it glow if the user presses close to it? so the glow is proximity+press
-    // based".
-    //
-    // `m.glow` is frozen at the press, so a mark the ship drifted past never
-    // lights, and a press right on the cross lights it fully. It costs no
-    // threshold either way: how close is a number, not a category.
-    const peak = rcfg.deadlineAlpha + (rcfg.deadlineNearAlpha - rcfg.deadlineAlpha) * m.glow;
-
-    const alpha =
-      born *
-      (m.age >= 0
-        ? peak * (1 - smoothstep(m.age / Math.max(1e-6, m.fade)))
-        : peak *
-          (1 -
-            smoothstep(
-              (this.lead - rcfg.deadlineFullSecs) /
-                Math.max(1e-6, rcfg.deadlineFadeInSecs - rcfg.deadlineFullSecs),
-            )));
-    // Width rises with it, the compass's second half.
-    const weight = m.scale * (1 + (rcfg.deadlineNearWidth - 1) * m.glow);
+    const u = clamp01(c.age / Math.max(1e-6, rcfg.deadlineConfirmSecs));
+    const lift = (rcfg.deadlineConfirmAlpha - rcfg.deadlineAlpha) * c.strength;
+    const alpha = (rcfg.deadlineAlpha + lift) * (1 - smoothstep(u));
     if (alpha <= 0.004) return;
+    this.dot(ctx, cam, rcfg, c.x, c.y, alpha);
+  }
 
-    // Every length in the glyph moves together, so the mark grows as one thing
-    // rather than becoming a differently-proportioned mark.
-    const stub = rcfg.deadlineStubHalf * m.scale;
+  private dot(
+    ctx: CanvasRenderingContext2D,
+    cam: Camera,
+    rcfg: RenderConfig,
+    x: number,
+    y: number,
+    alpha: number,
+  ): void {
+    const sx = toScreenX(cam, x);
+    const sy = toScreenY(cam, y);
+    const s = cam.scale;
+    ctx.beginPath();
+    ctx.arc(sx, sy, rcfg.deadlineMarkerCoreR * s, 0, Math.PI * 2);
+    ctx.fillStyle = withAlpha(HAZARD, alpha);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(sx, sy, rcfg.deadlineMarkerR * s, 0, Math.PI * 2);
+    ctx.strokeStyle = withAlpha(HAZARD, alpha * 0.55);
+    ctx.lineWidth = Math.max(1, rcfg.deadlineMarkerRing * s);
+    ctx.stroke();
+  }
+
+  private drawMark(ctx: CanvasRenderingContext2D, cam: Camera, rcfg: RenderConfig, m: Mark): void {
+    // Ramping in ahead of the ship, times a birth ramp so a mark BORN close to
+    // the ship — where the lead ramp is already at full strength — arrives rather
+    // than appears. Same rate as the follower, because both answer "how fast does
+    // this react to a change": one for where it is, one for whether it is there.
+    const born = 1 - Math.exp(-rcfg.deadlineSettleRate * m.born);
+    const ramp =
+      m.lead <= rcfg.deadlineFullSecs
+        ? 1
+        : 1 -
+          smoothstep(
+            (m.lead - rcfg.deadlineFullSecs) /
+              Math.max(1e-6, rcfg.deadlineFadeInSecs - rcfg.deadlineFullSecs),
+          );
+    const base = rcfg.deadlineAlpha * born * ramp;
+    if (base <= 0.004) return;
 
     ctx.save();
 
-    // ---- the long arm, from the ship along its own projected path
-    if (path && path.length > 1) {
-      // Cumulative distance along the path, so the taper is a property of the
+    // ---- the track, from the ship along its own projected path
+    //
+    // FULL LENGTH, TAPERED, rather than clamped to a floating stub. The clamp it
+    // replaces was asked for as "if the projected line is really long, we should
+    // clamp it — there's no danger of going out of bounds yet", which is sound,
+    // but measured it did something else: the cross first appears a median 375px
+    // away and 772px at p75, so a 150px clamp drew a segment sitting a quarter of
+    // a screen ahead of the ship, touching nothing. It only genuinely emerged from
+    // the ship in the bottom quartile — which is the `passed` cohort, the episodes
+    // that arrive too late to matter.
+    //
+    // So the track always reaches the ship, and `deadlineArmMaxPx` now says where
+    // it stops being a hairline instead of where it stops existing. The far end
+    // carries the connection and nothing else; the weight is all in the stretch
+    // with a decision in it.
+    if (this.path.length > 1) {
+      // Distance to the cross, per sample, so the profile is a property of the
       // shape rather than of how fast the ship happens to be going.
-      const run: number[] = [0];
-      for (let i = 1; i < path.length; i++) {
-        const a = path[i - 1]!;
-        const b = path[i]!;
-        run.push(run[i - 1]! + hypot(b.x - a.x, b.y - a.y));
+      const n = this.path.length;
+      const toCross: number[] = new Array<number>(n);
+      toCross[n - 1] = 0;
+      for (let i = n - 2; i >= 0; i--) {
+        const a = this.path[i]!;
+        const b = this.path[i + 1]!;
+        toCross[i] = toCross[i + 1]! + hypot(b.x - a.x, b.y - a.y);
       }
 
-      // CLAMPED. Reported as "if the projected line is really long, we should
-      // clamp it — there's no danger of going out of bounds yet". Measured, the
-      // complaint is well founded: the cross sits a median 432px ahead and 1551px
-      // at p90, against a 390x844 design viewport, so an unclamped arm is
-      // routinely twice the height of the screen. Past a certain length it stops
-      // being a lead-in to a mark and becomes a line across the map.
-      //
-      // Clamped from the FRONT, so what survives is the stretch nearest the
-      // cross: the far end is the part with nothing to decide in it.
-      const first = (() => {
-        const total = run[run.length - 1]!;
-        if (total <= rcfg.deadlineArmMaxPx) return 0;
-        let i = 0;
-        while (i < run.length - 1 && total - run[i]! > rcfg.deadlineArmMaxPx) i++;
-        return i;
-      })();
-
+      const lead = rcfg.deadlineLeadLenPx;
+      const arm = Math.max(rcfg.deadlineArmMaxPx, lead + 1e-6);
       const pts: Array<{ x: number; y: number; w: number; a: number }> = [];
-      const base = run[first]!;
-      const total = run[run.length - 1]! - base;
-      // The mark is the peak, and the arm runs a stub past it so the shape reads
-      // as a cross rather than as a sword hilt.
-      const span = total + stub;
-      const uc = span > 0 ? total / span : 1;
-      for (let i = first; i < path.length; i++) {
-        const s = path[i]!;
+      for (let i = 0; i < n; i++) {
+        const s = this.path[i]!;
+        const d = toCross[i]!;
+        // hairline -> track, over the stretch between the two lengths
+        const h = smoothstep((arm - d) / (arm - lead));
+        const body = rcfg.deadlineHairFrac + (1 - rcfg.deadlineHairFrac) * h;
+        // track -> lead-in, over the final stretch
+        const g = d < lead ? 1 - d / lead : 0;
         pts.push({
           x: toScreenX(cam, s.x),
           y: toScreenY(cam, s.y),
-          w: armWidth(
-            span > 0 ? (run[i]! - base) / span : 0,
-            uc,
-            rcfg.deadlineArmWidth * cam.scale * weight,
-          ),
-          a: alpha * (s.live ? 1 : rcfg.deadlineDeadFrac),
+          w: (rcfg.deadlineTrackWidth + rcfg.deadlineLeadWidth * g) * cam.scale * body,
+          a:
+            base *
+            (rcfg.deadlineTrackAlpha + (rcfg.deadlineLeadAlpha - rcfg.deadlineTrackAlpha) * g) *
+            body *
+            (s.live ? 1 : rcfg.deadlineDeadFrac),
         });
       }
       // The path was computed against the cross the follower is still easing
       // toward, so its far end and the mark can be a few pixels apart mid-glide.
-      // Land the arm ON the mark, so the crossbar never sits off the end of it.
+      // Land the track ON the mark, so the dot never sits off the end of it.
       const tip = pts[pts.length - 1]!;
       tip.x = toScreenX(cam, m.x);
       tip.y = toScreenY(cam, m.y);
-      // The overshoot: past the cross nothing is live, so it is drawn at the dead
-      // strength and dies to a point. Faintness IS the statement.
-      const N = 5;
-      for (let i = 1; i <= N; i++) {
-        const u = i / N;
-        pts.push({
-          x: toScreenX(cam, m.x + m.dx * stub * u),
-          y: toScreenY(cam, m.y + m.dy * stub * u),
-          w: armWidth(uc + (1 - uc) * u, uc, rcfg.deadlineArmWidth * cam.scale * weight),
-          a: alpha * rcfg.deadlineDeadFrac,
-        });
-      }
-      spindle(ctx, pts);
-    } else {
-      // Passed: a short stub through the mark, so it stays a four-tipped cross
-      // once the ship is no longer attached to it.
-      bar(
-        ctx,
-        cam,
-        m.x - m.dx * stub,
-        m.y - m.dy * stub,
-        m.x + m.dx * stub,
-        m.y + m.dy * stub,
-        rcfg.deadlineArmWidth * weight,
-        alpha,
-      );
+      ribbon(ctx, pts);
     }
 
-    // ---- the crossbar
-    const px = -m.dy;
-    const py = m.dx;
-    const barHalf = rcfg.deadlineBarHalf * m.scale;
-    bar(
-      ctx,
-      cam,
-      m.x - px * barHalf,
-      m.y - py * barHalf,
-      m.x + px * barHalf,
-      m.y + py * barHalf,
-      rcfg.deadlineBarWidth * weight,
-      alpha,
-    );
+    this.dot(ctx, cam, rcfg, m.x, m.y, base * rcfg.deadlineLeadAlpha);
 
     ctx.restore();
   }

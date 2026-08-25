@@ -129,108 +129,130 @@ export interface RenderConfig {
 
   // --- the deadline: the point of no return ---
   /**
-   * Seconds-to-cross at which the deadline starts ghosting in, and at which it
+   * Seconds-to-cross at which the deadline starts fading in, and at which it
    * reaches full strength.
    *
-   * Measured, not chosen. Over 640 committed approaches in `diagnostics/`, the
-   * lead between the deadline becoming computable and the cross runs median 1.65s,
-   * p75 3.67s. Full strength at the median means the deadline is solid for at least
-   * half of every approach that has one; ghosting in at p75 means three
-   * approaches in four never see it appear out of nothing.
+   * MEASURED, NOT CHOSEN, and re-measured on 2026-08-25 because the old pair had
+   * quietly stopped being what they claimed. The rule is `deadlineFullSecs` = the
+   * median lead between the cue becoming computable and the cross, and
+   * `deadlineFadeInSecs` = p75 of the same. Over 640 cross episodes in all 64
+   * recordings that distribution is now median 1.32s, p75 2.63s — so the shipped
+   * 1.65 / 3.67 had drifted to p58 / p87 as the corpus grew, and the cue was
+   * appearing earlier and reaching full strength later than the rule says.
    *
-   * A ramp rather than a switch, for the reason `nearestBody` gives about cones:
-   * a threshold is a cliff, and a mark that pops into existence is not a deadline.
+   * Full strength at the median means the deadline is solid for at least half of
+   * every approach that has one; fading in at p75 means three approaches in four
+   * never see it appear out of nothing.
+   *
+   * These get re-derived, not nudged. A threshold calibrated on a stale feel is
+   * worse than an unmeasured one, because it looks defensible.
    */
   deadlineFadeInSecs: number;
   deadlineFullSecs: number;
   /**
-   * Seconds a passed cross takes to fade out, aged only while the run is live.
+   * Lead below which a cross is not drawn at all, in seconds.
    *
-   * Longer than it looks like it needs to be, deliberately. The cross sits a
-   * median 0.53s before the wall and p90 1.05s, so a fade shorter than that would
-   * finish before the death it is explaining — and explaining the death is the
-   * whole job of the mark that stays behind. Frozen during the ending hold for
-   * the same reason the popups freeze while paused: nothing should burn down
-   * behind the notice the player is reading.
+   * A BIRTH GATE: it decides whether a mark is ever born, never whether a living
+   * one survives. Testing it live would blink the mark out at the moment the ship
+   * is closest to it, which is the opposite of what it is for.
+   *
+   * The cohort it removes is real and measured. 24% of episodes end with the ship
+   * sailing through the cross, and those appear with a median 0.27s of lead —
+   * against p10 = 0.22s over all episodes. With no residue left behind, such a
+   * mark is a red blink with no time to inform anything and nothing to study
+   * afterwards.
+   *
+   * NOT A PERCENTILE. It is simple human reaction time: a cue that arrives with
+   * less lead than that cannot influence the press it exists to inform. The
+   * lesson for those runs lands in the debrief instead, where there is time to
+   * read it.
    */
-  deadlineFadeOutSecs: number;
+  deadlineMinLeadSecs: number;
   /**
-   * How long a DISPLACED mark gets instead, in seconds.
+   * The confirm after a press: peak alpha, and how long it lasts.
    *
-   * Reported as "we should fade old crosses a bit faster if the user taps more.
-   * The deadlines add clutter, and it's only the most recent one that matters." Both
-   * halves of that are right, and they pull in opposite directions on one number:
-   * the mark left behind at a death is the explanation of the death and wants the
-   * long fade, while a mark shoved aside by a fresh answer is stale the instant it
-   * is replaced.
+   * WHAT IT IS FOR. Split by outcome over 640 episodes, 74% of them end because
+   * the player pressed — so the press is the cue's normal ending, not an
+   * exception, and this is the only thing that ever tells the player their read
+   * was good. The lift is scaled by how close the press was to the cross, which
+   * is the reward for timing it late.
    *
-   * So the duration belongs to the MARK and not to the class. A mark keeps
-   * `deadlineFadeOutSecs` for as long as it is the current one, and is cut to this the
-   * moment another takes its place. Tapping through the band replaces marks fast,
-   * which is exactly when the clutter appears and exactly when this bites.
+   * MILD, DELIBERATELY. The glow this replaces reached 0.74 on alpha AND 1.15x on
+   * width, tuned for a mark that then sat fading for 1.6 seconds. At a quarter of
+   * a second the same peak lands as a blink — reported as "REALLY visually loud.
+   * It should be much milder" — so the duration coming down brought the peak down
+   * with it, and the width term went entirely. Two channels moving together is
+   * what made the old mark shout.
    *
-   * Applied as a rescale rather than a jump — see `Deadline.observe` — so a ghost
-   * carries on from the alpha it already had instead of blinking down to it.
+   * The deadline is meant to be faint enough to fly past.
    */
-  deadlineGhostSecs: number;
+  deadlineConfirmAlpha: number;
+  deadlineConfirmSecs: number;
+  /** The dot: filled core radius, outer ring radius, ring stroke width. */
+  deadlineMarkerCoreR: number;
+  deadlineMarkerR: number;
+  deadlineMarkerRing: number;
   /**
-   * A capture this short leaves no mark behind at all, in seconds.
+   * The track's faint length and its weighted stretch, both in design units.
    *
-   * Asked for as "only show it if the user holds it for just a few frames, to
-   * avoid spamming". A press hides the deadline and leaves the mark fading where the
-   * cross was, so a burst of taps leaves a burst of marks — and a tap is not a
-   * decision worth recording.
+   * `deadlineArmMaxPx` says where the track stops being a hairline — NOT where it
+   * stops existing. The clamp it replaces cut the track off entirely at this
+   * length, which measured badly: the cross first appears a median 375px away and
+   * 772px at p75, so a 150px clamp drew a floating segment a quarter-screen ahead
+   * of the ship, connected to nothing. It only genuinely emerged from the ship in
+   * the bottom quartile, which is the cohort that arrives too late to matter.
    *
-   * MEASURED, because real captures are not as short as they feel. Over the
-   * corpus a capture runs a median 1.32s, with p5 at 0.300s and p1 at 0.100s.
-   * There is no gap in the distribution to cut at, but there is a distinct tail:
-   * 0.18 catches 2% of all captures and sits comfortably between p1 and p5, so it
-   * never reaches ordinary play. In a tapping burst it catches nearly all of them,
-   * which is the point — it targets the burst rather than the average.
-   *
-   * NOT the game's own idea of a tap. `ScoreAward` calls a press that never
-   * reached periapsis one, because it earns nothing; measured, that is 48% of all
-   * captures at a median of 0.72s, which is most of the game rather than a tap.
+   * `deadlineLeadLenPx` is the final stretch, where the track thickens and
+   * brightens into the dot.
    */
-  deadlineTapSecs: number;
-  /** Half-length of the crossbar, and of the arm stub kept after the cross is passed. */
-  deadlineBarHalf: number;
-  deadlineStubHalf: number;
+  deadlineArmMaxPx: number;
+  deadlineLeadLenPx: number;
   /**
-   * How much the mark shrinks and grows with the fire waiting at the cross.
+   * The track's profile: how faint the hairline is relative to the track, the
+   * track's own alpha, and what the final stretch reaches.
    *
-   * SIZE AND NOT BRIGHTNESS, and that is the whole reason this is a separate key
-   * rather than a term folded into `deadlineAlpha`. Alpha already carries how close
-   * the deadline is — it ramps in with time-to-cross and fades out once the mark
-   * is passed — so a prize term there would make a dim cross mean either "small
-   * fire" or "still far away", with no way to tell which. Note 51's lesson about
-   * spending one channel on two signals, applied to a world object instead of to
-   * text.
+   * All three are fractions of `deadlineAlpha`, so the cue has ONE overall
+   * strength and these say only how it is distributed along its own length.
    *
-   * The mark scales between these two multiples of its configured size, so a big
-   * fat deadline is a big fire and a thin one is a formality.
-   *
-   * THEY COMPOUND WITH `deadlineNearWidth`, which is what made the mark read as too
-   * thick: a big prize and a press right on the cross used to multiply out to
-   * 1.99x, near double. Both were brought in together rather than either alone —
-   * the two signals are independent and each still has to be legible on its own,
-   * so the fix was the product and not one of the factors.
+   * A PROFILE IN SPACE, NOT A RESPONSE IN TIME. An earlier pass had the final
+   * stretch brighten as the ship approached, which measured as redundant: the
+   * track is anchored to the ship, so its length already IS the proximity. A
+   * second channel restating a first is how a clean instrument turns back into a
+   * smear.
    */
-  deadlinePrizeMin: number;
-  deadlinePrizeMax: number;
+  deadlineHairFrac: number;
+  deadlineTrackAlpha: number;
+  deadlineLeadAlpha: number;
+  /** Half-width of the track, and the extra half-width it gains at the cross. */
+  deadlineTrackWidth: number;
+  deadlineLeadWidth: number;
   /**
-   * Predicted burn, in raw bank points, at which the mark reaches full size.
+   * Overall alpha of the cue, and the fraction of it left where a press would NOT
+   * be accepted.
    *
-   * Measured over the 548 committed approaches in `diagnostics/`: the fire
-   * waiting at the cross runs p25 280, median 402, p75 613, p90 857. 860 is that
-   * p90 — the mark saturates only on the top tenth, so the middle of real play
-   * spends its time in the middle of the scale rather than pinned at the top.
-   *
-   * Only 3% of crosses have no fire at all, which was the surprise: the flight
-   * AFTER the press carries the ship deeper than the cross itself, so nearly every
-   * rescue burns. The scale is about how much, not whether.
+   * The track is broken rather than blanked over a hole: 370 of 640 live stretches
+   * are not contiguous, so blanking them would leave the commonest case looking
+   * like several unrelated marks instead of one track with gaps in it.
    */
-  deadlinePrizeFull: number;
+  deadlineAlpha: number;
+  deadlineDeadFrac: number;
+  /**
+   * How fast the deadline reacts to a change, per second: both how the mark
+   * follows a moved cross and how a new mark fades in. One rate, because they are
+   * one question — 9/s is about a quarter second to converge, under the reaction
+   * time the mark exists to be aimed with.
+   *
+   * Applied PER FRAME, in `Deadline.update`, and that is the whole point of the
+   * key. Easing inside `observe` — which runs ten times a second — made
+   * `dt * rate` 0.9, so the mark covered 90% of a correction in one step and then
+   * sat still for a tenth of a second. A follower in name only.
+   *
+   * Worth knowing before tuning it: the position term almost never fires. Over
+   * the corpus the mark slides in 28 of 205,310 frames, by at most 3.13px,
+   * because an acquired cross is genuinely stable. What this rate mostly governs
+   * is the fade-in of a new mark.
+   */
+  deadlineSettleRate: number;
 
   // --- the skull ---
   /**
@@ -251,78 +273,6 @@ export interface RenderConfig {
    * is a worse one.
    */
   verdictTickSecs: number;
-  /** Peak half-width of the long arm and of the crossbar, in design units. */
-  deadlineArmWidth: number;
-  deadlineBarWidth: number;
-  /**
-   * Alpha at the peak of the arm, and the fraction of it left where a press
-   * would NOT be accepted.
-   *
-   * The arm is broken rather than blanked over a hole: 370 of 640 live stretches
-   * are not contiguous, so blanking them would leave the commonest case looking
-   * like several unrelated marks instead of one deadline with gaps in it.
-   */
-  deadlineAlpha: number;
-  deadlineDeadFrac: number;
-  /**
-   * What the mark reaches, in alpha and in width, when a press lands right on it.
-   *
-   * THE COMPASS'S OWN IDIOM. Its rings run `(0.15 + 0.5 * align)` on alpha and
-   * `(2 + 2 * align)` on width, so both rise together as the sweep lines up, and
-   * the author named it: "I like how we do the compass by making the color
-   * brighter when the ship is in the window." Here `align` is how close the ship
-   * is to the cross, so the mark tightens and burns brighter over the last stretch
-   * exactly as the decision gets sharper.
-   *
-   * IT REPLACED A LABEL, AND IS BETTER THAN ONE. Two badges were tried and cut on
-   * sight — SAFE for the recovery, then Nice! for the press that dared it — with
-   * "it's too crowded and the anticipation is fun" and "the 'nice!' is a bit
-   * cluttered". An instrument reacting is worth more than a word about the
-   * instrument, and it costs no threshold: how close a press was is a number, not
-   * a category.
-   *
-   * KEYED TO THE PRESS, not to the approach. It rose continuously with proximity
-   * for one session and lit on every approach, including the ones the player was
-   * going to sail straight past — ambience rather than an answer. `Mark.glow` is
-   * frozen at the press instead, so a mark the ship drifted past never lights.
-   *
-   * The width half compounds with `deadlinePrizeMax`, and together they reached 1.99x
-   * — reported as looking "a bit thick". Both came down; see the note there.
-   *
-   * 0.95 first, reported as "there are times that the cross glows a bit too
-   * bright". The lift matters more than the ceiling: half again over `deadlineAlpha`
-   * is plainly legible as the mark sharpening, where nearly double read as the
-   * mark shouting. The deadline is meant to be faint enough to fly past.
-   */
-  deadlineNearAlpha: number;
-  deadlineNearWidth: number;
-  /**
-   * How fast the deadline reacts to a change, per second: both how the mark follows
-   * a moved cross and how a new mark fades in. One rate, because they are one
-   * question — 9/s is about a quarter second to converge, under the reaction time
-   * the mark exists to be aimed with.
-   *
-   * Applied PER FRAME, in `Deadline.update`, and that is the whole point of the key.
-   * Easing inside `observe` — which runs ten times a second — made `dt * rate`
-   * 0.9, so the mark covered 90% of a correction in one step and then sat still
-   * for a tenth of a second. A follower in name only.
-   *
-   * Worth knowing before tuning it: the position term almost never fires. Over
-   * the corpus the mark slides in 28 of 205,310 frames, by at most 3.13px,
-   * because an acquired cross is genuinely stable. What this rate mostly governs
-   * is the fade-in of a new mark, of which there are 541.
-   */
-  deadlineSettleRate: number;
-  /**
-   * Longest the drawn arm may be, in design units.
-   *
-   * The cross sits a median 432px ahead and 1551px at p90 across the recorded
-   * approaches, against a 390x844 viewport — so an unclamped arm is routinely
-   * twice the height of the screen, describing a stretch with nothing in it to
-   * decide. 260 is two thirds of the viewport's width: long enough to read as a
-   * lead-in to the mark, short enough never to become a line across the map.
-   */
-  deadlineArmMaxPx: number;
 
   // --- boost halo ---
   /** Glow radius at zero charge / at full charge, in design units. */
@@ -391,27 +341,27 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
 
   hazardZoneWidth: 60,
 
-  deadlineFadeInSecs: 3.67,
-  deadlineFullSecs: 1.65,
-  deadlineFadeOutSecs: 1.6,
-  deadlineGhostSecs: 0.3,
-  deadlineTapSecs: 0.18,
-  deadlineBarHalf: 13,
-  deadlineStubHalf: 17,
-  deadlinePrizeMin: 0.62,
-  deadlinePrizeMax: 1.18,
-  deadlinePrizeFull: 860,
+  deadlineFadeInSecs: 2.63,
+  deadlineFullSecs: 1.35,
+  deadlineMinLeadSecs: 0.25,
+  deadlineConfirmAlpha: 0.62,
+  deadlineConfirmSecs: 0.25,
+  deadlineMarkerCoreR: 2.9,
+  deadlineMarkerR: 5,
+  deadlineMarkerRing: 1.6,
+  deadlineArmMaxPx: 150,
+  deadlineLeadLenPx: 46,
+  deadlineHairFrac: 0.35,
+  deadlineTrackAlpha: 0.3,
+  deadlineLeadAlpha: 1,
+  deadlineTrackWidth: 1.6,
+  deadlineLeadWidth: 2.6,
+  deadlineAlpha: 0.5,
+  deadlineDeadFrac: 0.18,
+  deadlineSettleRate: 9,
 
   doomAlpha: 0.78,
   verdictTickSecs: 1 / 60,
-  deadlineArmWidth: 1.3,
-  deadlineBarWidth: 1.7,
-  deadlineAlpha: 0.5,
-  deadlineDeadFrac: 0.18,
-  deadlineNearAlpha: 0.74,
-  deadlineNearWidth: 1.15,
-  deadlineSettleRate: 9,
-  deadlineArmMaxPx: 150,
 
   boostGlowMin: 13,
   boostGlowMax: 42,

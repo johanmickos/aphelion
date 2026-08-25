@@ -3573,6 +3573,68 @@ the long, chained, well-played ones.
 
 ---
 
+### 61 — The scar stopped being a scar, so it stopped being called one
+
+The cue that marks the point of no return left a mark fading behind the ship
+wherever it was passed. Cut at the author's request — "I don't love the scars
+being left after all; they're cluttering the space. They're also not obvious --
+the player doesn't quite know what to do with it."
+
+**Re-measuring first changed what got built.** Every number the feature was
+designed against came from a smaller corpus and had drifted. Over all 64
+recordings, 640 cross episodes:
+
+| claim in the code                          | re-measured 2026-08-25    |
+| ------------------------------------------ | ------------------------- |
+| 40% of wall deaths never had a live cross  | **68%** (133 of 196)      |
+| lead at first appearance: median 1.65s     | **1.32s** (1.65 was p58)  |
+| lead at first appearance: p75 3.67s        | **2.63s** (3.67 was p87)  |
+
+So `deadlineFullSecs` and `deadlineFadeInSecs` were re-derived to 1.35 / 2.63,
+restoring the rule they were supposed to follow (median, p75) rather than the
+values that had once satisfied it.
+
+**Splitting the episodes by outcome decided the design.** The cue lives a median
+0.30s, which read as instability until it was split:
+
+```
+pressed      472  74%   median 0.50s on screen, 1.77s lead
+passed       156  24%   median 0.30s on screen, 0.27s lead
+died           4   1%
+evaporated     8   1%
+```
+
+It is short-lived because it WORKS. That made the press-confirm the most
+important thing it draws, and it made the `passed` cohort legible: those crosses
+appear with 0.27s of lead — less than reaction time — so they are gated out at
+birth rather than drawn as a red blink nobody can use.
+
+**The residue could never have done its job.** It was justified as the answer to a
+playtest death that "read as arbitrary", but it can only appear where a cross
+existed — 32% of out-of-bounds deaths. The other 68% got the same blank sky the
+complaint was about. The explanation moved to the debrief, which fires on all 196.
+
+**A measurement inverted one decision mid-design.** The prize channel — the mark
+growing with the fire waiting at the cross, note 54 — was cut as the least
+legible channel, then defended when it turned out to be previewing the burn
+reward directly. It stayed cut for a better reason: `burnBank` already pays for
+real time captured in the band, and the ship is visibly *on fire* while it does.
+A preview that is systematically 2.21x low cannot compete with flames.
+`RescueDeadline.flight` is kept and unused so restoring it is a render change.
+
+**And the clamp was doing the opposite of what it was asked to do.** Asked for as
+"if the projected line is really long, we should clamp it", `deadlineArmMaxPx`
+cut the track to the final 150px — but the cross first appears a median 375px
+away and 772px at p75, so what drew was a floating segment a quarter-screen ahead
+of the ship, connected to nothing. It only reached the ship in the bottom
+quartile, which is the `passed` cohort. The track now always reaches the ship and
+the clamp says where it stops being a hairline.
+
+Renamed throughout: `scar` -> `deadline`. `gauge` was the obvious alternative and
+was already taken twice (`RenderConfig.gaugeFollow`, `drawFuelGauge`).
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
