@@ -948,10 +948,13 @@ describe('the sheet', () => {
   const max = { ...run, topSpeed: 940, peakChain: 14, distance: 12000, fireSecs: 6.2 };
   const bodies = createInitialState(DEFAULT_CONFIG).bodies;
 
-  /** `t` defaults past the roll, so a value assertion sees the landed number. */
+  /**
+   * `t` doubles as the roll progress here — both mean "how far along" — and
+   * defaults past the end, so a value assertion sees the landed number.
+   */
   function text(cleared: boolean, alpha = 1, style = CLEARED_SHEET, t = 9) {
     const r = recordingContext();
-    drawSheet(r.ctx, cam(), style, run, max, bodies, FIXED_DT, alpha, cleared, t);
+    drawSheet(r.ctx, cam(), style, run, max, bodies, FIXED_DT, alpha, cleared, t, t);
     return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
   }
 
@@ -1001,10 +1004,27 @@ describe('the sheet', () => {
     // column of duplicates next to the numbers it is supposed to give context to.
     // Context that equals the thing it contextualises is noise.
     const r = recordingContext();
-    drawSheet(r.ctx, cam(), CLEARED_SHEET, run, run, bodies, FIXED_DT, 1, true, 9);
+    drawSheet(r.ctx, cam(), CLEARED_SHEET, run, run, bodies, FIXED_DT, 1, true, 9, 9);
     const t = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     expect(t).not.toContain('SESSION');
     expect(t).not.toContain('RUN');
+  });
+
+  it('starts the score first, since it is what the sheet is about', () => {
+    // REPORTED as the score sitting visibly at zero while the rest of the sheet
+    // was already readable. Two bugs compounding: the stagger was inverted, so
+    // row 0 — the score — was the LAST thing to start moving rather than the
+    // first, and the roll ran on a hardcoded clock while the panel's opacity ran
+    // on how far the world had fallen, so the sheet became legible before the
+    // digits began.
+    // At 6% of the fade the score is already climbing while later rows have not
+    // begun — which is the stagger doing its job, not a fault.
+    const scoreAt = (p: number) => Number(text(true, 1, CLEARED_SHEET, p)[1]!.replace(/,/g, ''));
+    expect(scoreAt(0.06), 'the score is moving almost immediately').toBeGreaterThan(0);
+    expect(scoreAt(0.2)).toBeGreaterThan(scoreAt(0.06));
+    // ...and it is the FIRST row to move: a later row is still at nothing.
+    const bodyAt6 = sheetRows(run, max, 0.06).map((r) => r.value);
+    expect(bodyAt6[bodyAt6.length - 1]).toBe('0');
   });
 
   it('rolls the numbers up so they land together', () => {
@@ -1131,7 +1151,7 @@ describe('a death sheet and a clear sheet are told apart', () => {
     expect(DEATH_SHEET.celebrate).toBe(false);
     const marquee = (style: typeof CLEARED_SHEET) => {
       const r = recordingContext();
-      drawSheet(r.ctx, cam(), style, run, run, bodies, FIXED_DT, 1, true, 0.4);
+      drawSheet(r.ctx, cam(), style, run, run, bodies, FIXED_DT, 1, true, 0.4, 1);
       return (r.calls('setLineDash') as Array<[string, number[]]>).length;
     };
     expect(marquee(CLEARED_SHEET), 'a win has a light running round it').toBeGreaterThan(0);

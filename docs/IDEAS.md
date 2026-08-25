@@ -44,6 +44,16 @@ Sometimes the user gets lazy and may need to be punished. If they coast past pla
 - Extra points for tight captures (low peripsis)
 - Extra points for skimming the edge (getting close for a longer time and then surviving)
 - Extra points for blowing by a planet extremely close without capturing
+- Accolades for patterns collected ACROSS a run, not just single events. "FROGGER"
+  for leapfrogging several planets in a row is the shape: the thing being noticed
+  spans many captures, so no single award can see it. They would pop up as normal
+  awards when the pattern completes. Worth knowing before building: every existing
+  word in `praise.ts` names an axis of ONE passage (aim, peak, close), and the
+  rarity ladder colours it by how good that passage was — a run-spanning accolade
+  has no single passage to grade, so it needs a decision about where it sits on
+  that ladder, or whether it sits off it the way `HOP` and the burn word do.
+  Raised 2026-08-24 alongside the run sheet, which counts several such patterns
+  (`peakChain`, `roughPasses`, `anomalies`) already and could feed them.
 
 ### Performance testing and regressions (parked 2026-08-23)
 

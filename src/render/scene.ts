@@ -415,6 +415,9 @@ export class Scene {
         // paced from the moment the panel appeared, not from the crossing several
         // seconds earlier.
         cer ? Math.max(0, cer.t - CEREMONY_SHEET_AT) : (opts.deathSheetT ?? 0),
+        // The roll rides the fade, so the digits are moving from the first frame
+        // the panel can be read.
+        sheetAlpha,
       );
     }
 

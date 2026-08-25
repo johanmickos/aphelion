@@ -126,17 +126,28 @@ function secs(ticks: number, dt: number): string {
  * THEY LAND TOGETHER, WHICH IS THE WHOLE EFFECT. A slot machine is not satisfying
  * because the reels spin; it is satisfying because they STOP, one after another,
  * onto a row that is suddenly all there. So every row finishes at the same
- * instant and only its start is staggered — the last row spins briefly, the first
- * spins longest, and the sheet resolves in one beat rather than trickling.
+ * instant and only its start is staggered — the first row spins longest, the last
+ * briefly, and the sheet resolves in one beat rather than trickling.
  *
  * Rolling the wrong way round — equal durations, staggered ends — was the obvious
  * arrangement and gives the opposite feeling: a queue being served.
+ *
+ * `p` IS THE SHEET'S OWN FADE, 0..1, NOT A CLOCK. It used to be seconds measured
+ * from a hardcoded guess at when the panel appears, while the panel's opacity was
+ * driven by how far the world had fallen — two pacings for one moment, which drift
+ * apart the instant anything about the ceremony's speed changes. They had: the
+ * sheet became legible around 0.4s before the clock started, so the score sat
+ * visibly at zero while the player read the rest of it.
+ *
+ * The stagger was also inverted, which made the score — row 0, the number the
+ * sheet is about — the LAST thing to start moving. The comment above described
+ * the intended behaviour correctly and the arithmetic did the opposite.
  */
-function rollOf(t: number, row: number, rows: number): number {
-  const LAND = 0.95;
-  const LEAD = 0.18;
-  const start = ((rows - 1 - row) / Math.max(1, rows - 1)) * LEAD;
-  const u = (t - start) / Math.max(0.001, LAND - start);
+function rollOf(p: number, row: number, rows: number): number {
+  const LAND = 0.92;
+  const LEAD = 0.34;
+  const start = (row / Math.max(1, rows - 1)) * LEAD;
+  const u = (p - start) / Math.max(0.001, LAND - start);
   const c = u < 0 ? 0 : u > 1 ? 1 : u;
   // Fast, then settling: a reel slows into its stop rather than braking at it.
   return 1 - Math.pow(1 - c, 3);
@@ -186,8 +197,9 @@ function anomalyCount(bodies: readonly Body[]): number {
   return n;
 }
 
-export function sheetRows(run: RunStats, max: RunStats, t = Infinity): Row[] {
-  const r = (i: number) => rollOf(t, i, 5);
+export function sheetRows(run: RunStats, max: RunStats, roll = 1): Row[] {
+  // Offset by one: the score is row 0 of the same stagger, so the body starts at 1.
+  const r = (i: number) => rollOf(roll, i + 1, 6);
   return [
     { label: 'TOP SPEED', value: px(rolled(run.topSpeed, r(0))), best: px(max.topSpeed) },
     {
@@ -230,6 +242,13 @@ export function drawSheet(
   cleared: boolean,
   /** Seconds since the sheet's moment, for the marquee. Ignored when still. */
   t = 0,
+  /**
+   * How far the sheet has faded in, 0..1 — the same number that fades it.
+   *
+   * Drives the roll, so the digits are moving from the first frame the panel is
+   * legible rather than starting on a separate clock of their own.
+   */
+  roll = 1,
 ): void {
   if (alpha <= 0.005) return;
   const s = cam.scale;
@@ -319,7 +338,7 @@ export function drawSheet(
   // It is also simply the most important stat, which is the other half of the
   // report — every other row is a way of describing HOW the score happened.
   const cleared_ = planetsCleared(run, bodies);
-  const scoreRoll = rollOf(t, 0, 6);
+  const scoreRoll = rollOf(roll, 0, 6);
   ctx.fillStyle = style.accent;
   ctx.font = `700 ${40 * s}px ui-monospace, monospace`;
   ctx.fillText(Math.round(rolled(run.score, scoreRoll)).toLocaleString('en-US'), cx, top + 26 * s);
@@ -347,7 +366,7 @@ export function drawSheet(
   // the run that set every high — so printing both put a column of duplicates
   // next to the numbers it was supposed to give context to. A best is context, and
   // context that equals the thing it contextualises is noise.
-  const rows = sheetRows(run, max, t);
+  const rows = sheetRows(run, max, roll);
   const anyBest = rows.some((r) => r.best !== r.value);
   let y = top + 66 * s;
   if (anyBest) {
