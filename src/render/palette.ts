@@ -137,6 +137,13 @@ export const LADDER_GREAT = '#5cd67a';
 export const LADDER_EXCEPTIONAL = '#ffd633';
 
 /**
+ * The same two rungs, decomposed, for anything that has to interpolate between
+ * them. Pinned against the hex above so the pair cannot drift.
+ */
+export const LADDER_GOOD_RGB: RGB = [58, 168, 232];
+export const LADDER_GREAT_RGB: RGB = [92, 214, 122];
+
+/**
  * The finish line's marker, in the edge-arrow cue system.
  *
  * NOT ON THE RARITY LADDER, and it is worth being explicit because it is green

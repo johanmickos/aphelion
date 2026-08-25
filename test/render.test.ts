@@ -24,9 +24,16 @@ import {
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from '../src/render/ceremony.ts';
 import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
-import { FINISH, SLATE } from '../src/render/palette.ts';
+import {
+  FINISH,
+  LADDER_GOOD_RGB,
+  LADDER_GREAT_RGB,
+  SLATE,
+  SUMMIT_RGB,
+} from '../src/render/palette.ts';
 import {
   CLEARED_SHEET,
+  deathSheet,
   DEATH_SHEET,
   SHEET_FIELD_FRACTION,
   drawSheet,
@@ -1058,6 +1065,38 @@ describe('the sheet', () => {
     expect(bodyAt6[bodyAt6.length - 1]).toBe('0');
   });
 
+  it('does not reflow as the numbers roll', () => {
+    // REPORTED: the death sheet rendered, then "jumped a line" a beat later, "like
+    // it re-rendered with more text". The header row's existence was decided from
+    // the ROLLING values — mid-roll a partial number differs from its best, so the
+    // row was drawn; when the digits landed and matched, it vanished and the body
+    // jumped up. Worst on the first death of a session, where the run IS the
+    // session max so every row ends up matching.
+    //
+    // Layout must not depend on animation state. Every text baseline is pinned
+    // across the whole roll: the first death of a session is the fixture, since
+    // that is where the old code flipped.
+    const firstDeath = { ...run };
+    const ys = (roll: number) => {
+      const r = recordingContext();
+      drawSheet(r.ctx, cam(), {
+        style: DEATH_SHEET,
+        run: firstDeath,
+        max: firstDeath,
+        bodies,
+        dt: FIXED_DT,
+        alpha: 1,
+        t: 1,
+        roll,
+      });
+      return (r.calls('fillText') as Array<[string, number, number]>).map((o) => o[2]);
+    };
+    const settled = ys(1);
+    for (const roll of [0.05, 0.2, 0.5, 0.8, 0.99]) {
+      expect(ys(roll), `baselines moved at roll ${roll}`).toEqual(settled);
+    }
+  });
+
   it('rolls the numbers up so they land together', () => {
     // A slot machine is not satisfying because the reels spin, it is satisfying
     // because they STOP — one after another, onto a row that is suddenly all
@@ -1181,6 +1220,50 @@ describe('a death sheet and a clear sheet are told apart', () => {
     expect(DEATH_SHEET.accentRGB).toEqual(SLATE);
     expect(DEATH_SHEET.accentRGB).not.toEqual(FINISH);
     expect(DEATH_SHEET.accent).not.toBe(CLEARED_SHEET.accent);
+  });
+
+  it('warms a death with how far up the course it got', () => {
+    // Dying at 80% should not look like dying at 10%. A single slate treatment
+    // for every worthy death says only "that qualified", when the whole reason
+    // the gate exists is that some attempts are much better than others.
+    const at = (p: number) => deathSheet(p);
+    const near = at(0.92);
+    const bare = at(SHEET_FIELD_FRACTION);
+    expect(bare.accentRGB, 'a run that only just qualified is slate').toEqual(SLATE);
+    expect(near.accentRGB).not.toEqual(SLATE);
+    // It WALKS THE RARITY LADDER, which is the actual design claim and the thing
+    // worth pinning: slate, through the ladder's blue, to its green. Asserted at
+    // the three points that define the path rather than as a monotone gradient —
+    // the route is piecewise and blue is bluer than slate, so no single channel
+    // climbs all the way and a "greenness increases" check measures nothing.
+    const mid = SHEET_FIELD_FRACTION + (1 - SHEET_FIELD_FRACTION) * 0.5;
+    expect(at(mid).accentRGB, 'through the ladder’s blue').toEqual(LADDER_GOOD_RGB);
+    expect(at(1).accentRGB, 'to its green').toEqual(LADDER_GREAT_RGB);
+    // And it is continuous — no bands, so no threshold anyone has to defend.
+    for (const [a, b] of [
+      [0.3, 0.5],
+      [0.5, 0.7],
+      [0.7, 0.95],
+    ]) {
+      expect(at(b!).accentRGB, `${a} -> ${b}`).not.toEqual(at(a!).accentRGB);
+    }
+  });
+
+  it('never spends the summit gold on a death', () => {
+    // Gold is the ladder's top rung and a clear is the only thing that reaches
+    // it. Warming a death all the way there would make the one moment it exists
+    // for cheaper.
+    for (let p = 0; p <= 1.001; p += 0.05) {
+      expect(deathSheet(p).accentRGB).not.toEqual(SUMMIT_RGB);
+    }
+    expect(CLEARED_SHEET.accentRGB).toEqual(SUMMIT_RGB);
+  });
+
+  it('runs the marquee only for a death that nearly made it', () => {
+    expect(deathSheet(SHEET_FIELD_FRACTION).marquee, 'a bare qualifier is still').toBe(0);
+    expect(deathSheet(0.5).marquee).toBe(0);
+    expect(deathSheet(0.95).marquee, 'in sight of the finish, it runs').toBeGreaterThan(0.4);
+    expect(CLEARED_SHEET.marquee, 'and a clear is always full').toBe(1);
   });
 
   it('separates the two by MOTION, not only by hue', () => {

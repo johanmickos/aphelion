@@ -27,49 +27,15 @@
 import type { Body } from '../sim/types.ts';
 import type { RunStats } from '../score/types.ts';
 import type { Camera } from './camera.ts';
-import { SLATE, SUMMIT, SUMMIT_RGB, withAlpha } from './palette.ts';
-
-export interface SheetStyle {
-  /** Accent for the headline and the rules. */
-  accent: string;
-  accentRGB: readonly [number, number, number];
-  /** Word above the headline figure. */
-  kicker: string;
-  /**
-   * Whether this sheet is reporting a cleared field.
-   *
-   * ONE FLAG WHERE THERE WERE TWO. `drawSheet` also took a `cleared` boolean, and
-   * it and `celebrate` were the same fact under two names — so a caller could
-   * hand over a mismatched pair and get a death sheet with a victory marquee, or
-   * the reverse. Naming the EVENT rather than the behaviour is what collapses
-   * them: the marquee, the bigger word and the missing session column all follow
-   * from having cleared the field, and none of them is separately configurable.
-   *
-   * THE DIFFERENCE BETWEEN THE TWO SHEETS IS NOT MEANT TO BE A HUE. Colour in
-   * this codebase is a RANK — the rarity ladder — and gold is already its top
-   * rung, so a clear was being drawn in the right colour and simply was not loud
-   * enough. Arcades do not celebrate with hue; they celebrate with MOTION, and
-   * they always have: the marquee chase, the flashing border, the digits rolling
-   * up. So a clear gets a light travelling round its border and a bigger word,
-   * and a death gets stillness. One is an event, the other is a report, and that
-   * is a difference the eye reads before the words.
-   */
-  cleared: boolean;
-}
-
-export const CLEARED_SHEET: SheetStyle = {
-  accent: SUMMIT,
-  accentRGB: SUMMIT_RGB,
-  kicker: 'FIELD CLEARED',
-  cleared: true,
-};
-
-export const DEATH_SHEET: SheetStyle = {
-  accent: `rgb(${SLATE[0]},${SLATE[1]},${SLATE[2]})`,
-  accentRGB: SLATE,
-  kicker: 'RUN ENDED',
-  cleared: false,
-};
+import {
+  LADDER_GOOD_RGB,
+  LADDER_GREAT_RGB,
+  SLATE,
+  SUMMIT,
+  SUMMIT_RGB,
+  withAlpha,
+} from './palette.ts';
+import type { RGB } from './palette.ts';
 
 /**
  * Field fraction a life must reach before its death earns a sheet.
@@ -104,6 +70,111 @@ export const DEATH_SHEET: SheetStyle = {
  * before treating it as settled.
  */
 export const SHEET_FIELD_FRACTION = 0.28;
+
+export interface SheetStyle {
+  /** Accent for the headline and the rules. */
+  accent: string;
+  accentRGB: readonly [number, number, number];
+  /** Word above the headline figure. */
+  kicker: string;
+  /**
+   * Whether this sheet is reporting a cleared field.
+   *
+   * ONE FLAG WHERE THERE WERE TWO. `drawSheet` also took a `cleared` boolean, and
+   * it and `celebrate` were the same fact under two names — so a caller could
+   * hand over a mismatched pair and get a death sheet with a victory marquee, or
+   * the reverse. Naming the EVENT rather than the behaviour is what collapses
+   * them: the marquee, the bigger word and the missing session column all follow
+   * from having cleared the field, and none of them is separately configurable.
+   *
+   * THE DIFFERENCE BETWEEN THE TWO SHEETS IS NOT MEANT TO BE A HUE. Colour in
+   * this codebase is a RANK — the rarity ladder — and gold is already its top
+   * rung, so a clear was being drawn in the right colour and simply was not loud
+   * enough. Arcades do not celebrate with hue; they celebrate with MOTION, and
+   * they always have: the marquee chase, the flashing border, the digits rolling
+   * up. So a clear gets a light travelling round its border and a bigger word,
+   * and a death gets stillness. One is an event, the other is a report, and that
+   * is a difference the eye reads before the words.
+   */
+  cleared: boolean;
+  /**
+   * How brightly the border light runs, 0..1.
+   *
+   * Separate from `cleared` because a death is not simply still: it warms with
+   * how far up the course it got, and the marquee is the loudest channel that
+   * warming has. A clear is always 1 — there is nothing above finishing.
+   */
+  marquee: number;
+}
+
+export const CLEARED_SHEET: SheetStyle = {
+  accent: SUMMIT,
+  accentRGB: SUMMIT_RGB,
+  kicker: 'FIELD CLEARED',
+  cleared: true,
+  marquee: 1,
+};
+
+/** Linear blend between two colours. */
+function mix(a: RGB, b: RGB, u: number): RGB {
+  const c = u < 0 ? 0 : u > 1 ? 1 : u;
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * c),
+    Math.round(a[1] + (b[1] - a[1]) * c),
+    Math.round(a[2] + (b[2] - a[2]) * c),
+  ];
+}
+
+/**
+ * A death's sheet, warmed by how far up the course it got.
+ *
+ * DYING AT 80% SHOULD NOT LOOK LIKE DYING AT 10%. A single slate treatment for
+ * every worthy death says only "that qualified", and the whole reason the gate
+ * exists is that some attempts are much better than others. So the sheet reads
+ * the one number it already has — field fraction — and warms with it.
+ *
+ * CONTINUOUS, NOT TIERED, and that is a deliberate dodge. Bands would need
+ * thresholds, and AGENTS.md is right that a threshold is measured rather than
+ * chosen — but the corpus those would have to be measured against predates the
+ * funnel, the clear and the ceremony. A gradient needs no threshold at all: it is
+ * monotone by construction, so "further is better" is true at every pair of runs
+ * without anyone having to defend a line between them.
+ *
+ * IT WALKS THE RARITY LADDER AND STOPS SHORT OF GOLD. Slate through the ladder's
+ * blue to its green, which is meaning the player has already learned from every
+ * award they have ever been paid. The top rung is not on offer: gold is the
+ * summit, a clear is the only thing that reaches it, and spending it on a death
+ * would make the one moment it exists for cheaper.
+ *
+ * The marquee fades in over the same gradient rather than switching on, so there
+ * is no line to argue about there either — invisible on an ordinary attempt, and
+ * unmistakably running by the time a run dies in sight of the finish.
+ */
+export function deathSheet(progress: number): SheetStyle {
+  // Normalised from the gate, since nothing below it produces a sheet at all —
+  // measuring from zero would spend most of the range on runs that never appear.
+  const u = Math.max(
+    0,
+    Math.min(1, (progress - SHEET_FIELD_FRACTION) / (1 - SHEET_FIELD_FRACTION)),
+  );
+  const rgb =
+    u < 0.5
+      ? mix(SLATE, LADDER_GOOD_RGB, u * 2)
+      : mix(LADDER_GOOD_RGB, LADDER_GREAT_RGB, u * 2 - 1);
+  return {
+    accent: `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`,
+    accentRGB: rgb,
+    kicker: 'RUN ENDED',
+    cleared: false,
+    // Nothing for most of the range, then rising quickly: a light running round
+    // the border is a claim, and it should only be made about a run that nearly
+    // made it.
+    marquee: Math.max(0, (u - 0.55) / 0.45),
+  };
+}
+
+/** The plain slate sheet, for a run that only just cleared the bar. */
+export const DEATH_SHEET: SheetStyle = deathSheet(SHEET_FIELD_FRACTION);
 
 /**
  * Did this life get far enough up the course to be worth reporting on?
@@ -330,13 +401,13 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
   // score. It is the whole of the celebration difference: both sheets are drawn
   // by this function in a colour that means the same thing it always does, and
   // what separates a win from a post-mortem is that one of them moves.
-  if (style.cleared) {
+  if (style.marquee > 0.01) {
     const per = 2 * (bw + height);
     const head = ((t * per) / 1.6) % per;
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineWidth = Math.max(1.5, 2.4 * s);
-    ctx.strokeStyle = withAlpha(style.accentRGB, 0.95);
+    ctx.strokeStyle = withAlpha(style.accentRGB, 0.95 * style.marquee);
     // Drawn as a dash pattern offset along the perimeter, so one path stroke
     // carries every segment however many there are.
     ctx.setLineDash([26 * s, per / 4 - 26 * s]);
@@ -405,7 +476,17 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
   // continues, and "your best this session" is the thing the next attempt is
   // aimed at.
   const rows = sheetRows(run, max, roll);
-  const anyBest = !style.cleared && rows.some((r) => r.best !== r.value);
+  // ---- decided on the LANDED values, never the rolling ones
+  //
+  // LAYOUT MUST NOT DEPEND ON ANIMATION STATE. Asking the rolling rows whether
+  // any best differs is asking a question whose answer changes as the digits
+  // climb: mid-roll a partial value differs from its best, so the header row is
+  // drawn; when the numbers land and match, it vanishes and everything below it
+  // jumps up a line. Reported as the sheet re-rendering "with more text" a beat
+  // after appearing — and it fires hardest on the FIRST death of a session, where
+  // the run IS the session max so every row ends up matching.
+  const landed = sheetRows(run, max, 1);
+  const anyBest = !style.cleared && landed.some((r) => r.best !== r.value);
   let y = top + 66 * s;
   if (anyBest) {
     ctx.font = `${8 * s}px ui-monospace, monospace`;

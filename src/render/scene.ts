@@ -31,7 +31,7 @@ import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash, drawFinishFlash } from './ceremony.ts';
 import type { Ceremony } from './ceremony.ts';
-import { CLEARED_SHEET, DEATH_SHEET, drawSheet } from './sheet.ts';
+import { CLEARED_SHEET, deathSheet, drawSheet, planetsCleared } from './sheet.ts';
 
 import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
@@ -83,7 +83,16 @@ export class Scene {
   ): void {
     if (alpha <= 0 || !opts.score.lastRun) return;
     drawSheet(ctx, cam, {
-      style: cer ? CLEARED_SHEET : DEATH_SHEET,
+      // A death's sheet warms with how far up the course it got, so dying in
+      // sight of the finish does not look like dying at the first planet.
+      style: cer
+        ? CLEARED_SHEET
+        : deathSheet(
+            (() => {
+              const p = planetsCleared(opts.score.lastRun, this.deps.bodies);
+              return p.total > 0 ? p.done / p.total : 0;
+            })(),
+          ),
       run: opts.score.lastRun,
       max: opts.score.sessionMax,
       bodies: this.deps.bodies,
