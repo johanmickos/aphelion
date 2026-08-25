@@ -24,20 +24,11 @@ import {
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from '../src/render/ceremony.ts';
 import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
-import {
-  FINISH,
-  LADDER_GOOD_RGB,
-  LADDER_GREAT_RGB,
-  SLATE,
-  SUMMIT_RGB,
-} from '../src/render/palette.ts';
+import { FINISH, DEBRIEF } from '../src/render/palette.ts';
 import {
   CLEARED_SHEET,
-  deathSheet,
   DEATH_SHEET,
-  SHEET_FIELD_FRACTION,
   drawSheet,
-  earnsSheet,
   planetsCleared,
   sheetRows,
 } from '../src/render/sheet.ts';
@@ -1209,61 +1200,27 @@ describe('a death sheet and a clear sheet are told apart', () => {
     expect(words(DEATH_SHEET)).toContain('RUN ENDED');
   });
 
-  it('draws a worthy death in slate — not the finish green, not hazard red', () => {
-    // This pin asserted FINISH green and was wrong, which the sheet made obvious
-    // as soon as green came to mean THE FINISH everywhere else: a post-mortem was
-    // being drawn in the colour of arriving. Hazard red is wrong too and less
-    // obviously — this sheet only appears for runs that got a long way, so the
-    // colour of the wall argues with its reason for existing, and red is the one
-    // colour here that means "right now, and you can still act", which a
-    // post-mortem cannot.
-    expect(DEATH_SHEET.accentRGB).toEqual(SLATE);
+  it('draws every death in one colour, between the slate and the gold', () => {
+    // Three wrong answers are recorded at `DEBRIEF`: finish green congratulated
+    // the player for arriving somewhere they did not reach, hazard red is the one
+    // colour that means "right now, and you can still act", and a gradient that
+    // warmed with progress read as the game grading a failure rather than
+    // reporting it. One colour, every death.
+    expect(DEATH_SHEET.accentRGB).toEqual(DEBRIEF);
     expect(DEATH_SHEET.accentRGB).not.toEqual(FINISH);
     expect(DEATH_SHEET.accent).not.toBe(CLEARED_SHEET.accent);
   });
 
-  it('warms a death with how far up the course it got', () => {
-    // Dying at 80% should not look like dying at 10%. A single slate treatment
-    // for every worthy death says only "that qualified", when the whole reason
-    // the gate exists is that some attempts are much better than others.
-    const at = (p: number) => deathSheet(p);
-    const near = at(0.92);
-    const bare = at(SHEET_FIELD_FRACTION);
-    expect(bare.accentRGB, 'a run that only just qualified is slate').toEqual(SLATE);
-    expect(near.accentRGB).not.toEqual(SLATE);
-    // It WALKS THE RARITY LADDER, which is the actual design claim and the thing
-    // worth pinning: slate, through the ladder's blue, to its green. Asserted at
-    // the three points that define the path rather than as a monotone gradient —
-    // the route is piecewise and blue is bluer than slate, so no single channel
-    // climbs all the way and a "greenness increases" check measures nothing.
-    const mid = SHEET_FIELD_FRACTION + (1 - SHEET_FIELD_FRACTION) * 0.5;
-    expect(at(mid).accentRGB, 'through the ladder’s blue').toEqual(LADDER_GOOD_RGB);
-    expect(at(1).accentRGB, 'to its green').toEqual(LADDER_GREAT_RGB);
-    // And it is continuous — no bands, so no threshold anyone has to defend.
-    for (const [a, b] of [
-      [0.3, 0.5],
-      [0.5, 0.7],
-      [0.7, 0.95],
-    ]) {
-      expect(at(b!).accentRGB, `${a} -> ${b}`).not.toEqual(at(a!).accentRGB);
-    }
-  });
-
-  it('never spends the summit gold on a death', () => {
-    // Gold is the ladder's top rung and a clear is the only thing that reaches
-    // it. Warming a death all the way there would make the one moment it exists
-    // for cheaper.
-    for (let p = 0; p <= 1.001; p += 0.05) {
-      expect(deathSheet(p).accentRGB).not.toEqual(SUMMIT_RGB);
-    }
-    expect(CLEARED_SHEET.accentRGB).toEqual(SUMMIT_RGB);
-  });
-
-  it('runs the marquee only for a death that nearly made it', () => {
-    expect(deathSheet(SHEET_FIELD_FRACTION).marquee, 'a bare qualifier is still').toBe(0);
-    expect(deathSheet(0.5).marquee).toBe(0);
-    expect(deathSheet(0.95).marquee, 'in sight of the finish, it runs').toBeGreaterThan(0.4);
-    expect(CLEARED_SHEET.marquee, 'and a clear is always full').toBe(1);
+  it('is one colour and one treatment, whatever the run managed', () => {
+    // A worthiness gate and a progress gradient both lived here and are gone by
+    // decision: one screen, always, is simpler to learn than a screen that
+    // sometimes appears and shifts colour when it does. A player cannot form a
+    // habit around a report they only sometimes get.
+    expect(DEATH_SHEET.marquee, 'a death never runs the light').toBe(0);
+    expect(DEATH_SHEET.accentRGB).toEqual(DEBRIEF);
+    // Off the rarity ladder and clear of the summit, both of which are ranks and
+    // neither of which a run simply ending has earned.
+    expect(DEATH_SHEET.accentRGB).not.toEqual(CLEARED_SHEET.accentRGB);
   });
 
   it('separates the two by MOTION, not only by hue', () => {
@@ -1288,39 +1245,6 @@ describe('a death sheet and a clear sheet are told apart', () => {
     };
     expect(marquee(CLEARED_SHEET), 'a win has a light running round it').toBeGreaterThan(0);
     expect(marquee(DEATH_SHEET), 'a report is still').toBe(0);
-  });
-});
-
-describe('the worthiness gate', () => {
-  const bodies = createInitialState(DEFAULT_CONFIG).bodies;
-  const planets = bodies.filter((b) => b.kind === 'planet').length;
-
-  /** A run that reached `frac` of the way up the field. */
-  function reached(frac: number) {
-    const sorted = bodies
-      .filter((b) => b.kind === 'planet')
-      .map((b) => b.y)
-      .sort((a, b) => b - a);
-    const idx = Math.min(sorted.length - 1, Math.floor(frac * planets));
-    return { highWaterY: sorted[idx]! - 1 } as never;
-  }
-
-  it('turns a trivial run away', () => {
-    expect(earnsSheet(reached(0.05), bodies)).toBe(false);
-    expect(earnsSheet(reached(0.15), bodies)).toBe(false);
-  });
-
-  it('reports on a run that got most of the way', () => {
-    // "If I put in the effort only to die at 80%, I want to know that."
-    expect(earnsSheet(reached(0.8), bodies)).toBe(true);
-  });
-
-  it('sits where no trivial life in the corpus reaches', () => {
-    // Measured, not chosen: across 109 lives from the 63 diagnostics reports, the
-    // deepest sub-5-second life reached 0.265 of the field. 0.28 is the lowest
-    // bar that excludes every one of them.
-    expect(SHEET_FIELD_FRACTION).toBeGreaterThan(0.265);
-    expect(SHEET_FIELD_FRACTION).toBeLessThan(0.4);
   });
 });
 

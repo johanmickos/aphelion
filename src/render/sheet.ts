@@ -27,49 +27,7 @@
 import type { Body } from '../sim/types.ts';
 import type { RunStats } from '../score/types.ts';
 import type { Camera } from './camera.ts';
-import {
-  LADDER_GOOD_RGB,
-  LADDER_GREAT_RGB,
-  SLATE,
-  SUMMIT,
-  SUMMIT_RGB,
-  withAlpha,
-} from './palette.ts';
-import type { RGB } from './palette.ts';
-
-/**
- * Field fraction a life must reach before its death earns a sheet.
- *
- * A CONSTANT, NOT A WEIGHT. It decides WHEN a run is reported on, never what
- * anything costs — the rule in AGENTS.md that keeps it out of `ScoreConfig`, out
- * of the equality gate's config compare, and out of the golden.
- *
- * MEASURED, AND THE MEASUREMENT IS THE POINT. The brief was "for runs that end in
- * just a few seconds we may not need one, but if I put in the effort only to die
- * at 80%, I want to know". That is a statement about two populations, so it was
- * tested against both: 109 lives recovered from the 63 reports in `diagnostics/`,
- * split by how long they lasted.
- *
- *   bar    sub-5s lives firing    lives of 15s+ firing
- *   0.24        1 of 21  (5%)          64%
- *   0.26        1 of 21  (5%)          51%
- *   0.28        0 of 21  (0%)          44%
- *   0.40        0 of 21  (0%)          14%
- *
- * 0.28 is the LOWEST bar at which no trivial life qualifies — the deepest one of
- * those reached 0.265 of the field — while still reporting on a bit under half of
- * the substantial ones. Lower and a three-second flub gets a results screen;
- * much higher and the report becomes too rare to be the feedback it is for.
- *
- * THE CORPUS IS STALE AND THAT MATTERS. Every one of those recordings predates
- * the funnel, the clear, and the current tuning, and AGENTS.md is explicit that a
- * threshold calibrated on a stale feel is worse than an unmeasured one because it
- * looks defensible. What survives staleness is the SHAPE — that sub-5s lives top
- * out around a quarter of the field, and that the two populations separate near
- * there. Re-measure the exact value against sessions played on the current build
- * before treating it as settled.
- */
-export const SHEET_FIELD_FRACTION = 0.28;
+import { DEBRIEF, SUMMIT, SUMMIT_RGB, withAlpha } from './palette.ts';
 
 export interface SheetStyle {
   /** Accent for the headline and the rules. */
@@ -115,77 +73,15 @@ export const CLEARED_SHEET: SheetStyle = {
   marquee: 1,
 };
 
-/** Linear blend between two colours. */
-function mix(a: RGB, b: RGB, u: number): RGB {
-  const c = u < 0 ? 0 : u > 1 ? 1 : u;
-  return [
-    Math.round(a[0] + (b[0] - a[0]) * c),
-    Math.round(a[1] + (b[1] - a[1]) * c),
-    Math.round(a[2] + (b[2] - a[2]) * c),
-  ];
-}
-
-/**
- * A death's sheet, warmed by how far up the course it got.
- *
- * DYING AT 80% SHOULD NOT LOOK LIKE DYING AT 10%. A single slate treatment for
- * every worthy death says only "that qualified", and the whole reason the gate
- * exists is that some attempts are much better than others. So the sheet reads
- * the one number it already has — field fraction — and warms with it.
- *
- * CONTINUOUS, NOT TIERED, and that is a deliberate dodge. Bands would need
- * thresholds, and AGENTS.md is right that a threshold is measured rather than
- * chosen — but the corpus those would have to be measured against predates the
- * funnel, the clear and the ceremony. A gradient needs no threshold at all: it is
- * monotone by construction, so "further is better" is true at every pair of runs
- * without anyone having to defend a line between them.
- *
- * IT WALKS THE RARITY LADDER AND STOPS SHORT OF GOLD. Slate through the ladder's
- * blue to its green, which is meaning the player has already learned from every
- * award they have ever been paid. The top rung is not on offer: gold is the
- * summit, a clear is the only thing that reaches it, and spending it on a death
- * would make the one moment it exists for cheaper.
- *
- * The marquee fades in over the same gradient rather than switching on, so there
- * is no line to argue about there either — invisible on an ordinary attempt, and
- * unmistakably running by the time a run dies in sight of the finish.
- */
-export function deathSheet(progress: number): SheetStyle {
-  // Normalised from the gate, since nothing below it produces a sheet at all —
-  // measuring from zero would spend most of the range on runs that never appear.
-  const u = Math.max(
-    0,
-    Math.min(1, (progress - SHEET_FIELD_FRACTION) / (1 - SHEET_FIELD_FRACTION)),
-  );
-  const rgb =
-    u < 0.5
-      ? mix(SLATE, LADDER_GOOD_RGB, u * 2)
-      : mix(LADDER_GOOD_RGB, LADDER_GREAT_RGB, u * 2 - 1);
-  return {
-    accent: `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`,
-    accentRGB: rgb,
-    kicker: 'RUN ENDED',
-    cleared: false,
-    // Nothing for most of the range, then rising quickly: a light running round
-    // the border is a claim, and it should only be made about a run that nearly
-    // made it.
-    marquee: Math.max(0, (u - 0.55) / 0.45),
-  };
-}
-
-/** The plain slate sheet, for a run that only just cleared the bar. */
-export const DEATH_SHEET: SheetStyle = deathSheet(SHEET_FIELD_FRACTION);
-
-/**
- * Did this life get far enough up the course to be worth reporting on?
- *
- * A clear never asks: beating the field is worthy by construction. This is only
- * the question a DEATH has to answer.
- */
-export function earnsSheet(run: RunStats, bodies: readonly Body[]): boolean {
-  const { done, total } = planetsCleared(run, bodies);
-  return total > 0 && done / total >= SHEET_FIELD_FRACTION;
-}
+export const DEATH_SHEET: SheetStyle = {
+  accent: `rgb(${DEBRIEF[0]},${DEBRIEF[1]},${DEBRIEF[2]})`,
+  accentRGB: DEBRIEF,
+  kicker: 'RUN ENDED',
+  cleared: false,
+  // Still. A death is a report and a clear is an event, and the marquee is
+  // the whole of that difference.
+  marquee: 0,
+};
 
 /** One line of the body: what it is, this run's value, and the session's best. */
 interface Row {

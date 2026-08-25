@@ -28,7 +28,6 @@ import {
   previewBurn,
   scoreTick,
 } from '../src/score/index.ts';
-import { earnsSheet } from '../src/render/sheet.ts';
 import { buildReport, serializeReport, summarize } from '../src/app/report.ts';
 
 /**
@@ -478,15 +477,18 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     if (!state.ending.active) sheetOfferedForEnding = false;
     else if (!sheetOfferedForEnding) {
       sheetOfferedForEnding = true;
-      if (state.ending.reason === 'cleared') {
-        sheet = { kind: 'cleared', t: 0 };
-      } else if (score.lastRun && earnsSheet(score.lastRun, state.bodies)) {
-        sheet = { kind: 'death', t: 0 };
-      }
-      // An unworthy death raises nothing at all and respawns as it always has.
-      // Failure staying cheap is what `src/app/lifecycle.ts` argues hardest for,
-      // and a results screen after a three-second flub is exactly the tax it
-      // warns against.
+      // EVERY ENDING GETS A SHEET, short runs included.
+      //
+      // A worthiness gate lived here — a measured field fraction below which a
+      // death reported nothing, so that `src/app/lifecycle.ts`'s "failure stays
+      // cheap" survived. It is gone by decision: one screen, always, is simpler
+      // to learn than a screen that sometimes appears, and a player cannot form a
+      // habit around a report they only sometimes get.
+      //
+      // What keeps failure cheap instead is the dismissal. The sheet goes as soon
+      // as it is readable and one tap takes it away, so the cost of a bad run is a
+      // beat rather than a wait.
+      sheet = { kind: state.ending.reason === 'cleared' ? 'cleared' : 'death', t: 0 };
     }
     // Recorded as well as shown. A replay recomputes these, but only while it is
     // still reproducing the run — and past a divergence it recomputes a different

@@ -159,22 +159,27 @@ export const LADDER_GREAT_RGB: RGB = [92, 214, 122];
 export const FINISH: RGB = [92, 226, 140];
 
 /**
- * The post-mortem's slate: cold, factual, and not any of the other meanings.
+ * The debrief: the colour of a run that ended, whatever it managed first.
  *
- * A worthy death's sheet was briefly drawn in `FINISH` green, which was simply
- * wrong — green means THE FINISH in this game now, on the arrow, the chequers and
- * the notice, so a sheet about dying was congratulating the player for arriving.
+ * ONE COLOUR FOR EVERY DEATH. It has been three things and each was wrong in a
+ * way worth keeping written down. `FINISH` green congratulated the player for
+ * arriving at a finish they did not reach. Hazard red is the one colour here that
+ * means "right now, and you can still act", which a post-mortem cannot. And a
+ * gradient that warmed with how far the run got read as the game grading your
+ * failure, when what it should do is simply report it.
  *
- * Hazard red is wrong too, and less obviously. This sheet only appears for runs
- * that got a long way; it exists to say "that was a good attempt", and the colour
- * of the wall you hit argues with that. Red is also the one colour in the game
- * that means something is happening RIGHT NOW and can still be acted on, which a
- * post-mortem cannot.
+ * SO: BETWEEN THE TWO IT SITS BETWEEN. The plain slate it replaced was accurate
+ * and morose — the colourless family the HUD uses for readouts nobody is meant to
+ * look at — and the summit gold is the one thing above it that must stay rare. A
+ * muted indigo has enough chroma to be worth reading and no claim to being an
+ * award.
  *
- * So: the colourless family the HUD already uses for its quiet readouts. It reads
- * as a report rather than an alarm or an award, which is exactly what it is.
+ * OFF THE RARITY LADDER, deliberately, and not merely near it. Borrowing
+ * `LADDER_GOOD` would have been the easy way to get some life into it, and would
+ * have meant every death sheet announcing itself as a rung — colour is a RANK in
+ * this codebase, and a run ending is not a grade.
  */
-export const SLATE: RGB = [138, 155, 186];
+export const DEBRIEF: RGB = [124, 146, 212];
 
 /**
  * The summit gold, for the ceremony that fires when the field is cleared.
