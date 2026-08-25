@@ -217,6 +217,25 @@ export interface FieldBounds {
 }
 
 /**
+ * The run-in: the band the funnel pulls through and the bumpers guard.
+ *
+ * ONE DEFINITION, because there were briefly two and they disagreed. The funnel
+ * derives its band from `finishY` and walks DOWN by `finishFunnelDepth`; the
+ * bumper was written independently and subtracted both `grabRange` and the depth
+ * from the crest, which happen to be the same number today — so it reached 560px
+ * past the finish line into the ceremony's airspace and nothing looked wrong.
+ * Two expressions of one region is one bug waiting for the day those two keys
+ * stop matching.
+ *
+ * Returns null when the field cannot be cleared, or has no run-in.
+ */
+export function runInBand(cfg: SimConfig, fb: FieldBounds): { top: number; bottom: number } | null {
+  if (!cfg.clearAtTop || cfg.finishFunnelDepth <= 0) return null;
+  const finishY = fb.crest - cfg.grabRange;
+  return { top: finishY, bottom: finishY + cfg.finishFunnelDepth };
+}
+
+/**
  * Is this point inside some anomaly's bubble?
  *
  * The whole anomaly mechanic, in one predicate. `stepSim` suspends the SIDE

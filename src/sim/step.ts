@@ -18,7 +18,14 @@ import { applyClearance, beginCapture, freezeOrbit, releaseCapture } from './cap
 import { contactPolicy, reflectCoefficient } from './contact.ts';
 import { boostEnvelope } from './boost.ts';
 import { burn, regen } from './fuel.ts';
-import { backtrackFloorY, createBodies, fieldBounds, inAnomalyField, SPAWN } from './world.ts';
+import {
+  backtrackFloorY,
+  createBodies,
+  fieldBounds,
+  inAnomalyField,
+  runInBand,
+  SPAWN,
+} from './world.ts';
 
 /** A fresh run. Deterministic: same config in, same state out. */
 export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
@@ -109,8 +116,9 @@ function driftAccel(
   if (!cfg.clearAtTop || cfg.finishFunnelDepth <= 0) return { ax: 0, ay: 0 };
 
   const fb = fieldBounds(cfg, state.bodies);
-  const finishY = fb.crest - cfg.grabRange;
-  const below = y - finishY;
+  const band = runInBand(cfg, fb);
+  if (band === null) return { ax: 0, ay: 0 };
+  const below = y - band.top;
   if (below < 0 || below > cfg.finishFunnelDepth) return { ax: 0, ay: 0 };
 
   // 0 at the crest, 1 at the line. Smoothed so the pull arrives rather than
@@ -264,12 +272,43 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
     return;
   }
 
+  // ---- bumpers: nothing dies in the run-in
+  //
+  // The chevrons say "you are nearly there" and the funnel is actively carrying
+  // the ship, so a run that ends against a side wall in that stretch is the game
+  // taking something away at the exact moment it promised to hand it over. Inside
+  // the band the walls bounce instead.
+  //
+  // The death is suppressed for a CAPTURED ship too, not only a drifting one. A
+  // wide orbit at the last planet can swing over the line, and "no possible way
+  // to die here" has to mean no possible way — a rule with an exception in it is
+  // not the rule the player will remember. Only the drift is reflected, because
+  // an orbit will carry itself back anyway and rewriting a capture's velocity
+  // would be reaching into a manoeuvre that is already resolving.
+  const band = runInBand(cfg, fb);
+  const inRunIn =
+    cfg.finishBumper > 0 && band !== null && pos.y <= band.bottom && pos.y >= band.top;
+  if (inRunIn && !state.capture) {
+    const { ship } = state;
+    if (ship.x < fb.left) {
+      ship.x = fb.left + (fb.left - ship.x) * cfg.finishBumper;
+      ship.vx = Math.abs(ship.vx) * cfg.finishBumper;
+      ship.burstX = Math.abs(ship.burstX) * cfg.finishBumper;
+    } else if (ship.x > fb.right) {
+      ship.x = fb.right - (ship.x - fb.right) * cfg.finishBumper;
+      ship.vx = -Math.abs(ship.vx) * cfg.finishBumper;
+      ship.burstX = -Math.abs(ship.burstX) * cfg.finishBumper;
+    }
+  }
+
   // The side boundary is suspended inside an anomaly's bubble, which is what a
   // release aimed past the barrier is flying through. Nothing else is suspended:
   // leaving the far side of the bubble puts the ship back outside `fb.right` on
   // the very next tick and ends the run, which is the miss.
   const outX =
-    (pos.x < fb.left - 4 || pos.x > fb.right + 4) && !inAnomalyField(pos.x, pos.y, state.bodies);
+    (pos.x < fb.left - 4 || pos.x > fb.right + 4) &&
+    !inRunIn &&
+    !inAnomalyField(pos.x, pos.y, state.bodies);
   // THE CEILING IS NOT A DEATH ONCE THE FIELD CAN BE CLEARED. With `clearAtTop`
   // on, a drifting ship ends as `cleared` at `clearY` — 240px below `fb.top` —
   // so it can only ever reach the ceiling while CAPTURED, and a ship captured up

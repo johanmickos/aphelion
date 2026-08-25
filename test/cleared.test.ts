@@ -168,6 +168,77 @@ describe('clearing the field', () => {
   });
 });
 
+describe('nothing dies at a wall in the run-in', () => {
+  const cfg = DEFAULT_CONFIG;
+
+  /** Fly into the run-in from `dx` off centre, drifting sideways at `vx`. */
+  function enter(dx: number, vx: number, vy: number): SimState {
+    const state = createInitialState(cfg);
+    const fb = fieldBounds(cfg, state.bodies);
+    const cx = (fb.left + fb.right) / 2;
+    state.ship.x = cx + dx;
+    state.ship.y = fb.crest - cfg.grabRange + cfg.finishFunnelDepth - 2;
+    state.ship.vx = vx;
+    state.ship.vy = vy;
+    state.ship.burstX = 0;
+    state.ship.burstY = 0;
+    state.highWaterY = state.ship.y;
+    for (let i = 0; i < 1200 && !state.ending.active; i++) {
+      stepSim(state, cfg, NO_INPUT, FIXED_DT);
+    }
+    return state;
+  }
+
+  it('bounces instead of ending, however hard it is thrown at a wall', () => {
+    // The chevrons say "you are nearly there" and the funnel is carrying the
+    // ship, so a run ending against a side wall here is the game taking something
+    // away at the moment it promised to hand it over.
+    //
+    // Swept rather than sampled: 399 entries across the whole width at every
+    // sideways speed up to 520px/s produced no wall death at all, and 298 of them
+    // bounced at least once. This is the corner of that sweep.
+    for (const dx of [-360, -200, 0, 200, 360]) {
+      for (const vx of [-520, -300, 300, 520]) {
+        const end = enter(dx, vx, -420);
+        expect(end.ending.reason, `dx=${dx} vx=${vx}`).not.toBe('out-of-bounds');
+      }
+    }
+  });
+
+  it('takes speed out of the bounce, so it settles instead of rattling', () => {
+    // A perfect bumper sends a ship across the corridor at the speed it arrived
+    // with, and it crosses the line still ricocheting. Some loss per hit is what
+    // makes a wild entry resolve into a finish rather than a pinball table.
+    expect(cfg.finishBumper).toBeGreaterThan(0);
+    expect(cfg.finishBumper).toBeLessThan(1);
+  });
+
+  it('leaves the last planet solid, which is a different question', () => {
+    // "No wall deaths" is not "no deaths". The bumpers make the SIDES safe; the
+    // planet is a thing you can see and steer around, and an intangible one at
+    // the end of the course would be a stranger game than a lethal one.
+    const state = createInitialState(cfg);
+    let top = state.bodies[0]!;
+    for (const b of state.bodies) if (b.y < top.y) top = b;
+    // Below the crest, so the planet is genuinely ahead. Starting AT the band's
+    // bottom edge puts the ship level with the last body and it simply sails past
+    // — which is how this first "passed" while proving nothing.
+    state.ship.x = top.x;
+    state.ship.y = top.y + 260;
+    state.ship.vx = 0;
+    state.ship.vy = -420;
+    state.highWaterY = state.ship.y;
+    for (let i = 0; i < 1200 && !state.ending.active; i++) {
+      stepSim(state, cfg, NO_INPUT, FIXED_DT);
+    }
+    expect(state.ending.reason).toBe('impact');
+  });
+
+  it('is off in the prototype, where the walls stay lethal everywhere', () => {
+    expect(PROTOTYPE_CONFIG.finishBumper).toBe(0);
+  });
+});
+
 describe('the prototype never clears', () => {
   it('is off in PROTOTYPE_CONFIG, which is what keeps the gate at zero', () => {
     expect(PROTOTYPE_CONFIG.clearAtTop).toBe(false);

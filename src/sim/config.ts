@@ -483,6 +483,28 @@ export interface SimConfig {
    */
   finishFunnelHold: number;
   /**
+   * How much speed a side wall returns inside the run-in, 0..1. 0 disables the
+   * bumpers and the walls stay lethal there.
+   *
+   * NOTHING MAY DIE IN THE CARPET. The chevrons say "you are nearly there" and
+   * the funnel is actively carrying the ship, so a run that ends against a side
+   * wall in that stretch is the game taking something away at the exact moment it
+   * had promised to hand it over. At worst a bumper makes the finish a silly,
+   * bouncy one; at best it changes nothing because the ship was never near a wall.
+   *
+   * IT IS ALSO WHAT LETS THE GUIDE STAY LIGHT. `finishFunnelPull` was measured
+   * against "does it stop drifts dying at the wall", which is a job that wants
+   * stiffness — and stiffness is exactly what takes the crossing away from the
+   * player. With the walls no longer lethal here, that pressure is gone: the pull
+   * can go on being a nudge, and the one case it was never able to save — a ship
+   * 300px out and still accelerating outward — now bounces instead of dying.
+   *
+   * 0.72 rather than a perfect 1: some speed has to be lost or a ship arriving
+   * across the corridor rattles between the walls all the way to the line. Enough
+   * left to read as a real bounce.
+   */
+  finishBumper: number;
+  /**
    * A grab below escape speed is a capture, never a flyby.
    *
    * The prototype also called it a flyby when the ship was momentarily moving
@@ -863,6 +885,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   finishFunnelPull: 0,
   finishFunnelBoost: 0,
   finishFunnelHold: 0,
+  finishBumper: 0,
   boundGrabsCapture: false,
   // Inert here — but it is also what an older report replays under. See the key.
   outboundFlybyFrac: 1,
@@ -1003,6 +1026,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   finishFunnelPull: 13,
   finishFunnelBoost: 800,
   finishFunnelHold: 90,
+  finishBumper: 0.72,
   holdClimbInCapture: true,
   boundGrabsCapture: true,
   outboundFlybyFrac: 0.65,
@@ -1046,7 +1070,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 24;
+export const SIM_VERSION = 25;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

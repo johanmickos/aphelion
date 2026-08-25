@@ -57,6 +57,7 @@
   "finishFunnelPull": 0,
   "finishFunnelBoost": 0,
   "finishFunnelHold": 0,
+  "finishBumper": 0,
   "boundGrabsCapture": false,
   "outboundFlybyFrac": 1,
   "zipDur": 0,
