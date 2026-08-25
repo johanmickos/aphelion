@@ -13,14 +13,15 @@
  * inside the storm because cells are drawn around wherever it is, but WHICH part
  * of the storm it is inside changes as it flies.
  *
- * THE CURTAINS ARE RENDERED SMALL AND SCALED UP, WHICH IS THE WHOLE TRICK. They
- * were first drawn as a stack of strokes of decreasing width, and that cannot
- * produce a soft edge however many passes it uses: every stroke is solid with a
- * hard boundary, so N passes draw N terraces and the result is a contour map.
- * Eight passes on a Gaussian profile only made the terraces finer, and on a phone
- * they were still plainly visible as concentric lines fanning out of each band.
+ * THE WHOLE STORM IS RENDERED SMALL AND SCALED UP, WHICH IS THE WHOLE TRICK. The
+ * curtains were first drawn as a stack of strokes of decreasing width, and that
+ * cannot produce a soft edge however many passes it uses: every stroke is solid
+ * with a hard boundary, so N passes draw N terraces and the result is a contour
+ * map. Eight passes on a Gaussian profile only made the terraces finer, and on a
+ * phone they were still plainly visible as concentric lines fanning out of each
+ * band.
  *
- * So the curtains go into an offscreen canvas at 1/`DOWNSCALE`, and are drawn back
+ * So the storm goes into an offscreen canvas at 1/`DOWNSCALE`, and is drawn back
  * up to full size with image smoothing on. The bilinear filter blurs across every
  * step for free, and the whole thing costs a fraction of what the stack did:
  * three strokes over 1/64th of the pixels, plus one composite.
@@ -28,6 +29,25 @@
  * offscreen rasterisation of its own on every draw call, its cost scales with the
  * blurred area rather than with the geometry, and it would have to be applied once
  * per curtain rather than once per frame.
+ *
+ * THE CLOUDS GO THROUGH THE SAME BUFFER, AND FOR THE OTHER REASON. They used to be
+ * drawn at full size — a radial gradient is already smooth, so there was nothing
+ * for an upscale to fix and it only cost them detail. What that missed is the
+ * cost. A cloud is a soft blob two-thirds of a window wide, about sixteen of them
+ * survive the reach test every frame, and they overlap: measured at 5x the
+ * window's own area in alpha-blended pixels per frame, and the window grows with
+ * the screen. On a 1728x972 desktop at dpr 2 that is 12 megapixels of gradient
+ * blending per frame — 0.7 Gpx/s at 60fps — and it was reported as the whole game
+ * lagging the moment the storm came up, on a screen where a smaller browser window
+ * was fine. Through the buffer the same clouds cost 1/64th of that. At 1/8 a
+ * cloud's radius is still 40-odd buffer pixels across, which is far more than a
+ * three-stop gradient needs.
+ *
+ * EVERYTHING HERE IS SIZED TO THE DESIGN WINDOW, NOT THE VIEWPORT. They are the
+ * same rectangle on a phone and nowhere else: on that desktop the window is 611 of
+ * 1728 pixels, and the rest is letterbox bar that `Scene` has already clipped
+ * away. Sizing the sky wash, the buffer, the composite and the cull to the
+ * viewport meant paying for all of it and showing a third.
  *
  * IT DOES NOT FADE OUT WITH THE COUNTDOWN. An earlier version scaled everything
  * by the window's remaining fraction, which dimmed it linearly to nothing and let
@@ -43,7 +63,7 @@
  * in render and which `src/render/world.ts` already does for the anomaly's pulse.
  */
 import type { Camera } from './camera.ts';
-import { toScreenX, toScreenY } from './camera.ts';
+import { toScreenX, toScreenY, windowRect } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 
 /** How far from the ship clouds are drawn, in world units. */
@@ -56,7 +76,7 @@ const CELL = 300;
 const BAND = 480;
 
 /**
- * How much smaller the curtain buffer is than the viewport.
+ * How much smaller the storm buffer is than the design window.
  *
  * This is the blur radius in disguise: the upscale interpolates across
  * `DOWNSCALE` screen pixels, so a larger number is both softer and cheaper. Eight
@@ -111,6 +131,24 @@ function unit(h: number, shift: number): number {
   return ((h >>> shift) & 0xffff) / 0x10000;
 }
 
+/**
+ * Where the storm is being drawn, and how screen pixels map into it.
+ *
+ * Both layers are authored in screen pixels and then mapped, so the buffer and
+ * the no-buffer fallback run the same geometry: `k` is 1 and the origin is the
+ * window's own when drawing straight onto the canvas.
+ */
+interface Layer {
+  into: CanvasRenderingContext2D;
+  /** Screen pixels -> layer pixels. */
+  k: number;
+  ox: number;
+  oy: number;
+}
+
+const layerX = (l: Layer, sx: number): number => sx * l.k + l.ox;
+const layerY = (l: Layer, sy: number): number => sy * l.k + l.oy;
+
 export class Nebula {
   private readonly makeCanvas: CanvasFactory;
 
@@ -124,7 +162,7 @@ export class Nebula {
     this.makeCanvas = makeCanvas;
   }
 
-  /** The curtain buffer at the current size, or null if none can be had. */
+  /** The storm buffer at the current size, or null if none can be had. */
   private target(w: number, h: number): CanvasRenderingContext2D | null {
     if (this.failed || w <= 0 || h <= 0) return null;
     if (!this.buf) {
@@ -151,8 +189,6 @@ export class Nebula {
     cam: Camera,
     snap: RenderSnapshot,
     timeMs: number,
-    viewportW: number,
-    viewportH: number,
     outro: number | null,
   ): void {
     const frac = snap.chargedFrac;
@@ -189,17 +225,54 @@ export class Nebula {
 
     const t = timeMs / 1000;
     const pulse = 0.5 + 0.5 * Math.sin(t * Math.PI * beat);
+    const win = windowRect(cam);
+    if (win.w <= 0 || win.h <= 0) return;
 
     ctx.save();
 
     // A floor of colour across the sky, so the clouds have no hard edge where
-    // they run out.
+    // they run out. Kept at full resolution and off the buffer: it is one flat
+    // fill, so it costs the same either way, and a flat colour is the one thing
+    // an upscale can get wrong — the filter samples past the buffer's edge and
+    // leaves a seam down the letterbox boundary.
     const skyA = Math.min(0.4, (0.1 + 0.035 * pulse) * strength);
     ctx.fillStyle = `rgba(58,18,104,${skyA.toFixed(3)})`;
-    ctx.fillRect(0, 0, viewportW, viewportH);
+    ctx.fillRect(win.x, win.y, win.w, win.h);
 
-    this.clouds(ctx, cam, snap, t, viewportW, viewportH, strength, swell, beat);
-    this.curtains(ctx, cam, snap, t, viewportW, viewportH, strength, swell);
+    // The buffer covers the window at 1/DOWNSCALE, rounded UP: the composite maps
+    // it back at exactly DOWNSCALE rather than stretching it to the window's
+    // width, so the extra fraction of a pixel hangs over the clipped edge instead
+    // of shearing everything inside by half a percent.
+    const bw = Math.max(1, Math.ceil(win.w / DOWNSCALE));
+    const bh = Math.max(1, Math.ceil(win.h / DOWNSCALE));
+    const buf = this.target(bw, bh);
+    const layer: Layer = buf
+      ? { into: buf, k: 1 / DOWNSCALE, ox: -win.x / DOWNSCALE, oy: -win.y / DOWNSCALE }
+      : { into: ctx, k: 1, ox: 0, oy: 0 };
+    if (buf) buf.clearRect(0, 0, bw, bh);
+
+    let drew = this.clouds(layer, cam, snap, t, win, strength, swell, beat);
+    drew = this.curtains(layer, cam, snap, t, win, strength, swell) || drew;
+
+    if (buf && drew && this.buf) {
+      // Up to full size, smoothed. This is where the blur happens.
+      //
+      // `this.buf` and NOT the context that was drawn into. Passing the context
+      // throws a TypeError, which aborts the whole scene draw before the
+      // starfield, the bodies or the ship are reached — the screen keeps the black
+      // fill and the sky wash and nothing else, which is what "everything goes
+      // purple and all the objects disappear" looks like from the outside. A
+      // blanket cast on the argument is what let it compile.
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(
+        this.buf as unknown as CanvasImageSource,
+        win.x,
+        win.y,
+        bw * DOWNSCALE,
+        bh * DOWNSCALE,
+      );
+    }
 
     ctx.restore();
   }
@@ -207,27 +280,26 @@ export class Nebula {
   /**
    * The bed the curtains hang over: overlapping puffs on a world grid.
    *
-   * Drawn at full size rather than through the buffer, because a radial gradient
-   * is already smooth — there is nothing here for an upscale to fix, and it would
-   * only cost them their detail.
+   * Through the buffer — see the header. Returns whether anything was drawn.
    */
   private clouds(
-    ctx: CanvasRenderingContext2D,
+    layer: Layer,
     cam: Camera,
     snap: RenderSnapshot,
     t: number,
-    viewportW: number,
-    viewportH: number,
+    win: { x: number; y: number; w: number; h: number },
     strength: number,
     swell: number,
     beat: number,
-  ): void {
+  ): boolean {
+    const { into } = layer;
     const s = cam.scale;
     const reach = REACH * swell;
     const c0x = Math.floor((snap.x - reach) / CELL);
     const c1x = Math.floor((snap.x + reach) / CELL);
     const c0y = Math.floor((snap.y - reach) / CELL);
     const c1y = Math.floor((snap.y + reach) / CELL);
+    let drew = false;
 
     for (let cy = c0y; cy <= c1y; cy++) {
       for (let cx = c0x; cx <= c1x; cx++) {
@@ -265,48 +337,52 @@ export class Nebula {
         const px = toScreenX(cam, wx);
         const py = toScreenY(cam, wy);
         // Cull before touching a gradient: REACH is 760 world units in every
-        // direction and the viewport is a tall narrow slice of that, so most of
-        // the grid sits behind the camera's back — and every cell that survives
-        // costs up to a full-viewport alpha blend.
-        if (px + rad < 0 || px - rad > viewportW || py + rad < 0 || py - rad > viewportH) continue;
-        const grad = ctx.createRadialGradient(px, py, 0, px, py, rad);
+        // direction and the window is a tall narrow slice of that, so most of the
+        // grid sits behind the camera's back — and every cell that survives costs
+        // up to a full-window alpha blend.
+        //
+        // Against the WINDOW and not the viewport. On a wide screen the letterbox
+        // bars are most of the viewport, and a cloud centred out there passed this
+        // test and was then clipped away in full: two of every sixteen, paying
+        // their gradient for nothing.
+        if (px + rad < win.x || px - rad > win.x + win.w) continue;
+        if (py + rad < win.y || py - rad > win.y + win.h) continue;
+
+        const lx = layerX(layer, px);
+        const ly = layerY(layer, py);
+        const lr = rad * layer.k;
+        const grad = into.createRadialGradient(lx, ly, 0, lx, ly, lr);
         grad.addColorStop(0, `rgba(${r},${g},${b},${a.toFixed(3)})`);
         grad.addColorStop(0.55, `rgba(${r},${g},${b},${(a * 0.42).toFixed(3)})`);
         grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-        ctx.fillStyle = grad;
-        ctx.fillRect(px - rad, py - rad, rad * 2, rad * 2);
+        into.fillStyle = grad;
+        into.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
+        drew = true;
       }
     }
+    return drew;
   }
 
   /**
    * The northern lights: wavy ribbons hung across the field.
    *
-   * Rendered into the low-resolution buffer and composited up — see the header
-   * for why that is the blur. Falls back to drawing straight onto the canvas when
-   * no buffer can be had, which is visibly harder-edged but only ever happens
-   * where there is no `document` to make one from.
+   * Through the buffer — see the header for why that is the blur. Falls back to
+   * drawing straight onto the canvas when no buffer can be had, which is visibly
+   * harder-edged but only ever happens where there is no `document` to make one
+   * from. Returns whether anything was drawn.
    */
   private curtains(
-    ctx: CanvasRenderingContext2D,
+    layer: Layer,
     cam: Camera,
     snap: RenderSnapshot,
     t: number,
-    viewportW: number,
-    viewportH: number,
+    win: { x: number; y: number; w: number; h: number },
     strength: number,
     swell: number,
-  ): void {
+  ): boolean {
+    const { into, k } = layer;
     const s = cam.scale;
-    const bw = Math.max(1, Math.ceil(viewportW / DOWNSCALE));
-    const bh = Math.max(1, Math.ceil(viewportH / DOWNSCALE));
-    const buf = this.target(bw, bh);
-    const into = buf ?? ctx;
-    // Everything is authored in screen pixels, so drawing into the buffer is the
-    // same geometry at 1/DOWNSCALE.
-    const k = buf ? 1 / DOWNSCALE : 1;
 
-    if (buf) buf.clearRect(0, 0, bw, bh);
     into.lineCap = 'round';
     into.lineJoin = 'round';
 
@@ -336,7 +412,7 @@ export class Nebula {
 
       const mid = toScreenY(cam, baseY);
       const reachPx = (amp + 150) * s;
-      if (mid + reachPx < 0 || mid - reachPx > viewportH) continue;
+      if (mid + reachPx < win.y || mid - reachPx > win.y + win.h) continue;
 
       // The wave is two summed sines of different periods: one reads as a drawn
       // ripple, two look blown.
@@ -348,8 +424,8 @@ export class Nebula {
       into.beginPath();
       let first = true;
       for (let wx = snap.x - 900; wx <= snap.x + 900; wx += 26) {
-        const px = toScreenX(cam, wx) * k;
-        const py = toScreenY(cam, yAt(wx)) * k;
+        const px = layerX(layer, toScreenX(cam, wx));
+        const py = layerY(layer, toScreenY(cam, yAt(wx)));
         if (first) {
           into.moveTo(px, py);
           first = false;
@@ -370,18 +446,6 @@ export class Nebula {
         drew = true;
       }
     }
-
-    if (!buf || !drew || !this.buf) return;
-    // Up to full size, smoothed. This is where the blur happens.
-    //
-    // `this.buf` and NOT the context that was drawn into. Passing the context
-    // throws a TypeError, which aborts the whole scene draw before the starfield,
-    // the bodies or the ship are reached — the screen keeps the black fill and
-    // the sky wash and nothing else, which is what "everything goes purple and
-    // all the objects disappear" looks like from the outside. A blanket cast on
-    // the argument is what let it compile.
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(this.buf as unknown as CanvasImageSource, 0, 0, viewportW, viewportH);
+    return drew;
   }
 }

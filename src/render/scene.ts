@@ -288,8 +288,6 @@ export class Scene {
       cam,
       snap,
       opts.timeMs,
-      opts.viewportW,
-      opts.viewportH,
       this.outroT >= 0 ? Math.min(1, this.outroT / OUTRO_SECS) : null,
     );
 

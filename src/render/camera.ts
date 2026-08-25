@@ -519,10 +519,28 @@ export function visibleWorldY(cam: Camera): { top: number; bottom: number } {
   return { top: cam.centerY - half, bottom: cam.centerY + half };
 }
 
+/**
+ * The design window in screen pixels: everything that is not a letterbox bar.
+ *
+ * The viewport and the window are the same rectangle on a phone and nowhere
+ * else. On a 1728-wide desktop the window is 611px of it, so a full-viewport
+ * operation throws away 65% of what it costs — see `src/render/nebula.ts`, where
+ * that was most of a frame.
+ */
+export function windowRect(cam: Camera): { x: number; y: number; w: number; h: number } {
+  return {
+    x: cam.offsetX,
+    y: cam.offsetY,
+    w: cam.designW * cam.scale,
+    h: cam.viewH * cam.scale,
+  };
+}
+
 /** Clip to the design window, so nothing can spill onto the letterbox bars. */
 export function clipToWindow(ctx: CanvasRenderingContext2D, cam: Camera): void {
+  const r = windowRect(cam);
   ctx.beginPath();
-  ctx.rect(cam.offsetX, cam.offsetY, cam.designW * cam.scale, cam.viewH * cam.scale);
+  ctx.rect(r.x, r.y, r.w, r.h);
   ctx.clip();
 }
 
