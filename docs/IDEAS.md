@@ -14,6 +14,37 @@
 - Puzzle mode
 - Speed challenges
 - Trick shots
+- **The carpet as a play zone, and the fingerprint it leaves.** Raised 2026-08-25.
+  Make the run-in a drift/play space rather than only a corridor: green dots
+  scattered through it that can be CAPTURED like planets but are harmless to touch
+  and fly through. Then show the ship's path through that zone on the ceremony
+  sheet as a "fingerprint" — a signature unique to how the player flew it, drawn
+  white/blue and flashing platinum now and then, like mother of pearl.
+
+  Four things worth knowing before starting, because each one has a seam that
+  already exists or a rule that will bite:
+
+  - **The dots are a third `Body.kind`.** `contactPolicy` already switches on
+    kind, so "capturable but harmless" is a case there rather than a new code
+    path — the same way an anomaly is already a body that behaves differently on
+    contact. Do not special-case them in `stepSim`.
+  - **The zone is already non-lethal at the sides.** `finishBumper` made the walls
+    bounce inside `runInBand`, so a play space is what the region physically is
+    now; this idea is mostly asking the *content* to catch up with that.
+  - **The fingerprint cannot come from `Trail`.** It is capped at `trailMax` (16
+    points) and clears on respawn — it is a wake, not a record. The signature
+    wants its own buffer that opens when the ship enters the band. Good news: the
+    path is a pure function of `(config, seed, inputLog)` like everything else, so
+    a replay reproduces the same fingerprint, which makes it shareable and
+    verifiable rather than decorative.
+  - **The iridescence sits OFF the rarity ladder**, with the finish green and the
+    burn word. Colour means rank in `accolade.ts`; a signature is a unique artifact
+    rather than a graded one, and there is no "how good was that" for platinum to
+    encode. Green for the dots is a deliberate reuse — they belong to the finish —
+    not a clash.
+
+  Also note the sheet is already dense: five rows, a headline and a subtitle in the
+  top fifth of the screen. A fingerprint needs real estate that does not exist yet.
 - Early off-course warning: fire the boxed `⚠ LOST — OFF COURSE` treatment (with its leader line) as a *warning* seconds before the wall, not as the obituary. Playtest 2026-08-22 rec #4. Considered alongside the point-of-no-return scar and deliberately left out of it: the scar is a diegetic instrument, this is a screen-level alarm, and they should be judged separately.
 
 ## Entities
