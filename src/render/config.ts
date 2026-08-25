@@ -223,7 +223,14 @@ export interface RenderConfig {
   deadlineHairFrac: number;
   deadlineTrackAlpha: number;
   deadlineLeadAlpha: number;
-  /** Half-width of the track, and the extra half-width it gains at the cross. */
+  /**
+   * HALF-width of the track, and the extra half-width it gains at the cross.
+   *
+   * Half, because `ribbon` lays each point out at `p ± normal * w` — so these are
+   * half of the stroke widths they were tuned as. Tuned at 1.6 and 2.6 as canvas
+   * `lineWidth`, which is a full width; shipping those numbers unchanged drew the
+   * track at twice the weight it was chosen at.
+   */
   deadlineTrackWidth: number;
   deadlineLeadWidth: number;
   /**
@@ -354,8 +361,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   deadlineHairFrac: 0.35,
   deadlineTrackAlpha: 0.3,
   deadlineLeadAlpha: 1,
-  deadlineTrackWidth: 1.6,
-  deadlineLeadWidth: 2.6,
+  deadlineTrackWidth: 0.8,
+  deadlineLeadWidth: 1.3,
   deadlineAlpha: 0.5,
   deadlineDeadFrac: 0.18,
   deadlineSettleRate: 9,
