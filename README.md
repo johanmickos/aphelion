@@ -7,6 +7,11 @@ thing: **press and hold** to let a planet's gravity capture you into orbit, then
 **release** to fling out along the tangent toward the next planet. Chaining those
 slingshots is how you climb.
 
+The field has a top. Clear the last planet and a run-in of green chevrons carries
+you to a chequered finish line, the sky goes to lightspeed, and a sheet reports
+what the run was worth. Every run ends with that sheet — the field cleared, or
+not.
+
 TypeScript, Canvas2D, **zero runtime dependencies** — the game is also the engine.
 
 ---
@@ -47,7 +52,8 @@ pnpm build            # production bundle into dist/
 index.html            The prototype. IMMUTABLE reference material — never edit it.
 app/                  The playable shell (Vite root).
 src/sim/              The simulation. No DOM, no dependencies, no bundler syntax.
-src/render/           Camera, scene, HUD, compass. Everything that knows about pixels.
+src/render/           Camera, scene, HUD, compass, the ending ceremony and its
+                      results sheet. Everything that knows about pixels.
 src/app/              The fixed-timestep loop, run lifecycle, tuning, diagnostics.
 tools/                Headless harness, golden capture, replay, QR + Vite plugins.
 test/                 The equality gate, invariants, scenario matrix, render guards.
@@ -333,7 +339,14 @@ by the word instead, and every word names its own axis: proximity for the grab
 (`GRAZED`, `WHISKER`), composure for a nerve grab (`BRINK`, `CLUTCH`),
 marksmanship for aim (`PINPOINT`, `DEADEYE`), launch for the boost window
 (`SLINGSHOT`, `REDLINE`). `src/render/accolade.ts` is the single table the score
-band and the popups both read, so the two cannot drift apart. Two qualities at their top tier at once earns a rare superlative
+band and the popups both read, so the two cannot drift apart, and
+`src/render/palette.ts` holds the values it reads so a hue can be retuned in one
+place rather than in six.
+
+That rule governs **awards**. The game's other cues colour by category on purpose
+and always have — blue and purple edge markers for a planet and an anomaly, green
+everywhere the finish appears, indigo on a run's results sheet, the ladder's gold
+for the ceremony — because none of them answers "how good was that?". Two qualities at their top tier at once earns a rare superlative
 instead.
 
 One word is not a quality but a **conjunction**: a _nerve grab_ (`NERVE`,

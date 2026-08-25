@@ -48,6 +48,13 @@ Measure a session by `score.best`, not `score.score`. The score is the current
 _life's_ and a death zeroes it, so at the last tick of a recording it is usually
 zero — which will make any weight you are testing look dead.
 
+**Anything drawn after a run ends must read `score.lastRun`**, the copy sealed on
+the ending tick, and never the live fields. `endLife` runs on the FIRST tick of
+the ending hold, so by the time a results screen or a HUD readout draws, the run
+it is describing has already been reset. This has now caught two things that
+looked correct and rendered zeroes: the results sheet, and the score band during
+the entire victory ceremony.
+
 **Thresholds are measured, never chosen.** Every praise threshold in
 `src/score/praise.ts` and `reckless.ts` is a percentile of real play, replayed out
 of `diagnostics/`. Round numbers get this wrong in both directions: gated at a
@@ -63,13 +70,56 @@ pay at the press, and must not be "simplified" to: beside a planet you are alrea
 close to the surface, so every tap would be a tight grab and tapping in place
 would be a points faucet.
 
-**Colour means how good, the word means what.** Colour is the rarity ladder in
-`src/render/accolade.ts` and encodes nothing else; the category is carried by the
-word, and every word names its own axis. Do not re-add a category colour or a
-label naming the axis — both were tried, and a vocabulary that needs a caption is
-a vocabulary that has not been chosen carefully enough. `src/render/accolade.ts`
-is the only place a colour is picked, so the score band and the popups cannot
-drift apart.
+**Colour means how good, the word means what — on an AWARD.** Colour is the
+rarity ladder in `src/render/accolade.ts` and encodes nothing else there; the
+category is carried by the word, and every word names its own axis. Do not re-add
+a category colour or a label naming the axis to an award — both were tried, and a
+vocabulary that needs a caption is a vocabulary that has not been chosen carefully
+enough.
+
+The rule is about awards, and the boundary matters because other cue systems
+DELIBERATELY colour by category and always have: the edge markers are blue for a
+planet and purple for an anomaly, the finish is green wherever it appears (arrow,
+chequers, notice), a run ending is `DEBRIEF` indigo, and the ceremony is the
+ladder's gold. None of those answers "how good was that?", so none of them is on
+the ladder. A new colour has to say which system it belongs to.
+
+**`palette.ts` DEFINES a colour; `accolade.ts` PICKS one.** The palette holds the
+values so a hue can be retuned in one place; the accolade table still owns the
+mapping from rarity to style, which is what stops the score band and the popups
+drifting apart. Do not move the mapping into the palette — that was the original
+defect, where the band coloured by event and the popup by category.
+
+## The ending
+
+A run can end four ways, and `cleared` is the only one that is not a failure: the
+ship rose past the topmost body, so there is no more field to fly. It is an
+`EndingReason` like the others because everything downstream already knows how to
+stop for one — the scorer seals the run, the recorder closes the log, the renderer
+holds the frame.
+
+**Two geometries, each with exactly one definition, both in `src/sim/world.ts`.**
+
+- `finishLineY(cfg, fb)` — where the run ends as `cleared`.
+- `runInBand(cfg, fb)` — the stretch the funnel pulls through, the bumpers guard
+  and the chevrons are drawn over.
+
+Do not re-derive either. `crest - grabRange` was written by hand in three places
+and the band in two, and both sets agreed only because they were the same
+expression — which is how a renderer ends up painting a finish line somewhere the
+simulation does not end the run. Both bugs were real and both were silent.
+
+Everything else about the ending follows rules already stated elsewhere in this
+file: `clearAtTop`, the funnel and the bumpers are `SimConfig` keys that are OFF
+in `PROTOTYPE_CONFIG`, so the equality gate stays at zero; the ceremony and the
+sheets are `src/render/`, authored rather than simulated, for the reasons
+`src/render/attract.ts` gives at length.
+
+**A cleared run does not respawn.** `stepSim` holds it, deliberately, because what
+happens next is the caller's decision. A death does respawn on its own after
+`crashPause`, and the app freezes that hold — rather than racing it — while a
+results sheet is up. Worthiness, when it existed, could never live in `stepSim`:
+it is a question about `ScoreState`, which `src/sim/` must not be able to see.
 
 ## Reading a diagnostics report
 
@@ -95,13 +145,22 @@ This is the main debugging loop, and the easiest thing in the repo to misread.
    build around it, so a session played on a stale bundle is otherwise
    indistinguishable from one played on the current one.
 
-The header separates three ways a config can differ from the current defaults,
-because only one of them is a reason to distrust the report: keys in `KNOBS` are a
-deliberate experiment and print as `tuned`, `worldSeed` is a different world and
-prints as `field`, and everything else is build skew — which is the only case that
-raises "THIS REPORT CAME FROM A DIFFERENT BUILD". Keep that split when adding a
-key that a player can change at runtime, or the banner goes back to crying wolf on
-ordinary play and then blaming the knob for a divergence it did not cause.
+The header separates **five** ways a config can differ from the current defaults,
+because only one of them is a reason to distrust the report:
+
+| category        | what it is                                       | prints as             |
+| --------------- | ------------------------------------------------ | --------------------- |
+| `TUNED_KEYS`    | keys in `KNOBS`, moved in the tune panel         | `tuned`               |
+| `worldSeed`     | a different world, not different code            | `field`               |
+| `COURSE_KEYS`   | `bodyCount` / `anomalyCount` — the course picker | `course`              |
+| `DEV_KEYS`      | what the dev server always sets                  | `dev`                 |
+| everything else | build skew                                       | ⚠ **DIFFERENT BUILD** |
+
+All five live in `tools/replay-core.ts`. **Any key a player can change at runtime
+must join one of the first four**, or the banner goes back to crying wolf on
+ordinary play and then blaming the knob for a divergence it did not cause. That
+has now happened twice: `DEV_KEYS` and `COURSE_KEYS` were both added after the
+fact, and this paragraph said "three" for a while after it had become four.
 
 ## Simulation rules
 
