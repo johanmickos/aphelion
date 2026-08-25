@@ -951,15 +951,18 @@ describe('the sheet', () => {
   /**
    * `t` doubles as the roll progress here — both mean "how far along" — and
    * defaults past the end, so a value assertion sees the landed number.
+   *
+   * No `cleared` argument: the style carries that, and passing it separately is
+   * how a death sheet ends up with a victory marquee.
    */
-  function text(cleared: boolean, alpha = 1, style = CLEARED_SHEET, t = 9) {
+  function text(style = CLEARED_SHEET, alpha = 1, t = 9) {
     const r = recordingContext();
-    drawSheet(r.ctx, cam(), style, run, max, bodies, FIXED_DT, alpha, cleared, t, t);
+    drawSheet(r.ctx, cam(), { style, run, max, bodies, dt: FIXED_DT, alpha, t, roll: t });
     return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
   }
 
   it('draws nothing before it has faded in', () => {
-    expect(text(true, 0).length).toBe(0);
+    expect(text(CLEARED_SHEET, 0).length).toBe(0);
   });
 
   it('leads with the SCORE, which by then exists nowhere else', () => {
@@ -969,20 +972,20 @@ describe('the sheet', () => {
     // hole big enough to walk through: `endLife` zeroes the live score the instant
     // a run ends, so by the time any of this is read the number the player watched
     // all run is GONE. The sheet is the only place it still exists.
-    expect(text(true)).toContain('45,000');
-    expect(text(false, 1, DEATH_SHEET)).toContain('45,000');
+    expect(text()).toContain('45,000');
+    expect(text(DEATH_SHEET)).toContain('45,000');
   });
 
   it('keeps the clock and the field as the subtitle that qualifies it', () => {
     // Demoted, not deleted. They say what the score was made of.
-    const t = text(true).join(' | ');
+    const t = text().join(' | ');
     expect(t).toMatch(/20\.0s/);
     expect(t).toMatch(/PLANETS/);
   });
 
   it('rolls the score up too, since it is the number being celebrated', () => {
-    const early = text(true, 1, CLEARED_SHEET, 0.1);
-    const landed = text(true, 1, CLEARED_SHEET, 9);
+    const early = text(CLEARED_SHEET, 1, 0.1);
+    const landed = text(CLEARED_SHEET, 1, 9);
     expect(landed).toContain('45,000');
     expect(early).not.toContain('45,000');
   });
@@ -991,7 +994,7 @@ describe('the sheet', () => {
     // The whole reason `sessionMax` exists. 812 means nothing until it sits
     // beside the 940 from earlier in the session — on the sheet where the session
     // is still going, which is the death one.
-    const t = text(false, 1, DEATH_SHEET);
+    const t = text(DEATH_SHEET);
     expect(t).toContain('TOP SPEED');
     expect(t).toContain('812');
     expect(t).toContain('940');
@@ -1012,11 +1015,20 @@ describe('the sheet', () => {
     // scored higher. A sparse list of the player's worst moments, printed beside
     // their best run. This fixture reproduces that shape.
     const worseEarlier = { ...max, fireSecs: run.fireSecs + 9, roughPasses: run.roughPasses + 4 };
-    const t = text(true, 1, CLEARED_SHEET);
+    const t = text(CLEARED_SHEET);
     expect(t).not.toContain('SESSION');
     expect(t).not.toContain('RUN');
     const r = recordingContext();
-    drawSheet(r.ctx, cam(), CLEARED_SHEET, run, worseEarlier, bodies, FIXED_DT, 1, true, 9, 9);
+    drawSheet(r.ctx, cam(), {
+      style: CLEARED_SHEET,
+      run,
+      max: worseEarlier,
+      bodies,
+      dt: FIXED_DT,
+      alpha: 1,
+      t: 9,
+      roll: 9,
+    });
     const shown = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     expect(shown).not.toContain('SESSION');
   });
@@ -1024,7 +1036,7 @@ describe('the sheet', () => {
   it('keeps the session column on a death, where the session continues', () => {
     // The same field is still there and the next attempt is aimed at these
     // numbers, so the comparison is the whole point.
-    const t = text(false, 1, DEATH_SHEET);
+    const t = text(DEATH_SHEET);
     expect(t).toContain('SESSION');
     expect(t).toContain('RUN');
   });
@@ -1038,7 +1050,7 @@ describe('the sheet', () => {
     // digits began.
     // At 6% of the fade the score is already climbing while later rows have not
     // begun — which is the stagger doing its job, not a fault.
-    const scoreAt = (p: number) => Number(text(true, 1, CLEARED_SHEET, p)[1]!.replace(/,/g, ''));
+    const scoreAt = (p: number) => Number(text(CLEARED_SHEET, 1, p)[1]!.replace(/,/g, ''));
     expect(scoreAt(0.06), 'the score is moving almost immediately').toBeGreaterThan(0);
     expect(scoreAt(0.2)).toBeGreaterThan(scoreAt(0.06));
     // ...and it is the FIRST row to move: a later row is still at nothing.
@@ -1074,7 +1086,7 @@ describe('the sheet', () => {
   it('labels the two columns wherever both are shown', () => {
     // Two numbers side by side with nothing saying which is which, and the answer
     // is not guessable from the values.
-    const t = text(false, 1, DEATH_SHEET);
+    const t = text(DEATH_SHEET);
     expect(t).toContain('RUN');
     expect(t).toContain('SESSION');
   });
@@ -1116,9 +1128,18 @@ describe('a death sheet and a clear sheet are told apart', () => {
     highWaterY: -4000,
   };
   const bodies = createInitialState(DEFAULT_CONFIG).bodies;
-  const words = (style: typeof CLEARED_SHEET, cleared: boolean) => {
+  const words = (style: typeof CLEARED_SHEET) => {
     const r = recordingContext();
-    drawSheet(r.ctx, cam(), style, run, run, bodies, FIXED_DT, 1, cleared);
+    drawSheet(r.ctx, cam(), {
+      style,
+      run,
+      max: run,
+      bodies,
+      dt: FIXED_DT,
+      alpha: 1,
+      t: 9,
+      roll: 9,
+    });
     return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
   };
 
@@ -1145,8 +1166,8 @@ describe('a death sheet and a clear sheet are told apart', () => {
   });
 
   it('says what happened, in the right words', () => {
-    expect(words(CLEARED_SHEET, true)).toContain('FIELD CLEARED');
-    expect(words(DEATH_SHEET, false)).toContain('RUN ENDED');
+    expect(words(CLEARED_SHEET)).toContain('FIELD CLEARED');
+    expect(words(DEATH_SHEET)).toContain('RUN ENDED');
   });
 
   it('draws a worthy death in slate — not the finish green, not hazard red', () => {
@@ -1166,11 +1187,20 @@ describe('a death sheet and a clear sheet are told apart', () => {
     // Colour here is a rank — the rarity ladder — and gold is already its top
     // rung, so a clear was in the right colour and simply not loud enough.
     // Arcades celebrate with movement: the marquee chase, the rolling digits.
-    expect(CLEARED_SHEET.celebrate).toBe(true);
-    expect(DEATH_SHEET.celebrate).toBe(false);
+    expect(CLEARED_SHEET.cleared).toBe(true);
+    expect(DEATH_SHEET.cleared).toBe(false);
     const marquee = (style: typeof CLEARED_SHEET) => {
       const r = recordingContext();
-      drawSheet(r.ctx, cam(), style, run, run, bodies, FIXED_DT, 1, true, 0.4, 1);
+      drawSheet(r.ctx, cam(), {
+        style,
+        run,
+        max: run,
+        bodies,
+        dt: FIXED_DT,
+        alpha: 1,
+        t: 0.4,
+        roll: 1,
+      });
       return (r.calls('setLineDash') as Array<[string, number[]]>).length;
     };
     expect(marquee(CLEARED_SHEET), 'a win has a light running round it').toBeGreaterThan(0);

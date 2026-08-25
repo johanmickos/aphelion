@@ -36,7 +36,14 @@ export interface SheetStyle {
   /** Word above the headline figure. */
   kicker: string;
   /**
-   * Whether this sheet moves.
+   * Whether this sheet is reporting a cleared field.
+   *
+   * ONE FLAG WHERE THERE WERE TWO. `drawSheet` also took a `cleared` boolean, and
+   * it and `celebrate` were the same fact under two names — so a caller could
+   * hand over a mismatched pair and get a death sheet with a victory marquee, or
+   * the reverse. Naming the EVENT rather than the behaviour is what collapses
+   * them: the marquee, the bigger word and the missing session column all follow
+   * from having cleared the field, and none of them is separately configurable.
    *
    * THE DIFFERENCE BETWEEN THE TWO SHEETS IS NOT MEANT TO BE A HUE. Colour in
    * this codebase is a RANK — the rarity ladder — and gold is already its top
@@ -47,21 +54,21 @@ export interface SheetStyle {
    * and a death gets stillness. One is an event, the other is a report, and that
    * is a difference the eye reads before the words.
    */
-  celebrate: boolean;
+  cleared: boolean;
 }
 
 export const CLEARED_SHEET: SheetStyle = {
   accent: SUMMIT,
   accentRGB: SUMMIT_RGB,
   kicker: 'FIELD CLEARED',
-  celebrate: true,
+  cleared: true,
 };
 
 export const DEATH_SHEET: SheetStyle = {
   accent: `rgb(${SLATE[0]},${SLATE[1]},${SLATE[2]})`,
   accentRGB: SLATE,
   kicker: 'RUN ENDED',
-  celebrate: false,
+  cleared: false,
 };
 
 /**
@@ -230,26 +237,43 @@ export function sheetRows(run: RunStats, max: RunStats, roll = 1): Row[] {
  * which is why the warp keeps running underneath: the panel arrives on top of a
  * sky that is still moving.
  */
-export function drawSheet(
-  ctx: CanvasRenderingContext2D,
-  cam: Camera,
-  style: SheetStyle,
-  run: RunStats,
-  max: RunStats,
-  bodies: readonly Body[],
-  dt: number,
-  alpha: number,
-  cleared: boolean,
-  /** Seconds since the sheet's moment, for the marquee. Ignored when still. */
-  t = 0,
+export interface SheetDraw {
+  style: SheetStyle;
+  /** The run being reported on — `lastRun`, never the live one. */
+  run: RunStats;
+  /** Element-wise session maximum, for the second column. */
+  max: RunStats;
+  bodies: readonly Body[];
+  dt: number;
+  /** Opacity of the whole panel, 0..1. */
+  alpha: number;
+  /** Seconds since the panel's moment, for the marquee. Ignored when still. */
+  t: number;
   /**
-   * How far the sheet has faded in, 0..1 — the same number that fades it.
+   * How far the panel has faded in, 0..1 — the same number that fades it.
    *
-   * Drives the roll, so the digits are moving from the first frame the panel is
-   * legible rather than starting on a separate clock of their own.
+   * Drives the roll, so the digits move on the first frame there is anything to
+   * read rather than starting on a clock of their own.
    */
-  roll = 1,
-): void {
+  roll: number;
+}
+
+/**
+ * Draw the sheet.
+ *
+ * TAKES AN OBJECT BECAUSE IT TOOK ELEVEN POSITIONAL ARGUMENTS, four of them bare
+ * numbers and two of them booleans, and the failure mode is not hypothetical: a
+ * caller passed the marquee clock where the roll progress belonged and every test
+ * went on passing, silently drawing a fully-landed sheet. Positional arguments of
+ * the same type are a transposition waiting to happen, and this one had already
+ * happened once.
+ *
+ * `alpha` fades the whole thing in over the ceremony rather than cutting to it,
+ * which is why the warp keeps running underneath: the panel arrives on top of a
+ * sky that is still moving.
+ */
+export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDraw): void {
+  const { style, run, max, bodies, dt, alpha, t, roll } = d;
   if (alpha <= 0.005) return;
   const s = cam.scale;
   const cx = cam.offsetX + cam.designW * 0.5 * s;
@@ -306,7 +330,7 @@ export function drawSheet(
   // score. It is the whole of the celebration difference: both sheets are drawn
   // by this function in a colour that means the same thing it always does, and
   // what separates a win from a post-mortem is that one of them moves.
-  if (style.celebrate) {
+  if (style.cleared) {
     const per = 2 * (bw + height);
     const head = ((t * per) / 1.6) % per;
     ctx.save();
@@ -323,7 +347,7 @@ export function drawSheet(
   }
 
   ctx.fillStyle = withAlpha(style.accentRGB, 0.9);
-  ctx.font = `700 ${(style.celebrate ? 14 : 10) * s}px ui-monospace, monospace`;
+  ctx.font = `700 ${(style.cleared ? 14 : 10) * s}px ui-monospace, monospace`;
   ctx.fillText(style.kicker, cx, top - 12 * s);
 
   // ---- the headline is the SCORE
@@ -337,7 +361,7 @@ export function drawSheet(
   //
   // It is also simply the most important stat, which is the other half of the
   // report — every other row is a way of describing HOW the score happened.
-  const cleared_ = planetsCleared(run, bodies);
+  const planets = planetsCleared(run, bodies);
   const scoreRoll = rollOf(roll, 0, 6);
   ctx.fillStyle = style.accent;
   ctx.font = `700 ${40 * s}px ui-monospace, monospace`;
@@ -349,9 +373,9 @@ export function drawSheet(
   ctx.fillStyle = 'rgba(150,170,205,.8)';
   ctx.font = `${9 * s}px ui-monospace, monospace`;
   const anomalies = anomalyCount(bodies);
-  const progress = cleared
-    ? `${cleared_.total} PLANETS`
-    : `${cleared_.done} / ${cleared_.total} PLANETS`;
+  const progress = style.cleared
+    ? `${planets.total} PLANETS`
+    : `${planets.done} / ${planets.total} PLANETS`;
   const anom = anomalies > 0 ? ` · ${run.anomalies} / ${anomalies} ANOMALIES` : '';
   ctx.fillText(`${secs(run.ticks, dt)} · ${progress}${anom}`, cx, top + 44 * s);
 
@@ -381,7 +405,7 @@ export function drawSheet(
   // continues, and "your best this session" is the thing the next attempt is
   // aimed at.
   const rows = sheetRows(run, max, roll);
-  const anyBest = !cleared && rows.some((r) => r.best !== r.value);
+  const anyBest = !style.cleared && rows.some((r) => r.best !== r.value);
   let y = top + 66 * s;
   if (anyBest) {
     ctx.font = `${8 * s}px ui-monospace, monospace`;

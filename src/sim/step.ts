@@ -22,6 +22,7 @@ import {
   backtrackFloorY,
   createBodies,
   fieldBounds,
+  finishLineY,
   inAnomalyField,
   runInBand,
   SPAWN,
@@ -265,8 +266,8 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // of a manoeuvre is the same defect as cutting off the approach — one hop
   // later. Releasing is what says you are done with it. A ship that never lets go
   // simply keeps orbiting, exactly as it would anywhere else in the field.
-  const clearY = fb.crest - cfg.grabRange;
-  if (cfg.clearAtTop && !state.capture && pos.y < clearY) {
+  const clearY = finishLineY(cfg, fb);
+  if (clearY !== null && !state.capture && pos.y < clearY) {
     endRun(state, 'cleared', pos.x, pos.y);
     state.tick++;
     return;

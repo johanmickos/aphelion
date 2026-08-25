@@ -8,6 +8,7 @@ import type { SimConfig } from '../sim/config.ts';
 import { FIXED_DT } from '../sim/config.ts';
 import type { Body } from '../sim/types.ts';
 import type { FieldBounds } from '../sim/world.ts';
+import { finishLineY } from '../sim/world.ts';
 import type { Camera } from './camera.ts';
 import { clipToWindow, toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
@@ -29,14 +30,9 @@ import { drawVerdict } from './verdict.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash, drawFinishFlash } from './ceremony.ts';
+import type { Ceremony } from './ceremony.ts';
 import { CLEARED_SHEET, DEATH_SHEET, drawSheet } from './sheet.ts';
 
-/**
- * Roughly when the ceremony's sheet starts fading in, in seconds from the
- * crossing. The roll is paced from the panel's own arrival rather than from the
- * crossing, or the reels would have finished spinning before it was visible.
- */
-const CEREMONY_SHEET_AT = 2.4;
 import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
 import { drawEdgeMarkers } from './edge-markers.ts';
@@ -71,6 +67,85 @@ export class Scene {
   private readonly nebula: Nebula;
 
   private readonly deps: SceneDeps;
+
+  /**
+   * The results panel, over everything.
+   *
+   * Reads `lastRun` and never `run`: the live one was cleared by `endLife` on the
+   * tick the run ended, which is the trap `ScoreState.lastRun` exists to close.
+   */
+  private drawSheetLayer(
+    ctx: CanvasRenderingContext2D,
+    cam: Camera,
+    cer: Ceremony | null,
+    alpha: number,
+    opts: { score: ScoreState; deathSheetT?: number },
+  ): void {
+    if (alpha <= 0 || !opts.score.lastRun) return;
+    drawSheet(ctx, cam, {
+      style: cer ? CLEARED_SHEET : DEATH_SHEET,
+      run: opts.score.lastRun,
+      max: opts.score.sessionMax,
+      bodies: this.deps.bodies,
+      dt: FIXED_DT,
+      alpha,
+      // Any steadily-growing clock will do: the marquee is periodic, so where its
+      // light happens to be when the panel fades in is not something anyone can
+      // perceive. This used to subtract a hardcoded guess at when the sheet
+      // appears — a number with nothing keeping it true, which had already drifted
+      // out of step with the fade once and stalled the roll at zero.
+      t: cer ? cer.t : (opts.deathSheetT ?? 0),
+      // The roll rides the fade, so the digits move on the first readable frame.
+      roll: alpha,
+    });
+  }
+
+  /**
+   * The ship, its wake, and the mark the ceremony stamps beside it.
+   *
+   * Extracted because `draw` had grown from 140 lines to nearly 300 as the
+   * ceremony went in, and this is the part of it that is genuinely one idea:
+   * everything drawn AT the ship, in the ship's own place, which during a
+   * ceremony is not where the simulation left it.
+   *
+   * A translate rather than a position argument, because the trail has to travel
+   * with the hull — they are one object, and moving only the hull would leave the
+   * wake behind at the crossing point.
+   */
+  private drawShipLayer(
+    ctx: CanvasRenderingContext2D,
+    cam: Camera,
+    snap: RenderSnapshot,
+    cer: Ceremony | null,
+    bestAlign: number,
+    opts: { timeMs: number; score: ScoreState },
+  ): void {
+    const sx = toScreenX(cam, snap.x);
+    const sy = toScreenY(cam, snap.y);
+    const to = cer ? ceremonyShipPos(cam, cer, sx, sy) : null;
+    const shifted = to !== null && (to.x !== sx || to.y !== sy);
+    if (shifted) {
+      ctx.save();
+      ctx.translate(to.x - sx, to.y - sy);
+    }
+    this.trail.draw(ctx, cam, snap.x, snap.y, cer ? cer.warp : 0, cer ? cer.t : 0);
+    drawAlignGlow(ctx, cam, snap, bestAlign, opts.timeMs);
+    // Nose up through the ceremony. See `drawShip`'s `heading`.
+    drawShip(
+      ctx,
+      cam,
+      snap,
+      opts.score.hopped.length,
+      this.burn,
+      opts.timeMs,
+      cer ? -Math.PI / 2 : undefined,
+    );
+    if (shifted) ctx.restore();
+
+    // After the ship, so it is never drawn under it, and OUTSIDE the shift so it
+    // stamps the moment rather than receding with the world.
+    if (cer && to) drawFinishFlash(ctx, cam, cer, to.x, to.y);
+  }
 
   /**
    * The flame's own heat, chasing the scorer's.
@@ -169,7 +244,7 @@ export class Scene {
     // Where the run ends as `cleared`, or null when the field cannot be cleared.
     // Derived once and shared by the line and the arrow that points at it, so the
     // two can never disagree about where the finish is.
-    const finishY = sim.clearAtTop ? field.crest - sim.grabRange : null;
+    const finishY = finishLineY(sim, field);
     // Null unless the field has just been cleared. Everything the ceremony
     // touches reads it, so "is this the victory frame" is asked once.
     if (!snap.ending.active) {
@@ -296,44 +371,7 @@ export class Scene {
     // The gold, over the world and under the ship: it should tint the sky the
     // ship is flying through, never the ship itself.
     if (cer) drawCeremonyWash(ctx, cam, cer);
-
-    // During the ceremony the ship is drawn away from where the simulation left
-    // it, easing to the middle. A translate rather than a position argument,
-    // because the trail has to travel with it — they are one object, and moving
-    // only the hull would leave the wake behind at the crossing point.
-    let shifted = false;
-    if (cer) {
-      const sx = toScreenX(cam, snap.x);
-      const sy = toScreenY(cam, snap.y);
-      const to = ceremonyShipPos(cam, cer, sx, sy);
-      if (to.x !== sx || to.y !== sy) {
-        ctx.save();
-        ctx.translate(to.x - sx, to.y - sy);
-        shifted = true;
-      }
-    }
-    this.trail.draw(ctx, cam, snap.x, snap.y, cer ? cer.warp : 0, cer ? cer.t : 0);
-    drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
-    // Nose up through the ceremony. See `drawShip`'s `heading`.
-    drawShip(
-      ctx,
-      cam,
-      snap,
-      opts.score.hopped.length,
-      this.burn,
-      opts.timeMs,
-      cer ? -Math.PI / 2 : undefined,
-    );
-    if (shifted) ctx.restore();
-
-    // After the ship, so it is never drawn under it, and outside the shift so it
-    // stamps the moment rather than receding with the world.
-    if (cer) {
-      const sx = toScreenX(cam, snap.x);
-      const sy = toScreenY(cam, snap.y);
-      const at = ceremonyShipPos(cam, cer, sx, sy);
-      drawFinishFlash(ctx, cam, cer, at.x, at.y);
-    }
+    this.drawShipLayer(ctx, cam, snap, cer, compass.bestAlign, opts);
 
     // Above the ship and its wake, below the HUD: it belongs to the world, but
     // nothing in the world should ever cover it.
@@ -397,29 +435,8 @@ export class Scene {
     }
 
     // Last, and over everything: the sheet is the only thing on screen the player
-    // is meant to be reading by this point. It reads `lastRun` rather than `run`
-    // — the live one was cleared by `endLife` on the tick the run ended, which is
-    // the trap `ScoreState.lastRun` exists to close.
-    if (sheetAlpha > 0 && opts.score.lastRun) {
-      drawSheet(
-        ctx,
-        cam,
-        cer ? CLEARED_SHEET : DEATH_SHEET,
-        opts.score.lastRun,
-        opts.score.sessionMax,
-        bodies,
-        FIXED_DT,
-        sheetAlpha,
-        cer !== null,
-        // The sheet's own age, not the ceremony's: the marquee and the roll are
-        // paced from the moment the panel appeared, not from the crossing several
-        // seconds earlier.
-        cer ? Math.max(0, cer.t - CEREMONY_SHEET_AT) : (opts.deathSheetT ?? 0),
-        // The roll rides the fade, so the digits are moving from the first frame
-        // the panel can be read.
-        sheetAlpha,
-      );
-    }
+    // is meant to be reading by this point.
+    this.drawSheetLayer(ctx, cam, cer, sheetAlpha, opts);
 
     ctx.restore();
 

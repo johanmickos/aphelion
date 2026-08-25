@@ -217,6 +217,25 @@ export interface FieldBounds {
 }
 
 /**
+ * Where a run ends as `cleared`, or null when the field cannot be cleared.
+ *
+ * ONE DEFINITION, FOR THE SAME REASON `runInBand` IS ONE. This was derived
+ * independently in three places — where the simulation ends the run, where the
+ * renderer draws the chequers, and inside the band helper itself — all spelling
+ * `crest - grabRange` by hand. They agree today because they are the same
+ * expression, which is exactly the kind of agreement that stops being true
+ * quietly: change the basis in the simulation and the line goes on being PAINTED
+ * where it used to be, so the player crosses a finish that is no longer there.
+ *
+ * `grabRange` is the basis because that is the distance at which the last body
+ * stops being grabbable — see the clear test in `stepSim` for why that, and not
+ * a chosen margin.
+ */
+export function finishLineY(cfg: SimConfig, fb: FieldBounds): number | null {
+  return cfg.clearAtTop ? fb.crest - cfg.grabRange : null;
+}
+
+/**
  * The run-in: the band the funnel pulls through and the bumpers guard.
  *
  * ONE DEFINITION, because there were briefly two and they disagreed. The funnel
@@ -230,8 +249,8 @@ export interface FieldBounds {
  * Returns null when the field cannot be cleared, or has no run-in.
  */
 export function runInBand(cfg: SimConfig, fb: FieldBounds): { top: number; bottom: number } | null {
-  if (!cfg.clearAtTop || cfg.finishFunnelDepth <= 0) return null;
-  const finishY = fb.crest - cfg.grabRange;
+  const finishY = finishLineY(cfg, fb);
+  if (finishY === null || cfg.finishFunnelDepth <= 0) return null;
   return { top: finishY, bottom: finishY + cfg.finishFunnelDepth };
 }
 
