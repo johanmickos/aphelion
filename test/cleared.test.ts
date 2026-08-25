@@ -21,6 +21,8 @@ const HOLD: Input = { held: true, pressed: false, released: false };
 // so merely stopping holding leaves the ship attached and orbiting.
 const RELEASE: Input = { held: false, pressed: false, released: true };
 import { fieldBounds } from '../src/sim/world.ts';
+import { createScoreState, scoreTick } from '../src/score/score.ts';
+import type { ScoreAward } from '../src/score/types.ts';
 
 /** A ship placed just under the crest, climbing hard enough to cross it. */
 function aboutToClear(cfg: SimConfig, below = 200): SimState {
@@ -36,6 +38,53 @@ function aboutToClear(cfg: SimConfig, below = 200): SimState {
   state.ship.burstY = 0;
   state.highWaterY = state.ship.y;
   return state;
+}
+
+/** The finish line in this state's field. */
+function finishOf(state: SimState): number {
+  return fieldBounds(DEFAULT_CONFIG, state.bodies).crest - DEFAULT_CONFIG.grabRange;
+}
+
+/**
+ * Fly the flight that carries past the line while still attached, scoring it.
+ *
+ * The fixture is searched rather than guessed: these are the parameters that
+ * genuinely reach ~800px above the last body's centre while captured, against a
+ * line 560px above it. `hold` decides what the player does on each captured tick.
+ *
+ * Returns the ending and the awards that landed on the tick the hold ended —
+ * which is the whole question these ask, since `scoreTick` pays a release on
+ * exactly that tick and pays nothing at all once the ending is up.
+ */
+function flyTheLastBody(
+  cfg: SimConfig,
+  hold: (state: SimState) => Input,
+): { reason: SimState['ending']['reason']; atLetGo: ScoreAward[] } {
+  const state = createInitialState(cfg);
+  let top = state.bodies[0]!;
+  for (const b of state.bodies) if (b.y < top.y) top = b;
+  state.ship.x = top.x + 140;
+  state.ship.y = top.y + 480;
+  state.ship.vx = -39.2;
+  state.ship.vy = -700;
+  state.ship.burstX = 0;
+  state.ship.burstY = 0;
+  state.highWaterY = state.ship.y;
+
+  const score = createScoreState();
+  let grabbed = false;
+  let atLetGo: ScoreAward[] = [];
+  for (let i = 0; i < 400; i++) {
+    const input = state.capture ? hold(state) : grabbed ? NO_INPUT : PRESS;
+    const wasCaptured = state.capture !== null;
+    stepSim(state, cfg, input, FIXED_DT);
+    if (state.capture) grabbed = true;
+    const scored = scoreTick(score, state, cfg, FIXED_DT);
+    if (wasCaptured && !state.capture) atLetGo = scored.awards;
+    if (state.ending.active) break;
+  }
+  expect(grabbed, 'the fixture is meant to capture the last body').toBe(true);
+  return { reason: state.ending.reason, atLetGo };
 }
 
 /** Step until the run ends, or `limit` ticks pass. */
@@ -93,18 +142,23 @@ describe('clearing the field', () => {
     );
   });
 
-  it('does not cut a run off in the middle of a manoeuvre', () => {
-    // A fast pass round the last planet genuinely carries the ship past the line
-    // while still attached — measured at ~800px above the crest against a line at
-    // 560. Ending there is the same defect as ending on the approach, one hop
-    // later, so releasing rather than crossing is what says you are done.
+  it('lets go for you rather than waiting out a hold past the line', () => {
+    // THE BUG THIS NOW EXISTS FOR, reported from the seat: "I was drifting into
+    // the finish by holding on to a planet through the finish line, which
+    // extended everything until after I released". Measured on that session — a
+    // hold that crossed at tick 1425 and let go at 1603 — the wait was three
+    // seconds of a run that was already over, before the ceremony had even begun.
+    //
+    // This was pinned the other way round and deliberately so: cutting a
+    // manoeuvre off was held to be the same defect as cutting off the approach.
+    // Above the line it is not, because there is provably nothing left to grab
+    // there, so the manoeuvre cannot lead anywhere new. The fixture is the same
+    // flight — the one that genuinely carries ~800px above the last body while
+    // still attached, against a line at 560.
     const state = createInitialState(cfg);
     const fb = fieldBounds(cfg, state.bodies);
     let top = state.bodies[0]!;
     for (const b of state.bodies) if (b.y < top.y) top = b;
-    // Parameters searched for rather than guessed: this is the flight that
-    // actually reaches 800px above the last body's centre while still attached,
-    // against a line 560px above it.
     state.ship.x = top.x + 140;
     state.ship.y = top.y + 480;
     state.ship.vx = -39.2;
@@ -114,33 +168,66 @@ describe('clearing the field', () => {
     state.highWaterY = state.ship.y;
 
     const clearY = fb.crest - cfg.grabRange;
-    let everCapturedPastTheLine = false;
     let grabbed = false;
-    let heldFor = 0;
+    // The tick the ship first stood past the line, the tick the hold ended, and
+    // whether it was still attached going into that tick. The gaps between them
+    // are the whole fix.
+    let crossedAt = -1;
+    let letGoAt = -1;
+    let attachedAcross = false;
     for (let i = 0; i < 400; i++) {
-      // Held ticks, not loop ticks. Counting iterations releases before the grab
-      // has even landed, which is how this first failed to reach the line at all.
-      const input =
-        !grabbed && !state.capture
-          ? PRESS
-          : state.capture && heldFor < 120
-            ? HOLD
-            : state.capture
-              ? RELEASE
-              : NO_INPUT;
+      // Held throughout once the grab lands: this is the flight nobody lets go
+      // of, which is exactly the one that used to fly on past a finished run.
+      const input = !grabbed && !state.capture ? PRESS : HOLD;
+      const wasCaptured = state.capture !== null;
       stepSim(state, cfg, input, FIXED_DT);
-      if (state.capture) {
-        grabbed = true;
-        heldFor++;
-        const p = shipWorldPos(state);
-        if (p.y < clearY) everCapturedPastTheLine = true;
-        expect(state.ending.active, 'no clear may fire while attached').toBe(false);
+      if (state.capture) grabbed = true;
+      if (crossedAt < 0 && shipWorldPos(state).y < clearY) {
+        crossedAt = state.tick;
+        attachedAcross = wasCaptured;
       }
+      if (wasCaptured && !state.capture && letGoAt < 0) letGoAt = state.tick;
       if (state.ending.active) break;
     }
     expect(grabbed, 'the fixture is meant to capture the last body').toBe(true);
-    expect(everCapturedPastTheLine, 'and to carry past the line while attached').toBe(true);
-    expect(state.ending.reason, 'and clear only once it has let go').toBe('cleared');
+    expect(crossedAt, 'and to reach the line').toBeGreaterThan(0);
+    expect(attachedAcross, 'and to be carried across it still attached').toBe(true);
+    expect(state.ending.reason, 'crossing ends it, holding or not').toBe('cleared');
+    // Let go on the crossing tick, ended on the next one. The deferral is
+    // deliberate — see the clear test in `stepSim`: `scoreTick` stops scoring
+    // once the ending is up, so a run that ended on the same tick as its release
+    // forfeited the last manoeuvre it was flown with.
+    expect(letGoAt, 'the sim lets go rather than waiting for the player').toBe(crossedAt);
+    expect(state.tick, 'and ends one tick later, not sooner').toBe(crossedAt + 1);
+  });
+
+  it('pays the last manoeuvre instead of eating it on the ending tick', () => {
+    // `scoreTick` returns without scoring anything once `ending.active` is set,
+    // and it recognises a release as "a capture was here last tick and is gone
+    // now" — so ending on the release tick threw the release away. In the
+    // reported session the final flyby ran 363 ticks and paid nothing at all.
+    // This is why the clear is deferred by a tick rather than fired the instant
+    // the sim lets go.
+    const { reason, atLetGo } = flyTheLastBody(cfg, () => HOLD);
+    expect(reason).toBe('cleared');
+    expect(atLetGo, 'the release that finished the run was scored').not.toHaveLength(0);
+  });
+
+  it('and pays it when the player lets go on the very tick they cross', () => {
+    // The other way a capture can end above the line, and the one that was
+    // already silently unpaid before the sim ever let go for anyone: the release
+    // edge lands at the top of the tick and the drift carries the ship over the
+    // line before the tick is out. `wasCaptured` is what holds the ending back
+    // for it. Verified against the previous build, where this same flight ended
+    // on the release tick and paid nothing.
+    const { reason, atLetGo } = flyTheLastBody(cfg, (state) => {
+      const cap = state.capture!;
+      // One tick of lookahead: let go exactly when the next step would cross.
+      const p = shipWorldPos(state);
+      return p.y + cap.vy * FIXED_DT < finishOf(state) ? RELEASE : HOLD;
+    });
+    expect(reason).toBe('cleared');
+    expect(atLetGo, 'a chosen release at the line is scored too').not.toHaveLength(0);
   });
 
   it('holds instead of respawning, because what comes next is not the sim’s call', () => {

@@ -173,6 +173,13 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // release — which is what the config key promises.
   if (state.chargedT > 0) state.chargedT = Math.max(0, state.chargedT - dt);
 
+  // Did a capture end on this tick? Deliberately the scorer's own definition of a
+  // release — a capture was here last tick and is gone now — because the clear
+  // test near the bottom of this function exists to keep the two in step. It
+  // covers all three ways a hold can end: the release edge below, a putter-out,
+  // and the clear test letting go for the player.
+  const wasCaptured = state.capture !== null;
+
   // ---- input edges, applied before the frame as the prototype's handlers were
   if (input.pressed) {
     state.holdConsumed = false;
@@ -261,14 +268,49 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // settled captures of the topmost body reach at most ~265px above its centre,
   // so the line clears every one of them with room to spare.
   //
-  // AND NOT WHILE ATTACHED TO SOMETHING. A fast pass round the last planet can
-  // carry the ship past the line mid-flyby, and cutting a run off in the middle
-  // of a manoeuvre is the same defect as cutting off the approach — one hop
-  // later. Releasing is what says you are done with it. A ship that never lets go
-  // simply keeps orbiting, exactly as it would anywhere else in the field.
+  // AND IT LETS GO FOR YOU. This used to wait for the release — a ship still
+  // attached kept orbiting and the run ended whenever the player finally let go —
+  // on the argument that cutting off a manoeuvre is the same defect as cutting
+  // off the approach. Played, it is not: above the line `grabTarget` has nothing
+  // left to offer, so a manoeuvre that continues past it cannot lead anywhere
+  // new, and what the wait actually buys is dead time. Measured on the session
+  // that reported it, a hold drifting through the line at 89px/s: crossed at tick
+  // 1425, released at 1603 — three seconds of a finished run still being flown,
+  // and then the whole ceremony on top of that. Crossing is what says you are
+  // done with it.
+  //
+  // THE RELEASE IS REAL, not a putter-out: the player did everything the link
+  // asked of them, so it pays its boost and its fuel exactly as a chosen release
+  // would, and the ceremony gets a crossing speed to start from.
+  //
+  // ONE TICK LATER, THOUGH, AND THIS IS THE SUBTLE PART. `scoreTick` scores
+  // nothing on a tick where `ending.active` is set, and it recognises a release
+  // by exactly the diff `wasCaptured` records at the top of this function — a
+  // capture was here last tick and is gone now — so
+  // ending on the same tick as the release silently forfeits the last manoeuvre
+  // of the run. That was already happening to every voluntary release taken past
+  // the line: the flyby in the reported session ran 363 ticks and paid nothing.
+  // Letting the tick finish and ending on the next one costs 16ms nobody can see
+  // and hands the scorer the release it is owed. Nothing can re-grab in between —
+  // above the line no body is within `grabRange` by construction, which is what
+  // the line IS — so this defers by one tick and never by two.
+  //
+  // The tick ENDS here either way, which is the other half of the deferral: a
+  // ship that has crossed is finished, so nothing below may still take the
+  // ending away from it. `outX` would have — the bumpers stop at the line, so a
+  // release that crosses wide of a wall was one tick from being scored as lost
+  // off the side of a field it had just beaten.
   const clearY = finishLineY(cfg, fb);
-  if (clearY !== null && !state.capture && pos.y < clearY) {
-    endRun(state, 'cleared', pos.x, pos.y);
+  if (clearY !== null && pos.y < clearY) {
+    if (state.capture) {
+      releaseCapture(state, cfg, false);
+      // The button is still down. Nothing may act on the release edge when it
+      // eventually arrives — the same guard the putter-out sets, for the same
+      // reason.
+      state.holdConsumed = true;
+    } else if (!wasCaptured) {
+      endRun(state, 'cleared', pos.x, pos.y);
+    }
     state.tick++;
     return;
   }
@@ -311,16 +353,16 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
     !inRunIn &&
     !inAnomalyField(pos.x, pos.y, state.bodies);
   // THE CEILING IS NOT A DEATH ONCE THE FIELD CAN BE CLEARED. With `clearAtTop`
-  // on, a drifting ship ends as `cleared` at `clearY` — 240px below `fb.top` —
-  // so it can only ever reach the ceiling while CAPTURED, and a ship captured up
-  // there is attached to the last planet rather than lost in the void the ceiling
-  // exists to catch.
+  // on, the clear fires at `clearY` — 240px below `fb.top` — for a drifting ship
+  // and a captured one alike, and no tick moves 240px, so the ceiling is now
+  // unreachable rather than merely usually missed.
   //
-  // Found by the pin below it: a fast capture of the last body carries as far as
-  // 800px above its centre, which is exactly where the ceiling sits, so holding a
-  // good final slingshot killed the run it should have finished. Suppressing the
-  // clear while attached and not the ceiling turned "you cannot finish on the
-  // approach" into "you cannot finish on the release either".
+  // It stays suppressed anyway, because the reason it was written is worth
+  // keeping in view: while the clear waited for a release, a fast capture of the
+  // last body carried as far as 800px above its centre — exactly where the
+  // ceiling sits — so holding a good final slingshot killed the run it should
+  // have finished. A ship up there was attached to the last planet, not lost in
+  // the void this exists to catch.
   //
   // The floor below stays a death in every config: falling out of the bottom is
   // not an achievement.

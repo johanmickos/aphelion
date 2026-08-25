@@ -1070,7 +1070,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 25;
+export const SIM_VERSION = 26;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;
