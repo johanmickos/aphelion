@@ -893,6 +893,39 @@ describe('the ceremony takes the instruments down', () => {
     expect(frame('impact').some((t) => t.includes('CRASHED'))).toBe(true);
   });
 
+  it('hands the score from the band to the sheet without dropping it', () => {
+    // Two readouts of one number: the band is the only place it exists before the
+    // sheet arrives, and the sheet says the same thing larger once it does. They
+    // cross-fade, so there is no flicker and no moment where the score is nowhere.
+    const alphaOfBand = (t: number) => {
+      const r = recordingContext();
+      const c = cam();
+      const state = createInitialState(DEFAULT_CONFIG);
+      const snap = {
+        ...captureSnapshot(state, false, DEFAULT_CONFIG),
+        ending: { active: true, t, x: 195, y: 0, reason: 'cleared' as const },
+      };
+      const scene = new Scene(
+        { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field },
+        3,
+      );
+      scene.draw(r.ctx, c, snap, {
+        timeMs: 0,
+        paused: false,
+        viewportW: 390,
+        viewportH: 844,
+        headerBottom: 0,
+        frameDt: 1 / 60,
+        score: { ...createScoreState(), lastRun: null },
+      });
+      return scene.sheetAlpha;
+    };
+    // Early the sheet is absent, so the band carries it alone; late the sheet is
+    // full, so the band is gone. The sum is what never drops out.
+    expect(alphaOfBand(0.2)).toBe(0);
+    expect(alphaOfBand(20)).toBe(1);
+  });
+
   it('drops the fuel gauge, which reports a resource nobody is spending', () => {
     expect(frame('cleared').some((t) => t === 'FUEL')).toBe(false);
     expect(frame('impact').some((t) => t === 'FUEL')).toBe(true);

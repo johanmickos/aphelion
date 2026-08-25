@@ -356,6 +356,9 @@ export class Scene {
       finishY,
     );
 
+    const sheetAlpha = cer ? cer.sheet : (opts.deathSheet ?? 0);
+    this.sheetAlpha = sheetAlpha;
+
     // THE INSTRUMENTS BELONG TO A RUN, AND THE RUN IS OVER.
     //
     // The boxed notice explains a failure and there is none; the gauge reports a
@@ -374,7 +377,21 @@ export class Scene {
       // never be drawn over a letterbox bar.
       drawFuelGauge(ctx, cam, sim, snap, opts.timeMs);
     }
-    drawScore(ctx, cam, opts.score, snap);
+    // ---- the band hands the score over to the sheet
+    //
+    // Two readouts of one number, and only one of them should be lit. Before the
+    // sheet arrives the band is the ONLY place the score exists — `endLife` has
+    // already cleared the live figure, so the band is showing the sealed one —
+    // and once the sheet is up it says the same thing, larger, with everything
+    // that qualifies it. So they cross-fade rather than either being cut: no
+    // flicker, and no moment where the score is nowhere.
+    const bandFade = 1 - sheetAlpha;
+    if (bandFade > 0.005) {
+      ctx.save();
+      ctx.globalAlpha = bandFade;
+      drawScore(ctx, cam, opts.score, snap);
+      ctx.restore();
+    }
     if (!cer) {
       drawReadout(ctx, cam, readoutLines(sim, snap, canAffordCircularise(sim, snap)), opts.timeMs);
     }
@@ -383,8 +400,6 @@ export class Scene {
     // is meant to be reading by this point. It reads `lastRun` rather than `run`
     // — the live one was cleared by `endLife` on the tick the run ended, which is
     // the trap `ScoreState.lastRun` exists to close.
-    const sheetAlpha = cer ? cer.sheet : (opts.deathSheet ?? 0);
-    this.sheetAlpha = sheetAlpha;
     if (sheetAlpha > 0 && opts.score.lastRun) {
       drawSheet(
         ctx,
