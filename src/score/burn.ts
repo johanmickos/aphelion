@@ -78,25 +78,25 @@ export function edgeHeat(
 /**
  * How much fire the ship would fly INTO, for a rescue that has not happened yet.
  *
- * `rescueScar` hands over the flight it simulated for the press at the cross —
+ * `rescueDeadline` hands over the flight it simulated for the press at the cross —
  * one world position a tick — and this runs the same integral `scoreTick` runs on
  * the real thing: the same `edgeHeat`, the same `burnRate`, the same ignition
  * floor. One definition, now three consumers, which is the rule the header of
  * this file exists for.
  *
  * IT IS NOT THE PAYOUT, AND MUST NOT BE PRESENTED AS ONE. The flight ends where
- * `rescueScar`'s promise ends — at the turn-away — but the fire does not: the ship
+ * `rescueDeadline`'s promise ends — at the turn-away — but the fire does not: the ship
  * is still deep in the band at that moment and burns all the way back out through
  * it. Measured over 513 approaches in the corpus, what actually burns is a median
  * 2.21x this number (p10 1.94, p90 3.01), and only 5 of the 513 landed within 25%.
  * So this is the fire on the way IN, and the bias is systematic rather than noisy.
  *
  * That is good enough for the one thing it is used for — sizing the mark in
- * `src/render/scar.ts`, where what matters is that a bigger fire draws a bigger
- * scar, and where `RenderConfig.scarPrizeFull` is calibrated in these same units.
+ * `src/render/deadline.ts`, where what matters is that a bigger fire draws a bigger
+ * mark, and where `RenderConfig.deadlinePrizeFull` is calibrated in these same units.
  * It is NOT good enough to show the player a number, or to pay one. Anything that
  * needs the real total has to keep flying past the turn-away until the heat drops
- * below the floor, which is a longer flight than `rescueScar` has any reason to
+ * below the floor, which is a longer flight than `rescueDeadline` has any reason to
  * simulate for its own purposes.
  *
  * IT LIVES IN `src/score/` AND NOT BESIDE THE PREDICTOR because a point is not a

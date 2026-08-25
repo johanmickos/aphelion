@@ -2,9 +2,9 @@
  * The colours that mean something, in one place.
  *
  * WHY THIS EXISTS. The codebase already had semantic colour names — they were
- * just written in prose instead of in code. `src/render/scar.ts` explains its own
+ * just written in prose instead of in code. `src/render/deadline.ts` explains its own
  * red by pointing at another file's: "`rgba(255,70,90)` is the hazard band's own
- * colour, and the scar is a fact about that band", and then explains which red it
+ * colour, and the deadline is a fact about that band", and then explains which red it
  * must NOT borrow, because "Note 51 spent three passes establishing that
  * `#ee3f2c` MEANS 'this is about burning'". Two colours with settled meanings,
  * referenced across four files, and no way to say so except in a comment that
@@ -55,7 +55,7 @@ export function solid(c: RGB): string {
 // --------------------------------------------------------------------- hazard
 
 /**
- * The boundary red: side walls, the trailing floor, the ceiling, the scar, and
+ * The boundary red: side walls, the trailing floor, the ceiling, the deadline, and
  * the skull over a ship that pressed too late.
  *
  * The most-repeated colour in the renderer and the one most likely to be retuned,
@@ -67,7 +67,7 @@ export const HAZARD: RGB = [255, 70, 90];
  * THE HAZARD FAMILY IS FOUR SHADES, AND IT IS NOT KNOWN WHETHER ALL FOUR ARE
  * DELIBERATE. Collecting them was the first thing this file made visible:
  *
- *   (255, 70, 90)   the band, the scar, the skull        17 uses
+ *   (255, 70, 90)   the band, the deadline, the skull        17 uses
  *   (255, 85,102)   HUD warning lines                     6 uses
  *   (255,154,168)   ending-notice text, on a red fill     2 uses
  *   (255, 90,110)   empty tank, and a refused grab        2 uses
@@ -94,7 +94,7 @@ export const HAZARD_NOTICE_BORDER = withAlpha(HAZARD, 0.9);
 
 /**
  * "This is about burning." Note 51 spent three passes arriving at this exact
- * value, and `scar.ts` declines to borrow it precisely because it is settled —
+ * value, and `deadline.ts` declines to borrow it precisely because it is settled —
  * using it there "would promise a fire that has not started."
  */
 export const BURN = '#ee3f2c';

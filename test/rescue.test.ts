@@ -1,7 +1,7 @@
 /**
- * The scar's promise, pinned by construction.
+ * The deadline's promise, pinned by construction.
  *
- * `rescueScar` says: press and hold at the cross and the ship turns away from
+ * `rescueDeadline` says: press and hold at the cross and the ship turns away from
  * the wall before it crosses; press later and it does not. That is a claim about
  * the simulation, so it is checked by running the simulation — the same one the
  * player flies — rather than by asserting a remembered coordinate. It cannot rot
@@ -12,8 +12,8 @@ import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import type { Input, SimState } from '../src/sim/types.ts';
-import { DEFAULT_SCAR_OPTIONS, advanceScar, rescueScar } from '../src/sim/rescue.ts';
-import type { ScarWall } from '../src/sim/rescue.ts';
+import { DEFAULT_DEADLINE_OPTIONS, advanceDeadline, rescueDeadline } from '../src/sim/rescue.ts';
+import type { DeadlineWall } from '../src/sim/rescue.ts';
 import { fieldBounds } from '../src/sim/world.ts';
 
 const PRESS: Input = { held: true, pressed: true, released: false };
@@ -25,7 +25,7 @@ const NONE: Input = { held: false, pressed: false, released: false };
  *
  * Placed beside the opening body so a grab is genuinely on offer for a while,
  * and aimed across the corridor rather than straight out, so the path has some
- * length to draw a scar along.
+ * length to draw a deadline along.
  */
 function driftingAtTheWall(cfg: SimConfig): SimState {
   const state = createInitialState(cfg);
@@ -48,16 +48,16 @@ function driftFor(state: SimState, cfg: SimConfig, ticks: number): SimState {
 
 /**
  * Press and hold from here. Returns whether the ship turned away from `wall`
- * before the run ended — the definition `rescueScar` is claiming.
+ * before the run ended — the definition `rescueDeadline` is claiming.
  *
  * The axis and sign are spelled out here rather than imported from `rescue.ts`,
  * so this stays a second opinion. A test that borrowed the production table would
  * agree with it by construction, including about the ceiling.
  */
-function holdAndSee(state: SimState, cfg: SimConfig, wall: ScarWall): boolean {
+function holdAndSee(state: SimState, cfg: SimConfig, wall: DeadlineWall): boolean {
   const s = structuredClone(state) as SimState;
   stepSim(s, cfg, PRESS, FIXED_DT);
-  for (let i = 0; i < DEFAULT_SCAR_OPTIONS.captureBudget; i++) {
+  for (let i = 0; i < DEFAULT_DEADLINE_OPTIONS.captureBudget; i++) {
     if (s.ending.active) return false;
     const v =
       wall === 'top'
@@ -78,19 +78,19 @@ describe('the point of no return', () => {
   const cfg = DEFAULT_CONFIG;
 
   it('finds a wall the drift is committed to', () => {
-    const scar = rescueScar(driftingAtTheWall(cfg), cfg, FIXED_DT);
-    expect(scar, 'a ship flying at the right wall has a scar').not.toBeNull();
-    expect(scar!.wall).toBe('right');
-    expect(scar!.cross, 'and a press that still saves it').not.toBeNull();
+    const deadline = rescueDeadline(driftingAtTheWall(cfg), cfg, FIXED_DT);
+    expect(deadline, 'a ship flying at the right wall has a deadline').not.toBeNull();
+    expect(deadline!.wall).toBe('right');
+    expect(deadline!.cross, 'and a press that still saves it').not.toBeNull();
   });
 
   it('a press AT the cross turns away; one a few ticks later does not', () => {
     const state = driftingAtTheWall(cfg);
-    const scar = rescueScar(state, cfg, FIXED_DT)!;
-    const crossTick = Math.round(scar.cross!.t / FIXED_DT);
+    const deadline = rescueDeadline(state, cfg, FIXED_DT)!;
+    const crossTick = Math.round(deadline.cross!.t / FIXED_DT);
 
     expect(
-      holdAndSee(driftFor(state, cfg, crossTick), cfg, scar.wall),
+      holdAndSee(driftFor(state, cfg, crossTick), cfg, deadline.wall),
       'holding at the cross rescues the ship',
     ).toBe(true);
 
@@ -98,18 +98,18 @@ describe('the point of no return', () => {
     // must fail. A wider margin here would let the cross drift late without the
     // test noticing, which is the direction that gets a player killed.
     expect(
-      holdAndSee(driftFor(state, cfg, crossTick + 1), cfg, scar.wall),
+      holdAndSee(driftFor(state, cfg, crossTick + 1), cfg, deadline.wall),
       'holding one tick later does not',
     ).toBe(false);
   });
 
   it('every sample it marks live really is live', () => {
     const state = driftingAtTheWall(cfg);
-    const scar = rescueScar(state, cfg, FIXED_DT)!;
-    for (const s of scar.path) {
+    const deadline = rescueDeadline(state, cfg, FIXED_DT)!;
+    for (const s of deadline.path) {
       const at = driftFor(state, cfg, Math.round(s.t / FIXED_DT));
       expect(
-        holdAndSee(at, cfg, scar.wall),
+        holdAndSee(at, cfg, deadline.wall),
         `sample at t=${s.t.toFixed(2)} claims live=${s.live}`,
       ).toBe(s.live);
     }
@@ -118,15 +118,15 @@ describe('the point of no return', () => {
   it('carries forward to the same answer a fresh call would give', () => {
     // The whole reason a projection can be reused: a drift takes no input, so
     // every sample is a world point with a fixed verdict and the cross is a place
-    // rather than a countdown. If this is wrong the scar lies while the ship
+    // rather than a countdown. If this is wrong the deadline lies while the ship
     // coasts, which is exactly when it is being read.
     const state = driftingAtTheWall(cfg);
-    const base = rescueScar(state, cfg, FIXED_DT)!;
+    const base = rescueDeadline(state, cfg, FIXED_DT)!;
     expect(base.cross).not.toBeNull();
 
     const CARRY = 20;
-    const carried = advanceScar(base, CARRY * FIXED_DT)!;
-    const fresh = rescueScar(driftFor(state, cfg, CARRY), cfg, FIXED_DT)!;
+    const carried = advanceDeadline(base, CARRY * FIXED_DT)!;
+    const fresh = rescueDeadline(driftFor(state, cfg, CARRY), cfg, FIXED_DT)!;
 
     expect(carried, 'the projection is still alive after the carry').not.toBeNull();
     expect(carried.wall).toBe(fresh.wall);
@@ -146,11 +146,11 @@ describe('the point of no return', () => {
 
   it('expires rather than describing an ending that has already happened', () => {
     const state = driftingAtTheWall(cfg);
-    const base = rescueScar(state, cfg, FIXED_DT)!;
-    expect(advanceScar(base, base.tEnd + 0.001), 'past its own ending').toBeNull();
+    const base = rescueDeadline(state, cfg, FIXED_DT)!;
+    expect(advanceDeadline(base, base.tEnd + 0.001), 'past its own ending').toBeNull();
     // And a cross the ship has reached reads as passed, which is the same thing
-    // `rescueScar` reports by returning none.
-    const past = advanceScar(base, base.cross!.t + 0.001)!;
+    // `rescueDeadline` reports by returning none.
+    const past = advanceDeadline(base, base.cross!.t + 0.001)!;
     expect(past).not.toBeNull();
     expect(past.cross, 'the last press that could work is behind us now').toBeNull();
   });
@@ -159,11 +159,11 @@ describe('the point of no return', () => {
     const state = driftingAtTheWall(cfg);
     stepSim(state, cfg, PRESS, FIXED_DT);
     expect(state.capture, 'the fixture is meant to be able to grab').not.toBeNull();
-    expect(rescueScar(state, cfg, FIXED_DT)).toBeNull();
+    expect(rescueDeadline(state, cfg, FIXED_DT)).toBeNull();
 
     const dead = driftingAtTheWall(cfg);
     dead.ending.active = true;
-    expect(rescueScar(dead, cfg, FIXED_DT)).toBeNull();
+    expect(rescueDeadline(dead, cfg, FIXED_DT)).toBeNull();
   });
 
   // Was 'says nothing about a ship that is not headed at a wall', with this exact
@@ -176,14 +176,14 @@ describe('the point of no return', () => {
     const state = driftingAtTheWall(cfg);
     state.ship.vx = 0;
     state.ship.vy = -200;
-    expect(rescueScar(state, cfg, FIXED_DT)).toBeNull();
+    expect(rescueDeadline(state, cfg, FIXED_DT)).toBeNull();
   });
 
   it('says nothing about a ship headed at no boundary at all', () => {
     const state = driftingAtTheWall(cfg);
     state.ship.vx = 0;
     state.ship.vy = 0;
-    expect(rescueScar(state, cfg, FIXED_DT)).toBeNull();
+    expect(rescueDeadline(state, cfg, FIXED_DT)).toBeNull();
   });
 });
 
@@ -192,7 +192,7 @@ describe('the point of no return', () => {
  * off the top of the field.
  *
  * These are the side-wall cases re-asked at the boundary that used to refuse
- * them: `rescueScar` returned null for a top exit by construction, first at the
+ * them: `rescueDeadline` returned null for a top exit by construction, first at the
  * cheap refusal — which only measured horizontal reach — and then explicitly,
  * because the wall was a sign on the x axis and a top ending had no sign to give.
  */
@@ -203,9 +203,9 @@ describe('the point of no return', () => {
  * RUN AGAINST `clearAtTop: false`, AND THAT IS THE POINT OF THE SUITE BELOW IT.
  * Under the default config the ceiling is no longer reachable: rising past the
  * crest ends the run as `cleared` 800px earlier, so there is no `out-of-bounds`
- * ending up there for a scar to find. These cases therefore pin the MECHANISM —
- * that `ScarWall` handles a boundary on the y axis at all — against a config that
- * can still reach it, and `no ceiling scar once a clear ends the run first` pins
+ * ending up there for a deadline to find. These cases therefore pin the MECHANISM —
+ * that `DeadlineWall` handles a boundary on the y axis at all — against a config that
+ * can still reach it, and `no ceiling deadline once a clear ends the run first` pins
  * the interaction that makes it unreachable in the game. Deleting either would
  * lose half the truth.
  */
@@ -222,7 +222,7 @@ describe('the point of no return, at the ceiling', () => {
    * would be testing the refusal rather than the ceiling.
    *
    * `highWaterY` moves up with the ship so the trailing floor is not the nearer
-   * ending; without it the run is a `fell-behind` and the scar again says nothing.
+   * ending; without it the run is a `fell-behind` and the deadline again says nothing.
    */
   function climbingAtTheCeiling(c: SimConfig, above: number): SimState {
     const state = createInitialState(c);
@@ -247,23 +247,23 @@ describe('the point of no return, at the ceiling', () => {
   const beside = () => climbingAtTheCeiling(cfg, -150);
 
   it('finds the ceiling a climb is committed to', () => {
-    const scar = rescueScar(beside(), cfg, FIXED_DT);
-    expect(scar, 'a ship flying off the top of the field has a scar').not.toBeNull();
-    expect(scar!.wall).toBe('top');
-    expect(scar!.cross, 'and a press that still saves it').not.toBeNull();
+    const deadline = rescueDeadline(beside(), cfg, FIXED_DT);
+    expect(deadline, 'a ship flying off the top of the field has a deadline').not.toBeNull();
+    expect(deadline!.wall).toBe('top');
+    expect(deadline!.cross, 'and a press that still saves it').not.toBeNull();
   });
 
   it('every sample it marks live really is live', () => {
     const state = beside();
-    const scar = rescueScar(state, cfg, FIXED_DT)!;
+    const deadline = rescueDeadline(state, cfg, FIXED_DT)!;
     expect(
-      scar.path.some((p) => p.live),
+      deadline.path.some((p) => p.live),
       'the fixture must offer some rescue',
     ).toBe(true);
-    for (const s of scar.path) {
+    for (const s of deadline.path) {
       const at = driftFor(state, cfg, Math.round(s.t / FIXED_DT));
       expect(
-        holdAndSee(at, cfg, scar.wall),
+        holdAndSee(at, cfg, deadline.wall),
         `sample at t=${s.t.toFixed(2)} claims live=${s.live}`,
       ).toBe(s.live);
     }
@@ -275,8 +275,8 @@ describe('the point of no return, at the ceiling', () => {
     // a rescue here exactly as it is sideways. Asserting a settle would call the
     // same manoeuvre a death purely because it happened vertically.
     const state = beside();
-    const scar = rescueScar(state, cfg, FIXED_DT)!;
-    const crossTick = Math.round(scar.cross!.t / FIXED_DT);
+    const deadline = rescueDeadline(state, cfg, FIXED_DT)!;
+    const crossTick = Math.round(deadline.cross!.t / FIXED_DT);
     expect(
       holdAndSee(driftFor(state, cfg, crossTick), cfg, 'top'),
       'holding at the cross rescues the ship',
@@ -291,38 +291,42 @@ describe('the point of no return, at the ceiling', () => {
     // The ceiling's own shape, and the thing that makes it different from a side
     // wall: a ship 350px above the topmost body has left every gravity source
     // behind, so no press can turn it around and every sample is honestly dead.
-    // The scar still exists — the player is told the deadline is real and already
+    // The deadline still exists — the player is told the deadline is real and already
     // missed, which is the truth. If a cross ever appears here, something is
     // promising a rescue that does not exist.
-    const scar = rescueScar(climbingAtTheCeiling(cfg, 350), cfg, FIXED_DT);
-    expect(scar, 'the ending is still found and still named').not.toBeNull();
-    expect(scar!.wall).toBe('top');
-    expect(scar!.path.every((p) => !p.live)).toBe(true);
-    expect(scar!.cross).toBeNull();
-    expect(scar!.flight).toEqual([]);
+    const deadline = rescueDeadline(climbingAtTheCeiling(cfg, 350), cfg, FIXED_DT);
+    expect(deadline, 'the ending is still found and still named').not.toBeNull();
+    expect(deadline!.wall).toBe('top');
+    expect(deadline!.path.every((p) => !p.live)).toBe(true);
+    expect(deadline!.cross).toBeNull();
+    expect(deadline!.flight).toEqual([]);
   });
 
   it('leaves the world it was asked about untouched', () => {
     const state = beside();
     const before = JSON.stringify(state);
-    rescueScar(state, cfg, FIXED_DT);
+    rescueDeadline(state, cfg, FIXED_DT);
     expect(JSON.stringify(state), 'the prediction must not disturb the run').toBe(before);
   });
 
-  it('offers no ceiling scar once a clear ends the run first', () => {
+  it('offers no ceiling deadline once a clear ends the run first', () => {
     // The new truth, pinned where the old one used to be. Same fixture, same
     // climb, default config: the projection now reaches `cleared` rather than
     // `out-of-bounds`, and a cue whose entire subject is "this will kill you" has
-    // nothing to say about finishing the course. If this ever returns a scar, the
+    // nothing to say about finishing the course. If this ever returns a deadline, the
     // game is drawing a death warning over its own victory.
-    const scar = rescueScar(climbingAtTheCeiling(DEFAULT_CONFIG, -150), DEFAULT_CONFIG, FIXED_DT);
-    expect(scar).toBeNull();
+    const deadline = rescueDeadline(
+      climbingAtTheCeiling(DEFAULT_CONFIG, -150),
+      DEFAULT_CONFIG,
+      FIXED_DT,
+    );
+    expect(deadline).toBeNull();
   });
 
   it('leaves the world it was asked about untouched', () => {
     const state = driftingAtTheWall(cfg);
     const before = JSON.stringify(state);
-    rescueScar(state, cfg, FIXED_DT);
+    rescueDeadline(state, cfg, FIXED_DT);
     expect(JSON.stringify(state), 'the prediction must not disturb the run').toBe(before);
   });
 });

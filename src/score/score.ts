@@ -39,7 +39,7 @@ import { fieldBounds } from '../sim/world.ts';
 import { shipWorldPos } from '../sim/step.ts';
 import { readAim } from './aim.ts';
 import { edgeHeat } from './burn.ts';
-import { rescueScar, turnedAway } from '../sim/rescue.ts';
+import { rescueDeadline, turnedAway } from '../sim/rescue.ts';
 
 import { isNerveGrab } from './praise.ts';
 import {
@@ -812,7 +812,7 @@ function awardGrab(
  * tick. Everything else is taken from the live state: `clear` is the free phase,
  * so the fuel a rescue would have to brake with has not moved yet.
  *
- * COST. This runs `rescueScar`, which forward-simulates. It is affordable because
+ * COST. This runs `rescueDeadline`, which forward-simulates. It is affordable because
  * it happens once per capture and because the great majority of presses take its
  * cheap refusal — measured over the corpus, 37% of presses are made while
  * committed to a wall and the other 63% never reach the projection at all.
@@ -839,8 +839,8 @@ function armRescue(
     telemetry: { ...state.telemetry },
     bodies: state.bodies.slice(),
   };
-  const scar = rescueScar(pre, cfg, dt);
-  if (!scar) return none;
+  const deadline = rescueDeadline(pre, cfg, dt);
+  if (!deadline) return none;
 
   // Past the last press that could have worked. Asked before the once-per-body
   // rule below, deliberately: whether the run is lost is not a question about
@@ -851,18 +851,18 @@ function armRescue(
   // because the prediction is conservative — and a press that beats a prediction
   // pinned to the tick has earned the top of the scale. The omen is withdrawn on
   // the same event that pays it.
-  if (!scar.cross) {
-    const doomed = { wall: scar.wall, tick: state.tick };
+  if (!deadline.cross) {
+    const doomed = { wall: deadline.wall, tick: state.tick };
     if (sc.rescued.includes(body.name)) return { rescue: null, doomed };
-    return { rescue: { wall: scar.wall, quality: 1, body: body.name }, doomed };
+    return { rescue: { wall: deadline.wall, quality: 1, body: body.name }, doomed };
   }
 
   // Once per body per life. A drag along the wall hangs off one distant planet,
   // so without this the tightest rescue would also be the most repeatable one.
   if (sc.rescued.includes(body.name)) return none;
 
-  const quality = clamp01(1 - scar.cross.t / Math.max(1e-6, scfg.rescueSpan));
-  return { rescue: { wall: scar.wall, quality, body: body.name }, doomed: null };
+  const quality = clamp01(1 - deadline.cross.t / Math.max(1e-6, scfg.rescueSpan));
+  return { rescue: { wall: deadline.wall, quality, body: body.name }, doomed: null };
 }
 
 /**

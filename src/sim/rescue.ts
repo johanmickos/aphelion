@@ -53,7 +53,7 @@ import { shipWorldPos, stepSim } from './step.ts';
 import { fieldBounds } from './world.ts';
 
 /** One point on the projected path, and whether a press there still saves you. */
-export interface ScarSample {
+export interface DeadlineSample {
   /** Seconds from now. */
   t: number;
   x: number;
@@ -79,11 +79,11 @@ export interface ScarSample {
  * `field.bottom` is absent on purpose: the trailing floor is always the nearer
  * ending below, and it is a `fell-behind` with its own cue.
  */
-export type ScarWall = 'left' | 'right' | 'top';
+export type DeadlineWall = 'left' | 'right' | 'top';
 
-export interface RescueScar {
+export interface RescueDeadline {
   /** Which boundary the drift is committed to. */
-  wall: ScarWall;
+  wall: DeadlineWall;
   /** Seconds until the run would end at it. */
   tEnd: number;
   /**
@@ -92,7 +92,7 @@ export interface RescueScar {
    */
   cross: { x: number; y: number; t: number } | null;
   /** The projected drift path, ship first, ending where the run would. */
-  path: ScarSample[];
+  path: DeadlineSample[];
   /**
    * Where the ship would fly if it pressed AT the cross and held: one world
    * position per tick, from the press to the moment it turns away.
@@ -106,10 +106,10 @@ export interface RescueScar {
   flight: Array<{ x: number; y: number }>;
 }
 
-export interface ScarOptions {
+export interface DeadlineOptions {
   /**
    * How far ahead to look for the wall, in seconds. A guard, not a threshold:
-   * a ship whose ending is further away than this has no scar, because there is
+   * a ship whose ending is further away than this has no deadline, because there is
    * nothing to aim at yet. How far ahead it is DRAWN is the renderer's ramp and
    * a different question.
    */
@@ -149,7 +149,7 @@ export interface ScarOptions {
   captureBudget: number;
 }
 
-export const DEFAULT_SCAR_OPTIONS: Readonly<ScarOptions> = Object.freeze({
+export const DEFAULT_DEADLINE_OPTIONS: Readonly<DeadlineOptions> = Object.freeze({
   horizon: 6,
   stride: 3,
   maxSamples: 40,
@@ -195,7 +195,7 @@ function cloneState(s: SimState): SimState {
  * new logic — only an axis. Up is negative y, so the ceiling's sign is -1 and a
  * ship is rescued from it the moment `vy` reaches zero.
  */
-const WALL: Record<ScarWall, { axis: 'vx' | 'vy'; sign: 1 | -1 }> = {
+const WALL: Record<DeadlineWall, { axis: 'vx' | 'vy'; sign: 1 | -1 }> = {
   left: { axis: 'vx', sign: -1 },
   right: { axis: 'vx', sign: 1 },
   top: { axis: 'vy', sign: -1 },
@@ -211,7 +211,7 @@ const WALL: Record<ScarWall, { axis: 'vx' | 'vy'; sign: 1 | -1 }> = {
  * started to: the scorer would have paid a ceiling rescue the moment the ship
  * stopped moving sideways.
  */
-export function turnedAway(v: { vx: number; vy: number }, wall: ScarWall): boolean {
+export function turnedAway(v: { vx: number; vy: number }, wall: DeadlineWall): boolean {
   const { axis, sign } = WALL[wall];
   return v[axis] * sign <= 0;
 }
@@ -232,7 +232,7 @@ function rescues(
   from: SimState,
   cfg: SimConfig,
   dt: number,
-  wall: ScarWall,
+  wall: DeadlineWall,
   budget: number,
   record: Array<{ x: number; y: number }> | null = null,
 ): boolean {
@@ -272,25 +272,25 @@ function rescues(
  * responsible for noticing. `app/main.ts` recomputes on every capture transition
  * and on a timer besides.
  */
-export function advanceScar(scar: RescueScar, secs: number): RescueScar | null {
-  const tEnd = scar.tEnd - secs;
+export function advanceDeadline(deadline: RescueDeadline, secs: number): RescueDeadline | null {
+  const tEnd = deadline.tEnd - secs;
   if (tEnd <= 0) return null;
-  const path = scar.path.filter((p) => p.t - secs >= 0).map((p) => ({ ...p, t: p.t - secs }));
-  const crossT = scar.cross ? scar.cross.t - secs : 0;
+  const path = deadline.path.filter((p) => p.t - secs >= 0).map((p) => ({ ...p, t: p.t - secs }));
+  const crossT = deadline.cross ? deadline.cross.t - secs : 0;
   return {
-    wall: scar.wall,
+    wall: deadline.wall,
     tEnd,
     // A cross the ship has reached is a cross it is now past, which is the same
-    // thing `rescueScar` reports by returning none: the last press that could
+    // thing `rescueDeadline` reports by returning none: the last press that could
     // have worked is behind.
-    cross: scar.cross && crossT >= 0 ? { ...scar.cross, t: crossT } : null,
+    cross: deadline.cross && crossT >= 0 ? { ...deadline.cross, t: crossT } : null,
     path,
-    flight: scar.flight,
+    flight: deadline.flight,
   };
 }
 
 /**
- * The scar for a drifting ship, or null when there is nothing to draw.
+ * The deadline for a drifting ship, or null when there is nothing to draw.
  *
  * Null covers every case where the question is not being asked: mid-capture
  * (where the escape is a release, not a grab), during the ending hold, when the
@@ -298,12 +298,12 @@ export function advanceScar(scar: RescueScar, secs: number): RescueScar | null {
  * a wall this cue speaks for — a ship about to hit a planet or fall behind the
  * floor is dying of something with its own signal.
  */
-export function rescueScar(
+export function rescueDeadline(
   state: SimState,
   cfg: SimConfig,
   dt: number,
-  opts: ScarOptions = DEFAULT_SCAR_OPTIONS,
-): RescueScar | null {
+  opts: DeadlineOptions = DEFAULT_DEADLINE_OPTIONS,
+): RescueDeadline | null {
   if (state.capture || !state.ship.alive || state.ending.active) return null;
 
   // ---- cheap refusal, so the common case never pays for the projection
@@ -364,7 +364,7 @@ export function rescueScar(
   // A drift below `field.bottom` still falls through to null. That ending is
   // reachable only in the opening seconds, and the trailing floor is the nearer
   // and better-signalled one everywhere after.
-  const wall: ScarWall | null =
+  const wall: DeadlineWall | null =
     endX > fb.right ? 'right' : endX < fb.left ? 'left' : endY < fb.top ? 'top' : null;
   if (wall === null) return null;
 
@@ -374,7 +374,7 @@ export function rescueScar(
   // evaluations. A six-second drift is then sampled every 9 ticks rather than
   // every 3, which costs resolution in the holes and bounds the work.
   const stride = Math.max(opts.stride, Math.ceil((endTick + 1) / opts.maxSamples));
-  const path: ScarSample[] = [];
+  const path: DeadlineSample[] = [];
   let lastLive = -1;
   let lastLiveState: SimState | null = null;
   let firstDeadAfter = -1;
@@ -394,7 +394,7 @@ export function rescueScar(
 
   // ---- refine the last live tick to the tick, so the cross is a stable world
   // point rather than one that hops by a stride as the ship advances into it
-  let cross: RescueScar['cross'] = null;
+  let cross: RescueDeadline['cross'] = null;
   const flight: Array<{ x: number; y: number }> = [];
   if (lastLive >= 0 && lastLiveState) {
     // Walk the tick or two past the last live sample rather than bisecting into a

@@ -184,7 +184,7 @@ export interface ScoreConfig {
    * Full bonus for a press made with no rescue window left at all.
    *
    * Paid when the rescue COMPLETES — the instant the ship's velocity toward the
-   * wall reaches zero, which is the exact promise `src/render/scar.ts` draws. A
+   * wall reaches zero, which is the exact promise `src/render/deadline.ts` draws. A
    * press that never turns pays nothing, so a doomed one cannot collect, and the
    * award describes the outcome rather than the intention.
    *
@@ -215,7 +215,7 @@ export interface ScoreConfig {
    * MEASURED AGAINST SIGHTED PLAY, and the prediction that used to stand here was
    * wrong. It said presses would move later once the cross was drawable, the
    * median quality would rise, and the span would want shrinking. A 237s session
-   * flown with the scar says otherwise: quality came out p25 0.42, median 0.59,
+   * flown with the deadline says otherwise: quality came out p25 0.42, median 0.59,
    * p75 0.74, p90 0.78 against the blind p25 0.30, median 0.56, p75 0.78, p90
    * 0.86. The centre did not move. The TAILS tightened — fewer very early presses
    * and fewer very late ones — which is the more sensible reading: a visible

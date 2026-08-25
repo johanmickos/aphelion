@@ -12,7 +12,7 @@ import { isGrabKey, keydownAction } from '../src/app/input.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { COURSES, courseOf, withCourse } from '../src/sim/course.ts';
 import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
-import { advanceScar, rescueScar } from '../src/sim/rescue.ts';
+import { advanceDeadline, rescueDeadline } from '../src/sim/rescue.ts';
 import type { Input } from '../src/sim/types.ts';
 import { createLoop } from '../src/app/loop.ts';
 import { anomalyFocus, barrierRelax, frozenOrbit, orbitLock } from '../src/render/camera.ts';
@@ -313,7 +313,7 @@ rearm();
  * Ticks between refreshes of the point of no return, and between full recomputes.
  *
  * A drift takes no input, so a computed projection stays true as the ship flies
- * along it — see `advanceScar`. The refresh is therefore arithmetic and the full
+ * along it — see `advanceDeadline`. The refresh is therefore arithmetic and the full
  * simulation runs only when the projection can no longer be trusted: on every
  * capture transition, on a respawn, and on this timer as a backstop for anything
  * neither of those catches.
@@ -330,12 +330,12 @@ rearm();
  * difference was zero; carried a full second the 99th was 15px. The physics does
  * not drift — the resolution does.
  */
-const SCAR_EVERY = 6;
-const SCAR_RECOMPUTE = 30;
-let scarSkip = SCAR_EVERY;
-let scarAge = SCAR_RECOMPUTE;
-let scarCache: ReturnType<typeof rescueScar> = null;
-let scarWasCaptured = false;
+const DEADLINE_EVERY = 6;
+const DEADLINE_RECOMPUTE = 30;
+let deadlineSkip = DEADLINE_EVERY;
+let deadlineAge = DEADLINE_RECOMPUTE;
+let deadlineCache: ReturnType<typeof rescueDeadline> = null;
+let deadlineWasCaptured = false;
 /** Tick the running capture began on, for the tap test. */
 let captureStart = 0;
 
@@ -453,10 +453,10 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // How long this capture has run, for the tap test below.
     if (!wasCaptured && state.capture) captureStart = state.tick;
     // A press too brief to have been a decision leaves no mark behind. Before the
-    // scar is next observed, so the mark is taken away rather than handed to the
-    // ghost slot to fade — see `RenderConfig.scarTapSecs`.
-    if (wasCaptured && !state.capture && (state.tick - captureStart) * dt <= rcfg.scarTapSecs) {
-      scene.scar.dropMark();
+    // deadline is next observed, so the mark is taken away rather than handed to the
+    // ghost slot to fade — see `RenderConfig.deadlineTapSecs`.
+    if (wasCaptured && !state.capture && (state.tick - captureStart) * dt <= rcfg.deadlineTapSecs) {
+      scene.deadline.dropMark();
     }
     // A new capture begins, so the previous one's receipt is finished and the
     // awards raised below open a fresh one. Before `scoreTick`, deliberately: a
@@ -524,11 +524,11 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       // message about a run that is over.
       scene.fuelWarning.clear();
       scene.popups.settleReceipt();
-      // Same for the scar: it is a world-space mark against a wall this ship has
+      // Same for the deadline: it is a world-space mark against a wall this ship has
       // never approached, and the projection behind it describes a dead run.
-      scene.scar.clear();
-      scarCache = null;
-      scarAge = SCAR_RECOMPUTE;
+      scene.deadline.clear();
+      deadlineCache = null;
+      deadlineAge = DEADLINE_RECOMPUTE;
       centerCamera(cam, curr.x, curr.y, field, backtrackFloorY(sim, curr.highWaterY));
     }
 
@@ -544,36 +544,36 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // A capture starting or ending is the one thing that invalidates a projection,
     // because it is the one thing that changes the ship's velocity.
     const capturedNow = state.capture !== null;
-    if (capturedNow !== scarWasCaptured) {
-      scarCache = null;
-      scarAge = SCAR_RECOMPUTE;
-      scarWasCaptured = capturedNow;
+    if (capturedNow !== deadlineWasCaptured) {
+      deadlineCache = null;
+      deadlineAge = DEADLINE_RECOMPUTE;
+      deadlineWasCaptured = capturedNow;
     }
 
-    scarSkip++;
-    scarAge++;
-    if (!state.ending.active && scarSkip >= SCAR_EVERY) {
-      const elapsed = dt * scarSkip;
-      const stale = scarAge >= SCAR_RECOMPUTE;
-      const carried = scarCache && !stale ? advanceScar(scarCache, elapsed) : null;
+    deadlineSkip++;
+    deadlineAge++;
+    if (!state.ending.active && deadlineSkip >= DEADLINE_EVERY) {
+      const elapsed = dt * deadlineSkip;
+      const stale = deadlineAge >= DEADLINE_RECOMPUTE;
+      const carried = deadlineCache && !stale ? advanceDeadline(deadlineCache, elapsed) : null;
       if (carried) {
-        scarCache = carried;
+        deadlineCache = carried;
       } else {
-        scarCache = rescueScar(state, sim, dt);
-        scarAge = 0;
+        deadlineCache = rescueDeadline(state, sim, dt);
+        deadlineAge = 0;
       }
-      const scar = scarCache;
+      const deadline = deadlineCache;
       // How much fire the ship would fly into if the press were made at the
       // cross. The predictor hands back the flight and the scorer prices it,
       // because `src/sim/` may not know what a point is. Deliberately NOT the
       // payout — it runs out at the turn-away and the real burn is a median 2.21x
       // it — and it is never shown as a number, only as how big the mark draws.
       // See `previewBurn`.
-      const prize = scar
-        ? previewBurn(scar.flight, field, state.bodies, DEFAULT_SCORE_CONFIG, dt)
+      const prize = deadline
+        ? previewBurn(deadline.flight, field, state.bodies, DEFAULT_SCORE_CONFIG, dt)
         : 0;
-      scene.scar.observe(scar, prize, rcfg, elapsed);
-      scarSkip = 0;
+      scene.deadline.observe(deadline, prize, rcfg, elapsed);
+      deadlineSkip = 0;
     }
 
     // Sampled on the fixed tick so trail length never depends on frame rate.

@@ -127,22 +127,22 @@ export interface RenderConfig {
   /** Width of the danger gradient, measured INWARD from the field edge. */
   hazardZoneWidth: number;
 
-  // --- the scar: the point of no return ---
+  // --- the deadline: the point of no return ---
   /**
-   * Seconds-to-cross at which the scar starts ghosting in, and at which it
+   * Seconds-to-cross at which the deadline starts ghosting in, and at which it
    * reaches full strength.
    *
    * Measured, not chosen. Over 640 committed approaches in `diagnostics/`, the
-   * lead between the scar becoming computable and the cross runs median 1.65s,
-   * p75 3.67s. Full strength at the median means the scar is solid for at least
+   * lead between the deadline becoming computable and the cross runs median 1.65s,
+   * p75 3.67s. Full strength at the median means the deadline is solid for at least
    * half of every approach that has one; ghosting in at p75 means three
    * approaches in four never see it appear out of nothing.
    *
    * A ramp rather than a switch, for the reason `nearestBody` gives about cones:
-   * a threshold is a cliff, and a mark that pops into existence is not a scar.
+   * a threshold is a cliff, and a mark that pops into existence is not a deadline.
    */
-  scarFadeInSecs: number;
-  scarFullSecs: number;
+  deadlineFadeInSecs: number;
+  deadlineFullSecs: number;
   /**
    * Seconds a passed cross takes to fade out, aged only while the run is live.
    *
@@ -153,31 +153,31 @@ export interface RenderConfig {
    * the same reason the popups freeze while paused: nothing should burn down
    * behind the notice the player is reading.
    */
-  scarFadeOutSecs: number;
+  deadlineFadeOutSecs: number;
   /**
    * How long a DISPLACED mark gets instead, in seconds.
    *
    * Reported as "we should fade old crosses a bit faster if the user taps more.
-   * The scars add clutter, and it's only the most recent one that matters." Both
+   * The deadlines add clutter, and it's only the most recent one that matters." Both
    * halves of that are right, and they pull in opposite directions on one number:
    * the mark left behind at a death is the explanation of the death and wants the
    * long fade, while a mark shoved aside by a fresh answer is stale the instant it
    * is replaced.
    *
    * So the duration belongs to the MARK and not to the class. A mark keeps
-   * `scarFadeOutSecs` for as long as it is the current one, and is cut to this the
+   * `deadlineFadeOutSecs` for as long as it is the current one, and is cut to this the
    * moment another takes its place. Tapping through the band replaces marks fast,
    * which is exactly when the clutter appears and exactly when this bites.
    *
-   * Applied as a rescale rather than a jump — see `Scar.observe` — so a ghost
+   * Applied as a rescale rather than a jump — see `Deadline.observe` — so a ghost
    * carries on from the alpha it already had instead of blinking down to it.
    */
-  scarGhostSecs: number;
+  deadlineGhostSecs: number;
   /**
    * A capture this short leaves no mark behind at all, in seconds.
    *
    * Asked for as "only show it if the user holds it for just a few frames, to
-   * avoid spamming". A press hides the scar and leaves the mark fading where the
+   * avoid spamming". A press hides the deadline and leaves the mark fading where the
    * cross was, so a burst of taps leaves a burst of marks — and a tap is not a
    * decision worth recording.
    *
@@ -192,15 +192,15 @@ export interface RenderConfig {
    * reached periapsis one, because it earns nothing; measured, that is 48% of all
    * captures at a median of 0.72s, which is most of the game rather than a tap.
    */
-  scarTapSecs: number;
+  deadlineTapSecs: number;
   /** Half-length of the crossbar, and of the arm stub kept after the cross is passed. */
-  scarBarHalf: number;
-  scarStubHalf: number;
+  deadlineBarHalf: number;
+  deadlineStubHalf: number;
   /**
    * How much the mark shrinks and grows with the fire waiting at the cross.
    *
    * SIZE AND NOT BRIGHTNESS, and that is the whole reason this is a separate key
-   * rather than a term folded into `scarAlpha`. Alpha already carries how close
+   * rather than a term folded into `deadlineAlpha`. Alpha already carries how close
    * the deadline is — it ramps in with time-to-cross and fades out once the mark
    * is passed — so a prize term there would make a dim cross mean either "small
    * fire" or "still far away", with no way to tell which. Note 51's lesson about
@@ -208,16 +208,16 @@ export interface RenderConfig {
    * text.
    *
    * The mark scales between these two multiples of its configured size, so a big
-   * fat scar is a big fire and a thin one is a formality.
+   * fat deadline is a big fire and a thin one is a formality.
    *
-   * THEY COMPOUND WITH `scarNearWidth`, which is what made the mark read as too
+   * THEY COMPOUND WITH `deadlineNearWidth`, which is what made the mark read as too
    * thick: a big prize and a press right on the cross used to multiply out to
    * 1.99x, near double. Both were brought in together rather than either alone —
    * the two signals are independent and each still has to be legible on its own,
    * so the fix was the product and not one of the factors.
    */
-  scarPrizeMin: number;
-  scarPrizeMax: number;
+  deadlinePrizeMin: number;
+  deadlinePrizeMax: number;
   /**
    * Predicted burn, in raw bank points, at which the mark reaches full size.
    *
@@ -230,13 +230,13 @@ export interface RenderConfig {
    * AFTER the press carries the ship deeper than the cross itself, so nearly every
    * rescue burns. The scale is about how much, not whether.
    */
-  scarPrizeFull: number;
+  deadlinePrizeFull: number;
 
   // --- the skull ---
   /**
    * Peak alpha of the doom skull.
    *
-   * Louder than the scar's 0.5: the scar is something to read while deciding, and
+   * Louder than the deadline's 0.5: the deadline is something to read while deciding, and
    * this is the announcement that there is nothing left to decide.
    */
   doomAlpha: number;
@@ -252,18 +252,18 @@ export interface RenderConfig {
    */
   verdictTickSecs: number;
   /** Peak half-width of the long arm and of the crossbar, in design units. */
-  scarArmWidth: number;
-  scarBarWidth: number;
+  deadlineArmWidth: number;
+  deadlineBarWidth: number;
   /**
    * Alpha at the peak of the arm, and the fraction of it left where a press
    * would NOT be accepted.
    *
    * The arm is broken rather than blanked over a hole: 370 of 640 live stretches
    * are not contiguous, so blanking them would leave the commonest case looking
-   * like several unrelated marks instead of one scar with gaps in it.
+   * like several unrelated marks instead of one deadline with gaps in it.
    */
-  scarAlpha: number;
-  scarDeadFrac: number;
+  deadlineAlpha: number;
+  deadlineDeadFrac: number;
   /**
    * What the mark reaches, in alpha and in width, when a press lands right on it.
    *
@@ -286,23 +286,23 @@ export interface RenderConfig {
    * going to sail straight past — ambience rather than an answer. `Mark.glow` is
    * frozen at the press instead, so a mark the ship drifted past never lights.
    *
-   * The width half compounds with `scarPrizeMax`, and together they reached 1.99x
+   * The width half compounds with `deadlinePrizeMax`, and together they reached 1.99x
    * — reported as looking "a bit thick". Both came down; see the note there.
    *
    * 0.95 first, reported as "there are times that the cross glows a bit too
-   * bright". The lift matters more than the ceiling: half again over `scarAlpha`
+   * bright". The lift matters more than the ceiling: half again over `deadlineAlpha`
    * is plainly legible as the mark sharpening, where nearly double read as the
-   * mark shouting. The scar is meant to be faint enough to fly past.
+   * mark shouting. The deadline is meant to be faint enough to fly past.
    */
-  scarNearAlpha: number;
-  scarNearWidth: number;
+  deadlineNearAlpha: number;
+  deadlineNearWidth: number;
   /**
-   * How fast the scar reacts to a change, per second: both how the mark follows
+   * How fast the deadline reacts to a change, per second: both how the mark follows
    * a moved cross and how a new mark fades in. One rate, because they are one
    * question — 9/s is about a quarter second to converge, under the reaction time
    * the mark exists to be aimed with.
    *
-   * Applied PER FRAME, in `Scar.update`, and that is the whole point of the key.
+   * Applied PER FRAME, in `Deadline.update`, and that is the whole point of the key.
    * Easing inside `observe` — which runs ten times a second — made `dt * rate`
    * 0.9, so the mark covered 90% of a correction in one step and then sat still
    * for a tenth of a second. A follower in name only.
@@ -312,7 +312,7 @@ export interface RenderConfig {
    * because an acquired cross is genuinely stable. What this rate mostly governs
    * is the fade-in of a new mark, of which there are 541.
    */
-  scarSettleRate: number;
+  deadlineSettleRate: number;
   /**
    * Longest the drawn arm may be, in design units.
    *
@@ -322,7 +322,7 @@ export interface RenderConfig {
    * decide. 260 is two thirds of the viewport's width: long enough to read as a
    * lead-in to the mark, short enough never to become a line across the map.
    */
-  scarArmMaxPx: number;
+  deadlineArmMaxPx: number;
 
   // --- boost halo ---
   /** Glow radius at zero charge / at full charge, in design units. */
@@ -391,27 +391,27 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
 
   hazardZoneWidth: 60,
 
-  scarFadeInSecs: 3.67,
-  scarFullSecs: 1.65,
-  scarFadeOutSecs: 1.6,
-  scarGhostSecs: 0.3,
-  scarTapSecs: 0.18,
-  scarBarHalf: 13,
-  scarStubHalf: 17,
-  scarPrizeMin: 0.62,
-  scarPrizeMax: 1.18,
-  scarPrizeFull: 860,
+  deadlineFadeInSecs: 3.67,
+  deadlineFullSecs: 1.65,
+  deadlineFadeOutSecs: 1.6,
+  deadlineGhostSecs: 0.3,
+  deadlineTapSecs: 0.18,
+  deadlineBarHalf: 13,
+  deadlineStubHalf: 17,
+  deadlinePrizeMin: 0.62,
+  deadlinePrizeMax: 1.18,
+  deadlinePrizeFull: 860,
 
   doomAlpha: 0.78,
   verdictTickSecs: 1 / 60,
-  scarArmWidth: 1.3,
-  scarBarWidth: 1.7,
-  scarAlpha: 0.5,
-  scarDeadFrac: 0.18,
-  scarNearAlpha: 0.74,
-  scarNearWidth: 1.15,
-  scarSettleRate: 9,
-  scarArmMaxPx: 150,
+  deadlineArmWidth: 1.3,
+  deadlineBarWidth: 1.7,
+  deadlineAlpha: 0.5,
+  deadlineDeadFrac: 0.18,
+  deadlineNearAlpha: 0.74,
+  deadlineNearWidth: 1.15,
+  deadlineSettleRate: 9,
+  deadlineArmMaxPx: 150,
 
   boostGlowMin: 13,
   boostGlowMax: 42,

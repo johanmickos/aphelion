@@ -33,9 +33,9 @@ import {
   sheetRows,
 } from '../src/render/sheet.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
-import { rescueScar } from '../src/sim/rescue.ts';
+import { rescueDeadline } from '../src/sim/rescue.ts';
 import { DEFAULT_SCORE_CONFIG, previewBurn } from '../src/score/index.ts';
-import { Scar } from '../src/render/scar.ts';
+import { Deadline } from '../src/render/deadline.ts';
 import { boostColor, drawBoostHalo, drawOrbitCurve } from '../src/render/capture.ts';
 import {
   FUEL_LOW_FRAC,
@@ -1395,7 +1395,7 @@ describe('scene', () => {
       ship: { x: ANOMALY.x - 300, y: ANOMALY.y - 70, vx: 344, vy: 0 },
       charged: true,
     },
-    // The scar's own path. Nothing else in the suite drifts at a side wall, so
+    // The deadline's own path. Nothing else in the suite drifts at a side wall, so
     // without this the spindles, the broken arm and the mark left behind are all
     // drawn for the first time on a phone.
     {
@@ -1458,13 +1458,13 @@ describe('scene', () => {
       if (sc.charged && state.chargedT <= 0 && i < 150) {
         state.chargedT = DEFAULT_CONFIG.chargedSecs * (1 - i / 200);
       }
-      // Fed on the tick at the app's own cadence, so the scar is exercised
+      // Fed on the tick at the app's own cadence, so the deadline is exercised
       // through the same path `app/main.ts` drives it with.
       if (i % 6 === 0 && !state.ending.active) {
         // Priced the way `app/main.ts` prices it, so the scene test exercises the
         // sizing path rather than always drawing a minimum-size mark.
-        const s = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
-        scene.scar.observe(
+        const s = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT);
+        scene.deadline.observe(
           s,
           s ? previewBurn(s.flight, f, state.bodies, DEFAULT_SCORE_CONFIG, FIXED_DT) : 0,
           rcfg,
@@ -1507,8 +1507,8 @@ describe('scene', () => {
   });
 
   it('marks the point of no return, and leaves the mark behind once it is passed', () => {
-    // "Renders without error" cannot tell a drawn scar from an absent one, and an
-    // absent one is the failure mode this feature has: every gate in `rescueScar`
+    // "Renders without error" cannot tell a drawn deadline from an absent one, and an
+    // absent one is the failure mode this feature has: every gate in `rescueDeadline`
     // returns null, so a wiring mistake anywhere reads as a clean pass.
     const state = createInitialState(DEFAULT_CONFIG);
     Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
@@ -1521,8 +1521,8 @@ describe('scene', () => {
     );
     const r = recordingContext();
 
-    /** Fills in the hazard band's red, which is the scar and nothing else here. */
-    const scarFills = (): number =>
+    /** Fills in the hazard band's red, which is the deadline and nothing else here. */
+    const deadlineFills = (): number =>
       r.ops.filter((op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90'))
         .length;
 
@@ -1542,55 +1542,55 @@ describe('scene', () => {
     };
 
     frame();
-    expect(scarFills(), 'nothing is drawn before the scar has been observed').toBe(0);
+    expect(deadlineFills(), 'nothing is drawn before the deadline has been observed').toBe(0);
 
-    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
-    expect(scar, 'the fixture is meant to be committed to a wall').not.toBeNull();
-    expect(scar!.cross, 'and to still have a way out').not.toBeNull();
-    scene.scar.observe(scar, 0, rcfg, FIXED_DT);
+    const deadline = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT);
+    expect(deadline, 'the fixture is meant to be committed to a wall').not.toBeNull();
+    expect(deadline!.cross, 'and to still have a way out').not.toBeNull();
+    scene.deadline.observe(deadline, 0, rcfg, FIXED_DT);
     frame();
-    const ahead = scarFills();
-    expect(ahead, 'the scar is drawn once it has been observed').toBeGreaterThan(0);
+    const ahead = deadlineFills();
+    expect(ahead, 'the deadline is drawn once it has been observed').toBeGreaterThan(0);
 
     // Fly past the cross. The prediction now has no live press left, and the mark
     // must stay where it was rather than vanishing at the moment it matters.
-    const crossTick = Math.round(scar!.cross!.t / FIXED_DT);
+    const crossTick = Math.round(deadline!.cross!.t / FIXED_DT);
     for (let i = 0; i <= crossTick + 2; i++) {
       stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
     }
-    scene.scar.observe(rescueScar(state, DEFAULT_CONFIG, FIXED_DT), 0, rcfg, FIXED_DT);
+    scene.deadline.observe(rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT), 0, rcfg, FIXED_DT);
     frame();
-    expect(scarFills(), 'the mark stays behind after the cross is passed').toBeGreaterThan(0);
+    expect(deadlineFills(), 'the mark stays behind after the cross is passed').toBeGreaterThan(0);
 
     // A grab answers the question, so the mark ages out rather than blinking:
     // a tap IS a capture, and a hard clear made tapping through the band strobe.
-    scene.scar.observe(null, 0, rcfg, rcfg.scarFadeOutSecs * 0.25);
+    scene.deadline.observe(null, 0, rcfg, rcfg.deadlineFadeOutSecs * 0.25);
     frame();
-    expect(scarFills(), 'a brief capture does not blink the mark out').toBeGreaterThan(0);
-    scene.scar.observe(null, 0, rcfg, rcfg.scarFadeOutSecs);
+    expect(deadlineFills(), 'a brief capture does not blink the mark out').toBeGreaterThan(0);
+    scene.deadline.observe(null, 0, rcfg, rcfg.deadlineFadeOutSecs);
     frame();
-    expect(scarFills(), 'but it does expire').toBe(0);
+    expect(deadlineFills(), 'but it does expire').toBe(0);
   });
 
   it('replaces an interrupted mark rather than dragging it across the field', () => {
     // Reported as "the cross kind of jumped forward a few times". On the session
-    // that reported it the scar was absent for 3.9s — a capture — and the cross
+    // that reported it the deadline was absent for 3.9s — a capture — and the cross
     // that came back sat 456px away, which the follower dragged across the screen
     // in three visible steps. Two unrelated situations, nothing continuous
     // between them: the old mark is let go where it stands.
     const state = createInitialState(DEFAULT_CONFIG);
     Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
-    const scar = new Scar();
+    const deadline = new Deadline();
     const at = (): { x: number; y: number; born: number } | null =>
-      (scar as unknown as { mark: { x: number; y: number; born: number } | null }).mark;
+      (deadline as unknown as { mark: { x: number; y: number; born: number } | null }).mark;
 
-    const first = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
+    const first = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT);
     expect(first?.cross).toBeTruthy();
-    scar.observe(first, 0, rcfg, FIXED_DT);
+    deadline.observe(first, 0, rcfg, FIXED_DT);
     const born = { ...at()! };
 
     // An interruption: a capture makes the prediction null for as long as it lasts.
-    scar.observe(null, 0, rcfg, FIXED_DT);
+    deadline.observe(null, 0, rcfg, FIXED_DT);
     expect(at()!.x, 'the mark holds its ground while interrupted').toBeCloseTo(born.x, 6);
 
     // A different answer comes back, a long way off.
@@ -1598,8 +1598,8 @@ describe('scene', () => {
       ...first!,
       cross: { x: born.x + 400, y: born.y - 200, t: first!.cross!.t },
     };
-    scar.observe(far, 0, rcfg, FIXED_DT);
-    scar.update(1, rcfg);
+    deadline.observe(far, 0, rcfg, FIXED_DT);
+    deadline.update(1, rcfg);
     expect(at()!.x, 'the new mark is born AT the new answer, not eased toward it').toBeCloseTo(
       far.cross.x,
       6,
@@ -1611,8 +1611,8 @@ describe('scene', () => {
       ...first!,
       cross: { x: far.cross.x + 40, y: far.cross.y, t: first!.cross!.t },
     };
-    scar.observe(nudged, 0, rcfg, FIXED_DT);
-    scar.update(1 / 60, rcfg);
+    deadline.observe(nudged, 0, rcfg, FIXED_DT);
+    deadline.update(1 / 60, rcfg);
     const x = at()!.x;
     expect(x, 'an uninterrupted correction is followed, not snapped').toBeGreaterThan(far.cross.x);
     expect(x, 'and not covered in a single frame').toBeLessThan(nudged.cross.x - 1);
@@ -1624,12 +1624,12 @@ describe('scene', () => {
     // fire" or "still far away" with no way to tell which.
     const state = createInitialState(DEFAULT_CONFIG);
     Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
-    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
-    expect(scar?.cross).toBeTruthy();
+    const deadline = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT);
+    expect(deadline?.cross).toBeTruthy();
 
     const spanOf = (prize: number): number => {
-      const mark = new Scar();
-      mark.observe(scar, prize, rcfg, FIXED_DT);
+      const mark = new Deadline();
+      mark.observe(deadline, prize, rcfg, FIXED_DT);
       mark.update(1, rcfg);
       const c = createCamera(rcfg);
       fitCamera(c, { w: 390, h: 844, dpr: 1 });
@@ -1648,20 +1648,20 @@ describe('scene', () => {
     };
 
     const nothing = spanOf(0);
-    const middling = spanOf(rcfg.scarPrizeFull / 2);
-    const big = spanOf(rcfg.scarPrizeFull);
+    const middling = spanOf(rcfg.deadlinePrizeFull / 2);
+    const big = spanOf(rcfg.deadlinePrizeFull);
     expect(middling, 'a middling fire draws a bigger mark than none').toBeGreaterThan(nothing);
     expect(big, 'and a full one bigger still').toBeGreaterThan(middling);
 
     // It saturates rather than growing without limit: the top of the measured
     // distribution is three times the p90 the span is set to.
-    expect(spanOf(rcfg.scarPrizeFull * 10)).toBeCloseTo(big, 6);
+    expect(spanOf(rcfg.deadlinePrizeFull * 10)).toBeCloseTo(big, 6);
   });
 
   it('shows the skull only when a press was made past the last chance', () => {
     // Measured: a press past the cross is fatal 94% of the time and precedes 43%
     // of deaths by a median 0.85s. It is drawn on the side AWAY from the wall, so
-    // it never sits over the hazard gradient or the receding scar.
+    // it never sits over the hazard gradient or the receding deadline.
     const state = createInitialState(DEFAULT_CONFIG);
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
     const c = createCamera(rcfg);
@@ -1740,17 +1740,17 @@ describe('scene', () => {
     const state = createInitialState(DEFAULT_CONFIG);
     Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
-    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
-    expect(scar.cross).toBeTruthy();
+    const deadline = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT)!;
+    expect(deadline.cross).toBeTruthy();
 
     /** Brightest red drawn after the mark stops being live. */
     const glowOf = (lead: number, ended: 'press' | 'drifted'): number => {
-      const mark = new Scar();
-      mark.observe({ ...scar, cross: { ...scar.cross!, t: lead } }, 0, rcfg, FIXED_DT);
+      const mark = new Deadline();
+      mark.observe({ ...deadline, cross: { ...deadline.cross!, t: lead } }, 0, rcfg, FIXED_DT);
       mark.update(1, rcfg);
-      // A null scar means captured — a press. A scar with no cross left means the
+      // A null deadline means captured — a press. A deadline with no cross left means the
       // ship drifted past without pressing.
-      mark.observe(ended === 'press' ? null : { ...scar, cross: null }, 0, rcfg, FIXED_DT);
+      mark.observe(ended === 'press' ? null : { ...deadline, cross: null }, 0, rcfg, FIXED_DT);
       const c = createCamera(rcfg);
       fitCamera(c, { w: 390, h: 844, dpr: 1 });
       centerCamera(c, state.ship.x, state.ship.y, f, null);
@@ -1766,16 +1766,16 @@ describe('scene', () => {
     };
 
     const onIt = glowOf(0.02, 'press');
-    const early = glowOf(rcfg.scarFullSecs, 'press');
+    const early = glowOf(rcfg.deadlineFullSecs, 'press');
     const missed = glowOf(0.02, 'drifted');
 
     expect(onIt, 'a press right on the cross lights it').toBeGreaterThan(early);
-    expect(onIt, 'up to the configured peak').toBeLessThanOrEqual(rcfg.scarNearAlpha + 1e-6);
+    expect(onIt, 'up to the configured peak').toBeLessThanOrEqual(rcfg.deadlineNearAlpha + 1e-6);
     expect(early, 'a press with the whole window left does not').toBeLessThanOrEqual(
-      rcfg.scarAlpha + 1e-6,
+      rcfg.deadlineAlpha + 1e-6,
     );
     expect(missed, 'and drifting past it never lights, however close').toBeLessThanOrEqual(
-      rcfg.scarAlpha + 1e-6,
+      rcfg.deadlineAlpha + 1e-6,
     );
   });
 
@@ -1787,9 +1787,9 @@ describe('scene', () => {
     const state = createInitialState(DEFAULT_CONFIG);
     Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
-    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
-    const mark = new Scar();
-    mark.observe({ ...scar, cross: { ...scar.cross!, t: 0.005 } }, 0, rcfg, FIXED_DT);
+    const deadline = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT)!;
+    const mark = new Deadline();
+    mark.observe({ ...deadline, cross: { ...deadline.cross!, t: 0.005 } }, 0, rcfg, FIXED_DT);
     mark.update(1, rcfg);
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
@@ -1803,49 +1803,54 @@ describe('scene', () => {
   });
 
   it('cuts a displaced mark short, but not the one left behind at a death', () => {
-    // "We should fade old crosses a bit faster if the user taps more. The scars
+    // "We should fade old crosses a bit faster if the user taps more. The deadlines
     // add clutter, and it's only the most recent one that matters." Both halves
     // pull opposite ways on one number, so the duration belongs to the mark: the
     // one explaining a death keeps the long fade, the one shoved aside does not.
     const state = createInitialState(DEFAULT_CONFIG);
     Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
-    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
-    const peek = (m: Scar) =>
+    const deadline = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT)!;
+    const peek = (m: Deadline) =>
       m as unknown as { mark: { fade: number } | null; ghost: { fade: number } | null };
 
-    const mark = new Scar();
-    mark.observe(scar, 0, rcfg, FIXED_DT);
-    expect(peek(mark).mark!.fade, 'a live mark gets the long fade').toBe(rcfg.scarFadeOutSecs);
+    const mark = new Deadline();
+    mark.observe(deadline, 0, rcfg, FIXED_DT);
+    expect(peek(mark).mark!.fade, 'a live mark gets the long fade').toBe(rcfg.deadlineFadeOutSecs);
 
     // Passed without a press: still the most recent thing, so it keeps it. This
     // is the mark that explains a death, and the fade deliberately outlasts the
     // median 0.53s between the cross and the wall.
-    mark.observe({ ...scar, cross: null }, 0, rcfg, FIXED_DT);
-    expect(peek(mark).mark!.fade, 'the mark left behind keeps it').toBe(rcfg.scarFadeOutSecs);
+    mark.observe({ ...deadline, cross: null }, 0, rcfg, FIXED_DT);
+    expect(peek(mark).mark!.fade, 'the mark left behind keeps it').toBe(rcfg.deadlineFadeOutSecs);
 
     // Displaced by a fresher answer: cut short.
-    mark.observe({ ...scar, cross: { ...scar.cross!, x: scar.cross!.x + 400 } }, 0, rcfg, FIXED_DT);
-    expect(peek(mark).ghost, 'the old one was let go').not.toBeNull();
-    expect(peek(mark).ghost!.fade, 'and is cut short').toBe(rcfg.scarGhostSecs);
-    expect(peek(mark).mark!.fade, 'while the new one gets the long fade').toBe(
-      rcfg.scarFadeOutSecs,
+    mark.observe(
+      { ...deadline, cross: { ...deadline.cross!, x: deadline.cross!.x + 400 } },
+      0,
+      rcfg,
+      FIXED_DT,
     );
-    expect(rcfg.scarGhostSecs).toBeLessThan(rcfg.scarFadeOutSecs);
+    expect(peek(mark).ghost, 'the old one was let go').not.toBeNull();
+    expect(peek(mark).ghost!.fade, 'and is cut short').toBe(rcfg.deadlineGhostSecs);
+    expect(peek(mark).mark!.fade, 'while the new one gets the long fade').toBe(
+      rcfg.deadlineFadeOutSecs,
+    );
+    expect(rcfg.deadlineGhostSecs).toBeLessThan(rcfg.deadlineFadeOutSecs);
   });
 
   it('leaves no mark behind for a press too brief to have been a decision', () => {
-    // A press hides the scar and leaves the mark fading where the cross was, so a
+    // A press hides the deadline and leaves the mark fading where the cross was, so a
     // burst of taps leaves a burst of marks. `dropMark` takes it away rather than
     // handing it to the ghost slot, so a tap leaves nothing at all.
     const state = createInitialState(DEFAULT_CONFIG);
     Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
-    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT)!;
+    const deadline = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT)!;
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
     centerCamera(c, state.ship.x, state.ship.y, f, null);
 
-    const drew = (mark: Scar): boolean => {
+    const drew = (mark: Deadline): boolean => {
       const r = recordingContext();
       mark.draw(r.ctx, c, rcfg);
       return r.ops.some(
@@ -1854,15 +1859,15 @@ describe('scene', () => {
     };
 
     // A press leaves the mark behind, fading.
-    const held = new Scar();
-    held.observe(scar, 0, rcfg, FIXED_DT);
+    const held = new Deadline();
+    held.observe(deadline, 0, rcfg, FIXED_DT);
     held.update(1, rcfg);
     held.observe(null, 0, rcfg, FIXED_DT);
     expect(drew(held), 'a real capture leaves its mark').toBe(true);
 
     // The same, then told the press was a tap.
-    const tapped = new Scar();
-    tapped.observe(scar, 0, rcfg, FIXED_DT);
+    const tapped = new Deadline();
+    tapped.observe(deadline, 0, rcfg, FIXED_DT);
     tapped.update(1, rcfg);
     tapped.observe(null, 0, rcfg, FIXED_DT);
     tapped.dropMark();
@@ -1870,12 +1875,12 @@ describe('scene', () => {
 
     // And it does not take an older, unrelated ghost with it: a tap says nothing
     // about the mark before it.
-    const withGhost = new Scar();
-    withGhost.observe(scar, 0, rcfg, FIXED_DT);
+    const withGhost = new Deadline();
+    withGhost.observe(deadline, 0, rcfg, FIXED_DT);
     withGhost.update(1, rcfg);
     withGhost.observe(null, 0, rcfg, FIXED_DT);
     withGhost.observe(
-      { ...scar, cross: { ...scar.cross!, x: scar.cross!.x + 400 } },
+      { ...deadline, cross: { ...deadline.cross!, x: deadline.cross!.x + 400 } },
       0,
       rcfg,
       FIXED_DT,
@@ -1897,23 +1902,23 @@ describe('scene', () => {
       { sim: DEFAULT_CONFIG, render: rcfg, bodies: state.bodies, field: f },
       99,
     );
-    const scar = rescueScar(state, DEFAULT_CONFIG, FIXED_DT);
-    expect(scar?.cross, 'the fixture is meant to have a distant cross').toBeTruthy();
-    const reach = Math.hypot(scar!.cross!.x - state.ship.x, scar!.cross!.y - state.ship.y);
+    const deadline = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT);
+    expect(deadline?.cross, 'the fixture is meant to have a distant cross').toBeTruthy();
+    const reach = Math.hypot(deadline!.cross!.x - state.ship.x, deadline!.cross!.y - state.ship.y);
     expect(reach, 'and distant enough that the clamp has to bite').toBeGreaterThan(
-      rcfg.scarArmMaxPx,
+      rcfg.deadlineArmMaxPx,
     );
 
-    // The scar alone, not the whole scene: the hazard band and the trailing
+    // The deadline alone, not the whole scene: the hazard band and the trailing
     // floor are drawn in the same red family, and an extent measured over all of
     // it would be measuring the field, not the mark.
-    scene.scar.observe(scar, 0, rcfg, FIXED_DT);
+    scene.deadline.observe(deadline, 0, rcfg, FIXED_DT);
     // A mark arrives rather than appearing, so it has to be allowed to finish
     // being born before there is anything to measure.
-    scene.scar.update(1, rcfg);
+    scene.deadline.update(1, rcfg);
     const r = recordingContext();
     centerCamera(c, state.ship.x, state.ship.y, f, null);
-    scene.scar.draw(r.ctx, c, rcfg);
+    scene.deadline.draw(r.ctx, c, rcfg);
 
     const xs: number[] = [];
     const ys: number[] = [];
@@ -1923,13 +1928,13 @@ describe('scene', () => {
         ys.push(op[2] as number);
       }
     }
-    expect(xs.length, 'the scar drew nothing to measure').toBeGreaterThan(0);
+    expect(xs.length, 'the deadline drew nothing to measure').toBeGreaterThan(0);
     const spanPx = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
     // The arm, plus the stub past the mark and the crossbar across it.
-    const limit = (rcfg.scarArmMaxPx + rcfg.scarStubHalf + rcfg.scarBarHalf) * c.scale;
+    const limit = (rcfg.deadlineArmMaxPx + rcfg.deadlineStubHalf + rcfg.deadlineBarHalf) * c.scale;
     expect(
       spanPx,
-      `the scar spans ${spanPx.toFixed(0)}px against a ${limit.toFixed(0)}px bound`,
+      `the deadline spans ${spanPx.toFixed(0)}px against a ${limit.toFixed(0)}px bound`,
     ).toBeLessThanOrEqual(limit);
   });
 

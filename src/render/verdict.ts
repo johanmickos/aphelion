@@ -5,14 +5,14 @@
  * recovery (SAFE) and a badge for the press that dared it (Nice!), and both were
  * cut on sight — "it's too crowded and the anticipation is fun", then "the 'nice!'
  * is a bit cluttered". Both readings are right, and together they say something
- * this file should not forget: the good news does not need a badge. The scar
+ * this file should not forget: the good news does not need a badge. The deadline
  * already says where the line is and the flames say you are on it, so announcing
  * the outcome the instant it resolves spends the two seconds the game is at its
  * most tense.
  *
  * What replaced the praise is not a label at all: the CROSS ITSELF brightens and
  * thickens as the ship closes on it, the way the compass rings do as the sweep
- * lines up. See `src/render/scar.ts`. An instrument reacting is worth more than a
+ * lines up. See `src/render/deadline.ts`. An instrument reacting is worth more than a
  * word about the instrument.
  *
  * So the slot says only the thing nothing else can: a death that has not happened
@@ -27,7 +27,7 @@
  * rather than on the score.
  *
  * ON THE SIDE AWAY FROM THE BOUNDARY, so none of them draws over the hazard gradient
- * or the receding scar — both red, both already in that space — and so the mark
+ * or the receding deadline — both red, both already in that space — and so the mark
  * sits where an escape would be.
  */
 import type { Camera } from './camera.ts';
@@ -35,7 +35,7 @@ import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 import type { ScoreState } from '../score/types.ts';
-import type { ScarWall } from '../sim/rescue.ts';
+import type { DeadlineWall } from '../sim/rescue.ts';
 import { HAZARD, withAlpha } from './palette.ts';
 
 /** Design units from the ship the verdict sits at. */
@@ -46,7 +46,7 @@ const OFFSET = 24;
  * A unit direction rather than the old `-side` on x, because the ceiling's answer
  * is on the other axis. Down-screen is +y, so fleeing the ceiling is +1 there.
  */
-const DOOM_AWAY: Record<ScarWall, { x: number; y: number }> = {
+const DOOM_AWAY: Record<DeadlineWall, { x: number; y: number }> = {
   left: { x: 1, y: 0 },
   right: { x: -1, y: 0 },
   top: { x: 0, y: 1 },

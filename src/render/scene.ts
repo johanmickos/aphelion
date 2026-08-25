@@ -25,7 +25,7 @@ import { Trail, drawShip } from './ship.ts';
 import { Nebula, OUTRO_SECS } from './nebula.ts';
 import type { CanvasFactory } from './nebula.ts';
 import { FuelWarning } from './fuel-warning.ts';
-import { Scar } from './scar.ts';
+import { Deadline } from './deadline.ts';
 import { drawVerdict } from './verdict.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
@@ -54,9 +54,9 @@ export class Scene {
   /**
    * The point of no return. Fed on the tick from `app/main.ts`, which is where
    * the full `SimState` the prediction needs lives — the snapshot is deliberately
-   * narrow and a scar is not something it should learn to carry.
+   * narrow and a deadline is not something it should learn to carry.
    */
-  readonly scar = new Scar();
+  readonly deadline = new Deadline();
   private readonly stars: Starfield;
   private readonly bodyRenderer = new BodyRenderer();
 
@@ -342,12 +342,12 @@ export class Scene {
     // Under the ship and its wake: it describes where the ship is going, and
     // nothing about it should ever obscure the ship itself.
     //
-    // The follower advances here rather than where the scar is fed, so the mark
+    // The follower advances here rather than where the deadline is fed, so the mark
     // glides at display rate instead of stepping at the ten-times-a-second the
     // prediction is recomputed at. Frozen while paused, like the popups: a mark
     // must not slide to a new place behind an overlay.
-    if (!opts.paused) this.scar.update(opts.frameDt, render);
-    this.scar.draw(ctx, cam, render);
+    if (!opts.paused) this.deadline.update(opts.frameDt, render);
+    this.deadline.draw(ctx, cam, render);
 
     const compass = drawCompass(ctx, cam, sim, render, snap, bodies, opts.timeMs);
 
