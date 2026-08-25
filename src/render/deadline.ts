@@ -41,7 +41,7 @@
  * separates from the wall by FORM instead — the wall is straight, dashed and
  * vertical, this lies along your own path — which is the channel that was free.
  */
-import type { RescueDeadline, DeadlineSample } from '../sim/rescue.ts';
+import type { RescueDeadline, DeadlineSample, DeadlineWall } from '../sim/rescue.ts';
 import { hypot } from '../sim/orbit.ts';
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
@@ -138,6 +138,25 @@ export class Deadline {
   private path: DeadlineSample[] = [];
 
   /**
+   * A wall ahead with no press left that reaches it — the drifting half of the
+   * skull's condition. Null the rest of the time.
+   *
+   * KEPT HERE AND NOT IN `ScoreState` for the reason `src/score/` exists: the
+   * scorer is an observer that must stay a pure function of (config, seed,
+   * inputLog), and answering this every tick would mean it forward-simulating for
+   * a render cue. This class is already handed the answer ten times a second for
+   * the track, so the expensive part is paid for.
+   *
+   * `age` is advanced per FRAME, like everything else on this object.
+   */
+  private fatedState: { wall: DeadlineWall; age: number } | null = null;
+
+  /** The drifting half of `Doom`, or null. See `src/render/verdict.ts`. */
+  get fated(): { wall: DeadlineWall; age: number } | null {
+    return this.fatedState;
+  }
+
+  /**
    * Take the latest prediction.
    *
    * Called on the simulation tick and not every frame: the answer is a property
@@ -148,16 +167,26 @@ export class Deadline {
    * as "the ship must have been captured, so a press happened", which is true
    * most of the time and silently wrong when a drift simply stops threatening a
    * wall — that case would have fired a confirm for a press nobody made.
+   *
+   * TAKES NO `dt`, deliberately. It used to, and used it to age the confirm — but
+   * `update` was ageing the same field per frame, so everything on a clock ran at
+   * about double speed. There is one clock and it is `update`.
    */
-  observe(
-    deadline: RescueDeadline | null,
-    captured: boolean,
-    rcfg: RenderConfig,
-    dt: number,
-  ): void {
-    if (this.confirm) {
-      this.confirm.age += dt;
-      if (this.confirm.age >= rcfg.deadlineConfirmSecs) this.confirm = null;
+  observe(deadline: RescueDeadline | null, captured: boolean, rcfg: RenderConfig): void {
+    // NOTHING IS AGED HERE. It was, and it was wrong twice over: `observe` runs on
+    // the simulation tick and `update` runs per frame, so anything advanced in
+    // both ran at roughly double speed — the confirm was expiring in half its
+    // configured 0.25s. `update` is the clock; this method only decides what
+    // exists.
+    //
+    // A wall ahead with no press left. Recorded before the cross branch below,
+    // because a null cross is exactly the condition and the branch returns early.
+    if (deadline && !deadline.cross) {
+      if (!this.fatedState || this.fatedState.wall !== deadline.wall) {
+        this.fatedState = { wall: deadline.wall, age: 0 };
+      }
+    } else {
+      this.fatedState = null;
     }
 
     if (deadline?.cross) {
@@ -243,7 +272,11 @@ export class Deadline {
    * — a follower in name only, and visibly a series of jumps.
    */
   update(frameDt: number, rcfg: RenderConfig): void {
-    if (this.confirm) this.confirm.age += frameDt;
+    if (this.confirm) {
+      this.confirm.age += frameDt;
+      if (this.confirm.age >= rcfg.deadlineConfirmSecs) this.confirm = null;
+    }
+    if (this.fatedState) this.fatedState.age += frameDt;
     const m = this.mark;
     if (!m) return;
     m.born += frameDt;
@@ -266,6 +299,7 @@ export class Deadline {
     this.mark = null;
     this.target = null;
     this.confirm = null;
+    this.fatedState = null;
     this.path = [];
   }
 

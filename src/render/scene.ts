@@ -379,7 +379,26 @@ export class Scene {
     this.fuelWarning.draw(ctx, cam, snap);
     // Beside the ship, on the side away from the wall — clear of the fuel badge
     // below it and of the popups above it. See `verdict.ts`.
-    drawVerdict(ctx, cam, render, snap, opts.score);
+    // ---- resolve the skull's two disjoint sources into one
+    //
+    // Drifting, the deadline knows; captured, the scorer does. They cannot both
+    // be true — `rescueDeadline` returns null during a capture, and `doomed` is
+    // armed only at the start of one — so this is one meaning in two states
+    // rather than a priority between two opinions. Resolving it here leaves
+    // `drawVerdict` with a single input and no idea either source exists.
+    const fated = this.deadline.fated;
+    const doomed = opts.score.doomed;
+    drawVerdict(
+      ctx,
+      cam,
+      render,
+      snap,
+      fated
+        ? { wall: fated.wall, age: fated.age }
+        : doomed
+          ? { wall: doomed.wall, age: (snap.tick - doomed.tick) * render.verdictTickSecs }
+          : null,
+    );
 
     drawEdgeMarkers(
       ctx,

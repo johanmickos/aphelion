@@ -41,9 +41,9 @@ import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
-import type { ScoreState } from '../score/types.ts';
 import type { DeadlineWall } from '../sim/rescue.ts';
 import { HAZARD, withAlpha } from './palette.ts';
+import { hypot } from '../sim/orbit.ts';
 
 /** Design units from the ship the verdict sits at. */
 const OFFSET = 24;
@@ -58,9 +58,9 @@ const DOOM_AWAY: Record<DeadlineWall, { x: number; y: number }> = {
   right: { x: -1, y: 0 },
   top: { x: 0, y: 1 },
 };
-/** Cranium radius, in design units. */
-const R = 6.2;
-/** Seconds per pulse. The fuel warning's own rate, so every badge beats alike. */
+/**
+ * Seconds per pulse. The fuel warning's own rate, so every badge beats alike.
+ */
 const PULSE_SEC = 0.36;
 
 /**
@@ -71,7 +71,87 @@ function beat(phase: number): number {
   return phase < 0.22 ? phase / 0.22 : 1 - (phase - 0.22) / 0.78;
 }
 
-/** The death's-head: filled silhouette, holes punched back out to the sky. */
+/**
+ * How far below centre the bones cross, in units of `r`.
+ *
+ * They used to cross THROUGH the cranium, and the problem was not the geometry —
+ * it was the compositing. Bones and skull were two separate fills at the same
+ * alpha, so every overlapping pixel came out at `1-(1-a)²` and the crossing read
+ * brighter than either shape. Reported as "the crossbones and the skull overlay
+ * in intensity".
+ *
+ * Both halves of that are fixed here, and the order matters: the single-path fill
+ * below is what makes the intensity uniform, and this is what makes the
+ * SILHOUETTE legible — bones behind a jaw are a shape, bones through a cranium
+ * are a scribble at 11px.
+ */
+const BONE_DROP = 0.46;
+
+/**
+ * Append one bone to the current path: a shaft, and two lobes at each end.
+ *
+ * APPENDS RATHER THAN DRAWS, which is the whole technique. Every piece of this
+ * glyph goes into one path and is filled once, so overlapping pieces fill exactly
+ * once — a stroked bone and a filled skull could not do that, however carefully
+ * they were placed.
+ */
+function bonePath(
+  ctx: CanvasRenderingContext2D,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  w: number,
+  k: number,
+): void {
+  let dx = x1 - x0;
+  let dy = y1 - y0;
+  const len = hypot(dx, dy) || 1;
+  dx /= len;
+  dy /= len;
+  const nx = -dy;
+  const ny = dx;
+  ctx.moveTo(x0 + nx * w, y0 + ny * w);
+  ctx.lineTo(x1 + nx * w, y1 + ny * w);
+  ctx.lineTo(x1 - nx * w, y1 - ny * w);
+  ctx.lineTo(x0 - nx * w, y0 - ny * w);
+  ctx.closePath();
+  for (const [ex, ey] of [
+    [x0, y0],
+    [x1, y1],
+  ] as const) {
+    for (const side of [1, -1] as const) {
+      const cx = ex + nx * k * side;
+      const cy = ey + ny * k * side;
+      // `moveTo` the arc's start, or the subpath draws a spoke in from the last
+      // point and the lobe fills as a wedge.
+      ctx.moveTo(cx + k, cy);
+      ctx.arc(cx, cy, k, 0, Math.PI * 2);
+    }
+  }
+}
+
+/**
+ * The death's-head, over crossed bones.
+ *
+ * DRAWN FOR ELEVEN PIXELS, which is the only design constraint that mattered.
+ * The shape this replaced was described as "a bit bubbly and not immediately
+ * recognisable as death", and the cause was feature count rather than proportion:
+ * a round cranium, two small sockets, a nose and a tooth gap is five things
+ * inside a glyph the size of a word's letter. This spends the pixels on fewer,
+ * larger ones.
+ *
+ * THE SLANT IS THE WHOLE TRICK. Each socket's TOP edge runs downward toward the
+ * nose, which is the difference between a skull and an angry one — it reads as a
+ * brow. Everything else is silhouette: a flat crown, a cheekbone, a hard notch
+ * under it, and a jaw tapered inward.
+ *
+ * ONE PATH, ONE FILL. Bones, cranium and jaw all append to a single path and are
+ * filled once, so no overlap ever composites twice. Alpha is therefore uniform
+ * across the whole mark whatever the pieces do, which is what a pulsing glyph
+ * needs — the alternative was a mark whose crossing point flashed brighter than
+ * its own head.
+ */
 function skull(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -80,71 +160,109 @@ function skull(
   alpha: number,
 ): void {
   ctx.fillStyle = withAlpha(HAZARD, alpha);
-  // One filled path with the jaw hanging off it, so the glyph is a single
-  // silhouette rather than a stack of shapes that can separate at small sizes.
   ctx.beginPath();
-  ctx.arc(x, y - r * 0.16, r, Math.PI * 0.86, Math.PI * 0.14);
-  ctx.lineTo(x + r * 0.52, y + r * 0.72);
-  ctx.lineTo(x + r * 0.3, y + r * 0.72);
-  ctx.lineTo(x + r * 0.3, y + r * 1.02);
-  ctx.lineTo(x - r * 0.3, y + r * 1.02);
-  ctx.lineTo(x - r * 0.3, y + r * 0.72);
-  ctx.lineTo(x - r * 0.52, y + r * 0.72);
+
+  // ---- the bones, behind and below
+  const by = y + r * BONE_DROP;
+  const L = r * 1.2;
+  for (const d of [1, -1] as const) {
+    bonePath(ctx, x - L * d, by + r * 0.62, x + L * d, by - r * 0.62, r * 0.12, r * 0.19);
+  }
+
+  // ---- cranium and jaw
+  const w = r * 1.04;
+  const top = y - r * 0.95;
+  const cheek = y + r * 0.16;
+  ctx.moveTo(x - w, top + r * 0.4);
+  ctx.quadraticCurveTo(x - w * 0.98, top - r * 0.14, x - w * 0.36, top - r * 0.16);
+  ctx.lineTo(x + w * 0.36, top - r * 0.16);
+  ctx.quadraticCurveTo(x + w * 0.98, top - r * 0.14, x + w, top + r * 0.4);
+  ctx.lineTo(x + w * 0.94, cheek);
+  ctx.lineTo(x + w * 0.44, cheek + r * 0.26);
+  ctx.lineTo(x + w * 0.4, cheek + r * 0.82);
+  ctx.lineTo(x - w * 0.4, cheek + r * 0.82);
+  ctx.lineTo(x - w * 0.44, cheek + r * 0.26);
+  ctx.lineTo(x - w * 0.94, cheek);
   ctx.closePath();
+
   ctx.fill();
 
-  // Sockets and nose, punched out rather than filled dark, so the holes read
-  // against whatever is behind the ship instead of against an assumption about it.
+  // ---- the voids, punched back out to the sky
+  //
+  // Punched rather than filled dark, so the holes read against whatever is behind
+  // the ship instead of against an assumption about it. Two sockets, one nose,
+  // one jaw gap — and nothing else, because a tooth row at this size is a smudge.
   ctx.globalCompositeOperation = 'destination-out';
+  const sy = y - r * 0.2;
+  for (const d of [-1, 1] as const) {
+    const sx = x + d * r * 0.47;
+    ctx.beginPath();
+    ctx.moveTo(sx - d * r * 0.25, sy - r * 0.3);
+    ctx.lineTo(sx + d * r * 0.24, sy - r * 0.1);
+    ctx.lineTo(sx + d * r * 0.16, sy + r * 0.26);
+    ctx.lineTo(sx - d * r * 0.22, sy + r * 0.22);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.beginPath();
-  ctx.ellipse(x - r * 0.42, y - r * 0.2, r * 0.28, r * 0.32, 0, 0, Math.PI * 2);
-  ctx.ellipse(x + r * 0.42, y - r * 0.2, r * 0.28, r * 0.32, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(x, y + r * 0.1);
-  ctx.lineTo(x + r * 0.17, y + r * 0.44);
-  ctx.lineTo(x - r * 0.17, y + r * 0.44);
+  ctx.moveTo(x, y + r * 0.16);
+  ctx.lineTo(x + r * 0.15, y + r * 0.44);
+  ctx.lineTo(x - r * 0.15, y + r * 0.44);
   ctx.closePath();
   ctx.fill();
-  ctx.fillRect(x - r * 0.06, y + r * 0.72, r * 0.12, r * 0.3);
+  ctx.fillRect(x - r * 0.08, cheek + r * 0.34, r * 0.16, r * 0.48);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/**
+ * What the skull is owed for: a wall ahead, and no press left that reaches it.
+ *
+ * ONE MEANING, TWO STATES, and they are disjoint by construction — which is why
+ * this is a single type rather than a flag with two sources that could disagree.
+ *
+ *  - DRIFTING, the common case. `rescueDeadline` finds a wall inside its horizon
+ *    and no press along the way still turns the ship: `Deadline.fated`.
+ *  - CAPTURED, after a press that came too late: `ScoreState.doomed`, armed on
+ *    the first tick of the capture.
+ *
+ * They cannot both be true: `rescueDeadline` returns null while captured (the
+ * escape from a capture is a release, not a grab), and `doomed` exists only
+ * during one. That is also why BOTH are needed. Dropping the captured half would
+ * make the skull vanish on the very press that sealed the run — the player panics,
+ * presses, and the death mark disappears, which reads as a save.
+ *
+ * `age` is seconds and not a tick, because the two sources count differently: one
+ * is a render-side clock advanced per frame, the other a tick stamped by the
+ * scorer. Resolving that at the seam leaves this file with a single input.
+ */
+export interface Doom {
+  wall: DeadlineWall;
+  /** Seconds since it became true, for the pulse phase. */
+  age: number;
 }
 
 /**
  * Draw the skull, if one is owed.
  *
- * A pure function of the snapshot and the score — it holds no state, because the
- * only thing it would have to remember is a phase, and the tick is already a clock
+ * A pure function of its arguments — it holds no state, because the only thing it
+ * would have to remember is a phase, and `age` already carries one from a clock
  * that stops when the game does. `fuel-warning.ts` keeps state because it counts
- * pulses from a transition it has to detect itself; both of these arrive with the
- * tick they started on.
+ * pulses from a transition it has to detect itself; this arrives resolved.
  */
 export function drawVerdict(
   ctx: CanvasRenderingContext2D,
   cam: Camera,
   rcfg: RenderConfig,
   snap: RenderSnapshot,
-  score: ScoreState,
+  doom: Doom | null,
 ): void {
   // Nothing during the ending hold: the `LOST — OFF COURSE` notice is the
   // explanation from there, and a countdown that continues past the thing it was
   // counting to is noise.
   if (snap.ending.active) return;
+  if (!doom || doom.age < 0) return;
 
-  // Ticks, not milliseconds: the pulse freezes with the simulation the way the
-  // popups do behind an overlay, and a replay of a report beats identically.
-  const ageOf = (at: { tick: number } | null): number =>
-    at ? (snap.tick - at.tick) * rcfg.verdictTickSecs : -1;
-
-  // Priority is the order the moments happen, in reverse: a doomed press is the
-  // whole story if it happened, then the recovery that answers the question, then
-  // the press that dared. Each is checked against its own lifetime, so an expired
-  // one hands the slot back rather than holding it empty.
-  const doom = score.doomed;
-  if (!doom) return;
-  const age = ageOf(doom);
-  if (age < 0) return;
-
-  const alpha = rcfg.doomAlpha * (0.45 + 0.55 * beat((age % PULSE_SEC) / PULSE_SEC));
+  const alpha = rcfg.doomAlpha * (0.45 + 0.55 * beat((doom.age % PULSE_SEC) / PULSE_SEC));
 
   const s = cam.scale;
   // Away from the boundary it is about to cross, so the mark never sits between
@@ -155,6 +273,6 @@ export function drawVerdict(
   const y = toScreenY(cam, snap.y + away.y * OFFSET);
 
   ctx.save();
-  skull(ctx, x, y, R * s, alpha);
+  skull(ctx, x, y, rcfg.doomR * s, alpha);
   ctx.restore();
 }

@@ -281,6 +281,17 @@ export interface RenderConfig {
    */
   doomAlpha: number;
   /**
+   * Radius of the doom skull, in design units.
+   *
+   * THE LEVER THAT MATTERS. The glyph was redrawn once for being "not immediately
+   * recognisable as death", and most of what reads as unrecognisable at a glance
+   * is this number rather than the path: at 6.2 it renders 6-19px across the
+   * camera's real scale range, and the smallest end of that is a smudge whatever
+   * is drawn into it. It lives here, next to the alpha, so the two can be judged
+   * together.
+   */
+  doomR: number;
+  /**
    * Seconds a tick represents, for the verdict badges that beat on the tick.
    *
    * Here rather than imported from `SimConfig` because it is a RENDER fact — how
@@ -379,6 +390,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   deadlineSettleRate: 9,
 
   doomAlpha: 0.78,
+  doomR: 7.4,
   verdictTickSecs: 1 / 60,
 
   boostGlowMin: 13,

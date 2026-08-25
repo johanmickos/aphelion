@@ -1496,7 +1496,7 @@ describe('scene', () => {
       // through the same path `app/main.ts` drives it with.
       if (i % 6 === 0 && !state.ending.active) {
         const s = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT);
-        scene.deadline.observe(s, state.capture !== null, rcfg, FIXED_DT * 6);
+        scene.deadline.observe(s, state.capture !== null, rcfg);
       }
       const snap = captureSnapshot(state, held, DEFAULT_CONFIG);
       scene.trail.sample(snap.x, snap.y);
@@ -1577,7 +1577,7 @@ describe('scene', () => {
     expect(deadline!.cross!.t, 'and far enough out to clear the birth gate').toBeGreaterThan(
       rcfg.deadlineMinLeadSecs,
     );
-    scene.deadline.observe(deadline, false, rcfg, FIXED_DT);
+    scene.deadline.observe(deadline, false, rcfg);
     frame();
     expect(deadlineFills(), 'the deadline is drawn once it has been observed').toBeGreaterThan(0);
 
@@ -1592,9 +1592,22 @@ describe('scene', () => {
     for (let i = 0; i <= crossTick + 2; i++) {
       stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
     }
-    scene.deadline.observe(rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT), false, rcfg, FIXED_DT);
+    scene.deadline.observe(rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT), false, rcfg);
     frame();
-    expect(deadlineFills(), 'nothing is left behind once the cross is passed').toBe(0);
+
+    // MEASURED OFF THE DEADLINE ALONE from here, and that is not a dodge. Past
+    // the cross the ship is FATED, so the skull now speaks — in the same hazard
+    // red, in the same patch of screen. A scene-wide count of that red would pass
+    // this assertion for the wrong reason on the day the deadline started
+    // leaving something behind again.
+    const own = recordingContext();
+    scene.deadline.draw(own.ctx, c, rcfg);
+    expect(
+      own.ops.filter((op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90'))
+        .length,
+      'the deadline leaves nothing behind once the cross is passed',
+    ).toBe(0);
+    expect(deadlineFills(), 'but the skull has taken over — the run is fated').toBeGreaterThan(0);
   });
 
   it('leaves a brief confirm where a press landed, and nothing where one did not', () => {
@@ -1619,22 +1632,72 @@ describe('scene', () => {
     };
 
     const pressed = new Deadline();
-    pressed.observe(deadline, false, rcfg, FIXED_DT);
+    pressed.observe(deadline, false, rcfg);
     pressed.update(1, rcfg);
-    pressed.observe(null, true, rcfg, FIXED_DT);
+    pressed.observe(null, true, rcfg);
     expect(drew(pressed), 'a press leaves its confirm').toBe(true);
-    pressed.observe(null, true, rcfg, rcfg.deadlineConfirmSecs);
+    // Aged through `update` and NOT through `observe`. There is one clock, and
+    // this is it — both methods used to advance the confirm, so a confirm on a
+    // live app expired in about half its configured time.
+    pressed.update(rcfg.deadlineConfirmSecs, rcfg);
     expect(drew(pressed), 'and it is gone a quarter second later').toBe(false);
 
     // A threat that simply stops being one is NOT a press, and earns nothing.
     // This is why `captured` is passed rather than inferred from a null deadline:
     // reading "null means captured" would have confirmed a press nobody made.
     const faded = new Deadline();
-    faded.observe(deadline, false, rcfg, FIXED_DT);
+    faded.observe(deadline, false, rcfg);
     faded.update(1, rcfg);
-    faded.observe(null, false, rcfg, FIXED_DT);
+    faded.observe(null, false, rcfg);
     expect(drew(faded), 'a drift that curves away confirms nothing').toBe(false);
   });
+  it('reports a fated drift, which is the half of the skull nobody was getting', () => {
+    // The skull used to be armed ONLY by `armRescue`, on the first tick of a
+    // capture — so a player who never pressed was never told. Reported as "I kind
+    // of expected to see the skull flash as well".
+    //
+    // Measured over the 66 recordings: 182 of 199 out-of-bounds deaths (91%) pass
+    // through this state first, for a median 0.40s and p90 1.10s. It needs no
+    // "near enough" threshold — the wall is a median 0.77s away when it first
+    // becomes true, because `horizon` and the cheap refusal already gate it.
+    const state = createInitialState(DEFAULT_CONFIG);
+    Object.assign(state.ship, { x: 189, y: 120, vx: 230, vy: -70 });
+    const d = new Deadline();
+
+    const live = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT)!;
+    expect(live.cross, 'the fixture starts with a way out').not.toBeNull();
+    d.observe(live, false, rcfg);
+    expect(d.fated, 'a cross means there is still a press that saves').toBeNull();
+
+    // Same drift, no press left.
+    d.observe({ ...live, cross: null }, false, rcfg);
+    expect(d.fated, 'no cross means fated').not.toBeNull();
+    expect(d.fated!.wall).toBe(live.wall);
+    expect(d.fated!.age, 'and it starts its own clock').toBe(0);
+
+    // ONE CLOCK, and it is `update`. Ageing in `observe` too is what made the
+    // confirm expire in half its configured time.
+    d.observe({ ...live, cross: null }, false, rcfg);
+    expect(d.fated!.age, 'observe does not advance it').toBe(0);
+    d.update(0.5, rcfg);
+    expect(d.fated!.age).toBeCloseTo(0.5, 6);
+
+    // A capture ends it here — `rescueDeadline` returns null while captured, so
+    // the drifting half CANNOT be true at the same time as `ScoreState.doomed`.
+    // That disjointness is what lets `scene.ts` resolve the two without a
+    // priority rule, and it is why both halves have to exist: dropping the
+    // captured one would make the skull vanish on the very press that sealed the
+    // run.
+    d.observe(null, true, rcfg);
+    expect(d.fated, "captured is the other half's business, not this one").toBeNull();
+
+    // A respawn is a new world; a wall that is no longer there owes nothing.
+    d.observe({ ...live, cross: null }, false, rcfg);
+    expect(d.fated).not.toBeNull();
+    d.clear();
+    expect(d.fated, 'and a respawn forgets it').toBeNull();
+  });
+
   it('replaces an interrupted mark rather than dragging it across the field', () => {
     // Reported as "the cross kind of jumped forward a few times". On the session
     // that reported it the deadline was absent for 3.9s — a capture — and the cross
@@ -1649,14 +1712,14 @@ describe('scene', () => {
 
     const first = rescueDeadline(state, DEFAULT_CONFIG, FIXED_DT);
     expect(first?.cross).toBeTruthy();
-    deadline.observe(first, false, rcfg, FIXED_DT);
+    deadline.observe(first, false, rcfg);
     const born = { ...at()! };
 
     // A capture ends the question outright now. The mark used to hold its ground
     // through the interruption so a tap would not blink it; with nothing left
     // behind there is nothing to blink, and the drag this test guards against
     // cannot happen because there is never an old mark to drag.
-    deadline.observe(null, true, rcfg, FIXED_DT);
+    deadline.observe(null, true, rcfg);
     expect(at(), 'a press takes the mark away').toBeNull();
 
     // A different answer comes back, a long way off.
@@ -1664,7 +1727,7 @@ describe('scene', () => {
       ...first!,
       cross: { x: born.x + 400, y: born.y - 200, t: first!.cross!.t },
     };
-    deadline.observe(far, false, rcfg, FIXED_DT);
+    deadline.observe(far, false, rcfg);
     deadline.update(1, rcfg);
     expect(at()!.x, 'the new mark is born AT the new answer, not eased toward it').toBeCloseTo(
       far.cross.x,
@@ -1677,7 +1740,7 @@ describe('scene', () => {
       ...first!,
       cross: { x: far.cross.x + 40, y: far.cross.y, t: first!.cross!.t },
     };
-    deadline.observe(nudged, false, rcfg, FIXED_DT);
+    deadline.observe(nudged, false, rcfg);
     deadline.update(1 / 60, rcfg);
     const x = at()!.x;
     expect(x, 'an uninterrupted correction is followed, not snapped').toBeGreaterThan(far.cross.x);
@@ -1703,7 +1766,7 @@ describe('scene', () => {
 
     const spanOf = (flight: Array<{ x: number; y: number }>): number => {
       const mark = new Deadline();
-      mark.observe({ ...deadline!, flight }, false, rcfg, FIXED_DT);
+      mark.observe({ ...deadline!, flight }, false, rcfg);
       mark.update(1, rcfg);
       const c = createCamera(rcfg);
       fitCamera(c, { w: 390, h: 844, dpr: 1 });
@@ -1820,10 +1883,10 @@ describe('scene', () => {
       // Born with room to spare, then closed on: the birth gate would refuse a
       // mark that first appeared this late, and pressing is not how a mark is
       // born anyway.
-      mark.observe({ ...deadline, cross: { ...deadline.cross!, t: 1.2 } }, false, rcfg, FIXED_DT);
+      mark.observe({ ...deadline, cross: { ...deadline.cross!, t: 1.2 } }, false, rcfg);
       mark.update(1, rcfg);
-      mark.observe({ ...deadline, cross: { ...deadline.cross!, t: lead } }, false, rcfg, FIXED_DT);
-      mark.observe(null, true, rcfg, FIXED_DT);
+      mark.observe({ ...deadline, cross: { ...deadline.cross!, t: lead } }, false, rcfg);
+      mark.observe(null, true, rcfg);
       const c = createCamera(rcfg);
       fitCamera(c, { w: 390, h: 844, dpr: 1 });
       centerCamera(c, state.ship.x, state.ship.y, f, null);
@@ -1865,8 +1928,8 @@ describe('scene', () => {
     const mark = new Deadline();
     // Born with room, then closed right down — the birth gate refuses a mark that
     // first appears this late, which is a different rule from this one.
-    mark.observe({ ...deadline, cross: { ...deadline.cross!, t: 1.2 } }, false, rcfg, FIXED_DT);
-    mark.observe({ ...deadline, cross: { ...deadline.cross!, t: 0.005 } }, false, rcfg, FIXED_DT);
+    mark.observe({ ...deadline, cross: { ...deadline.cross!, t: 1.2 } }, false, rcfg);
+    mark.observe({ ...deadline, cross: { ...deadline.cross!, t: 0.005 } }, false, rcfg);
     mark.update(1, rcfg);
     const c = createCamera(rcfg);
     fitCamera(c, { w: 390, h: 844, dpr: 1 });
@@ -1909,21 +1972,21 @@ describe('scene', () => {
     };
     const fresh = (): Deadline => {
       const m = new Deadline();
-      m.observe(deadline, false, rcfg, FIXED_DT);
+      m.observe(deadline, false, rcfg);
       m.update(1, rcfg);
       return m;
     };
 
     // Passed without a press — the case the residue existed for.
     const passed = fresh();
-    passed.observe({ ...deadline, cross: null }, false, rcfg, FIXED_DT);
+    passed.observe({ ...deadline, cross: null }, false, rcfg);
     expect(drew(passed), 'a drift past the cross leaves bare sky').toBe(false);
 
     // Displaced by a fresher answer — the case the ghost existed for. The new
     // mark draws; no second, older one draws with it.
     const displaced = fresh();
     const moved = { ...deadline, cross: { ...deadline.cross!, x: deadline.cross!.x + 400 } };
-    displaced.observe(moved, false, rcfg, FIXED_DT);
+    displaced.observe(moved, false, rcfg);
     const peek = displaced as unknown as { mark: unknown; confirm: unknown };
     expect(peek.mark, 'the fresher answer is on screen').not.toBeNull();
     expect(peek.confirm, 'and nothing was handed to a ghost slot').toBeNull();
@@ -1931,9 +1994,9 @@ describe('scene', () => {
     // A press, brief or not — the case the tap rule existed for. Both leave the
     // same confirm, because a press is a press.
     const held = fresh();
-    held.observe(null, true, rcfg, FIXED_DT);
+    held.observe(null, true, rcfg);
     const tapped = fresh();
-    tapped.observe(null, true, rcfg, FIXED_DT);
+    tapped.observe(null, true, rcfg);
     expect(drew(held), 'a press confirms').toBe(true);
     expect(drew(tapped), 'and a brief one is not treated differently').toBe(true);
   });
@@ -1978,7 +2041,7 @@ describe('scene', () => {
     // The deadline alone, not the whole scene: the hazard band and the trailing
     // floor are drawn in the same red family, and an extent measured over all of
     // it would be measuring the field, not the mark.
-    scene.deadline.observe(deadline, false, rcfg, FIXED_DT);
+    scene.deadline.observe(deadline, false, rcfg);
     // A mark arrives rather than appearing, so it has to be allowed to finish
     // being born before there is anything to measure.
     scene.deadline.update(1, rcfg);

@@ -552,7 +552,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       // simply stopped being one — only the first earns a confirm — and reading
       // "null means captured" was right most of the time and silently wrong for
       // a drift that curves away on its own.
-      scene.deadline.observe(deadlineCache, capturedNow, rcfg, elapsed);
+      scene.deadline.observe(deadlineCache, capturedNow, rcfg);
       deadlineSkip = 0;
     }
 
