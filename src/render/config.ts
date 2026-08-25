@@ -219,6 +219,17 @@ export interface RenderConfig {
    * track is anchored to the ship, so its length already IS the proximity. A
    * second channel restating a first is how a clean instrument turns back into a
    * smear.
+   *
+   * RAISED AFTER PLAY, and only these two. Reported as "the two-channel cue is
+   * not very noticeable" over a 68s session that nonetheless spent 62% of its
+   * rescue windows — so the cue was informing presses and simply hard to see. The
+   * faint end was the problem: the hairline landed at 0.053 alpha over a
+   * starfield. It is 0.124 now.
+   *
+   * `deadlineAlpha` deliberately did NOT move with them. The confirm is a LIFT
+   * over it — 0.5 to 0.62 — so raising the base would have quietly flattened the
+   * one piece of positive feedback the cue has, which is the opposite of the
+   * complaint.
    */
   deadlineHairFrac: number;
   deadlineTrackAlpha: number;
@@ -358,8 +369,8 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   deadlineMarkerRing: 1.6,
   deadlineArmMaxPx: 150,
   deadlineLeadLenPx: 46,
-  deadlineHairFrac: 0.35,
-  deadlineTrackAlpha: 0.3,
+  deadlineHairFrac: 0.55,
+  deadlineTrackAlpha: 0.45,
   deadlineLeadAlpha: 1,
   deadlineTrackWidth: 0.8,
   deadlineLeadWidth: 1.3,
