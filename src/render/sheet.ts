@@ -361,13 +361,27 @@ export function drawSheet(
   // nothing on the sheet said which was this run and which was the session, and
   // the answer is not guessable from the values.
   //
-  // THE SESSION COLUMN ONLY APPEARS WHEN IT HAS SOMETHING TO SAY. On a cleared
-  // field the two are almost always identical — the run that reached the top is
-  // the run that set every high — so printing both put a column of duplicates
-  // next to the numbers it was supposed to give context to. A best is context, and
-  // context that equals the thing it contextualises is noise.
+  // THE SESSION COLUMN BELONGS TO A DEATH SHEET AND NOT TO A CLEAR.
+  //
+  // It was first shown on both, then suppressed per-row where the two agreed, and
+  // both of those were wrong for the same reason: a CLEAR ENDS THE SESSION.
+  // Dismissing it returns to armed with a fresh seed and `rearm` resets the
+  // score, so the session being compared against is about to stop existing. There
+  // is nothing to carry the comparison forward to.
+  //
+  // The per-row suppression also made the residue actively misleading, which is
+  // what surfaced it. Measured on the session that reported it — two deaths at
+  // 10.1s and 17.9s, then the clear — the clearing run set the highs for speed,
+  // chain and distance, so those rows matched and vanished. What was left was
+  // SECONDS ON FIRE and ROUGHNESS: the two axes where an earlier, worse run had
+  // scored higher. The column had become a sparse list of the player's worst
+  // moments, printed beside their best run.
+  //
+  // On a death it earns its place: the same field is still there, the session
+  // continues, and "your best this session" is the thing the next attempt is
+  // aimed at.
   const rows = sheetRows(run, max, roll);
-  const anyBest = rows.some((r) => r.best !== r.value);
+  const anyBest = !cleared && rows.some((r) => r.best !== r.value);
   let y = top + 66 * s;
   if (anyBest) {
     ctx.font = `${8 * s}px ui-monospace, monospace`;

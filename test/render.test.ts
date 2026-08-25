@@ -987,10 +987,11 @@ describe('the sheet', () => {
     expect(early).not.toContain('45,000');
   });
 
-  it('shows a row against its session best where they differ', () => {
+  it('shows a row against its session best on a death', () => {
     // The whole reason `sessionMax` exists. 812 means nothing until it sits
-    // beside the 940 from earlier in the session.
-    const t = text(true);
+    // beside the 940 from earlier in the session — on the sheet where the session
+    // is still going, which is the death one.
+    const t = text(false, 1, DEATH_SHEET);
     expect(t).toContain('TOP SPEED');
     expect(t).toContain('812');
     expect(t).toContain('940');
@@ -998,16 +999,34 @@ describe('the sheet', () => {
     expect(t).toContain('14');
   });
 
-  it('drops the session column when it only repeats the run', () => {
-    // On a cleared field the two are almost always identical — the run that
-    // reached the top is the run that set every high — so printing both puts a
-    // column of duplicates next to the numbers it is supposed to give context to.
-    // Context that equals the thing it contextualises is noise.
-    const r = recordingContext();
-    drawSheet(r.ctx, cam(), CLEARED_SHEET, run, run, bodies, FIXED_DT, 1, true, 9, 9);
-    const t = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+  it('never shows a session column on a clear, even where the numbers differ', () => {
+    // A CLEAR ENDS THE SESSION: dismissing it returns to armed with a fresh seed
+    // and resets the score, so the session being compared against is about to
+    // stop existing.
+    //
+    // Suppressing it only where the two AGREED was the first attempt, and the
+    // residue was worse than the duplication. Measured on the session that
+    // reported it — two deaths, then the clear — the clearing run set the highs
+    // for speed, chain and distance, so those rows vanished and what remained was
+    // SECONDS ON FIRE and ROUGHNESS: the two axes where an earlier, worse run had
+    // scored higher. A sparse list of the player's worst moments, printed beside
+    // their best run. This fixture reproduces that shape.
+    const worseEarlier = { ...max, fireSecs: run.fireSecs + 9, roughPasses: run.roughPasses + 4 };
+    const t = text(true, 1, CLEARED_SHEET);
     expect(t).not.toContain('SESSION');
     expect(t).not.toContain('RUN');
+    const r = recordingContext();
+    drawSheet(r.ctx, cam(), CLEARED_SHEET, run, worseEarlier, bodies, FIXED_DT, 1, true, 9, 9);
+    const shown = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(shown).not.toContain('SESSION');
+  });
+
+  it('keeps the session column on a death, where the session continues', () => {
+    // The same field is still there and the next attempt is aimed at these
+    // numbers, so the comparison is the whole point.
+    const t = text(false, 1, DEATH_SHEET);
+    expect(t).toContain('SESSION');
+    expect(t).toContain('RUN');
   });
 
   it('starts the score first, since it is what the sheet is about', () => {
@@ -1052,10 +1071,10 @@ describe('the sheet', () => {
     }
   });
 
-  it('labels the two columns, which were previously a puzzle', () => {
+  it('labels the two columns wherever both are shown', () => {
     // Two numbers side by side with nothing saying which is which, and the answer
     // is not guessable from the values.
-    const t = text(true);
+    const t = text(false, 1, DEATH_SHEET);
     expect(t).toContain('RUN');
     expect(t).toContain('SESSION');
   });
