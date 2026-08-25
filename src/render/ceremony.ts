@@ -92,8 +92,23 @@ const SPOOL_DIST = 1200;
  * spectacle the backdrop to a results screen rather than the point. Measured in
  * distance like everything else here, so the whole ceremony is paced by one
  * quantity and cannot develop a seam.
+ *
+ * 1100 -> 560, ON THE ONE STRETCH WHERE DISTANCE IS HONESTLY A DURATION. By the
+ * time the warp is full the world has finished accelerating and is falling at
+ * exactly `CRUISE`, so everything after that point converts at a fixed rate and
+ * this number is a fade time in disguise: 560/1400 is 0.4s, which is the fade a
+ * death sheet already uses (`DEATH_SHEET_FADE`, in `app/main.ts` — a different
+ * layer, so the relationship is pinned by a test rather than by an import). Two
+ * endings, two panels, one rate; the alternative was a victory panel that took
+ * twice as long to arrive as the one that reports a crash, for no reason a
+ * player could name. Swept across every crossing height and entry speed the
+ * camera can produce, the fade lands between 0.39s and 0.40s.
+ *
+ * Reported from the seat as the wait between the stars stretching and the card
+ * showing up, and trimmed there rather than in the coast or the spool because
+ * those two are the spectacle. This stretch is the part with nothing left in it.
  */
-const SHEET_DIST = 1100;
+const SHEET_DIST = 560;
 
 /**
  * Seconds spent easing the ship from where it crossed to the middle.

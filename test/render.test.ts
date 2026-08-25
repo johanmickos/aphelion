@@ -648,6 +648,33 @@ describe('the ceremony', () => {
     expect(w(30), 'still full warp half a minute later').toBe(1);
   });
 
+  it('brings the panel in at the rate a death sheet does', () => {
+    // REPORTED from the seat: the wait between the stars stretching and the card
+    // showing up. `SHEET_DIST` is the only part of the ceremony where a distance
+    // is honestly a duration — past full warp the world falls at a constant
+    // `CRUISE` — so it is set to convert to `DEATH_SHEET_FADE`, the 0.4s the app
+    // fades a death sheet in over. That constant lives a layer away in
+    // `app/main.ts` and cannot be imported here, so the relationship is asserted
+    // instead of shared: two endings, two panels, one rate.
+    //
+    // Swept, because the fade begins wherever the warp happens to finish, and
+    // that depends on both the crossing height and the speed it was crossed at.
+    for (let finishY = 400; finishY >= -900; finishY -= 100) {
+      for (const entry of [0, 90, 400, 700]) {
+        let start = 0;
+        let full = 0;
+        for (let t = 0; t < 20; t += 1 / 600) {
+          const p = phase('cleared', t, finishY, entry)!;
+          if (!start && p.sheet > 0) start = t;
+          if (!full && p.sheet >= 0.999) full = t;
+        }
+        const fade = full - start;
+        expect(fade, `finishY=${finishY} entry=${entry}`).toBeGreaterThan(0.35);
+        expect(fade, `finishY=${finishY} entry=${entry}`).toBeLessThan(0.45);
+      }
+    }
+  });
+
   it('is clocked by the simulation, not by a wall clock', () => {
     // `ending.t` is ticks times dt. Two snapshots at the same tick must produce
     // the same frame however much real time passed between them — which is what
