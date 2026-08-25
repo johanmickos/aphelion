@@ -355,6 +355,21 @@ let captureStart = 0;
  */
 let sheet: { kind: 'cleared' | 'death'; t: number } | null = null;
 
+/**
+ * This ending has already been offered a sheet.
+ *
+ * WITHOUT IT, DISMISSING A DEATH SHEET PUTS IT STRAIGHT BACK UP. The hold freezes
+ * `crashPause` rather than skipping it, so `ending.active` is still true on the
+ * tick after the tap — and the test that raises a sheet would fire again
+ * immediately, every time, forever. Reported as the modal being "removed and then
+ * brought up again", and only on a death: a clear never reaches the test again
+ * because it leaves for the armed screen and stops stepping.
+ *
+ * Keyed to the ending rather than to the sheet, and cleared when the run
+ * respawns, so the next death gets its own.
+ */
+let sheetOfferedForEnding = false;
+
 /** Seconds a death sheet takes to fade in, once the ending notice has had its beat. */
 const DEATH_SHEET_DELAY = 0.55;
 const DEATH_SHEET_FADE = 0.4;
@@ -431,7 +446,9 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     // On the tick a run ends, `scoreTick` has already sealed `lastRun`, so the
     // question can be asked immediately and the sheet raised without a frame of
     // the world carrying on underneath a finished run.
-    if (state.ending.active && !sheet) {
+    if (!state.ending.active) sheetOfferedForEnding = false;
+    else if (!sheetOfferedForEnding) {
+      sheetOfferedForEnding = true;
       if (state.ending.reason === 'cleared') {
         sheet = { kind: 'cleared', t: 0 };
       } else if (score.lastRun && earnsSheet(score.lastRun, state.bodies)) {

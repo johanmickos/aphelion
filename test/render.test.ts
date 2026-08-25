@@ -547,8 +547,8 @@ describe('the ceremony', () => {
    * The handover is geometric now, so a fixture has to say where the line is.
    * -300 puts it above the ship, which is where a just-crossed line sits.
    */
-  const phase = (reason: string, t: number, finishY: number | null = -300) =>
-    ceremonyPhase(ended(reason, t), cam(), finishY);
+  const phase = (reason: string, t: number, finishY: number | null = -300, entry = 600) =>
+    ceremonyPhase(ended(reason, t), cam(), finishY, entry);
 
   it('fires for a clear and for nothing else', () => {
     // Gilding a death would be the cruellest possible misreading of the moment,
@@ -561,7 +561,32 @@ describe('the ceremony', () => {
 
   it('says nothing while the run is still being flown', () => {
     const live = captureSnapshot(createInitialState(DEFAULT_CONFIG), false, DEFAULT_CONFIG);
-    expect(ceremonyPhase(live, cam(), -300)).toBeNull();
+    expect(ceremonyPhase(live, cam(), -300, 600)).toBeNull();
+  });
+
+  it('starts the world falling at the speed the ship crossed at', () => {
+    // A BUG THAT WAS HIDING INSIDE AN EASING FUNCTION. `smoothstep` has zero
+    // derivative at zero, so the world used to begin falling at no speed at all
+    // on the tick a ship crossed the line doing several hundred pixels a second —
+    // a stop, then a go, at the exact seam the ceremony exists to make seamless.
+    //
+    // Measured as a speed over the first slice rather than asserted about the
+    // curve, so it stays true whatever shape replaces it.
+    const speedOver = (entry: number, dt = 0.05) =>
+      (phase('cleared', dt, -700, entry)!.shift - phase('cleared', 0, -700, entry)!.shift) / dt;
+    expect(speedOver(600), 'leaves at roughly the speed it arrived').toBeGreaterThan(500);
+    expect(speedOver(300), 'and a slower arrival leaves slower').toBeLessThan(speedOver(600));
+  });
+
+  it('accelerates after the line, which is where the speeding up belongs', () => {
+    // The brief: "roughly the speed they come in ... and then only speed up in
+    // the last bit across the line and into the starfield". The runway hands the
+    // ship over at its own speed; this is the part that does the speeding up,
+    // on the far side of the line where there is nothing left to read.
+    const speedAt = (t: number) =>
+      (phase('cleared', t + 0.05, -700, 600)!.shift - phase('cleared', t, -700, 600)!.shift) / 0.05;
+    expect(speedAt(0.8)).toBeGreaterThan(speedAt(0));
+    expect(speedAt(2)).toBeGreaterThan(speedAt(0.8));
   });
 
   it('coasts first, so the finish line can be watched leaving', () => {
@@ -653,7 +678,7 @@ describe('the ceremony', () => {
     // Mid-spool: far enough for gold, not yet far enough for the green to have
     // finished fading. Chosen against a line with room to fall, so the window is
     // wide enough to name.
-    drawCeremonyWash(r.ctx, cam(), phase('cleared', 0.95, -700)!);
+    drawCeremonyWash(r.ctx, cam(), phase('cleared', 1.6, -700)!);
     const stops = (r.calls('addColorStop') as Array<[string, number, string]>).map((o) => o[2]);
     expect(
       stops.some((v) => v.startsWith('rgba(255,214,51')),

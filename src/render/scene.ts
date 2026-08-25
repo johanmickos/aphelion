@@ -80,6 +80,16 @@ export class Scene {
   private burn = 0;
 
   /**
+   * The ship's speed on the last tick it was alive.
+   *
+   * `endRun` zeroes the velocity, so by the time the ceremony wants to know how
+   * fast the player arrived, the answer is gone from the state. Carrying it here
+   * is render bookkeeping of exactly the kind `burn` already is — nothing the
+   * simulation can see, and nothing a replay has to reproduce.
+   */
+  private entrySpeed = 0;
+
+  /**
    * The charged storm's closing animation. See `drawNebula`.
    *
    * Seconds since the window ended, or -1 when nothing is playing. Render state
@@ -142,7 +152,10 @@ export class Scene {
     const finishY = sim.clearAtTop ? field.crest - sim.grabRange : null;
     // Null unless the field has just been cleared. Everything the ceremony
     // touches reads it, so "is this the victory frame" is asked once.
-    const cer = ceremonyPhase(snap, cam, finishY);
+    if (!snap.ending.active) {
+      this.entrySpeed = Math.sqrt(snap.vx * snap.vx + snap.vy * snap.vy);
+    }
+    const cer = ceremonyPhase(snap, cam, finishY, this.entrySpeed);
 
     // the bars
     ctx.fillStyle = '#05070d';

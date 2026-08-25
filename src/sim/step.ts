@@ -120,9 +120,20 @@ function driftAccel(
   const cx = (fb.left + fb.right) / 2;
   const k = cfg.finishFunnelPull;
   const damping = 2 * Math.sqrt(k);
+  // TWO ACCELERATIONS, NOT ONE RAMP. A single smooth ramp pushes harder with
+  // every pixel, so the ship is at its top speed by the time it reaches the
+  // chequers and the line goes past in a blur. What the runway should feel like
+  // is being picked up and carried at roughly the speed you arrived with — the
+  // `hold` — and then kicked, once, right at the end.
+  //
+  // The kick is a fifth power because that is what "stays out of the way until
+  // the very end" looks like as a curve: it is under 4% of full at the runway's
+  // midpoint and under a third at 80% of the way along. A smootherstep would be a
+  // third of the way up by halfway, which is the shape being replaced.
+  const kick = t * t * t * t * t;
   return {
     ax: (k * (cx - x) - damping * state.ship.vx) * t,
-    ay: -cfg.finishFunnelBoost * t,
+    ay: -(cfg.finishFunnelHold * t + cfg.finishFunnelBoost * kick),
   };
 }
 

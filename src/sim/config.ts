@@ -435,8 +435,35 @@ export interface SimConfig {
    * made the line hard to look at was that it vanished on the tick it was
    * crossed; it now recedes down the screen through a coast phase before the warp
    * starts. See `COAST` in `src/render/ceremony.ts`.
+   *
+   * 380 -> 800 when this stopped being the WHOLE profile and became only its last
+   * quarter. Paired with the fifth-power curve it is worth far less than the
+   * number suggests: measured from a 300px/s arrival, the ship is still doing 301
+   * a quarter of the way along the runway and 315 at the halfway point, and
+   * crosses at 609. Under the old smooth ramp the same arrival was already being
+   * pushed from the first pixel.
+   *
+   * The sweep that chose it: 550 crosses at 548, 800 at 609, 1100 at 671, 1500 at
+   * 747. 800 is about a doubling — unmistakably a kick, and still slow enough
+   * that the chequers are a thing you see rather than a thing you passed.
    */
   finishFunnelBoost: number;
+  /**
+   * Gentle acceleration held through the whole runway, in px/s².
+   *
+   * THE RUNWAY IS NOT A LAUNCH RAMP. It used to be: `finishFunnelBoost` ramped
+   * smoothly from the crest to the line, so the ship was being pushed harder with
+   * every pixel and arrived at the chequers already at its top speed. Reported as
+   * wanting to reach the line "at roughly the speed they come in (maybe a slight
+   * boost to show they're grabbed), and then only speed up in the last bit across
+   * the line".
+   *
+   * That is two different accelerations, so it is two numbers. This one is the
+   * slight boost — enough to feel picked up and carried, not enough to change how
+   * fast the line arrives. The kick is `finishFunnelBoost`, and it is now shaped
+   * to stay out of the way until the very end.
+   */
+  finishFunnelHold: number;
   /**
    * A grab below escape speed is a capture, never a flyby.
    *
@@ -798,6 +825,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   finishFunnelDepth: 0,
   finishFunnelPull: 0,
   finishFunnelBoost: 0,
+  finishFunnelHold: 0,
   boundGrabsCapture: false,
   // Inert here — but it is also what an older report replays under. See the key.
   outboundFlybyFrac: 1,
@@ -935,7 +963,8 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   clearAtTop: true,
   finishFunnelDepth: 560,
   finishFunnelPull: 32,
-  finishFunnelBoost: 380,
+  finishFunnelBoost: 800,
+  finishFunnelHold: 90,
   holdClimbInCapture: true,
   boundGrabsCapture: true,
   outboundFlybyFrac: 0.65,
@@ -979,7 +1008,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 23;
+export const SIM_VERSION = 24;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

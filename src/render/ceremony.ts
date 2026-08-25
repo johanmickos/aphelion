@@ -34,26 +34,32 @@ import type { RenderSnapshot } from './snapshot.ts';
 import { FINISH, SUMMIT_RGB, withAlpha } from './palette.ts';
 
 /**
- * Seconds spent COASTING before the warp begins.
+ * Seconds over which the world accelerates from the speed the ship crossed at to
+ * `CRUISE`.
  *
- * THE FINISH LINE HAS TO LEAVE. The first version started stretching the stars on
- * the tick the ship crossed, which meant the chequers — the thing the whole
- * runway was built to deliver the player to — were replaced before they could be
- * looked at. Reported as "the transition from finish line to the starfield is too
- * fast". So the ceremony now opens by simply flying on: the world recedes, the
- * line slides off the bottom of the screen, and only once it is gone does
- * anything else happen.
+ * THE COAST USED TO START FROM A STANDSTILL, and that was a bug hiding inside an
+ * easing function. `smoothstep` has zero derivative at zero, so the world began
+ * falling at no speed at all on the tick a ship crossed the line at several
+ * hundred pixels a second — a stop, and then a go, at the exact seam the whole
+ * ceremony exists to make seamless.
+ *
+ * It is now a constant acceleration from the real crossing speed, in closed form
+ * so it stays a pure function of the tick. That is also what makes the brief work
+ * — "roughly the speed they come in, and then only speed up in the last bit
+ * across the line and into the starfield": the runway hands the ship over at its
+ * own speed and the ceremony does the speeding up, on the far side of the line
+ * where there is nothing left to read.
  */
-const COAST = 1.15;
+const ACCEL = 1.2;
 
 /**
- * How far the world falls away during the coast, in design units.
+ * Design units per second the world settles at, once it is done accelerating.
  *
- * Comfortably more than a screen height, because the warp is handed over by
- * DISTANCE rather than by the clock — see `warp` below — and the remainder after
- * the line has cleared is what the spool is measured against.
+ * The number the sky ends up streaming at. Comfortably above any speed a ship can
+ * cross the line at, so the ceremony always reads as a further acceleration
+ * rather than as the world catching up with something already faster.
  */
-const COAST_DIST = 1500;
+const CRUISE = 1400;
 
 /**
  * Design units of further travel, after the line has left, to reach full warp.
@@ -68,17 +74,14 @@ const COAST_DIST = 1500;
  * Measuring both halves in the same units removes the seam: the sky begins to
  * open at the exact moment the last of the chequers leaves the bottom of the
  * screen, wherever that happens to be.
- */
-const SPOOL_DIST = 260;
-
-/**
- * Design units per second the world keeps falling at once the coast is spent.
  *
- * Fast, because the ship is at lightspeed by then and this is what the sky is
- * scrolled by. It is a speed rather than an easing because there is nothing left
- * to ease toward: the ceremony holds here until the player taps.
+ * 260 -> 1200, once the coast started accelerating properly. Distance is not
+ * time, and the difference bit: at the old shift rate 260 units was most of a
+ * second, but the world now passes through it in a quarter of one, so the sky
+ * snapped open instead of spooling. The units are right; the number had been
+ * calibrated against a slower world.
  */
-const CRUISE = 900;
+const SPOOL_DIST = 1200;
 
 /**
  * Further travel, in design units, over which the sheet fades in once the warp is
@@ -90,7 +93,7 @@ const CRUISE = 900;
  * distance like everything else here, so the whole ceremony is paced by one
  * quantity and cannot develop a seam.
  */
-const SHEET_DIST = 700;
+const SHEET_DIST = 1100;
 
 /** Seconds spent easing the ship from where it crossed to the middle. */
 const CENTRE = 0.8;
@@ -132,17 +135,30 @@ export function ceremonyPhase(
   cam: Camera,
   /** World y of the finish line, so the handover can be geometric. */
   finishY: number | null,
+  /**
+   * How fast the ship was going on the last tick before it crossed, px/s.
+   *
+   * `endRun` zeroes the velocity, so this cannot be read off the snapshot — the
+   * scene carries the last live value forward. Without it the ceremony has no way
+   * to begin at the speed the player arrived with, and any curve it picks instead
+   * is a seam.
+   */
+  entrySpeed = 0,
 ): Ceremony | null {
   if (!snap.ending.active || snap.ending.reason !== 'cleared') return null;
   const t = snap.ending.t;
   // Eased, so the coast decelerates rather than stopping dead. The ship has just
   // been accelerated by the funnel; a world that halted on a timer would undo
   // that in one frame.
-  //
-  // AND IT KEEPS GROWING once the coast is spent. The ship is at warp; a world
-  // that stopped falling would leave the sky frozen — the starfield scrolls off
-  // this same number, so anything that stops it stops the animation with it.
-  const shift = COAST_DIST * ease(t / COAST) + CRUISE * Math.max(0, t - COAST);
+  // Constant acceleration from the crossing speed to `CRUISE`, then straight
+  // line. Closed form, so this stays a pure function of the tick — and unbounded,
+  // because the starfield scrolls off it and a shift that stopped growing would
+  // freeze the sky.
+  const v0 = Math.max(0, entrySpeed);
+  const shift =
+    t < ACCEL
+      ? v0 * t + ((CRUISE - v0) * t * t) / (2 * ACCEL)
+      : v0 * ACCEL + ((CRUISE - v0) * ACCEL) / 2 + CRUISE * (t - ACCEL);
 
   // How far the world still has to fall before the last of the chequers is off
   // the bottom of the screen. Derived from where the line actually is, so a ship
