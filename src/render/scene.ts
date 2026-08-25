@@ -28,8 +28,15 @@ import { Scar } from './scar.ts';
 import { drawVerdict } from './verdict.ts';
 import { Popups } from './popups.ts';
 import { drawEndingNotice, drawPaused } from './overlays.ts';
-import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from './ceremony.ts';
+import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash, drawFinishFlash } from './ceremony.ts';
 import { CLEARED_SHEET, DEATH_SHEET, drawSheet } from './sheet.ts';
+
+/**
+ * Roughly when the ceremony's sheet starts fading in, in seconds from the
+ * crossing. The roll is paced from the panel's own arrival rather than from the
+ * crossing, or the reels would have finished spinning before it was visible.
+ */
+const CEREMONY_SHEET_AT = 2.4;
 import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
 import { drawEdgeMarkers } from './edge-markers.ts';
@@ -154,6 +161,8 @@ export class Scene {
        * its fade rides the ceremony, which the scene already has.
        */
       deathSheet?: number | null;
+      /** Seconds since a death sheet was raised, for its roll. */
+      deathSheetT?: number;
     },
   ): void {
     const { sim, render, bodies, field } = this.deps;
@@ -317,6 +326,15 @@ export class Scene {
     );
     if (shifted) ctx.restore();
 
+    // After the ship, so it is never drawn under it, and outside the shift so it
+    // stamps the moment rather than receding with the world.
+    if (cer) {
+      const sx = toScreenX(cam, snap.x);
+      const sy = toScreenY(cam, snap.y);
+      const at = ceremonyShipPos(cam, cer, sx, sy);
+      drawFinishFlash(ctx, cam, cer, at.x, at.y);
+    }
+
     // Above the ship and its wake, below the HUD: it belongs to the world, but
     // nothing in the world should ever cover it.
     this.popups.draw(ctx, cam);
@@ -378,6 +396,10 @@ export class Scene {
         FIXED_DT,
         sheetAlpha,
         cer !== null,
+        // The sheet's own age, not the ceremony's: the marquee and the roll are
+        // paced from the moment the panel appeared, not from the crossing several
+        // seconds earlier.
+        cer ? Math.max(0, cer.t - CEREMONY_SHEET_AT) : (opts.deathSheetT ?? 0),
       );
     }
 

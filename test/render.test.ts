@@ -24,7 +24,7 @@ import {
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from '../src/render/ceremony.ts';
 import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
-import { FINISH } from '../src/render/palette.ts';
+import { FINISH, SLATE } from '../src/render/palette.ts';
 import {
   CLEARED_SHEET,
   DEATH_SHEET,
@@ -659,6 +659,22 @@ describe('the ceremony', () => {
     expect(a).toEqual(b);
   });
 
+  it('draws the ceremony wake as sparks rather than swollen dots', () => {
+    // A circle that grows is a bubble however brightly it is lit. At lightspeed a
+    // wake is bright specks tearing past, so the ceremony changes the PRIMITIVE
+    // rather than the parameters.
+    const trail = new Trail(rcfg);
+    for (let i = 0; i < 40; i++) trail.sample(100 + i * 9, -i * 9, 400);
+    const ops = (warp: number) => {
+      const r = recordingContext();
+      trail.draw(r.ctx, cam(), 100 + 39 * 9, -39 * 9, warp, 0.1);
+      return r;
+    };
+    expect(ops(0).calls('arc').length, 'dots when flying').toBeGreaterThan(0);
+    expect(ops(1).calls('arc').length, 'no dots at warp').toBe(0);
+    expect(ops(1).calls('lineTo').length, 'streaks at warp').toBeGreaterThan(0);
+  });
+
   it('pulses the wake, and only during the ceremony', () => {
     // The wake is the one thing on screen attached to the ship, so it is where an
     // engine can be heard without the whole scene shaking. The starfield stays
@@ -668,9 +684,14 @@ describe('the ceremony', () => {
       for (let i = 0; i < 40; i++) trail.sample(100 + i * 9, -i * 9, 400);
       const r = recordingContext();
       trail.draw(r.ctx, cam(), 100 + 39 * 9, -39 * 9, warp, t);
-      return (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>).map(
-        (o) => o[1],
-      );
+      // Both paint properties. The wake is dots when flying and sparks in the
+      // ceremony, and a test that names one goes hollow the moment the other is
+      // used — which has now happened three times in this file.
+      return (
+        r.ops.filter((o) => o[0] === '=fillStyle' || o[0] === '=strokeStyle') as Array<
+          [string, string]
+        >
+      ).map((o) => o[1]);
     };
     expect(wake(0, 0), 'still flight is unchanged frame to frame').toEqual(wake(0, 0.3));
     expect(wake(1, 0), 'the ceremony wake moves').not.toEqual(wake(1, 0.08));
@@ -685,9 +706,11 @@ describe('the ceremony', () => {
     const alphas = (warp: number, t: number) => {
       const r = recordingContext();
       trail.draw(r.ctx, cam(), 100 + 39 * 9, -39 * 9, warp, t);
-      return (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>).map((o) =>
-        Number(o[1].split(',')[3]!.replace(')', '')),
-      );
+      return (
+        r.ops.filter((o) => o[0] === '=fillStyle' || o[0] === '=strokeStyle') as Array<
+          [string, string]
+        >
+      ).map((o) => Number(o[1].split(',')[3]!.replace(')', '')));
     };
     // Against its OWN baseline, not in absolute terms. The wake's alpha already
     // ramps toward the head, so the head is the brightest point at every phase and
@@ -892,9 +915,10 @@ describe('the sheet', () => {
   const max = { ...run, topSpeed: 940, peakChain: 14, distance: 12000, fireSecs: 6.2 };
   const bodies = createInitialState(DEFAULT_CONFIG).bodies;
 
-  function text(cleared: boolean, alpha = 1, style = CLEARED_SHEET) {
+  /** `t` defaults past the roll, so a value assertion sees the landed number. */
+  function text(cleared: boolean, alpha = 1, style = CLEARED_SHEET, t = 9) {
     const r = recordingContext();
-    drawSheet(r.ctx, cam(), style, run, max, bodies, FIXED_DT, alpha, cleared);
+    drawSheet(r.ctx, cam(), style, run, max, bodies, FIXED_DT, alpha, cleared, t);
     return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
   }
 
@@ -926,6 +950,39 @@ describe('the sheet', () => {
     expect(t).toContain('LONGEST CHAIN');
     expect(t).toContain('9');
     expect(t).toContain('14');
+  });
+
+  it('rolls the numbers up so they land together', () => {
+    // A slot machine is not satisfying because the reels spin, it is satisfying
+    // because they STOP — one after another, onto a row that is suddenly all
+    // there. So durations vary and the LANDING is shared; equal durations with
+    // staggered ends is the obvious arrangement and gives the opposite feeling,
+    // a queue being served.
+    const at = (t: number) => sheetRows(run, max, t).map((r) => r.value);
+    expect(at(0)).not.toEqual(at(0.5));
+    expect(at(0.5)).not.toEqual(at(9));
+    // Every row is finished by the same moment, and none of them after it.
+    expect(at(0.95)).toEqual(at(9));
+  });
+
+  it('counts up to the value rather than cycling random digits', () => {
+    // Random digits read as a machine searching; counting reads as a total being
+    // tallied, which is what the sheet reports. It also settles the digit count
+    // early, so the column does not shimmy as it lands.
+    const speeds = [0.2, 0.4, 0.6, 0.8].map((t) =>
+      Number(sheetRows(run, max, t)[0]!.value.replace('k', '000')),
+    );
+    for (let i = 1; i < speeds.length; i++) {
+      expect(speeds[i]!).toBeGreaterThanOrEqual(speeds[i - 1]!);
+    }
+  });
+
+  it('labels the two columns, which were previously a puzzle', () => {
+    // Two numbers side by side with nothing saying which is which, and the answer
+    // is not guessable from the values.
+    const t = text(true);
+    expect(t).toContain('RUN');
+    expect(t).toContain('SESSION');
   });
 
   it('carries the five measured rows and no more', () => {
@@ -976,12 +1033,32 @@ describe('a death sheet and a clear sheet are told apart', () => {
     expect(words(DEATH_SHEET, false)).toContain('RUN ENDED');
   });
 
-  it('commends a worthy death in the finish green, not the hazard red', () => {
-    // The sheet exists to say "you got a long way". Painting that in the colour
-    // of the wall it hit would be the sheet arguing with its own reason for
-    // existing.
-    expect(DEATH_SHEET.accentRGB).toEqual(FINISH);
+  it('draws a worthy death in slate — not the finish green, not hazard red', () => {
+    // This pin asserted FINISH green and was wrong, which the sheet made obvious
+    // as soon as green came to mean THE FINISH everywhere else: a post-mortem was
+    // being drawn in the colour of arriving. Hazard red is wrong too and less
+    // obviously — this sheet only appears for runs that got a long way, so the
+    // colour of the wall argues with its reason for existing, and red is the one
+    // colour here that means "right now, and you can still act", which a
+    // post-mortem cannot.
+    expect(DEATH_SHEET.accentRGB).toEqual(SLATE);
+    expect(DEATH_SHEET.accentRGB).not.toEqual(FINISH);
     expect(DEATH_SHEET.accent).not.toBe(CLEARED_SHEET.accent);
+  });
+
+  it('separates the two by MOTION, not only by hue', () => {
+    // Colour here is a rank — the rarity ladder — and gold is already its top
+    // rung, so a clear was in the right colour and simply not loud enough.
+    // Arcades celebrate with movement: the marquee chase, the rolling digits.
+    expect(CLEARED_SHEET.celebrate).toBe(true);
+    expect(DEATH_SHEET.celebrate).toBe(false);
+    const marquee = (style: typeof CLEARED_SHEET) => {
+      const r = recordingContext();
+      drawSheet(r.ctx, cam(), style, run, run, bodies, FIXED_DT, 1, true, 0.4);
+      return (r.calls('setLineDash') as Array<[string, number[]]>).length;
+    };
+    expect(marquee(CLEARED_SHEET), 'a win has a light running round it').toBeGreaterThan(0);
+    expect(marquee(DEATH_SHEET), 'a report is still').toBe(0);
   });
 });
 

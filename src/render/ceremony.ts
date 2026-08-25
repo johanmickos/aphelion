@@ -125,6 +125,14 @@ export interface Ceremony {
   shift: number;
   /** How far the results sheet has faded in, 0..1. */
   sheet: number;
+  /**
+   * How much of the way the finish line is to leaving the screen, 0..1.
+   *
+   * Reaches 1 exactly as the warp begins, which is what it is for: anything that
+   * wants to build up DURING the coast has to be driven by something that moves
+   * during the coast, and `warp` is flat at zero the whole time.
+   */
+  crossing: number;
   /** Seconds since the crossing. */
   t: number;
 }
@@ -188,6 +196,7 @@ export function ceremonyPhase(
   return {
     t,
     shift,
+    crossing: cleared > 0 ? Math.min(1, shift / cleared) : 1,
     warp: ease((shift - cleared) / SPOOL_DIST),
     sheet: ease((shift - cleared - SPOOL_DIST) / SHEET_DIST),
     centred: ease(t / CENTRE),
@@ -231,30 +240,82 @@ export function ceremonyShipPos(
  * from somewhere rather than as a filter over everything.
  */
 export function drawCeremonyWash(ctx: CanvasRenderingContext2D, cam: Camera, cer: Ceremony): void {
-  if (cer.warp <= 0) return;
   const w = cam.designW * cam.scale;
   const h = cam.viewH * cam.scale;
   const x = cam.offsetX;
   const y = cam.offsetY;
 
-  const g = ctx.createLinearGradient(0, y, 0, y + h);
-  g.addColorStop(0, withAlpha(SUMMIT_RGB, 0.3 * cer.warp));
-  g.addColorStop(0.45, withAlpha(SUMMIT_RGB, 0.1 * cer.warp));
-  g.addColorStop(1, withAlpha(SUMMIT_RGB, 0));
   ctx.save();
-  ctx.fillStyle = g;
-  ctx.fillRect(x, y, w, h);
+  if (cer.warp > 0) {
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, withAlpha(SUMMIT_RGB, 0.3 * cer.warp));
+    g.addColorStop(0.45, withAlpha(SUMMIT_RGB, 0.1 * cer.warp));
+    g.addColorStop(1, withAlpha(SUMMIT_RGB, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+  }
 
-  // A green afterglow at the bottom, where the line the ship just crossed is
-  // receding. It is the two colours overlapping for a moment rather than one
-  // cutting to the other, which is what makes the crossing feel continuous.
-  if (cer.warp < 1) {
-    const fade = 1 - cer.warp;
+  // The green afterglow at the bottom, where the line the ship just crossed is
+  // receding. Two colours overlapping for a moment rather than one cutting to
+  // the other, which is what makes the crossing feel continuous.
+  //
+  // IT RISES ON `crossing`, NOT ON `warp`, and that distinction was a visible
+  // bug. Driven by `warp` — and drawn inside a guard that skipped the whole wash
+  // until the warp began — this went from NOTHING to full strength in a single
+  // frame, at the exact tick the handover fired. Black to bright green, right
+  // after the line passed, reported as "really jarring". `warp` is flat at zero
+  // for the entire coast, so it cannot express a build-up that happens during it;
+  // `crossing` can, because it is what moves then.
+  const glow = cer.crossing * (1 - cer.warp);
+  if (glow > 0.002) {
     const gg = ctx.createLinearGradient(0, y + h, 0, y + h * 0.55);
-    gg.addColorStop(0, withAlpha(FINISH, 0.28 * fade));
+    gg.addColorStop(0, withAlpha(FINISH, 0.28 * glow));
     gg.addColorStop(1, withAlpha(FINISH, 0));
     ctx.fillStyle = gg;
     ctx.fillRect(x, y, w, h);
   }
+  ctx.restore();
+}
+
+/**
+ * `FINISH!` beside the ship, at the moment it goes through.
+ *
+ * NOT A SCORE POPUP, and deliberately not routed through one. `Popups` is built
+ * around `ScoreAward` and the praise ladder — every mark it draws is an answer to
+ * "how good was that?", picked from a vocabulary and coloured by rarity. Crossing
+ * the line is not an award and has no quality: you either finished the course or
+ * you did not. Feeding it through that system would have needed a fake award with
+ * a fake tier, and the ladder would have had to have an opinion about it.
+ *
+ * So it lives here, with the rest of the crossing, and takes the finish green like
+ * everything else in that sentence — the arrow, the chequers, the notice.
+ *
+ * Rises and fades over its own second, independent of the coast, so it reads as a
+ * stamp on the moment rather than as something being carried away with the world.
+ */
+export function drawFinishFlash(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  cer: Ceremony,
+  shipX: number,
+  shipY: number,
+): void {
+  const LIFE = 1.1;
+  if (cer.t > LIFE) return;
+  const u = cer.t / LIFE;
+  // Quick in, slow out: the word should be legible before it starts leaving.
+  const alpha = u < 0.12 ? u / 0.12 : 1 - (u - 0.12) / 0.88;
+  if (alpha <= 0.01) return;
+
+  const s = cam.scale;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 ${15 * s}px ui-monospace, monospace`;
+  ctx.fillStyle = withAlpha(FINISH, 1);
+  // Beside and above, drifting up as it goes — clear of the ship itself and of
+  // the sheet that arrives later, higher up the screen.
+  ctx.fillText('FINISH!', shipX + 22 * s, shipY - (10 + 26 * u) * s);
   ctx.restore();
 }

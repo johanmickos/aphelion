@@ -152,6 +152,24 @@ export const LADDER_EXCEPTIONAL = '#ffd633';
 export const FINISH: RGB = [92, 226, 140];
 
 /**
+ * The post-mortem's slate: cold, factual, and not any of the other meanings.
+ *
+ * A worthy death's sheet was briefly drawn in `FINISH` green, which was simply
+ * wrong — green means THE FINISH in this game now, on the arrow, the chequers and
+ * the notice, so a sheet about dying was congratulating the player for arriving.
+ *
+ * Hazard red is wrong too, and less obviously. This sheet only appears for runs
+ * that got a long way; it exists to say "that was a good attempt", and the colour
+ * of the wall you hit argues with that. Red is also the one colour in the game
+ * that means something is happening RIGHT NOW and can still be acted on, which a
+ * post-mortem cannot.
+ *
+ * So: the colourless family the HUD already uses for its quiet readouts. It reads
+ * as a report rather than an alarm or an award, which is exactly what it is.
+ */
+export const SLATE: RGB = [138, 155, 186];
+
+/**
  * The summit gold, for the ceremony that fires when the field is cleared.
  *
  * DELIBERATELY THE LADDER'S TOP RUNG AND NOT A NEW COLOUR. Clearing the field is

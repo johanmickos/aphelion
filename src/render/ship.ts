@@ -78,27 +78,49 @@ export class Trail {
       // the run rather than just reporting the current instant.
       const heat = Math.max(0, Math.min(1, (p.speed - calm) / Math.max(1, hot - calm)));
       let [r, g, b] = trailColor(heat);
-      let rad = (0.6 + (2.6 + 1.6 * heat) * f) * cam.scale;
+      const rad = (0.6 + (2.6 + 1.6 * heat) * f) * cam.scale;
       let alpha = (0.08 + 0.5 * f) * (0.75 + 0.35 * heat);
+      const sx = toScreenX(cam, p.x);
+      const sy = toScreenY(cam, p.y);
+
       if (warp > 0) {
-        // A wave running from the ship down the wake. `f` is 1 at the head, so
-        // subtracting it from the phase sends the crest backwards — away from the
-        // ship, the direction an exhaust actually travels.
+        // ---- sparks, not bubbles
+        //
+        // The first version scaled the wake's own dots up with the pulse, and a
+        // circle that grows is a bubble however brightly it is lit — reported as
+        // "too bubbly". At lightspeed a wake is not a row of beads getting bigger,
+        // it is bright specks tearing past, so the ceremony swaps the primitive
+        // rather than the parameters: a short streak, thinner than the dot it
+        // replaces and longer than it is wide.
+        //
+        // The wave still travels down the trail — `f` is 1 at the head, so
+        // subtracting it from the phase sends the crest away from the ship, which
+        // is the direction an exhaust goes. What it drives is now LENGTH and
+        // brightness, not girth.
         const wave = 0.5 + 0.5 * Math.sin((warpT * 9 - f * 7) * Math.PI);
         const pulse = warp * wave;
-        rad *= 1 + 1.5 * pulse;
-        alpha = Math.min(1, alpha * (1 + 2.2 * pulse));
-        // Toward the hot end of the wake's own ramp rather than to some new
-        // colour: the trail already means "how fast", and the ceremony is the
-        // fastest the ship ever goes. Borrowing a different hue here would be
-        // inventing a second meaning for the one cue that already had this one.
+        // Toward the hot end of the wake's own ramp rather than a new colour: the
+        // trail already means "how fast", and this is the fastest the ship goes.
         const hot = trailColor(1);
         r = Math.round(r + (hot[0] - r) * pulse);
         g = Math.round(g + (hot[1] - g) * pulse);
         b = Math.round(b + (hot[2] - b) * pulse);
+        alpha = Math.min(1, alpha * (1 + 2.6 * pulse));
+        const len = (5 + 26 * pulse) * f * cam.scale;
+        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(0.6, rad * 0.5);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        // Straight down the screen, with the streaming sky. A spark belongs to the
+        // motion of the field, not to the ship's own heading.
+        ctx.lineTo(sx, sy + len);
+        ctx.stroke();
+        continue;
       }
+
       ctx.beginPath();
-      ctx.arc(toScreenX(cam, p.x), toScreenY(cam, p.y), rad, 0, Math.PI * 2);
+      ctx.arc(sx, sy, rad, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
       ctx.fill();
     }

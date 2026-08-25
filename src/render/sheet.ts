@@ -27,7 +27,7 @@
 import type { Body } from '../sim/types.ts';
 import type { RunStats } from '../score/types.ts';
 import type { Camera } from './camera.ts';
-import { FINISH, SUMMIT, SUMMIT_RGB, withAlpha } from './palette.ts';
+import { SLATE, SUMMIT, SUMMIT_RGB, withAlpha } from './palette.ts';
 
 export interface SheetStyle {
   /** Accent for the headline and the rules. */
@@ -35,21 +35,33 @@ export interface SheetStyle {
   accentRGB: readonly [number, number, number];
   /** Word above the headline figure. */
   kicker: string;
+  /**
+   * Whether this sheet moves.
+   *
+   * THE DIFFERENCE BETWEEN THE TWO SHEETS IS NOT MEANT TO BE A HUE. Colour in
+   * this codebase is a RANK — the rarity ladder — and gold is already its top
+   * rung, so a clear was being drawn in the right colour and simply was not loud
+   * enough. Arcades do not celebrate with hue; they celebrate with MOTION, and
+   * they always have: the marquee chase, the flashing border, the digits rolling
+   * up. So a clear gets a light travelling round its border and a bigger word,
+   * and a death gets stillness. One is an event, the other is a report, and that
+   * is a difference the eye reads before the words.
+   */
+  celebrate: boolean;
 }
 
 export const CLEARED_SHEET: SheetStyle = {
   accent: SUMMIT,
   accentRGB: SUMMIT_RGB,
   kicker: 'FIELD CLEARED',
+  celebrate: true,
 };
 
 export const DEATH_SHEET: SheetStyle = {
-  // The finish green, not the hazard red. A worthy death is being commended for
-  // how far it got, and painting that in the colour of the wall it hit would be
-  // the sheet arguing with its own reason for existing.
-  accent: `rgb(${FINISH[0]},${FINISH[1]},${FINISH[2]})`,
-  accentRGB: FINISH,
+  accent: `rgb(${SLATE[0]},${SLATE[1]},${SLATE[2]})`,
+  accentRGB: SLATE,
   kicker: 'RUN ENDED',
+  celebrate: false,
 };
 
 /**
@@ -108,6 +120,40 @@ function secs(ticks: number, dt: number): string {
   return `${(ticks * dt).toFixed(1)}s`;
 }
 
+/**
+ * How far a row has rolled, 0..1, given the sheet's age and which row it is.
+ *
+ * THEY LAND TOGETHER, WHICH IS THE WHOLE EFFECT. A slot machine is not satisfying
+ * because the reels spin; it is satisfying because they STOP, one after another,
+ * onto a row that is suddenly all there. So every row finishes at the same
+ * instant and only its start is staggered — the last row spins briefly, the first
+ * spins longest, and the sheet resolves in one beat rather than trickling.
+ *
+ * Rolling the wrong way round — equal durations, staggered ends — was the obvious
+ * arrangement and gives the opposite feeling: a queue being served.
+ */
+function rollOf(t: number, row: number, rows: number): number {
+  const LAND = 0.95;
+  const LEAD = 0.18;
+  const start = ((rows - 1 - row) / Math.max(1, rows - 1)) * LEAD;
+  const u = (t - start) / Math.max(0.001, LAND - start);
+  const c = u < 0 ? 0 : u > 1 ? 1 : u;
+  // Fast, then settling: a reel slows into its stop rather than braking at it.
+  return 1 - Math.pow(1 - c, 3);
+}
+
+/**
+ * A number part-way through its roll.
+ *
+ * Counts UP to the value rather than cycling random digits. Random digits read as
+ * a machine searching; counting reads as a total being tallied, which is what the
+ * sheet is actually reporting — and it means the digit count settles early
+ * instead of jittering, so the column does not shimmy as it lands.
+ */
+function rolled(v: number, roll: number): number {
+  return roll >= 1 ? v : v * roll;
+}
+
 function px(v: number): string {
   return v >= 10000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v));
 }
@@ -140,21 +186,26 @@ function anomalyCount(bodies: readonly Body[]): number {
   return n;
 }
 
-export function sheetRows(run: RunStats, max: RunStats): Row[] {
+export function sheetRows(run: RunStats, max: RunStats, t = Infinity): Row[] {
+  const r = (i: number) => rollOf(t, i, 5);
   return [
-    { label: 'TOP SPEED', value: px(run.topSpeed), best: px(max.topSpeed) },
-    { label: 'LONGEST CHAIN', value: `${run.peakChain}`, best: `${max.peakChain}` },
+    { label: 'TOP SPEED', value: px(rolled(run.topSpeed, r(0))), best: px(max.topSpeed) },
+    {
+      label: 'LONGEST CHAIN',
+      value: `${Math.round(rolled(run.peakChain, r(1)))}`,
+      best: `${max.peakChain}`,
+    },
     {
       label: 'SECONDS ON FIRE',
-      value: `${run.fireSecs.toFixed(1)}s`,
+      value: `${rolled(run.fireSecs, r(2)).toFixed(1)}s`,
       best: `${max.fireSecs.toFixed(1)}s`,
     },
-    { label: 'DISTANCE', value: px(run.distance), best: px(max.distance) },
+    { label: 'DISTANCE', value: px(rolled(run.distance, r(3))), best: px(max.distance) },
     // Kinks and impacts as one idea: how badly it was flown. The title above is
     // what interprets it; the number on its own is not a verdict.
     {
       label: 'ROUGHNESS',
-      value: `${run.roughPasses + run.impacts}`,
+      value: `${Math.round(rolled(run.roughPasses + run.impacts, r(4)))}`,
       best: `${max.roughPasses + max.impacts}`,
     },
   ];
@@ -177,6 +228,8 @@ export function drawSheet(
   dt: number,
   alpha: number,
   cleared: boolean,
+  /** Seconds since the sheet's moment, for the marquee. Ignored when still. */
+  t = 0,
 ): void {
   if (alpha <= 0.005) return;
   const s = cam.scale;
@@ -193,19 +246,65 @@ export function drawSheet(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
 
+  // ---- push the rest of the picture back
+  //
+  // A vignette rather than a flat dim, so the darkening reads as attention rather
+  // than as the brightness being turned down: the corners go furthest, the middle
+  // barely moves, and the ceremony carries on visibly underneath. Drawn full-bleed
+  // over the viewport, since it is about everything that is NOT the sheet.
+  const vw = cam.designW * s;
+  const vh = cam.viewH * s;
+  const vig = ctx.createRadialGradient(
+    cx,
+    cam.offsetY + vh * 0.4,
+    vh * 0.18,
+    cx,
+    cam.offsetY + vh * 0.4,
+    vh * 0.78,
+  );
+  vig.addColorStop(0, 'rgba(2,3,8,0)');
+  vig.addColorStop(1, 'rgba(2,3,8,0.66)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(cam.offsetX, cam.offsetY, vw, vh);
+
   // A scrim, so the rows stay readable over a moving sky. Dark rather than
   // tinted: the accent is doing the colour work and a second hue here would put
   // the sheet in competition with the ceremony behind it.
   const pad = 18 * s;
-  const height = (172 + sheetRows(run, max).length * 22) * s;
+  const height = (190 + sheetRows(run, max).length * 22) * s;
   ctx.fillStyle = 'rgba(4,6,12,0.72)';
   ctx.fillRect(cx - w / 2 - pad, top - 34 * s, w + pad * 2, height);
   ctx.strokeStyle = withAlpha(style.accentRGB, 0.45);
   ctx.lineWidth = Math.max(1, 1.2 * s);
-  ctx.strokeRect(cx - w / 2 - pad, top - 34 * s, w + pad * 2, height);
+  const bx = cx - w / 2 - pad;
+  const by = top - 34 * s;
+  const bw = w + pad * 2;
+  ctx.strokeRect(bx, by, bw, height);
 
-  ctx.fillStyle = withAlpha(style.accentRGB, 0.85);
-  ctx.font = `600 ${10 * s}px ui-monospace, monospace`;
+  // ---- the marquee
+  //
+  // A light running round the border, the way an arcade cabinet announces a high
+  // score. It is the whole of the celebration difference: both sheets are drawn
+  // by this function in a colour that means the same thing it always does, and
+  // what separates a win from a post-mortem is that one of them moves.
+  if (style.celebrate) {
+    const per = 2 * (bw + height);
+    const head = ((t * per) / 1.6) % per;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1.5, 2.4 * s);
+    ctx.strokeStyle = withAlpha(style.accentRGB, 0.95);
+    // Drawn as a dash pattern offset along the perimeter, so one path stroke
+    // carries every segment however many there are.
+    ctx.setLineDash([26 * s, per / 4 - 26 * s]);
+    ctx.lineDashOffset = -head;
+    ctx.strokeRect(bx, by, bw, height);
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = withAlpha(style.accentRGB, 0.9);
+  ctx.font = `700 ${(style.celebrate ? 14 : 10) * s}px ui-monospace, monospace`;
   ctx.fillText(style.kicker, cx, top - 12 * s);
 
   // ---- the headline
@@ -224,9 +323,20 @@ export function drawSheet(
   ctx.fillText(sub, cx, top + 38 * s);
 
   // ---- the body
-  let y = top + 66 * s;
+  //
+  // A header row, because two numbers side by side with no labels is a puzzle:
+  // nothing on the sheet said which was this run and which was the session, and
+  // the answer is not guessable from the values.
+  let y = top + 60 * s;
+  ctx.font = `${8 * s}px ui-monospace, monospace`;
+  ctx.fillStyle = 'rgba(120,140,175,.65)';
+  ctx.textAlign = 'right';
+  ctx.fillText('RUN', cx + w / 2 - 46 * s, y);
+  ctx.fillText('SESSION', cx + w / 2, y);
+  ctx.textAlign = 'center';
+  y += 18 * s;
   ctx.font = `${10 * s}px ui-monospace, monospace`;
-  for (const row of sheetRows(run, max)) {
+  for (const row of sheetRows(run, max, t)) {
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(150,170,205,.75)';
     ctx.fillText(row.label, cx - w / 2, y);

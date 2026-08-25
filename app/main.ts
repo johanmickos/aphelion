@@ -631,6 +631,7 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       frameDt,
       score,
       deathSheet: deathSheetAlpha(),
+      deathSheetT: sheet?.kind === 'death' ? Math.max(0, sheet.t - DEATH_SHEET_DELAY) : 0,
     });
   },
 });
