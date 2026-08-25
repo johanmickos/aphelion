@@ -85,6 +85,7 @@ export class Scene {
     drawSheet(ctx, cam, {
       style: cer ? CLEARED_SHEET : DEATH_SHEET,
       run: opts.score.lastRun,
+      ending: opts.score.lastEnding,
       max: opts.score.sessionMax,
       bodies: this.deps.bodies,
       dt: FIXED_DT,

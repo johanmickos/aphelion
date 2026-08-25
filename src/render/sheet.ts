@@ -25,9 +25,22 @@
  * only axis left is speed.
  */
 import type { Body } from '../sim/types.ts';
-import type { RunStats } from '../score/types.ts';
+import type { RunStats, ScoreState } from '../score/types.ts';
 import type { Camera } from './camera.ts';
-import { DEBRIEF, SUMMIT, SUMMIT_RGB, withAlpha } from './palette.ts';
+import { DEBRIEF, HAZARD, SUMMIT, SUMMIT_RGB, withAlpha } from './palette.ts';
+import type { DeadlineWall } from '../sim/rescue.ts';
+
+/**
+ * What each boundary is called in prose.
+ *
+ * "THE CEILING" and not "the top wall": the field has no wall up there, it has a
+ * height, and a player who flew off the top did not hit anything.
+ */
+const WALL_NAME: Record<DeadlineWall, string> = {
+  left: 'THE LEFT WALL',
+  right: 'THE RIGHT WALL',
+  top: 'THE CEILING',
+};
 
 export interface SheetStyle {
   /** Accent for the headline and the rules. */
@@ -210,6 +223,14 @@ export interface SheetDraw {
   run: RunStats;
   /** Element-wise session maximum, for the second column. */
   max: RunStats;
+  /**
+   * How the run ended at a boundary — `score.lastEnding`, never live state.
+   *
+   * Null for every other ending, and the line is simply absent then: an impact
+   * and a fall behind the floor each have their own cue, and naming a wall would
+   * be answering a question nobody asked.
+   */
+  ending: ScoreState['lastEnding'];
   bodies: readonly Body[];
   dt: number;
   /** Opacity of the whole panel, 0..1. */
@@ -240,7 +261,7 @@ export interface SheetDraw {
  * sky that is still moving.
  */
 export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDraw): void {
-  const { style, run, max, bodies, dt, alpha, t, roll } = d;
+  const { style, run, max, bodies, dt, alpha, t, roll, ending } = d;
   if (alpha <= 0.005) return;
   const s = cam.scale;
   const cx = cam.offsetX + cam.designW * 0.5 * s;
@@ -281,7 +302,7 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
   // tinted: the accent is doing the colour work and a second hue here would put
   // the sheet in competition with the ceremony behind it.
   const pad = 18 * s;
-  const height = (196 + sheetRows(run, max).length * 22) * s;
+  const height = (196 + sheetRows(run, max).length * 22 + (ending ? 18 : 0)) * s;
   ctx.fillStyle = 'rgba(4,6,12,0.72)';
   ctx.fillRect(cx - w / 2 - pad, top - 34 * s, w + pad * 2, height);
   ctx.strokeStyle = withAlpha(style.accentRGB, 0.45);
@@ -414,6 +435,34 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
   }
 
   ctx.textAlign = 'center';
+
+  // ---- WHY THE RUN ENDED, on the one ending that never explained itself
+  //
+  // `LOST — OFF COURSE` says the run ended out of bounds and nothing more. From
+  // the player's seat that has read as arbitrary since the playtest of
+  // 2026-08-22, where a run ended with full fuel and two planets on screen.
+  //
+  // The deadline cue was built to answer that and cannot: measured over the 64
+  // recordings, 133 of 196 out-of-bounds deaths never had a live cross at all, so
+  // 68% of them are exactly the blank sky the complaint was about. This line
+  // reaches all 196, and it reaches them where there is time to read it rather
+  // than during the third of a second the cue is on screen.
+  //
+  // HAZARD RED, WHICH IS A CATEGORY AND NOT A RANK. The rarity ladder in
+  // `accolade.ts` owns colour-as-quality on AWARDS; this is not one. It is the
+  // boundary red — side walls, trailing floor, ceiling, the deadline — naming a
+  // boundary, which is the same thing it says everywhere else it appears.
+  if (ending) {
+    ctx.fillStyle = withAlpha(HAZARD, 0.75 * alpha);
+    ctx.font = `${8 * s}px ui-monospace, monospace`;
+    ctx.fillText(
+      `LEFT THE FIELD AT ${WALL_NAME[ending.wall]} · ADRIFT ${ending.driftSecs.toFixed(2)}s`,
+      cx,
+      y + 2 * s,
+    );
+    y += 18 * s;
+  }
+
   ctx.fillStyle = 'rgba(120,140,175,.6)';
   ctx.font = `${8 * s}px ui-monospace, monospace`;
   ctx.fillText('TAP TO CONTINUE', cx, y + 14 * s);

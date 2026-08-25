@@ -51,6 +51,7 @@ import type { Capture, SimState } from './types.ts';
 import { NO_INPUT } from './types.ts';
 import { shipWorldPos, stepSim } from './step.ts';
 import { fieldBounds } from './world.ts';
+import type { FieldBounds } from './world.ts';
 
 /** One point on the projected path, and whether a press there still saves you. */
 export interface DeadlineSample {
@@ -104,6 +105,33 @@ export interface RescueDeadline {
    * trajectory; scoring is somebody else's word for it.
    */
   flight: Array<{ x: number; y: number }>;
+}
+
+/**
+ * Which boundary a run at `(x, y)` has left the field through, or null for none
+ * this cue speaks for.
+ *
+ * Read off the POSITION rather than the heading: `outX` and `outY` share one
+ * ending, so a diagonal drift that leaves through a corner has to be resolved by
+ * where it went, not where it was pointed.
+ *
+ * Sides are tested first, and win a corner. Both readings are true there, and the
+ * side is the one with a gradient the player has been watching build for seconds
+ * — the ceiling only ever appears at the very top of the field, so naming it in a
+ * corner would move the answer to the less-expected wall.
+ *
+ * `field.bottom` returns null deliberately. That ending is reachable only in the
+ * opening seconds, and the trailing floor is the nearer and better-signalled one
+ * everywhere after — it is a `fell-behind` with its own cue.
+ *
+ * EXPORTED BECAUSE THERE ARE TWO CALLERS AND THERE MUST BE ONE DEFINITION. The
+ * scorer names the wall a run was lost to for the debrief, and it would otherwise
+ * have written this expression a second time — which is the mistake that put
+ * `crest - grabRange` in three files, all silently agreeing until one of them did
+ * not.
+ */
+export function wallAt(fb: FieldBounds, x: number, y: number): DeadlineWall | null {
+  return x > fb.right ? 'right' : x < fb.left ? 'left' : y < fb.top ? 'top' : null;
 }
 
 export interface DeadlineOptions {
@@ -352,20 +380,7 @@ export function rescueDeadline(
   if (endTick < 0) return null; // nothing ahead worth marking
   if (endReason !== 'out-of-bounds') return null;
 
-  // Which boundary, read off where the run actually ended rather than off the
-  // heading: `outX` and `outY` share one ending, so a diagonal drift that leaves
-  // through a corner has to be resolved by position.
-  //
-  // Sides are tested first, and win a corner. Both readings are true there, and
-  // the side is the one with a gradient the player has been watching build for
-  // seconds — the ceiling only ever appears at the very top of the field, so
-  // naming it in a corner would move the mark to the less-expected wall.
-  //
-  // A drift below `field.bottom` still falls through to null. That ending is
-  // reachable only in the opening seconds, and the trailing floor is the nearer
-  // and better-signalled one everywhere after.
-  const wall: DeadlineWall | null =
-    endX > fb.right ? 'right' : endX < fb.left ? 'left' : endY < fb.top ? 'top' : null;
+  const wall = wallAt(fb, endX, endY);
   if (wall === null) return null;
 
   // ---- evaluate a press at each sampled tick, re-walking the drift as we go

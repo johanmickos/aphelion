@@ -391,6 +391,33 @@ export interface ScoreState {
    */
   lastRun: RunStats | null;
   /**
+   * Ticks the ship has been drifting, uncaptured, right now. Reset by a capture.
+   *
+   * Not a stat and not a weight: it exists only so the debrief can say how long
+   * the ship had been adrift when the run ended, which is the question a player
+   * asks after an out-of-bounds death.
+   */
+  driftTicks: number;
+  /**
+   * How the last run ended at a boundary, sealed on the ending tick.
+   *
+   * NULL FOR EVERY OTHER ENDING. An impact, a fall behind the floor and a clear
+   * all have their own cue, and a line about a wall would be answering a question
+   * nobody asked.
+   *
+   * SEPARATE FROM `lastRun` ON PURPOSE. `RunStats` is the set of numbers that
+   * have a session best to be compared against, and folds element-wise through
+   * `foldSessionMax`. Neither of these does: "the furthest-left wall of the
+   * session" is not a thing, and a longest-drift record would be a prize for
+   * dying slowly.
+   *
+   * Sealed at the same moment and for the same reason as `lastRun` — `endLife`
+   * runs on the FIRST tick of the ending hold, so anything drawn afterwards that
+   * reads live state is describing a run that has already been reset.
+   */
+  lastEnding: { wall: DeadlineWall; driftSecs: number } | null;
+
+  /**
    * Element-wise maximum across every life this session, for the "· best 940"
    * figure the sheet prints beside each row.
    *

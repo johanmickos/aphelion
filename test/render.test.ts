@@ -979,14 +979,45 @@ describe('the sheet', () => {
    * No `cleared` argument: the style carries that, and passing it separately is
    * how a death sheet ends up with a victory marquee.
    */
-  function text(style = CLEARED_SHEET, alpha = 1, t = 9) {
+  function text(style = CLEARED_SHEET, alpha = 1, t = 9, ending: ScoreState['lastEnding'] = null) {
     const r = recordingContext();
-    drawSheet(r.ctx, cam(), { style, run, max, bodies, dt: FIXED_DT, alpha, t, roll: t });
+    drawSheet(r.ctx, cam(), {
+      style,
+      run,
+      max,
+      bodies,
+      ending,
+      dt: FIXED_DT,
+      alpha,
+      t,
+      roll: t,
+    });
     return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
   }
 
   it('draws nothing before it has faded in', () => {
     expect(text(CLEARED_SHEET, 0).length).toBe(0);
+  });
+
+  it('names the wall a lost run left through, and how long it had been adrift', () => {
+    // `LOST — OFF COURSE` says the run ended out of bounds and nothing more, and
+    // from the player's seat that has read as arbitrary since the playtest of
+    // 2026-08-22. The deadline cue cannot answer it: 133 of 196 out-of-bounds
+    // deaths in the corpus never had a live cross at all. This line reaches all
+    // of them, and it reaches them where there is time to read.
+    const lost = text(DEATH_SHEET, 1, 9, { wall: 'left', driftSecs: 0.85 }).join(' | ');
+    expect(lost, 'it says which boundary').toContain('THE LEFT WALL');
+    expect(lost, 'and how long the ship had been adrift').toContain('ADRIFT 0.85s');
+
+    // The ceiling is not a wall. A player who flew off the top hit nothing.
+    expect(text(DEATH_SHEET, 1, 9, { wall: 'top', driftSecs: 2.7 }).join(' | ')).toContain(
+      'THE CEILING',
+    );
+
+    // Every other ending has its own cue, so the line is simply absent.
+    const other = text(DEATH_SHEET).join(' | ');
+    expect(other, 'an impact is not explained by a wall').not.toContain('LEFT THE FIELD');
+    expect(other).not.toContain('ADRIFT');
   });
 
   it('leads with the SCORE, which by then exists nowhere else', () => {
@@ -1048,6 +1079,7 @@ describe('the sheet', () => {
       run,
       max: worseEarlier,
       bodies,
+      ending: null,
       dt: FIXED_DT,
       alpha: 1,
       t: 9,
@@ -1101,6 +1133,7 @@ describe('the sheet', () => {
         run: firstDeath,
         max: firstDeath,
         bodies,
+        ending: null,
         dt: FIXED_DT,
         alpha: 1,
         t: 1,
@@ -1191,6 +1224,7 @@ describe('a death sheet and a clear sheet are told apart', () => {
       run,
       max: run,
       bodies,
+      ending: null,
       dt: FIXED_DT,
       alpha: 1,
       t: 9,
@@ -1262,6 +1296,7 @@ describe('a death sheet and a clear sheet are told apart', () => {
         run,
         max: run,
         bodies,
+        ending: null,
         dt: FIXED_DT,
         alpha: 1,
         t: 0.4,

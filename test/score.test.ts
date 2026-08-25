@@ -1725,6 +1725,56 @@ describe('the grab award lands at periapsis, not at the press', () => {
  * band is not "barely hanging on", it is just dying; and inside a bubble the wall
  * is switched off, so there is nothing to hang on against.
  */
+describe('what the debrief is told about the ending', () => {
+  it('names the wall a run was lost to, and how long it had been adrift', () => {
+    // Sealed on the ending tick beside `lastRun`, and for the same reason:
+    // `endLife` runs on the FIRST tick of the hold, so anything read afterwards
+    // off live state is describing a run that has already been reset.
+    // Short enough to still be inside the ending hold: the run is over at tick
+    // 35 and a respawn would put `ending.active` back to false, which is the
+    // trap `lastEnding` exists to be immune to.
+    const s = play([], 60, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, {
+      x: 60,
+      y: 300,
+      vx: -400,
+      vy: 0,
+    } as Ship);
+    expect(s.state.ending.active, 'the fixture is meant to leave the field').toBe(true);
+    expect(s.state.ending.reason).toBe('out-of-bounds');
+    expect(s.score.lastEnding, 'the debrief is told something').not.toBeNull();
+    expect(s.score.lastEnding!.wall, 'and told which boundary').toBe('left');
+    expect(s.score.lastEnding!.driftSecs, 'and how long the drift ran').toBeGreaterThan(0);
+
+    // The drift is counted, not guessed: the ship never captured, so it had been
+    // adrift for the whole life.
+    expect(s.score.lastEnding!.driftSecs).toBeCloseTo(s.score.lastRun!.ticks * FIXED_DT, 1);
+  });
+
+  it('tells the debrief nothing when the ending was not a boundary', () => {
+    // An impact and a fall behind the floor each have their own cue. A line about
+    // a wall would be answering a question nobody asked — which is why `wallAt`
+    // returns null for the floor rather than naming it, and why this reads the
+    // ending REASON rather than only the position.
+    const hit = play([], 60, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, {
+      x: 195,
+      y: 200,
+      vx: 0,
+      vy: -300,
+    } as Ship);
+    expect(hit.state.ending.reason, 'the fixture is meant to hit a planet').toBe('impact');
+    expect(hit.score.lastEnding, 'an impact is not a wall').toBeNull();
+
+    const fell = play([], 30, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, {
+      x: 195,
+      y: 1400,
+      vx: 0,
+      vy: 400,
+    } as Ship);
+    expect(fell.state.ending.reason, 'and this one to fall behind the floor').toBe('fell-behind');
+    expect(fell.score.lastEnding, 'the floor is not a wall either').toBeNull();
+  });
+});
+
 describe('the burn', () => {
   const bodies = createBodies(DEFAULT_CONFIG);
   const field = fieldBounds(DEFAULT_CONFIG, bodies);

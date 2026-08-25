@@ -39,7 +39,7 @@ import { fieldBounds } from '../sim/world.ts';
 import { shipWorldPos } from '../sim/step.ts';
 import { readAim } from './aim.ts';
 import { edgeHeat } from './burn.ts';
-import { rescueDeadline, turnedAway } from '../sim/rescue.ts';
+import { rescueDeadline, turnedAway, wallAt } from '../sim/rescue.ts';
 
 import { isNerveGrab } from './praise.ts';
 import {
@@ -157,6 +157,8 @@ export function createScoreState(): ScoreState {
     hopTotal: 0,
     run: emptyRun(),
     lastRun: null,
+    driftTicks: 0,
+    lastEnding: null,
     sessionMax: emptyRun(),
   };
 }
@@ -270,6 +272,10 @@ function endLife(sc: ScoreState): void {
   sc.burnHeat = 0;
   sc.burnBank = 0;
   sc.burnPeak = 0;
+  // The new life starts where the old one did, not adrift for as long as the
+  // last one was. `lastEnding` has already been sealed off this by the time this
+  // runs — the same ordering `lastRun` depends on.
+  sc.driftTicks = 0;
 }
 
 /**
@@ -324,6 +330,13 @@ export function scoreTick(
   const shouts: Shout[] = [];
   let tally: Tally | null = null;
 
+  // How long the ship has been adrift, counted before anything else so the
+  // ending block below reads the drift that reached the wall rather than one
+  // tick short of it. A capture zeroes it: hanging off a planet is not drifting,
+  // which is the same distinction `edgeHeat` draws to decide what burns.
+  if (state.capture) sc.driftTicks = 0;
+  else sc.driftTicks++;
+
   // ---- the ending hold: nothing is scored, and the life is over
   if (state.ending.active) {
     if (!sc.endingSeen) {
@@ -349,6 +362,20 @@ export function scoreTick(
       sc.run.score = sc.score;
       sc.run.highWaterY = state.highWaterY;
       sc.lastRun = { ...sc.run };
+      // Which wall, and how long the ship had been adrift when it reached one.
+      //
+      // `wallAt` rather than a second copy of the same three comparisons — the
+      // predictor already owns that definition and this is the second caller it
+      // was exported for. It returns null for the floor and for an ending that is
+      // not at a boundary at all, which is exactly when the debrief should say
+      // nothing.
+      sc.lastEnding =
+        state.ending.reason === 'out-of-bounds'
+          ? (() => {
+              const wall = wallAt(fieldBounds(cfg, state.bodies), state.ending.x, state.ending.y);
+              return wall ? { wall, driftSecs: sc.driftTicks * dt } : null;
+            })()
+          : null;
       foldSessionMax(sc.sessionMax, sc.lastRun);
       endLife(sc);
     }
