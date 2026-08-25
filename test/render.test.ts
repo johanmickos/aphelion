@@ -926,21 +926,32 @@ describe('the sheet', () => {
     expect(text(true, 0).length).toBe(0);
   });
 
-  it('leads a clear with the clock, because speed is the only axis left', () => {
-    // Once the course is beaten the score has already been on screen all run;
-    // the time is the thing that can still be improved.
-    expect(text(true)).toContain('20.0s');
+  it('leads with the SCORE, which by then exists nowhere else', () => {
+    // These two pins used to assert the opposite — the clock on a clear, the
+    // field fraction on a death — on the reasoning that the score had been on
+    // screen all run so leading with it said nothing new. That reasoning had a
+    // hole big enough to walk through: `endLife` zeroes the live score the instant
+    // a run ends, so by the time any of this is read the number the player watched
+    // all run is GONE. The sheet is the only place it still exists.
+    expect(text(true)).toContain('45,000');
+    expect(text(false, 1, DEATH_SHEET)).toContain('45,000');
   });
 
-  it('leads a death with how far it got, which is the thing to beat', () => {
-    const t = text(false, 1, DEATH_SHEET);
-    expect(
-      t.some((v) => /^\d+ \/ \d+$/.test(v)),
-      'a fraction of the field',
-    ).toBe(true);
+  it('keeps the clock and the field as the subtitle that qualifies it', () => {
+    // Demoted, not deleted. They say what the score was made of.
+    const t = text(true).join(' | ');
+    expect(t).toMatch(/20\.0s/);
+    expect(t).toMatch(/PLANETS/);
   });
 
-  it('shows every row against its session best', () => {
+  it('rolls the score up too, since it is the number being celebrated', () => {
+    const early = text(true, 1, CLEARED_SHEET, 0.1);
+    const landed = text(true, 1, CLEARED_SHEET, 9);
+    expect(landed).toContain('45,000');
+    expect(early).not.toContain('45,000');
+  });
+
+  it('shows a row against its session best where they differ', () => {
     // The whole reason `sessionMax` exists. 812 means nothing until it sits
     // beside the 940 from earlier in the session.
     const t = text(true);
@@ -948,8 +959,19 @@ describe('the sheet', () => {
     expect(t).toContain('812');
     expect(t).toContain('940');
     expect(t).toContain('LONGEST CHAIN');
-    expect(t).toContain('9');
     expect(t).toContain('14');
+  });
+
+  it('drops the session column when it only repeats the run', () => {
+    // On a cleared field the two are almost always identical — the run that
+    // reached the top is the run that set every high — so printing both puts a
+    // column of duplicates next to the numbers it is supposed to give context to.
+    // Context that equals the thing it contextualises is noise.
+    const r = recordingContext();
+    drawSheet(r.ctx, cam(), CLEARED_SHEET, run, run, bodies, FIXED_DT, 1, true, 9);
+    const t = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(t).not.toContain('SESSION');
+    expect(t).not.toContain('RUN');
   });
 
   it('rolls the numbers up so they land together', () => {
@@ -1027,6 +1049,28 @@ describe('a death sheet and a clear sheet are told apart', () => {
     drawSheet(r.ctx, cam(), style, run, run, bodies, FIXED_DT, 1, cleared);
     return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
   };
+
+  it('shows the sealed score during an ending, never the live zero', () => {
+    // `endLife` clears the live score on the tick a run ends, so for the whole
+    // ending hold — and the whole victory ceremony, which lasts seconds — the
+    // biggest number on screen was reading 0. At the exact moment the player had
+    // just done the best thing in the game.
+    const sc = { ...createScoreState(), score: 0, best: 12345, lastRun: run };
+    const draw = (endingActive: boolean) => {
+      const r = recordingContext();
+      const snap = {
+        ...captureSnapshot(createInitialState(DEFAULT_CONFIG), false, DEFAULT_CONFIG),
+        ending: { active: endingActive, t: 1, x: 0, y: 0, reason: 'cleared' as const },
+      };
+      drawScore(r.ctx, cam(), sc, snap);
+      return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    };
+    // This block's fixture scored 9,000 — the point is that the sealed figure is
+    // what appears, not the live zero beside it.
+    expect(draw(true), 'the run that just ended').toContain('9,000');
+    expect(draw(true)).not.toContain('0');
+    expect(draw(false), 'and the live value while still flying').toContain('0');
+  });
 
   it('says what happened, in the right words', () => {
     expect(words(CLEARED_SHEET, true)).toContain('FIELD CLEARED');

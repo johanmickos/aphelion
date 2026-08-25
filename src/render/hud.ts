@@ -490,15 +490,22 @@ export function drawScore(
 
   // The score is the current life's. Showing what a death took, as the number to
   // beat, is the whole reason the reset reads as a cost rather than as a bug.
-  if (score.best > score.score) {
+  if (score.best > (snap.ending.active && score.lastRun ? score.lastRun.score : score.score)) {
     ctx.font = `${9 * s}px ui-monospace, monospace`;
     ctx.fillStyle = 'rgba(120,140,175,.75)';
     ctx.fillText(`BEST ${formatScore(score.best)}`, cx, cam.offsetY + SCORE.bestY * s);
   }
 
+  // THE SEALED SCORE ONCE THE RUN IS OVER, not the live zero. `endLife` clears
+  // `score` on the tick a run ends, so through every ending hold — and through
+  // the whole victory ceremony, which lasts seconds — the largest number on
+  // screen was reading 0. At the exact moment a player has just done the best
+  // thing in the game. The same trap `lastRun` was added to close, walked into by
+  // the one readout nobody thought to check.
+  const shown = snap.ending.active && score.lastRun ? score.lastRun.score : score.score;
   ctx.font = `600 ${24 * s}px ui-monospace, monospace`;
   ctx.fillStyle = 'rgba(214,228,250,.92)';
-  ctx.fillText(formatScore(score.score), cx, cam.offsetY + SCORE.y * s);
+  ctx.fillText(formatScore(shown), cx, cam.offsetY + SCORE.y * s);
 
   const multY = cam.offsetY + SCORE.multY * s;
   if (score.multiplier > 1) {

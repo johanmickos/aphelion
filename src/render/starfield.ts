@@ -121,16 +121,25 @@ export class Starfield {
       // a tier moves together, downward, because the ship is going up. Length is
       // per tier rather than per star for exactly that reason — within one plane
       // there is nothing to make one star faster than its neighbour.
-      // Shorter than the first attempt, which drew a lattice rather than a sky:
-      // at full length every tier overlapped the next and the screen read as
-      // ruled lines. Length is a hint of travel per frame, not a measure of it.
-      const gain = warp * (9 + t * 22) * cam.scale;
+      // ---- length spread is what stops this being rain
+      //
+      // Rain is uniform: every drop the same length, the same brightness, evenly
+      // spread. A warp is DEPTH — the things near you tear past and the things far
+      // away barely move — and the eye reads that difference long before it reads
+      // any individual streak. At a 9-to-31 spread across the three tiers, every
+      // tier looked much like its neighbour and the whole field read as weather.
+      // Squared, the spread runs 3 to 83: the far tier is still very nearly a
+      // point, and only the near one really travels.
+      const gain = warp * (2.5 + t * t * 20) * cam.scale;
       ctx.strokeStyle = tier.color;
       ctx.lineWidth = size;
       ctx.lineCap = 'butt';
-      // A streak is already brighter than a dot simply by covering more pixels.
-      // Holding the dot's alpha made the field close up into a wall.
-      ctx.globalAlpha *= 0.62;
+      // Dimmer with distance, on top of the tier alpha the still field already
+      // has. A streak is brighter than a dot simply by covering more pixels, so
+      // holding the dot's alpha closed the field into a wall — and fading the far
+      // tiers harder is the same depth statement the length makes, in the other
+      // channel the eye reads it in.
+      ctx.globalAlpha *= 0.34 + t * 0.28;
       ctx.beginPath();
       for (const s of stars) {
         const p = lo + s.z * (hi - lo);

@@ -271,7 +271,7 @@ export function drawSheet(
   // tinted: the accent is doing the colour work and a second hue here would put
   // the sheet in competition with the ceremony behind it.
   const pad = 18 * s;
-  const height = (190 + sheetRows(run, max).length * 22) * s;
+  const height = (196 + sheetRows(run, max).length * 22) * s;
   ctx.fillStyle = 'rgba(4,6,12,0.72)';
   ctx.fillRect(cx - w / 2 - pad, top - 34 * s, w + pad * 2, height);
   ctx.strokeStyle = withAlpha(style.accentRGB, 0.45);
@@ -307,49 +307,75 @@ export function drawSheet(
   ctx.font = `700 ${(style.celebrate ? 14 : 10) * s}px ui-monospace, monospace`;
   ctx.fillText(style.kicker, cx, top - 12 * s);
 
-  // ---- the headline
+  // ---- the headline is the SCORE
+  //
+  // It was the clock, on the reasoning that the score had been on screen all run
+  // so leading with it told the player nothing new. That reasoning had a hole in
+  // it big enough to walk through: `endLife` zeroes the live score the instant a
+  // run ends, so by the time any of this is read the number the player watched
+  // all run is GONE, replaced by a 0. Far from being redundant, the sheet is the
+  // only place the figure still exists.
+  //
+  // It is also simply the most important stat, which is the other half of the
+  // report — every other row is a way of describing HOW the score happened.
   const cleared_ = planetsCleared(run, bodies);
+  const scoreRoll = rollOf(t, 0, 6);
   ctx.fillStyle = style.accent;
-  ctx.font = `700 ${34 * s}px ui-monospace, monospace`;
-  const headline = cleared ? secs(run.ticks, dt) : `${cleared_.done} / ${cleared_.total}`;
-  ctx.fillText(headline, cx, top + 22 * s);
+  ctx.font = `700 ${40 * s}px ui-monospace, monospace`;
+  ctx.fillText(Math.round(rolled(run.score, scoreRoll)).toLocaleString('en-US'), cx, top + 26 * s);
 
+  // What the score was made of, small: how long it took, and how much of the
+  // field it covered. The old headlines, demoted to their real job of qualifying
+  // the number above them.
   ctx.fillStyle = 'rgba(150,170,205,.8)';
   ctx.font = `${9 * s}px ui-monospace, monospace`;
   const anomalies = anomalyCount(bodies);
-  const sub = cleared
-    ? `${cleared_.total} PLANETS · ${run.anomalies} / ${anomalies} ANOMALIES`
-    : `PLANETS · ${run.anomalies} / ${anomalies} ANOMALIES`;
-  ctx.fillText(sub, cx, top + 38 * s);
+  const progress = cleared
+    ? `${cleared_.total} PLANETS`
+    : `${cleared_.done} / ${cleared_.total} PLANETS`;
+  const anom = anomalies > 0 ? ` · ${run.anomalies} / ${anomalies} ANOMALIES` : '';
+  ctx.fillText(`${secs(run.ticks, dt)} · ${progress}${anom}`, cx, top + 44 * s);
 
   // ---- the body
   //
   // A header row, because two numbers side by side with no labels is a puzzle:
   // nothing on the sheet said which was this run and which was the session, and
   // the answer is not guessable from the values.
-  let y = top + 60 * s;
-  ctx.font = `${8 * s}px ui-monospace, monospace`;
-  ctx.fillStyle = 'rgba(120,140,175,.65)';
-  ctx.textAlign = 'right';
-  ctx.fillText('RUN', cx + w / 2 - 46 * s, y);
-  ctx.fillText('SESSION', cx + w / 2, y);
-  ctx.textAlign = 'center';
-  y += 18 * s;
+  //
+  // THE SESSION COLUMN ONLY APPEARS WHEN IT HAS SOMETHING TO SAY. On a cleared
+  // field the two are almost always identical — the run that reached the top is
+  // the run that set every high — so printing both put a column of duplicates
+  // next to the numbers it was supposed to give context to. A best is context, and
+  // context that equals the thing it contextualises is noise.
+  const rows = sheetRows(run, max, t);
+  const anyBest = rows.some((r) => r.best !== r.value);
+  let y = top + 66 * s;
+  if (anyBest) {
+    ctx.font = `${8 * s}px ui-monospace, monospace`;
+    ctx.fillStyle = 'rgba(120,140,175,.65)';
+    ctx.textAlign = 'right';
+    ctx.fillText('RUN', cx + w / 2 - 46 * s, y);
+    ctx.fillText('SESSION', cx + w / 2, y);
+    ctx.textAlign = 'center';
+    y += 18 * s;
+  }
   ctx.font = `${10 * s}px ui-monospace, monospace`;
-  for (const row of sheetRows(run, max, t)) {
+  for (const row of rows) {
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(150,170,205,.75)';
     ctx.fillText(row.label, cx - w / 2, y);
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(214,228,250,.92)';
-    ctx.fillText(row.value, cx + w / 2 - 46 * s, y);
-    // The session's best, quiet and to the right. Quiet because it is context
-    // rather than news — but present, because a number with nothing to measure it
-    // against is not information.
-    ctx.fillStyle = 'rgba(120,140,175,.7)';
-    ctx.font = `${8 * s}px ui-monospace, monospace`;
-    ctx.fillText(row.best, cx + w / 2, y);
-    ctx.font = `${10 * s}px ui-monospace, monospace`;
+    ctx.fillText(row.value, cx + w / 2 - (anyBest ? 46 * s : 0), y);
+    // The session's best, quiet and to the right, and only where it differs.
+    // Quiet because it is context rather than news; absent where it would only
+    // repeat the number beside it.
+    if (anyBest && row.best !== row.value) {
+      ctx.fillStyle = 'rgba(120,140,175,.7)';
+      ctx.font = `${8 * s}px ui-monospace, monospace`;
+      ctx.fillText(row.best, cx + w / 2, y);
+      ctx.font = `${10 * s}px ui-monospace, monospace`;
+    }
     y += 22 * s;
   }
 
