@@ -373,7 +373,7 @@ export function scoreTick(
         state.ending.reason === 'out-of-bounds'
           ? (() => {
               const wall = wallAt(fieldBounds(cfg, state.bodies), state.ending.x, state.ending.y);
-              return wall ? { wall, driftSecs: sc.driftTicks * dt } : null;
+              return wall ? { wall, driftSecs: sc.driftTicks * dt, alight: sc.burnHeat > 0 } : null;
             })()
           : null;
       foldSessionMax(sc.sessionMax, sc.lastRun);

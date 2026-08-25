@@ -59,6 +59,8 @@ import {
 } from '../src/score/aim.ts';
 import { createScoreState } from '../src/score/score.ts';
 import type { ScoreState } from '../src/score/types.ts';
+import type { EndingReason } from '../src/sim/types.ts';
+import { drawEndingNotice } from '../src/render/overlays.ts';
 import { orbitRadius } from '../src/sim/orbit.ts';
 import { Trail } from '../src/render/ship.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
@@ -1005,14 +1007,27 @@ describe('the sheet', () => {
     // 2026-08-22. The deadline cue cannot answer it: 133 of 196 out-of-bounds
     // deaths in the corpus never had a live cross at all. This line reaches all
     // of them, and it reaches them where there is time to read.
-    const lost = text(DEATH_SHEET, 1, 9, { wall: 'left', driftSecs: 0.85 }).join(' | ');
+    const lost = text(DEATH_SHEET, 1, 9, { wall: 'left', driftSecs: 0.85, alight: false }).join(
+      ' | ',
+    );
     expect(lost, 'it says which boundary').toContain('THE LEFT WALL');
     expect(lost, 'and how long the ship had been adrift').toContain('ADRIFT 0.85s');
 
+    // ON FIRE instead of a drift time when the ship was still burning. 48% of
+    // wall deaths happen captured, where `driftTicks` has just been reset — so
+    // the drift reads 0.02s and describes nothing the player did.
+    const burned = text(DEATH_SHEET, 1, 9, {
+      wall: 'right',
+      driftSecs: 0.02,
+      alight: true,
+    }).join(' | ');
+    expect(burned, 'a burning death says so').toContain('ON FIRE');
+    expect(burned, 'and does not report a drift that never happened').not.toContain('ADRIFT');
+
     // The ceiling is not a wall. A player who flew off the top hit nothing.
-    expect(text(DEATH_SHEET, 1, 9, { wall: 'top', driftSecs: 2.7 }).join(' | ')).toContain(
-      'THE CEILING',
-    );
+    expect(
+      text(DEATH_SHEET, 1, 9, { wall: 'top', driftSecs: 2.7, alight: false }).join(' | '),
+    ).toContain('THE CEILING');
 
     // Every other ending has its own cue, so the line is simply absent.
     const other = text(DEATH_SHEET).join(' | ');
@@ -2417,6 +2432,45 @@ describe('HUD', () => {
       expect(x + w).toBeLessThanOrEqual(winR + 1e-6);
     }
     expect((r.calls('fillText') as Array<[string, string]>).some((o) => o[1] === '42')).toBe(true);
+  });
+});
+
+describe('the ending notice', () => {
+  // `⚠ LOST — OFF COURSE` described a navigational drift, which is the MINORITY
+  // of the deaths it appeared on: of 195 side-wall deaths in the corpus, 126
+  // (65%) were on fire within the final half second. Two thirds of the time the
+  // player was dragging the wall inside the red band with flames all round the
+  // ship, and the game told them they had wandered off course.
+  const noticeText = (reason: EndingReason, alight: boolean): string => {
+    const state = createInitialState(DEFAULT_CONFIG);
+    const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
+    const ending = { active: true, t: DEFAULT_CONFIG.crashPause / 2, x: 100, y: 200, reason };
+    const c = createCamera(rcfg);
+    fitCamera(c, { w: 390, h: 844, dpr: 1 });
+    centerCamera(c, 100, 200, fieldBounds(DEFAULT_CONFIG, state.bodies), null);
+    const r = recordingContext();
+    drawEndingNotice(r.ctx, c, DEFAULT_CONFIG, { ...snap, ending }, alight);
+    return (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]).join(' | ');
+  };
+
+  it('says the ship burned when it did, and drifted when it did', () => {
+    expect(noticeText('out-of-bounds', true), 'burning is the commoner ending').toContain(
+      'BURNED UP',
+    );
+    expect(noticeText('out-of-bounds', true)).not.toContain('OFF COURSE');
+    expect(noticeText('out-of-bounds', false), 'a cold drift keeps the old words').toContain(
+      'OFF COURSE',
+    );
+  });
+
+  it('splits only the ending that needed it', () => {
+    // One extra message, not a family. The split is on the single fact that
+    // changes what the player saw; the debrief names the boundary.
+    expect(noticeText('impact', true), 'a crash is a crash however hot it was').toContain(
+      'CRASHED',
+    );
+    expect(noticeText('fell-behind', true)).toContain('FELL BEHIND');
+    expect(noticeText('cleared', true)).toContain('FIELD CLEARED');
   });
 });
 

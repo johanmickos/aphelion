@@ -74,14 +74,40 @@ const NOTICE: Record<EndingReason, NoticeStyle> = {
   },
 };
 
+/**
+ * The same ending, told the way it was actually experienced.
+ *
+ * `⚠ LOST — OFF COURSE` described a navigational drift, and that is the MINORITY
+ * of the deaths it appeared on. Measured over the corpus: of 195 side-wall
+ * deaths, 126 (65%) were on fire within the final half second and 95 (48%) were
+ * still alight on the very last tick. Two thirds of the time the player was
+ * dragging the wall inside the red band, flames all round the ship and a skull
+ * beside it, and the game said they had wandered off course.
+ *
+ * ONE EXTRA MESSAGE AND NOT A FAMILY OF THEM. The split is on the one fact that
+ * changes what the player saw — was it burning — and not on the boundary, which
+ * the debrief already names. The 4 ceiling deaths in the corpus cannot burn at
+ * all, because the band exists only at the side walls, so they take the drift
+ * wording and it is correct for them.
+ */
+const BURNED_UP: NoticeStyle = {
+  msg: '⚠ LOST — BURNED UP',
+  fill: HAZARD_NOTICE_FILL,
+  border: HAZARD_NOTICE_BORDER,
+  text: HAZARD_NOTICE,
+};
+
 export function drawEndingNotice(
   ctx: CanvasRenderingContext2D,
   cam: Camera,
   sim: SimConfig,
   snap: RenderSnapshot,
+  /** Whether the ship was still burning as it left — `score.lastEnding`. */
+  alight = false,
 ): void {
   if (!snap.ending.active) return;
-  const style = NOTICE[snap.ending.reason];
+  const style =
+    snap.ending.reason === 'out-of-bounds' && alight ? BURNED_UP : NOTICE[snap.ending.reason];
   const s = cam.scale;
   const csx = toScreenX(cam, snap.ending.x);
   const csy = toScreenY(cam, snap.ending.y);

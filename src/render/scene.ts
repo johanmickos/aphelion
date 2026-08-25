@@ -428,7 +428,7 @@ export class Scene {
     // around, and cutting it at the crossing only to bring it back a beat later
     // would be a flicker rather than a transition.
     if (!cer) {
-      drawEndingNotice(ctx, cam, sim, snap);
+      drawEndingNotice(ctx, cam, sim, snap, opts.score.lastEnding?.alight ?? false);
       // HUD sits inside the clip too: it is laid out in design space, so it must
       // never be drawn over a letterbox bar.
       drawFuelGauge(ctx, cam, sim, snap, opts.timeMs);

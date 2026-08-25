@@ -455,11 +455,12 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
   if (ending) {
     ctx.fillStyle = withAlpha(HAZARD, 0.75 * alpha);
     ctx.font = `${8 * s}px ui-monospace, monospace`;
-    ctx.fillText(
-      `LEFT THE FIELD AT ${WALL_NAME[ending.wall]} · ADRIFT ${ending.driftSecs.toFixed(2)}s`,
-      cx,
-      y + 2 * s,
-    );
+    // ON FIRE rather than a drift time, when there was one. `driftTicks` resets
+    // on a capture, so a ship that died hanging off a planet at the wall — 48% of
+    // them — reports a drift of one or two ticks, and "ADRIFT 0.02s" is a true
+    // sentence that describes nothing the player did.
+    const how = ending.alight ? 'ON FIRE' : `ADRIFT ${ending.driftSecs.toFixed(2)}s`;
+    ctx.fillText(`LEFT THE FIELD AT ${WALL_NAME[ending.wall]} · ${how}`, cx, y + 2 * s);
     y += 18 * s;
   }
 

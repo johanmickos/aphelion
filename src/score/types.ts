@@ -411,11 +411,23 @@ export interface ScoreState {
    * session" is not a thing, and a longest-drift record would be a prize for
    * dying slowly.
    *
+   * `alight` is whether the ship was still burning as it went. Measured over the
+   * corpus, 126 of 195 side-wall deaths (65%) were on fire within the final half
+   * second and 95 (48%) on the very last tick — so this is not a rare flourish,
+   * it is the commoner of the two ways to leave the field, and the one the notice
+   * used to describe as "off course".
+   *
+   * READ ON THE LAST LIVE TICK, with no window and no threshold. `endLife` zeroes
+   * `burnHeat`, and it runs after this seal, so `sc.burnHeat` here still holds the
+   * value from the tick before the ending — which is exactly "was it burning as it
+   * crossed". A tolerance window would need a constant nobody can measure the
+   * right value of.
+   *
    * Sealed at the same moment and for the same reason as `lastRun` — `endLife`
    * runs on the FIRST tick of the ending hold, so anything drawn afterwards that
    * reads live state is describing a run that has already been reset.
    */
-  lastEnding: { wall: DeadlineWall; driftSecs: number } | null;
+  lastEnding: { wall: DeadlineWall; driftSecs: number; alight: boolean } | null;
 
   /**
    * Element-wise maximum across every life this session, for the "· best 940"
