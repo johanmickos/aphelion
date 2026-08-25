@@ -95,8 +95,20 @@ const SPOOL_DIST = 1200;
  */
 const SHEET_DIST = 1100;
 
-/** Seconds spent easing the ship from where it crossed to the middle. */
-const CENTRE = 0.8;
+/**
+ * Seconds spent easing the ship from where it crossed to the middle.
+ *
+ * THIS IS WHERE THE CENTRING HAPPENS, and it used to have help it no longer
+ * wants. The funnel was stiff enough to deliver a ship to the middle of the
+ * field before the line, which took the crossing away from the player — "it's
+ * satisfying to cross the finish line roughly in the line they were going". The
+ * funnel now only keeps a ship off the walls, so this has the whole job, and it
+ * has it at the right moment: after the line, with nothing left being flown.
+ *
+ * Longer than it was, because it now starts from wherever the player actually
+ * crossed rather than from a few pixels out.
+ */
+const CENTRE = 1.25;
 
 export interface Ceremony {
   /** 0 before the crossing, climbing to 1 at full warp, then held. */
@@ -186,11 +198,12 @@ export function ceremonyPhase(
  * Where the ship is drawn during the ceremony: its own screen position, easing to
  * the middle of the design window.
  *
- * The funnel has already done most of this work in the simulation — a ship that
- * flew the runway arrives inside the middle quarter of the field — so this is the
- * last few pixels and a settling, not a yank. That ordering is the point: the
- * player was pulled to the centre while they still had control, and the ceremony
- * only finishes the gesture.
+ * ALL OF IT, not the last few pixels. An earlier arrangement had the funnel do
+ * the centring during the runway, which meant the ship was already lined up
+ * before it reached the chequers — and crossing on rails is not the same
+ * experience as crossing on the line you chose. The funnel now only keeps a ship
+ * off the side walls; everything else happens here, after the crossing, where
+ * there is no longer a flight to interfere with.
  */
 export function ceremonyShipPos(
   cam: Camera,
@@ -199,7 +212,9 @@ export function ceremonyShipPos(
   sy: number,
 ): { x: number; y: number } {
   const cx = cam.offsetX + cam.designW * 0.5 * cam.scale;
-  const cy = cam.offsetY + cam.viewH * 0.42 * cam.scale;
+  // Low, so the sheet has the top half of the screen. The ship is the thing
+  // being celebrated, but the numbers are the thing being read.
+  const cy = cam.offsetY + cam.viewH * 0.72 * cam.scale;
   return { x: sx + (cx - sx) * cer.centred, y: sy + (cy - sy) * cer.centred };
 }
 

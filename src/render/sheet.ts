@@ -181,7 +181,11 @@ export function drawSheet(
   if (alpha <= 0.005) return;
   const s = cam.scale;
   const cx = cam.offsetX + cam.designW * 0.5 * s;
-  const top = cam.offsetY + cam.viewH * 0.46 * s;
+  // THE TOP HALF. It sat at 0.46 and read as a panel dropped over the middle of
+  // the picture; up here it is a header the ceremony plays underneath. Clear of
+  // the score band above (see `SCORE_BAND_BOTTOM`) and of the ship, which the
+  // ceremony now settles low for exactly this reason.
+  const top = cam.offsetY + cam.viewH * 0.2 * s;
   const w = cam.designW * 0.78 * s;
 
   ctx.save();

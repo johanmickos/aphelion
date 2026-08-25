@@ -659,6 +659,48 @@ describe('the ceremony', () => {
     expect(a).toEqual(b);
   });
 
+  it('pulses the wake, and only during the ceremony', () => {
+    // The wake is the one thing on screen attached to the ship, so it is where an
+    // engine can be heard without the whole scene shaking. The starfield stays
+    // uniform on purpose: a flickering background reads as a rendering fault.
+    const wake = (warp: number, t: number) => {
+      const trail = new Trail(rcfg);
+      for (let i = 0; i < 40; i++) trail.sample(100 + i * 9, -i * 9, 400);
+      const r = recordingContext();
+      trail.draw(r.ctx, cam(), 100 + 39 * 9, -39 * 9, warp, t);
+      return (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>).map(
+        (o) => o[1],
+      );
+    };
+    expect(wake(0, 0), 'still flight is unchanged frame to frame').toEqual(wake(0, 0.3));
+    expect(wake(1, 0), 'the ceremony wake moves').not.toEqual(wake(1, 0.08));
+  });
+
+  it('sends the pulse away from the ship, the way an exhaust travels', () => {
+    // A wake that brightens uniformly is a lamp being turned up; one with a wave
+    // running down it is something being expelled. So the crest has to move, and
+    // it has to move backwards.
+    const trail = new Trail(rcfg);
+    for (let i = 0; i < 40; i++) trail.sample(100 + i * 9, -i * 9, 400);
+    const alphas = (warp: number, t: number) => {
+      const r = recordingContext();
+      trail.draw(r.ctx, cam(), 100 + 39 * 9, -39 * 9, warp, t);
+      return (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>).map((o) =>
+        Number(o[1].split(',')[3]!.replace(')', '')),
+      );
+    };
+    // Against its OWN baseline, not in absolute terms. The wake's alpha already
+    // ramps toward the head, so the head is the brightest point at every phase and
+    // an argmax over raw values never moves — which is what this first measured,
+    // and what it proved nothing about. The pulse is the RATIO to unpulsed flight.
+    const base = alphas(0, 0);
+    const crest = (t: number) => {
+      const lit = alphas(1, t).map((a, i) => a / base[i]!);
+      return lit.indexOf(Math.max(...lit));
+    };
+    expect(crest(0)).not.toBe(crest(0.06));
+  });
+
   it('carries the ship to the middle and leaves it there', () => {
     const c = cam();
     const cx = c.offsetX + c.designW * 0.5 * c.scale;

@@ -38,7 +38,30 @@ export class Trail {
     }
   }
 
-  draw(ctx: CanvasRenderingContext2D, cam: Camera, shipX: number, shipY: number): void {
+  /**
+   * @param warp 0 for ordinary flight; 1 during the ceremony's full warp.
+   * @param warpT Seconds into the ceremony, for the pulse.
+   *
+   * WHY THE WAKE PULSES AND THE STARS DO NOT. The starfield sells the SPEED — a
+   * whole sky moving at once — and it does that by being uniform; a flickering
+   * background would read as a rendering fault rather than as motion. The wake is
+   * the one thing on screen attached to the ship, so it is where an engine can be
+   * heard without anything else having to shake. It is also the only element the
+   * player has been watching all run: making it behave differently is a statement
+   * about the ship, not about the scene.
+   *
+   * The pulse travels ALONG the wake rather than flashing it whole. A wake that
+   * brightens uniformly is a lamp being turned up; one with a wave running down it
+   * is something being expelled, which is what a drive does.
+   */
+  draw(
+    ctx: CanvasRenderingContext2D,
+    cam: Camera,
+    shipX: number,
+    shipY: number,
+    warp = 0,
+    warpT = 0,
+  ): void {
     const n = this.pts.length;
     const { trailSpeedCalm: calm, trailSpeedHot: hot, trailHeadGap: gap } = this.cfg;
     const gap2 = gap * gap;
@@ -54,9 +77,26 @@ export class Trail {
       // a visibly hot streak that cools as the ship settles — the wake records
       // the run rather than just reporting the current instant.
       const heat = Math.max(0, Math.min(1, (p.speed - calm) / Math.max(1, hot - calm)));
-      const [r, g, b] = trailColor(heat);
-      const rad = (0.6 + (2.6 + 1.6 * heat) * f) * cam.scale;
-      const alpha = (0.08 + 0.5 * f) * (0.75 + 0.35 * heat);
+      let [r, g, b] = trailColor(heat);
+      let rad = (0.6 + (2.6 + 1.6 * heat) * f) * cam.scale;
+      let alpha = (0.08 + 0.5 * f) * (0.75 + 0.35 * heat);
+      if (warp > 0) {
+        // A wave running from the ship down the wake. `f` is 1 at the head, so
+        // subtracting it from the phase sends the crest backwards — away from the
+        // ship, the direction an exhaust actually travels.
+        const wave = 0.5 + 0.5 * Math.sin((warpT * 9 - f * 7) * Math.PI);
+        const pulse = warp * wave;
+        rad *= 1 + 1.5 * pulse;
+        alpha = Math.min(1, alpha * (1 + 2.2 * pulse));
+        // Toward the hot end of the wake's own ramp rather than to some new
+        // colour: the trail already means "how fast", and the ceremony is the
+        // fastest the ship ever goes. Borrowing a different hue here would be
+        // inventing a second meaning for the one cue that already had this one.
+        const hot = trailColor(1);
+        r = Math.round(r + (hot[0] - r) * pulse);
+        g = Math.round(g + (hot[1] - g) * pulse);
+        b = Math.round(b + (hot[2] - b) * pulse);
+      }
       ctx.beginPath();
       ctx.arc(toScreenX(cam, p.x), toScreenY(cam, p.y), rad, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;

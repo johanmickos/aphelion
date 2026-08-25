@@ -403,17 +403,35 @@ export interface SimConfig {
    * scale with how wrong the line is: a ship already centred should feel nothing
    * at all, and one at the wall should feel a lot.
    *
-   * MEASURED, and the measurement says the binding constraint is TIME rather than
-   * force. Swept across arrivals from 340px off-centre at 260-650px/s, the worst
-   * remaining offset at the line runs 71% of the half-field at stiffness 4, 44%
-   * at 14, 32% at 22 and 23% at 32 — a curve that flattens because a faster ship
-   * spends less of the funnel being pulled. Overshoot is zero at every one of
-   * them, which is the damping being derived rather than guessed.
+   * IT IS NOT WHAT CENTRES THE SHIP, and it was briefly asked to be. Set high
+   * enough to deliver a ship to the middle of the field it takes the line away
+   * from the player: "it's satisfying to cross the finish line roughly in the
+   * line they were going". Crossing on your own heading is the reward for having
+   * flown there. The centring belongs AFTER the line, where nothing is being
+   * flown any more — `CENTRE` in `src/render/ceremony.ts` does it, and the ship
+   * is frozen by then.
    *
-   * 32 is therefore chosen at the knee: it lands the worst case inside the middle
-   * quarter of the field, and buying the last 20% would need either a stiffness
-   * that snatches at a ship still being flown, or a deeper funnel than the
-   * runway is allowed to be.
+   * So what is left for this to do is narrow and worth stating: stop a ship
+   * drifting into a side wall in the last stretch, where a death would be
+   * maximally galling. A spring is the right shape for exactly that job — the
+   * force scales with displacement, so it is nearly nothing in the middle of the
+   * corridor and firm near the edges, which is the difference between a guide and
+   * a rail.
+   *
+   * 32 -> 13, measured against that narrower job. Drifting sideways into the last
+   * stretch at 430px/s from 250px off-centre: at 0 every such drift dies at the
+   * wall, so the guide is genuinely load-bearing and not decoration. 13 is the
+   * lowest stiffness that saves all of them, and it still delivers the ship to
+   * the line 105-148px off-centre — visibly the player's own line rather than the
+   * middle of the field. At 32 the same drifts arrive 30-42px out, which is a
+   * rail.
+   *
+   * A ship 300px out and still accelerating outward at 380px/s dies at every
+   * stiffness up to 20, and that is correct: it is aimed at the wall rather than
+   * drifting toward it, and a guide that rescued it would be flying the ship.
+   *
+   * Overshoot is zero across the whole range, because the damping is derived
+   * rather than guessed.
    */
   finishFunnelPull: number;
   /**
@@ -755,7 +773,26 @@ export interface SimConfig {
    * term decide, which is what it was written to do.
    */
   crashConeSeverityFloor: number;
-  /** Seconds to hold on a crash before respawning. */
+  /**
+   * Seconds to hold on a crash before respawning.
+   *
+   * 0.7 in the prototype, 0.45 in the game. The hold is there so the player sees
+   * WHAT happened — the boxed notice, the point of impact — and 0.7s was long
+   * enough to also feel like being made to wait for it. Failure staying cheap is
+   * the thing `src/app/lifecycle.ts` argues hardest for, and a hold is the one
+   * place that cost is paid on every single death.
+   *
+   * IT IS A DEFAULT-ONLY OVERRIDE, and this key is a good example of why that
+   * discipline exists. `crashPause` had no entry in `DEFAULT_CONFIG` at all —
+   * the game simply inherited the prototype's value — so editing "the" value
+   * edited the prototype's, and `port-equality` failed immediately with a phase
+   * mismatch at tick 121. The gate caught it in one run. An override is the only
+   * safe way to move a shared value.
+   *
+   * It bounds nothing else: a worthy death's sheet freezes this rather than
+   * racing it, so shortening the hold does not shorten the time a report is on
+   * screen.
+   */
   crashPause: number;
   /** Only near-parallel grazes survive; anything steeper kills. */
   crashGrazeDot: number;
@@ -961,8 +998,9 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   anomalyCount: 3,
   backtrackLimit: 700,
   clearAtTop: true,
+  crashPause: 0.45,
   finishFunnelDepth: 560,
-  finishFunnelPull: 32,
+  finishFunnelPull: 13,
   finishFunnelBoost: 800,
   finishFunnelHold: 90,
   holdClimbInCapture: true,

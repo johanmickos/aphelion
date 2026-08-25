@@ -594,11 +594,11 @@ describe('what the camera watches', () => {
   it('holds the wall through the death and the hold after it', () => {
     // The reported shape, flown rather than asserted about: a ship leaves the
     // corridor, the run ends four pixels past the line, and `crashPause` then
-    // holds the wreck out there for 0.7s — 42 frames during which the camera is
-    // still being driven and the ship is still outside. That hold is most of what
-    // the player actually sees of the mistake, and the view spent it drifting into
-    // the void. Replayed from the session that reported it: 82px past the dashed
-    // line on the left wall and 82 on the right.
+    // holds the wreck out there — frames during which the camera is still being
+    // driven and the ship is still outside. That hold is most of what the player
+    // actually sees of the mistake, and the view spent it drifting into the void.
+    // Replayed from the session that reported it: 82px past the dashed line on the
+    // left wall and 82 on the right.
     //
     // Driven through `stepSim` because the ending is the part that matters and no
     // hand-placed ship reproduces it: `endRun` freezes the position, so the ship
@@ -634,7 +634,14 @@ describe('what the camera watches', () => {
       }
       // The run really did end at the wall and really was held there, or this is
       // asserting about a ship that never left.
-      expect(ended, `dir ${dir} never ended at the wall`).toBeGreaterThan(30);
+      //
+      // Derived from `crashPause` rather than counted once and written down. The
+      // literal 30 here was a stand-in for 0.7s of hold, and it failed the moment
+      // that became 0.45 — reporting a camera fault for a change that had nothing
+      // to do with the camera. What this case is about is that the view stays on
+      // the wall for the WHOLE hold, however long the hold is.
+      const holdFrames = Math.floor(cfg.crashPause / FIXED_DT);
+      expect(ended, `dir ${dir} never ended at the wall`).toBeGreaterThanOrEqual(holdFrames);
       expect(worst, `dir ${dir} showed dead space past the wall`).toBeLessThan(1e-9);
     }
   });

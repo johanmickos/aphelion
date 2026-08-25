@@ -90,6 +90,17 @@ export class Scene {
   private entrySpeed = 0;
 
   /**
+   * How far the results sheet had faded in on the last frame drawn.
+   *
+   * Published so the app can refuse a dismissing tap until there is something to
+   * dismiss. It could recompute the ceremony to find out, but that means a second
+   * copy of where the finish line is and how the fade is paced — two derivations
+   * of one number, free to drift. The renderer already knows; it just had no way
+   * to say so.
+   */
+  sheetAlpha = 0;
+
+  /**
    * The charged storm's closing animation. See `drawNebula`.
    *
    * Seconds since the window ended, or -1 when nothing is playing. Render state
@@ -292,7 +303,7 @@ export class Scene {
         shifted = true;
       }
     }
-    this.trail.draw(ctx, cam, snap.x, snap.y);
+    this.trail.draw(ctx, cam, snap.x, snap.y, cer ? cer.warp : 0, cer ? cer.t : 0);
     drawAlignGlow(ctx, cam, snap, compass.bestAlign, opts.timeMs);
     // Nose up through the ceremony. See `drawShip`'s `heading`.
     drawShip(
@@ -355,6 +366,7 @@ export class Scene {
     // — the live one was cleared by `endLife` on the tick the run ended, which is
     // the trap `ScoreState.lastRun` exists to close.
     const sheetAlpha = cer ? cer.sheet : (opts.deathSheet ?? 0);
+    this.sheetAlpha = sheetAlpha;
     if (sheetAlpha > 0 && opts.score.lastRun) {
       drawSheet(
         ctx,

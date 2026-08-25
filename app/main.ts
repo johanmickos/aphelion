@@ -210,7 +210,7 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (sheet) {
-    dismissSheet();
+    if (sheetReadable()) dismissSheet();
     return;
   }
   held = true;
@@ -382,6 +382,18 @@ function deathSheetAlpha(): number | null {
 }
 
 /**
+ * Has the sheet finished arriving?
+ *
+ * The tap that dismisses it is the same gesture as the tap that flies, and a
+ * player whose run just ended is usually mid-press. Without this the results are
+ * gone before they have finished fading in — dismissed by an input aimed at
+ * something else entirely.
+ */
+function sheetReadable(): boolean {
+  return sheet !== null && scene.sheetAlpha > 0.6;
+}
+
+/**
  * Put the sheet away and get back to flying.
  *
  * A CLEAR ENDS THE SESSION, because a session IS a field: `respawn` keeps the
@@ -414,6 +426,23 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       // its ceremony is animated from `ending.t` and the simulation is the thing
       // advancing that.
       if (sheet.kind === 'death') return;
+    }
+    // ---- the controls go dead between a run ending and the next one starting
+    //
+    // Not because the simulation would misbehave — its ending branch ignores
+    // input, and `respawn` sets `holdConsumed` so a button still down cannot grab
+    // on the first tick back. It is because a player who is mashing during a
+    // death should not have those presses SILENTLY EATEN and then have one of
+    // them turn out to matter. Dropping the edges here makes the dead period a
+    // stated rule with one owner, rather than an emergent property of two guards
+    // in different files that both happen to hold today.
+    //
+    // Recorded as dropped, too. The log has to be what the simulation was fed or
+    // a replay stops reproducing the run.
+    if (state.ending.active) {
+      held = false;
+      pressedEdge = false;
+      releasedEdge = false;
     }
     const input: Input = { held, pressed: pressedEdge, released: releasedEdge };
     recorder.recordInput(state.tick, pressedEdge, releasedEdge);
