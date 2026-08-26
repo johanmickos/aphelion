@@ -133,7 +133,20 @@ export class Scene {
       ctx.save();
       ctx.translate(to.x - sx, to.y - sy);
     }
-    this.trail.draw(ctx, cam, snap.x, snap.y, cer ? cer.warp : 0, cer ? cer.t : 0);
+    // ---- one wake at a time
+    //
+    // The signature IS this wake, drawn whole and fitted, so both at once is the
+    // same object at two scales — reported from a phone as "a thin white line
+    // overlaid with the existing shiny trail". They cross-fade on one number, so
+    // the wake appears to unfurl from the last half second into the entire run-in
+    // rather than either being cut.
+    const sigFade = cer ? cer.sheet : 0;
+    if (sigFade < 0.995) {
+      ctx.save();
+      ctx.globalAlpha = 1 - sigFade;
+      this.trail.draw(ctx, cam, snap.x, snap.y, cer ? cer.warp : 0, cer ? cer.t : 0);
+      ctx.restore();
+    }
     drawAlignGlow(ctx, cam, snap, bestAlign, opts.timeMs);
     // Nose up through the ceremony. See `drawShip`'s `heading`.
     drawShip(
@@ -155,7 +168,17 @@ export class Scene {
     // world falling away behind it — and after both, because it is the last thing
     // the eye should be able to follow down from the ship.
     if (cer && to) {
-      drawSignature(ctx, cam, cer, snap.signature, snap.motes, to.x, to.y, cer.sheet);
+      drawSignature(
+        ctx,
+        cam,
+        this.deps.render,
+        cer,
+        snap.signature,
+        snap.motes,
+        to.x,
+        to.y,
+        sigFade,
+      );
     }
   }
 

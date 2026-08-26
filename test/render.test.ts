@@ -3927,7 +3927,7 @@ describe('the carpet signature', () => {
     // Where the ceremony parks the ship: centred, low.
     const shipX = c.offsetX + c.designW * 0.5 * c.scale;
     const shipY = c.offsetY + c.viewH * 0.72 * c.scale;
-    drawSignature(r.ctx, c, cer(t, sheet), state.signature, state.motes, shipX, shipY, sheet);
+    drawSignature(r.ctx, c, rcfg, cer(t, sheet), state.signature, state.motes, shipX, shipY, sheet);
     const pts = [...r.calls('moveTo'), ...r.calls('lineTo'), ...r.calls('arc')].map(
       (o) => [o[1] as number, o[2] as number] as const,
     );
@@ -3936,6 +3936,44 @@ describe('the carpet signature', () => {
 
   it('draws nothing until the sheet is there to draw it beside', () => {
     expect(drawn(0).r.ops).toEqual([]);
+  });
+
+  it('is the wake, drawn in the wake’s own colours', () => {
+    // THE DEFECT THIS PINS, reported off a phone: a stroked line in a colour of
+    // its own put TWO wakes on the ceremony at two different scales — the live
+    // `Trail` streaking at world size around the frozen ship, and a thin line at a
+    // fifteenth of that underneath it. The fix was to notice they are one object.
+    //
+    // Asserted as the colours actually painted: every one has to be a point on
+    // `trailColor`'s ramp, because that ramp is what "this is a wake" means here.
+    const { r } = drawn(1);
+    const paints = r.ops
+      .filter((o) => o[0] === '=fillStyle' || o[0] === '=strokeStyle')
+      .map((o) => String(o[1]))
+      .filter((c) => !c.startsWith('rgba(92,226,140')); // the dots are the carpet's
+    expect(paints.length).toBeGreaterThan(20);
+    for (const c of paints) {
+      const m = /^rgba\((\d+),(\d+),(\d+),/.exec(c);
+      expect(m, c).not.toBeNull();
+      const [rr, gg, bb] = [Number(m![1]), Number(m![2]), Number(m![3])];
+      // On the ramp: indigo at rest through violet to a hot cyan-white. Every
+      // channel of every stop lies inside these bounds, and nothing off the ramp
+      // does — a pearl white (220,234,255) fails the red bound, which is exactly
+      // the paint this test was written to keep out.
+      expect(rr, c).toBeLessThanOrEqual(200);
+      expect(gg, c).toBeGreaterThanOrEqual(80);
+      expect(bb, c).toBeGreaterThanOrEqual(140);
+    }
+  });
+
+  it('clears the control row at the bottom of the window', () => {
+    // The buttons are DOM over the canvas and the drawing ran straight through
+    // them on the phone: a budget measured as a fraction of the height gets this
+    // right on the design window (844 tall) and wrong on a 393x651 handset, where
+    // `viewH` works out at 646.
+    const { pts, c } = drawn(1);
+    const floor = c.offsetY + c.viewH * c.scale;
+    for (const [, y] of pts) expect(floor - y).toBeGreaterThan(40 * c.scale);
   });
 
   it('stays inside the design window, on both axes', () => {
@@ -3973,12 +4011,12 @@ describe('the carpet signature', () => {
     const r = recordingContext();
     const straight = {
       pts: [
-        { x: 0, y: 0 },
-        { x: 0, y: -8 },
+        { x: 0, y: 0, speed: 300 },
+        { x: 0, y: -8, speed: 300 },
       ],
       spacing: 8,
     };
-    drawSignature(r.ctx, c, cer(1, 1), straight, [], 100, 400, 1);
+    drawSignature(r.ctx, c, rcfg, cer(1, 1), straight, [], 100, 400, 1);
     expect(r.ops).toEqual([]);
   });
 });

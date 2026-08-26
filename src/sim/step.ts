@@ -351,7 +351,8 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   const band = runInBand(cfg, fb);
   collectMotes(state, cfg, pos.x, pos.y);
   if (cfg.carpetCarve > 0 && band !== null && pos.y >= band.top && pos.y <= band.bottom) {
-    recordSignature(state, pos.x, pos.y);
+    const vel = shipVelocity(state);
+    recordSignature(state, pos.x, pos.y, hypot(vel.vx, vel.vy));
   }
 
   // Falling too far behind the high-water mark ends the run. The floor trails the
@@ -953,7 +954,7 @@ function collectMotes(state: SimState, cfg: SimConfig, x: number, y: number): vo
  * BY DISTANCE, NOT BY TICK, and the buffer HALVES rather than truncating when it
  * fills. `Signature` records why both of those are the way round they are.
  */
-function recordSignature(state: SimState, x: number, y: number): void {
+function recordSignature(state: SimState, x: number, y: number, speed: number): void {
   const sig = state.signature;
   const last = sig.pts[sig.pts.length - 1];
   if (last) {
@@ -961,7 +962,7 @@ function recordSignature(state: SimState, x: number, y: number): void {
     const dy = y - last.y;
     if (dx * dx + dy * dy < sig.spacing * sig.spacing) return;
   }
-  sig.pts.push({ x, y });
+  sig.pts.push({ x, y, speed });
   if (sig.pts.length <= SIGNATURE_MAX) return;
 
   // Thinned from the NEWEST end, so the point just pushed is always one of the

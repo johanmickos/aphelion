@@ -3871,6 +3871,47 @@ note above claims the felt quantity is movement DURING the press, and this is th
 evidence for it. Two builds with nearly the same peak excursion, one called dead
 and one called too strong, differing in rate.
 
+**The signature was drawn beside the wake instead of AS it.** Reported off a phone
+with the screen grab: "a thin white line overlaid with the existing shiny trail. I
+was picturing that the signature would be rendered as the trail." Exactly right,
+and the picture makes the mistake obvious once seen — there were two wakes on the
+ceremony at two different scales. The live `Trail` streaks at full world size
+around the frozen ship; the signature was a stroked pearl polyline at a fifteenth
+of that, fitted, underneath it.
+
+The fix is not to hide one. They are the same object: the signature IS the ship's
+wake, the whole of it rather than the last sixteen points. So it takes the wake's
+vocabulary — `trailColor` mapping speed to hue, radius and brightness climbing
+toward the head, a pulse travelling down it at the same rate `Trail.draw` uses —
+and `SignaturePoint` grew a `speed` for it. Derived alternatives do not exist: the
+points are sampled by DISTANCE, so their spacing says nothing about speed, and
+nothing records a tick to difference against.
+
+The live trail then cross-fades out on the same number that fades the signature in,
+so there is exactly one wake at every moment and it appears to unfurl from the last
+half second into the entire run-in.
+
+Two deliberate departures from the trail, both forced by this being 380 points
+rather than 16. The alpha taper is gentler: the trail runs 0.08 to 0.58 across half
+a second, where the fade means "a moment old", and across a whole run-in that curve
+puts the first two thirds under a fifth of full — fading out precisely the early
+carving, which is the part that was hardest to fly. And the streaks follow the
+CURVE where the trail's go straight down; the trail's own comment says its sparks
+belong to the motion of the streaming field, and nothing streams in a portrait held
+still.
+
+`PEARL` and `PEARL_SHEEN` went with it. A colour earns a name in `palette.ts` by
+carrying a meaning and recurring, and as the wake this inherits a ramp that already
+means something — how fast you were going.
+
+**And the drawing had been running through the buttons.** The height budget was a
+fraction of the view, which is right on the design window and wrong on a handset:
+844 tall in design units, but `viewH` on the 393x651 phone works out at 646, and
+the DOM control row sits a fixed ~45 CSS px off the bottom whatever the viewport.
+It is a clearance in design units now. The width freed up in exchange — the
+vertical is compressed nearly sevenfold and the horizontal was using a third of
+what it had — went into the gain, 2 to 3.
+
 **A fixed press rhythm turned out to be a phase, not a cadence.** Three fixtures
 were written as recorded edges, and because the carve alternates on every press,
 the same 8-on/12-off rhythm collects one dot from tick 0 and five from tick 16.

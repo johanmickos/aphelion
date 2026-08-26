@@ -193,36 +193,3 @@ export const DEBRIEF: RGB = [124, 146, 212];
  */
 export const SUMMIT = LADDER_EXCEPTIONAL;
 export const SUMMIT_RGB: RGB = [255, 214, 51];
-
-// ------------------------------------------------------------------ signature
-
-/**
- * The carpet signature: the line the player drew through the run-in, shown once
- * the field is cleared. See `src/render/signature.ts`.
- *
- * OFF THE RARITY LADDER, with the finish green and the burn's red, and it is the
- * clearest case of the three. Colour means how good an AWARD was; a signature is
- * not graded at all — there is no better or worse line through the carpet, only a
- * different one. It is a unique artifact, so what it wants is a treatment nothing
- * else in the game has rather than a rung nothing else has reached.
- *
- * A COOL WHITE, NOT A HUE. Every colour in this file that means something is
- * saturated, so the one thing that means nothing on that axis is the one thing
- * that has no chroma to speak of: the eye reads it as light rather than as a
- * category, and it cannot be confused with the gold sky it is drawn against.
- */
-export const PEARL: RGB = [220, 234, 255];
-
-/**
- * The three tints the sheen travels through, mother-of-pearl fashion.
- *
- * Named as a set rather than left as literals in the drawing, for the reason the
- * flame ramp is: it is one idea — "what iridescence looks like here" — and a
- * retune should be one edit. All three are near-white on purpose; the effect is a
- * shift in temperature as the highlight moves, not a rainbow.
- */
-export const PEARL_SHEEN: readonly RGB[] = [
-  [255, 244, 214],
-  [214, 250, 255],
-  [238, 220, 255],
-];

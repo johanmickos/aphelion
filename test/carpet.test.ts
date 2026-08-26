@@ -438,8 +438,9 @@ describe('the signature', () => {
     // point just written, which is the end anchored to the ship.
     const state = inCarpet(cfg, 4);
     const sig = state.signature;
-    const first = { x: 100, y: 0 };
-    for (let i = 0; i < SIGNATURE_MAX; i++) sig.pts.push(i === 0 ? first : { x: 100 + i, y: 0 });
+    const first = { x: 100, y: 0, speed: 300 };
+    for (let i = 0; i < SIGNATURE_MAX; i++)
+      sig.pts.push(i === 0 ? first : { x: 100 + i, y: 0, speed: 300 });
 
     // One more sample, written through the real path, tips it over. Teleporting
     // the ship is what guarantees the spacing test passes and a point is actually

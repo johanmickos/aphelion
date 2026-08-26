@@ -123,9 +123,23 @@ export interface Mote {
  * point instead and doubling the spacing keeps the whole shape at half the
  * resolution, which is a thing nobody can see.
  */
+export interface SignaturePoint extends Vec {
+  /**
+   * How fast the ship was going here, px/s.
+   *
+   * Carried so the line can be drawn the way the WAKE is — `trailColor` maps speed
+   * to a hue, and without this the signature has to be a flat stroke in a colour
+   * of its own, which is what put two different-looking wakes on the ceremony at
+   * two different scales. Derived quantities were the alternative and do not work:
+   * the points are sampled by DISTANCE, so their spacing says nothing about speed,
+   * and nothing here records a tick to difference against.
+   */
+  speed: number;
+}
+
 export interface Signature {
   /** Path points in world coordinates, oldest first. */
-  pts: Vec[];
+  pts: SignaturePoint[];
   /** Current sample spacing, px. Doubles each time the buffer is decimated. */
   spacing: number;
 }
