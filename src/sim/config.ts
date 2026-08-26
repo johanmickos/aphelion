@@ -376,7 +376,22 @@ export interface SimConfig {
    */
   clearAtTop: boolean;
   /**
-   * How far below the finish line the run-in funnel reaches. 0 disables it.
+   * How far above the last planet the finish line sits, and therefore how deep the
+   * carpet is. 0 disables the funnel.
+   *
+   * ONE KEY OWNS THE WHOLE GEOMETRY, and it did not used to. The line was
+   * `crest - grabRange` and the band was `line + finishFunnelDepth`, which agreed
+   * only because both numbers were 560 — so the first attempt to make the carpet
+   * deeper pushed its BOTTOM down past the crest, into the approach to the last
+   * planet, where a press is a slingshot and must not become a carve. See
+   * `finishLineY`, which now derives the line from this and keeps `grabRange` as a
+   * floor under it.
+   *
+   * 560 -> 840, on a playtest of the deployed build: "extend the carpet a touch".
+   * At 560 the run-in lasts 1.5s at an ordinary crossing and 0.87s at a fast one,
+   * which is room for two carves and no more — and it was shortest exactly when
+   * the run had gone best. 840 makes those 2.3s and 1.3s. The ceiling moves up with
+   * it; `CEILING_GAP` in `world.ts` records why it has to.
    *
    * Inside this band a drifting ship is steered toward the middle of the field
    * and accelerated upward, so it arrives at the line centred and fast. That is
@@ -391,8 +406,9 @@ export interface SimConfig {
    * an ORBIT: `driftAccel` is called from `stepDrift` only, so a captured ship
    * feels nothing.
    *
-   * `src/render/` reads this same key to size the chevron runway, so the picture
-   * cannot promise a pull the physics does not apply.
+   * `src/render/` sizes the chevron runway off the same BAND — not off this key
+   * directly, since `grabRange` can floor it — so the picture cannot promise a
+   * pull the physics does not apply.
    */
   finishFunnelDepth: number;
   /**
@@ -480,6 +496,19 @@ export interface SimConfig {
    * slight boost — enough to feel picked up and carried, not enough to change how
    * fast the line arrives. The kick is `finishFunnelBoost`, and it is now shaped
    * to stay out of the way until the very end.
+   *
+   * 90 -> 45 WHEN THE CARPET GOT DEEPER, and this is the term that had to move
+   * rather than the kick. It is a rate applied for the whole crossing, so its
+   * total is the one thing in the funnel that grows with how long the crossing
+   * takes: at `finishFunnelDepth` 840 and 90, a 300px/s arrival crossed at 726
+   * against the 607 the boost sweep had chosen by ear. Halved, it crosses at ~700 —
+   * a 15% gain after a 55% longer runway, which is the runway doing something
+   * without becoming the launch ramp the note above says it must not be.
+   *
+   * The kick is deliberately untouched. It is normalised over the band by
+   * construction, it is the part that was swept against "a thing you see rather
+   * than a thing you passed", and it fires at the exact moment the player is
+   * watching hardest.
    */
   finishFunnelHold: number;
   /**
@@ -530,10 +559,17 @@ export interface SimConfig {
    * shapes close on themselves rather than run away, and it costs nothing in
    * safety because `finishBumper` already means nothing can die in here.
    *
-   * 1100: held for 0.4s that is 440px/s of sideways speed and about 90px of
-   * travel, against a corridor 741px wide. Big enough that one tap is visibly a
-   * swerve, small enough that a full hold from the crest reaches a wall rather
-   * than crossing the corridor twice.
+   * 1100 -> 2200, reported off the deployed build as simply not noticeable, and the
+   * measurement says why: what the player feels is the movement DURING the press,
+   * not the excursion the lateral speed goes on to produce after it. At 1100 a
+   * 0.33s press moved the ship 50px sideways while it was held — 7% of a 741px
+   * corridor, four ship-widths, indistinguishable from a lean. At 2200 the same
+   * press moves 121px while held and peaks at 259 before the funnel's spring nulls
+   * it, which is a third of the corridor and unmistakably a swerve.
+   *
+   * Not higher: at 2800 an ordinary tap peaks at 333 against a half-width of 370,
+   * so every press ends at a bumper. A long hold SHOULD reach the wall — that is
+   * what the bumpers are for — but it should be a thing you chose.
    */
   carpetCarve: number;
   /**
@@ -1087,12 +1123,12 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   backtrackLimit: 700,
   clearAtTop: true,
   crashPause: 0.45,
-  finishFunnelDepth: 560,
+  finishFunnelDepth: 840,
   finishFunnelPull: 13,
   finishFunnelBoost: 800,
-  finishFunnelHold: 90,
+  finishFunnelHold: 45,
   finishBumper: 0.72,
-  carpetCarve: 1100,
+  carpetCarve: 2200,
   carpetLift: 9,
   carpetRise: 60,
   carpetMoteCount: 7,

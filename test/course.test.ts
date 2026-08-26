@@ -13,7 +13,7 @@ import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import { COURSES, courseOf, withCourse } from '../src/sim/course.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { NO_INPUT } from '../src/sim/types.ts';
-import { fieldBounds } from '../src/sim/world.ts';
+import { fieldBounds, finishLineY } from '../src/sim/world.ts';
 
 describe('the course picker', () => {
   it('round-trips: a config built for a course reports that course', () => {
@@ -63,9 +63,11 @@ describe('a short course is a whole game, not a truncated one', () => {
     const state = createInitialState(short);
     const fb = fieldBounds(short, state.bodies);
     expect(fb.crest).toBeLessThan(state.ship.y);
-    // And the ceiling still sits its fixed margin beyond it, so the geometry the
-    // clear depends on is the same geometry, just closer.
-    expect(fb.crest - fb.top).toBe(800);
+    // And the ceiling still sits beyond the finish line, so the geometry the clear
+    // depends on is the same geometry, just closer. Stated as the relationship
+    // rather than as 800: the ceiling moves up with the carpet, and
+    // `test/cleared.test.ts` owns why.
+    expect(fb.top).toBeLessThan(finishLineY(short, fb)!);
   });
 
   it('can be cleared, which is the entire point of it existing', () => {

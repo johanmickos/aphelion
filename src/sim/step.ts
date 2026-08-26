@@ -150,8 +150,12 @@ function driftAccel(
   const fb = fieldBounds(cfg, state.bodies);
   const band = runInBand(cfg, fb);
   if (band === null) return { ax: 0, ay: 0 };
+  // The band's OWN depth, not the config key. They are the same number wherever
+  // `finishFunnelDepth` is the larger of it and `grabRange`, and `finishLineY`
+  // records why that is not something to rely on.
+  const depth = band.bottom - band.top;
   const below = y - band.top;
-  if (below < 0 || below > cfg.finishFunnelDepth) return { ax: 0, ay: 0 };
+  if (below < 0 || below > depth) return { ax: 0, ay: 0 };
 
   // ---- the carpet lifts, whatever else is happening
   //
@@ -171,7 +175,7 @@ function driftAccel(
   // 0 at the crest, 1 at the line. Smoothed so the pull arrives rather than
   // switching on — a step change in acceleration is a shove, and the player is
   // still flying at this point.
-  const t = smootherstep(1 - below / cfg.finishFunnelDepth);
+  const t = smootherstep(1 - below / depth);
   const cx = (fb.left + fb.right) / 2;
   const k = cfg.finishFunnelPull;
   const damping = 2 * Math.sqrt(k);

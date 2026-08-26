@@ -3888,14 +3888,15 @@ describe('the carpet signature', () => {
     state.ship.vy = -320;
     state.highWaterY = state.ship.y;
     state.holdConsumed = false;
-    const edges = new Map<number, 0 | 1>([
-      [3, 1],
-      [17, 0],
-      [29, 1],
-      [43, 0],
-      [55, 1],
-      [69, 0],
-    ]);
+    // 8 ticks down, 12 up, from tick 16. The phase matters as much as the cadence
+    // — the carve alternates on every press — and this one is the well-phased case
+    // that threads the chain: 5 dots of 7, so the drawing has both treatments in
+    // it. `test/carpet.test.ts` owns why a rhythm is a phase.
+    const edges = new Map<number, 0 | 1>();
+    for (let t = 16; t < 200; t += 20) {
+      edges.set(t, 1);
+      edges.set(t + 8, 0);
+    }
     let held = false;
     for (let t = 0; t < 300 && !state.ending.active; t++) {
       const e = edges.get(t);

@@ -20,7 +20,7 @@ const HOLD: Input = { held: true, pressed: false, released: false };
 // A real letting-go. `NO_INPUT` is not one: release fires on the `released` EDGE,
 // so merely stopping holding leaves the ship attached and orbiting.
 const RELEASE: Input = { held: false, pressed: false, released: true };
-import { fieldBounds } from '../src/sim/world.ts';
+import { fieldBounds, finishLineY, runInBand } from '../src/sim/world.ts';
 import { createScoreState, scoreTick } from '../src/score/score.ts';
 import type { ScoreAward } from '../src/score/types.ts';
 
@@ -40,9 +40,17 @@ function aboutToClear(cfg: SimConfig, below = 200): SimState {
   return state;
 }
 
-/** The finish line in this state's field. */
+/**
+ * The finish line in this state's field.
+ *
+ * ASKED, NOT RE-DERIVED. This used to spell `crest - grabRange` by hand, which was
+ * true only while the carpet happened to be exactly `grabRange` deep — the very
+ * habit `finishLineY`'s own header exists to stop, reproduced inside the test file
+ * that guards it. Deepening the carpet moved the line and this went on pointing at
+ * where it used to be.
+ */
 function finishOf(state: SimState): number {
-  return fieldBounds(DEFAULT_CONFIG, state.bodies).crest - DEFAULT_CONFIG.grabRange;
+  return finishLineY(DEFAULT_CONFIG, fieldBounds(DEFAULT_CONFIG, state.bodies))!;
 }
 
 /**
@@ -153,8 +161,8 @@ describe('clearing the field', () => {
     // manoeuvre off was held to be the same defect as cutting off the approach.
     // Above the line it is not, because there is provably nothing left to grab
     // there, so the manoeuvre cannot lead anywhere new. The fixture is the same
-    // flight — the one that genuinely carries ~800px above the last body while
-    // still attached, against a line at 560.
+    // flight — the one that genuinely carries a long way above the last body while
+    // still attached, launched hard enough to clear whatever the line is set to.
     const state = createInitialState(cfg);
     const fb = fieldBounds(cfg, state.bodies);
     let top = state.bodies[0]!;
@@ -167,7 +175,7 @@ describe('clearing the field', () => {
     state.ship.burstY = 0;
     state.highWaterY = state.ship.y;
 
-    const clearY = fb.crest - cfg.grabRange;
+    const clearY = finishLineY(cfg, fb)!;
     let grabbed = false;
     // The tick the ship first stood past the line, the tick the hold ended, and
     // whether it was still attached going into that tick. The gaps between them
@@ -264,7 +272,9 @@ describe('nothing dies at a wall in the run-in', () => {
     const fb = fieldBounds(cfg, state.bodies);
     const cx = (fb.left + fb.right) / 2;
     state.ship.x = cx + dx;
-    state.ship.y = fb.crest - cfg.grabRange + cfg.finishFunnelDepth - 2;
+    // Just inside the bottom of the run-in, asked of the band rather than rebuilt
+    // from the line and a depth — see `finishOf`.
+    state.ship.y = runInBand(cfg, fb)!.bottom - 2;
     state.ship.vx = vx;
     state.ship.vy = vy;
     state.ship.burstX = 0;
@@ -352,12 +362,25 @@ describe('the crest is named rather than re-derived', () => {
     expect(fb.crest).toBe(highest);
   });
 
-  it('keeps the ceiling a fixed margin above it', () => {
+  it('keeps the ceiling clear of the finish line, however deep the carpet is', () => {
     // Before `crest` existed, the clear line had to be recovered by adding 800
     // back onto `top` — the same magic number written in two places, free to
-    // disagree. This is the relationship, asserted once.
+    // disagree. The relationship is now stated the other way round and it has to
+    // be: at a 560-deep carpet the ceiling was 800 above the crest and the line
+    // 560, and deepening the carpet to 840 put the FINISH LINE 40px above the
+    // ceiling. Not a death — the top bound is switched off under `clearAtTop` —
+    // but a world where the run ends past the edge of itself.
     const state = createInitialState(DEFAULT_CONFIG);
     const fb = fieldBounds(DEFAULT_CONFIG, state.bodies);
-    expect(fb.crest - fb.top).toBe(800);
+    const finish = finishLineY(DEFAULT_CONFIG, fb)!;
+    expect(fb.top).toBeLessThan(finish);
+    expect(fb.crest - fb.top).toBeGreaterThanOrEqual(800);
+
+    // And where the carpet is shallow enough not to push it, the ceiling is still
+    // exactly the 800 the prototype froze.
+    const shallow: SimConfig = { ...DEFAULT_CONFIG, finishFunnelDepth: 400 };
+    expect(fieldBounds(shallow, state.bodies).crest - fieldBounds(shallow, state.bodies).top).toBe(
+      800,
+    );
   });
 });

@@ -229,6 +229,22 @@ const CARPET_SHIP: Ship = (() => {
 })();
 
 /**
+ * The presses that carve that crossing: 8 ticks down, 12 up, from tick 16.
+ *
+ * THE PHASE IS PART OF THE FIXTURE, not just the cadence, because the carve
+ * alternates on every press — the same 8/12 rhythm started at tick 0 collects one
+ * dot and started at 16 collects five. A fixture at one dot is one retune from
+ * zero, and a battery session that collects none makes `moteBonus` measure as dead
+ * when it is merely unreached. `the carpet session actually reaches its dots`
+ * below is the guard that says which of the two happened.
+ */
+const CARPET_EDGES: Edges = (() => {
+  const out: Edges = [];
+  for (let t = 16; t < 200; t += 20) out.push([t, 1], [t + 8, 0]);
+  return out;
+})();
+
+/**
  * The sessions every weight is measured against.
  *
  * One is not enough, for the same reason `test/tune.test.ts` needs several: a
@@ -379,14 +395,7 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
   {
     name: 'carving the run-in carpet',
     ship: CARPET_SHIP,
-    edges: [
-      [3, 1],
-      [17, 0],
-      [29, 1],
-      [43, 0],
-      [55, 1],
-      [69, 0],
-    ],
+    edges: CARPET_EDGES,
     ticks: 200,
   },
   {
@@ -503,6 +512,18 @@ describe('a score is a pure function of (config, seed, inputLog)', () => {
 });
 
 describe('scoring weights', () => {
+  it('the carpet session actually reaches its dots', () => {
+    // A FIXTURE GUARD, and it earns its place: `moteBonus` can only move an
+    // outcome if some session collects a dot, so a battery that stopped reaching
+    // them would report the weight as dead. AGENTS.md names that failure mode —
+    // `fuelRegen` was pinned as inert twice on scenarios that never reached the
+    // mechanism — and this is the assertion that tells the two apart.
+    const s = SESSIONS.find((x) => x.name === 'carving the run-in carpet')!;
+    const r = play(s.edges, s.ticks, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, s.ship);
+    expect(r.state.motes.filter((m) => m.taken).length).toBeGreaterThanOrEqual(3);
+    expect(r.awards.filter((a) => a.kind === 'mote').length).toBeGreaterThanOrEqual(3);
+  });
+
   it('exposes no weight that leaves every score unchanged', () => {
     // The twin of the tune-panel guarantee. These cannot go in the tune panel —
     // `test/tune.test.ts` measures a knob by how far it moves the ship, and a

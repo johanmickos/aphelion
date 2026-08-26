@@ -297,8 +297,47 @@ export interface FieldBounds {
  * a chosen margin.
  */
 export function finishLineY(cfg: SimConfig, fb: FieldBounds): number | null {
-  return cfg.clearAtTop ? fb.crest - cfg.grabRange : null;
+  return finishAboveCrest(cfg, fb.crest);
 }
+
+/**
+ * The same line, from the crest alone.
+ *
+ * Split out because `fieldBounds` needs it BEFORE it has a `FieldBounds` to hand
+ * — the ceiling has to be kept clear of the finish, and it cannot ask a function
+ * that takes the thing it is still building. Two copies of the `max` below would
+ * be exactly the two-definitions bug this file's other helpers exist to prevent.
+ */
+function finishAboveCrest(cfg: SimConfig, crest: number): number | null {
+  if (!cfg.clearAtTop) return null;
+  // `grabRange` is the FLOOR and `finishFunnelDepth` is the setting, and it took a
+  // playtest to see that those are two different jobs wearing one number.
+  //
+  // The floor is a correctness bound: below it the last body is still grabbable at
+  // the line, so the run would end while the player was reaching for it — the
+  // defect the note in `stepSim` calls "unplayable in the most annoying possible
+  // way". The setting is a FEEL choice: how much sky there is between the last
+  // planet and the finish, which is how long the carpet lasts and therefore how
+  // much of a signature there is room to draw.
+  //
+  // They were the same 560 by coincidence, and raising the carpet on its own would
+  // have pushed the band DOWN past the crest — putting the carve where the
+  // approach to the last planet is, so a press meant to slingshot would have bent
+  // the line instead. One expression, and the max is what keeps the bound.
+  return crest - Math.max(cfg.grabRange, cfg.finishFunnelDepth);
+}
+
+/**
+ * How far the ceiling stays above the finish line.
+ *
+ * 240px, which is what the gap has always been — `fb.top` sat 800 above the crest
+ * and the line 560 — and `stepSim` quotes the figure where it explains why the
+ * ceiling is unreachable once the field can be cleared. Naming it is what lets the
+ * carpet get deeper without the two crossing over: at 840 the old arithmetic put
+ * the finish line 40px ABOVE the ceiling, which is not a death (the top bound is
+ * switched off under `clearAtTop`) but is a world that no longer makes sense.
+ */
+const CEILING_GAP = 240;
 
 /**
  * The run-in: the band the funnel pulls through and the bumpers guard.
@@ -316,7 +355,13 @@ export function finishLineY(cfg: SimConfig, fb: FieldBounds): number | null {
 export function runInBand(cfg: SimConfig, fb: FieldBounds): { top: number; bottom: number } | null {
   const finishY = finishLineY(cfg, fb);
   if (finishY === null || cfg.finishFunnelDepth <= 0) return null;
-  return { top: finishY, bottom: finishY + cfg.finishFunnelDepth };
+  // THE CREST, NOT `finishY + finishFunnelDepth`. The band is the sky between the
+  // last planet and the line, which is a statement about where things ARE — so it
+  // is read off the two of them rather than reconstructed by adding a length to
+  // one. Adding the length was correct only while the depth and `grabRange`
+  // happened to be equal; the moment the carpet was made deeper it reached back
+  // down past the crest into the approach.
+  return { top: finishY, bottom: fb.crest };
 }
 
 /**
@@ -371,12 +416,19 @@ export function fieldBounds(cfg: SimConfig, bodies: readonly Body[]): FieldBound
   const cx = DESIGN_W * 0.5;
   let highest = 0;
   for (const b of bodies) if (b.y < highest) highest = b.y;
+  // 800 above the crest, or clear of the finish line, whichever is higher. The two
+  // agree exactly at a 560-deep carpet, which is where the 800 came from; a deeper
+  // one pushes the ceiling up with it rather than being allowed to pass it. Inert
+  // in PROTOTYPE_CONFIG, where there is no finish line at all — which is what keeps
+  // this out of the equality gate.
+  const finish = finishAboveCrest(cfg, highest);
+  const ceiling = highest - 800;
   return {
     left: cx - fw / 2,
     right: cx + fw / 2,
     width: fw,
     crest: highest,
-    top: highest - 800,
+    top: finish === null ? ceiling : Math.min(ceiling, finish - CEILING_GAP),
     bottom: SPAWN.y + DESIGN_H + 400,
   };
 }

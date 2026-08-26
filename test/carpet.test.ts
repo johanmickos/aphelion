@@ -46,6 +46,65 @@ function inCarpet(c: SimConfig, above: number, vy = -320, dx = 0): SimState {
   return state;
 }
 
+/**
+ * A periodic press rhythm: `on` ticks down, `off` ticks up, from `start`.
+ *
+ * Built rather than written out, because the carve alternates on every press — so
+ * a hand-written list is a phase as much as a cadence, and a retune of either the
+ * carve or the carpet's depth silently turns it into a different manoeuvre.
+ */
+function rhythm(on: number, off: number, start: number, ticks = 200): Array<[number, 0 | 1]> {
+  const out: Array<[number, 0 | 1]> = [];
+  for (let t = start; t < ticks; t += on + off) {
+    out.push([t, 1], [t + on, 0]);
+  }
+  return out;
+}
+
+/**
+ * A pilot that steers for the dots, flown rather than recorded.
+ *
+ * The alternative is a fixed rhythm, and a fixed rhythm is a PHASE: `on 8 / off
+ * 12` collects 1 dot from one starting tick and 5 from another, so a fixture
+ * written that way measures how lucky it was rather than whether steering works.
+ * This one asks the only question the test wants answered — does moving toward the
+ * dots collect more of them than not moving at all.
+ *
+ * Deliberately not a good pilot. It reacts to the nearest dot still ahead with no
+ * anticipation, which is why it collects 4 of 7 at an ordinary crossing and merely
+ * ties a drift at a fast one; a well-phased rhythm reaches 5 at both. The headroom
+ * between the two is the skill the carpet is asking for.
+ */
+function steerForDots(state: SimState, c: SimConfig, ticks: number): void {
+  const fb = fieldBounds(c, state.bodies);
+  const cx = (fb.left + fb.right) / 2;
+  let held = false;
+  for (let t = 0; t < ticks && !state.ending.active; t++) {
+    let pressed = false;
+    let released = false;
+    let target: { x: number; y: number } | null = null;
+    for (const m of state.motes) {
+      if (!m.taken && m.y < state.ship.y && (!target || m.y > target.y)) target = m;
+    }
+    const want = target ? Math.sign(target.x - state.ship.x) : 0;
+    if (held) {
+      if (state.carveDir !== want || want === 0) {
+        released = true;
+        held = false;
+      }
+    } else {
+      // A press FLIPS the carve, so the pilot can only ask for the direction the
+      // next press would actually give it. See `SimState.carveDir`.
+      const next = state.carveDir === 0 ? (state.ship.x > cx ? -1 : 1) : -state.carveDir;
+      if (want !== 0 && next === want) {
+        pressed = true;
+        held = true;
+      }
+    }
+    stepSim(state, c, { held: held || pressed, pressed, released }, FIXED_DT);
+  }
+}
+
 /** Fly `edges` from `state` until the run ends or `ticks` pass. */
 function fly(
   state: SimState,
@@ -125,8 +184,11 @@ describe('a press in the carpet carves instead of grabbing', () => {
     // that exchange is what makes a carve close on itself instead of running away.
     // Measured as the sign of the lateral acceleration, which is the only place
     // the two rules differ.
-    const state = inCarpet(cfg, 200);
-    fly(state, cfg, [[0, 1]], 40);
+    // A SHORT press, because a long one at `carpetCarve` 2200 reaches a side wall
+    // inside two thirds of a second and comes back off the bumper — which is a
+    // legitimate thing to do and tells you nothing about the spring.
+    const state = inCarpet(cfg, 400);
+    fly(state, cfg, [[0, 1]], 14);
     const out = state.ship.vx;
     expect(out).toBeGreaterThan(0);
     // Let go: the funnel takes over and pulls the ship back toward the middle.
@@ -229,33 +291,23 @@ describe('the dots', () => {
 
   it('reward flying the carpet rather than riding it', () => {
     // The funnel delivers a ship that does nothing to the middle of the field, and
-    // the chain of dots is a curve away from the middle — so a run that is flown
-    // collects more than a run that is merely survived. The rhythm here is not a
-    // magic sequence; it is the coarse press-release cadence the chain is spaced
-    // for. See `MOTE_CYCLES`.
+    // the chain of dots is a curve away from the middle — so a run that is STEERED
+    // collects more than one that is merely survived. Flown by a pilot rather than
+    // by a recorded rhythm, for the reason `steerForDots` gives at length: a
+    // rhythm is a phase, and the same cadence collects 1 or 5 depending on which
+    // tick it starts.
     const idle = inCarpet(cfg, 4);
     fly(idle, cfg, [], 300);
     const flown = inCarpet(cfg, 4);
-    fly(
-      flown,
-      cfg,
-      [
-        [3, 1],
-        [17, 0],
-        [29, 1],
-        [43, 0],
-        [55, 1],
-        [69, 0],
-      ],
-      300,
-    );
+    steerForDots(flown, cfg, 300);
     const taken = (s: SimState) => s.motes.filter((m) => m.taken).length;
+    expect(taken(idle)).toBeLessThanOrEqual(2);
     expect(taken(flown)).toBeGreaterThan(taken(idle));
   });
 
   it('pay a flat award with no multiplier and no streak', () => {
     const state = inCarpet(cfg, 4);
-    const { awards } = fly(state, cfg, [], 300);
+    const { awards } = fly(state, cfg, rhythm(8, 12, 16), 300);
     const dots = awards.filter((a) => a.kind === 'mote');
     expect(dots.length).toBe(state.motes.filter((m) => m.taken).length);
     expect(dots.length).toBeGreaterThan(0);

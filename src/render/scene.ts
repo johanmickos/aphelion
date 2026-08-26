@@ -8,7 +8,7 @@ import type { SimConfig } from '../sim/config.ts';
 import { FIXED_DT } from '../sim/config.ts';
 import type { Body } from '../sim/types.ts';
 import type { FieldBounds } from '../sim/world.ts';
-import { finishLineY } from '../sim/world.ts';
+import { finishLineY, runInBand } from '../sim/world.ts';
 import type { Camera } from './camera.ts';
 import { clipToWindow, toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
@@ -327,7 +327,10 @@ export class Scene {
     // the rest of the world instead, and by the time the warp starts they have
     // left the screen on their own.
     if (!cer || cer.warp < 1) {
-      drawSpeedCarpet(ctx, cam, field, finishY, sim.finishFunnelDepth, opts.timeMs);
+      // The band's own depth rather than the config key, so the chevrons cover
+      // exactly the stretch the funnel acts on. See `finishLineY`.
+      const band = runInBand(sim, field);
+      drawSpeedCarpet(ctx, cam, field, finishY, band ? band.bottom - band.top : 0, opts.timeMs);
       // Over the chevrons and under the chequers, which is where they sit in the
       // world: a dot is a thing IN the carpet, and the line is still the brightest
       // thing in that stretch of sky.

@@ -3721,9 +3721,9 @@ fingerprint. All three shipped. The interesting part is what had to move first.
 **The press had to stop meaning grab, and that was not a design preference.** The
 plan was for a press in the carpet to carve only when no grab was on offer — no
 new rule to learn, the button just doing whatever was left. Measured, the carve
-never fired once. `grabRange` and `finishFunnelDepth` are both 560, so the topmost
-planet is within reach from EVERY point of the carpet, and every press in the
-run-in took the planet behind it. The two keys agreeing is a coincidence, but the
+never fired once. `grabRange` and `finishFunnelDepth` were both 560, so the topmost
+planet was within reach from EVERY point of the carpet, and every press in the
+run-in took the planet behind it. The two keys agreeing was a coincidence, but the
 shape is not: the carpet begins at the crest, so the only body it can ever offer
 is one you have already passed. `grabTarget` now returns `carved` there, which is
 a fourth kind of answer beside `captured` and the refusals — nothing was asked for
@@ -3795,14 +3795,56 @@ stretching every signature to fill the space makes a straight line drawn by a
 player who never pressed come out looking like a carve. At a constant gain the
 picture is a uniform scale of the real path and two runs stay comparable.
 
-**Known, measured, and left for a decision.** The carpet is 1.0-1.5 seconds long
-at ordinary crossing speeds and 0.85s at 600px/s, which is room for three or four
-carves and no more — and it is shortest exactly when the run has gone best.
-Deepening it means raising `finishFunnelDepth`, which is a tuned feel key with the
-handover into the ceremony hanging off it, so it is a design call rather than a
-bug fix and it has not been made. The signature is expressive at every speed; it
-is the dot chain that suffers, and going fast costing you dots is at least a
-tension rather than a defect.
+**And then it was played, which moved three numbers and found a fourth bug.**
+Reported off the deployed build: the carve was not noticeable, and the carpet
+wanted to be longer.
+
+The carve was not noticeable because the wrong thing had been sized. What a player
+feels is the movement DURING the press, not the excursion the lateral speed goes on
+to produce after it — and at `carpetCarve` 1100 a 0.33s press moved the ship 50px
+sideways while it was held, 7% of a 741px corridor and four ship-widths, which
+reads as a lean. At 2200 the same press moves 121px while held and peaks at 259
+before the funnel's spring nulls it. Not higher: at 2800 an ordinary tap peaks at
+333 against a half-width of 370, so every press would end at a bumper. Reaching a
+wall should be a thing you chose.
+
+**Making the carpet deeper broke the geometry, quietly, in the direction nobody
+looks.** The finish line was `crest - grabRange` and the band was
+`line + finishFunnelDepth` — one expression each, as the rules require, but two
+expressions for one shape, agreeing only because both numbers were 560. Raising
+the depth to 840 pushed the band's BOTTOM 280px DOWN past the crest, into the
+approach to the last planet, where a press is a slingshot and must not become a
+carve. The line is now derived from the depth with `grabRange` as a floor under it,
+and the band is read off the crest and the line rather than rebuilt from a length.
+At 560 that is bit-for-bit the old geometry, which is how it went in without
+touching anything.
+
+It also put the finish line 40px ABOVE `fieldBounds.top`. Not a death — the top
+bound is switched off under `clearAtTop` — but a world whose run ends past its own
+edge. The ceiling now keeps a named 240px above the line, which is exactly the gap
+it always had at 560; `CEILING_GAP` records it, and PROTOTYPE_CONFIG, having no
+finish line, keeps the frozen 800 untouched.
+
+**The depth bought time, and `finishFunnelHold` paid for it.** The funnel's hold is
+a rate applied for the whole crossing, so its total is the one term that grows with
+how long the crossing takes: at depth 840 it took a 300px/s arrival across the line
+at 726, against the 607 the boost sweep had chosen by ear against "a thing you see
+rather than a thing you passed". Halved to 45 it crosses at ~700 — a 15% gain after
+a 55% longer runway, which is the runway doing something without becoming the
+launch ramp its own note forbids. The kick is untouched: it is normalised over the
+band by construction, and it fires at the moment the player is watching hardest.
+
+Together those took the run-in from 1.5s / 0.87s (ordinary / fast crossing) to
+2.3s / 1.3s, and the dot chain from 2-of-7 collectable at a fast crossing to 5.
+
+**A fixed press rhythm turned out to be a phase, not a cadence.** Three fixtures
+were written as recorded edges, and because the carve alternates on every press,
+the same 8-on/12-off rhythm collects one dot from tick 0 and five from tick 16.
+They were measuring how lucky they were. `test/carpet.test.ts` now flies a pilot
+that steers for the dots instead, and the score battery's fixture carries a guard
+that says it still reaches them — because a battery that stops reaching a mechanism
+reports the weight as dead, which AGENTS.md records having happened to `fuelRegen`
+twice.
 
 ---
 
