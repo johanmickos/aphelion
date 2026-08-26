@@ -3910,8 +3910,29 @@ with no shape left in it.
 
 Toning the effect down would have given back exactly what was asked for. So the same
 renderer is called twice instead: densely with the warp OFF, which draws the curve,
-and sparsely with it ON, which throws the streaks over it. Nothing is restyled; one
-pass is sampled thirteen times harder than the other.
+and sparsely with it ON, which hangs the curtain over it. Nothing is restyled; one
+pass is sampled harder than the other and drawn smaller.
+
+**Getting that ratio right took a third pass and a better model of what a curtain
+is.** The first try at two passes put the sparks 26 units apart, which is eight
+streaks in the whole signature, and was reported back as "there look to be SOME
+starlight streaks, but it's not really the same curtain effect we had before." Both
+failures turn out to be the same number approached from opposite ends, and the
+quantity neither attempt was thinking about is how many streaks land in a BUNDLE.
+
+`drawWakePoint`'s wave cycles three and a half times along a wake, so the sparks
+arrive in clusters separated by stretches where the length falls to nothing — that
+alternation IS the curtain, and `Trail` puts about four streaks in each cluster.
+Streaking all 380 signature points put eighty in a cluster, which merges. 26 units
+put under one in a cluster, which is a whisker. 10 units puts five, which is the
+trail's own figure.
+
+The ribbon also had to stop being beads. At full size its points draw at nearly ten
+device pixels across, so the picture was mostly fat dots — and at warp the trail
+draws NO dots at all, which is the whole of why it did not look like the trail. It
+is drawn at 0.45 of a point's size now, which is the honest use of that parameter:
+`scale` means "how big is a point here", and a ribbon laid five times denser than a
+wake wants points smaller in proportion or it stops being a line.
 
 One remap survives, and it is one line rather than a fork. `f` is the trail's
 position-in-wake and everything hangs off it — size, brightness, spark length — and

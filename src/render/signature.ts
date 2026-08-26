@@ -123,25 +123,37 @@ const X_GAIN = 3;
 const RIBBON_GAP = 2;
 
 /**
+ * How big a ribbon point is, against what `drawWakePoint` would draw at full size.
+ *
+ * A DENSITY COMPENSATION, and it is the honest use of that parameter: `scale` is
+ * "how big is a point here", and a ribbon laid five times denser than a wake wants
+ * points five times smaller or it stops being a line and becomes a row of beads.
+ * At full size it drew exactly that — reported as the signature not looking like
+ * the trail at all, because at warp the trail draws NO dots and this was mostly
+ * dots.
+ */
+const RIBBON_SCALE = 0.45;
+
+/**
  * Design units between the SPARKS — the long streaks, drawn over the ribbon.
  *
- * TWO PASSES THROUGH ONE RENDERER, AND THE REASON IS DENSITY, NOT STYLE. `Trail`
- * holds 16 points and throws a streak up to 31 design units off each, so its sparks
- * are two thirds as long as the whole wake — which is exactly why it reads as warp.
- * It gets away with it because a wake half a second long is nearly straight, so the
- * streaks lie along the motion.
+ * TWO PASSES THROUGH ONE RENDERER, AND THE REASON IS DENSITY, NOT STYLE. The
+ * question is how many streaks land in a BUNDLE, which is what the curtain is made
+ * of: `drawWakePoint`'s wave cycles three and a half times over a wake, so the
+ * sparks come in clusters separated by stretches where the length falls to nothing.
+ * `Trail` puts about four streaks in each of those clusters.
  *
- * A signature is a curve, and streaking every one of its 380 points buries it: at a
- * spark every 7 units the streaks merged into a vertical bar with no shape left in
- * it. Measured by looking, which is the only way to measure this.
+ * Both failures were failures of that count. Streaking every one of the signature's
+ * 380 points put eighty in a cluster and they merged into a solid vertical blob
+ * with no shape left in it. At 26 units there were eight streaks in the WHOLE
+ * signature — under one per cluster — which is a few stray whiskers rather than a
+ * curtain, and was reported as exactly that: "there look to be SOME starlight
+ * streaks, but it's not really the same curtain effect."
  *
- * So the ribbon draws the shape at `warp: 0` and the sparks are laid over it at the
- * ceremony's warp, from the same `drawWakePoint`. Nothing is restyled; one pass is
- * simply sampled far harder than the other. 26 units puts about eight sparks along
- * a typical signature — enough for the pulse to travel visibly, sparse enough to
- * see the curve between them.
+ * 10 puts roughly five in a cluster, which is the trail's own figure. Measured by
+ * rendering the alternatives side by side, which is the only way to measure this.
  */
-const SPARK_GAP = 26;
+const SPARK_GAP = 10;
 
 /**
  * Where the signature's own `f` starts, instead of 0.
@@ -307,10 +319,11 @@ export function drawSignature(
   // ---- the wake, through the trail's own renderer, twice
   //
   // `drawWakePoint` is the trail's per-point drawing, extracted rather than copied:
-  // same speed ramp, same pulse, same sparks at warp. Called once densely with the
-  // warp OFF, which draws the curve, and once sparsely with it ON, which throws the
-  // streaks. See `SPARK_GAP` for why that is two passes and not one.
-  const wake = (gapUnits: number, warp: number): void => {
+  // same speed ramp, same pulse, same sparks at warp. Called once densely and small
+  // with the warp OFF, which draws the curve, and once sparsely and full-size with
+  // it ON, which hangs the curtain over it. See `SPARK_GAP` for why that is two
+  // passes and not one, and `RIBBON_SCALE` for why the first is small.
+  const wake = (gapUnits: number, warp: number, sizeMul: number): void => {
     const gap = gapUnits * s;
     const n = sig.pts.length;
     let last: { x: number; y: number } | null = null;
@@ -327,7 +340,7 @@ export function drawSignature(
       drawWakePoint(ctx, rcfg, at.x, at.y, {
         f: F_FLOOR + (1 - F_FLOOR) * (i / (n - 1 || 1)),
         speed: p.speed,
-        scale: s,
+        scale: s * sizeMul,
         warp,
         // The ceremony's own clock, so the pulse running down the signature is in
         // step with the one running down the live trail while they cross-fade.
@@ -335,10 +348,10 @@ export function drawSignature(
       });
     }
   };
-  wake(RIBBON_GAP, 0);
+  wake(RIBBON_GAP, 0, RIBBON_SCALE);
   // The ceremony's own warp, so the signature streaks for exactly as long as the
   // sky does. It arrives after the warp is full, so in practice this is 1.
-  wake(SPARK_GAP, cer.warp);
+  wake(SPARK_GAP, cer.warp, 1);
 
   ctx.restore();
 }

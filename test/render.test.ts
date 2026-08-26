@@ -3961,15 +3961,21 @@ describe('the carpet signature', () => {
     expect(Math.max(...strokes)).toBeGreaterThan(8 * cam().scale);
   });
 
-  it('keeps the curve readable underneath them', () => {
-    // The sparks are drawn far more sparsely than the ribbon, and that is the
-    // reason there are two passes: at a spark every 7 design units they merged into
-    // a vertical bar with no shape left in it. The ribbon is what stays legible, so
-    // there have to be many more of its dots than of the streaks.
+  it('hangs a curtain rather than a few whiskers', () => {
+    // BOTH FAILURES WERE THE SAME NUMBER, from opposite ends, and this brackets
+    // them. `drawWakePoint`'s wave clusters the sparks into bundles; what matters
+    // is how many land in one. Streaking every point put eighty in a bundle and
+    // they merged into a solid blob; at a spark every 26 units there were eight in
+    // the whole signature, reported as "SOME starlight streaks, but not really the
+    // same curtain effect".
     const { r } = drawn(1);
     const arcs = r.calls('arc').length;
-    const verticals = r.calls('lineTo').length;
-    expect(arcs).toBeGreaterThan(verticals * 3);
+    const sparks = r.calls('lineTo').length;
+    // Enough of them to read as a curtain...
+    expect(sparks).toBeGreaterThan(12);
+    // ...and the ribbon still far denser, which is what keeps the curve legible
+    // under it. Two passes, and this is the ratio that makes them two.
+    expect(arcs).toBeGreaterThan(sparks * 2);
   });
 
   it('is the wake, drawn in the wake’s own colours', () => {
