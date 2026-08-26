@@ -203,8 +203,26 @@ function driftAccel(
   // control, and a control whose strength depends on where you happen to be is a
   // control that cannot be learned.
   const carving = holding && cfg.carpetCarve > 0 && state.carveDir !== 0;
+  // ---- and it eases off as the sideways speed approaches its ceiling
+  //
+  // A TAPER RATHER THAN A CUT-OFF, the same shape `flybyBrake`'s `speedTaper`
+  // already uses: the push falls to nothing as `carpetCarveMax` is reached, so the
+  // ship settles onto a terminal sideways speed instead of hitting a wall in the
+  // acceleration. `SimConfig.carpetCarveMax` records what happened without it.
+  //
+  // The clamp's upper bound is 2, not 1, and that is a feel decision rather than a
+  // safety one: a ship already travelling the WRONG way — off a bumper, say — gets
+  // up to double thrust to turn around, which is what makes weaving answer. It is
+  // still bounded, so nothing here can run away.
+  let carveScale = 1;
+  if (carving && cfg.carpetCarveMax > 0) {
+    const along = state.carveDir * state.ship.vx;
+    carveScale = Math.max(0, Math.min(2, 1 - along / cfg.carpetCarveMax));
+  }
   return {
-    ax: carving ? state.carveDir * cfg.carpetCarve : (k * (cx - x) - damping * state.ship.vx) * t,
+    ax: carving
+      ? state.carveDir * cfg.carpetCarve * carveScale
+      : (k * (cx - x) - damping * state.ship.vx) * t,
     ay: -(cfg.finishFunnelHold * t + cfg.finishFunnelBoost * kick) + lift,
   };
 }

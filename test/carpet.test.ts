@@ -210,6 +210,73 @@ describe('a press in the carpet carves instead of grabbing', () => {
   });
 });
 
+describe('the carve has a terminal speed', () => {
+  /** Peak lateral speed and wall contacts over a whole crossing. */
+  function fly1(c: SimConfig, holdTicks: number): { vpk: number; walls: number } {
+    const state = inCarpet(c, 4);
+    const fb = fieldBounds(c, state.bodies);
+    let held = false;
+    let vpk = 0;
+    let walls = 0;
+    let wasOut = false;
+    for (let t = 0; t < 400 && !state.ending.active; t++) {
+      const pressed = t === 0;
+      const released = t === holdTicks;
+      if (pressed) held = true;
+      if (released) held = false;
+      stepSim(state, c, { held: held || pressed, pressed, released }, FIXED_DT);
+      vpk = Math.max(vpk, Math.abs(state.ship.vx));
+      const out = state.ship.x <= fb.left + 1 || state.ship.x >= fb.right - 1;
+      if (out && !wasOut) walls++;
+      wasOut = out;
+    }
+    return { vpk, walls };
+  }
+
+  it('bounds a long hold, which an acceleration alone cannot', () => {
+    // THE DEFECT THIS PINS, reported off the deployed build as "way too strong"
+    // and measured on its trace: `vx` peaked at 1360px/s and the ship reached a
+    // wall three times in 2.3 seconds, each bumper handing back 750px/s for the
+    // next carve to build on.
+    //
+    // The cause is that a constant push is unbounded in TIME. The strength had
+    // been sized against a 0.33s press and the session held for 0.5-0.58s, and
+    // distance under a constant acceleration goes as the square of the hold. So
+    // this is a test about hold LENGTH, not about the strength — which is why the
+    // fix was a second key rather than a smaller first one.
+    const uncapped: SimConfig = { ...cfg, carpetCarveMax: 0 };
+    expect(fly1(uncapped, 34).vpk).toBeGreaterThan(1000);
+    expect(fly1(cfg, 34).vpk).toBeLessThan(cfg.carpetCarveMax * 1.15);
+    // Held for the whole crossing it still cannot run away.
+    expect(fly1(cfg, 999).vpk).toBeLessThan(cfg.carpetCarveMax * 1.15);
+  });
+
+  it('leaves the response to a press untouched, which is the half that was felt', () => {
+    // `carpetCarve` 1100 was reported as NOT noticeable, and its excursions were
+    // never small — a 0.33s tap peaked 212px off centre. What it lacked was rate.
+    // So the cap must not eat the first moments of a press: at the instant the
+    // button goes down the ship is not moving sideways, so the taper is inert and
+    // the acceleration is the full configured one.
+    const state = inCarpet(cfg, 200);
+    const before = state.ship.vx;
+    stepSim(state, cfg, PRESS, FIXED_DT);
+    const gained = Math.abs(state.ship.vx - before);
+    expect(gained).toBeGreaterThan(cfg.carpetCarve * FIXED_DT * 0.9);
+  });
+
+  it('still lets a sustained hold reach a wall, because that is a choice', () => {
+    // The bumpers exist and bouncing off one is a thing to do on purpose. What the
+    // cap removes is arriving at a wall as the incidental result of an ordinary
+    // press.
+    expect(fly1(cfg, 999).walls).toBeGreaterThan(0);
+    expect(fly1(cfg, 20).walls).toBe(0);
+  });
+
+  it('is off in the prototype, with the rest of the carpet', () => {
+    expect(PROTOTYPE_CONFIG.carpetCarveMax).toBe(0);
+  });
+});
+
 describe('the carpet pushes up, so there is no going backwards', () => {
   /** Total descent over a whole crossing, and the worst single tick. */
   function descent(c: SimConfig, vy: number): { total: number; tick: number } {
@@ -394,6 +461,7 @@ describe('the signature', () => {
 describe('none of it exists in the prototype', () => {
   it('leaves every carpet key at zero, which is what keeps the gate at zero', () => {
     expect(PROTOTYPE_CONFIG.carpetCarve).toBe(0);
+    expect(PROTOTYPE_CONFIG.carpetCarveMax).toBe(0);
     expect(PROTOTYPE_CONFIG.carpetLift).toBe(0);
     expect(PROTOTYPE_CONFIG.carpetRise).toBe(0);
     expect(PROTOTYPE_CONFIG.carpetMoteCount).toBe(0);

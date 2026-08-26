@@ -59,6 +59,7 @@
   "finishFunnelHold": 0,
   "finishBumper": 0,
   "carpetCarve": 0,
+  "carpetCarveMax": 0,
   "carpetLift": 0,
   "carpetRise": 0,
   "carpetMoteCount": 0,

@@ -3837,6 +3837,40 @@ band by construction, and it fires at the moment the player is watching hardest.
 Together those took the run-in from 1.5s / 0.87s (ordinary / fast crossing) to
 2.3s / 1.3s, and the dot chain from 2-of-7 collectable at a fast crossing to 5.
 
+**And then 2200 was played, and it was pinball.** Reported as "way too strong",
+with the trace. The checkpoints are phone truth even though the replay diverged at
+tick 280 on the usual capture-chain engine difference, and they are unambiguous:
+in the 2.3 seconds of carpet, `vx` peaked at 1360px/s and the ship reached a side
+wall three times, each bumper handing back 750px/s for the next carve to build on.
+
+The cause is not the strength, and that distinction is the whole of the fix. A
+constant acceleration is unbounded in TIME, so distance under it goes as the SQUARE
+of the hold — and 2200 had been sized against a 0.33s press while the session that
+reported it held for 30, 35 and 34 ticks, which is 0.5 to 0.58s. Those produce
+1100-1250px/s of sideways speed in a corridor 741px wide.
+
+Lowering the acceleration would have walked straight back into the first report,
+because the two complaints are about different halves of one curve: how fast the
+ship answers a press, and how far it has gone by the time you let go. One number
+cannot set both. `carpetCarveMax` was added to own the second, tapered rather than
+cut off, in the same shape `flybyBrake`'s `speedTaper` already uses.
+
+**The measurement that chose 500 is the build nobody complained about.**
+`carpetCarve` 1100 was called not noticeable, and its EXCURSIONS were never small —
+a 0.33s tap peaked 212px off centre and a 0.57s hold 341px. What it lacked was
+rate, which is the acceleration. So its SPEEDS are the honest ceiling to aim under:
+tap 367px/s, hold 623px/s. At 2200 capped at 500 a tap peaks at 391 and a hold at
+462, so every lateral speed in the carpet now sits at or below what the "too weak"
+build already produced, while the acceleration stays at double it. On excursion it
+is still more than that build: tap 239px against 212. Replayed against the reported
+session's own presses, peak `vx` goes from 1837 to 460 and the wall contacts to
+none.
+
+That correction also says something about the first fix that is worth keeping: the
+note above claims the felt quantity is movement DURING the press, and this is the
+evidence for it. Two builds with nearly the same peak excursion, one called dead
+and one called too strong, differing in rate.
+
 **A fixed press rhythm turned out to be a phase, not a cadence.** Three fixtures
 were written as recorded edges, and because the carve alternates on every press,
 the same 8-on/12-off rhythm collects one dot from tick 0 and five from tick 16.

@@ -567,11 +567,50 @@ export interface SimConfig {
    * press moves 121px while held and peaks at 259 before the funnel's spring nulls
    * it, which is a third of the corridor and unmistakably a swerve.
    *
-   * Not higher: at 2800 an ordinary tap peaks at 333 against a half-width of 370,
-   * so every press ends at a bumper. A long hold SHOULD reach the wall — that is
-   * what the bumpers are for — but it should be a thing you chose.
+   * It STAYS at 2200 now that `carpetCarveMax` owns the far end of the curve. This
+   * number is the response — how quickly the ship answers a press — and the report
+   * that called 2200 too strong was about where the ship had got to by the end of
+   * a half-second hold, which is the cap's job. Cutting this to fix that would
+   * have walked straight back into "not noticeable".
    */
   carpetCarve: number;
+  /**
+   * Fastest the carve will push the ship sideways, px/s. 0 lets it run away.
+   *
+   * THE ACCELERATION IS UNBOUNDED IN TIME AND THE HOLD IS NOT A TAP. That is the
+   * whole of what went wrong at `carpetCarve` 2200 with no ceiling: the strength
+   * was sized against a 0.33s press, and the session that reported it held for 30,
+   * 35 and 34 ticks — 0.5 to 0.58s. Under a constant push, distance goes as the
+   * square of the hold, so those produced 1100-1250px/s of sideways speed against
+   * a corridor 741px wide. Recorded off the phone: `vx` peaked at 1360, the ship
+   * reached a wall three times in 2.3 seconds, and each bumper handed back 750px/s
+   * for the next carve to build on. Pinball.
+   *
+   * Lowering the acceleration does not fix it, and that is why this key exists
+   * rather than a smaller number. The two complaints — "not noticeable" at 1100
+   * and "way too strong" at 2200 — are about different halves of the same curve:
+   * how fast the ship responds when you press, and how far it has gone by the time
+   * you let go. One number cannot set both. The acceleration owns the first and
+   * this owns the second.
+   *
+   * 500, CHOSEN AGAINST THE VERSION NOBODY CALLED PINBALL. `carpetCarve` 1100 was
+   * reported as not noticeable, but its EXCURSIONS were never small — a 0.33s tap
+   * peaked 212px off centre and a 0.57s hold 341px. What it lacked was rate. Its
+   * speeds are therefore the honest ceiling to aim under: tap 367px/s, hold
+   * 623px/s. At 2200 capped here, a tap peaks at 391 and a hold at 462, so every
+   * lateral speed in the carpet is now at or below what the "too weak" build
+   * already produced — while the acceleration, which is the half that was actually
+   * being complained about, is untouched at double it.
+   *
+   * On excursion it is still MORE than that build on every axis: tap 239px against
+   * 212, hold 290 against 341 at a third of the speed.
+   *
+   * And a WALL IS STILL REACHABLE, which matters — a sustained hold arrives at a
+   * bumper in about 1.4s, so it is a thing you choose on an ordinary crossing and
+   * something you cannot quite buy on a fast one. The bumper calms down with it: a
+   * bounce returns 360px/s instead of the 750 that was feeding the next carve.
+   */
+  carpetCarveMax: number;
   /**
    * How hard the carpet insists on lifting a ship that is not climbing, 1/s.
    *
@@ -983,6 +1022,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   finishFunnelHold: 0,
   finishBumper: 0,
   carpetCarve: 0,
+  carpetCarveMax: 0,
   carpetLift: 0,
   carpetRise: 0,
   carpetMoteCount: 0,
@@ -1129,6 +1169,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   finishFunnelHold: 45,
   finishBumper: 0.72,
   carpetCarve: 2200,
+  carpetCarveMax: 500,
   carpetLift: 9,
   carpetRise: 60,
   carpetMoteCount: 7,
