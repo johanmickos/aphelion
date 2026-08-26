@@ -114,46 +114,50 @@ const INSET = 20;
 const X_GAIN = 3;
 
 /**
- * Design units of drawn path between one point of the ribbon and the next.
+ * Design units of DRAWN path between one strand of the curtain and the next.
  *
- * The curve itself, at the density that makes it a line rather than beads. Walked
- * by DRAWN distance rather than by index, because the fit is anisotropic — equal
- * steps along the recorded path bunch up wherever the ship was climbing straight.
+ * MEASURED ON THE SCREEN, NOT ALONG THE RECORDING, and that is what finally closed
+ * the holes. Sampling every recorded point is not dense enough: the points are 8
+ * world units apart and the fit stretches x by `X_GAIN`, so on a stretch where the
+ * ship was carving sideways they land 7 device pixels apart while a strand is under
+ * 5 wide. The curtain came out solid on the climbs and striated on the traverses —
+ * which is a property of the fit, not of the flying, so no sampling of the input
+ * could fix it.
+ *
+ * The path is walked by arc length instead and a strand emitted every step, with
+ * position, speed and `f` interpolated between the recorded points either side.
+ * Density is then a fact about the picture and holds at any shape, any fit and any
+ * viewport.
+ *
+ * 0.6 design units is about 1.2 device pixels on a 2x phone, chosen against the
+ * THINNEST strand rather than the average: `drawWakePoint` sizes its stroke off `f`
+ * and speed, so the tail — slowest, and furthest down the wake — draws at about 1.5
+ * device pixels and is the one that would show gaps first.
  */
-const RIBBON_GAP = 2;
+const STRAND_STEP = 0.6;
+
+/**
+ * The same walk, for the ribbon underneath. Coarser, because it is a line rather
+ * than a fill and nothing is hiding behind it.
+ */
+const RIBBON_STEP = 2;
 
 /**
  * How big a ribbon point is, against what `drawWakePoint` would draw at full size.
  *
  * A DENSITY COMPENSATION, and it is the honest use of that parameter: `scale` is
- * "how big is a point here", and a ribbon laid five times denser than a wake wants
- * points five times smaller or it stops being a line and becomes a row of beads.
- * At full size it drew exactly that — reported as the signature not looking like
- * the trail at all, because at warp the trail draws NO dots and this was mostly
- * dots.
+ * "how big is a point here", and a ribbon laid denser than a wake wants points
+ * smaller in proportion or it stops being a line and becomes a row of beads. At
+ * full size it drew exactly that — reported as the signature not looking like the
+ * trail at all, because at warp the trail draws NO dots and this was mostly dots.
+ *
+ * 0.45 -> 0.7 once the curtain became solid. The beads were only ever visible
+ * because the sparks were sparse enough to see between; with the curtain closed the
+ * ribbon shows only where the wave has pulled the strands short — the troughs, and
+ * the tail, which is exactly where a continuous line is wanted. It is the hem of
+ * the curtain now rather than a thing drawn beside it.
  */
-const RIBBON_SCALE = 0.45;
-
-/**
- * Design units between the SPARKS — the long streaks, drawn over the ribbon.
- *
- * TWO PASSES THROUGH ONE RENDERER, AND THE REASON IS DENSITY, NOT STYLE. The
- * question is how many streaks land in a BUNDLE, which is what the curtain is made
- * of: `drawWakePoint`'s wave cycles three and a half times over a wake, so the
- * sparks come in clusters separated by stretches where the length falls to nothing.
- * `Trail` puts about four streaks in each of those clusters.
- *
- * Both failures were failures of that count. Streaking every one of the signature's
- * 380 points put eighty in a cluster and they merged into a solid vertical blob
- * with no shape left in it. At 26 units there were eight streaks in the WHOLE
- * signature — under one per cluster — which is a few stray whiskers rather than a
- * curtain, and was reported as exactly that: "there look to be SOME starlight
- * streaks, but it's not really the same curtain effect."
- *
- * 10 puts roughly five in a cluster, which is the trail's own figure. Measured by
- * rendering the alternatives side by side, which is the only way to measure this.
- */
-const SPARK_GAP = 10;
+const RIBBON_SCALE = 0.7;
 
 /**
  * Where the signature's own `f` starts, instead of 0.
@@ -319,39 +323,43 @@ export function drawSignature(
   // ---- the wake, through the trail's own renderer, twice
   //
   // `drawWakePoint` is the trail's per-point drawing, extracted rather than copied:
-  // same speed ramp, same pulse, same sparks at warp. Called once densely and small
-  // with the warp OFF, which draws the curve, and once sparsely and full-size with
-  // it ON, which hangs the curtain over it. See `SPARK_GAP` for why that is two
-  // passes and not one, and `RIBBON_SCALE` for why the first is small.
-  const wake = (gapUnits: number, warp: number, sizeMul: number): void => {
-    const gap = gapUnits * s;
+  // same speed ramp, same pulse, same sparks at warp. Called once coarsely and
+  // small with the warp OFF, which draws the curve, and once finely and full-size
+  // with it ON, which hangs the curtain over it. See `STRAND_STEP` for why the
+  // second is a walk in screen space rather than a walk over the recorded points,
+  // and `RIBBON_SCALE` for why the first is small.
+  const wake = (stepUnits: number, warp: number, sizeMul: number): void => {
+    const step = Math.max(0.1, stepUnits * s);
     const n = sig.pts.length;
-    let last: { x: number; y: number } | null = null;
-    for (let i = 0; i < n; i++) {
-      const p = sig.pts[i]!;
-      const at = place(fit, p.x, p.y);
-      const head = i === n - 1;
-      if (!head && last) {
-        const dx = at.x - last.x;
-        const dy = at.y - last.y;
-        if (dx * dx + dy * dy < gap * gap) continue;
+    let carry = 0;
+    for (let i = 0; i < n - 1; i++) {
+      const a = sig.pts[i]!;
+      const b = sig.pts[i + 1]!;
+      const pa = place(fit, a.x, a.y);
+      const pb = place(fit, b.x, b.y);
+      const seg = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+      const fa = F_FLOOR + ((1 - F_FLOOR) * i) / (n - 1);
+      const fb = F_FLOOR + ((1 - F_FLOOR) * (i + 1)) / (n - 1);
+      if (seg < 1e-6) continue;
+      for (; carry <= seg; carry += step) {
+        const u = carry / seg;
+        drawWakePoint(ctx, rcfg, pa.x + (pb.x - pa.x) * u, pa.y + (pb.y - pa.y) * u, {
+          f: fa + (fb - fa) * u,
+          speed: a.speed + (b.speed - a.speed) * u,
+          scale: s * sizeMul,
+          warp,
+          // The ceremony's own clock, so the pulse running down the signature is in
+          // step with the one running down the live trail while they cross-fade.
+          warpT: cer.t,
+        });
       }
-      last = at;
-      drawWakePoint(ctx, rcfg, at.x, at.y, {
-        f: F_FLOOR + (1 - F_FLOOR) * (i / (n - 1 || 1)),
-        speed: p.speed,
-        scale: s * sizeMul,
-        warp,
-        // The ceremony's own clock, so the pulse running down the signature is in
-        // step with the one running down the live trail while they cross-fade.
-        warpT: cer.t,
-      });
+      carry -= seg;
     }
   };
-  wake(RIBBON_GAP, 0, RIBBON_SCALE);
+  wake(RIBBON_STEP, 0, RIBBON_SCALE);
   // The ceremony's own warp, so the signature streaks for exactly as long as the
   // sky does. It arrives after the warp is full, so in practice this is 1.
-  wake(SPARK_GAP, cer.warp, 1);
+  wake(STRAND_STEP, cer.warp, 1);
 
   ctx.restore();
 }

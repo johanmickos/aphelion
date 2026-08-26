@@ -3927,6 +3927,27 @@ Streaking all 380 signature points put eighty in a cluster, which merges. 26 uni
 put under one in a cluster, which is a whisker. 10 units puts five, which is the
 trail's own figure.
 
+**And five was still wrong, because the signature is not a wake.** Reported at 10:
+"it's still not quite as much a sense of a curtain as I'd like, I really don't want
+ANY holes between the strands." The trail's sparks are separated because its wake IS
+a wake — sixteen points of it, in motion. This is a portrait of two and a half
+seconds of flying, and what hangs off a curve that long is a sheet, not a comb. The
+bundles were the trail's property being copied where it did not belong.
+
+Sampling every recorded point was still not enough, and the reason is worth keeping:
+the points are 8 world units apart and the fit stretches x by `X_GAIN`, so on a
+stretch where the ship was carving sideways they land 7 device pixels apart while a
+strand is under 5 wide. The curtain came out solid on the climbs and striated on the
+traverses — a property of the FIT, not of the flying, which no sampling of the input
+could have fixed. The path is walked by arc length in screen space now, with
+position, speed and `f` interpolated between the recorded points either side, so
+density is a fact about the picture. The step is chosen against the THINNEST strand
+rather than the average — the tail draws at about 1.5 device pixels and is where a
+gap would show first.
+
+The wave still runs down it, so the hem stays ragged and the pulse still travels.
+The curtain is solid across, not down.
+
 The ribbon also had to stop being beads. At full size its points draw at nearly ten
 device pixels across, so the picture was mostly fat dots — and at warp the trail
 draws NO dots at all, which is the whole of why it did not look like the trail. It
@@ -3953,6 +3974,25 @@ the DOM control row sits a fixed ~45 CSS px off the bottom whatever the viewport
 It is a clearance in design units now. The width freed up in exchange — the
 vertical is compressed nearly sevenfold and the horizontal was using a third of
 what it had — went into the gain, 2 to 3.
+
+**A tap could close the results before they had been read.** Reported as "I tried
+clicking after the game and accidentally just closed the final screen", and on a
+clear that is expensive: dismissing rerolls the seed and rearms, so the run the
+sheet was reporting on stops existing.
+
+The guard already existed. `sheetReadable` was written for exactly this and wired to
+the KEYBOARD only, while the pointer — the input the game is actually played with —
+dismissed unconditionally. That is what a rule living inline in a DOM shell with no
+test around it looks like a few months later, so it moved to `src/app/input.ts`
+beside `keydownAction`, which is there for the same reason.
+
+Arriving is also not the same as having been seen, and a gate on arrival alone would
+not have fixed the report. The ceremony runs about three seconds before the panel
+lands, long enough that an impatient player is already tapping; the first tap after
+the fade completes then lands within a mash interval of it and the screen is gone in
+the instant it appeared. So the panel must have STOOD for half a second — longer
+than a mash interval at ~200ms and than a deliberate reaction at ~250ms. It can
+swallow one deliberate tap, which costs half a second against a whole result.
 
 **A fixed press rhythm turned out to be a phase, not a cadence.** Three fixtures
 were written as recorded edges, and because the carve alternates on every press,

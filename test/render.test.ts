@@ -3961,21 +3961,38 @@ describe('the carpet signature', () => {
     expect(Math.max(...strokes)).toBeGreaterThan(8 * cam().scale);
   });
 
-  it('hangs a curtain rather than a few whiskers', () => {
-    // BOTH FAILURES WERE THE SAME NUMBER, from opposite ends, and this brackets
-    // them. `drawWakePoint`'s wave clusters the sparks into bundles; what matters
-    // is how many land in one. Streaking every point put eighty in a bundle and
-    // they merged into a solid blob; at a spark every 26 units there were eight in
-    // the whole signature, reported as "SOME starlight streaks, but not really the
-    // same curtain effect".
-    const { r } = drawn(1);
-    const arcs = r.calls('arc').length;
-    const sparks = r.calls('lineTo').length;
-    // Enough of them to read as a curtain...
-    expect(sparks).toBeGreaterThan(12);
-    // ...and the ribbon still far denser, which is what keeps the curve legible
-    // under it. Two passes, and this is the ratio that makes them two.
-    expect(arcs).toBeGreaterThan(sparks * 2);
+  it('hangs a curtain with no holes between the strands', () => {
+    // THE NUMBER THAT WAS WRONG THREE TIMES, and this pins it from the side that
+    // matters. A strand every 26 design units read as stray whiskers; every 10 gave
+    // the bundles the live trail has, and the gaps beside them were reported as "I
+    // really don't want ANY holes between the strands"; sampling every recorded
+    // point was still striated wherever the ship had been carving sideways, because
+    // the fit stretches x by `X_GAIN` and pulls those points apart.
+    //
+    // So the property is about the PICTURE, and it is measured on the picture: no
+    // two neighbouring strands further apart than the thinnest one is wide.
+    const { r, c } = drawn(1);
+    const origins: Array<[number, number]> = [];
+    let from: [number, number] | null = null;
+    for (const [k, ...a] of r.ops) {
+      if (k === 'moveTo') from = [a[0] as number, a[1] as number];
+      else if (k === 'lineTo' && from) {
+        // A strand is vertical and downward; a zero-length one at a trough of the
+        // pulse still counts, because it still holds its place in the walk.
+        if (Math.abs((a[0] as number) - from[0]) < 1e-9 && (a[1] as number) >= from[1]) {
+          origins.push(from);
+        }
+      }
+    }
+    expect(origins.length).toBeGreaterThan(100);
+    let worst = 0;
+    for (let i = 1; i < origins.length; i++) {
+      const dx = origins[i]![0] - origins[i - 1]![0];
+      const dy = origins[i]![1] - origins[i - 1]![1];
+      worst = Math.max(worst, Math.hypot(dx, dy));
+    }
+    // `drawWakePoint`'s thinnest stroke is about 1.5 device pixels, at the tail.
+    expect(worst).toBeLessThan(1.5 * c.scale);
   });
 
   it('is the wake, drawn in the wake’s own colours', () => {
