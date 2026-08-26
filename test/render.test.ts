@@ -23,6 +23,7 @@ import {
 } from '../src/render/world.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from '../src/render/ceremony.ts';
+import type { Ceremony } from '../src/render/ceremony.ts';
 import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
 import { FINISH, DEBRIEF } from '../src/render/palette.ts';
 import {
@@ -70,6 +71,8 @@ import { createBodies, fieldBounds } from '../src/sim/world.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { Scene } from '../src/render/scene.ts';
 import { captureSnapshot } from '../src/render/snapshot.ts';
+import { drawSignature } from '../src/render/signature.ts';
+import { runInBand } from '../src/sim/world.ts';
 import type { RenderSnapshot } from '../src/render/snapshot.ts';
 
 const rcfg = DEFAULT_RENDER_CONFIG;
@@ -3860,5 +3863,121 @@ describe('the fuel warning beside the ship', () => {
       w.update(FIXED_DT);
     }
     expect(fired).toEqual(['low', 'empty']);
+  });
+});
+
+/**
+ * The carpet signature on the ceremony sheet.
+ *
+ * The line itself is the simulation's — `test/carpet.test.ts` pins what gets
+ * recorded. These pin the picture: that it fits in the space it was given, that
+ * it hangs off the ship rather than floating somewhere near it, and that it only
+ * appears for the ending it is about.
+ */
+describe('the carpet signature', () => {
+  const sim = DEFAULT_CONFIG;
+
+  /** A real cleared run, flown up the carpet with a carve in it. */
+  function flownCarpet() {
+    const state = createInitialState(sim);
+    const fb = fieldBounds(sim, state.bodies);
+    const band = runInBand(sim, fb)!;
+    state.ship.x = (fb.left + fb.right) / 2;
+    state.ship.y = band.bottom - 4;
+    state.ship.vx = 0;
+    state.ship.vy = -320;
+    state.highWaterY = state.ship.y;
+    state.holdConsumed = false;
+    const edges = new Map<number, 0 | 1>([
+      [3, 1],
+      [17, 0],
+      [29, 1],
+      [43, 0],
+      [55, 1],
+      [69, 0],
+    ]);
+    let held = false;
+    for (let t = 0; t < 300 && !state.ending.active; t++) {
+      const e = edges.get(t);
+      const pressed = e === 1;
+      const released = e === 0;
+      if (pressed) held = true;
+      if (released) held = false;
+      stepSim(state, sim, { held: held || pressed, pressed, released }, FIXED_DT);
+    }
+    expect(state.ending.reason).toBe('cleared');
+    return state;
+  }
+
+  const cer = (t: number, sheet: number): Ceremony => ({
+    warp: 1,
+    centred: 1,
+    shift: 4000,
+    sheet,
+    crossing: 1,
+    t,
+  });
+
+  /** Every point the line and the dots were drawn at. */
+  function drawn(sheet: number, t = 1.4) {
+    const state = flownCarpet();
+    const c = cam();
+    const r = recordingContext();
+    // Where the ceremony parks the ship: centred, low.
+    const shipX = c.offsetX + c.designW * 0.5 * c.scale;
+    const shipY = c.offsetY + c.viewH * 0.72 * c.scale;
+    drawSignature(r.ctx, c, cer(t, sheet), state.signature, state.motes, shipX, shipY, sheet);
+    const pts = [...r.calls('moveTo'), ...r.calls('lineTo'), ...r.calls('arc')].map(
+      (o) => [o[1] as number, o[2] as number] as const,
+    );
+    return { pts, r, c, shipX, shipY, state };
+  }
+
+  it('draws nothing until the sheet is there to draw it beside', () => {
+    expect(drawn(0).r.ops).toEqual([]);
+  });
+
+  it('stays inside the design window, on both axes', () => {
+    // The one failure mode a fit can have: a line that finished hard against a
+    // wall is anchored to a ship in the MIDDLE, so the drawing runs off the side
+    // unless the scale solves for the room on each side of the anchor separately.
+    const { pts, c } = drawn(1);
+    expect(pts.length).toBeGreaterThan(8);
+    for (const [x, y] of pts) {
+      expect(x).toBeGreaterThanOrEqual(c.offsetX - 1);
+      expect(x).toBeLessThanOrEqual(c.offsetX + c.designW * c.scale + 1);
+      expect(y).toBeLessThanOrEqual(c.offsetY + c.viewH * c.scale + 1);
+    }
+  });
+
+  it('hangs below the ship, which is what makes it read as attached', () => {
+    const { pts, shipY } = drawn(1);
+    for (const [, y] of pts) expect(y).toBeGreaterThan(shipY);
+  });
+
+  it('marks the dots that were taken and the ones that were not', () => {
+    const { r, state } = drawn(1);
+    const taken = state.motes.filter((m) => m.taken).length;
+    expect(taken).toBeGreaterThan(0);
+    expect(taken).toBeLessThan(state.motes.length);
+    // Filled for taken, stroked for missed: two treatments, one per dot.
+    const green = r.ops.filter(
+      (o) => o[0] === '=fillStyle' && String(o[1]).startsWith('rgba(92,226,140'),
+    );
+    expect(green.length).toBe(taken);
+  });
+
+  it('refuses a line with no bend in it', () => {
+    const c = cam();
+    const r = recordingContext();
+    const straight = {
+      pts: [
+        { x: 0, y: 0 },
+        { x: 0, y: -8 },
+      ],
+      spacing: 8,
+    };
+    drawSignature(r.ctx, c, cer(1, 1), straight, [], 100, 400, 1);
+    expect(r.ops).toEqual([]);
   });
 });

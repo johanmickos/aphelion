@@ -292,14 +292,23 @@ describe('targeting inside a charged window', () => {
     // A preference, not a gate. `nearestBody` records why a heading cone was
     // refused — a threshold is a cliff — so this one never forbids a press, it
     // only decides which body a press takes when there is a real choice.
+    //
+    // FLOWN WITH THE CARPET OFF, and the reason is geometric rather than a
+    // convenience. "Nothing at all above the ship" can only be staged above the
+    // topmost body, and everything from the crest to the finish line IS the run-in
+    // carpet, where a press carves instead of grabbing — while everything above
+    // the line is by construction further than `grabRange` from any body, so there
+    // is nothing to fall back TO. The two rules are independent and this one is
+    // still exactly what it always was; the carpet simply owns the only region it
+    // could ever have been demonstrated in.
+    const carpetless: SimConfig = { ...DEFAULT_CONFIG, carpetCarve: 0 };
     const { state, behind } = stage();
-    // Put the ship above everything, so nothing at all is ahead of it.
     const top = Math.min(...state.bodies.map((b) => b.y));
     state.ship.y = top - 200;
     state.ship.x = state.bodies.find((b) => b.y === top)!.x;
     state.cameFrom = -1;
-    state.chargedT = DEFAULT_CONFIG.chargedSecs;
-    const got = grabTarget(state, DEFAULT_CONFIG);
+    state.chargedT = carpetless.chargedSecs;
+    const got = grabTarget(state, carpetless);
     expect(got.index).toBeGreaterThanOrEqual(0);
     expect(got.result).toBe('captured');
     void behind;

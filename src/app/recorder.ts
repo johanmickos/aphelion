@@ -53,7 +53,7 @@ export type InputRecord = [number, 0 | 1];
  */
 export type AwardRecord = [
   number,
-  'g' | 'l' | 'h' | 'f' | 'b' | 'r',
+  'g' | 'l' | 'h' | 'f' | 'b' | 'r' | 'd',
   number,
   number,
   number,
@@ -83,6 +83,7 @@ const AWARD_CODE: Record<ScoreAward['kind'], AwardRecord[1]> = {
   flyby: 'f',
   burn: 'b',
   rescue: 'r',
+  mote: 'd',
 };
 
 /**

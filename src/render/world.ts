@@ -1,7 +1,7 @@
 /**
  * World layer: hazard zones and bodies.
  */
-import type { Body } from '../sim/types.ts';
+import type { Body, Mote } from '../sim/types.ts';
 import type { SimConfig } from '../sim/config.ts';
 import type { FieldBounds } from '../sim/world.ts';
 import { backtrackFloorY } from '../sim/world.ts';
@@ -309,6 +309,68 @@ export function drawSpeedCarpet(
     ctx.fill();
   }
   ctx.restore();
+}
+
+/**
+ * The dots scattered up the carpet.
+ *
+ * THE FINISH GREEN, like the chevrons they sit among and the chequers they lead
+ * to. They belong to that cue system — the one that colours by category and always
+ * has — rather than to the rarity ladder; see `DOT` in `accolade.ts` for the full
+ * argument, which is the same one.
+ *
+ * A taken dot is not removed. It leaves a hollow ring where it was, because the
+ * carpet is a thing the player is trying to complete and a set with holes in it
+ * says how you are doing in a way a shrinking set cannot. It also means the
+ * signature has something to be drawn against at the end.
+ *
+ * The pulse is driven by `timeMs` and by the dot's own position, so the row does
+ * not breathe in unison — a synchronised blink reads as a UI element, and these
+ * are meant to read as objects in the world. Render may take a wall clock; the
+ * simulation may not.
+ */
+export function drawMotes(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  motes: readonly Mote[],
+  timeMs: number,
+): void {
+  if (motes.length === 0) return;
+  const view = visibleWorldY(cam);
+  const s = cam.scale;
+
+  for (const m of motes) {
+    if (m.y < view.top - 40 || m.y > view.bottom + 40) continue;
+    const x = toScreenX(cam, m.x);
+    const y = toScreenY(cam, m.y);
+
+    if (m.taken) {
+      // A hollow ring: this one is spent, and the gap in the row is the score.
+      ctx.beginPath();
+      ctx.arc(x, y, 5 * s, 0, Math.PI * 2);
+      ctx.strokeStyle = withAlpha(FINISH, 0.22);
+      ctx.lineWidth = Math.max(1, 1.2 * s);
+      ctx.stroke();
+      continue;
+    }
+
+    const pulse = 0.5 + 0.5 * Math.sin(timeMs * 0.004 + m.y * 0.02);
+    const r = (4.2 + 1.1 * pulse) * s;
+    // A bloom under the core, so the dot has presence against the chevrons behind
+    // it without the core itself having to be large enough to look like a planet.
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.4);
+    g.addColorStop(0, withAlpha(FINISH, 0.34 + 0.16 * pulse));
+    g.addColorStop(1, withAlpha(FINISH, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 3.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = withAlpha(FINISH, 0.92);
+    ctx.fill();
+  }
 }
 
 /**

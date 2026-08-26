@@ -10,7 +10,7 @@
  * Here the layout is evaluated once at the design viewport (390x844) and baked in.
  * Resize is inert. The renderer scales and letterboxes to fit. See PORT_NOTES 10.
  */
-import type { Body } from './types.ts';
+import type { Body, Mote } from './types.ts';
 import type { SimConfig } from './config.ts';
 import { mulberry32 } from './rng.ts';
 
@@ -189,6 +189,71 @@ function placeAnomalies(
   }
   return out;
 }
+
+/**
+ * The dots scattered up the run-in carpet.
+ *
+ * Deterministic like everything else about the world, and from its own `rnd`
+ * stream rather than the one `createBodies` walks: a seed's CORRIDOR must be the
+ * same corridor whether there are ten dots in the carpet or none, exactly as it is
+ * the same corridor whether or not there are anomalies. Drawing from the shared
+ * stream would have made a change to `carpetMoteCount` silently relayout the whole
+ * field, and the two would then never be comparable again.
+ *
+ * The seed is offset rather than reused so the two streams do not run in step —
+ * with the same seed the first draw of each is the same number, and the dots would
+ * lean the same way the first row does on every world.
+ *
+ * ALTERNATING SIDES, EVENLY SPREAD. See `SimConfig.carpetMoteCount` for why this
+ * is a weave rather than a scatter. The band is inset at both ends: a dot sitting
+ * on the finish line would be collected on the tick the run clears, which
+ * `scoreTick` scores nothing on, so it would pay nothing and read as a bug.
+ */
+export function createMotes(cfg: SimConfig, bodies: readonly Body[]): Mote[] {
+  if (cfg.carpetMoteCount <= 0) return [];
+  const band = runInBand(cfg, fieldBounds(cfg, bodies));
+  if (band === null) return [];
+
+  const rnd = mulberry32((cfg.worldSeed ^ 0x9e3779b9) >>> 0);
+  const fw = DESIGN_W * cfg.fieldWidthFrac;
+  const cx = DESIGN_W * 0.5;
+  const depth = band.bottom - band.top;
+  // Amplitude and opening phase from the seed, so the same shape is not flown
+  // twice, and the run does not always begin by asking for the same hand.
+  const amp = fw * (0.1 + rnd() * 0.06);
+  const phase = rnd() * Math.PI * 2;
+  const out: Mote[] = [];
+  for (let i = 0; i < cfg.carpetMoteCount; i++) {
+    // 0 at the bottom of the band, 1 at the top, inset at both ends: a dot on the
+    // finish line would be taken on the tick the run clears, and `scoreTick`
+    // scores nothing on that tick.
+    const t = 0.08 + ((i + 0.5) / cfg.carpetMoteCount) * 0.84;
+    out.push({
+      x: cx + amp * Math.sin(phase + t * Math.PI * 2 * MOTE_CYCLES),
+      y: band.bottom - depth * t,
+      taken: false,
+    });
+  }
+  return out;
+}
+
+/**
+ * How many lateral swings the chain of dots makes up the carpet.
+ *
+ * THE CHAIN IS THE RHYTHM, WHICH IS WHY IT IS A CURVE AND NOT A ZIG-ZAG. The
+ * first version alternated the dots hard from side to side, and it was
+ * uncollectable rather than difficult: ten dots over a 560px band is one every
+ * 47px, and at the 400px/s a ship crosses the carpet at that is 0.12s to cross
+ * 300px of corridor. Nobody threads that, so the row degenerated into "collect
+ * whichever two happen to be near your line", which is the confetti problem it was
+ * written to avoid wearing different clothes.
+ *
+ * Laid along a sine instead, the dots describe a line a player can actually fly —
+ * and two cycles over the band is one swing per half second at ordinary crossing
+ * speed, which is about the rhythm a press-release-press cadence produces. The
+ * chain is therefore a demonstration of the carve, and following it is the tutorial.
+ */
+const MOTE_CYCLES = 1;
 
 /** Ship spawn, frozen from the prototype's `resetShip` at the design viewport. */
 export const SPAWN = Object.freeze({

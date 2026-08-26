@@ -3710,6 +3710,100 @@ Two gaps were measured and deliberately left; both are written up in
 `docs/IDEAS.md` with their numbers. The larger: 48% of wall deaths happen while
 captured, where neither the deadline track nor the SOS light can fire at all.
 
+### 63 — The carpet became a play zone, and the press had to change meaning to let it
+
+The run-in — the 560px between the last planet and the finish line — was a
+corridor the funnel carried you down. `docs/IDEAS.md` had asked, since 2026-08-25,
+for it to be somewhere you could play: dots to fly through, a way to draw a line
+of your own, and that line shown on the ceremony sheet afterwards as a
+fingerprint. All three shipped. The interesting part is what had to move first.
+
+**The press had to stop meaning grab, and that was not a design preference.** The
+plan was for a press in the carpet to carve only when no grab was on offer — no
+new rule to learn, the button just doing whatever was left. Measured, the carve
+never fired once. `grabRange` and `finishFunnelDepth` are both 560, so the topmost
+planet is within reach from EVERY point of the carpet, and every press in the
+run-in took the planet behind it. The two keys agreeing is a coincidence, but the
+shape is not: the carpet begins at the crest, so the only body it can ever offer
+is one you have already passed. `grabTarget` now returns `carved` there, which is
+a fourth kind of answer beside `captured` and the refusals — nothing was asked for
+and nothing was denied. The approach to the last planet is untouched, because it
+happens below the crest.
+
+**A lateral push, not a turn, and the no-going-backwards rule falls out of it.** A
+force perpendicular to the velocity draws better arcs and can also turn the ship
+right around, which is the one thing the carpet must not permit. A flat sideways
+acceleration on a ship that is always rising draws a parabola and cannot reverse
+the climb however long it is held. What is left is a ship that arrives already
+falling, and `carpetLift` catches that: a one-sided spring on `vy`, not a clamp.
+Measured, a 600px/s arrival — faster than any real one, which is climbing — gives
+up 40px and turns, worst tick 8px. With the lift off the same arrival falls 280px
+and flies into the planet it had just cleared, which is also the answer to whether
+the lift is decoration.
+
+**Holding turns the centring spring OFF.** `finishFunnelPull` is 13 with derived
+damping, stiff enough to save a drift that would otherwise die at a wall — and
+stiff enough to fight a carve to a standstill near the edges, which is where the
+interesting shapes are. So the two are alternatives: hold and the funnel lets go
+of the wheel, release and it takes it back and pulls you home. That exchange is
+what makes a carve close on itself instead of running away, and it costs nothing
+in safety, because `finishBumper` already means nothing can die in there.
+
+**The dots are not a third `Body.kind`, which is what the idea proposed.** It would
+have been cheap — `contactPolicy` already switches on kind — and it would have
+been wrong in a way that is hard to see: `fieldBounds` takes the crest from the
+topmost body, so a dot in the carpet is a dot above the last planet, and it would
+have MOVED THE FINISH LINE. `nearestBody` would also have offered one to a press,
+and the capture loop would have bounced off one. A dot has a position and a
+boolean; it is its own list, and four subsystems never learn it exists.
+
+**And the chain of dots had to be a curve rather than a zig-zag.** Alternating them
+hard from side to side was uncollectable rather than difficult: ten dots over 560px
+is one every 47px, which at the ~400px/s a ship crosses at is 0.12s to cross 300px
+of corridor. Nobody threads that, so the row degenerated into "collect whichever
+two happen to be near your line" — the confetti problem it was written to avoid,
+wearing different clothes. Laid along a single sine over the band, seven of them,
+the chain describes a line that can actually be flown: a run that does nothing
+takes 2 of 7 and a flown one takes 5.
+
+**The signature is a portrait, not a view.** It cannot come from `Trail`, which is
+capped at 16 points and cleared on respawn — a wake, not a record. It is recorded
+by `stepSim` while the ship is in the band, sampled by distance so the density does
+not depend on speed, and thinned by half rather than truncated when the buffer
+fills: dropping the oldest points would amputate the start of the line, which is
+where the carving begins. Being written by the simulation makes it a pure function
+of `(config, seed, inputLog)`, so a replay reproduces the line the player was shown.
+
+Drawing it in world space does not work — the world RECEDES during the ceremony,
+so the line would slide off the bottom within a second of being finished. It is
+fitted instead, hung off the frozen ship with its newest point pinned to the hull,
+which is what makes it read as attached rather than as a diagram placed nearby. The
+idea had wanted it on the results sheet and had noted the problem: five rows, a
+headline and a subtitle in the top fifth of the screen, and no room. The bottom
+quarter, directly under the ship, is empty for the first time in the run — the
+ceremony suppresses the gauge, the readout and the notice — and it is also where
+the line actually was.
+
+**The one deliberate distortion, and why it is a constant.** The carpet is 560px
+deep and a hard carve moves the ship maybe 200 across it, so a true-to-scale
+portrait is a 3-to-1 sliver in which an idle crossing and a flown one look nearly
+the same: the axis carrying all the information has almost no room. The drawing
+therefore has a fixed 2x horizontal gain, the way a seismograph or an ECG amplifies
+the signal axis and leaves the sweep alone. FIXED, and not fitted to the width
+available — that was the first version and it is the version that lies, because
+stretching every signature to fill the space makes a straight line drawn by a
+player who never pressed come out looking like a carve. At a constant gain the
+picture is a uniform scale of the real path and two runs stay comparable.
+
+**Known, measured, and left for a decision.** The carpet is 1.0-1.5 seconds long
+at ordinary crossing speeds and 0.85s at 600px/s, which is room for three or four
+carves and no more — and it is shortest exactly when the run has gone best.
+Deepening it means raising `finishFunnelDepth`, which is a tuned feel key with the
+handover into the ceremony hanging off it, so it is a design call rather than a
+bug fix and it has not been made. The signature is expressive at every speed; it
+is the dot chain that suffers, and going fast costing you dots is at least a
+tension rather than a defect.
+
 ---
 
 ## Tuning vs. fidelity
@@ -3734,11 +3828,11 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 105 · camera 55
+tests    port-equality 11 · invariants 32 · render 200 · camera 55
          diagnostics 25 · backtrack 15 · world 23 · tune 7 · clearance 14
-         score 74 · input 8 · grab-target 8 · link-fuel 6
+         score 93 · input 8 · grab-target 8 · link-fuel 6 · carpet 21
          boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         charged 26 · attract 13 · 467 total
+         charged 26 · attract 13 · 666 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

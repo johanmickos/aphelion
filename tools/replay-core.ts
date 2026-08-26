@@ -131,8 +131,12 @@ export interface Analysis {
  */
 export const CLOSE_PX = 2;
 
-/** Exhaustive, so a new way to refuse a grab cannot go unreported. */
+/** Exhaustive, so a new way for a press to take nothing cannot go unreported. */
 const REFUSAL_TEXT: Record<Exclude<GrabResult, 'captured'>, string> = {
+  // Not a refusal at all: in the run-in carpet a press bends the line instead of
+  // reaching for a planet. Reported anyway, because a reader working out why a
+  // press produced no capture needs to be told which of the two it was.
+  carved: 'CARVED — a press inside the run-in carpet',
   'refused-crash-cone': 'GRAB REFUSED — inside the crash cone (too late to recover)',
   'refused-no-fuel': 'GRAB REFUSED — tank empty',
   'refused-out-of-range': 'GRAB REFUSED — out of reach',
@@ -427,6 +431,7 @@ const AWARD_KIND: Record<AwardRecord[1], ScoreAward['kind']> = {
   f: 'flyby',
   b: 'burn',
   r: 'rescue',
+  d: 'mote',
 };
 
 export function recordedAwards(report: DiagReport): ScoreAward[] | null {

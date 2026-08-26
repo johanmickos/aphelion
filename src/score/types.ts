@@ -39,7 +39,12 @@ export interface ScoreAward {
    * a captured ship is and pays when the fire goes out, one capture can raise two
    * of them, and a DEATH cancels one outright — see `endLife`.
    */
-  kind: 'grab' | 'link' | 'hop' | 'flyby' | 'burn' | 'rescue';
+  /**
+   * `mote` is a dot flown through in the run-in carpet — the one award that is not
+   * about a body at all. It pays flat and steps nothing; see
+   * `ScoreConfig.moteBonus`.
+   */
+  kind: 'grab' | 'link' | 'hop' | 'flyby' | 'burn' | 'rescue' | 'mote';
   /** Points actually applied. Never negative — nothing takes points away. */
   points: number;
   /** The multiplier in force. */
@@ -341,6 +346,15 @@ export interface ScoreState {
    * stops paying, which keeps the ability honest and the points earned.
    */
   hopped: string[];
+  /**
+   * Dots in the carpet that have already been paid for.
+   *
+   * A COUNT, not a set of indices, because the simulation only ever takes them —
+   * `Mote.taken` goes false to true within a life and a respawn resets every one
+   * of them at once. So the number taken can only rise while a life lasts, and the
+   * difference between it and this is exactly how many awards are owed.
+   */
+  motes: number;
   /** Last observed `chargedT`, to edge-detect a window opening and closing. */
   wasCharged: boolean;
   /**

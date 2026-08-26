@@ -505,6 +505,66 @@ export interface SimConfig {
    */
   finishBumper: number;
   /**
+   * Sideways acceleration a held press applies in the carpet, px/s². 0 disables
+   * the whole play zone — the carve, the lift and the dots together.
+   *
+   * THE CARPET IS THE ONE PLACE THE BUTTON DOES NOT MEAN GRAB. Everywhere else in
+   * the game a press reaches for a planet; here, with nothing left in range worth
+   * reaching for, it bends the line instead. That is not a second control scheme:
+   * it is the same button doing the only thing left to do in a stretch where the
+   * flying is already over and the ship is being carried.
+   *
+   * WHY A LATERAL PUSH AND NOT A TURN. A force perpendicular to the velocity is
+   * the obvious model and draws prettier arcs — and it can also turn the ship all
+   * the way round, which is precisely what the carpet must not permit. A constant
+   * sideways acceleration on a ship that is always rising draws a parabola, and
+   * cannot reverse the climb no matter how long it is held. The no-going-backwards
+   * rule is therefore a property of the shape of the force rather than a clamp
+   * bolted on after it, and `carpetLift` only has to catch a ship that arrived
+   * already falling.
+   *
+   * WHILE IT IS HELD THE CENTRING SPRING IS OFF. `finishFunnelPull` exists to stop
+   * a drift dying at a wall, and at 13 it is stiff enough to fight a carve to a
+   * standstill near the edges. Hold and the funnel lets go of the wheel; let go
+   * and it takes it back and pulls the ship home. That exchange is what makes the
+   * shapes close on themselves rather than run away, and it costs nothing in
+   * safety because `finishBumper` already means nothing can die in here.
+   *
+   * 1100: held for 0.4s that is 440px/s of sideways speed and about 90px of
+   * travel, against a corridor 741px wide. Big enough that one tap is visibly a
+   * swerve, small enough that a full hold from the crest reaches a wall rather
+   * than crossing the corridor twice.
+   */
+  carpetCarve: number;
+  /**
+   * How hard the carpet insists on lifting a ship that is not climbing, 1/s.
+   *
+   * A ONE-SIDED SPRING ON VERTICAL SPEED, not a clamp. It pulls `vy` up to
+   * `carpetRise` and then does nothing at all, so a fast climb never feels it and
+   * a ship that arrives falling is caught rather than stopped dead. A hard clamp
+   * was the first version and it reads as a teleport: a ship dropping into the
+   * band at 300px/s loses that speed between one tick and the next.
+   *
+   * 9 arrests a 300px/s fall in about 0.15s, over roughly 22px of descent — which
+   * is to say the carpet pushes you up and there is no going backwards, without
+   * any instant where the picture jumps.
+   */
+  carpetLift: number;
+  /** The upward speed the carpet holds a ship to, px/s. See `carpetLift`. */
+  carpetRise: number;
+  /**
+   * Dots scattered up the carpet. 0 for none.
+   *
+   * Placed alternating either side of the centre line, evenly spread up the band,
+   * so the row of them zig-zags and collecting the set means weaving — which is
+   * the carve teaching itself. A random scatter was tried first and reads as
+   * confetti: with no pattern to follow there is nothing to aim at, and the player
+   * flies straight through the middle collecting whatever happens to be there.
+   */
+  carpetMoteCount: number;
+  /** How near the ship has to pass to take a dot, px. */
+  carpetMoteRange: number;
+  /**
    * A grab below escape speed is a capture, never a flyby.
    *
    * The prototype also called it a flyby when the ship was momentarily moving
@@ -886,6 +946,11 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   finishFunnelBoost: 0,
   finishFunnelHold: 0,
   finishBumper: 0,
+  carpetCarve: 0,
+  carpetLift: 0,
+  carpetRise: 0,
+  carpetMoteCount: 0,
+  carpetMoteRange: 0,
   boundGrabsCapture: false,
   // Inert here — but it is also what an older report replays under. See the key.
   outboundFlybyFrac: 1,
@@ -1027,6 +1092,11 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   finishFunnelBoost: 800,
   finishFunnelHold: 90,
   finishBumper: 0.72,
+  carpetCarve: 1100,
+  carpetLift: 9,
+  carpetRise: 60,
+  carpetMoteCount: 7,
+  carpetMoteRange: 26,
   holdClimbInCapture: true,
   boundGrabsCapture: true,
   outboundFlybyFrac: 0.65,
@@ -1070,7 +1140,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 26;
+export const SIM_VERSION = 27;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

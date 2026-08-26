@@ -366,6 +366,26 @@ export interface ScoreConfig {
    * into the next link, and climb is paid by the mechanism that already exists.
    */
   hopBonus: number;
+  /**
+   * What one dot in the run-in carpet pays. See `SimConfig.carpetMoteCount`.
+   *
+   * FLAT, like `hopBonus`, and for a related reason: every dot is the same dot, so
+   * there is no quality here for a multiplier to be a multiplier OF. It is also
+   * the only scoring event in the game that can happen after the last planet is
+   * behind you, and paying it on the streak would mean the carpet was worth five
+   * times as much to a run that had chained well — which is a run that has already
+   * been paid for chaining well, everywhere else.
+   *
+   * A DOT DOES NOT STEP THE STREAK EITHER. Ten free rungs at the end of every
+   * cleared run would make the ladder a fact about the carpet rather than about
+   * the flying, and there is nothing left above the carpet to spend a multiplier
+   * on.
+   *
+   * 150, against a link at maxed streak worth several thousand: the full set is
+   * about half of one good release. The carpet is a victory lap and the points are
+   * a receipt for having flown it well, not a second course.
+   */
+  moteBonus: number;
 }
 
 /**
@@ -448,4 +468,5 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   streakMax: 5,
   anomalyBonus: 800,
   hopBonus: 500,
+  moteBonus: 150,
 } satisfies ScoreConfig);

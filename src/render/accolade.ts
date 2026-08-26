@@ -32,7 +32,7 @@
  * earned, so the two are alternatives rather than neighbours.
  */
 import type { PraiseLevel } from '../score/index.ts';
-import { BURN, LADDER_EXCEPTIONAL, LADDER_GOOD, LADDER_GREAT } from './palette.ts';
+import { BURN, FINISH, LADDER_EXCEPTIONAL, LADDER_GOOD, LADDER_GREAT, solid } from './palette.ts';
 
 export interface AccoladeStyle {
   /** Colour of the word and the number. */
@@ -162,6 +162,32 @@ export const HOP_TALLY: AccoladeStyle = {
   color: '#c89aff',
   labelColor: 'rgba(200,154,255,.9)',
   size: 26,
+};
+
+/**
+ * A dot flown through in the run-in carpet — see `SimConfig.carpetMoteCount`.
+ *
+ * OFF THE LADDER, like `HOP`, and for the same structural reason: every dot pays
+ * the same flat `moteBonus`, so there is no quality for a rarity colour to report
+ * and inventing one would be inventing a distinction the award does not have.
+ *
+ * THE FINISH GREEN, which is the deliberate reuse this file's header would
+ * otherwise forbid. The rule there is about the LADDER: colour on an award means
+ * how good it was. This is one of the cue systems that has always coloured by
+ * category instead — the edge arrows, the chequers, the finish notice — and a dot
+ * is a member of that system rather than a neighbour of it. It is scattered
+ * through the carpet, drawn in the same green as the chevrons under it, and taken
+ * on the way to the same line. Giving it a fourth hue would say it belonged to
+ * something else.
+ *
+ * Small, like `HOP`, and for the identical reason: a full carpet raises ten of
+ * these in a couple of seconds and every one of them is the same number. They are
+ * receipts.
+ */
+export const DOT: AccoladeStyle = {
+  color: solid(FINISH),
+  labelColor: 'rgba(92,226,140,.8)',
+  size: 11,
 };
 
 /**

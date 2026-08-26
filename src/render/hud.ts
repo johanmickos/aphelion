@@ -13,10 +13,10 @@ import type { ScoreAward, ScoreState } from '../score/types.ts';
 import type { Praise } from '../score/index.ts';
 import { praiseFor } from '../score/index.ts';
 import type { AccoladeStyle } from './accolade.ts';
-import { BURN_WORD, HOP, LEVEL, ROUTINE } from './accolade.ts';
+import { BURN_WORD, DOT, HOP, LEVEL, ROUTINE } from './accolade.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
-import { HAZARD, HAZARD_FUEL, HAZARD_WARN, solid, withAlpha } from './palette.ts';
+import { FINISH, HAZARD, HAZARD_FUEL, HAZARD_WARN, solid, withAlpha } from './palette.ts';
 
 export interface ReadoutLine {
   text: string;
@@ -141,7 +141,7 @@ interface BandLine {
  * in the other.
  *
  * A record rather than a ternary on `kind === 'link'`, for the reason
- * `REFUSAL_LINE` below is one: this WAS a two-way boolean, and when a third kind
+ * `PRESS_LINE` below is one: this WAS a two-way boolean, and when a third kind
  * arrived it fell through to the else branch and announced every grab in the
  * deduction colour, captioned as a penalty — the player told off for the capture
  * they had just made. Adding a kind now fails to compile until it has an entry.
@@ -204,6 +204,14 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     style: ROUTINE,
     detail: `${a.body}  RESCUE · LATE ${pct(a.timing)}`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
+  }),
+  // No word and no multiplier, because a dot has neither: it pays flat and every
+  // one is identical. The line says which of them this was, so ten of them read as
+  // a count rather than as the same message ten times.
+  mote: () => ({
+    style: DOT,
+    detail: 'CARPET  DOT',
+    mult: '',
   }),
 };
 
@@ -340,11 +348,17 @@ const REFUSAL_TICKS = 60;
 const FLYBY_HARD = 0.7;
 
 /**
- * Why a grab did nothing. A record rather than a ternary chain, so adding a way
- * to refuse a grab makes the compiler ask for its message instead of quietly
- * falling through to the wrong one.
+ * What a press did, when it did not take a body. A record rather than a ternary
+ * chain, so adding a way for a press to do nothing makes the compiler ask for its
+ * message instead of quietly falling through to the wrong one.
+ *
+ * `carved` is the one entry that is not an apology, so it is the one entry without
+ * a `✕`. It is the finish green because the carpet is, and it is here at all
+ * because the first press a player makes in the run-in is the moment the button
+ * changes meaning — the ship swerving says so, and this says why.
  */
-const REFUSAL_LINE: Record<Exclude<GrabResult, 'captured'>, ReadoutLine> = {
+const PRESS_LINE: Record<Exclude<GrabResult, 'captured'>, ReadoutLine> = {
+  carved: { text: '↯ CARVING THE CARPET', color: solid(FINISH) },
   'refused-crash-cone': { text: '✕ TOO LATE — crash course', color: HAZARD_WARN, pulse: 1 },
   'refused-no-fuel': { text: '✕ TANK EMPTY — cannot grab', color: HAZARD_WARN, pulse: 1 },
   'refused-out-of-range': { text: '✕ TOO FAR — get closer', color: '#8fb8e8' },
@@ -397,7 +411,7 @@ export function readoutLines(
     }
     const g = snap.lastGrab;
     if (g && g.result !== 'captured' && snap.tick - g.tick < REFUSAL_TICKS) {
-      out.push(REFUSAL_LINE[g.result]);
+      out.push(PRESS_LINE[g.result]);
     }
   }
 

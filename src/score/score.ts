@@ -153,6 +153,7 @@ export function createScoreState(): ScoreState {
     rescued: [],
     doomed: null,
     hopped: [],
+    motes: 0,
     wasCharged: false,
     hopTotal: 0,
     run: emptyRun(),
@@ -266,6 +267,10 @@ function endLife(sc: ScoreState): void {
   // total for a frenzy that ended in a crash.
   sc.wasCharged = false;
   sc.hopTotal = 0;
+  // The carpet's dots come back with the ship — `respawn` un-takes them — so the
+  // tally they are counted against has to come back too, or the next life's first
+  // dot would look like one already collected.
+  sc.motes = 0;
   // A flare still burning at the moment of death is dropped rather than paid.
   // Flying into the ground is how a hot pass goes wrong, and the score it would
   // have banked is exactly what the death is taking.
@@ -404,6 +409,20 @@ export function scoreTick(
   // distance flown.
   sc.run.distance += speed * dt;
   if (sc.streak > sc.run.peakChain) sc.run.peakChain = sc.streak;
+
+  // ---- dots flown through in the carpet
+  //
+  // Counted rather than event-driven, which is the observer's whole method: the
+  // simulation emits nothing, so "a dot was taken" is recovered by noticing that
+  // more of them are taken now than were last tick. Several can land on one tick
+  // at speed, and each pays its own award — they merge into one receipt popup,
+  // which is what a run of them should read as.
+  if (state.motes.length > 0) {
+    let taken = 0;
+    for (const m of state.motes) if (m.taken) taken++;
+    for (let i = sc.motes; i < taken; i++) awards.push(awardMote(sc, state, scfg));
+    sc.motes = taken;
+  }
 
   // ---- the burn: heat integrated over a hot pass, paid when the fire dies
   //
@@ -939,6 +958,42 @@ function awardRescue(
     // A rescue is paid for one decision at one instant. How far the ride swung
     // the ship is the flyby's quantity, and the capture this happened inside is
     // still running — there is no finished pass here to report.
+    turn: 0,
+  };
+  sc.score += points;
+  return award;
+}
+
+/**
+ * Pay for a dot in the carpet.
+ *
+ * The simplest award in the game and deliberately so: a flat figure, no
+ * multiplier, no streak step, no word. See `ScoreConfig.moteBonus`.
+ *
+ * It reports `multiplier: 1` rather than the live one, and that is not a rounding
+ * of the truth — the band and the popups both print `multiplier` when it is above
+ * one, and printing x5 beside a number that was not multiplied by five is the
+ * readout lying about its own arithmetic.
+ */
+function awardMote(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAward {
+  const points = Math.round(scfg.moteBonus);
+  const award: ScoreAward = {
+    tick: state.tick,
+    kind: 'mote',
+    points,
+    multiplier: 1,
+    // Not a body, and there is no honest name to put here. `DOT` is what the band
+    // and the replay's body column print, which is the true answer to "what was
+    // that award about".
+    body: 'DOT',
+    close: 0,
+    clearance: Infinity,
+    skim: Infinity,
+    defl: 0,
+    timing: 0,
+    aim: 0,
+    climb: 0,
+    heat: 0,
     turn: 0,
   };
   sc.score += points;

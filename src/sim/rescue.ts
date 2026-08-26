@@ -204,6 +204,16 @@ function cloneState(s: SimState): SimState {
     ship: { ...s.ship },
     capture: cap,
     bodies: s.bodies.slice(),
+    // Copied rather than shared: the prediction steps a real `stepSim`, which
+    // takes dots and appends to the signature. A shared list would let a
+    // hypothetical future collect the player's dots for them, and a shared
+    // signature would draw the ceremony's line out of a flight that never
+    // happened. The dots are the only element-wise copy here and there are ten of
+    // them; the signature is a shallow slice, because a point once pushed is never
+    // mutated.
+    motes: s.motes.map((m) => ({ ...m })),
+    signature: { pts: s.signature.pts.slice(), spacing: s.signature.spacing },
+    carveDir: s.carveDir,
     fuel: s.fuel,
     highWaterY: s.highWaterY,
     ending: { ...s.ending },

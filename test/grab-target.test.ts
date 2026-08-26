@@ -62,13 +62,21 @@ describe('which body a press takes', () => {
 });
 
 describe('the crash cone', () => {
-  const TARGET = planet(0, 0, 40, 'P1');
+  /**
+   * WELL BELOW THE ORIGIN, AND THAT IS LOAD-BEARING. `fieldBounds` starts its
+   * crest search at y=0, so a fixture body at the origin IS the crest — which puts
+   * the run-in carpet at [-560, 0] and the diving ship inside it, where a press
+   * carves instead of grabbing and every assertion here reads `carved`. Dropping
+   * the whole fixture 600px changes no distance and no angle in these tests; it
+   * only moves it out of a band that is nothing to do with what they measure.
+   */
+  const TARGET = planet(0, 600, 40, 'P1');
 
   /** Head straight at a body from `surf` px above its surface. */
   function divingAt(cfg: SimConfig, surf: number): SimState {
     const state = createInitialState(cfg);
     state.bodies = [TARGET];
-    Object.assign(state.ship, { x: 0, y: -(40 + surf), vx: 0, vy: 150 });
+    Object.assign(state.ship, { x: 0, y: TARGET.y - (40 + surf), vx: 0, vy: 150 });
     return state;
   }
 

@@ -45,8 +45,21 @@ import {
   naturalPeriapsis,
   predictedCaptureOrbit,
 } from './orbit.ts';
+import { fieldBounds, runInBand } from './world.ts';
 
 export type { GrabResult } from './types.ts';
+
+/**
+ * Is the ship inside the run-in carpet?
+ *
+ * Asked of the SHIP and not of a resolved world position, because a capture is
+ * already running whenever the two differ and this is only ever consulted on a
+ * press that is not already holding one.
+ */
+function inRunInCarpet(state: SimState, cfg: SimConfig): boolean {
+  const band = runInBand(cfg, fieldBounds(cfg, state.bodies));
+  return band !== null && state.ship.y >= band.top && state.ship.y <= band.bottom;
+}
 
 /**
  * Index of the body a press would take. Returns -1 if there are none.
@@ -141,6 +154,27 @@ export function inCrashCone(cfg: SimConfig, state: SimState, body: Body): boolea
  * actually on offer.
  */
 export function grabTarget(state: SimState, cfg: SimConfig): { index: number; result: GrabResult } {
+  // ---- above the last planet the button stops meaning grab
+  //
+  // FIRST, BEFORE THE TANK IS EVEN CHECKED, because this is not a refusal and does
+  // not want to queue behind one. A carve costs no fuel and asks for no body.
+  //
+  // IT HAD TO BE A RULE RATHER THAN AN EMERGENCE, and the measurement is the
+  // argument. `grabRange` and `finishFunnelDepth` are both 560, so the last planet
+  // is within reach from EVERY point of the carpet — a press anywhere in the
+  // run-in took it, which meant the carve could never fire once in ordinary play.
+  // The two keys are independent and their agreeing is a coincidence, but the
+  // shape of the problem is not: the carpet begins at the crest, so the only body
+  // it can ever offer is the one already behind you.
+  //
+  // And grabbing backwards at the finish is not a manoeuvre anyone wants. The
+  // approach to the last planet is untouched — it happens BELOW the crest, outside
+  // this band — so what is given up is a slingshot off a planet you have already
+  // passed, and what is bought is a stretch where the one button you have does the
+  // one thing left to do.
+  if (cfg.carpetCarve > 0 && inRunInCarpet(state, cfg)) {
+    return { index: -1, result: 'carved' };
+  }
   if (state.fuel <= 0.5) return { index: -1, result: 'refused-no-fuel' };
   const pi = state.chargedT > 0 ? chargedTarget(state, cfg) : nearestBody(state, cfg.grabLeadTime);
   if (pi < 0) return { index: -1, result: 'refused-no-body' };

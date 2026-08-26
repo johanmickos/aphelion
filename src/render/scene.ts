@@ -18,6 +18,7 @@ import {
   drawBacktrackFloor,
   drawFinishLine,
   drawHazardZones,
+  drawMotes,
   drawSpeedCarpet,
 } from './world.ts';
 import { drawAnchorLine, drawBoostHalo, drawOrbitCurve } from './capture.ts';
@@ -34,6 +35,7 @@ import type { WarningLight } from './warnings.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash, drawFinishFlash } from './ceremony.ts';
 import type { Ceremony } from './ceremony.ts';
 import { CLEARED_SHEET, DEATH_SHEET, drawSheet } from './sheet.ts';
+import { drawSignature } from './signature.ts';
 
 import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
@@ -148,6 +150,13 @@ export class Scene {
     // After the ship, so it is never drawn under it, and OUTSIDE the shift so it
     // stamps the moment rather than receding with the world.
     if (cer && to) drawFinishFlash(ctx, cam, cer, to.x, to.y);
+    // The line drawn through the carpet, hung off the hull. Outside the shift for
+    // the same reason the flash is — it belongs to the frozen ship, not to the
+    // world falling away behind it — and after both, because it is the last thing
+    // the eye should be able to follow down from the ship.
+    if (cer && to) {
+      drawSignature(ctx, cam, cer, snap.signature, snap.motes, to.x, to.y, cer.sheet);
+    }
   }
 
   /**
@@ -319,6 +328,10 @@ export class Scene {
     // left the screen on their own.
     if (!cer || cer.warp < 1) {
       drawSpeedCarpet(ctx, cam, field, finishY, sim.finishFunnelDepth, opts.timeMs);
+      // Over the chevrons and under the chequers, which is where they sit in the
+      // world: a dot is a thing IN the carpet, and the line is still the brightest
+      // thing in that stretch of sky.
+      drawMotes(ctx, cam, snap.motes, opts.timeMs);
       drawFinishLine(ctx, cam, field, finishY);
     }
     this.bodyRenderer.draw(

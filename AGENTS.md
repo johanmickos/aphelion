@@ -115,6 +115,26 @@ in `PROTOTYPE_CONFIG`, so the equality gate stays at zero; the ceremony and the
 sheets are `src/render/`, authored rather than simulated, for the reasons
 `src/render/attract.ts` gives at length.
 
+**The carpet is a play zone, and the button means something else in it.** Inside
+`runInBand` a press does not grab: `grabTarget` returns `carved`, which is a
+fourth kind of answer beside `captured` and the refusals. That is a rule and not
+an emergence, and the measurement is why — `grabRange` and `finishFunnelDepth`
+are both 560, so the topmost planet is in reach from every point of the carpet
+and every press there took it. Do not "simplify" it back to carving only when no
+grab is on offer; that was the first version and it never fired once.
+
+The carve is a flat LATERAL acceleration, never a turning force. A sideways push
+on a ship that is always rising cannot reverse the climb however long it is held,
+which is how "no going backwards" is a property of the force rather than a clamp
+bolted on after it. `carpetLift` only has to catch a ship that arrived falling,
+and it is a one-sided spring rather than a clamp on `vy` for the reason its note
+gives.
+
+`SimState.signature` is written by `stepSim` and read by nothing under
+`src/sim/`. It is not `Trail` and must not be rebuilt from it — a wake is capped
+and clears on respawn. It is excluded from `fingerprint()`, like `chargedT` and
+for the same reason.
+
 **A cleared run does not respawn.** `stepSim` holds it, deliberately, because what
 happens next is the caller's decision. A death does respawn on its own after
 `crashPause`, and the app freezes that hold — rather than racing it — while a

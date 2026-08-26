@@ -73,6 +73,63 @@ export interface Anomaly {
 
 export type Body = Planet | Anomaly;
 
+// ---------------------------------------------------------------------- motes
+
+/**
+ * A green dot in the run-in carpet: flown through rather than grabbed.
+ *
+ * DELIBERATELY NOT A THIRD `Body.kind`, which is what `docs/IDEAS.md` proposed
+ * and what `contactPolicy` would have made cheap. A body is a thing with mass and
+ * a surface, and every one of those facts is load-bearing somewhere: `fieldBounds`
+ * takes the crest from the topmost body, so a dot placed above the last planet
+ * would MOVE THE FINISH LINE; `nearestBody` would offer one to a press; the
+ * capture loop would bounce off it. A dot has none of those properties — it has a
+ * position and a boolean — so it is its own list, and the four subsystems that
+ * would each have needed a `kind !== 'mote'` guard never learn it exists.
+ *
+ * Only `taken` ever changes, and only from false to true within a life; a respawn
+ * puts them all back. That is what keeps the carpet the same puzzle on every
+ * attempt.
+ */
+export interface Mote {
+  x: number;
+  y: number;
+  taken: boolean;
+}
+
+// ------------------------------------------------------------------ signature
+
+/**
+ * The line the ship drew through the carpet, kept so the ceremony can show it.
+ *
+ * IT CANNOT COME FROM `Trail`. That is capped at `trailMax` points and cleared on
+ * a respawn — it is a wake, which is a picture of the last half second, not a
+ * record. This opens when the ship enters the run-in band and closes when the run
+ * does, and because it is written by `stepSim` it is a pure function of
+ * `(config, seed, inputLog)` like everything else: a replay reproduces the same
+ * signature the player was shown, which is what would make one shareable or
+ * verifiable rather than decorative.
+ *
+ * NOTHING IN THE SIMULATION READS IT. It is written in the same spirit as
+ * `Telemetry` and excluded from `fingerprint()` for the same reason — a report
+ * recorded before it existed must not read as diverged — but it is not
+ * diagnostics, so it does not live there.
+ *
+ * SAMPLED BY DISTANCE, AND DECIMATED RATHER THAN TRUNCATED. Sampling every tick
+ * would make the density depend on speed, which is exactly the defect `Trail`'s
+ * header records about the prototype. And when the buffer fills, dropping the
+ * OLDEST points would quietly amputate the start of the signature — the part
+ * nearest the crest, where the carving usually begins. Throwing away every second
+ * point instead and doubling the spacing keeps the whole shape at half the
+ * resolution, which is a thing nobody can see.
+ */
+export interface Signature {
+  /** Path points in world coordinates, oldest first. */
+  pts: Vec[];
+  /** Current sample spacing, px. Doubles each time the buffer is decimated. */
+  spacing: number;
+}
+
 // -------------------------------------------------------------------- contact
 
 /**
@@ -268,9 +325,16 @@ export interface EndingState {
 
 // ------------------------------------------------------------------- telemetry
 
-/** Why a grab did or did not take. */
+/**
+ * What a press did.
+ *
+ * `carved` is the odd one and is deliberately not a refusal: inside the run-in
+ * carpet a press bends the line instead of reaching for a planet, so nothing was
+ * asked for and nothing was denied. See `SimConfig.carpetCarve`.
+ */
 export type GrabResult =
   | 'captured'
+  | 'carved'
   | 'refused-no-fuel'
   | 'refused-crash-cone'
   | 'refused-out-of-range'
@@ -304,6 +368,38 @@ export interface SimState {
   /** Null while drifting. */
   capture: Capture | null;
   bodies: Body[];
+  /**
+   * The dots scattered through the run-in carpet. Empty when there is no carpet.
+   *
+   * Beside `bodies` rather than inside it, for the reasons `Mote` gives.
+   */
+  motes: Mote[];
+  /**
+   * The line drawn through the carpet, for the ceremony to show. See `Signature`.
+   *
+   * Written by `stepSim` and read by nothing under `src/sim/`.
+   */
+  signature: Signature;
+  /**
+   * Which way the next carve in the carpet bends: -1 left, +1 right, 0 unset.
+   *
+   * ALTERNATES ON EACH PRESS, which is the whole of what makes the carpet
+   * expressive with one button. A fixed direction only ever draws the same arc,
+   * and "toward the middle" — the other stateless rule available — is the funnel's
+   * job already and would draw nothing at all. Flipping means two taps make an S
+   * and a rhythm makes a ribbon, so the shape is the player's timing rather than
+   * the game's.
+   *
+   * The first carve of a life bends toward the centre of the field, so a press
+   * taken near a wall never opens by driving at it. After that it simply
+   * alternates.
+   *
+   * DELIBERATELY NOT IN `fingerprint()`, for the reason `chargedT` records: it
+   * changes the trajectory the moment a carve takes it, and the position and
+   * velocity already hashed catch that. Adding a field would make every report
+   * recorded before it read as diverged from its first checkpoint.
+   */
+  carveDir: number;
   /** Ship fuel. Persists across captures and regenerates during drift. */
   fuel: number;
   /**

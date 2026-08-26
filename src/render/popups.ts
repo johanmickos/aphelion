@@ -117,7 +117,7 @@ const STACK_X = 80;
  */
 const RECEIPT_TAIL = 1.8;
 
-import { BURN_WORD, HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+import { BURN_WORD, DOT, HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 
 /**
  * The dark rim that keeps text legible over planets and stars.
@@ -149,6 +149,8 @@ interface Popup {
   roll: number;
   /** A hop inside a charged window: off the rarity ladder, purple. */
   hop: boolean;
+  /** A dot in the carpet: off the rarity ladder, the finish green. */
+  dot: boolean;
   /** The closing tally of a window. Drawn large, and without a `+`. */
   tally: boolean;
 }
@@ -225,6 +227,7 @@ export class Popups {
       // once: it reads as a tally rather than as a replay.
       open.roll = ROLL;
       open.hop = open.hop || award.kind === 'hop';
+      open.dot = open.dot || award.kind === 'mote';
       // The clock restarts, so the receipt lives its tail past its LAST entry
       // rather than past its first.
       open.t = 0;
@@ -245,6 +248,7 @@ export class Popups {
       shout: null,
       roll: burning ? ROLL : 0,
       hop: award.kind === 'hop',
+      dot: award.kind === 'mote',
       tally: false,
     };
     this.live.push(popup);
@@ -284,6 +288,7 @@ export class Popups {
       points: null,
       praise: null,
       hop: false,
+      dot: false,
       tally: false,
       shout: shout.word,
       roll: 0,
@@ -311,6 +316,7 @@ export class Popups {
       points,
       praise: null,
       hop: false,
+      dot: false,
       tally: true,
       shout: null,
       roll: 0,
@@ -360,7 +366,15 @@ export class Popups {
 
       // A hop is off the ladder: it pays flat, so there is no quality for a
       // rarity colour to report. See `HOP` in `accolade.ts`.
-      const style = p.tally ? HOP_TALLY : p.hop ? HOP : p.praise ? LEVEL[p.praise.level] : ROUTINE;
+      const style = p.tally
+        ? HOP_TALLY
+        : p.hop
+          ? HOP
+          : p.dot
+            ? DOT
+            : p.praise
+              ? LEVEL[p.praise.level]
+              : ROUTINE;
       const burning = p.praise?.category === 'burn';
       // The ember is the WORD's, never the number's.
       const wordColor = burning ? BURN_WORD.color : style.color;

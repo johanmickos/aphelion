@@ -21,12 +21,30 @@ import { burn, regen } from './fuel.ts';
 import {
   backtrackFloorY,
   createBodies,
+  createMotes,
   fieldBounds,
   finishLineY,
   inAnomalyField,
   runInBand,
   SPAWN,
 } from './world.ts';
+
+/**
+ * Design px between recorded signature points, and how many are kept.
+ *
+ * Constants beside the code that writes them rather than `SimConfig` keys, by the
+ * rule the file header for `clearEaseFrames` states differently: nothing here
+ * changes a trajectory, so a knob for it would be a knob that measures as inert
+ * — and it would drag a recording parameter into the equality gate's config
+ * compare for no benefit.
+ *
+ * 8px is about four samples per ship length at the sizes the carpet is flown at.
+ * 384 covers 3km of path at that spacing, which is twice the longest carpet run
+ * measured; past it the buffer halves its resolution rather than losing its head.
+ */
+export const SIGNATURE_SPACING = 8;
+
+export const SIGNATURE_MAX = 384;
 
 /** A fresh run. Deterministic: same config in, same state out. */
 export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
@@ -35,6 +53,9 @@ export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
     ship: { x: 0, y: 0, vx: 0, vy: 0, alive: true, burstX: 0, burstY: 0, burstT: 0 },
     capture: null,
     bodies: createBodies(cfg),
+    motes: [],
+    signature: { pts: [], spacing: SIGNATURE_SPACING },
+    carveDir: 0,
     fuel: cfg.fuelMax,
     highWaterY: 0,
     ending: { active: false, t: 0, x: 0, y: 0, reason: 'impact' },
@@ -43,6 +64,8 @@ export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
     cameFrom: -1,
     telemetry: { lastGrab: null, floorSubsteps: 0, floorSubstepsTotal: 0, putterOuts: 0 },
   };
+  // After the bodies, because the carpet is positioned off the crest.
+  state.motes = createMotes(cfg, state.bodies);
   respawn(state, cfg);
   state.tick = 0;
   return state;
@@ -69,6 +92,13 @@ export function respawn(state: SimState, cfg: SimConfig): void {
   // a death would pay the next run for the last one's work.
   state.chargedT = 0;
   state.cameFrom = -1;
+  // The carpet is the same puzzle on every attempt: the dots come back and the
+  // line drawn through them is thrown away. A cleared run never gets here, which
+  // is exactly why the ceremony still has a signature to show.
+  for (const m of state.motes) m.taken = false;
+  state.signature.pts.length = 0;
+  state.signature.spacing = SIGNATURE_SPACING;
+  state.carveDir = 0;
 }
 
 /** The ship's world position, wherever it currently lives. */
@@ -113,6 +143,7 @@ function driftAccel(
   cfg: SimConfig,
   x: number,
   y: number,
+  holding: boolean,
 ): { ax: number; ay: number } {
   if (!cfg.clearAtTop || cfg.finishFunnelDepth <= 0) return { ax: 0, ay: 0 };
 
@@ -121,6 +152,21 @@ function driftAccel(
   if (band === null) return { ax: 0, ay: 0 };
   const below = y - band.top;
   if (below < 0 || below > cfg.finishFunnelDepth) return { ax: 0, ay: 0 };
+
+  // ---- the carpet lifts, whatever else is happening
+  //
+  // A ONE-SIDED SPRING, so it is silent on the climb it is meant to protect and
+  // firm on the one case that needs it: a ship that came over the crest already
+  // falling, which is the only way to be in here going the wrong way. See
+  // `SimConfig.carpetLift` for why this is not a clamp on `vy`.
+  //
+  // Outside the `holding` branch below because it is a property of the CARPET and
+  // not of the button: "you cannot go backwards in here" has to be true of a
+  // player who never presses at all, or it is not a rule, it is a reward.
+  let lift = 0;
+  if (cfg.carpetLift > 0 && state.ship.vy > -cfg.carpetRise) {
+    lift = -cfg.carpetLift * (state.ship.vy + cfg.carpetRise);
+  }
 
   // 0 at the crest, 1 at the line. Smoothed so the pull arrives rather than
   // switching on — a step change in acceleration is a shove, and the player is
@@ -140,9 +186,22 @@ function driftAccel(
   // midpoint and under a third at 80% of the way along. A smootherstep would be a
   // third of the way up by halfway, which is the shape being replaced.
   const kick = t * t * t * t * t;
+  // ---- the carve: the player's own line through the last stretch
+  //
+  // While the button is down the centring spring is OFF and a flat sideways push
+  // takes its place. The two are alternatives rather than a sum, and that is the
+  // whole feel: hold and the funnel lets go of the wheel, release and it takes it
+  // back. A carve fighting a spring stiff enough to save a wall drift is a carve
+  // that goes nowhere near the edges, which is where the interesting shapes are.
+  //
+  // NOT RAMPED BY `t`, unlike everything else here. The funnel's forces grow
+  // toward the line because they are a handover that must not switch on; this is a
+  // control, and a control whose strength depends on where you happen to be is a
+  // control that cannot be learned.
+  const carving = holding && cfg.carpetCarve > 0 && state.carveDir !== 0;
   return {
-    ax: (k * (cx - x) - damping * state.ship.vx) * t,
-    ay: -(cfg.finishFunnelHold * t + cfg.finishFunnelBoost * kick),
+    ax: carving ? state.carveDir * cfg.carpetCarve : (k * (cx - x) - damping * state.ship.vx) * t,
+    ay: -(cfg.finishFunnelHold * t + cfg.finishFunnelBoost * kick) + lift,
   };
 }
 
@@ -187,6 +246,22 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
       const result = beginCapture(state, cfg);
       state.telemetry.lastGrab = { tick: state.tick, result };
       if (result === 'captured') state.telemetry.floorSubsteps = 0;
+      // ---- the press landed in the carpet, so it bends the line instead
+      //
+      // `grabTarget` owns that decision, which is why this reads its answer rather
+      // than asking the question again: two copies of "is the ship in the run-in"
+      // is exactly the kind of pair `runInBand`'s header exists to stop.
+      //
+      // The direction flips on every press, and the first of a life bends toward
+      // the middle of the field. See `SimState.carveDir`.
+      if (result === 'carved') {
+        if (state.carveDir === 0) {
+          const fb = fieldBounds(cfg, state.bodies);
+          state.carveDir = state.ship.x > (fb.left + fb.right) / 2 ? -1 : 1;
+        } else {
+          state.carveDir = -state.carveDir;
+        }
+      }
     }
   }
   if (input.released) {
@@ -223,7 +298,7 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
     // The prototype returned from update() the instant a lethal contact landed,
     // which skips the bounds test and the fuel regen below for that one tick.
     // Reproduced deliberately: dropping it leaks one tick of regen (0.25 fuel).
-    if (stepDrift(state, cfg, dt)) {
+    if (stepDrift(state, cfg, holding, dt)) {
       state.tick++;
       return;
     }
@@ -240,6 +315,22 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // the mark resumes at the release point, which is the height actually kept.
   const banking = !(cfg.holdClimbInCapture && state.capture);
   if (banking && pos.y < state.highWaterY) state.highWaterY = pos.y;
+
+  // ---- the carpet's own bookkeeping: what was collected, and the line drawn
+  //
+  // Before the endings below rather than after, so the last tick of a life is
+  // recorded as part of it. It reads the resolved world position, so a ship that
+  // swings through the carpet while still attached to the last planet collects and
+  // draws exactly as a drifting one does — the dots are flown through, and how you
+  // came to be flying through them is not something they have an opinion about.
+  // The run-in, computed once: the signature is written inside it and the bumpers
+  // below guard it, and two derivations of one region is the bug `runInBand`'s
+  // header exists to have stopped happening.
+  const band = runInBand(cfg, fb);
+  collectMotes(state, cfg, pos.x, pos.y);
+  if (cfg.carpetCarve > 0 && band !== null && pos.y >= band.top && pos.y <= band.bottom) {
+    recordSignature(state, pos.x, pos.y);
+  }
 
   // Falling too far behind the high-water mark ends the run. The floor trails the
   // climb, so it is pressure to keep going rather than a wall you meet once.
@@ -328,7 +419,6 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   // not the rule the player will remember. Only the drift is reflected, because
   // an orbit will carry itself back anyway and rewriting a capture's velocity
   // would be reaching into a manoeuvre that is already resolving.
-  const band = runInBand(cfg, fb);
   const inRunIn =
     cfg.finishBumper > 0 && band !== null && pos.y <= band.bottom && pos.y >= band.top;
   if (inRunIn && !state.capture) {
@@ -814,10 +904,65 @@ function updateDefl(state: SimState): void {
 }
 
 /**
+ * Take any dot the ship is passing through.
+ *
+ * Proximity and nothing else — no contact, no bounce, no policy. A dot has no
+ * surface, which is the difference between flying THROUGH something and hitting
+ * it, and it is why these are not bodies.
+ *
+ * The whole list is swept every tick. Ten dots against sixty bodies and eight
+ * substeps of gravity is not a cost worth indexing away, and a spatial structure
+ * here would be a second thing that has to stay in step with a respawn.
+ */
+function collectMotes(state: SimState, cfg: SimConfig, x: number, y: number): void {
+  if (state.motes.length === 0 || cfg.carpetMoteRange <= 0) return;
+  const r2 = cfg.carpetMoteRange * cfg.carpetMoteRange;
+  for (const m of state.motes) {
+    if (m.taken) continue;
+    const dx = x - m.x;
+    const dy = y - m.y;
+    if (dx * dx + dy * dy <= r2) m.taken = true;
+  }
+}
+
+/**
+ * Add a point to the signature, if the ship has moved far enough since the last.
+ *
+ * BY DISTANCE, NOT BY TICK, and the buffer HALVES rather than truncating when it
+ * fills. `Signature` records why both of those are the way round they are.
+ */
+function recordSignature(state: SimState, x: number, y: number): void {
+  const sig = state.signature;
+  const last = sig.pts[sig.pts.length - 1];
+  if (last) {
+    const dx = x - last.x;
+    const dy = y - last.y;
+    if (dx * dx + dy * dy < sig.spacing * sig.spacing) return;
+  }
+  sig.pts.push({ x, y });
+  if (sig.pts.length <= SIGNATURE_MAX) return;
+
+  // Thinned from the NEWEST end, so the point just pushed is always one of the
+  // survivors. Thinning from the oldest would drop it every other time the buffer
+  // fills, and the head of the signature is the end anchored to the ship.
+  //
+  // Both ENDS are then kept, which the parity walk does not guarantee on its own:
+  // at an even length it steps past index 0 and the line loses the moment the ship
+  // entered the carpet. The tail is put back rather than the walk being flipped,
+  // because the head has to be exact and the tail only has to be there.
+  const kept: typeof sig.pts = [];
+  for (let i = sig.pts.length - 1; i >= 0; i -= 2) kept.push(sig.pts[i]!);
+  kept.reverse();
+  if (kept[0] !== sig.pts[0]) kept.unshift(sig.pts[0]!);
+  sig.pts = kept;
+  sig.spacing *= 2;
+}
+
+/**
  * Free drift: one step per frame, no forces.
  * Returns true if the ship crashed, which aborts the rest of the tick.
  */
-function stepDrift(state: SimState, cfg: SimConfig, dt: number): boolean {
+function stepDrift(state: SimState, cfg: SimConfig, holding: boolean, dt: number): boolean {
   const { ship } = state;
 
   // Transient escape burst, decaying over boostBurstDecay seconds.
@@ -835,7 +980,7 @@ function stepDrift(state: SimState, cfg: SimConfig, dt: number): boolean {
     }
   }
 
-  const { ax, ay } = driftAccel(state, cfg, ship.x, ship.y);
+  const { ax, ay } = driftAccel(state, cfg, ship.x, ship.y, holding);
   ship.vx += ax * dt;
   ship.vy += ay * dt;
   ship.x += (ship.vx + bx) * dt;

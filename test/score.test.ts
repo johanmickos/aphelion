@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, PROTOTYPE_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
-import { createBodies, fieldBounds, inAnomalyField } from '../src/sim/world.ts';
+import { createBodies, fieldBounds, inAnomalyField, runInBand } from '../src/sim/world.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { grabTarget } from '../src/sim/capture.ts';
 import { hypot } from '../src/sim/orbit.ts';
@@ -214,6 +214,21 @@ const FLYBY_SHIP = { x: FLYBY_BODY.x - 160, y: FLYBY_BODY.y + 800, vx: 0, vy: -5
 const FAR_BODY = createBodies(DEFAULT_CONFIG).find((b) => b.name === 'P18')!;
 
 /**
+ * A ship entering the run-in carpet, centred and climbing at an ordinary crossing
+ * speed.
+ *
+ * `runInBand` rather than arithmetic on the crest, because that helper is the one
+ * definition of where the carpet is and a second copy here would be free to drift
+ * from it — which is the bug its own header is about.
+ */
+const CARPET_SHIP: Ship = (() => {
+  const cfg = DEFAULT_CONFIG;
+  const fb = fieldBounds(cfg, createBodies(cfg));
+  const band = runInBand(cfg, fb)!;
+  return { x: (fb.left + fb.right) / 2, y: band.bottom - 4, vx: 0, vy: -320 };
+})();
+
+/**
  * The sessions every weight is measured against.
  *
  * One is not enough, for the same reason `test/tune.test.ts` needs several: a
@@ -340,6 +355,39 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
       [200, 0],
     ],
     ticks: 400,
+  },
+  /**
+   * Carving up the run-in carpet, taking dots on the way.
+   *
+   * Here for the same reason the nerve grab, the anomaly and the flyby are:
+   * nothing else in the battery gets anywhere near the crest — the pilot flies
+   * 4000 ticks and the field is sixty bodies deep — so without it `moteBonus`
+   * measures as inert, which is a blind spot in the fixture rather than a dead
+   * weight.
+   *
+   * Staged rather than flown, and cheaply: the ship is dropped in at the bottom of
+   * the band already climbing, which is the state a real run arrives in. The
+   * presses alternate the carve, so the line weaves across the chain of dots
+   * instead of riding the funnel straight up the middle — the run collects two
+   * dots doing nothing at all and more than twice that when it is flown.
+   *
+   * The band is derived from the field rather than written down, for the reason
+   * the anomaly session gives: a hardcoded height would silently stop reaching the
+   * carpet the first time anything about the field moved, and the test would go
+   * quietly green while covering nothing.
+   */
+  {
+    name: 'carving the run-in carpet',
+    ship: CARPET_SHIP,
+    edges: [
+      [3, 1],
+      [17, 0],
+      [29, 1],
+      [43, 0],
+      [55, 1],
+      [69, 0],
+    ],
+    ticks: 200,
   },
   {
     name: 'out to an anomaly and back',
