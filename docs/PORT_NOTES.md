@@ -3635,6 +3635,83 @@ was already taken twice (`RenderConfig.gaugeFollow`, `drawFuelGauge`).
 
 ---
 
+### 62 — The glyph was never the problem, and three rounds of redrawing proved it
+
+The doom skull was reported as "a bit bubbly and not immediately recognisable as
+death", redrawn, then reported as "too blocky/bulky, and near impossible to tell
+what it is due to the busy overlap of bones". Every attempt to fix it added
+detail, and at eleven pixels detail subtracts legibility.
+
+What fixed it was context, not draughtsmanship: a plate to sit on, a fixed place
+to sit, and a word beside it. `src/render/warnings.ts` is a panel of ship-local
+warning lights below the ship — asked for as "kind of like how a car dashboard
+has dedicated slots for its warning lights" — and once position and a word carry
+the identity, the glyph does not have to. It is three features now: a cranium and
+two sockets whose top edge slants toward the nose. The crossbones, the nose and
+the tooth gap are gone.
+
+**The overlap complaint was systematic, and a test was pinning the bug.** The
+skull sat on the "away from the boundary" axis, and for every wall that is the
+same direction as the wake — a ship heading at the left wall trails to the right,
+and away from the left wall is right. It was drawn on the trail every single
+time, not occasionally. `test/render.test.ts` had asserted exactly that placement
+("left wall -> skull sits right of the ship"), so the suite was enforcing it. The
+pin is inverted now: the wall does not move the skull at all.
+
+**Two of the panel's decisions were measured rather than reasoned.**
+
+| question                          | measurement                                  |
+| --------------------------------- | -------------------------------------------- |
+| reserve a slot per light?         | two lights coincide **3s in 71.8 minutes** — 1.8% of the time anything is lit |
+| does a fated ship actually die?   | drifting **95%**, captured **134 of 135**     |
+
+The first killed reserved slots: a real dashboard fixes a position per light so
+position carries identity, but optimising a 1.8% case at the expense of the 98.2%
+one is the wrong trade. First-best occupancy — worst warning takes the row
+nearest the ship — with the second stacking below.
+
+The second chose the word. `DOOMED` and `LOST` are claims about the outcome, and
+the condition is only "no single press-and-hold from here turns the ship away" —
+it never tries releasing and grabbing a different body, which is a real escape.
+`SOS` asserts nothing but trouble, which is exactly what is known, and is three
+characters instead of six.
+
+**The skull was firing for the wrong population.** `doomed` was armed only by
+`armRescue`, on the first tick of a capture, so it meant "you pressed too late"
+and a player who never pressed was told nothing. 182 of 199 out-of-bounds deaths
+(91%) pass through a state where a wall is ahead and no press reaches it;
+`Deadline.fated` now carries that half, at no new simulation cost since the
+projection is already computed ten times a second for the track.
+
+**Both halves are required, which is the opposite of the first proposal.**
+Deleting `ScoreState.doomed` in favour of the new one would have made the skull
+vanish on the very press that sealed the run — `rescueDeadline` returns null while
+captured, so the drifting half goes quiet exactly when the player panics and
+grabs. They are disjoint by construction, so it is one meaning in two states,
+resolved in `scene.ts` and leaving `verdict.ts` with a single input.
+
+**A clock bug fell out of it.** `Deadline.observe` and `Deadline.update` were both
+advancing the press-confirm's age — the first on the simulation tick, the second
+per frame — so it expired in roughly half its configured 0.25s and had never once
+been seen at full length. `update` is the clock; `observe` decides only what
+exists, and no longer takes a `dt`.
+
+**And the ending notice was describing the minority.** `LOST — OFF COURSE` names a
+navigational drift, but of 195 side-wall deaths, 126 (65%) were on fire within the
+final half second and 95 (48%) still alight on the last tick. Two thirds of the
+time the player was dragging the wall inside the red band with flames round the
+ship, being told they had wandered off course. `LOST — BURNED UP` when the ship was
+still burning, read off `burnHeat` on the last live tick with no window and no
+threshold — `endLife` zeroes it and runs after the seal. The debrief line got the
+same fix: `driftTicks` resets on a capture, so 48% of wall deaths reported
+"ADRIFT 0.02s", a true sentence describing nothing the player did.
+
+Two gaps were measured and deliberately left; both are written up in
+`docs/IDEAS.md` with their numbers. The larger: 48% of wall deaths happen while
+captured, where neither the deadline track nor the SOS light can fire at all.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

@@ -180,6 +180,56 @@ carries the measurement it was found by, because re-finding it is most of the wo
   captures ended at a side wall inside 20 seconds. Worth measuring before assuming
   it is a skill issue.
 
+### Next steps from the warning-panel session (parked 2026-08-25)
+
+Both were measured during the session that built `src/render/warnings.ts`, and
+both were deliberately left rather than forgotten. Each carries the number that
+makes it worth doing, because re-finding it is most of the work.
+
+- **Half of all wall deaths get no cue at all, because the ship is CAPTURED.**
+  Measured over the corpus: of 199 out-of-bounds deaths, 95 (48%) were captured on
+  the very last tick and 106 (53%) captured for most of the final half second.
+  `rescueDeadline` returns null while captured — deliberately, since the escape
+  from a capture is a release rather than a grab — so neither the deadline track
+  nor the SOS light can fire for any of them. The player drags the wall on fire,
+  earning points, and the game says nothing until the run ends.
+
+  The missing piece is NOT another deadline search. That one is expensive because
+  it evaluates a press at dozens of sampled points; the captured question needs a
+  single forward simulation: clone the state, step with HOLD to the horizon, and
+  see whether the run ends out of bounds. If it does, the capture is going to kill
+  you. Cheap enough to run at the same 10Hz the deadline already runs at, and it
+  reuses `cloneState` and the cheap-refusal bound already in `src/sim/rescue.ts`.
+
+  **The design call to make first, because it is not a bug fix.** Such a cue would
+  have a VERB — "keep holding and you go out", whose answer is to let go — and the
+  deadline was deliberately built with none (it is a risk dial you learn to aim at,
+  not a prompt you react to). Adding a cue that tells the player what to do is a
+  different kind of thing from everything else on screen, and this repo has
+  reversed two features that were decided casually.
+
+- **The third warning light should be a refused grab.** The panel takes one more
+  row for almost nothing, and this is the same class of problem the fuel badge was
+  invented for: you pressed, nothing happened, and the explanation is 200px away in
+  the HUD readout. Measured frequency over 71.8 minutes:
+
+  | refusal              | count | rate     |
+  | -------------------- | ----- | -------- |
+  | `refused-crash-cone` | 21    | 0.29/min |
+  | `refused-out-of-range` | 20  | 0.28/min |
+  | `refused-no-fuel`    | 0     | never    |
+  | `refused-no-body`    | 0     | never    |
+
+  Worth knowing before building it: only two of the four refusal reasons ever
+  actually fire, so this is one light with two words rather than four. The empty
+  tank case is already the fuel badge's — `FuelWarning.observe` fires `empty` on
+  `refused-no-fuel` — which is why that row reads zero here rather than being
+  missing.
+
+  Two other candidates were measured and are weaker: riding the minimum-orbit
+  floor (0.21s/min, explains a capture that feels dead) and puttering out
+  mid-settle (0.15/min). Both are currently visible only in diagnostics.
+
 ## Easter Eggs
 - Award for most orbits around single planet (award: 10 or more)
 - Award for bumping into planet (i.e. bumpy orbits due to coming straight on)
