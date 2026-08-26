@@ -47,11 +47,11 @@
  * going — and inventing a second meaning on top of that would be the thing
  * `accolade.ts` spends its header warning about.
  */
-import type { Mote, Signature, SignaturePoint } from '../sim/types.ts';
+import type { Mote, Signature } from '../sim/types.ts';
 import type { Camera } from './camera.ts';
 import type { Ceremony } from './ceremony.ts';
 import type { RenderConfig } from './config.ts';
-import { trailColor } from './ship.ts';
+import { drawWakePoint } from './ship.ts';
 import { FINISH, withAlpha } from './palette.ts';
 
 /**
@@ -114,28 +114,50 @@ const INSET = 20;
 const X_GAIN = 3;
 
 /**
- * The pulse that travels down the wake, in the trail's own terms.
+ * Design units of drawn path between one point of the ribbon and the next.
  *
- * `Trail.draw` runs `0.5 + 0.5*sin((warpT*9 - f*7)*PI)` during the ceremony, which
- * sends a crest away from the ship because `f` is 1 at the head. The same numbers
- * are used here so the two read as one object while they are cross-fading, rather
- * than as a slow thing dissolving into a fast one.
+ * The curve itself, at the density that makes it a line rather than beads. Walked
+ * by DRAWN distance rather than by index, because the fit is anisotropic — equal
+ * steps along the recorded path bunch up wherever the ship was climbing straight.
  */
-const PULSE_RATE = 9;
-
-const PULSE_WAVES = 7;
+const RIBBON_GAP = 2;
 
 /**
- * How long the streak each point throws is, at the crest of the pulse.
+ * Design units between the SPARKS — the long streaks, drawn over the ribbon.
  *
- * ALONG THE CURVE, WHERE THE TRAIL'S GO STRAIGHT DOWN, and the difference is
- * argued rather than accidental. `Trail.draw` streaks its sparks down the screen
- * because they belong to the motion of the streaming field — its own comment says
- * so. Nothing streams here: this is a portrait of a path, held still, and a
- * downward smear across it would bury the one thing it exists to show. Tangent to
- * the line is where a streak on a still picture of a line belongs.
+ * TWO PASSES THROUGH ONE RENDERER, AND THE REASON IS DENSITY, NOT STYLE. `Trail`
+ * holds 16 points and throws a streak up to 31 design units off each, so its sparks
+ * are two thirds as long as the whole wake — which is exactly why it reads as warp.
+ * It gets away with it because a wake half a second long is nearly straight, so the
+ * streaks lie along the motion.
+ *
+ * A signature is a curve, and streaking every one of its 380 points buries it: at a
+ * spark every 7 units the streaks merged into a vertical bar with no shape left in
+ * it. Measured by looking, which is the only way to measure this.
+ *
+ * So the ribbon draws the shape at `warp: 0` and the sparks are laid over it at the
+ * ceremony's warp, from the same `drawWakePoint`. Nothing is restyled; one pass is
+ * simply sampled far harder than the other. 26 units puts about eight sparks along
+ * a typical signature — enough for the pulse to travel visibly, sparse enough to
+ * see the curve between them.
  */
-const STREAK = 9;
+const SPARK_GAP = 26;
+
+/**
+ * Where the signature's own `f` starts, instead of 0.
+ *
+ * `f` is the trail's position-in-wake, and everything hangs off it: size,
+ * brightness, and how long a spark is. At 0 the tail is 8% alpha and throws no
+ * streak at all, which is right for a wake half a second long — the fade means
+ * "this is a moment old". Across a whole run-in it fades out the early carving,
+ * which is the part that was hardest to fly and the most individual thing in the
+ * picture.
+ *
+ * Remapping the range is how that is fixed WITHOUT forking the renderer: the whole
+ * signature is treated as the newer two thirds of a wake, so it keeps the trail's
+ * exact curve and simply never reaches the invisible end of it.
+ */
+const F_FLOOR = 0.34;
 
 /** Where a world point lands on screen, under the fit computed below. */
 interface Fit {
@@ -197,7 +219,11 @@ function fitTo(
   if (depth <= 1) return null;
 
   const anchorY = shipY + HANG * s;
-  const floor = cam.offsetY + (cam.viewH - BOTTOM_CLEARANCE) * s;
+  // The clearance plus the streak the TAIL throws, which hangs below the lowest
+  // point of the path itself: `drawWakePoint` streaks downward and the tail sits at
+  // `F_FLOOR`, so it reaches `31 * F_FLOOR` design units past where the fit ends.
+  // Left out, the sparks are what land on the buttons instead of the line.
+  const floor = cam.offsetY + (cam.viewH - BOTTOM_CLEARANCE - 31 * F_FLOOR) * s;
   const roomH = floor - anchorY;
   const roomL = shipX - (cam.offsetX + INSET * s);
   const roomR = cam.offsetX + (cam.designW - INSET) * s - shipX;
@@ -219,71 +245,6 @@ function fitTo(
   if (!(k > 0)) return null;
 
   return { k, kx, ax: shipX - last.x * kx, ay: anchorY - last.y * k };
-}
-
-/** One point of the wake, in the treatment `Trail.draw` gives its own. */
-function drawPoint(
-  ctx: CanvasRenderingContext2D,
-  fit: Fit,
-  cam: Camera,
-  rcfg: RenderConfig,
-  pts: readonly SignaturePoint[],
-  i: number,
-  t: number,
-): void {
-  const p = pts[i]!;
-  const n = pts.length;
-  const s = cam.scale;
-  const f = i / (n - 1 || 1); // 0 at the tail, 1 at the head
-  const { trailSpeedCalm: calm, trailSpeedHot: hot } = rcfg;
-  const heat = Math.max(0, Math.min(1, (p.speed - calm) / Math.max(1, hot - calm)));
-  const base = trailColor(heat);
-  const at = place(fit, p.x, p.y);
-
-  // The crest travels away from the ship, because `f` is 1 at the head — the same
-  // sign and the same rate `Trail.draw` uses, so the two agree while they are
-  // cross-fading rather than reading as a slow thing dissolving into a fast one.
-  const wave = 0.5 + 0.5 * Math.sin((t * PULSE_RATE - f * PULSE_WAVES) * Math.PI);
-  const peak = trailColor(1);
-  const cr = Math.round(base[0] + (peak[0] - base[0]) * wave * 0.6);
-  const cg = Math.round(base[1] + (peak[1] - base[1]) * wave * 0.6);
-  const cb = Math.round(base[2] + (peak[2] - base[2]) * wave * 0.6);
-
-  // THE TAPER IS GENTLER THAN THE TRAIL'S, and it has to be. `Trail.draw` runs its
-  // alpha from 0.08 to 0.58 across a wake half a second long, where the fade means
-  // "this is a moment old". Across a whole run-in that same curve puts the first
-  // two thirds of the signature under a fifth of full — fading out precisely the
-  // early carving, which is the part that was hardest to fly.
-  const alpha = (0.3 + 0.35 * f) * (0.75 + 0.35 * heat) * (0.55 + 0.45 * wave);
-  const rad = (0.9 + (1.6 + 1.2 * heat) * f) * s;
-  const paint = `rgba(${cr},${cg},${cb},${alpha.toFixed(3)})`;
-
-  // A streak at the crest of the pulse, a dot everywhere else. The direction comes
-  // from the NEIGHBOURING POINT rather than from the ship's velocity: the drawing
-  // is scaled anisotropically, so the heading the ship actually flew is not the
-  // direction this picture runs in. See `STREAK` for why it follows the curve at
-  // all where the trail's go straight down.
-  const streak = STREAK * wave * f * s;
-  if (streak > 1) {
-    const nb = pts[i + 1] ?? pts[i - 1] ?? p;
-    const to = place(fit, nb.x, nb.y);
-    const dx = to.x - at.x;
-    const dy = to.y - at.y;
-    const len = Math.hypot(dx, dy);
-    if (len > 0.01) {
-      ctx.strokeStyle = paint;
-      ctx.lineWidth = Math.max(0.8, rad * 1.6);
-      ctx.beginPath();
-      ctx.moveTo(at.x - (dx / len) * streak * 0.5, at.y - (dy / len) * streak * 0.5);
-      ctx.lineTo(at.x + (dx / len) * streak * 0.5, at.y + (dy / len) * streak * 0.5);
-      ctx.stroke();
-      return;
-    }
-  }
-  ctx.fillStyle = paint;
-  ctx.beginPath();
-  ctx.arc(at.x, at.y, rad, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 /**
@@ -312,7 +273,6 @@ export function drawSignature(
   const s = cam.scale;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.lineCap = 'round';
 
   // ---- the dots, under the wake
   //
@@ -333,9 +293,52 @@ export function drawSignature(
     }
   }
 
-  for (let i = 0; i < sig.pts.length; i++) {
-    drawPoint(ctx, fit, cam, rcfg, sig.pts, i, cer.t);
-  }
+  // ---- the wake, through the trail's own renderer
+  //
+  // `drawWakePoint` is the trail's per-point drawing, extracted rather than copied:
+  // same speed ramp, same pulse, same sparks at warp. What differs is only what a
+  // point is and where it lands — see `SPARK_GAP` for the density and `F_FLOOR` for
+  // the one remap.
+  //
+  // Walked by DRAWN distance rather than by index, so the spacing is even on the
+  // picture instead of on the path: the fit is anisotropic and compresses the
+  // vertical far harder than the horizontal, so equal steps along the recorded line
+  // would bunch the sparks up wherever the ship was climbing straight.
+  // ---- the wake, through the trail's own renderer, twice
+  //
+  // `drawWakePoint` is the trail's per-point drawing, extracted rather than copied:
+  // same speed ramp, same pulse, same sparks at warp. Called once densely with the
+  // warp OFF, which draws the curve, and once sparsely with it ON, which throws the
+  // streaks. See `SPARK_GAP` for why that is two passes and not one.
+  const wake = (gapUnits: number, warp: number): void => {
+    const gap = gapUnits * s;
+    const n = sig.pts.length;
+    let last: { x: number; y: number } | null = null;
+    for (let i = 0; i < n; i++) {
+      const p = sig.pts[i]!;
+      const at = place(fit, p.x, p.y);
+      const head = i === n - 1;
+      if (!head && last) {
+        const dx = at.x - last.x;
+        const dy = at.y - last.y;
+        if (dx * dx + dy * dy < gap * gap) continue;
+      }
+      last = at;
+      drawWakePoint(ctx, rcfg, at.x, at.y, {
+        f: F_FLOOR + (1 - F_FLOOR) * (i / (n - 1 || 1)),
+        speed: p.speed,
+        scale: s,
+        warp,
+        // The ceremony's own clock, so the pulse running down the signature is in
+        // step with the one running down the live trail while they cross-fade.
+        warpT: cer.t,
+      });
+    }
+  };
+  wake(RIBBON_GAP, 0);
+  // The ceremony's own warp, so the signature streaks for exactly as long as the
+  // sky does. It arrives after the warp is full, so in practice this is 1.
+  wake(SPARK_GAP, cer.warp);
 
   ctx.restore();
 }

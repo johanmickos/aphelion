@@ -3938,6 +3938,40 @@ describe('the carpet signature', () => {
     expect(drawn(0).r.ops).toEqual([]);
   });
 
+  it('throws the same warp sparks the live trail does', () => {
+    // "The trail has longer lines like the starfield/warp speed effect. We already
+    // had that rendering well, can't we plug into the same mechanic" — so the
+    // sparks are `drawWakePoint`'s own warp branch, not a second implementation of
+    // it. What identifies them is the shape it draws: a straight vertical line down
+    // the screen, which nothing else here produces.
+    const { r } = drawn(1);
+    const strokes: number[] = [];
+    let from: [number, number] | null = null;
+    for (const [k, ...a] of r.ops) {
+      if (k === 'moveTo') from = [a[0] as number, a[1] as number];
+      else if (k === 'lineTo' && from) {
+        const [x0, y0] = from;
+        const [x1, y1] = [a[0] as number, a[1] as number];
+        if (Math.abs(x1 - x0) < 1e-9 && y1 > y0) strokes.push(y1 - y0);
+      }
+    }
+    expect(strokes.length).toBeGreaterThan(3);
+    // And they are LONG, which is the whole of what was being asked for: a spark
+    // is a meaningful fraction of the drawing rather than a tick on it.
+    expect(Math.max(...strokes)).toBeGreaterThan(8 * cam().scale);
+  });
+
+  it('keeps the curve readable underneath them', () => {
+    // The sparks are drawn far more sparsely than the ribbon, and that is the
+    // reason there are two passes: at a spark every 7 design units they merged into
+    // a vertical bar with no shape left in it. The ribbon is what stays legible, so
+    // there have to be many more of its dots than of the streaks.
+    const { r } = drawn(1);
+    const arcs = r.calls('arc').length;
+    const verticals = r.calls('lineTo').length;
+    expect(arcs).toBeGreaterThan(verticals * 3);
+  });
+
   it('is the wake, drawn in the wake’s own colours', () => {
     // THE DEFECT THIS PINS, reported off a phone: a stroked line in a colour of
     // its own put TWO wakes on the ceremony at two different scales — the live

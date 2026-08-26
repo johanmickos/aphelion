@@ -3891,14 +3891,35 @@ The live trail then cross-fades out on the same number that fades the signature 
 so there is exactly one wake at every moment and it appears to unfurl from the last
 half second into the entire run-in.
 
-Two deliberate departures from the trail, both forced by this being 380 points
-rather than 16. The alpha taper is gentler: the trail runs 0.08 to 0.58 across half
-a second, where the fade means "a moment old", and across a whole run-in that curve
-puts the first two thirds under a fifth of full — fading out precisely the early
-carving, which is the part that was hardest to fly. And the streaks follow the
-CURVE where the trail's go straight down; the trail's own comment says its sparks
-belong to the motion of the streaming field, and nothing streams in a portrait held
-still.
+The first attempt at that reinterpreted the streaks — short, and tangent to the
+curve — on the reasoning that the trail streaks DOWN because its sparks belong to a
+streaming field, and nothing streams in a portrait held still. Reported back: "I was
+really picturing it to have the same effect as the trail before, where the trail has
+longer lines like the starfield/warp speed effect. We already had that rendering
+well, can't we plug into the same mechanic." Correct, and the tidier answer:
+`drawWakePoint` came out of `Trail.draw` as a free function taking SCREEN
+coordinates, and both callers use it unchanged. There is one wake renderer.
+
+**Which left a density problem, and it needed two passes rather than a compromise.**
+`Trail` holds 16 points and throws a streak up to 31 design units off each, so its
+sparks are two thirds as long as the whole wake — that is why it reads as warp, and
+it gets away with it because a wake half a second long is nearly straight, so the
+streaks lie along the motion. A signature is a CURVE with 380 points fitted into 125
+design units of height, and streaking every one of them painted a solid vertical bar
+with no shape left in it.
+
+Toning the effect down would have given back exactly what was asked for. So the same
+renderer is called twice instead: densely with the warp OFF, which draws the curve,
+and sparsely with it ON, which throws the streaks over it. Nothing is restyled; one
+pass is sampled thirteen times harder than the other.
+
+One remap survives, and it is one line rather than a fork. `f` is the trail's
+position-in-wake and everything hangs off it — size, brightness, spark length — and
+at 0 the tail is 8% alpha with no streak at all. That is right for half a second,
+where the fade means "a moment old"; across a whole run-in it fades out the early
+carving, which is the part that was hardest to fly. The signature therefore starts
+its `f` at 0.34: the whole of it is treated as the newer two thirds of a wake, so it
+keeps the trail's exact curve and never reaches the invisible end of it.
 
 `PEARL` and `PEARL_SHEEN` went with it. A colour earns a name in `palette.ts` by
 carrying a meaning and recurring, and as the wake this inherits a ramp that already
