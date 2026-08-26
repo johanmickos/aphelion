@@ -4023,6 +4023,63 @@ that says it still reaches them — because a battery that stops reaching a mech
 reports the weight as dead, which AGENTS.md records having happened to `fuelRegen`
 twice.
 
+### 64 — The signature was removed, and the measurement says it never could have worked
+
+Five renderings of the carpet signature were built and shown to the author, each
+one satisfying the note it was asked for and none of them landing: a pearl
+polyline, then the wake's own colours, then the trail's warp sparks, then a solid
+curtain, then a curtain spaced by its own strand width. The right question was
+asked only after the fifth — "is this idea overall a good idea?" — and the answer
+is no. It is recorded here because the FEATURE is gone and the reasoning is the
+part worth keeping.
+
+**Measured over 96 carpet crossings, twelve worlds by eight ways of playing.**
+Lateral extent as a fraction of the 741px corridor, and how many times the line
+changed direction:
+
+| flown as        | extent | turns |
+| --------------- | ------ | ----- |
+| never pressed   | 11px   | 0     |
+| fast taps       | 49px   | 10    |
+| medium taps     | 69px   | 5     |
+| late flurry     | 30px   | 5     |
+| slow taps       | 173px  | 3     |
+| one long hold   | 385px  | 22    |
+
+**IT IS ANTI-CORRELATED WITH PLAYING WELL**, and that is structural rather than a
+tuning failure. `finishFunnelPull` centres a drifting ship, so each carve is being
+undone as the next one starts: the busiest, most skilful input draws a nearly
+straight line, while the single laziest input — one long hold into a bumper —
+draws the largest and most distinctive shape in the set. A player who ignored the
+carpet entirely and one who worked it hard leave marks 11px and 49px wide, which
+is the same mark.
+
+The median crossing uses 20% of the corridor's width in a band 840 deep, which is
+why every treatment needed an anisotropic gain to be legible at all. Needing to
+distort a thing to make it readable is the measurement telling you it has nothing
+to say.
+
+**And underneath that, it was a byproduct rather than a choice.** Everything else
+in this game is a decision with a consequence — grab or not, release now or later.
+The shape of a signature was not one; it was what fell out of the physics. So it
+could not be aimed at, repeated, or recognised, which is what a signature IS. No
+rendering fixes that, which is why five of them did not.
+
+What survives: the carpet as a play space, the carve with its terminal speed, the
+lift, the dots, and the geometry that keeps the band and the finish line one
+expression. What was taken out: `SimState.signature`, `SignaturePoint`, the
+recording in `stepSim`, the clone in `rescue.ts`, the field on `RenderSnapshot`,
+`src/render/signature.ts`, and the `drawWakePoint` extraction in `ship.ts` — that
+last one folded back into `Trail.draw`, because a shared renderer whose stated
+reason for being shared no longer exists is debt rather than design.
+
+The replacement is decided and not yet built: the dots become ROUTES through the
+carpet, several of them, and completing one earns an authored emblem. That inverts
+every number above — a handful of discrete shapes instead of a continuum of
+near-identical squiggles, legible at leaderboard size, correlated with skill
+because the route has to be flown, and aimable, which is the thing that gives a
+victory lap a reason to be replayed.
+
 ---
 
 ## Tuning vs. fidelity

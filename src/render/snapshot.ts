@@ -3,14 +3,7 @@
  * per frame. Keeping this narrow is what stops rendering from reaching into sim
  * internals and re-deriving things the sim already computed.
  */
-import type {
-  CapturePhase,
-  EndingReason,
-  GrabResult,
-  Mote,
-  Signature,
-  SimState,
-} from '../sim/types.ts';
+import type { CapturePhase, EndingReason, GrabResult, Mote, SimState } from '../sim/types.ts';
 import type { SimConfig } from '../sim/config.ts';
 import { escapeSpeed, hypot } from '../sim/orbit.ts';
 import { grabTarget } from '../sim/capture.ts';
@@ -83,22 +76,18 @@ export interface RenderSnapshot {
    */
   chargedFrac: number;
   /**
-   * The carpet's dots, and the line drawn through them.
+   * The carpet's dots.
    *
-   * LIVE REFERENCES INTO `SimState`, which is the one place this file's rule about
-   * staying narrow bends, and it bends for a reason rather than for convenience.
-   * Both are lists that change size, so copying them per tick would allocate on
-   * every frame for a picture that is identical between ticks; and neither is
-   * interpolated, because neither is a position of the ship. `lerpSnapshot` carries
-   * them through untouched for the same reason it carries `bodies`-shaped facts
-   * through: there is nothing between two ticks to interpolate.
+   * A LIVE REFERENCE INTO `SimState`, which is the one place this file's rule about
+   * staying narrow bends, and it bends for a reason rather than convenience: it is
+   * a list that changes size, so copying it per tick would allocate on every frame
+   * for a picture identical between ticks, and it is not interpolated because it is
+   * not a position of the ship.
    *
    * READ-ONLY HERE. `src/render/` may draw them and must never write them —
-   * `taken` belongs to `stepSim`, which is what keeps a replay's signature the
-   * signature the player was shown.
+   * `taken` belongs to `stepSim`.
    */
   motes: readonly Mote[];
-  signature: Signature;
 }
 
 export function captureSnapshot(state: SimState, held: boolean, cfg: SimConfig): RenderSnapshot {
@@ -144,7 +133,6 @@ export function captureSnapshot(state: SimState, held: boolean, cfg: SimConfig):
     chargedFrac:
       cfg.chargedSecs > 0 ? Math.max(0, Math.min(1, state.chargedT / cfg.chargedSecs)) : 0,
     motes: state.motes,
-    signature: state.signature,
   };
 }
 

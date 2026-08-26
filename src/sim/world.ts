@@ -318,7 +318,7 @@ function finishAboveCrest(cfg: SimConfig, crest: number): number | null {
   // defect the note in `stepSim` calls "unplayable in the most annoying possible
   // way". The setting is a FEEL choice: how much sky there is between the last
   // planet and the finish, which is how long the carpet lasts and therefore how
-  // much of a signature there is room to draw.
+  // much there is room to do in it.
   //
   // They were the same 560 by coincidence, and raising the carpet on its own would
   // have pushed the band DOWN past the crest — putting the carve where the

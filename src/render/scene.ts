@@ -35,7 +35,6 @@ import type { WarningLight } from './warnings.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash, drawFinishFlash } from './ceremony.ts';
 import type { Ceremony } from './ceremony.ts';
 import { CLEARED_SHEET, DEATH_SHEET, drawSheet } from './sheet.ts';
-import { drawSignature } from './signature.ts';
 
 import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
@@ -133,20 +132,7 @@ export class Scene {
       ctx.save();
       ctx.translate(to.x - sx, to.y - sy);
     }
-    // ---- one wake at a time
-    //
-    // The signature IS this wake, drawn whole and fitted, so both at once is the
-    // same object at two scales — reported from a phone as "a thin white line
-    // overlaid with the existing shiny trail". They cross-fade on one number, so
-    // the wake appears to unfurl from the last half second into the entire run-in
-    // rather than either being cut.
-    const sigFade = cer ? cer.sheet : 0;
-    if (sigFade < 0.995) {
-      ctx.save();
-      ctx.globalAlpha = 1 - sigFade;
-      this.trail.draw(ctx, cam, snap.x, snap.y, cer ? cer.warp : 0, cer ? cer.t : 0);
-      ctx.restore();
-    }
+    this.trail.draw(ctx, cam, snap.x, snap.y, cer ? cer.warp : 0, cer ? cer.t : 0);
     drawAlignGlow(ctx, cam, snap, bestAlign, opts.timeMs);
     // Nose up through the ceremony. See `drawShip`'s `heading`.
     drawShip(
@@ -163,23 +149,6 @@ export class Scene {
     // After the ship, so it is never drawn under it, and OUTSIDE the shift so it
     // stamps the moment rather than receding with the world.
     if (cer && to) drawFinishFlash(ctx, cam, cer, to.x, to.y);
-    // The line drawn through the carpet, hung off the hull. Outside the shift for
-    // the same reason the flash is — it belongs to the frozen ship, not to the
-    // world falling away behind it — and after both, because it is the last thing
-    // the eye should be able to follow down from the ship.
-    if (cer && to) {
-      drawSignature(
-        ctx,
-        cam,
-        this.deps.render,
-        cer,
-        snap.signature,
-        snap.motes,
-        to.x,
-        to.y,
-        sigFade,
-      );
-    }
   }
 
   /**

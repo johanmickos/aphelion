@@ -1,17 +1,16 @@
 /**
- * The run-in carpet as a play zone: the carve, the lift, the dots, the signature.
+ * The run-in carpet as a play zone: the carve, the lift and the dots.
  *
  * The stretch between the last planet and the finish line used to be a corridor
  * the funnel carried you down. It is now the one place in the game where the
- * button does something other than reach for a planet, and these pin the four
- * facts that makes true — each of which was, at some point during the build,
- * false in a way that looked fine.
+ * button does something other than reach for a planet, and these pin the facts
+ * that makes true — each of which was, at some point during the build, false in a
+ * way that looked fine.
  */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, FIXED_DT, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, respawn, shipWorldPos, stepSim } from '../src/sim/step.ts';
-import { SIGNATURE_MAX, SIGNATURE_SPACING } from '../src/sim/step.ts';
 import { createMotes, fieldBounds, runInBand } from '../src/sim/world.ts';
 import { grabTarget } from '../src/sim/capture.ts';
 import type { Input, SimState } from '../src/sim/types.ts';
@@ -396,69 +395,6 @@ describe('the dots', () => {
   });
 });
 
-describe('the signature', () => {
-  it('records only inside the carpet, and by distance rather than by tick', () => {
-    // Down at the spawn, which is the whole field below the carpet: nothing is
-    // written however far the ship flies.
-    const spawned = createInitialState(cfg);
-    for (let i = 0; i < 120; i++) stepSim(spawned, cfg, NO_INPUT, FIXED_DT);
-    expect(spawned.signature.pts).toHaveLength(0);
-
-    const state = inCarpet(cfg, 4);
-    fly(state, cfg, [], 400);
-    expect(state.signature.pts.length).toBeGreaterThan(8);
-    const band = bandOf(cfg, state);
-    for (const p of state.signature.pts) {
-      expect(p.y).toBeGreaterThanOrEqual(band.top - 1);
-      expect(p.y).toBeLessThanOrEqual(band.bottom + 1);
-    }
-    // Consecutive points are a spacing apart, not a tick apart: the density of the
-    // line must not depend on how fast the ship was going.
-    for (let i = 1; i < state.signature.pts.length; i++) {
-      const a = state.signature.pts[i - 1]!;
-      const b = state.signature.pts[i]!;
-      expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeGreaterThanOrEqual(SIGNATURE_SPACING);
-    }
-  });
-
-  it('survives the ending it is drawn for', () => {
-    // A cleared run never respawns, which is the only reason the ceremony has a
-    // line to show. Pinned because `respawn` clears it and the two facts have to
-    // stay on the right sides of each other.
-    const state = inCarpet(cfg, 4);
-    fly(state, cfg, [], 400);
-    expect(state.ending.reason).toBe('cleared');
-    expect(state.signature.pts.length).toBeGreaterThan(8);
-  });
-
-  it('halves rather than truncating when the buffer fills', () => {
-    // Dropping the OLDEST points would amputate the start of the signature — the
-    // part nearest the crest, where the carving begins. Thinning keeps the whole
-    // shape at half the resolution, and thinning from the NEWEST end keeps the
-    // point just written, which is the end anchored to the ship.
-    const state = inCarpet(cfg, 4);
-    const sig = state.signature;
-    const first = { x: 100, y: 0, speed: 300 };
-    for (let i = 0; i < SIGNATURE_MAX; i++)
-      sig.pts.push(i === 0 ? first : { x: 100 + i, y: 0, speed: 300 });
-
-    // One more sample, written through the real path, tips it over. Teleporting
-    // the ship is what guarantees the spacing test passes and a point is actually
-    // taken; the band is where it has to be for anything to be written at all.
-    const band = bandOf(cfg, state);
-    state.ship.y = band.top + 100;
-    state.ship.x = 4000;
-    stepSim(state, cfg, NO_INPUT, FIXED_DT);
-
-    expect(sig.pts.length).toBeLessThanOrEqual(SIGNATURE_MAX / 2 + 1);
-    expect(sig.spacing).toBe(SIGNATURE_SPACING * 2);
-    // Both ends survive: the tail is where the ship entered the carpet and the
-    // head is what the ceremony pins to the hull.
-    expect(sig.pts[0]).toEqual(first);
-    expect(sig.pts[sig.pts.length - 1]!.x).toBeGreaterThan(3000);
-  });
-});
-
 describe('none of it exists in the prototype', () => {
   it('leaves every carpet key at zero, which is what keeps the gate at zero', () => {
     expect(PROTOTYPE_CONFIG.carpetCarve).toBe(0);
@@ -469,7 +405,7 @@ describe('none of it exists in the prototype', () => {
     expect(PROTOTYPE_CONFIG.carpetMoteRange).toBe(0);
   });
 
-  it('builds no dots and writes no signature, because it has no run-in at all', () => {
+  it('builds no dots, because it has no run-in at all', () => {
     // `runInBand` is null without `clearAtTop`, so the whole feature is unreachable
     // there rather than merely switched off — which is the same thing that makes a
     // report recorded before any of this existed replay unchanged.

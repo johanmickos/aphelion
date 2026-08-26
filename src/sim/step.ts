@@ -29,23 +29,6 @@ import {
   SPAWN,
 } from './world.ts';
 
-/**
- * Design px between recorded signature points, and how many are kept.
- *
- * Constants beside the code that writes them rather than `SimConfig` keys, by the
- * rule the file header for `clearEaseFrames` states differently: nothing here
- * changes a trajectory, so a knob for it would be a knob that measures as inert
- * — and it would drag a recording parameter into the equality gate's config
- * compare for no benefit.
- *
- * 8px is about four samples per ship length at the sizes the carpet is flown at.
- * 384 covers 3km of path at that spacing, which is twice the longest carpet run
- * measured; past it the buffer halves its resolution rather than losing its head.
- */
-export const SIGNATURE_SPACING = 8;
-
-export const SIGNATURE_MAX = 384;
-
 /** A fresh run. Deterministic: same config in, same state out. */
 export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
   const state: SimState = {
@@ -54,7 +37,6 @@ export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
     capture: null,
     bodies: createBodies(cfg),
     motes: [],
-    signature: { pts: [], spacing: SIGNATURE_SPACING },
     carveDir: 0,
     fuel: cfg.fuelMax,
     highWaterY: 0,
@@ -92,12 +74,9 @@ export function respawn(state: SimState, cfg: SimConfig): void {
   // a death would pay the next run for the last one's work.
   state.chargedT = 0;
   state.cameFrom = -1;
-  // The carpet is the same puzzle on every attempt: the dots come back and the
-  // line drawn through them is thrown away. A cleared run never gets here, which
-  // is exactly why the ceremony still has a signature to show.
+  // The carpet is the same puzzle on every attempt: the dots come back, so the
+  // choice they present is the same choice.
   for (const m of state.motes) m.taken = false;
-  state.signature.pts.length = 0;
-  state.signature.spacing = SIGNATURE_SPACING;
   state.carveDir = 0;
 }
 
@@ -338,22 +317,15 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   const banking = !(cfg.holdClimbInCapture && state.capture);
   if (banking && pos.y < state.highWaterY) state.highWaterY = pos.y;
 
-  // ---- the carpet's own bookkeeping: what was collected, and the line drawn
+  // ---- the carpet's own bookkeeping: what was collected
   //
-  // Before the endings below rather than after, so the last tick of a life is
-  // recorded as part of it. It reads the resolved world position, so a ship that
-  // swings through the carpet while still attached to the last planet collects and
-  // draws exactly as a drifting one does — the dots are flown through, and how you
-  // came to be flying through them is not something they have an opinion about.
-  // The run-in, computed once: the signature is written inside it and the bumpers
-  // below guard it, and two derivations of one region is the bug `runInBand`'s
-  // header exists to have stopped happening.
+  // Before the endings below rather than after, so the last tick of a life counts.
+  // It reads the resolved world position, so a ship that swings through the carpet
+  // while still attached to the last planet collects exactly as a drifting one does
+  // — the dots are flown through, and how you came to be flying through them is not
+  // something they have an opinion about.
   const band = runInBand(cfg, fb);
   collectMotes(state, cfg, pos.x, pos.y);
-  if (cfg.carpetCarve > 0 && band !== null && pos.y >= band.top && pos.y <= band.bottom) {
-    const vel = shipVelocity(state);
-    recordSignature(state, pos.x, pos.y, hypot(vel.vx, vel.vy));
-  }
 
   // Falling too far behind the high-water mark ends the run. The floor trails the
   // climb, so it is pressure to keep going rather than a wall you meet once.
@@ -946,39 +918,6 @@ function collectMotes(state: SimState, cfg: SimConfig, x: number, y: number): vo
     const dy = y - m.y;
     if (dx * dx + dy * dy <= r2) m.taken = true;
   }
-}
-
-/**
- * Add a point to the signature, if the ship has moved far enough since the last.
- *
- * BY DISTANCE, NOT BY TICK, and the buffer HALVES rather than truncating when it
- * fills. `Signature` records why both of those are the way round they are.
- */
-function recordSignature(state: SimState, x: number, y: number, speed: number): void {
-  const sig = state.signature;
-  const last = sig.pts[sig.pts.length - 1];
-  if (last) {
-    const dx = x - last.x;
-    const dy = y - last.y;
-    if (dx * dx + dy * dy < sig.spacing * sig.spacing) return;
-  }
-  sig.pts.push({ x, y, speed });
-  if (sig.pts.length <= SIGNATURE_MAX) return;
-
-  // Thinned from the NEWEST end, so the point just pushed is always one of the
-  // survivors. Thinning from the oldest would drop it every other time the buffer
-  // fills, and the head of the signature is the end anchored to the ship.
-  //
-  // Both ENDS are then kept, which the parity walk does not guarantee on its own:
-  // at an even length it steps past index 0 and the line loses the moment the ship
-  // entered the carpet. The tail is put back rather than the walk being flipped,
-  // because the head has to be exact and the tail only has to be there.
-  const kept: typeof sig.pts = [];
-  for (let i = sig.pts.length - 1; i >= 0; i -= 2) kept.push(sig.pts[i]!);
-  kept.reverse();
-  if (kept[0] !== sig.pts[0]) kept.unshift(sig.pts[0]!);
-  sig.pts = kept;
-  sig.spacing *= 2;
 }
 
 /**

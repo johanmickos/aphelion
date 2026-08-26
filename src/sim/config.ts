@@ -534,8 +534,8 @@ export interface SimConfig {
    */
   finishBumper: number;
   /**
-   * Sideways acceleration a held press applies in the carpet, px/s². 0 disables
-   * the whole play zone — the carve, the lift and the dots together.
+   * Sideways acceleration a held press applies in the carpet, px/s². 0 turns the
+   * carve off; `carpetLift` and `carpetMoteCount` switch off independently.
    *
    * THE CARPET IS THE ONE PLACE THE BUTTON DOES NOT MEAN GRAB. Everywhere else in
    * the game a press reaches for a planet; here, with nothing left in range worth

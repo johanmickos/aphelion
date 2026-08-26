@@ -97,53 +97,6 @@ export interface Mote {
   taken: boolean;
 }
 
-// ------------------------------------------------------------------ signature
-
-/**
- * The line the ship drew through the carpet, kept so the ceremony can show it.
- *
- * IT CANNOT COME FROM `Trail`. That is capped at `trailMax` points and cleared on
- * a respawn — it is a wake, which is a picture of the last half second, not a
- * record. This opens when the ship enters the run-in band and closes when the run
- * does, and because it is written by `stepSim` it is a pure function of
- * `(config, seed, inputLog)` like everything else: a replay reproduces the same
- * signature the player was shown, which is what would make one shareable or
- * verifiable rather than decorative.
- *
- * NOTHING IN THE SIMULATION READS IT. It is written in the same spirit as
- * `Telemetry` and excluded from `fingerprint()` for the same reason — a report
- * recorded before it existed must not read as diverged — but it is not
- * diagnostics, so it does not live there.
- *
- * SAMPLED BY DISTANCE, AND DECIMATED RATHER THAN TRUNCATED. Sampling every tick
- * would make the density depend on speed, which is exactly the defect `Trail`'s
- * header records about the prototype. And when the buffer fills, dropping the
- * OLDEST points would quietly amputate the start of the signature — the part
- * nearest the crest, where the carving usually begins. Throwing away every second
- * point instead and doubling the spacing keeps the whole shape at half the
- * resolution, which is a thing nobody can see.
- */
-export interface SignaturePoint extends Vec {
-  /**
-   * How fast the ship was going here, px/s.
-   *
-   * Carried so the line can be drawn the way the WAKE is — `trailColor` maps speed
-   * to a hue, and without this the signature has to be a flat stroke in a colour
-   * of its own, which is what put two different-looking wakes on the ceremony at
-   * two different scales. Derived quantities were the alternative and do not work:
-   * the points are sampled by DISTANCE, so their spacing says nothing about speed,
-   * and nothing here records a tick to difference against.
-   */
-  speed: number;
-}
-
-export interface Signature {
-  /** Path points in world coordinates, oldest first. */
-  pts: SignaturePoint[];
-  /** Current sample spacing, px. Doubles each time the buffer is decimated. */
-  spacing: number;
-}
-
 // -------------------------------------------------------------------- contact
 
 /**
@@ -388,12 +341,6 @@ export interface SimState {
    * Beside `bodies` rather than inside it, for the reasons `Mote` gives.
    */
   motes: Mote[];
-  /**
-   * The line drawn through the carpet, for the ceremony to show. See `Signature`.
-   *
-   * Written by `stepSim` and read by nothing under `src/sim/`.
-   */
-  signature: Signature;
   /**
    * Which way the next carve in the carpet bends: -1 left, +1 right, 0 unset.
    *

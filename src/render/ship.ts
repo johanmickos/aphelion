@@ -63,7 +63,7 @@ export class Trail {
     warpT = 0,
   ): void {
     const n = this.pts.length;
-    const gap = this.cfg.trailHeadGap;
+    const { trailSpeedCalm: calm, trailSpeedHot: hot, trailHeadGap: gap } = this.cfg;
     const gap2 = gap * gap;
     for (let i = 0; i < n; i++) {
       const p = this.pts[i]!;
@@ -73,125 +73,58 @@ export class Trail {
       const dy = p.y - shipY;
       if (dx * dx + dy * dy < gap2) continue;
       const f = i / (n - 1 || 1); // 0 at the tail, 1 at the head
-      drawWakePoint(ctx, this.cfg, toScreenX(cam, p.x), toScreenY(cam, p.y), {
-        f,
-        speed: p.speed,
-        scale: cam.scale,
-        warp,
-        warpT,
-      });
+      // Each point keeps the speed it was laid down at, so a boosted exit leaves
+      // a visibly hot streak that cools as the ship settles — the wake records
+      // the run rather than just reporting the current instant.
+      const heat = Math.max(0, Math.min(1, (p.speed - calm) / Math.max(1, hot - calm)));
+      let [r, g, b] = trailColor(heat);
+      const rad = (0.6 + (2.6 + 1.6 * heat) * f) * cam.scale;
+      let alpha = (0.08 + 0.5 * f) * (0.75 + 0.35 * heat);
+      const sx = toScreenX(cam, p.x);
+      const sy = toScreenY(cam, p.y);
+
+      if (warp > 0) {
+        // ---- sparks, not bubbles
+        //
+        // The first version scaled the wake's own dots up with the pulse, and a
+        // circle that grows is a bubble however brightly it is lit — reported as
+        // "too bubbly". At lightspeed a wake is not a row of beads getting bigger,
+        // it is bright specks tearing past, so the ceremony swaps the primitive
+        // rather than the parameters: a short streak, thinner than the dot it
+        // replaces and longer than it is wide.
+        //
+        // The wave still travels down the trail — `f` is 1 at the head, so
+        // subtracting it from the phase sends the crest away from the ship, which
+        // is the direction an exhaust goes. What it drives is now LENGTH and
+        // brightness, not girth.
+        const wave = 0.5 + 0.5 * Math.sin((warpT * 9 - f * 7) * Math.PI);
+        const pulse = warp * wave;
+        // Toward the hot end of the wake's own ramp rather than a new colour: the
+        // trail already means "how fast", and this is the fastest the ship goes.
+        const peak = trailColor(1);
+        r = Math.round(r + (peak[0] - r) * pulse);
+        g = Math.round(g + (peak[1] - g) * pulse);
+        b = Math.round(b + (peak[2] - b) * pulse);
+        alpha = Math.min(1, alpha * (1 + 2.6 * pulse));
+        const len = (5 + 26 * pulse) * f * cam.scale;
+        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(0.6, rad * 0.5);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        // Straight down the screen, with the streaming sky. A spark belongs to the
+        // motion of the field, not to the ship's own heading.
+        ctx.lineTo(sx, sy + len);
+        ctx.stroke();
+        continue;
+      }
+
+      ctx.beginPath();
+      ctx.arc(sx, sy, rad, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+      ctx.fill();
     }
   }
-}
-
-/** Where one point of a wake sits in it, and what the wake is doing. */
-export interface WakePoint {
-  /** 0 at the tail, 1 at the head. Drives size, brightness and streak length. */
-  f: number;
-  /** Speed the ship was going here, px/s. Drives the colour. */
-  speed: number;
-  scale: number;
-  /** 0 for ordinary flight; 1 during the ceremony's full warp. */
-  warp: number;
-  /** Seconds into the ceremony, for the pulse. */
-  warpT: number;
-}
-
-/**
- * How big a wake point draws, and how wide the streak it throws is.
- *
- * SPLIT OUT SO A CALLER CAN SPACE BY IT. `signature.ts` hangs a curtain out of
- * these streaks and needs them touching without merging, which is a statement
- * about their WIDTH — and that width varies threefold along a wake, because it is
- * built from `f` and from speed. A caller pacing itself by a fixed step gets a comb
- * at one end and a solid sheet at the other; pacing by this it gets the same
- * texture everywhere.
- *
- * `drawWakePoint` uses them too, so there is one formula rather than a copy that
- * would drift the first time a wake was retuned.
- */
-export function wakeDotRadius(cfg: RenderConfig, at: WakePoint): number {
-  const { trailSpeedCalm: calm, trailSpeedHot: hot } = cfg;
-  const heat = Math.max(0, Math.min(1, (at.speed - calm) / Math.max(1, hot - calm)));
-  return (0.6 + (2.6 + 1.6 * heat) * at.f) * at.scale;
-}
-
-export function wakeStreakWidth(radius: number): number {
-  return Math.max(0.6, radius * 0.5);
-}
-
-/**
- * One point of a wake.
- *
- * EXTRACTED SO THE SIGNATURE CAN BE DRAWN BY IT. The line a run draws through the
- * carpet is the ship's wake — the whole of it rather than the last half second —
- * and it was briefly drawn as a stroked line of its own, which put two wakes on the
- * ceremony in two different treatments. Reported as exactly that. There is one
- * renderer now, and `src/render/signature.ts` feeds it a longer path.
- *
- * Takes SCREEN coordinates rather than world ones, which is the whole reason this
- * is a free function and not a method: the trail lives in the world and the
- * signature is a fitted portrait of a path that is no longer where it happened, so
- * they agree on everything except how a point becomes a pixel.
- *
- * Each point keeps the speed it was laid down at, so a boosted exit leaves a
- * visibly hot streak that cools as the ship settles — the wake records the run
- * rather than just reporting the current instant.
- */
-export function drawWakePoint(
-  ctx: CanvasRenderingContext2D,
-  cfg: RenderConfig,
-  sx: number,
-  sy: number,
-  at: WakePoint,
-): void {
-  const { trailSpeedCalm: calm, trailSpeedHot: hot } = cfg;
-  const { f, scale, warp, warpT } = at;
-  const heat = Math.max(0, Math.min(1, (at.speed - calm) / Math.max(1, hot - calm)));
-  let [r, g, b] = trailColor(heat);
-  const rad = wakeDotRadius(cfg, at);
-  let alpha = (0.08 + 0.5 * f) * (0.75 + 0.35 * heat);
-
-  if (warp > 0) {
-    // ---- sparks, not bubbles
-    //
-    // The first version scaled the wake's own dots up with the pulse, and a
-    // circle that grows is a bubble however brightly it is lit — reported as
-    // "too bubbly". At lightspeed a wake is not a row of beads getting bigger,
-    // it is bright specks tearing past, so the ceremony swaps the primitive
-    // rather than the parameters: a short streak, thinner than the dot it
-    // replaces and longer than it is wide.
-    //
-    // The wave still travels down the trail — `f` is 1 at the head, so
-    // subtracting it from the phase sends the crest away from the ship, which
-    // is the direction an exhaust goes. What it drives is now LENGTH and
-    // brightness, not girth.
-    const wave = 0.5 + 0.5 * Math.sin((warpT * 9 - f * 7) * Math.PI);
-    const pulse = warp * wave;
-    // Toward the hot end of the wake's own ramp rather than a new colour: the
-    // trail already means "how fast", and this is the fastest the ship goes.
-    const peak = trailColor(1);
-    r = Math.round(r + (peak[0] - r) * pulse);
-    g = Math.round(g + (peak[1] - g) * pulse);
-    b = Math.round(b + (peak[2] - b) * pulse);
-    alpha = Math.min(1, alpha * (1 + 2.6 * pulse));
-    const len = (5 + 26 * pulse) * f * scale;
-    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
-    ctx.lineWidth = wakeStreakWidth(rad);
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    // Straight down the screen, with the streaming sky. A spark belongs to the
-    // motion of the field, not to the ship's own heading.
-    ctx.lineTo(sx, sy + len);
-    ctx.stroke();
-    return;
-  }
-
-  ctx.beginPath();
-  ctx.arc(sx, sy, rad, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
-  ctx.fill();
 }
 
 /**

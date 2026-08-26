@@ -321,8 +321,7 @@ export function drawSpeedCarpet(
  *
  * A taken dot is not removed. It leaves a hollow ring where it was, because the
  * carpet is a thing the player is trying to complete and a set with holes in it
- * says how you are doing in a way a shrinking set cannot. It also means the
- * signature has something to be drawn against at the end.
+ * says how you are doing in a way a shrinking set cannot.
  *
  * The pulse is driven by `timeMs` and by the dot's own position, so the row does
  * not breathe in unison — a synchronised blink reads as a UI element, and these

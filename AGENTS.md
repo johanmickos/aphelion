@@ -130,10 +130,12 @@ bolted on after it. `carpetLift` only has to catch a ship that arrived falling,
 and it is a one-sided spring rather than a clamp on `vy` for the reason its note
 gives.
 
-`SimState.signature` is written by `stepSim` and read by nothing under
-`src/sim/`. It is not `Trail` and must not be rebuilt from it — a wake is capped
-and clears on respawn. It is excluded from `fingerprint()`, like `chargedT` and
-for the same reason.
+**The carpet's output is a decision, not a picture.** A drift signature — the
+line the ship drew through the run-in, recorded and shown on the ceremony — was
+built here and removed. Do not rebuild it without reading PORT_NOTES 63: it was
+measured over 96 runs and is ANTI-correlated with playing well, because the
+funnel's centring spring cancels each carve, so the busiest input draws the
+straightest line and one lazy hold into a bumper draws the biggest shape.
 
 **A cleared run does not respawn.** `stepSim` holds it, deliberately, because what
 happens next is the caller's decision. A death does respawn on its own after
