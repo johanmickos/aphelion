@@ -55,3 +55,53 @@ export function keydownAction(k: KeyContext): KeyAction {
 export function isGrabKey(code: string): boolean {
   return code === GRAB_KEY;
 }
+
+// ------------------------------------------------------------- the results sheet
+
+/**
+ * Seconds the sheet must have been fully on screen before a tap can take it away.
+ *
+ * A GATE ON HAVING BEEN SEEN, NOT ON HAVING ARRIVED, and the difference is the
+ * whole bug. Reported as "I tried clicking after the game and accidentally just
+ * closed the final screen" — and on a clear that is expensive: dismissing rerolls
+ * the seed and rearms, so the run the sheet was reporting on stops existing.
+ *
+ * A readable-yet gate alone does not fix it. The ceremony runs about three seconds
+ * before the panel lands, which is long enough that an impatient player is already
+ * tapping; the first tap after the fade completes then lands within a mash
+ * interval of it, and the screen is gone in the same instant it appeared. So the
+ * panel has to have been STANDING for long enough to have been looked at.
+ *
+ * Half a second, chosen against the two intervals it sits between: mashing runs
+ * about 200ms apart, and a deliberate reaction to a new screen is around 250ms. It
+ * clears both. It can therefore swallow one deliberate tap, which costs half a
+ * second; the failure it prevents costs the whole result. The asymmetry is the
+ * argument.
+ */
+export const SHEET_SETTLE = 0.5;
+
+/** What the page knew when the sheet was tapped. */
+export interface SheetContext {
+  /** How far the panel has faded in, 0..1, from the last frame drawn. */
+  alpha: number;
+  /** Seconds the panel has been fully faded in. */
+  settled: number;
+}
+
+/**
+ * May this tap put the results away?
+ *
+ * The tap that dismisses is the same gesture as the tap that flies, and a player
+ * whose run just ended is usually mid-press — so the rule has to be that the
+ * dismissal is only available once there is something to dismiss AND it has been
+ * there a moment.
+ *
+ * IT LIVES HERE BECAUSE IT WAS WIRED TO ONE PATH AND NOT THE OTHER. The guard
+ * existed in `main.ts` and was applied to the keyboard only, while the pointer —
+ * the only input the game is actually played with — dismissed unconditionally. A
+ * rule written inline in a DOM shell is a rule with no test and two call sites;
+ * `keydownAction` is here for the same reason.
+ */
+export function sheetDismissible(s: SheetContext): boolean {
+  return s.alpha >= 0.999 && s.settled >= SHEET_SETTLE;
+}

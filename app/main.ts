@@ -8,7 +8,7 @@ import { DEFAULT_CONFIG, FIXED_DT, MAX_CATCHUP_STEPS } from '../src/sim/config.t
 import type { SimConfig } from '../src/sim/config.ts';
 import { createLifecycle } from '../src/app/lifecycle.ts';
 import { KNOBS } from '../src/app/tune.ts';
-import { isGrabKey, keydownAction } from '../src/app/input.ts';
+import { isGrabKey, keydownAction, sheetDismissible } from '../src/app/input.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { COURSES, courseOf, withCourse } from '../src/sim/course.ts';
 import { backtrackFloorY, fieldBounds } from '../src/sim/world.ts';
@@ -156,8 +156,12 @@ canvas.addEventListener('pointerdown', (e) => {
   // A tap that puts the sheet away is not a grab. Without this the same press
   // both dismisses the results and starts a capture on the tick after it, which
   // is a grab the player did not ask for at the worst possible moment.
+  //
+  // AND IT HAS TO BE GATED HERE TOO. It was not: `sheetReadable` guarded the
+  // keyboard and this path dismissed unconditionally, which is the input the game
+  // is actually played with. Reported as closing the final screen by accident.
   if (sheet) {
-    dismissSheet();
+    if (sheetReadable()) dismissSheet();
     return;
   }
   held = true;
@@ -345,7 +349,7 @@ let deadlineWasCaptured = false;
  *
  * So the app holds that one itself, by not stepping, and runs the fade clock.
  */
-let sheet: { kind: 'cleared' | 'death'; t: number } | null = null;
+let sheet: { kind: 'cleared' | 'death'; t: number; settled: number } | null = null;
 
 /**
  * This ending has already been offered a sheet.
@@ -374,15 +378,14 @@ function deathSheetAlpha(): number | null {
 }
 
 /**
- * Has the sheet finished arriving?
+ * Has the sheet been up long enough to take away?
  *
- * The tap that dismisses it is the same gesture as the tap that flies, and a
- * player whose run just ended is usually mid-press. Without this the results are
- * gone before they have finished fading in — dismissed by an input aimed at
- * something else entirely.
+ * The rule is `sheetDismissible` in `src/app/input.ts`, where it can be tested —
+ * `main.ts` is a DOM shell. All this does is read the two numbers it needs off the
+ * renderer and the sheet's own clock.
  */
 function sheetReadable(): boolean {
-  return sheet !== null && scene.sheetAlpha > 0.6;
+  return sheet !== null && sheetDismissible({ alpha: scene.sheetAlpha, settled: sheet.settled });
 }
 
 /**
@@ -414,6 +417,12 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
     if (paused || life.phase !== 'running') return;
     if (sheet) {
       sheet.t += dt;
+      // How long the panel has stood at full strength, which is what the dismissal
+      // is gated on. Off the RENDERER's alpha rather than off `sheet.t`, because a
+      // clear's fade is paced by how far the world has fallen and therefore by
+      // where the ship happened to cross — there is no fixed time to compare
+      // against. Frozen while paused, along with everything else here.
+      if (scene.sheetAlpha >= 0.999) sheet.settled += dt;
       // A death sheet freezes the run beneath it; a clear keeps stepping, because
       // its ceremony is animated from `ending.t` and the simulation is the thing
       // advancing that.
@@ -473,7 +482,11 @@ const loop = createLoop(FIXED_DT, MAX_CATCHUP_STEPS, {
       // What keeps failure cheap instead is the dismissal. The sheet goes as soon
       // as it is readable and one tap takes it away, so the cost of a bad run is a
       // beat rather than a wait.
-      sheet = { kind: state.ending.reason === 'cleared' ? 'cleared' : 'death', t: 0 };
+      sheet = {
+        kind: state.ending.reason === 'cleared' ? 'cleared' : 'death',
+        t: 0,
+        settled: 0,
+      };
     }
     // Recorded as well as shown. A replay recomputes these, but only while it is
     // still reproducing the run — and past a divergence it recomputes a different
