@@ -51,7 +51,8 @@ import type { Mote, Signature } from '../sim/types.ts';
 import type { Camera } from './camera.ts';
 import type { Ceremony } from './ceremony.ts';
 import type { RenderConfig } from './config.ts';
-import { drawWakePoint } from './ship.ts';
+import { drawWakePoint, wakeDotRadius, wakeStreakWidth } from './ship.ts';
+import type { WakePoint } from './ship.ts';
 import { FINISH, withAlpha } from './palette.ts';
 
 /**
@@ -114,33 +115,42 @@ const INSET = 20;
 const X_GAIN = 3;
 
 /**
- * Design units of DRAWN path between one strand of the curtain and the next.
+ * How far apart the strands are, as a multiple of how WIDE a strand is there.
  *
- * MEASURED ON THE SCREEN, NOT ALONG THE RECORDING, and that is what finally closed
- * the holes. Sampling every recorded point is not dense enough: the points are 8
- * world units apart and the fit stretches x by `X_GAIN`, so on a stretch where the
- * ship was carving sideways they land 7 device pixels apart while a strand is under
- * 5 wide. The curtain came out solid on the climbs and striated on the traverses —
- * which is a property of the fit, not of the flying, so no sampling of the input
- * could fix it.
+ * THE PITCH IS RELATIVE BECAUSE THE STRAND IS NOT A FIXED SIZE. `drawWakePoint`
+ * builds its stroke width out of `f` and speed, so a strand at the head is about
+ * three times the width of one at the tail. Every fixed step tried therefore gave
+ * two different textures in one picture, and the reports track that exactly: a comb
+ * with gaps beside it in one place, a solid sheet in another. `wakeDotRadius` is
+ * shared out of `ship.ts` so this can pace itself by the real number.
  *
- * The path is walked by arc length instead and a strand emitted every step, with
- * position, speed and `f` interpolated between the recorded points either side.
- * Density is then a fact about the picture and holds at any shape, any fit and any
- * viewport.
+ * 2: THE SEAM BETWEEN TWO STRANDS IS EXACTLY AS WIDE AS A STRAND. That is the rule,
+ * and it is chosen because it is a rule rather than a number — it holds at the head
+ * and at the tail even though the strand is three times wider at one end, and it can
+ * be checked on the drawing rather than trusted.
  *
- * 0.6 design units is about 1.2 device pixels on a 2x phone, chosen against the
- * THINNEST strand rather than the average: `drawWakePoint` sizes its stroke off `f`
- * and speed, so the tail — slowest, and furthest down the wake — draws at about 1.5
- * device pixels and is the one that would show gaps first.
+ * Both reports are one step either side of it. At 1 the strands abut and merge into
+ * a single sheet with a smooth outline: "now it's just a thick curtain without the
+ * original strands effect". Far above it they stop touching at all and the
+ * background comes through in patches: "I really don't want ANY holes between the
+ * strands." A seam is not a hole, and the difference is whether it is wider than the
+ * thing beside it.
+ *
+ * It also restores the ragged hem, which is the other half of reading as strands.
+ * The pulse cycles a couple of times along the signature, so how much neighbouring
+ * strands differ in LENGTH depends on how many of them there are: at a fine pitch
+ * consecutive lengths are nearly identical and the bottom smooths into an outline.
  */
-const STRAND_STEP = 0.6;
+const STRAND_PITCH = 2;
 
 /**
- * The same walk, for the ribbon underneath. Coarser, because it is a line rather
- * than a fill and nothing is hiding behind it.
+ * Never step less than this many design units, however thin the strand.
+ *
+ * A floor under the walk rather than a look: `wakeStreakWidth` bottoms out at 0.6
+ * device pixels, and a curtain paced by that would draw thousands of strokes across
+ * the tail for a texture nobody can see at that size.
  */
-const RIBBON_STEP = 2;
+const MIN_STEP = 0.5;
 
 /**
  * How big a ribbon point is, against what `drawWakePoint` would draw at full size.
@@ -328,8 +338,7 @@ export function drawSignature(
   // with it ON, which hangs the curtain over it. See `STRAND_STEP` for why the
   // second is a walk in screen space rather than a walk over the recorded points,
   // and `RIBBON_SCALE` for why the first is small.
-  const wake = (stepUnits: number, warp: number, sizeMul: number): void => {
-    const step = Math.max(0.1, stepUnits * s);
+  const wake = (warp: number, sizeMul: number, stepAt: (at: WakePoint) => number): void => {
     const n = sig.pts.length;
     let carry = 0;
     for (let i = 0; i < n - 1; i++) {
@@ -338,12 +347,12 @@ export function drawSignature(
       const pa = place(fit, a.x, a.y);
       const pb = place(fit, b.x, b.y);
       const seg = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+      if (seg < 1e-6) continue;
       const fa = F_FLOOR + ((1 - F_FLOOR) * i) / (n - 1);
       const fb = F_FLOOR + ((1 - F_FLOOR) * (i + 1)) / (n - 1);
-      if (seg < 1e-6) continue;
-      for (; carry <= seg; carry += step) {
+      while (carry <= seg) {
         const u = carry / seg;
-        drawWakePoint(ctx, rcfg, pa.x + (pb.x - pa.x) * u, pa.y + (pb.y - pa.y) * u, {
+        const at: WakePoint = {
           f: fa + (fb - fa) * u,
           speed: a.speed + (b.speed - a.speed) * u,
           scale: s * sizeMul,
@@ -351,15 +360,20 @@ export function drawSignature(
           // The ceremony's own clock, so the pulse running down the signature is in
           // step with the one running down the live trail while they cross-fade.
           warpT: cer.t,
-        });
+        };
+        drawWakePoint(ctx, rcfg, pa.x + (pb.x - pa.x) * u, pa.y + (pb.y - pa.y) * u, at);
+        carry += Math.max(MIN_STEP * s, stepAt(at));
       }
       carry -= seg;
     }
   };
-  wake(RIBBON_STEP, 0, RIBBON_SCALE);
+  // The ribbon paces itself by the DOT it is drawing, for the same reason the
+  // curtain paces itself by the strand: a line of touching dots is a line, and one
+  // of spaced dots is beads.
+  wake(0, RIBBON_SCALE, (at) => wakeDotRadius(rcfg, at) * 1.1);
   // The ceremony's own warp, so the signature streaks for exactly as long as the
   // sky does. It arrives after the warp is full, so in practice this is 1.
-  wake(STRAND_STEP, cer.warp, 1);
+  wake(cer.warp, 1, (at) => wakeStreakWidth(wakeDotRadius(rcfg, at)) * STRAND_PITCH);
 
   ctx.restore();
 }

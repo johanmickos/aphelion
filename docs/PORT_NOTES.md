@@ -3945,6 +3945,26 @@ density is a fact about the picture. The step is chosen against the THINNEST str
 rather than the average — the tail draws at about 1.5 device pixels and is where a
 gap would show first.
 
+**And then it was solid, which was the fourth wrong value.** Reported as "now it's
+just a thick curtain without the original strands effect". Two things go at once
+when the walk gets that fine: neighbouring strokes abut, and — because the pulse
+cycles only a couple of times along the whole signature — consecutive strands differ
+in LENGTH by almost nothing, so the ragged hem smooths into an outline. What was
+left was a shape, not a curtain.
+
+The number had been wrong four times because it was the wrong kind of number. A
+strand is three times wider at the head than at the tail — `drawWakePoint` builds
+its stroke width out of `f` and speed — so any fixed step gives two textures in one
+picture, and every report was about whichever end it got wrong. `wakeDotRadius` and
+`wakeStreakWidth` are split out of `ship.ts` so the walk can pace itself by the real
+width, and what is configured is a RATIO: the seam between two strands is exactly as
+wide as a strand.
+
+That holds end to end, brackets both failures — at 1 they merge, far above it they
+stop touching — and, unlike a step in pixels, it can be checked on the drawing
+rather than trusted. `test/render.test.ts` measures every adjacent pair against the
+stroke width recorded for it.
+
 The wave still runs down it, so the hem stays ragged and the pulse still travels.
 The curtain is solid across, not down.
 

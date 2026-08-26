@@ -98,6 +98,29 @@ export interface WakePoint {
 }
 
 /**
+ * How big a wake point draws, and how wide the streak it throws is.
+ *
+ * SPLIT OUT SO A CALLER CAN SPACE BY IT. `signature.ts` hangs a curtain out of
+ * these streaks and needs them touching without merging, which is a statement
+ * about their WIDTH — and that width varies threefold along a wake, because it is
+ * built from `f` and from speed. A caller pacing itself by a fixed step gets a comb
+ * at one end and a solid sheet at the other; pacing by this it gets the same
+ * texture everywhere.
+ *
+ * `drawWakePoint` uses them too, so there is one formula rather than a copy that
+ * would drift the first time a wake was retuned.
+ */
+export function wakeDotRadius(cfg: RenderConfig, at: WakePoint): number {
+  const { trailSpeedCalm: calm, trailSpeedHot: hot } = cfg;
+  const heat = Math.max(0, Math.min(1, (at.speed - calm) / Math.max(1, hot - calm)));
+  return (0.6 + (2.6 + 1.6 * heat) * at.f) * at.scale;
+}
+
+export function wakeStreakWidth(radius: number): number {
+  return Math.max(0.6, radius * 0.5);
+}
+
+/**
  * One point of a wake.
  *
  * EXTRACTED SO THE SIGNATURE CAN BE DRAWN BY IT. The line a run draws through the
@@ -126,7 +149,7 @@ export function drawWakePoint(
   const { f, scale, warp, warpT } = at;
   const heat = Math.max(0, Math.min(1, (at.speed - calm) / Math.max(1, hot - calm)));
   let [r, g, b] = trailColor(heat);
-  const rad = (0.6 + (2.6 + 1.6 * heat) * f) * scale;
+  const rad = wakeDotRadius(cfg, at);
   let alpha = (0.08 + 0.5 * f) * (0.75 + 0.35 * heat);
 
   if (warp > 0) {
@@ -154,7 +177,7 @@ export function drawWakePoint(
     alpha = Math.min(1, alpha * (1 + 2.6 * pulse));
     const len = (5 + 26 * pulse) * f * scale;
     ctx.strokeStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
-    ctx.lineWidth = Math.max(0.6, rad * 0.5);
+    ctx.lineWidth = wakeStreakWidth(rad);
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(sx, sy);
