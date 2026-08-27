@@ -20,5 +20,9 @@
     "noEmit": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["app", "src", "test", "*.ts"]
+  "include": ["app", "src", "test", "tools", "*.ts"],
+  // Deliberate portability violations, kept as data for tools/check-portability.ts
+  // to be pointed at. They are inputs to a test, not code — typechecking them
+  // would report exactly the problems they exist to contain.
+  "exclude": ["test/fixtures"]
 }

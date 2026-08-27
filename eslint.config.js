@@ -19,7 +19,10 @@ export default tseslint.config(
     // `docs/**` is author-owned: the design boards ship their own live
     // components, which are not this codebase's to restyle or to hold to its
     // rules (ADR-0002 — the boards stay canonical for appearance).
-    ignores: ['**/dist/**', '**/node_modules/**', '.claude/**', 'docs/**'],
+    // `test/fixtures/**` holds deliberate portability violations, kept as data
+    // for the checker to be pointed at. Linting them reports the problems they
+    // exist to contain.
+    ignores: ['**/dist/**', '**/node_modules/**', '.claude/**', 'docs/**', 'test/fixtures/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

@@ -1,20 +1,32 @@
 /**
- * The app shell.
+ * The app shell: the clock that drives the three layers, and nothing else.
  *
- * There is no game here yet: M0.2 is the scaffold, and the three layers this
- * file will eventually drive — `src/sim/`, `src/state/`, `src/render/` — are
- * M0.3's to create (ADR-0006).
+ * This file is the one place the layers meet. It steps the simulation, derives
+ * presentation state from it, and hands that to the renderer — which is the
+ * whole of ADR-0006 expressed in five lines, and the reason it is worth having
+ * before there is a game to put through it.
  *
- * What it does do is prove the pipeline end to end: a TypeScript module that is
- * bundled, served under a relative base path, and stamped with its own build
- * time so that a deploy which did not actually take is visible on the page
- * rather than inferred from a green workflow.
+ * There is still no game here. M0.3 is the skeleton and the boundary that keeps
+ * it honest; the swing is [M1](../docs/plan/m1-the-swing.md).
  */
+import { createInitialState, stepSim } from '../src/sim/step.ts';
+import { NO_INPUT } from '../src/sim/types.ts';
+import { derive } from '../src/state/derive.ts';
+import { draw } from '../src/render/index.ts';
 
-/** Replaced at build time by Vite's `define`; `dev` when the dev server serves it. */
-declare const __BUILD_STAMP__: string;
+const target = document.getElementById('app');
 
-const app = document.getElementById('app');
-if (app) {
-  app.textContent = `APHELION · SCAFFOLD · ${__BUILD_STAMP__}`;
+if (target) {
+  const sim = createInitialState();
+
+  // One tick per frame, deliberately naive. The real loop is a fixed timestep
+  // with a catch-up bound, because a tick has to mean the same thing on every
+  // device for a recipe to replay — but that loop belongs with the physics it
+  // exists to protect, and arrives in M1.
+  const frame = (): void => {
+    stepSim(sim, NO_INPUT);
+    draw(derive(sim), target);
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
 }

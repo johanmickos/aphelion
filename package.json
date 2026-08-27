@@ -18,7 +18,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+    "portable": "node tools/check-portability.ts",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm portable && pnpm test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
