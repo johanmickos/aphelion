@@ -36,7 +36,7 @@ playing it, so a plan whose first playable moment is late is a plan that cannot 
 
 | # | Milestone | Ends with | Gate | Status |
 |---|-----------|-----------|------|--------|
-| [M0](./m0-foundations.md) | Foundations, specs, renderer verdict | Specs written, a field you can pan, a renderer ADR | — | **M0.1–M0.4 done** ([specs](../spec/), scaffold, the three layers and `pnpm portable`, the QR dev server — scanned, and the phone shows the tick counter); CI and the Pages deploy are written but have never run, since the repo has no remote yet and pushing it is deferred; M0.5 not started |
+| [M0](./m0-foundations.md) | Foundations, specs, renderer verdict | Specs written, a field you can pan, a renderer ADR | — | **M0.1–M0.4 done** ([specs](../spec/), scaffold, the three layers and `pnpm portable`, the QR dev server — scanned, and the phone shows the tick counter); CI and the Pages deploy are written but have never run, since the repo has no remote yet and pushing it is deferred; **M0.5's harness is built** (`app/spike/`, reached by pressing `x` in `pnpm dev`) and runs clean on desktop; the verdict is a measurement on the author's phone and is not taken yet, so the renderer ADR is unwritten |
 | [M1](./m1-the-swing.md) | The swing | Crude shapes, real gravity, a flyable swing | **author** | not started |
 | [M2](./m2-the-instrument.md) | The instrument | The compass, the release, the 400ms | **author** | not started |
 | [M3](./m3-the-field.md) | The field | Rungs, sky, anomaly, boundary, retro grade | — | not started |

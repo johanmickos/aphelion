@@ -1,10 +1,17 @@
 import { defineConfig } from 'vite';
 import { qrPlugin } from './tools/vite-plugin-qr.ts';
+import { diagPlugin } from './tools/vite-plugin-diag.ts';
+import { spikePlugin } from './tools/vite-plugin-spike.ts';
 
 export default defineConfig(({ command }) => ({
   // The game lives in app/; src/ holds the game's modules, imported from here.
   root: 'app',
-  plugins: [qrPlugin()],
+  // Both of the added plugins are `apply: 'serve'` and exist only in dev.
+  // `diagPlugin` receives measurement reports from the phone and writes them
+  // to diagnostics/; `spikePlugin` prints a QR for the M0.5 harness and is
+  // deleted along with app/spike/ when the renderer ADR lands. Neither is a
+  // backend: they are the dev server, on the author's own machine (ADR-0003).
+  plugins: [qrPlugin(), diagPlugin(), spikePlugin()],
   // Relative, not '/': GitHub Pages serves a project site from a subpath
   // (/aphelion-2/), so absolute asset URLs 404 there. './' is correct at any
   // mount point, and Vite resolves it back to '/' for the dev server
