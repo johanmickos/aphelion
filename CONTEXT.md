@@ -20,7 +20,8 @@ _Avoid_: level, stage, map
 A stratum of the field hung perpendicular to intended travel, marking one unit of
 altitude. Rungs bow toward mass and part around the craft, so the field states gravity
 and speed without an instrument.
-_Avoid_: grid, grid line, carpet, mesh, floor
+_Avoid_: grid, grid line, carpet, mesh, floor (a rung is never a floor; **Floor** is the
+orbit's, below)
 
 **Body**:
 Anything in the field with mass that the craft can be caught by. A planet is the common
@@ -71,7 +72,8 @@ _Avoid_: approach (that is the whole run-up, before the grab), capture arc
 
 **Floor**:
 The closest a craft may orbit — a fixed clearance above a body's surface. A hard limit
-that is never crossed, and the one guarantee a grab makes.
+that is never crossed, and the one guarantee a grab makes. The word belongs to the orbit
+alone: the line that trails the climb and ends a run is the **fell-behind line**.
 _Avoid_: minimum radius, surface, collision radius
 
 **Clearance**:

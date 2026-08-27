@@ -479,9 +479,11 @@ have just left is legitimate flying, and at 0.18 the exemption covers it without
 that reads as a crash.
 
 **The high-water mark is held during a grab for a measured reason.** An orbit is a round trip, and
-the height gained going round its near side is not ground kept. Counting it put the trailing floor
+the height gained going round its near side is not ground kept. Counting it put the fell-behind line
 at the orbit's apex — which the far side of that same orbit then flew straight into, killing a
-craft that had not lost a unit of altitude.
+craft that had not lost a unit of altitude. (**Floor** is the orbit's floor and nothing else; the
+line that trails the climb is the **fell-behind line**, and they are 700 units and a whole run
+apart.)
 
 **Measured distribution over 24 real endings**: 20 out of bounds (83%), 2 impact (8%), 2 fell
 behind (8%). No session in the cohort reached the top. `VISION.md` records the same shape across a
@@ -593,6 +595,42 @@ and the dive duration is **identical to the tick**. Sixteen times the work buys 
 integration step relative to the geometry it must not miss. The worst integrated step in 474 seconds
 of real play was **1.45 units**, at 521 units/s — against a smallest body radius of **34** and a floor
 gap of **12**. A 23× margin on the tightest feature in the field.
+
+### 12a · Determinism is a property of the arithmetic, not only of the timestep
+
+A fixed timestep makes a run repeatable **on one engine**. It does not make it repeatable across
+two, and the prototype learned this the expensive way — which matters here because ADR-0004 makes
+a recipe's reproducibility the contract, and a recipe recorded on the author's phone is replayed
+on a laptop.
+
+**`Math.hypot` is not required to be correctly rounded, and engines genuinely disagree.** Measured
+across 20 000 inputs, JavaScriptCore and V8 return different results **36% of the time**. At six
+calls per substep that alone made a phone session impossible to replay: a full session diverged
+**5.63 units** against **0.000** for the same session using `sqrt(x*x + y*y)`, and past roughly ten
+seconds the drift flipped whole decisions — a grab becoming a fly-past. `sqrt` **is** correctly
+rounded by IEEE-754, and `*` and `+` are exact, so the written-out form is identical on every
+engine. Overflow is not a concern at this scale: coordinates reach ~1e4, so the squares reach ~1e8
+against a float64 ceiling of 1.8e308.
+
+`pnpm portable` already bans `Math.hypot` in `src/sim/` and tells you to write your own. **This is
+why**, and the reason belongs here rather than only in the checker, because a rule whose reason
+lives somewhere else is a rule someone deletes.
+
+**`sin`, `cos` and `atan2` are the same class of hazard and are not yet solved.** They are
+implementation-approximated too, the prototype's orbit clock calls them every tick, and a long
+unbroken swing amplifies the difference — which is why §1 treats late-session replay figures as
+weaker evidence, and why the prototype records its scoring events rather than trusting a replay to
+recompute them. **This is an open engineering problem for M1.2**, not a solved one: the options are
+a table-based or polynomial implementation owned by the simulation, an orbit clock that advances by
+composing rotations rather than by re-evaluating a trig function at an accumulated angle, or
+accepting single-engine determinism and saying so in the recipe. It should be decided deliberately
+and recorded, because it is the difference between "the simulation is non-deterministic" and "you
+were running a different engine", and those look identical in the numbers.
+
+> **Tolerance.** A recipe replayed twice on the same engine produces **byte-identical** state at
+> every tick — exact, and it is M1.2's acceptance. Across two engines, the same recipe holds
+> position to **within 0.5 units over 60 simulated seconds** — which the prototype's `hypot` form
+> meets and its `Math.hypot` form misses by an order of magnitude.
 
 **At the top of the field, with a caveat.** Spec [17](./17-daily-field.md)'s difficulty curve is
 explicitly an opening position and no session in the cohort reached the top, so the top-of-field
