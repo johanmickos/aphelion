@@ -36,7 +36,7 @@ playing it, so a plan whose first playable moment is late is a plan that cannot 
 
 | # | Milestone | Ends with | Gate | Status |
 |---|-----------|-----------|------|--------|
-| [M0](./m0-foundations.md) | Foundations, specs, renderer verdict | Specs written, a field you can pan, a renderer ADR | — | not started |
+| [M0](./m0-foundations.md) | Foundations, specs, renderer verdict | Specs written, a field you can pan, a renderer ADR | — | **M0.1 done** ([specs](../spec/)); M0.2–M0.5 not started |
 | [M1](./m1-the-swing.md) | The swing | Crude shapes, real gravity, a flyable swing | **author** | not started |
 | [M2](./m2-the-instrument.md) | The instrument | The compass, the release, the 400ms | **author** | not started |
 | [M3](./m3-the-field.md) | The field | Rungs, sky, anomaly, boundary, retro grade | — | not started |
