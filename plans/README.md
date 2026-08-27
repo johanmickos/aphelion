@@ -24,21 +24,21 @@ When `plans/` is empty, the refactor is finished and the directory goes too.
 
 ## Status
 
-| #   | Plan                                                | Severity | Blocks                  | State                    |
-| --- | --------------------------------------------------- | -------- | ----------------------- | ------------------------ |
-| F01 | Body traits                                         | BLOCKS   | Dir 04 body types       | **done** — PORT_NOTES 65 |
-| F02 | Body type table                                     | BLOCKS   | Dir 04, VISION field    | **done** — PORT_NOTES 66 |
-| F03 | [Theme as a value](F03-theme-value.md)              | BLOCKS   | Dir 01, regions         | ready                    |
-| F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | needs a call             |
-| F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | needs F04                |
-| F06 | [Effects stack](F06-effects-stack.md)               | COSTS    | powerups                | deferred                 |
-| F07 | [Draw layer list](F07-layer-list.md)                | COSTS    | Dir 02, 05              | needs F03                |
-| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | ready                    |
-| F09 | [Award vocabulary](F09-award-vocabulary.md)         | COSTS    | Dir 06                  | needs a call             |
-| F10 | [HUD grid](F10-hud-grid.md)                         | COSTS    | Dir 03                  | needs F03                |
-| F11 | [Screen machine](F11-screen-machine.md)             | COSTS    | Dir 09, 10, 11          | deferred                 |
-| F12 | [Audio observer](F12-audio-observer.md)             | COSTS    | VISION sound            | deferred                 |
-| F13 | Design-width duplication                            | —        | —                       | **done** 2026-08-27      |
+| #   | Plan                                                | Severity | Blocks                  | State                        |
+| --- | --------------------------------------------------- | -------- | ----------------------- | ---------------------------- |
+| F01 | Body traits                                         | BLOCKS   | Dir 04 body types       | **done** — PORT_NOTES 65     |
+| F02 | Body type table                                     | BLOCKS   | Dir 04, VISION field    | **done** — PORT_NOTES 66     |
+| F03 | [Theme as a value](F03-theme-value.md)              | BLOCKS   | Dir 01, regions         | **a** done — **b** after F07 |
+| F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | needs a call                 |
+| F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | needs F04                    |
+| F06 | [Effects stack](F06-effects-stack.md)               | COSTS    | powerups                | deferred                     |
+| F07 | [Draw layer list](F07-layer-list.md)                | COSTS    | Dir 02, 05              | ready — do next              |
+| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | ready                        |
+| F09 | [Award vocabulary](F09-award-vocabulary.md)         | COSTS    | Dir 06                  | needs a call                 |
+| F10 | [HUD grid](F10-hud-grid.md)                         | COSTS    | Dir 03                  | needs F07                    |
+| F11 | [Screen machine](F11-screen-machine.md)             | COSTS    | Dir 09, 10, 11          | deferred                     |
+| F12 | [Audio observer](F12-audio-observer.md)             | COSTS    | VISION sound            | deferred                     |
+| F13 | Design-width duplication                            | —        | —                       | **done** 2026-08-27          |
 
 F13 was fixed in the review session: `DEFAULT_RENDER_CONFIG.designW` now reads
 `DESIGN_W` from `src/sim/world.ts` instead of repeating the literal `390`. No plan
@@ -52,8 +52,10 @@ Dependencies, not severity. Steps 1 and 2 are independent and can run together.
    left of F02 is shipping the first NEW body type, which is content rather than
    refactor and wants the author's call: what a ringed body does, how many a field
    holds, and where.
-2. **F03** — mechanical, large, and never touches the gate.
-3. **F07** → **F10** — both want F03 done first.
+2. ~~**F03a**~~ — the eight tokens landed 2026-08-27; the game is repainted.
+3. **F07** → **F03b** → **F10**. F07 comes first now: `Frame` carries the theme, so
+   converting the remaining 87 literals costs no signature churn. Threading a
+   parameter into ~40 functions and then removing it again is the same work twice.
 4. **F04** + **F05** — together; splitting the score without the pricing gives two
    numbers that mean the same thing.
 5. **F08** — unblocked; the type table landed.

@@ -1,6 +1,20 @@
 # F07 · Draw layer list
 
-**Severity** COSTS · **Blocks** Direction 02 (hitstop), Direction 05 (four new world layers) · **Depends on** F03
+**Severity** COSTS · **Blocks** Direction 02 (hitstop), Direction 05 (four new world layers) · **Depends on** F03a (landed)
+
+> **THE ORDER CHANGED, 2026-08-27.** This plan used to say "land F03 first", on the
+> grounds that a layer list whose members still reach into module scope for colour
+> is half the refactor. That is an argument about VALUE, and the argument about
+> COST points the other way: threading a `theme` parameter into ~40 draw functions
+> and then removing it again when `Frame` arrives is the same work twice.
+>
+> F03 split in half on its own. **F03a landed** — `theme.ts` holds the eight
+> tokens and `palette.ts` maps roles onto them, so the game is already repainted.
+> **F03b is what remains**: the 87 literals in the other 13 modules, and making the
+> theme an argument rather than a module-load constant.
+>
+> So F07 runs first and `Frame` carries `theme` from its first commit. F03b then
+> becomes "convert the literals", with nowhere left to thread.
 
 ## Why
 
@@ -69,9 +83,14 @@ interface Layer {
 const LAYERS: readonly Layer[] = [ ... ];
 ```
 
-`Frame` carries what `draw` currently destructures — ctx, cam, snap, theme,
-config, score, ceremony, timings — so a layer takes one argument instead of six
-and adding a layer never changes a signature.
+`Frame` carries what `draw` currently destructures — ctx, cam, snap, config,
+score, ceremony, timings — **plus `theme`, from the first commit**. The theme is
+resolved once per frame and handed down as a value, which is what makes the
+open question about regions cheap: whether a theme is fixed for a run or sampled
+by altitude becomes a decision inside one resolver, not a property of 87 call
+sites. Nothing Direction 05 asks for needs more than that — "the violet-black
+warms almost imperceptibly toward AURORA as an anomaly approaches" is a per-frame
+scalar, not a spatial gradient, and the anomaly's own aurora is already a layer.
 
 Three things become expressible that are not today:
 
@@ -86,10 +105,11 @@ Three things become expressible that are not today:
 
 ## Steps
 
-### 1. Land F03 first
+### 1. Nothing — F03a already landed
 
-A layer list whose members still reach into module scope for colour is half the
-refactor and the less useful half.
+`DEFAULT_THEME` exists and `palette.ts` resolves from it. What F07 adds is the
+place a _different_ theme could arrive: `Frame` carries one from the start, even
+though every layer still reads the module constants until F03b converts them.
 
 ### 2. Extract `Frame`, change nothing else
 

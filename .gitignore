@@ -30,3 +30,9 @@ scratchpad/
 
 # playtest reports received from a device (dev only)
 diagnostics/
+
+# Capture and export material. Screen recordings run to hundreds of megabytes and
+# design exports arrive zipped; both are working material rather than source, and
+# a stray `git add -A` over them is not recoverable in a hurry.
+*.mp4
+*.zip
