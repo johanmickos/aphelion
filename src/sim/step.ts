@@ -33,7 +33,7 @@ import {
 export function createInitialState(cfg: SimConfig = DEFAULT_CONFIG): SimState {
   const state: SimState = {
     tick: 0,
-    ship: { x: 0, y: 0, vx: 0, vy: 0, alive: true, burstX: 0, burstY: 0, burstT: 0 },
+    ship: { x: 0, y: 0, vx: 0, vy: 0, alive: true, burstX: 0, burstY: 0, burstT: 0, burstDecay: 0 },
     capture: null,
     bodies: createBodies(cfg),
     motes: [],
@@ -64,6 +64,7 @@ export function respawn(state: SimState, cfg: SimConfig): void {
   ship.burstX = 0;
   ship.burstY = 0;
   ship.burstT = 0;
+  ship.burstDecay = 0;
   state.fuel = cfg.fuelMax;
   state.highWaterY = ship.y;
   state.capture = null;
@@ -932,7 +933,12 @@ function stepDrift(state: SimState, cfg: SimConfig, holding: boolean, dt: number
   let by = 0;
   if (ship.burstX || ship.burstY) {
     ship.burstT = (ship.burstT || 0) + dt;
-    const f = Math.max(0, 1 - ship.burstT / cfg.boostBurstDecay);
+    // The burst's OWN decay time, not the config constant: a release held to the
+    // top of its envelope carries further. `kickHold` is 0 in the prototype config
+    // and `burstDecay` is 0 on any burst nobody graded, so both fall back to the
+    // constant and the equality gate cannot see this.
+    const decay = ship.burstDecay > 0 ? ship.burstDecay : cfg.boostBurstDecay;
+    const f = Math.max(0, 1 - ship.burstT / decay);
     if (f <= 0) {
       ship.burstX = 0;
       ship.burstY = 0;

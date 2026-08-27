@@ -75,10 +75,20 @@ if (!check) {
     console.error(`dt changed: golden ${golden.dt} vs current ${FIXED_DT}`);
     failures++;
   }
-  for (const [key, value] of Object.entries(PROTOTYPE_CONFIG)) {
-    const was = (golden.config as unknown as Record<string, number | boolean>)[key];
-    if (was !== value) {
-      console.error(`config drift: ${key} golden=${was} current=${value}`);
+  // THE UNION OF BOTH KEY SETS, not just the current one.
+  //
+  // This walked `PROTOTYPE_CONFIG` alone, so a key the golden HELD and the config
+  // no longer has was never looked at — deleting a config key passed silently. It
+  // went unnoticed because the sample comparison below is the real proof and would
+  // have caught a deletion that moved a trajectory; but a check that reports a key
+  // appearing and says nothing about one disappearing is a check that looks
+  // symmetric and is not, and the whole point of this file is to be the thing you
+  // can believe about the prototype.
+  const current = PROTOTYPE_CONFIG as unknown as Record<string, number | boolean>;
+  const was = golden.config as unknown as Record<string, number | boolean>;
+  for (const key of new Set([...Object.keys(current), ...Object.keys(was)])) {
+    if (was[key] !== current[key]) {
+      console.error(`config drift: ${key} golden=${was[key]} current=${current[key]}`);
       failures++;
     }
   }

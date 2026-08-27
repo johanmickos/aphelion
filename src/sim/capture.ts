@@ -627,6 +627,33 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
   // thing in the game has already been punished by the link they did not get.
   if (cfg.chargedSecs > 0 && body.traits.charges) state.chargedT = cfg.chargedSecs;
 
+  // ---- how well this release was flown, on the one axis it has
+  //
+  // A converted capture is graded on WHEN it let go: `boost` is the envelope's
+  // value at this instant and `boostFull` its peak, so the fraction is how close
+  // to the top of the arc the button came up. A flyby never froze an orbit and has
+  // neither, but it has `defl` — how hard the body is bending the heading right
+  // now — and releasing at the top of the turn is the same skill wearing different
+  // clothes.
+  //
+  // ONE NUMBER FOR BOTH, deliberately. It prices the swing below and stretches the
+  // burst's decay, and a second definition of "how good was that" is exactly the
+  // kind of pair that agrees until it quietly does not.
+  const quality = earned
+    ? cap.boostFull > 0
+      ? Math.max(0, Math.min(1, cap.boost / cap.boostFull))
+      : 0
+    : cfg.flybyKickSpan > 0
+      ? Math.max(0, Math.min(1, cap.defl / cfg.flybyKickSpan))
+      : 0;
+
+  // The swing: what a release that never converted is worth.
+  //
+  // Measured, 54% of releases earned no kick at all and only 31 of 366 flew badly
+  // — the rest were flybys and dives that never reached periapsis, which are
+  // manoeuvres that were flown and did not pay. See `SimConfig.flybyKick`.
+  const swing = earned ? 0 : cfg.flybyKick * quality;
+
   const spd = hypot(cap.vx, cap.vy) || 1;
   const bx = cap.vx / spd;
   const by = cap.vy / spd;
@@ -645,14 +672,18 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
   // four escapes in five — which is most of the mechanic.
   const escape = cap.escaped ? cfg.escapeFling : 0;
 
-  const permAdd = (add + escape) * cfg.boostPermFrac;
+  const permAdd = (add + escape + swing) * cfg.boostPermFrac;
   const burstAdd = add * (1 - cfg.boostPermFrac) * cfg.boostPunch;
   const escapeBurst = escape * (1 - cfg.boostPermFrac) * cfg.boostPunch;
+  const swingBurst = swing * (1 - cfg.boostPermFrac) * cfg.boostPunch;
   ship.vx = (cap.vx + bx * permAdd) * flingScale;
   ship.vy = (cap.vy + by * permAdd) * flingScale;
   ship.burstX = bx * burstAdd;
   ship.burstY = by * burstAdd;
   ship.burstT = 0;
+  // How long the kick carries. The second channel quality rides, and the gentler
+  // one — see `SimConfig.kickHold` for why it is not the same size as the first.
+  ship.burstDecay = cfg.boostBurstDecay * (1 + cfg.kickHold * quality);
 
   state.capture = null;
 
@@ -663,7 +694,12 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
   // Added after the weak damping, deliberately: a ship that ran dry on the way
   // out of the fire still got out of the fire, and this was earned by the escape
   // rather than by the exit.
-  ship.burstX += bx * escapeBurst;
-  ship.burstY += by * escapeBurst;
+  //
+  // The swing is added here for the same reason. A putter-out is a release like
+  // any other and the body was still bending it; the tank running dry is already
+  // paid for by the link that did not happen, and taking the kick away as well
+  // would be confiscating rather than withholding.
+  ship.burstX += bx * (escapeBurst + swingBurst);
+  ship.burstY += by * (escapeBurst + swingBurst);
   return { boostApplied: add, weak };
 }

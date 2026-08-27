@@ -222,10 +222,24 @@ export interface Ship {
   vx: number;
   vy: number;
   alive: boolean;
-  /** Transient escape burst, applied on top of velocity during drift and decaying. */
+  /** Transient release burst, applied on top of velocity during drift and decaying. */
   burstX: number;
   burstY: number;
   burstT: number;
+  /**
+   * Seconds this burst takes to decay to nothing.
+   *
+   * Per-release rather than the config constant, because a well-flown release
+   * holds its kick longer — see `SimConfig.kickHold`. 0 falls back to
+   * `boostBurstDecay`, which is what a burst set by anything that does not know
+   * about quality gets.
+   *
+   * DELIBERATELY NOT IN `fingerprint()`, for the reason `chargedT` and `carveDir`
+   * both record: it changes the trajectory the moment it acts, and the position
+   * and velocity already hashed catch that. `burstT` is excluded on the same
+   * grounds and always has been.
+   */
+  burstDecay: number;
 }
 
 export interface Capture {
@@ -346,7 +360,20 @@ export interface Capture {
   escapeSide: number;
   /** This capture has already been paid for one escape. Once per capture. */
   escaped: boolean;
-  /** Per-sample heading deflection, for the trace recorder. Not physics. */
+  /**
+   * Per-sample heading deflection, in degrees.
+   *
+   * WAS "for the trace recorder, not physics" AND IS NOW PHYSICS. It is how hard
+   * the body is bending the heading right now, which is the only quality a flyby
+   * has — it never froze an orbit, so it has no `tightness` and no `boostFull` —
+   * and `releaseCapture` prices its kick on it. See `SimConfig.flybyKick`.
+   *
+   * INSTANTANEOUS AND NOT ACCUMULATED, which is what makes it a skill rather than
+   * a stopwatch: it reads how hard you are being turned at the instant the button
+   * comes up, so letting go at the top of the turn pays and letting go on the way
+   * in does not. The scorer keeps its own running maximum for its own purposes;
+   * this is the live value and the two are not the same question.
+   */
   lastAngle: number;
   defl: number;
 }
