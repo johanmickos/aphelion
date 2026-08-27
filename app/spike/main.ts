@@ -47,11 +47,12 @@ const BUDGET_P99_MS = 8;
  */
 const BUDGET_DROP_RATIO = 0.01;
 
+const WARMUP_FRAMES = 90;
+const MEASURE_FRAMES = 600;
+
 function passes(r: DiagRun): boolean {
   return r.ok && r.cpu.p99 <= BUDGET_P99_MS && r.dropped <= r.frames * BUDGET_DROP_RATIO;
 }
-const WARMUP_FRAMES = 90;
-const MEASURE_FRAMES = 600;
 
 /**
  * The ladder, in the plan's order, with the bare scene first as the floor to
@@ -73,18 +74,31 @@ const panel = need('panel');
 
 const scene = createScene();
 
-function measureBacking(): Backing {
-  // Design coordinates, letterboxed, identical on every device (ADR-0010).
+/**
+ * The backing store is the **design size**, always, and never the size the
+ * viewport happens to allow.
+ *
+ * The first four reports off the author's phone came back at 902×1953 — 59.5%
+ * of the design pixel area — because a browser's own chrome ate the height, the
+ * letterbox fit went height-constrained, and this function sized the buffer to
+ * the fit. Every fill-rate cost in both candidates was therefore measured on
+ * fewer than two pixels in three, which is a discount the game does not get:
+ * spec 00 §7 puts the design space at 1170×2532 and ADR-0010 says everything is
+ * drawn in design coordinates identically on every device.
+ *
+ * So the buffer is pinned and the CSS box is what shrinks. On a phone whose
+ * viewport is smaller than the design rect that means the compositor downscales
+ * on present, which costs a little more than the real game will pay — the right
+ * direction to be wrong in.
+ */
+function measureBacking(): { backing: Backing; fit: number } {
   const fit = Math.min(window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H);
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  const w = Math.round(DESIGN_W * fit * dpr);
-  const h = Math.round(DESIGN_H * fit * dpr);
   stage.style.width = `${DESIGN_W * fit}px`;
   stage.style.height = `${DESIGN_H * fit}px`;
-  return { w, h, scale: w / DESIGN_W };
+  return { backing: { w: DESIGN_W, h: DESIGN_H, scale: 1 }, fit };
 }
 
-const backing = measureBacking();
+const { backing, fit } = measureBacking();
 const hasWebGL2 = (() => {
   const probe = document.createElement('canvas');
   return probe.getContext('webgl2') !== null;
@@ -191,6 +205,11 @@ function buildReport(runs: readonly DiagRun[]): DiagReport {
       css: { w: window.innerWidth, h: window.innerHeight },
       backing: { w: backing.w, h: backing.h },
       webgl2: hasWebGL2,
+      // The buffer is the design size; `fit` is how much of the viewport it
+      // was shown in. Recorded so a report can never again be read as if it
+      // had been taken at the size it was displayed at.
+      fit: Number(fit.toFixed(4)),
+      renderAt: 'design',
     },
     scene: scene.facts,
     runs,
@@ -230,7 +249,8 @@ const facts = Object.entries(scene.facts)
 
 const intro =
   `<h1>M0.5 · renderer spike</h1>` +
-  `<p class="hint">${backing.w}×${backing.h} backing · dpr ${window.devicePixelRatio} · ` +
+  `<p class="hint">${backing.w}×${backing.h} backing — the design size, whatever the ` +
+  `viewport allows · shown at ${Math.round(fit * 100)}% · dpr ${window.devicePixelRatio} · ` +
   `webgl2 ${hasWebGL2 ? 'yes' : 'no'}</p>` +
   `<div class="facts">${facts}</div>` +
   `<button id="go">RUN</button>` +

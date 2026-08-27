@@ -90,6 +90,21 @@ describe('formatDiagReport', () => {
     expect(formatDiagReport(stuttering).join('\n')).toContain(RED);
   });
 
+  it('says outright when a report was not measured at the design size', () => {
+    // The first four reports off the phone were taken at 902×1953 because
+    // browser chrome ate the viewport height, and nothing in the output said
+    // so. A number measured on 59.5% of the pixels is not the number.
+    const header = strip(formatDiagReport(report)[1] ?? '');
+    expect(header).toContain('not the design size');
+
+    const atDesign: DiagReport = {
+      ...report,
+      device: { ...report.device, renderAt: 'design', fit: 0.257 },
+    };
+    expect(strip(formatDiagReport(atDesign)[1] ?? '')).toContain('design size');
+    expect(strip(formatDiagReport(atDesign)[1] ?? '')).not.toContain('not the design size');
+  });
+
   it('offers no mean column to quote', () => {
     // `VISION.md`: the units that matter are p99 and max. The footer says the
     // word so a reader knows the omission is deliberate; the table must not

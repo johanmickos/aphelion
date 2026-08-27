@@ -75,6 +75,15 @@ export interface DiagReport {
     readonly css: { readonly w: number; readonly h: number };
     readonly backing: { readonly w: number; readonly h: number };
     readonly webgl2: boolean;
+    /**
+     * Optional: absent from the first reports, which is the reason they exist.
+     * `renderAt: 'design'` means the buffer was the full 1170×2532 regardless
+     * of viewport; `fit` is the fraction of the design rect the viewport could
+     * show. A report without them was measured at whatever size the phone's
+     * browser chrome left over.
+     */
+    readonly fit?: number;
+    readonly renderAt?: 'design' | 'viewport';
   };
   readonly scene: Record<string, number>;
   readonly runs: readonly DiagRun[];
@@ -148,7 +157,9 @@ export function formatDiagReport(report: DiagReport): string[] {
   const d = report.device;
   const out: string[] = [
     '',
-    `  \x1b[1m▼ renderer spike · ${d.css.w}×${d.css.h} css · ${d.backing.w}×${d.backing.h} backing · dpr ${d.dpr}\x1b[0m`,
+    `  \x1b[1m▼ renderer spike · ${d.backing.w}×${d.backing.h} backing` +
+      `${d.renderAt === 'design' ? ' (design size)' : ' \x1b[31m(viewport-sized — not the design size)\x1b[0m\x1b[1m'}` +
+      ` · ${d.css.w}×${d.css.h} css · dpr ${d.dpr}\x1b[0m`,
     `  \x1b[2m${d.ua}\x1b[0m`,
     '',
     '  candidate                        cpu p50  cpu p95  \x1b[1mcpu p99\x1b[0m  cpu max   frame p99  dropped  drift',
