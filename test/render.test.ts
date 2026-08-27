@@ -3,6 +3,24 @@
  * defect found in the prototype; if one regresses, the test names it.
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_THEME } from '../src/render/theme.ts';
+
+/**
+ * The `rgba(r,g,b` prefix of a theme token.
+ *
+ * These tests detect what was drawn by matching the colour string the canvas
+ * stub recorded, and the prefixes used to be written out as literals — so
+ * repainting the game to Direction 01 made twelve of them silently match nothing
+ * and fail as "the carpet actually drew something: expected 0 to be greater
+ * than 0". A detector keyed to a literal is testing the literal, not the drawing.
+ */
+const rgbaOf = (c: readonly [number, number, number]): string => `rgba(${c[0]},${c[1]},${c[2]}`;
+const rgbOf = (c: readonly [number, number, number]): string => `rgb(${c[0]},${c[1]},${c[2]}`;
+
+const FINISH_RGBA = rgbaOf(DEFAULT_THEME.lumen);
+const HAZARD_RGBA = rgbaOf(DEFAULT_THEME.ion);
+const HAZARD_RGB = rgbOf(DEFAULT_THEME.ion);
+const SUMMIT_RGBA = rgbaOf(DEFAULT_THEME.solar);
 import { recordingContext } from './canvas-stub.ts';
 import type { RecordingContext } from './canvas-stub.ts';
 import type { OffscreenTarget } from '../src/render/nebula.ts';
@@ -231,7 +249,7 @@ describe('the finish marker', () => {
       const { r } = draw(d);
       const fills = (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>)
         .map((o) => o[1])
-        .filter((v) => v.startsWith('rgba(92,226,140'));
+        .filter((v) => v.startsWith(FINISH_RGBA));
       return Number(fills[0]!.split(',')[3]!.replace(')', ''));
     };
     expect(alphaOf(600)).toBeGreaterThan(alphaOf(1200));
@@ -253,7 +271,7 @@ describe('the finish marker', () => {
     const fills = (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>).map(
       (o) => o[1],
     );
-    expect(fills.some((v) => v.startsWith('rgba(92,226,140'))).toBe(true);
+    expect(fills.some((v) => v.startsWith(FINISH_RGBA))).toBe(true);
     expect(fills.some((v) => v.includes('92,214,122'))).toBe(false);
   });
 });
@@ -317,7 +335,7 @@ describe('the finish line', () => {
     const fills = (r.ops.filter((o) => o[0] === '=fillStyle') as Array<[string, string]>).map(
       (o) => o[1],
     );
-    expect(fills.some((v) => typeof v === 'string' && v.startsWith('rgba(92,226,140'))).toBe(true);
+    expect(fills.some((v) => typeof v === 'string' && v.startsWith(FINISH_RGBA))).toBe(true);
   });
 });
 
@@ -473,7 +491,7 @@ describe('the speed carpet', () => {
         >
       )
         .map((o) => o[1])
-        .filter((v): v is string => typeof v === 'string' && v.startsWith('rgba(92,226,140'))
+        .filter((v): v is string => typeof v === 'string' && v.startsWith(FINISH_RGBA))
         .map((v) => Number(v.split(',')[3]!.replace(')', '')));
     const lineR = recordingContext();
     const c = createCamera(rcfg);
@@ -495,7 +513,7 @@ describe('the speed carpet', () => {
       ) as Array<[string, unknown]>
     )
       .map((o) => o[1])
-      .filter((v): v is string => typeof v === 'string' && v.startsWith('rgba(92,226,140'))
+      .filter((v): v is string => typeof v === 'string' && v.startsWith(FINISH_RGBA))
       .map((v) => Number(v.split(',')[3]!.replace(')', '')));
     expect(new Set(alphas).size, 'rows differ in opacity').toBeGreaterThan(1);
     expect(Math.min(...alphas)).toBeGreaterThan(0);
@@ -774,11 +792,11 @@ describe('the ceremony', () => {
     drawCeremonyWash(r.ctx, cam(), phase('cleared', 1.6, -700)!);
     const stops = (r.calls('addColorStop') as Array<[string, number, string]>).map((o) => o[2]);
     expect(
-      stops.some((v) => v.startsWith('rgba(255,214,51')),
+      stops.some((v) => v.startsWith(SUMMIT_RGBA)),
       'gold',
     ).toBe(true);
     expect(
-      stops.some((v) => v.startsWith('rgba(92,226,140')),
+      stops.some((v) => v.startsWith(FINISH_RGBA)),
       'green afterglow',
     ).toBe(true);
 
@@ -788,7 +806,7 @@ describe('the ceremony', () => {
       (o) => o[2],
     );
     expect(
-      lateStops.some((v) => v.startsWith('rgba(92,226,140')),
+      lateStops.some((v) => v.startsWith(FINISH_RGBA)),
       'green is gone',
     ).toBe(false);
   });
@@ -1567,8 +1585,7 @@ describe('scene', () => {
 
     /** Fills in the hazard band's red, which is the deadline and nothing else here. */
     const deadlineFills = (): number =>
-      r.ops.filter((op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90'))
-        .length;
+      r.ops.filter((op) => op[0] === '=fillStyle' && String(op[1]).startsWith(HAZARD_RGBA)).length;
 
     const frame = (): void => {
       const snap = captureSnapshot(state, false, DEFAULT_CONFIG);
@@ -1620,14 +1637,14 @@ describe('scene', () => {
     const own = recordingContext();
     scene.deadline.draw(own.ctx, c, rcfg);
     expect(
-      own.ops.filter((op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90'))
+      own.ops.filter((op) => op[0] === '=fillStyle' && String(op[1]).startsWith(HAZARD_RGBA))
         .length,
       'the deadline leaves nothing behind once the cross is passed',
     ).toBe(0);
     // The skull now speaks in the panel below the ship, which is a different
     // shape of red: an opaque fill on a plate rather than an alpha-blended mark.
     const scenered = r.ops.filter(
-      (op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgb(255,70,90'),
+      (op) => op[0] === '=fillStyle' && String(op[1]).startsWith(HAZARD_RGB),
     ).length;
     expect(scenered, 'but the skull has taken over — the run is fated').toBeGreaterThan(0);
   });
@@ -1648,9 +1665,7 @@ describe('scene', () => {
     const drew = (m: Deadline): boolean => {
       const r = recordingContext();
       m.draw(r.ctx, c, rcfg);
-      return r.ops.some(
-        (op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90'),
-      );
+      return r.ops.some((op) => op[0] === '=fillStyle' && String(op[1]).startsWith(HAZARD_RGBA));
     };
 
     const pressed = new Deadline();
@@ -1901,7 +1916,9 @@ describe('scene', () => {
       let peak = 0;
       for (const op of r.ops) {
         if (op[0] !== '=fillStyle') continue;
-        const m = /rgba\(255,70,90,([\d.]+)\)/.exec(String(op[1]));
+        const m = new RegExp(`${HAZARD_RGBA.replace(/[()]/g, '\\$&')},([\\d.]+)\\)`).exec(
+          String(op[1]),
+        );
         if (m) peak = Math.max(peak, Number(m[1]));
       }
       return peak;
@@ -1943,7 +1960,7 @@ describe('scene', () => {
     const r = recordingContext();
     mark.draw(r.ctx, c, rcfg);
     expect(
-      r.ops.some((op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90')),
+      r.ops.some((op) => op[0] === '=fillStyle' && String(op[1]).startsWith(HAZARD_RGBA)),
       'the mark is still there at the cross',
     ).toBe(true);
   });
@@ -1972,9 +1989,7 @@ describe('scene', () => {
     const drew = (m: Deadline): boolean => {
       const r = recordingContext();
       m.draw(r.ctx, c, rcfg);
-      return r.ops.some(
-        (op) => op[0] === '=fillStyle' && String(op[1]).startsWith('rgba(255,70,90'),
-      );
+      return r.ops.some((op) => op[0] === '=fillStyle' && String(op[1]).startsWith(HAZARD_RGBA));
     };
     const fresh = (): Deadline => {
       const m = new Deadline();
@@ -2572,28 +2587,53 @@ describe('floating score popups', () => {
   const texts = (r: ReturnType<typeof recordingContext>) =>
     (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
 
-  it('keeps the routine colour quiet by chroma, not by darkness', () => {
-    // The rule that is easy to undo by reaching for a darker grey. ROUTINE was a
-    // dark grey once and it was the least legible text in the game while being the
-    // one shown most often. It is a near-white now, and what makes it recessive is
-    // having no hue — which leaves the ladder free to climb in saturation instead
-    // of in light.
+  it('separates the routine tier from the first rung by alpha, not by hue', () => {
+    // THIS PIN USED TO ASSERT SOMETHING ELSE, and the change is deliberate.
+    //
+    // It read "keeps the routine colour quiet by chroma, not by darkness", and
+    // required every rung above ROUTINE to be saturated — because the old ladder
+    // ran grey, blue, green, gold, so a colourless ROUTINE was what left the rungs
+    // free to climb in saturation.
+    //
+    // Direction 06 makes the first rung deliberately WHITE: "IN THE WINDOW —
+    // points only, white at 70%" and "TRUE — the word for a release you meant",
+    // also white. So the two lowest tiers now share a hue on purpose, and what
+    // separates them is the alpha and the presence of a word. Requiring rung one
+    // to be saturated would now be requiring the design not to happen.
+    //
+    // What survives unchanged is the thing that reasoning was protecting: ROUTINE
+    // is recessive by being pale and slightly transparent, never by being dark. It
+    // was a dark grey once and was the least legible text in the game while being
+    // the one shown most often.
     const m = /rgba\((\d+),(\d+),(\d+),([\d.]+)\)/.exec(ROUTINE.color);
     expect(m, 'ROUTINE should be an rgba near-white').not.toBeNull();
     const [r, g, b, a] = [1, 2, 3, 4].map((i) => Number(m![i])) as [number, number, number, number];
-    // Near-white: bright, and close to neutral.
     expect(Math.min(r, g, b)).toBeGreaterThan(200);
     expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThan(40);
-    // Slightly transparent, so it cannot be the brightest thing on a dark screen
-    // and the starfield shows through the strokes.
     expect(a).toBeGreaterThan(0.4);
     expect(a).toBeLessThan(0.85);
 
-    // And every rung above it is saturated, so the ladder is a chroma ladder.
-    for (const level of [LEVEL.good, LEVEL.great, LEVEL.exceptional]) {
-      const [lr, lg, lb] = [1, 3, 5].map((i) => parseInt(level.color.slice(i, i + 2), 16));
-      expect(Math.max(lr!, lg!, lb!) - Math.min(lr!, lg!, lb!)).toBeGreaterThan(80);
-    }
+    // Rung one is the same near-white at full strength: same hue, more presence.
+    const hue = (c: readonly [number, number, number]) => Math.max(...c) - Math.min(...c);
+    const good = [1, 3, 5].map((i) => parseInt(LEVEL.good.color.slice(i, i + 2), 16)) as [
+      number,
+      number,
+      number,
+    ];
+    expect(Math.min(...good), 'the first rung is a near-white too').toBeGreaterThan(200);
+
+    // And the two rungs ABOVE it climb in chroma, which is what keeps the ladder
+    // ordinal for a player who cannot separate the hues.
+    const great = [1, 3, 5].map((i) => parseInt(LEVEL.great.color.slice(i, i + 2), 16)) as [
+      number,
+      number,
+      number,
+    ];
+    const exceptional = [1, 3, 5].map((i) =>
+      parseInt(LEVEL.exceptional.color.slice(i, i + 2), 16),
+    ) as [number, number, number];
+    expect(hue(great)).toBeGreaterThan(hue(good));
+    expect(hue(exceptional)).toBeGreaterThan(hue(good));
   });
 
   it('shows the points for a routine link, with no word', () => {

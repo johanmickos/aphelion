@@ -1,48 +1,32 @@
 /**
- * The colours that mean something, in one place.
+ * The colours the renderer asks for by role, resolved from the theme.
  *
- * WHY THIS EXISTS. The codebase already had semantic colour names — they were
- * just written in prose instead of in code. `src/render/deadline.ts` explains its own
- * red by pointing at another file's: "`rgba(255,70,90)` is the hazard band's own
- * colour, and the deadline is a fact about that band", and then explains which red it
- * must NOT borrow, because "Note 51 spent three passes establishing that
- * `#ee3f2c` MEANS 'this is about burning'". Two colours with settled meanings,
- * referenced across four files, and no way to say so except in a comment that
- * cannot be checked. Hazard red alone was written out 17 times.
+ * WHAT CHANGED. This file used to hold the values themselves, and admitted in its
+ * own header that it did not know whether all four of its hazard reds were
+ * deliberate. It now holds only the MAPPING from a role the code already has
+ * ("this will end the run", "this is about burning") onto one of Direction 01's
+ * eight tokens — which is a question that can be argued about, unlike a triple.
  *
- * WHAT BELONGS HERE, AND WHAT DOES NOT. A colour earns a name by carrying a
- * meaning and recurring. A gradient stop inside one bloom does neither: it is a
- * shade of something already named, tuned by eye against the stop beside it, and
- * a token for it would be a rename with churn and no benefit — you would still
- * tune that bloom by editing that bloom. So the ~55 one-off stops stay literal
- * where they are drawn. The test for graduating one is whether a second file
- * would ever need to agree with it.
+ * The eight are in `theme.ts`. Where a role resolves to a token and an alpha, the
+ * combination is built once at module load, exactly as before.
  *
  * WHERE A COLOUR IS *PICKED* IS STILL SOMEWHERE ELSE. `accolade.ts` remains the
  * single table mapping an award's rarity to its style, which is what stops the
- * score band and the floating popup disagreeing about the same link — the defect
- * its header records. This file says what `LADDER_GREAT` is; that file says a
- * `great` award gets it. Defining and choosing are different jobs and moving the
- * second one here would undo the fix.
+ * score band and the floating popup disagreeing about the same link. This file
+ * says what `LADDER_GREAT` is; that file says a `great` award gets it.
  *
- * COST AT RUNTIME IS ZERO for the fixed combinations, which are built once at
- * module load rather than per frame. Only genuinely varying alphas call
- * `withAlpha`, and every one of those was already building a string per frame
- * before this file existed.
+ * STILL RESOLVED AT MODULE LOAD, which is the half of F03 that is not finished:
+ * a region cannot yet supply its own theme, because these are constants and not
+ * arguments. Threading the theme through the draw calls deletes most of this file.
  */
+import { DEFAULT_THEME, mix } from './theme.ts';
+import type { RGB } from './theme.ts';
 
-/** A base colour, unresolved, so an alpha can be chosen at the call site. */
-export type RGB = readonly [number, number, number];
+export type { RGB };
 
-/**
- * `rgba()` for a base colour at a chosen alpha.
- *
- * Alpha may be a string so a caller that has already fixed its precision can pass
- * that through untouched. `ship.ts` builds the flame's alpha with `.toFixed(3)`
- * to stop a float like 0.7200000000000001 reaching the canvas as a 19-character
- * string every frame; taking a number here would round-trip that back to a float
- * and undo it.
- */
+const T = DEFAULT_THEME;
+
+/** `rgba()` for a base colour at a chosen alpha. */
 export function withAlpha(c: RGB, a: number | string): string {
   return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 }
@@ -52,144 +36,165 @@ export function solid(c: RGB): string {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
+/** `#rrggbb`, for the handful of places that want a hex string. */
+function hex(c: RGB): string {
+  return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
+}
+
+// --------------------------------------------------------------------- the sky
+
+/** The ground everything is drawn on. Violet-black, never pure. */
+export const VOID = T.void;
+export const VOID_SOLID = solid(T.void);
+
+/** Structure at rest. The unlit state of everything, and it never glows. */
+export const DUSK = T.dusk;
+
+/** Strange: the anomaly's sky, its bubble, farewell rings. Never "good". */
+export const AURORA = T.aurora;
+
+/** The player. Nothing else may reach it. */
+export const CORE = T.core;
+
+/** Utility text at full strength. */
+export const INK = T.ink;
+export const INK_SOLID = solid(T.ink);
+
 // --------------------------------------------------------------------- hazard
 
 /**
- * The boundary red: side walls, the trailing floor, the ceiling, the deadline, and
- * the skull over a ship that pressed too late.
+ * Everything that can end the run: the side walls, the trailing floor, the
+ * ceiling, the deadline, a tank low enough to matter.
  *
- * The most-repeated colour in the renderer and the one most likely to be retuned,
- * because it is the only colour that means "this will end the run".
+ * ONE COLOUR NOW, WHERE THERE WERE FOUR. The old family ran (255,70,90),
+ * (255,85,102), (255,154,168) and (255,90,110), and the file could only say of the
+ * fourth that it "sits 20 units from the first with no note anywhere explaining
+ * the gap, which is what drift looks like". Direction 01 answers the question the
+ * old header could only pose: severity is ORDINAL, so it rides the energy channel,
+ * and the three that were reasoned — a wash, small text, text on a red fill — are
+ * the same ION at three strengths.
  */
-export const HAZARD: RGB = [255, 70, 90];
+export const HAZARD = T.ion;
+export const HAZARD_WARN = hex(T.ion);
+/** Text sitting ON an ION fill has to lift off it, so it goes toward CORE. */
+export const HAZARD_NOTICE = hex(mix(T.ion, T.core, 0.55));
+export const HAZARD_FUEL = T.ion;
 
-/**
- * THE HAZARD FAMILY IS FOUR SHADES, AND IT IS NOT KNOWN WHETHER ALL FOUR ARE
- * DELIBERATE. Collecting them was the first thing this file made visible:
- *
- *   (255, 70, 90)   the band, the deadline, the skull        17 uses
- *   (255, 85,102)   HUD warning lines                     6 uses
- *   (255,154,168)   ending-notice text, on a red fill     2 uses
- *   (255, 90,110)   empty tank, and a refused grab        2 uses
- *
- * Two of those read as reasoned — small text wants more brightness than a wash,
- * and text ON a red fill has to lift off it. The fourth sits 20 units from the
- * first with no note anywhere explaining the gap, which is what drift looks like.
- * They are named separately rather than collapsed, because collapsing them would
- * be a feel change smuggled into a refactor. Now that they are addressable, the
- * question can be asked properly.
- */
-export const HAZARD_WARN = '#ff5566';
-export const HAZARD_NOTICE = '#ff9aa8';
-export const HAZARD_FUEL: RGB = [255, 90, 110];
-
-/** Fixed hazard combinations, resolved once. */
-export const HAZARD_EDGE = withAlpha(HAZARD, 0.5);
-export const HAZARD_BAND_FROM = withAlpha(HAZARD, 0);
-export const HAZARD_BAND_TO = withAlpha(HAZARD, 0.22);
-export const HAZARD_NOTICE_FILL = withAlpha(HAZARD, 0.14);
-export const HAZARD_NOTICE_BORDER = withAlpha(HAZARD, 0.9);
+export const HAZARD_EDGE = withAlpha(T.ion, 0.5);
+export const HAZARD_BAND_FROM = withAlpha(T.ion, 0);
+export const HAZARD_BAND_TO = withAlpha(T.ion, 0.22);
+export const HAZARD_NOTICE_FILL = withAlpha(T.ion, 0.14);
+export const HAZARD_NOTICE_BORDER = withAlpha(T.ion, 0.9);
 
 // ----------------------------------------------------------------------- burn
 
 /**
- * "This is about burning." Note 51 spent three passes arriving at this exact
- * value, and `deadline.ts` declines to borrow it precisely because it is settled —
- * using it there "would promise a fire that has not started."
+ * "This is about burning."
+ *
+ * Note 51 spent three passes arriving at a vermilion `#ee3f2c`, and Direction 07
+ * repeals the result rather than the reasoning: the burn is the clearest case of
+ * something that can cost you the bank, so it wears ION like every other such
+ * thing. "The one time the player's white light wears pink, because the edge is
+ * writing on them."
  */
-export const BURN = '#ee3f2c';
+export const BURN = hex(T.ion);
 
 /**
  * The flame ramp, hot to deep.
  *
- * Named as a ramp rather than left as four stops because the fire is one idea
- * drawn by two functions — the wake and the shock — which have to agree, and
- * because "make the fire less orange" should not be a hunt through `ship.ts`.
+ * The craft's own white dissolving into ION embers, which is what Direction 07
+ * describes and what the old orange could not: an orange fire is a thing that
+ * happens TO the ship, and a white core thinning into pink is the ship itself
+ * coming apart. Built from the two tokens rather than sampled by eye, so "make the
+ * fire less hot" is one number.
  */
-export const FLAME_HOT: RGB = [255, 116, 26];
-export const FLAME_MID: RGB = [255, 104, 24];
-export const FLAME_DEEP: RGB = [228, 34, 14];
-export const FLAME_FADE: RGB = [210, 26, 10];
+export const FLAME_HOT: RGB = mix(T.core, T.ion, 0.4);
+export const FLAME_MID: RGB = mix(T.core, T.ion, 0.7);
+export const FLAME_DEEP: RGB = T.ion;
+export const FLAME_FADE: RGB = mix(T.ion, T.void, 0.35);
 
 // --------------------------------------------------------------------- impact
 
-/** A crash: yellow, so the cause is legible before the words are read. */
-export const IMPACT: RGB = [255, 205, 50];
-export const IMPACT_TEXT = '#ffe27a';
-export const IMPACT_NOTICE_FILL = withAlpha(IMPACT, 0.12);
-export const IMPACT_NOTICE_BORDER = withAlpha(IMPACT, 0.9);
+/**
+ * A crash.
+ *
+ * THE YELLOW IS GONE, and deliberately. It was the fourth meaning on the hue
+ * channel, and Direction 03 rules on exactly this: "Yellow would add a fourth
+ * meaning to hue; severity is ordinal, so it rides the energy channel like
+ * everything else." A crash is the same category as a wall — it ends the run — so
+ * it is the same colour at a different energy.
+ *
+ * It also frees the gold, which now means only one thing: the top of the ladder.
+ */
+export const IMPACT = T.ion;
+export const IMPACT_TEXT = hex(mix(T.ion, T.core, 0.55));
+export const IMPACT_NOTICE_FILL = withAlpha(T.ion, 0.12);
+export const IMPACT_NOTICE_BORDER = withAlpha(T.ion, 0.9);
 
-/** Amber: the boost is armed. Not the crash yellow, and not the flame. */
-export const BOOST_AMBER: RGB = [255, 176, 32];
+/**
+ * The boost is armed.
+ *
+ * CORE, not an amber of its own. The boost is the player's stored energy, and
+ * Direction 01's first sentence is that everything luminous is either that or a
+ * fact about the future. Stored energy is CORE and grades by brightness — an
+ * amber would have been a fifth hue meaning "good", which is the one thing hue is
+ * not allowed to mean.
+ */
+export const BOOST_AMBER: RGB = T.core;
 
 // -------------------------------------------------------------- rarity ladder
 
 /**
- * Grey, blue, green, gold — the rarity convention, "because it arrives already
- * learned from a hundred other games".
+ * White, green, gold — the ladder, and it is now three rungs rather than four.
  *
- * The reasoning that fixed these values, and the L* spacing that keeps the ladder
- * ordinal for a player who cannot separate the hues, lives at `LEVEL` in
- * `accolade.ts` and stays there. Do not retune one of these without reading it.
+ * Direction 06 collapses the vocabulary to TRUE / SHARP / PERFECT, and the colours
+ * follow: CORE white, LUMEN green, SOLAR gold. The blue rung goes with the word
+ * that used to wear it.
+ *
+ * The rungs still climb in lightness — 0.97, 0.83, 0.86 in OKLCH L — so the ladder
+ * survives for a player who cannot separate the hues, which was the property the
+ * old grey-blue-green-gold ramp was chosen for. What carries the order now is
+ * chroma: 0.03, 0.12, 0.15. A rarer award is more saturated, not lighter.
+ *
+ * QUALITY COLOURS LIVE ONLY IN TYPE. LUMEN and SOLAR may not appear on a planet, a
+ * ring or a gauge — the single exception is LUMEN's world monopoly on the finish
+ * system, granted by Direction 12 — and no callout may ever wear an identity hue.
+ * That is what keeps hue-as-identity intact while type carries a rarity ladder.
  */
-export const LADDER_GOOD = '#3aa8e8';
-export const LADDER_GREAT = '#5cd67a';
-export const LADDER_EXCEPTIONAL = '#ffd633';
+export const LADDER_GOOD = hex(T.core);
+export const LADDER_GREAT = hex(T.lumen);
+export const LADDER_EXCEPTIONAL = hex(T.solar);
+
+export const LADDER_GOOD_RGB: RGB = T.core;
+export const LADDER_GREAT_RGB: RGB = T.lumen;
 
 /**
- * The same two rungs, decomposed, for anything that has to interpolate between
- * them. Pinned against the hex above so the pair cannot drift.
- */
-export const LADDER_GOOD_RGB: RGB = [58, 168, 232];
-export const LADDER_GREAT_RGB: RGB = [92, 214, 122];
-
-/**
- * The finish line's marker, in the edge-arrow cue system.
+ * The finish system: the carpet, the chevrons, the chequered line, the arrow.
  *
- * NOT ON THE RARITY LADDER, and it is worth being explicit because it is green
- * and the ladder's third rung is also green. Those arrows are category-coded —
- * blue for a planet, purple for an anomaly — and category is exactly what colour
- * is NOT allowed to mean on an award. Two systems, two jobs: this one answers
- * "what is that", the ladder answers "how good was that", and they never appear
- * on the same glyph.
- *
- * Distinct from `LADDER_GREAT` on purpose rather than by accident. Sharing the
- * value would make a later retune of the ladder silently move a navigation cue.
+ * THE SAME GREEN AS THE LADDER'S MIDDLE RUNG, which repeals a separation this file
+ * used to insist on — "sharing the value would make a later retune of the ladder
+ * silently move a navigation cue". Direction 12 answers it: "the two greens agree
+ * — green means good news, in type and in terrain. Confusion needs contradiction;
+ * there is none." One token, and a retune moves both on purpose.
  */
-export const FINISH: RGB = [92, 226, 140];
+export const FINISH = T.lumen;
 
 /**
  * The debrief: the colour of a run that ended, whatever it managed first.
  *
- * ONE COLOUR FOR EVERY DEATH. It has been three things and each was wrong in a
- * way worth keeping written down. `FINISH` green congratulated the player for
- * arriving at a finish they did not reach. Hazard red is the one colour here that
- * means "right now, and you can still act", which a post-mortem cannot. And a
- * gradient that warmed with how far the run got read as the game grading your
- * failure, when what it should do is simply report it.
- *
- * SO: BETWEEN THE TWO IT SITS BETWEEN. The plain slate it replaced was accurate
- * and morose — the colourless family the HUD uses for readouts nobody is meant to
- * look at — and the summit gold is the one thing above it that must stay rare. A
- * muted indigo has enough chroma to be worth reading and no claim to being an
- * award.
- *
- * OFF THE RARITY LADDER, deliberately, and not merely near it. Borrowing
- * `LADDER_GOOD` would have been the easy way to get some life into it, and would
- * have meant every death sheet announcing itself as a rung — colour is a RANK in
- * this codebase, and a run ending is not a grade.
+ * DUSK. Direction 09 renders the number the field kept "in DUSK — spent, like a
+ * taken planet", which is the same word the palette already uses for a body that
+ * has been used up. The muted indigo it replaces was reaching for exactly this and
+ * had to invent a colour to get there.
  */
-export const DEBRIEF: RGB = [124, 146, 212];
+export const DEBRIEF = T.dusk;
 
 /**
- * The summit gold, for the ceremony that fires when the field is cleared.
+ * The summit, for the ceremony that fires when the field is cleared.
  *
- * DELIBERATELY THE LADDER'S TOP RUNG AND NOT A NEW COLOUR. Clearing the field is
+ * Still the ladder's top rung and still for the same reason: clearing the field is
  * the best thing a player can do, and the ladder already has a colour that means
- * "the best thing" — one the player has spent the whole run learning. Green was
- * asked for first and is wrong for the same reason it would be wrong on a popup:
- * it is rung three of four, so it would paint the game's rarest outcome in the
- * colour of an ordinary good link.
+ * "the best thing".
  */
 export const SUMMIT = LADDER_EXCEPTIONAL;
-export const SUMMIT_RGB: RGB = [255, 214, 51];
+export const SUMMIT_RGB: RGB = T.solar;
