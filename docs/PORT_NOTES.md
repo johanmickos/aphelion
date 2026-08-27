@@ -4473,6 +4473,144 @@ SWAPPABLE: a region cannot supply its own until the draw functions read
 markers already do. That is a third pass, and it buys nothing until there is a
 second region to put in it.
 
+### 70 — Three of the planet language's claims were wrong, and the corpus said which
+
+Direction 04 replaces the shaded sphere with flat anatomy that emits: a near-void
+disc, concentric strata, a rim in the body's identity hue, a core that is the
+type slot, and **the tide** — a bright limb segment that faces the craft. The
+anatomy landed as specified. Three of the board's claims about it did not survive
+being checked, and each one would have shipped a cue that was confidently wrong.
+
+**"The tide appears on every planet in range" and "the planet that would catch
+your press is the one already reaching for you" are the same sentence only if at
+most one body is ever in range.** Measured across the 28 diagnostics reports that
+replay faithfully, 40,752 free-flight ticks:
+
+```
+ticks with >=1 body in grab range   14197
+  exactly one in range               2975   21%
+  two to seven in range             11222   79%
+```
+
+`grabRange` is a flat 560 against bodies of 34–56R, so reach is crowded. The
+board's own teaching claim — "the press is taught without a word" — is the half
+worth keeping, so the tide is the OFFER and there is exactly one.
+
+And it is the simulation's offer rather than a distance test. `snap.grabOffer`
+already existed, already asks `grabTarget` once a frame, and its own comment
+already made the argument: "a second copy would drift from it." A nearest-in-range
+test disagrees with it on **5.8%** of capturing ticks, because targeting leads the
+ship, prefers upward inside a charged window, and refuses a crash cone. Those
+refusals are the valuable 1.1% — 140 crash-cone and 12 no-fuel across the corpus.
+A tide still reaching from a body the crash cone will not let you take is lying at
+the exact moment the cue matters.
+
+**"It scales with mass" is inverted.** `GM` is a single global at 5,500,000 and a
+body's `R` sets only its collision surface and its minimum-orbit ring, so at any
+given distance every body in the field pulls identically — 60.9 at 300px, whatever
+body it is. The claim then reverses at the only distance that differs:
+
+```
+smallest R=34, minOrbit 46   g 2254.1
+largest  R=56, minOrbit 68   g 1111.6     the SMALL one pulls 2.03x harder
+```
+
+A large body holds you further out, where gravity is weaker. "Mass is size,
+nothing else changes" is not true here.
+
+What IS true and live is the pull the craft is feeling from this body right now,
+which is what the board wanted made visible in the first place. Re-pointed there,
+the cue pays for itself twice: the AHEAD → IN REACH transition falls out as a
+continuous ramp instead of needing a threshold, and a threshold on the one cue
+meant to teach a press would have been a cliff. Square-rooted, because gravity is
+inverse-square and the raw ratio spans two orders of magnitude across grab range.
+
+**SPENT cannot be permanent.** The board wants the lamp to go out for good — "a
+spent field behind you is the run's scoreboard, drawn in the world" — and there is
+something to draw: a session holds a median of 6 distinct bodies, p90 12, max 17,
+about 19% of the field. But **15 of the 28 faithful sessions re-grab a body they
+had already held**, a median of once. A permanent mark tells the player a body is
+used up in over half of sessions where they go back and successfully use it, and a
+cue that lies about availability is worse than none. It decays over three seconds
+instead: hard at the release, recovered by the time going back is a real option.
+
+**The measurement that was not needed.** The fourth thing checked was whether the
+tide could just be nearest-body — it cannot, per the 5.8% — but the useful part
+was discovering the answer was already computed and already commented. Same shape
+as note 68's kick: the mechanism existed and the missing piece was who gets one.
+
+---
+
+### 71 — `world.ts` was two files and its own header said so
+
+`world.ts` opened with "World layer: hazard zones and bodies", which is an
+admission rather than a description. `BodyRenderer` sat four hundred lines below
+the hazard band, sharing nothing with it, the backtrack floor, the finish line,
+the speed carpet or the motes.
+
+That was survivable while a body was a gradient and a label. It stopped being
+survivable at the exact moment `bodies.ts` promised that adding a type costs "a
+row here plus a case in the renderer's draw switch" — because Direction 04 adds
+four types to a switch nobody could find. The split is `src/render/body.ts`, and
+three things came out of it.
+
+**`markerHue` was about to be copied.** It was private to `edge-markers.ts`, which
+was correct while an edge dot was the only thing that needed a body's colour.
+Direction 04's whole legend-free premise is that a planet "is the same colour its
+compass ring wears, so target and window never need a legend" — a claim two copies
+of one expression cannot keep. It is `bodyHue`, exported, and `edge-markers.ts`
+imports it. Same defect `finishLineY` and `runInBand` are in `AGENTS.md` for, and
+both of those agreed right up until they did not.
+
+**`Theme.emission` was dead data.** The ladder has been defined since Direction 01
+landed and nothing read it; `world.ts` picks `shadowBlur` 9 and 20 by hand for the
+finish line, and those predate it. Direction 04 states its states in ladder terms,
+so this is its first consumer. The helper is deliberately local: one function with
+one caller is not a seam, and when the finish line comes onto the ladder is the
+right time to decide where it lives.
+
+The bloom is NOT always on, which the board also says — AHEAD is "E0-E1", not E1.
+A distant body draws its rim flat. That is both what "present and identifiable,
+but quiet" means and the only affordable version: a shadowed stroke is a Gaussian
+over the arc's bounding box and a dense field puts ten on screen at once.
+
+**A boolean became a value.** `drawPlanet` took `held: boolean`. Four states, a
+continuous pull and a decaying mark do not become five more positional arguments;
+they become `BodyView`, computed once per body per frame. `BodyRenderer.draw` took
+six positional parameters and now takes the `Frame`, which is what note 67 built it
+for.
+
+**What deleted itself.** The gradient cache and its `cacheScale` invalidation
+existed solely to make one expensive radial fill affordable. Flat anatomy has no
+gradient, so both went, and the renderer's only surviving state is the two things
+that genuinely persist between frames: the tide's lagged angle and the spent
+countdown. Both are aged in the bodies layer rather than in `advance`, and the
+distinction is note 67's own: `advance` exists because layers ABOVE it read what
+it moved, and nothing above the bodies reads a tide angle. Putting them there
+would mean reaching into this class from outside it, which is the coupling the
+split was for.
+
+The spent mark ages for the whole field and the tide only for the visible part,
+which looks inconsistent and is not: a spent mark is a fact about the run and must
+not pause because nothing was drawing it, while an off-screen tide has nobody to
+lag for and is re-seeded to the true bearing when it returns, rather than swinging
+into place in front of the player.
+
+**Two pins failed and both were repeals, not bugs.** The scene's smoke test
+counted radial gradients as a stand-in for "a body was drawn"; it asks for a rim
+in the body's identity hue now, which is a sharper question than the old one — a
+gradient count could not tell a planet from the nebula behind it. And "draws a
+halo only around the body holding the ship" measured a halo that the emission
+ladder replaced; it is five assertions about what a body says it is doing, each
+counting arcs at ONE body's centre, because the field is dense enough that a
+whole-frame count cannot tell which body grew a limb.
+
+Nothing under `src/sim/` moved. The equality gate read `0.000e+0` across all ten
+scenarios throughout, the golden did not move, and `SIM_VERSION` did not need a
+bump.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
