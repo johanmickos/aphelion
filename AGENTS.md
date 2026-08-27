@@ -185,11 +185,18 @@ because only one of them is a reason to distrust the report:
 | `DEV_KEYS`      | what the dev server always sets                  | `dev`                 |
 | everything else | build skew                                       | ⚠ **DIFFERENT BUILD** |
 
-All five live in `tools/replay-core.ts`. **Any key a player can change at runtime
-must join one of the first four**, or the banner goes back to crying wolf on
-ordinary play and then blaming the knob for a divergence it did not cause. That
-has now happened twice: `DEV_KEYS` and `COURSE_KEYS` were both added after the
+All five live in `tools/replay-core.ts`. **Any `SimConfig` key a player can change
+at runtime must join one of the first four**, or the banner goes back to crying
+wolf on ordinary play and then blaming the knob for a divergence it did not cause.
+That has now happened twice: `DEV_KEYS` and `COURSE_KEYS` were both added after the
 fact, and this paragraph said "three" for a while after it had become four.
+
+The tune panel also carries `RENDER_KNOBS`, and those are **not** a sixth category.
+They write to `RenderConfig`, which a report does not carry because it is not part
+of the run — so there is nothing for the banner to compare and nothing to
+categorise. Do not "fix" that by adding a `RENDER_KEYS` set, and do not fix it by
+moving a render value into `SimConfig` so the panel can reach it: the panel reaches
+it already.
 
 ## Simulation rules
 
@@ -241,13 +248,21 @@ the author's files, and do not commit their in-progress edits alongside your own
 
 ## Tests
 
-- A knob that does nothing is worse than no knob: `test/tune.test.ts` asserts
-  every tune-panel slider moves the simulation. Its scenarios have blind spots —
-  a knob can measure as inert because no scenario reaches the part of the run it
+- A knob that does nothing is worse than no knob, and the panel has **two tables
+  with two promises**. `KNOBS` names `SimConfig` keys and `test/tune.test.ts`
+  asserts each one moves the ship; `RENDER_KNOBS` names `RenderConfig` keys, which
+  cannot move the ship at all, so the same file asserts each one changes what gets
+  drawn. A new knob belongs on the table whose promise it can keep — the wrong one
+  either fails to typecheck or pins a value against a measurement it was never
+  going to pass. Both tables have the same blind spot, and it is the same trap —
+  a knob measures as inert because no scenario reaches the part of the run it
   governs. Check that before concluding a knob is dead — and note that checking
   thoroughly is not the same as checking the right mechanism. `fuelRegen` was
   pinned as dead on the strength of several scenarios, all of which exercised the
   grab gate (`fuel <= 0.5`) when the live one was the flyby brake (`fuel > 0`).
+  The render side's version of that discipline is a **control**: add a real
+  `RenderConfig` key the renderer under test cannot read, and check the test fails.
+  A whole-picture comparison that always differed would pass every knob given it.
 - When a documented defect is fixed, the assertion that pinned it should fail
   loudly and specifically. That is the point of pinning it. Update the pin to
   assert the new truth rather than deleting it.

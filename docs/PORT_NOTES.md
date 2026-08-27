@@ -4611,6 +4611,77 @@ bump.
 
 ---
 
+### 72 — The unflown numbers went behind sliders, and the panel needed a second table
+
+Direction 04a's body language and the release kick are two piles of defensible
+constants that nobody has felt. `TIDE_LAG_REST` 4, `TIDE_LAG_FULL` 14,
+`SPENT_RECOVER` 3, `EMIT_AT` 0.3, `RIM_REST` 0.4, `releaseKick` 54,
+`kickShape` 0.5, `kickHold` 0.5 — every one of them was argued from the corpus,
+and **the corpus is the wrong instrument for the question that is left**. Notes 68
+and 70 are what it is good at: it says a hitstop reads as jarring, that a tide on
+"every planet in range" lights two to seven lamps while one takes the press, that
+a permanent spent mark lies in over half of sessions. Those are claims a
+measurement can refute. How hard a release should LAND, and how fast a limb should
+swing, are not.
+
+So the answer is a phone, and what this note records is what it cost to make one
+reachable.
+
+**Half of it was free.** `releaseKick`, `kickShape`, `kickHold` and
+`boostBurstDecay` were already `SimConfig` keys, so each cost one row in `KNOBS`.
+No key was added, so the golden did not move; they join `TUNED_KEYS` through
+`tools/replay-core.ts`'s existing `KNOBS.map`, so a session flown on a dragged
+slider prints `tuned` rather than ⚠ DIFFERENT BUILD — which is the rule
+`AGENTS.md` states and which has been broken twice by knobs added after the fact.
+
+All four also had to survive the table's own promise, and that was not a
+formality: `test/tune.test.ts` measures a knob by how far it moves the ship, and
+`kickShape` and `kickHold` reach the trajectory only through a release that has
+quality to be paid for. All four move it across the existing six scenarios.
+
+**The other half could not be a `SimConfig` key at all.** The body's feel settings
+are render constants, and putting one in `SimConfig` would drag it into the
+equality gate's config compare, force a golden recapture, and pin it against a
+measurement it cannot pass — while claiming that a rim's alpha can move a
+trajectory. `KNOBS` is `keyof SimConfig` and could not even name them.
+
+So there are two tables. `RENDER_KNOBS` writes into `RenderConfig`, which the app
+already holds as a mutable clone and the `Scene` already holds by reference —
+`tuneCam` has been mutating `cameraOrbitLock` that way since the camera lock
+shipped. The separation is the safety: a render knob is absent from a diagnostics
+report's config compare **because it is absent from the run**, and
+`test/tune.test.ts` now pins that no key appears on both tables.
+
+**A render knob keeps the same promise through a different instrument.** It cannot
+move the ship — that is the whole reason it is a separate table — so what it must
+do is change what gets DRAWN. Twenty-four frames of one hand-built sequence go
+through `BodyRenderer` twice per knob and the recorded op streams are compared.
+
+**And the sequence is the entire test**, which is the trap `fuelRegen` fell into:
+a knob measures as dead when nothing reached the mechanism. The ship sits at twice
+the minimum orbit, so `pull` lands mid-ramp and neither end of the tide's lag ramp
+is weighted out of the comparison; it MOVES every frame, because a lag that never
+has to catch up draws the same arc at any rate; and the capture ends part-way
+through, because a spent mark that is never seeded cannot decay. Verified by
+control rather than by argument: `hazardZoneWidth` is a real `RenderConfig` key the
+body renderer cannot read, and adding it to the table fails the test. A comparison
+of whole op streams that always differed would have passed everything.
+
+**Five knobs and not the whole anatomy.** `RIM_W`, `TIDE_W`, the two `STRATA`
+alphas, `CORE_R` and the tide's span stayed consts in `src/render/body.ts`. A
+proportion is either right or wrong on a screenshot, and a slider that a still
+frame can settle is panel weight for nothing. What moved is everything whose answer
+only exists in motion: how a limb swings, how long a mark lingers, and how a field
+ahead resolves as you climb into it.
+
+Nothing under `src/sim/` changed. The equality gate read `0.000e+0` across all ten
+scenarios, the golden did not move, and `SIM_VERSION` did not need a bump.
+
+**None of this is a verdict.** The rig is not the flight, and every number above is
+still the one that was reasoned rather than felt.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -4633,11 +4704,12 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    port-equality 11 · invariants 32 · render 200 · camera 55
-         diagnostics 25 · backtrack 15 · world 23 · tune 7 · clearance 14
-         score 93 · input 8 · grab-target 8 · link-fuel 6 · carpet 21
-         boost-envelope 6 · flyby-fuel 14 · anomaly 19 · outbound-grab 6
-         charged 26 · attract 13 · 666 total
+tests    render 203 · score 94 · camera 55 · invariants 32 · charged 26
+         diagnostics 25 · world 23 · carpet 22 · anomaly 19 · cleared 16
+         backtrack 15 · palette 15 · rescue 15 · clearance 14 · flyby-fuel 14
+         attract 13 · kick 13 · tune 13 · input 12 · port-equality 11
+         run-stats 10 · course 9 · grab-target 8 · boost-envelope 6
+         escape 6 · link-fuel 6 · outbound-grab 6 · 701 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
