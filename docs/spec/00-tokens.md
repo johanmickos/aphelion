@@ -72,6 +72,39 @@ different here.
 > and "teal 170°". LUMEN sits at oklch H 157.1, so the printed teal slot is 12.9° clear, not
 > 20°. One of the two numbers is wrong and the board does not say which. Until it is ruled:
 > generate from the ±20° windows above and treat the printed exemplars as illustration.
+>
+> **Flagged for the colour-vision sweep** (§2a), which will move these numbers anyway.
+
+### 2a · Colour vision — a sweep, not yet a rule
+
+**Flagged, 2026-08-27, for a dedicated pass.** Hue is this game's identity channel, and hue is the
+one channel colour-vision deficiency compresses. The palette and the ≥50° separation rule above
+were chosen for *distinguishability by a trichromat*, and have not been checked against anything
+else.
+
+What the sweep must check, when it runs:
+
+| Surface | The risk |
+|---|---|
+| Identity hues | 40 hues at ≥50° oklch separation collapse toward two axes under deuteranopia and protanopia. The effective separation under simulation is what matters, not the nominal 50° |
+| The callout ladder | CORE white → LUMEN green → SOLAR gold. Green-against-gold is the classic red-green confusion, and these are the words that say how well you flew |
+| ION against identity | ION at oklch H 357.7 against the ember end of the identity band, in the fire band, where being wrong is expensive |
+| LUMEN against identity | The finish system against jade and teal identities, at the moment the run is won |
+| The reserved-window widths | ±20° may not be enough separation once simulated |
+
+What already mitigates it, and must be preserved whatever the sweep concludes:
+
+- **Brightness is the only ordinal channel** (§3). Quality never depends on hue alone — the tiers
+  differ in type scale and bloom as well as colour, and every "better" in the game is *brighter*.
+- **ION and LUMEN hold world monopolies** (§1), so risk and sanctuary are identifiable by
+  *position and behaviour* — the boundary is at the boundary, the carpet is at the top — before
+  colour is consulted.
+- **The band multiplier is now labelled in the world** (spec [07](./07-boundary.md) §2), so the
+  most expensive colour judgement in the game has a text fallback.
+- **Body type is a glyph** (§6), not a hue, so the extension path is already non-chromatic.
+
+The sweep may change palette values, the separation rule and the reserved windows. It may not
+change the grammar: hue stays identity, brightness stays quality.
 
 ## 3 · Energy — the ordinal channel
 
@@ -182,6 +215,8 @@ ever. The compass, the masthead and every award live above it.
   or true black; a lint over the render layer finds no other literal.
 - Generating 40 identity hues for one day yields no hue inside a reserved window, and no two
   adjacent addresses closer than 50°.
+- Every ordinal distinction in the game survives converting the frame to greyscale: tiers, energies,
+  bands and chain remain rankable. Identity does not, and is not expected to.
 - Bloom radius is a pure function of energy step and chain length; no code path sets bloom from
   a hue.
 - Two window tips placed 10° apart produce labels that do not overlap.
@@ -190,3 +225,5 @@ ever. The compass, the masthead and every award live above it.
 ## Open
 
 - The teal identity slot (§2).
+- The colour-vision sweep (§2a) — flagged, not scheduled. It has authority over every hue value and
+  every separation number in this spec, and none over the grammar.

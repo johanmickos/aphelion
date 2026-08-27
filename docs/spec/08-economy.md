@@ -24,8 +24,14 @@ for band.
 3. **Coasting is unpaid, never punished.** Disengaged metres earn ×0. No decay, no drain.
 4. **Points exist in two states.** Carried (at stake, glowing) or banked (safe, dim). What death
    takes is a property of the mode.
-5. **Every multiplier has a pixel.** Tier = the dot. Band = the motes. Streak = the `×N`. Chain =
-   the craft's bloom. No invisible math.
+5. **Every multiplier has a pixel.** Tier = the dot. Band = the motes **and the band's own `×N`
+   label in the world**. Streak = the `×N`. Chain = the craft's bloom. No invisible math.
+
+   > **Author ruling, 2026-08-27.** Direction 07 wanted the band's price shown but never named.
+   > It is now named: in-world multipliers and boost labels are in, because the game stays
+   > arcade-like and what rewards the player should be obvious. This strengthens axiom 5 rather
+   > than bending it — the label is a pixel the multiplier can point at. See spec
+   > [07](./07-boundary.md) §2.
 
 > If a scoring rule cannot point at the pixel that announced it, the rule is wrong.
 
@@ -79,7 +85,7 @@ before the multipliers are applied. Rounding is half-up.
 | Multiplier | Source | Values | Its pixel |
 |---|---|---|---|
 | **tier** | spec [06](./06-awards.md) | make ×1.0 · TRUE ×1.25 · SHARP ×1.5 · PERFECT ×2.0 | the dot |
-| **band** | spec [07](./07-boundary.md) | field ×1 · outer ×2 · fire ×3 | the motes |
+| **band** | spec [07](./07-boundary.md) | field ×1 · outer ×2 · fire ×3 | the motes, and the band's `×N` label |
 | **streak** | spec [06](./06-awards.md) | 1 + 0.10 × min(N−1, 5) → ×1.0 … ×1.5 | the `×N` |
 | **chain** | this spec, §4 | folded into accrual, +10% per link | the craft's bloom |
 
@@ -212,7 +218,7 @@ what death takes — from the start.
 | Bank | BANK chip | A number, Archivo 600 tracked. Dims to 55% while coasting |
 | Chain | Under the velocity subline, and the craft's bloom | `CHAIN ×N` |
 | Tier & streak | The callout at the dot | spec [06](./06-awards.md) |
-| Band | The motes | spec [07](./07-boundary.md). Never a number |
+| Band | The motes, and the band's own label | spec [07](./07-boundary.md) §2 |
 
 ## Acceptance
 

@@ -9,10 +9,14 @@ retelling (Direction 04). The board's `+445 ON RELEASE` is a stale absolute from
 scoring model — the behaviour survives, the number does not.
 
 **Board that lost**: this board draws a `×3` multiplier label in the world next to the boundary
-motes. [Direction 07](../design/Aphelion%2007%20-%20Boundary.dc.html) forbids it outright —
+motes; [Direction 07](../design/Aphelion%2007%20-%20Boundary.dc.html) forbids it outright —
 *"No multiplier labels in the world, no arrows, no 'RISK ZONE' text. The glimmer is the
-signpost."* Direction 07 is the later board and it is arguing this exact point. **There is no
-band label in the world.**
+signpost."*
+
+**Author ruling, 2026-08-27 — Direction 07 lost.** In-world multipliers and boost labels are **in**:
+*"I want to keep it arcade-like and obvious what rewards you."* The later board does not win this
+one. The band carries its multiplier as a label in the world (spec [07](./07-boundary.md) §2), and
+anything the field pays says what it pays, where it is.
 
 **Depends on**: [00 · Tokens](./00-tokens.md), [13 · Fuel](./13-fuel.md), [07 · Boundary](./07-boundary.md).
 
@@ -50,7 +54,7 @@ One layout, five states. Nothing moves between states; only energy and content c
 | **1 · FREE FLIGHT** (coasting) | BANK at 55%. Bodies in range show a lit rim and a tide facing the craft. Off-screen bodies are screen-edge dots in identity hue — no labels, no collision handling. Fuel halo present |
 | **2 · HELD** (the board calls this state CAPTURED) | The compass at rest: windows E1, hand thin, crossing dots quiet. The whole instrument sits above the thumb line. During a hold the thumb covers only trail the craft has already left. BANK at full |
 | **3 · PEAK** (near release) | Hand closes on the dot; window E2; hand thick; ghost bright. Velocity heats to CORE. BANK states the armed value — a fact, not an instruction to release |
-| **4 · BOUNDARY** | The ION gradient scales with **closing speed**, not proximity. Boundary motes glimmer in the outer bands. Fuel halo has gone ION. Velocity subline reads `M/S · TOWARD EDGE` in ION |
+| **4 · BOUNDARY** | The ION gradient scales with **closing speed**, not proximity. Boundary motes glimmer in the outer bands, each band **labelled with its multiplier** (spec [07](./07-boundary.md) §2). Fuel halo has gone ION. Velocity subline reads `M/S · TOWARD EDGE` in ION |
 | **5 · ANOMALY** | **Nothing about the HUD changes.** The world changed, not the instruments. Chip backgrounds go true black so labels hold against the curtains |
 
 ## 4 · Severity states
@@ -99,7 +103,8 @@ collision resolution between them — they may overlap.
 - The top band contains exactly two readable elements in every state.
 - The BANK chip's opacity is a pure function of engagement; toggling coasting toggles it and
   nothing else.
-- No band multiplier, risk label, arrow or instruction text is drawn anywhere in the world.
+- Each boundary band's multiplier is drawn in the world, at the band, and is legible at every altitude the band spans.
+- No **instruction** text — arrows, `RISK ZONE`, `TURN` — is drawn anywhere in the world. A label that states what a band pays is a fact; a label that tells the player what to do is not.
 - The deadline window's drawn length is independent of fuel; only its lit fraction depends on
   fuel. A test at 0%, 50% and 100% fuel finds three identical geometries and three different lit
   fractions.

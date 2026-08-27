@@ -80,6 +80,10 @@ with `W` the wake amplitude in design px. The parted rung relaxes back over **~4
 Nothing radiates from the craft — the wake is a local displacement of an existing structure, not
 an emitted ring.
 
+> **Confirmed, 2026-08-27**: the rung approach and the gravity bend hold. **Spacing and the label
+> numbers are deferred** to when there is a swing to measure them against — they are not blocking,
+> and the shape of the system is not in question.
+>
 > **Open — what an addressed rung says.** The board's prose reads *"every 5th carrying its
 > address (the same numbers the planets wear)"* and *"'died at 23' has a place"*, which puts
 > body addresses (1–40) on the rungs. The board's own live component prints metres

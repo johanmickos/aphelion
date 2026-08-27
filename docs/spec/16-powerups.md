@@ -51,7 +51,8 @@ a data change (spec [17](./17-daily-field.md)).
 | Colour | **ION** — it pays fuel, and fuel is ION's (spec [00](./00-tokens.md)). It is not decoration; it is a fact about the risk budget |
 | Energy | E1 at rest; E2 within grab range of the craft, so it wakes like a body does |
 | Pickup | Proximity: the craft's collision radius plus 12 design px |
-| Pickup feedback | An E3 flash at the cell, a `+20% FUEL` callout in ION at the pickup point (Archivo 600, 12px, same pop-and-linger as a callout), and the halo arc visibly filling |
+| Label, before pickup | `+20% FUEL` in ION, Archivo 700, 9px, tracked 0.1em, sitting beside the cell in world space. **A boost says what it pays, before it pays it** (author ruling, 2026-08-27 — in-world boost labels are in) |
+| Pickup feedback | An E3 flash at the cell, the same `+20% FUEL` text popping and lingering at the pickup point (Archivo 600, 12px, same pop-and-linger as a callout), and the halo arc visibly filling |
 | Pickup sound | Spec [15](./15-audio.md) — a bed voice, not a graded one. A powerup is never praised |
 | On a full tank | It is still collected, still flashes, and pays nothing. **It never becomes points.** |
 
@@ -76,7 +77,7 @@ places.
 
 There is no powerup slot, no inventory, no icon, no timer bar. A cell is a thing in the world that
 pays into the halo already drawn on the craft. Its entire HUD presence is **the fuel halo getting
-fuller** (spec [03](./03-hud.md)).
+fuller** (spec [03](./03-hud.md)) — everything else it has to say, it says in the world, at itself.
 
 That is the whole reason ADR-0009 restricted powerups to fuel and time: both are already
 instrumented, so a powerup needs no new instrument.
@@ -100,3 +101,5 @@ instrumented, so a powerup needs no new instrument.
 - No cell is placed in the carpet, inside a body, or in a boundary band.
 - Removing the powerup module leaves a playable game with a slightly tighter fuel budget and no
   missing UI.
+- A cell's label states its exact payout, and a cell that would pay nothing (full tank) still shows
+  it — the label describes the cell, not the player's state.

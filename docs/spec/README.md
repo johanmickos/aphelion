@@ -7,6 +7,32 @@ Every spec cites its board, or states that it has none.
 Where two boards disagree, the spec records the ruling and names the board that lost, rather than
 leaving the reader to apply the design index's "higher-numbered revision wins" convention.
 
+## How these specs treat numbers
+
+`VISION.md`'s seventh pillar rules that a threshold is **a percentile of real play**, never a
+plausible round number, and that the standing hazard is **staleness, not error** — a threshold
+measured under tuning that has since moved is worse than an unmeasured one, because it looks
+defensible.
+
+So every number in these files is one of three kinds, and says which it is:
+
+- **Measured** — taken from recorded sessions of the real game. Cited with what was measured.
+- **Ruled** — an author decision, dated, with the board or ADR it settles.
+- **An opening position** — a plausible round number, marked as such, existing only so there is
+  something to measure. Spec [17](./17-daily-field.md)'s whole difficulty curve is this kind, and
+  says so.
+
+An opening position that is still an opening position after the thing it describes has been flown
+is a bug in the process, not a property of the spec.
+
+## What these specs are for
+
+The deliverable of this rewrite is **a technical architecture that is easy to maintain and
+extend** (author, 2026-08-27). Every spec is written to serve that: extension points are named
+before they are needed (`type` on a body, the powerup `kind`, the mode boundary's two variables,
+the seed and standings seams), and each spec's acceptance criteria include at least one that fails
+if a layer boundary is crossed.
+
 ## The files
 
 | Spec | Board | Covers |
@@ -46,11 +72,13 @@ author's to close.
 
 | Where | Question |
 |---|---|
-| [05 · The field](./05-field.md) §3 | What an addressed rung's label says — metres, or the address of the nearest body. The board's prose and its own live component disagree |
+| [05 · The field](./05-field.md) §3 | What an addressed rung's label says — metres, or the address of the nearest body. The rung approach and the gravity bend are **confirmed**; spacing and label numbers are deliberately deferred |
 | [08 · The economy](./08-economy.md) §3 | How a swing that crosses boundary bands is priced. Derived here as deepest-band-reached; not ruled |
 | [08 · The economy](./08-economy.md) §4 | Whether the chain has a ceiling, and the bank-spark behaviour if it does. `VISION.md` says measure first |
 | [08 · The economy](./08-economy.md) §7 | What death takes in DRIFT. Blocks [09 · The debrief](./09-debrief.md) §5 |
 | [00 · Tokens](./00-tokens.md) §2 | The teal identity slot: the board's "≥20° clear of LUMEN" and its "teal 170°" cannot both hold |
+| [00 · Tokens](./00-tokens.md) §2a | **The colour-vision sweep** — flagged, not scheduled. It has authority over every hue value and separation number, and none over the grammar |
+| [10 · The results sheet](./10-results.md) §5 | The recipe line's length — 12 today, revisited when the codec and store exist |
 | [17 · The daily field](./17-daily-field.md) | Every number in the difficulty curve is an opening position, not a measurement |
 
 ## Rulings applied
@@ -74,7 +102,11 @@ Do not re-litigate them.
 - **ION is monopolised in the world, not on the craft.** Fuel, the deadline track and the save
   trail wear pink legitimately; nothing else in the world does.
 
-One further ruling was applied by the design index's own convention rather than by M0.1, and is
-recorded where it bites: Direction 03 draws a `×3` band label in the world; Direction 07 forbids
-in-world multiplier labels outright. **Direction 03 lost** ([03 · The HUD](./03-hud.md),
-[07 · The boundary](./07-boundary.md)).
+## Rulings made since
+
+| Date | Ruling | Where it bites |
+|---|---|---|
+| 2026-08-27 | **In-world multipliers and boost labels are in.** Direction 03 draws a `×3` band label in the world and Direction 07 forbids it; **Direction 07 lost**, against the higher-number convention, by author ruling — *"I want to keep it arcade-like and obvious what rewards you."* Each boundary band carries its multiplier as an ION label in world space, and a powerup states what it pays before it pays it. What stays refused is **instruction**: no arrows, no `RISK ZONE`, nothing that says *turn*. A price is a fact; a command is not (`VISION.md`, pillar 4) | [03](./03-hud.md), [07 · §2](./07-boundary.md), [08 · axiom 5](./08-economy.md), [16 · §3](./16-powerups.md) |
+| 2026-08-27 | **The rung system holds**; its spacing and label numbers are deferred until there is a swing to measure them against | [05 · §3](./05-field.md) |
+| 2026-08-27 | **The palette is flagged for a colour-vision sweep**, with authority over hue values and separation numbers and none over the grammar | [00 · §2a](./00-tokens.md) |
+| 2026-08-27 | **The recipe line's length is revisited at implementation** | [10 · §5](./10-results.md) |

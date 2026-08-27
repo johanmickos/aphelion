@@ -3,9 +3,12 @@
 **Board**: [Direction 07 — Boundary](../design/Aphelion%2007%20-%20Boundary.dc.html).
 
 **Rulings applied**: **ION is monopolised in the world, not on the craft.** Fuel, the deadline
-track and the save trail all wear pink legitimately; nothing else in the world does. This board
-also overrules [Direction 03](./03-hud.md)'s in-world `×3` band label — **there are no multiplier
-labels in the world**.
+track and the save trail all wear pink legitimately; nothing else in the world does.
+
+**Author ruling, 2026-08-27**: this board's second law said *"reward is shown, never spoken"* and
+refused [Direction 03](./03-hud.md)'s in-world `×3` band label. **That refusal is overturned.**
+In-world multipliers and boost labels are in — the game stays arcade-like, and what rewards the
+player is obvious. Direction 03 wins this one against the higher-number convention, by ruling.
 
 **Depends on**: [00 · Tokens](./00-tokens.md), [13 · Fuel](./13-fuel.md),
 [08 · Economy](./08-economy.md), [09 · Debrief](./09-debrief.md).
@@ -17,9 +20,10 @@ labels in the world**.
 1. **Intensity = closing speed, not proximity.** Coast along the outer band and the boundary glows
    softly — the player can live there. Dive at it and it flares. A barrier reacts to where you are;
    a risk reacts to what you are doing.
-2. **Reward is shown, never spoken.** Boundary motes drift in the outer bands, denser and
-   brighter deeper in. No multiplier labels, no arrows, no "RISK ZONE" text anywhere in the world.
-   The glimmer is the signpost.
+2. **Reward is shown *and* named.** Boundary motes drift in the outer bands, denser and brighter
+   deeper in, and each band carries its multiplier as a label. The glimmer is the signpost; the
+   label is the price. What is still refused is **instruction**: no arrows, no "RISK ZONE", no
+   "TURN". A band states what it pays and lets the player price the trade (§7).
 3. **The line is the only absolute.** Bands are negotiable; the line is not. Past it, physics
    stops negotiating too. That stake is the game's one deliberate cruelty.
 
@@ -28,16 +32,28 @@ labels in the world**.
 Measured inward from **the line**, in world metres. Positions are drawn in world space; the
 gradient never sits on the screen edges, so it reads as geography rather than as a vignette.
 
-| Band | Extent | Band multiplier | Motes |
-|---|---|---|---|
-| **THE FIELD** | deeper than 220 m from the line | **×1** | none |
-| **OUTER BAND** | line − 220 m … line − 90 m | **×2** | sparse, α ≈ 0.25–0.55, r ≈ 1.6–2.4px, no bloom |
-| **FIRE BAND** | line − 90 m … the line | **×3** | dense and bright, α ≈ 0.55–0.85, r ≈ 2.4–3.0px, 5px bloom |
-| **GONE** | past the line | — | **absent — even the reward stops promising** |
+| Band | Extent | Band multiplier | Motes | Label |
+|---|---|---|---|---|
+| **THE FIELD** | deeper than 220 m from the line | **×1** | none | none — ×1 is the default and needs no sign |
+| **OUTER BAND** | line − 220 m … line − 90 m | **×2** | sparse, α ≈ 0.25–0.55, r ≈ 1.6–2.4px, no bloom | `×2` |
+| **FIRE BAND** | line − 90 m … the line | **×3** | dense and bright, α ≈ 0.55–0.85, r ≈ 2.4–3.0px, 5px bloom | `×3` |
+| **GONE** | past the line | — | **absent — even the reward stops promising** | none |
 
 Motes drift at world speed, strictly parallel, like dust.
 
-The band multiplier prices a swing's cash (spec [08](./08-economy.md)). It is never printed.
+### The band label
+
+| Property | Value |
+|---|---|
+| Content | `×2` or `×3`. The multiplier, and nothing else |
+| Type | Archivo **700**, 9px, tracked 0.1em |
+| Colour | **ION**, at E1 |
+| Position | In **world space**, centred in its band, repeating every **500 m** of altitude so a label is always in frame while the band is |
+| Behaviour | Rises with `heat` (§3) exactly as the gradient does — it is part of the band, not an overlay on it |
+| Never | Animated on its own, never pulsed, never enlarged to draw attention. It is a price tag, not a prompt |
+
+The band multiplier prices a swing's cash (spec [08](./08-economy.md)), and it is now printed where
+it is earned — the label *is* axiom 5's pixel, alongside the motes.
 
 ## 3 · The gradient
 
@@ -111,9 +127,13 @@ Mirrored grammar makes death feel like the game's own physics rather than a puni
 The boundary never issues a command. It states four facts and lets the player price the trade:
 
 - where the bands are — gradient in world space;
-- what they pay — mote density;
+- what they pay — mote density, **and the band's own label**;
 - how fast the craft is closing — bloom;
 - when saving stops being possible — the deadline dot.
+
+Naming the price is still stating a fact. The line the design holds is between a **fact** and an
+**instruction**: `×3` is a fact. An arrow, a `RISK ZONE` banner, or anything that says *turn* is an
+instruction, and those stay refused (`VISION.md`, pillar 4).
 
 The bands also make the score-chase **spatial**: the optimal run lives in the fire band, the safe
 run in the field, and the standings show which players lived where.
@@ -123,7 +143,8 @@ run in the field, and the standings show which players lived where.
 - Flying parallel to the line inside the fire band produces `heat ≤ 0.25` sustained; turning to
   dive at the same distance raises it above 0.6 within 500ms. Distance did not change.
 - Mote density is a pure function of band; no mote exists past the line.
-- No text, label, arrow or numeral is drawn in the world anywhere in the boundary system.
+- Each band's multiplier label is drawn in world space, repeats every 500 m, and is legible against the gradient at maximum `heat`.
+- No arrow, banner or instruction text is drawn in the world anywhere in the boundary system.
 - The death sequence contains no velocity vector that is not parallel to the craft's velocity at
   the line.
 - A run that crosses the line and a run that releases perfectly both begin with an identical

@@ -96,7 +96,7 @@ APH-214-KX7Q
 
 | Property | Value |
 |---|---|
-| Length | **12 characters**, including the two hyphens (ADR-0003) |
+| Length | **12 characters**, including the two hyphens (ADR-0003). **Revisit at implementation** (author, 2026-08-27) — the length follows from what the codec actually needs to address a run, and that is not known until the store exists |
 | Structure | `APH` · day number · payload, checksummed |
 | Contains | Enough to identify **one** run — a handle, not the run itself |
 | Does not contain | The input log. Twelve characters cannot hold a compressed input log |
