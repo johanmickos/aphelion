@@ -41,6 +41,9 @@ import { drawAlignGlow, drawCompass } from './compass.ts';
 import { drawEdgeMarkers } from './edge-markers.ts';
 import { canAffordCircularise } from './capture.ts';
 import type { RenderSnapshot } from './snapshot.ts';
+import type { Frame } from './frame.ts';
+import { DEFAULT_THEME } from './theme.ts';
+import type { Theme } from './theme.ts';
 import type { ScoreState } from '../score/types.ts';
 
 export interface SceneDeps {
@@ -48,6 +51,52 @@ export interface SceneDeps {
   render: RenderConfig;
   bodies: readonly Body[];
   field: FieldBounds;
+  /**
+   * The palette this scene paints in. Defaults to the canonical one.
+   *
+   * Optional rather than required because every caller today wants the default,
+   * and making ten test constructions say so would be noise instead of
+   * explicitness. A region passes its own — which is the whole point of the theme
+   * being a value, and the thing `palette.ts` could not do while it was a module
+   * of constants.
+   */
+  theme?: Theme;
+}
+
+/**
+ * What the app hands the scene each frame, as opposed to what the scene derives.
+ *
+ * Named rather than inline because `frame()` takes it too, and an inline type
+ * repeated in two signatures is one rename away from being two types.
+ */
+export interface DrawOpts {
+  timeMs: number;
+  paused: boolean;
+  viewportW: number;
+  viewportH: number;
+  /** Bottom of the header text, in design units. */
+  headerBottom: number;
+  /** Seconds since the last frame, for animation that is not tick-locked. */
+  frameDt: number;
+  /**
+   * The live score. Passed in rather than carried on the snapshot: the snapshot
+   * is derived from `SimState`, and the score deliberately is not part of it —
+   * see `src/score/score.ts`.
+   */
+  score: ScoreState;
+  /**
+   * Fade of a DEATH sheet, 0..1, or null when none is up.
+   *
+   * Clocked by the app rather than derived here, because a worthy death has no
+   * ceremony to hang a phase off — and it cannot borrow the simulation's hold
+   * either: whether a death earned a sheet is a question about `ScoreState`,
+   * which `src/sim/` must never be able to see. So the app stops stepping and
+   * runs this clock itself. A CLEAR needs no such field; its fade rides the
+   * ceremony, which the scene already has.
+   */
+  deathSheet?: number | null;
+  /** Seconds since a death sheet was raised, for its roll. */
+  deathSheetT?: number;
 }
 
 export class Scene {
@@ -210,51 +259,57 @@ export class Scene {
     this.nebula = new Nebula(makeCanvas);
   }
 
-  draw(
+  /**
+   * Assemble the frame.
+   *
+   * The two derived values are computed HERE and nowhere else. `finishY` is read
+   * by the chequered line, by the arrow that points at it and by the carpet that
+   * runs up to it, and `world.ts` spends a header explaining what happens when one
+   * geometry is derived twice. `cer` answers "is this the victory frame", which a
+   * dozen layers ask.
+   */
+  private frame(
     ctx: CanvasRenderingContext2D,
     cam: Camera,
     snap: RenderSnapshot,
-    opts: {
-      timeMs: number;
-      paused: boolean;
-      viewportW: number;
-      viewportH: number;
-      /** Bottom of the header text, in design units. */
-      headerBottom: number;
-      /** Seconds since the last frame, for animation that is not tick-locked. */
-      frameDt: number;
-      /**
-       * The live score. Passed in rather than carried on the snapshot: the
-       * snapshot is derived from `SimState`, and the score deliberately is not
-       * part of it — see `src/score/score.ts`.
-       */
-      score: ScoreState;
-      /**
-       * Fade of a DEATH sheet, 0..1, or null when none is up.
-       *
-       * Clocked by the app rather than derived here, because a worthy death has
-       * no ceremony to hang a phase off — and it cannot borrow the simulation's
-       * hold either: whether a death earned a sheet is a question about
-       * `ScoreState`, which `src/sim/` must never be able to see. So the app
-       * stops stepping and runs this clock itself. A CLEAR needs no such field;
-       * its fade rides the ceremony, which the scene already has.
-       */
-      deathSheet?: number | null;
-      /** Seconds since a death sheet was raised, for its roll. */
-      deathSheetT?: number;
-    },
-  ): void {
+    opts: DrawOpts,
+  ): Frame {
     const { sim, render, bodies, field } = this.deps;
-    // Where the run ends as `cleared`, or null when the field cannot be cleared.
-    // Derived once and shared by the line and the arrow that points at it, so the
-    // two can never disagree about where the finish is.
     const finishY = finishLineY(sim, field);
-    // Null unless the field has just been cleared. Everything the ceremony
-    // touches reads it, so "is this the victory frame" is asked once.
+    // The ceremony needs the speed the ship arrived at, and `endRun` has already
+    // zeroed the velocity by the time it asks — so the last live reading is kept.
     if (!snap.ending.active) {
       this.entrySpeed = Math.sqrt(snap.vx * snap.vx + snap.vy * snap.vy);
     }
-    const cer = ceremonyPhase(snap, cam, finishY, this.entrySpeed);
+    return {
+      ctx,
+      cam,
+      snap,
+      sim,
+      render,
+      theme: this.deps.theme ?? DEFAULT_THEME,
+      bodies,
+      field,
+      score: opts.score,
+      cer: ceremonyPhase(snap, cam, finishY, this.entrySpeed),
+      finishY,
+      timeMs: opts.timeMs,
+      frameDt: opts.frameDt,
+      paused: opts.paused,
+      viewportW: opts.viewportW,
+      viewportH: opts.viewportH,
+      headerBottom: opts.headerBottom,
+      deathSheet: opts.deathSheet ?? null,
+      deathSheetT: opts.deathSheetT ?? 0,
+    };
+  }
+
+  draw(ctx: CanvasRenderingContext2D, cam: Camera, snap: RenderSnapshot, opts: DrawOpts): void {
+    const f = this.frame(ctx, cam, snap, opts);
+    // Destructured so the draw order below reads as it always has. Everything here
+    // is a field of the frame, and each layer takes the frame as its one argument
+    // once the order becomes a list.
+    const { sim, render, bodies, field, finishY, cer } = f;
 
     // the bars
     ctx.fillStyle = '#05070d';
