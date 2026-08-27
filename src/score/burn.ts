@@ -41,7 +41,7 @@
  */
 import type { Body } from '../sim/types.ts';
 import type { FieldBounds } from '../sim/world.ts';
-import { inAnomalyField } from '../sim/world.ts';
+import { sheltered } from '../sim/world.ts';
 import type { ScoreConfig } from './config.ts';
 
 function clamp01(v: number): number {
@@ -70,7 +70,7 @@ export function edgeHeat(
   scfg: ScoreConfig,
 ): number {
   if (!captured) return 0;
-  if (inAnomalyField(x, y, bodies)) return 0;
+  if (sheltered(x, y, bodies)) return 0;
   const dist = Math.min(x - field.left, field.right - x);
   return clamp01(1 - dist / Math.max(1e-6, scfg.burnEdgeSpan));
 }

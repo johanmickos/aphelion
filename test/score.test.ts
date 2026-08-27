@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, PROTOTYPE_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
-import { createBodies, fieldBounds, inAnomalyField, runInBand } from '../src/sim/world.ts';
+import { createBodies, fieldBounds, sheltered, runInBand } from '../src/sim/world.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { grabTarget } from '../src/sim/capture.ts';
 import { hypot } from '../src/sim/orbit.ts';
@@ -1892,7 +1892,7 @@ describe('the burn', () => {
     expect(a, 'the default field should contain an anomaly').toBeDefined();
     const anomaly = a!;
     const wall = anomaly.x < (field.left + field.right) / 2 ? field.left : field.right;
-    expect(inAnomalyField(wall, anomaly.y, bodies)).toBe(true);
+    expect(sheltered(wall, anomaly.y, bodies)).toBe(true);
     expect(edgeHeat(wall, anomaly.y, field, bodies, true, DEFAULT_SCORE_CONFIG)).toBe(0);
   });
 

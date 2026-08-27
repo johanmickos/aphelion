@@ -366,10 +366,13 @@ export function beginCapture(state: SimState, cfg: SimConfig): GrabResult {
   // The charge is spent here and nowhere else, so every future source of one —
   // a pickup, a streak reward — gets this behaviour for free. An anomaly does not
   // spend a charge: it authors its own arrival and always has.
-  const authored: AuthoredOrbit | null = p.kind === 'anomaly' ? p : zipOrbit(state, cfg, cap, p);
+  const authored: AuthoredOrbit | null = p.traits.authored ?? zipOrbit(state, cfg, cap, p);
   if (authored) {
     freezeOrbit(cap, cfg, authored);
-    cap.zipped = p.kind !== 'anomaly';
+    // Zipped means the arrival was BOUGHT rather than authored by the body. A body
+    // that authors its own orbit was always going to glide you in; a charge is what
+    // buys that glide anywhere else, and only the second is a hop.
+    cap.zipped = p.traits.authored === null;
     cap.phase = 'settle';
     // The swing has happened, as far as anything downstream is concerned: the
     // grab award is owed, and a release from here is a release from a real orbit.
@@ -622,7 +625,7 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
   //
   // Opened even on a weak release. A player who fumbles the exit of the hardest
   // thing in the game has already been punished by the link they did not get.
-  if (cfg.chargedSecs > 0 && body.kind === 'anomaly') state.chargedT = cfg.chargedSecs;
+  if (body.traits.charges > 0) state.chargedT = body.traits.charges;
 
   const spd = hypot(cap.vx, cap.vy) || 1;
   const bx = cap.vx / spd;

@@ -8,13 +8,7 @@
  * single-seed versions of these assertions could not tell the difference.
  */
 import { describe, expect, it } from 'vitest';
-import {
-  createBodies,
-  fieldBounds,
-  inAnomalyField,
-  DESIGN_W,
-  PLANET_TRAITS,
-} from '../src/sim/world.ts';
+import { createBodies, fieldBounds, sheltered, DESIGN_W, PLANET_TRAITS } from '../src/sim/world.ts';
 import { DEFAULT_CONFIG, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import type { Body } from '../src/sim/types.ts';
@@ -328,10 +322,10 @@ describe('anomalies', () => {
       for (const a of anomalies) {
         const wall = a.x < 0 ? fb.left : fb.right;
         expect(
-          inAnomalyField(wall, a.y, [a]),
+          sheltered(wall, a.y, [a]),
           `${label}: ${a.name}'s bubble does not reach its barrier`,
         ).toBe(true);
-        const reach = a.bubble - Math.abs(a.x - wall);
+        const reach = a.traits.shelter - Math.abs(a.x - wall);
         expect(
           reach,
           `${label}: ${a.name} only reaches ${reach.toFixed(0)}px inside`,
@@ -349,11 +343,10 @@ describe('anomalies', () => {
       const fb = fieldBounds(cfg, all);
       for (const a of anomalies) {
         const outward = a.x < 0 ? -1 : 1;
-        const beyond = a.x + outward * (a.bubble + 1);
-        expect(
-          inAnomalyField(beyond, a.y, all),
-          `${label}: ${a.name}'s bubble has no far side`,
-        ).toBe(false);
+        const beyond = a.x + outward * (a.traits.shelter + 1);
+        expect(sheltered(beyond, a.y, all), `${label}: ${a.name}'s bubble has no far side`).toBe(
+          false,
+        );
         const dead = beyond < fb.left - 4 || beyond > fb.right + 4;
         expect(dead, `${label}: past ${a.name}'s bubble is still in bounds`).toBe(true);
       }

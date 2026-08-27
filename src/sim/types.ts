@@ -60,7 +60,7 @@ export interface BodyTraits {
    *
    * The anomaly's whole mechanic, and the reason it is a distance rather than a
    * flag: what lets a well-aimed release coast THROUGH the barrier is that the
-   * exemption has an edge to leave by. See `inAnomalyField`.
+   * exemption has an edge to leave by. See `sheltered`.
    */
   shelter: number;
   /** Seconds of charged window a release from here opens. 0 for none. */
@@ -115,15 +115,22 @@ export interface Planet {
  *
  * It is a normal gravitating body in every respect the simulation cares about —
  * captured by the same code, orbited by the same phase clock, contacted by the
- * same policy. The only thing that makes it special is `bubble`.
+ * same policy. Everything that makes it special is now in its `traits`, and the
+ * one that carries the mechanic is `shelter`.
  *
- * The bubble is a radius within which the field's side boundary does not kill.
- * That single exemption is the whole mechanic: it is what lets a well-aimed
- * release coast THROUGH the barrier, and what kills a badly-aimed one the moment
- * it drifts out the far side. The barrier itself never moves — `fieldBounds` is
- * untouched — so ordinary play is unaffected everywhere the bubble does not
- * reach, and the protection cannot leak to the opposite wall because the two are
- * further apart than any bubble is wide.
+ * Shelter is a radius within which the field's side boundary does not kill. That
+ * single exemption is what lets a well-aimed release coast THROUGH the barrier,
+ * and what kills a badly-aimed one the moment it drifts out the far side. The
+ * barrier itself never moves — `fieldBounds` is untouched — so ordinary play is
+ * unaffected everywhere the shelter does not reach, and the protection cannot
+ * leak to the opposite wall because the two are further apart than any shelter
+ * is wide.
+ *
+ * WHICH LEAVES THIS INTERFACE IDENTICAL TO `Planet`, and that is honest rather
+ * than a smell: what distinguishes the two is what they DO, and that now lives
+ * where it can be read. The separate member stays because `kind` is what the
+ * renderer's draw switch is checked against — an anomaly does not look like a
+ * planet, and the compiler should keep saying so.
  */
 export interface Anomaly {
   kind: 'anomaly';
@@ -132,31 +139,6 @@ export interface Anomaly {
   /** Surface radius. */
   R: number;
   name: string;
-  /** Radius within which the side boundary is suspended. */
-  bubble: number;
-  /**
-   * The orbit a capture here settles to, regardless of how the dive arrived.
-   *
-   * An anomaly is a rest stop, not a test of the approach: a fixed modest orbit
-   * at a fixed unhurried pace is the breathing room it exists to give. Held on
-   * the BODY rather than read from config at the point of use, like `bubble`, so
-   * that anomalies of different kinds can differ without any of this moving.
-   */
-  orbitR: number;
-  /** Seconds for one lap of that orbit, once settled. */
-  orbitPeriod: number;
-  /** Fuel per second restored while parked in it. */
-  refuel: number;
-  /**
-   * Seconds to reach that orbit, instead of `SimConfig.settleDur`.
-   *
-   * Shorter, because the arrival is not the point here. Reported as "I spent a
-   * second or so waiting to stabilize which felt wasted — the screen with just
-   * the purple orb is really powerful and I don't want to delay that effect": the
-   * settle is the delay between committing and getting the thing you committed
-   * for.
-   */
-  settleDur: number;
   traits: BodyTraits;
 }
 

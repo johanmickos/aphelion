@@ -545,7 +545,7 @@ function drawAnomaly(
   const x = toScreenX(cam, a.x);
   const y = toScreenY(cam, a.y);
   const s = cam.scale;
-  const bubble = a.bubble * s;
+  const bubble = a.traits.shelter * s;
 
   ctx.save();
 

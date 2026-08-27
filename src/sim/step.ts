@@ -24,7 +24,7 @@ import {
   createMotes,
   fieldBounds,
   finishLineY,
-  inAnomalyField,
+  sheltered,
   runInBand,
   SPAWN,
 } from './world.ts';
@@ -436,7 +436,7 @@ export function stepSim(state: SimState, cfg: SimConfig, input: Input, dt: numbe
   const outX =
     (pos.x < fb.left - 4 || pos.x > fb.right + 4) &&
     !inRunIn &&
-    !inAnomalyField(pos.x, pos.y, state.bodies);
+    !sheltered(pos.x, pos.y, state.bodies);
   // THE CEILING IS NOT A DEATH ONCE THE FIELD CAN BE CLEARED. With `clearAtTop`
   // on, the clear fires at `clearY` — 240px below `fb.top` — for a drifting ship
   // and a captured one alike, and no tick moves 240px, so the ceiling is now
@@ -511,7 +511,7 @@ function escapeShove(state: SimState, cfg: SimConfig): void {
   // Outside the band, or standing where the boundary does not kill, there is
   // nothing to escape — and the arming is dropped so a later approach is judged
   // on its own closing rather than on this one.
-  if (gap > cfg.escapeBandWidth || inAnomalyField(pos.x, pos.y, state.bodies)) {
+  if (gap > cfg.escapeBandWidth || sheltered(pos.x, pos.y, state.bodies)) {
     cap.escapeSide = 0;
     return;
   }
@@ -718,7 +718,7 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
       cap.periR = nr;
       if (holding) {
         const anchor = state.bodies[cap.planet];
-        freezeOrbit(cap, cfg, anchor?.kind === 'anomaly' ? anchor : null);
+        freezeOrbit(cap, cfg, anchor?.traits.authored ?? null);
         cap.phase = 'settle';
       }
     }

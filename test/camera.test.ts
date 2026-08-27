@@ -751,12 +751,12 @@ describe('what the camera watches', () => {
       return anomalyFocus(bodies, x, a.y, rc, vx, vy);
     };
     expect(at(195), 'leaned from the middle of the corridor').toBe(null);
-    expect(at(a.x + a.bubble + 1)).toBe(null);
+    expect(at(a.x + a.traits.shelter + 1)).toBe(null);
     // A pixel inside the bubble the weight is a thousandth, not a step: the lean
     // has to arrive with the barrier opening or it is the switch note 37 spent a
     // session removing.
-    expect(at(a.x + a.bubble - 1)!.lock).toBeLessThan(0.01);
-    const half = at(a.x + a.bubble - rc.cameraBarrierRelax / 2)!;
+    expect(at(a.x + a.traits.shelter - 1)!.lock).toBeLessThan(0.01);
+    const half = at(a.x + a.traits.shelter - rc.cameraBarrierRelax / 2)!;
     const full = at(a.x + 1)!;
     expect(half.lock).toBeCloseTo(rc.cameraAnomalyLead / 2, 2);
     expect(full.lock).toBeCloseTo(rc.cameraAnomalyLead, 1);
@@ -1089,8 +1089,10 @@ describe('the view around an anomaly', () => {
     // dead centre of the corridor, nowhere near one
     expect(barrierRelax(bodies, 195, anomaly.y, rc)).toBe(0);
     // just outside the bubble, then just inside
-    expect(barrierRelax(bodies, anomaly.x + anomaly.bubble + 1, anomaly.y, rc)).toBe(0);
-    expect(barrierRelax(bodies, anomaly.x + anomaly.bubble - 40, anomaly.y, rc)).toBeCloseTo(40, 0);
+    expect(barrierRelax(bodies, anomaly.x + anomaly.traits.shelter + 1, anomaly.y, rc)).toBe(0);
+    expect(
+      barrierRelax(bodies, anomaly.x + anomaly.traits.shelter - 40, anomaly.y, rc),
+    ).toBeCloseTo(40, 0);
     // fully open well inside
     expect(barrierRelax(bodies, anomaly.x, anomaly.y, rc)).toBe(rc.cameraBarrierRelax);
   });

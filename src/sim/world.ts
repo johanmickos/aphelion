@@ -229,11 +229,6 @@ function placeAnomalies(
       y,
       R: 40 + rnd() * 16,
       name: 'A' + (i + 1),
-      bubble: cfg.anomalyBubble,
-      orbitR: cfg.anomalyOrbitR,
-      orbitPeriod: cfg.anomalyOrbitPeriod,
-      refuel: cfg.anomalyRefuel,
-      settleDur: cfg.anomalySettleDur,
       traits: anomalyTraits(cfg),
     });
     side = -side;
@@ -416,25 +411,31 @@ export function runInBand(cfg: SimConfig, fb: FieldBounds): { top: number; botto
 }
 
 /**
- * Is this point inside some anomaly's bubble?
+ * Is this point inside some body's shelter?
  *
- * The whole anomaly mechanic, in one predicate. `stepSim` suspends the SIDE
- * boundary — and only the side boundary — while this is true, which is what lets
- * a well-aimed release coast through the barrier and back.
+ * `stepSim` suspends the SIDE boundary — and only the side boundary — while this
+ * is true, which is what lets a well-aimed release coast through the barrier and
+ * back.
+ *
+ * NAMED FOR THE CAPABILITY, NOT FOR THE ANOMALY. It was `inAnomalyField` and read
+ * `kind === 'anomaly'`, which made the exemption sound like a property of one
+ * body type rather than a thing any body might project. It is the same predicate;
+ * only what it asks has changed.
  *
  * Deliberately not applied to the top, bottom or the trailing floor. The side
- * walls are the only boundary an anomaly sits beyond, and a bubble that
+ * walls are the only boundary a sheltering body sits beyond, and a shelter that
  * suspended the others would open a hole with nothing on the far side of it: a
  * ship exempted from every bound drifts forever in a straight line, because
- * `driftAccel` is zero and nothing would ever catch it. Leaving the far side of
- * the bubble must always be reachable and always be fatal.
+ * `driftAccel` is zero and nothing would ever catch it. Leaving the far side must
+ * always be reachable and always be fatal.
  */
-export function inAnomalyField(x: number, y: number, bodies: readonly Body[]): boolean {
+export function sheltered(x: number, y: number, bodies: readonly Body[]): boolean {
   for (const b of bodies) {
-    if (b.kind !== 'anomaly') continue;
+    const r = b.traits.shelter;
+    if (r <= 0) continue;
     const dx = x - b.x;
     const dy = y - b.y;
-    if (dx * dx + dy * dy <= b.bubble * b.bubble) return true;
+    if (dx * dx + dy * dy <= r * r) return true;
   }
   return false;
 }

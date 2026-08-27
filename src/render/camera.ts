@@ -597,16 +597,17 @@ export function anomalyFocus(
   let bestI = -1;
   for (let i = 0; i < bodies.length; i++) {
     const b = bodies[i]!;
-    if (b.kind !== 'anomaly') continue;
+    const shelter = b.traits.shelter;
+    if (shelter <= 0) continue;
     const d = Math.hypot(x - b.x, y - b.y);
-    if (d <= b.bubble && d < bestD) {
+    if (d <= shelter && d < bestD) {
       bestD = d;
       best = b;
       bestI = i;
     }
   }
   if (!best) return null;
-  const relax = Math.min(cfg.cameraBarrierRelax, best.bubble - bestD);
+  const relax = Math.min(cfg.cameraBarrierRelax, best.traits.shelter - bestD);
   const escape = Math.min(1, relax / Math.max(1, cfg.cameraBarrierRelax));
   if (escape <= 0) return null;
   // Closing, and how hard. The lean exists to put the anomaly on screen before
@@ -630,10 +631,11 @@ export function barrierRelax(
 ): number {
   let best = 0;
   for (const b of bodies) {
-    if (b.kind !== 'anomaly') continue;
+    const shelter = b.traits.shelter;
+    if (shelter <= 0) continue;
     const d = Math.hypot(x - b.x, y - b.y);
-    if (d > b.bubble) continue;
-    best = Math.max(best, Math.min(cfg.cameraBarrierRelax, b.bubble - d));
+    if (d > shelter) continue;
+    best = Math.max(best, Math.min(cfg.cameraBarrierRelax, shelter - d));
   }
   return best;
 }

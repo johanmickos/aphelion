@@ -1,7 +1,7 @@
 /**
  * Anomalies: the barrier exemption, and the bonus it pays for.
  *
- * The mechanic is one predicate — `inAnomalyField` suspends the SIDE boundary and
+ * The mechanic is one predicate — `sheltered` suspends the SIDE boundary and
  * nothing else — so what has to be pinned is small and specific: that a release
  * aimed at one survives crossing the barrier, that leaving the bubble is fatal,
  * and that the bonus lands on top of the streak ceiling rather than inside it.
