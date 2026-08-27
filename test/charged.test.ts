@@ -405,7 +405,7 @@ describe('the closing tally', () => {
     sc.wasCharged = true;
     sc.hopTotal = hopTotal;
     sc.hopped.push(...hopped);
-    sc.score = 4242;
+    sc.bank = 4242;
     const tallies: Tally[] = [];
     for (let t = 0; t < 30; t++) {
       stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
@@ -429,7 +429,7 @@ describe('the closing tally', () => {
     // everything they had already earned.
     const { sc, tallies } = expire(1500, ['P1', 'P2', 'P3']);
     expect(tallies).toHaveLength(1);
-    expect(sc.score, 'the tally moved the score').toBe(4242);
+    expect(sc.bank, 'the tally moved the score').toBe(4242);
   });
 
   it('fires once, not on every tick after the window', () => {

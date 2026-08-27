@@ -117,7 +117,10 @@ export const FLYBY_TURN_MIN = 8;
 
 export function createScoreState(): ScoreState {
   return {
-    score: 0,
+    bank: 0,
+    carry: 0,
+    coastClimb: 0,
+    lastHighY: 0,
     best: 0,
     streak: 0,
     multiplier: 1,
@@ -207,6 +210,45 @@ function clamp01(v: number): number {
 }
 
 /**
+ * Metres, priced but unpaid — Direction 08's carry, accrued a tick at a time.
+ *
+ * NOTHING HERE REACHES A SCORE YET. `awardLink` still prices its own climb off
+ * `climbFromY`, so this runs alongside the existing economy and changes no number.
+ * That is deliberate: the gap gate below is the single decision that moves most of
+ * F04's economy, and building it in a stage where it cannot break an outcome is
+ * what makes stage (b) a swap rather than a leap.
+ *
+ * THE GATE. `highWaterY` only ratchets, so a dip inside an orbit cannot accrue
+ * negative ground and the measure is the same one `awardLink` has always used.
+ * While captured, every metre counts and the coast resets. While drifting, metres
+ * count until the ship has climbed `cfg.grabRange` without engaging anything —
+ * after that it is out of reach of everything it left, which is aimless drift by
+ * the game's own definition rather than by a number chosen for the economy.
+ *
+ * See `ScoreState.coastClimb` for why the cut is there and not at the board's own
+ * rung, and for the rule that a per-body reach must multiply `cfg.grabRange`
+ * rather than replace it.
+ */
+function accrueCarry(sc: ScoreState, state: SimState, cfg: SimConfig, scfg: ScoreConfig): void {
+  const high = state.highWaterY;
+  // A fresh life, or the first tick of the session: seed and accrue nothing.
+  if (sc.lastHighY === 0) {
+    sc.lastHighY = high;
+    return;
+  }
+  const gained = Math.max(0, sc.lastHighY - high);
+  sc.lastHighY = high;
+  if (state.capture) {
+    sc.coastClimb = 0;
+    sc.carry += gained * scfg.climbPerPx;
+    return;
+  }
+  const allowed = Math.max(0, cfg.grabRange - sc.coastClimb);
+  sc.carry += Math.min(gained, allowed) * scfg.climbPerPx;
+  sc.coastClimb += gained;
+}
+
+/**
  * The live multiplier: the streak ladder, and nothing else.
  *
  * An anomaly used to raise the ceiling here for ten seconds. It no longer does —
@@ -240,7 +282,15 @@ function endLife(sc: ScoreState): void {
   // The live run only. `lastRun` is a sealed copy taken by the caller before this
   // point, and `sessionMax` outlives every life by construction.
   sc.run = emptyRun();
-  sc.score = 0;
+  sc.bank = 0;
+  // The carry dies with the life it was at stake in — that IS what "at stake"
+  // means, and it is the one part of Direction 08's death rule that is universal
+  // across the mode matrix. What varies by mode is the bank.
+  sc.carry = 0;
+  sc.coastClimb = 0;
+  // Not reset to a value: reseeded by the next tick from the new life's own
+  // `highWaterY`, so a respawn far below cannot register as a mountain of climb.
+  sc.lastHighY = 0;
   sc.pending = null;
   sc.pendingFlyby = null;
   sc.streak = 0;
@@ -364,7 +414,7 @@ export function scoreTick(
       // summary of nothing. Reading the final numbers here, into a copy that
       // survives, is what makes a post-mortem possible.
       sc.run.impacts = state.ending.reason === 'impact' ? 1 : 0;
-      sc.run.score = sc.score;
+      sc.run.score = sc.bank;
       sc.run.highWaterY = state.highWaterY;
       sc.lastRun = { ...sc.run };
       // Which wall, and how long the ship had been adrift when it reached one.
@@ -390,6 +440,7 @@ export function scoreTick(
   }
   sc.endingSeen = false;
   if (sc.climbFromY === null) sc.climbFromY = state.highWaterY;
+  accrueCarry(sc, state, cfg, scfg);
 
   // ---- what this life is measuring about itself
   //
@@ -687,7 +738,7 @@ export function scoreTick(
   sc.wasCaptured = cap !== null;
 
   sc.multiplier = multiplierFor(sc, scfg);
-  if (sc.score > sc.best) sc.best = sc.score;
+  if (sc.bank > sc.best) sc.best = sc.bank;
   if (awards.length > 0) sc.lastAward = awards[awards.length - 1]!;
   return { awards, shouts, tally };
 }
@@ -820,7 +871,7 @@ function awardGrab(
     // at rather than the one in force, which the popup would otherwise print.
     award.multiplier = 1;
     award.points = scfg.hopBonus;
-    sc.score += award.points;
+    sc.bank += award.points;
     sc.hopTotal += award.points;
     sc.grabs++;
     return award;
@@ -844,7 +895,7 @@ function awardGrab(
   const raw = close * scfg.closeBonus + (isNerveGrab(award) ? scfg.nerveBonus : 0) + anomaly;
   if (raw <= 0) return null;
   award.points = Math.round(raw * multiplier);
-  sc.score += award.points;
+  sc.bank += award.points;
   sc.grabs++;
   return award;
 }
@@ -964,7 +1015,7 @@ function awardRescue(
     // still running — there is no finished pass here to report.
     turn: 0,
   };
-  sc.score += points;
+  sc.bank += points;
   return award;
 }
 
@@ -1000,7 +1051,7 @@ function awardMote(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
     heat: 0,
     turn: 0,
   };
-  sc.score += points;
+  sc.bank += points;
   return award;
 }
 
@@ -1052,7 +1103,7 @@ function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
     heat: peak,
     turn: 0,
   };
-  sc.score += points;
+  sc.bank += points;
   sc.burns++;
   return award;
 }
@@ -1146,10 +1197,29 @@ function awardFlyby(
     // dragged along the dead zone.
     heat: 0,
   };
-  sc.score += award.points;
+  sc.bank += award.points;
   sc.flybys++;
   sc.streak++;
+  cashCarry(sc);
   return award;
+}
+
+/**
+ * A cash empties the carry.
+ *
+ * Called where Direction 08 says payday is — the release, on a link and on a
+ * paid flyby, which are the two manoeuvres that end in one. It returns the amount
+ * so stage (b) has something to spend; at stage (a) every caller drops it, because
+ * `awardLink` is still pricing its own climb off `climbFromY`.
+ *
+ * The coast is NOT reset here. A cash is not an engagement — the ship has just let
+ * go — so the drift that follows a release starts counting immediately, which is
+ * the whole point of gating on reach rather than on time since a payment.
+ */
+function cashCarry(sc: ScoreState): number {
+  const cashed = sc.carry;
+  sc.carry = 0;
+  return cashed;
 }
 
 function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: PendingLink): ScoreAward {
@@ -1158,6 +1228,7 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
   // baseline survives the whole flight between two links.
   const climb = sc.climbFromY === null ? 0 : Math.max(0, sc.climbFromY - state.highWaterY);
   sc.climbFromY = state.highWaterY;
+  cashCarry(sc);
 
   const timing = Math.pow(p.timing, scfg.timingSharpness);
   const aim = Math.pow(p.aim, scfg.aimSharpness);
@@ -1188,7 +1259,7 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
     turn: 0,
   };
   award.points = Math.round(raw * multiplier);
-  sc.score += award.points;
+  sc.bank += award.points;
   sc.links++;
   sc.streak++;
   return award;

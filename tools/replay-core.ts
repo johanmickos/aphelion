@@ -334,7 +334,7 @@ export function replayReport(report: DiagReport): Analysis {
   // death, so at the final tick of a recording it is usually zero and says
   // nothing about how the session went.
   findings.push(
-    `best life scored ${score.best} (${score.score} standing at the end) — ` +
+    `best life scored ${score.best} (${score.bank} standing at the end) — ` +
       `${score.grabs} grab(s), ${score.links} link(s), ` +
       `${score.flybys} flyby(s), ${score.burns} burn(s), ` +
       `best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,

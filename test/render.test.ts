@@ -3008,20 +3008,20 @@ describe('the score band', () => {
 
   it('always shows the total, and the multiplier only once it is above 1', () => {
     const r = recordingContext();
-    drawScore(r.ctx, cam(), scoreWith({ score: 1240 }), snapAt(0));
+    drawScore(r.ctx, cam(), scoreWith({ bank: 1240 }), snapAt(0));
     let texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     expect(texts).toContain('1,240');
     expect(texts.some((t) => t.startsWith('x'))).toBe(false);
 
     r.reset();
-    drawScore(r.ctx, cam(), scoreWith({ score: 1240, multiplier: 2.25 }), snapAt(0));
+    drawScore(r.ctx, cam(), scoreWith({ bank: 1240, multiplier: 2.25 }), snapAt(0));
     texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     expect(texts).toContain('x2.25');
   });
 
   it('names what a link was paid for, so the weights can be read while playing', () => {
     const r = recordingContext();
-    const sc = scoreWith({ score: 1240, multiplier: 2.25, lastAward: award({}) });
+    const sc = scoreWith({ bank: 1240, multiplier: 2.25, lastAward: award({}) });
     drawScore(r.ctx, cam(), sc, snapAt(110));
     const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     expect(texts.some((t) => t.includes('+1,240'))).toBe(true);
@@ -3042,7 +3042,7 @@ describe('the score band', () => {
     // reason `accolade.ts` is one table.
     const r = recordingContext();
     const burn = award({ kind: 'burn' as const, points: 180, heat: 0.8, multiplier: 2 });
-    drawScore(r.ctx, cam(), scoreWith({ score: 900, lastAward: burn }), snapAt(110));
+    drawScore(r.ctx, cam(), scoreWith({ bank: 900, lastAward: burn }), snapAt(110));
 
     const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     const fills = r.calls('=fillStyle').map((o) => String(o[1]));
@@ -3061,7 +3061,7 @@ describe('the score band', () => {
     // now; what this still pins is that a grab reads as a gain.
     const r = recordingContext();
     const sc = scoreWith({
-      score: 200,
+      bank: 200,
       lastAward: award({ kind: 'grab', points: 34, body: 'P1', multiplier: 1 }),
     });
     drawScore(r.ctx, cam(), sc, snapAt(110));
@@ -3106,7 +3106,7 @@ describe('the score band', () => {
     drawScore(
       r.ctx,
       c,
-      scoreWith({ score: 1234567, multiplier: 5, lastAward: award({}) }),
+      scoreWith({ bank: 1234567, multiplier: 5, lastAward: award({}) }),
       snapAt(110),
     );
     expect(r.ops.length).toBeGreaterThan(0);

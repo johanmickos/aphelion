@@ -527,7 +527,7 @@ export function drawScore(
 
   // The score is the current life's. Showing what a death took, as the number to
   // beat, is the whole reason the reset reads as a cost rather than as a bug.
-  if (score.best > (snap.ending.active && score.lastRun ? score.lastRun.score : score.score)) {
+  if (score.best > (snap.ending.active && score.lastRun ? score.lastRun.score : score.bank)) {
     ctx.font = `${9 * s}px ui-monospace, monospace`;
     ctx.fillStyle = withAlpha(DUSK, 0.75);
     ctx.fillText(`BEST ${formatScore(score.best)}`, cx, cam.offsetY + SCORE.bestY * s);
@@ -539,7 +539,7 @@ export function drawScore(
   // screen was reading 0. At the exact moment a player has just done the best
   // thing in the game. The same trap `lastRun` was added to close, walked into by
   // the one readout nobody thought to check.
-  const shown = snap.ending.active && score.lastRun ? score.lastRun.score : score.score;
+  const shown = snap.ending.active && score.lastRun ? score.lastRun.score : score.bank;
   ctx.font = `600 ${24 * s}px ui-monospace, monospace`;
   ctx.fillStyle = withAlpha(INK, 0.92);
   ctx.fillText(formatScore(shown), cx, cam.offsetY + SCORE.y * s);

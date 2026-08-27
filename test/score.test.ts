@@ -120,6 +120,10 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
   /** What each life was worth at the instant it was zeroed. */
   const lives: number[] = [];
   let prevScore = 0;
+  /** The carry is watched here because nothing spends it yet — see F04 stage (a). */
+  let carryPeak = 0;
+  let carryCashed = 0;
+  let prevCarry = 0;
 
   for (let t = 0; t < ticks; t++) {
     let pressed = false;
@@ -167,11 +171,14 @@ function pilot(ticks: number, cfg: SimConfig = DEFAULT_CONFIG, scfg = DEFAULT_SC
     const out = scoreTick(sc, state, cfg, FIXED_DT, scfg);
     awards.push(...out.awards);
     shouts.push(...out.shouts);
-    if (sc.score === 0 && prevScore > 0) lives.push(prevScore);
-    prevScore = sc.score;
+    if (sc.bank === 0 && prevScore > 0) lives.push(prevScore);
+    prevScore = sc.bank;
+    if (sc.carry < prevCarry) carryCashed += prevCarry;
+    if (sc.carry > carryPeak) carryPeak = sc.carry;
+    prevCarry = sc.carry;
     if (state.ending.active) taken = new Set();
   }
-  return { score: sc, awards, shouts, state, lives };
+  return { score: sc, awards, shouts, state, lives, carryPeak, carryCashed };
 }
 
 /**
@@ -491,7 +498,7 @@ describe('a score is a pure function of (config, seed, inputLog)', () => {
       340,
     );
     expect(awards.length).toBeGreaterThan(0);
-    expect(awards.reduce((n, a) => n + a.points, 0)).toBe(score.score);
+    expect(awards.reduce((n, a) => n + a.points, 0)).toBe(score.bank);
     expect(awards.filter((a) => a.kind === 'link')).toHaveLength(score.links);
     expect(awards.filter((a) => a.kind === 'grab')).toHaveLength(score.grabs);
   });
@@ -914,7 +921,7 @@ describe('the streak multiplier', () => {
     // The score is the current life's, so a session that died has banked strictly
     // less than the sum of everything it was ever paid.
     const paid = awards.reduce((n, a) => n + a.points, 0);
-    expect(score.score).toBeLessThan(paid);
+    expect(score.bank).toBeLessThan(paid);
   });
 
   it('keeps a best, so a death has something to show for what it took', () => {
@@ -925,7 +932,7 @@ describe('the streak multiplier', () => {
     // flown. Asserting `best > score` instead would only hold while the pilot
     // happens not to finish on its best life, which is a fact about the flight
     // path and not about the score.
-    expect(score.best).toBe(Math.max(...lives, score.score));
+    expect(score.best).toBe(Math.max(...lives, score.bank));
   });
 
   it('starts the next life clean rather than judging it on the last one', () => {
@@ -1362,7 +1369,7 @@ describe('the reckless shout', () => {
 
   it('pays nothing — it is a separate channel from the score', () => {
     const h = harness();
-    const before = h.sc.score;
+    const before = h.sc.bank;
     for (let i = 0; i < RECKLESS_STREAK + 1; i++) h.capture(ROUGH);
     expect(h.shouts.length).toBeGreaterThan(0);
     // the captures themselves earn links; what must not move is the shout's own
@@ -1370,7 +1377,7 @@ describe('the reckless shout', () => {
     const quiet = harness();
     for (let i = 0; i < RECKLESS_STREAK + 1; i++) quiet.capture(SMOOTH);
     expect(quiet.shouts).toHaveLength(0);
-    expect(h.sc.score - before).toBe(quiet.sc.score - before);
+    expect(h.sc.bank - before).toBe(quiet.sc.bank - before);
   });
 
   it('picks a word deterministically, so a replay shows what was said', () => {
@@ -1759,7 +1766,7 @@ describe('the grab award lands at periapsis, not at the press', () => {
     for (let i = 0; i < 8; i++) edges.push([240 + i * 12, 1], [244 + i * 12, 0]);
     const { awards, score } = play(edges, 600);
     expect(awards.filter((a) => a.kind === 'grab')).toHaveLength(0);
-    expect(score.score).toBe(0);
+    expect(score.bank).toBe(0);
   });
 
   it('is a separate award from the release, with its own points and word', () => {
@@ -2022,3 +2029,98 @@ function fakeCapture(): NonNullable<SimState['capture']> {
     defl: 0,
   };
 }
+
+/**
+ * F04 stage (a): the carry exists, accrues, and buys nothing yet.
+ *
+ * The whole point of a stage that changes no outcome is that the risky half of the
+ * economy — the gap gate, which decides most of F04 — can be built and pinned
+ * where it cannot break anything. These tests are what makes that true rather than
+ * merely intended, and they are the ones stage (b) has to keep passing while it
+ * makes the link SPEND what they measure.
+ */
+describe('the carry, before anything spends it', () => {
+  /** Climb without moving the ship: `accrueCarry` reads only `highWaterY`. */
+  function climb(px: number, perTick: number, scfg = DEFAULT_SCORE_CONFIG) {
+    const state = createInitialState(DEFAULT_CONFIG);
+    const sc = createScoreState();
+    // One tick to seed the anchor, accruing nothing — a respawn far below must not
+    // register as a mountain of climb.
+    scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT, scfg);
+    for (let done = 0; done < px; done += perTick) {
+      state.highWaterY -= perTick;
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT, scfg);
+    }
+    return sc;
+  }
+
+  it('stops paying once the ship has climbed out of reach of everything', () => {
+    // THE GAP GATE, and the number is cfg.grabRange rather than the board's 25m
+    // rung: measured over 401 coasts, gating at a rung leaves 58.6% of all climb
+    // unpaid, which is 93% of the way to paying only for captured metres.
+    const cap = DEFAULT_CONFIG.grabRange * DEFAULT_SCORE_CONFIG.climbPerPx;
+    expect(climb(400, 20).carry).toBeCloseTo(400 * DEFAULT_SCORE_CONFIG.climbPerPx, 6);
+    expect(climb(4000, 20).carry, 'a long drift kept earning').toBeCloseTo(cap, 6);
+  });
+
+  it('gates on the field-wide reach, not on a body that happens to be near', () => {
+    // The rule Q7 settled and `ScoreState.coastClimb` states: if reach becomes a
+    // per-body trait it must MULTIPLY this, never replace it. Pinned by reading the
+    // global — halve it and the drift is paid half as far.
+    const half = { ...DEFAULT_CONFIG, grabRange: DEFAULT_CONFIG.grabRange / 2 };
+    const state = createInitialState(half);
+    const sc = createScoreState();
+    scoreTick(sc, state, half, FIXED_DT);
+    for (let i = 0; i < 200; i++) {
+      state.highWaterY -= 20;
+      scoreTick(sc, state, half, FIXED_DT);
+    }
+    expect(sc.carry).toBeCloseTo(
+      (DEFAULT_CONFIG.grabRange / 2) * DEFAULT_SCORE_CONFIG.climbPerPx,
+      6,
+    );
+  });
+
+  it('an engagement lifts the gate again', () => {
+    // Measured over the SESSION rather than over one carry, and that is the only
+    // shape that works: `coastClimb` only ratchets down at a capture, so if a grab
+    // did not reset it the gate would shut permanently after the first 560px of
+    // drift and the whole session could never accrue more than one gate's worth,
+    // however many times the carry was cashed in between.
+    const cap = DEFAULT_CONFIG.grabRange * DEFAULT_SCORE_CONFIG.climbPerPx;
+    const r = pilot(4000);
+    expect(r.carryPeak, 'the carry never rose at all').toBeGreaterThan(0);
+    const accrued = r.carryCashed + r.score.carry;
+    expect(accrued, 'the coast never reset, so the gate shut for good').toBeGreaterThan(cap);
+  });
+
+  it('buys nothing: every banked point still came from an award', () => {
+    // Stage (a)'s contract. `awardLink` prices its own climb off `climbFromY` and
+    // will keep doing so until stage (b), so the carry must be observable and
+    // inert. If this fails, stage (a) has become stage (b) by accident.
+    const r = pilot(4000);
+    expect(
+      r.carryCashed,
+      'nothing ever cashed, so the pin proves less than it should',
+    ).toBeGreaterThan(0);
+    const lives = [...r.lives, r.score.bank];
+    expect(lives.reduce((n, v) => n + v, 0)).toBe(r.awards.reduce((n, a) => n + a.points, 0));
+  });
+
+  it('dies with the life it was at stake in', () => {
+    // The one part of Direction 08's death rule that is universal across the mode
+    // matrix: the bank is what varies by mode, the carry never survives.
+    const r = pilot(4000);
+    expect(r.lives.length, 'nothing died, so this proves nothing').toBeGreaterThan(0);
+    const state = createInitialState(DEFAULT_CONFIG);
+    const sc = createScoreState();
+    scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+    state.highWaterY -= 200;
+    scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+    expect(sc.carry).toBeGreaterThan(0);
+    state.ending.active = true;
+    state.ending.reason = 'impact';
+    scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+    expect(sc.carry, 'a death left the carry standing').toBe(0);
+  });
+});

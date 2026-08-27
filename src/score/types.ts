@@ -163,8 +163,63 @@ export interface PendingFlyby {
 }
 
 export interface ScoreState {
-  /** Points banked in the CURRENT life. A death takes them. */
-  score: number;
+  /**
+   * Points CASHED in the current life. A death takes them.
+   *
+   * This was `score`, and the rename is F04 stage (a): Direction 08 splits the
+   * live number into what is at stake and what has been paid, and `score` was
+   * already the second of those — every award adds to it the instant it is made.
+   * Renaming it rather than adding a third number is what keeps one definition:
+   * a `score` beside a `bank` would be two names for one total, which is the
+   * defect `finishLineY` and `runInBand` are in `AGENTS.md` for.
+   *
+   * A death still takes it, which is the Daily economy. The mode matrix (F05) is
+   * where that stops being universal — INFINITE lets the bank survive — and it is
+   * deliberately not encoded here yet.
+   */
+  bank: number;
+  /**
+   * Metres climbed and not yet cashed, priced but unpaid. Direction 08's "at
+   * stake, glowing".
+   *
+   * NOT YET SPENT, AND THAT IS STAGE (a)'S WHOLE POINT. `awardLink` still prices
+   * its own climb from `climbFromY`, exactly as it always has, so no number this
+   * accrual produces reaches a score. It is built and pinned here so the risky
+   * half of F04 — the gap gate below — exists in a stage where it cannot change an
+   * outcome. Stage (b) makes the link spend this instead.
+   *
+   * The chain and tightness multipliers the settled formula puts INSIDE the carry
+   * are also stage (b): this is the raw accrual they will price.
+   */
+  carry: number;
+  /**
+   * Climb accrued in the current coast, in world px. Reset by any engagement.
+   *
+   * THE GAP GATE. Axiom 3 says disengaged metres earn nothing, and 63.7% of all
+   * climb in the corpus is coasted — so where the gate falls decides most of the
+   * economy. It falls at `cfg.grabRange`: metres stop counting once the ship has
+   * climbed a full grab-range without engaging anything, which is aimless drift by
+   * the game's own definition of reach.
+   *
+   * Measured rather than chosen, over 401 coasts: at the board's own rung (25m)
+   * the gate leaves 58.6% of climb unpaid, which is 93% of the way to paying only
+   * for captured metres; at `grabRange` it leaves 7.3%. The swing between bodies
+   * stays paid, which is what VISION's one non-negotiable feeling requires.
+   *
+   * IT READS THE GLOBAL `cfg.grabRange` AND MUST KEEP DOING SO. If reach becomes a
+   * per-body trait it has to MULTIPLY this, never replace it — otherwise how
+   * patient the economy is with drifting would change according to which planet
+   * happened to be nearby. Same shape as `traits.charges` and `traits.claimable`,
+   * both of which are booleans so the config can keep the magnitude.
+   */
+  coastClimb: number;
+  /**
+   * `highWaterY` as of the end of last tick, so the carry can accrue per tick.
+   *
+   * `climbFromY` cannot serve: it is the anchor for a whole inter-link stretch and
+   * is only read when a link cashes, so it cannot say which metres were coasted.
+   */
+  lastHighY: number;
   /** The highest any life reached this session. Never reset by a death. */
   best: number;
   /**
