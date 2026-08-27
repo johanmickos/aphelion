@@ -221,6 +221,19 @@ no longer existed and two mechanics that were never implemented.
 document. If something needs explaining, explain it at the site that would tempt
 someone to change it.
 
+## `plans/` expires
+
+`plans/` holds work orders for the refactor toward `design/`, one file per finding
+of the 2026-08-27 structural review. It is the exception to the rule above and it
+survives only by expiring: **delete a plan when its refactor lands** — not "mark
+it done", delete it. What deserves keeping goes where it cannot go stale: a
+measurement or a rejected approach into `PORT_NOTES.md`, a rule someone will be
+tempted to break into a comment at the site that tempts them, or into this file.
+
+Nothing in `plans/` is authority. Where a plan and the code disagree, the code is
+right and the plan is stale — re-read the code before starting one. When `plans/`
+is empty, delete the directory.
+
 ## `docs/` is author-owned
 
 Prettier ignores everything under `docs/` except `PORT_NOTES.md`. Do not reformat

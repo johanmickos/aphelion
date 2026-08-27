@@ -1,0 +1,75 @@
+# Refactor plans
+
+Work orders for the structural refactor toward the `design/` directions. One file
+per finding, numbered as the 2026-08-27 structural review numbered them.
+
+## These are disposable, and that is the point
+
+`AGENTS.md` says: **do not create a new standing design document.** `DESIGN.md`
+and `FEEL.md` were both deleted for drifting away from the code they claimed to
+describe.
+
+These files dodge that rule only by expiring. Each one is a **work order**, not a
+description of how the game behaves:
+
+- **Delete the plan when its refactor lands.** Not "mark it done" — delete it.
+- **What survives goes somewhere that cannot go stale.** A measurement or a
+  rejected approach goes into `docs/PORT_NOTES.md`, which is history. A rule that
+  will tempt someone to break it goes into a comment at the site that tempts them,
+  or into `AGENTS.md` if it spans sessions.
+- **Nothing here is authority.** If a plan and the code disagree, the code is
+  right and the plan is stale. Re-read before starting one.
+
+When `plans/` is empty, the refactor is finished and the directory goes too.
+
+## Status
+
+| #   | Plan                                                | Severity | Blocks                  | State               |
+| --- | --------------------------------------------------- | -------- | ----------------------- | ------------------- |
+| F01 | [Body traits](F01-body-traits.md)                   | BLOCKS   | Dir 04 body types       | ready               |
+| F02 | [Body type table](F02-body-type-table.md)           | BLOCKS   | Dir 04, VISION field    | needs F01           |
+| F03 | [Theme as a value](F03-theme-value.md)              | BLOCKS   | Dir 01, regions         | ready               |
+| F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | needs a call        |
+| F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | needs F04           |
+| F06 | [Effects stack](F06-effects-stack.md)               | COSTS    | powerups                | deferred            |
+| F07 | [Draw layer list](F07-layer-list.md)                | COSTS    | Dir 02, 05              | needs F03           |
+| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | needs F02           |
+| F09 | [Award vocabulary](F09-award-vocabulary.md)         | COSTS    | Dir 06                  | needs a call        |
+| F10 | [HUD grid](F10-hud-grid.md)                         | COSTS    | Dir 03                  | needs F03           |
+| F11 | [Screen machine](F11-screen-machine.md)             | COSTS    | Dir 09, 10, 11          | deferred            |
+| F12 | [Audio observer](F12-audio-observer.md)             | COSTS    | VISION sound            | deferred            |
+| F13 | Design-width duplication                            | —        | —                       | **done** 2026-08-27 |
+
+F13 was fixed in the review session: `DEFAULT_RENDER_CONFIG.designW` now reads
+`DESIGN_W` from `src/sim/world.ts` instead of repeating the literal `390`. No plan
+file; the note lives at the field it explains.
+
+## Order
+
+Dependencies, not severity. Steps 1 and 2 are independent and can run together.
+
+1. **F01** → **F02** — traits first, alone, so the gate proves the refactor.
+2. **F03** — mechanical, large, and never touches the gate.
+3. **F07** → **F10** — both want F03 done first.
+4. **F04** + **F05** — together; splitting the score without the pricing gives two
+   numbers that mean the same thing.
+5. **F08** — needs the type table.
+6. **F06**, **F11**, **F12** — when there is a first powerup, a second screen, and
+   a first sound respectively. Cheap once, expensive repeatedly, and not urgent
+   while the count is one.
+
+## The gates, every time
+
+`pnpm check` before every commit. Beyond that, each plan states which of these it
+is allowed to move:
+
+- **Equality gate** — `node tools/diff-report.ts` reads `0.000e+0` across all ten
+  scenarios. Never moves. A change that moves it is wrong or belongs behind a flag
+  that is `false` in `PROTOTYPE_CONFIG`.
+- **Golden** — `pnpm golden:check`. Moves only when a `SimConfig` key is added.
+  Local only; CI runs `check:ci`, which excludes it.
+- **Fingerprint** — `fingerprint()` in `src/sim/serialize.ts`. Adding a field
+  invalidates the checkpoints in every existing `diagnostics/` report. Bank that
+  cost once, not per feature.
+- **`SIM_VERSION`** — bump when behaviour under `src/sim/` changes. A change to a
+  value outside `fingerprint()` does not need one; check before bumping.
