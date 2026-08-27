@@ -100,6 +100,88 @@ export interface DrawOpts {
 }
 
 export class Scene {
+  /**
+   * THE DRAW ORDER, AND IT IS LOAD-BEARING.
+   *
+   * Every comment on a row below records a defect someone paid for once. This used
+   * to be 180 lines of statements, so the order was only visible by reading all of
+   * them — and Direction 05 adds four more world layers, Direction 02 a hitstop that
+   * freezes some of these and not others, and Directions 09 to 11 glass cards over a
+   * field that is still moving. Each of those is a row here now.
+   */
+  static readonly LAYERS: readonly Layer[] = [
+    { name: 'letterbox', draw: (s, f) => s.letterbox(f) },
+    {
+      name: 'window',
+      // Everything below the HUD is clipped to the design window, so no world
+      // content can spill onto the letterbox bars.
+      wrap: (f, inner) => {
+        f.ctx.save();
+        clipToWindow(f.ctx, f.cam);
+        inner();
+        f.ctx.restore();
+      },
+      children: [
+        { name: 'ground', draw: (s, f) => s.ground(f) },
+        // UNDER THE STARFIELD, deliberately. Stars parallax THROUGH the storm as the
+        // camera moves, which is what makes it read as a volume the ship is inside
+        // of rather than as a filter laid over the picture. See `nebula.ts`.
+        { name: 'storm', draw: (s, f) => s.storm(f) },
+        { name: 'starfield', draw: (s, f) => s.starfield(f) },
+        {
+          name: 'world',
+          // ---- the world falls away
+          //
+          // The ship is frozen where it crossed, so "flying on" is the world
+          // receding rather than the ship advancing. Everything in world space
+          // shifts down together — bodies, runway, chequers — and slides off the
+          // bottom while the ship holds its place. The ship is drawn after this
+          // closes, so it stays put while the field leaves.
+          wrap: (f, inner) => {
+            const receding = f.cer !== null && f.cer.shift > 0;
+            if (!receding) return inner();
+            f.ctx.save();
+            f.ctx.translate(0, f.cer!.shift * f.cam.scale);
+            inner();
+            f.ctx.restore();
+          },
+          children: [
+            { name: 'hazard-zones', draw: (s, f) => s.hazardZones(f) },
+            { name: 'backtrack-floor', draw: (s, f) => s.backtrackFloor(f) },
+            // Under the bodies, so the chequers stay the brightest thing in that
+            // part of the sky.
+            {
+              name: 'runway',
+              when: (f) => !f.cer || f.cer.warp < 1,
+              draw: (s, f) => s.runway(f),
+            },
+            { name: 'bodies', draw: (s, f) => s.bodies(f) },
+          ],
+        },
+        { name: 'capture', draw: (s, f) => s.capture(f) },
+        // Under the ship and its wake: it describes where the ship is going, and
+        // nothing about it should ever obscure the ship itself.
+        { name: 'deadline', draw: (s, f) => s.deadlineMark(f) },
+        { name: 'compass', draw: (s, f) => s.compass(f) },
+        { name: 'advance', draw: (s, f) => s.advance(f) },
+        { name: 'ceremony-wash', draw: (s, f) => s.ceremonyWash(f) },
+        { name: 'ship', draw: (s, f) => s.ship(f) },
+        // Above the ship and its wake, below the HUD: they belong to the world, but
+        // nothing in the world should ever cover them.
+        { name: 'floating-scores', draw: (s, f) => s.floatingScores(f) },
+        { name: 'warnings', draw: (s, f) => s.warnings(f) },
+        { name: 'edge-markers', draw: (s, f) => s.edgeMarkers(f) },
+        { name: 'resolve-sheet', draw: (s, f) => s.resolveSheet(f) },
+        { name: 'instruments', when: (f) => !f.cer, draw: (s, f) => s.instruments(f) },
+        { name: 'score-band', draw: (s, f) => s.scoreBand(f) },
+        { name: 'readout', when: (f) => !f.cer, draw: (s, f) => s.readout(f) },
+        { name: 'sheet', draw: (s, f) => s.sheet(f) },
+      ],
+    },
+    // Outside the clip: a pause covers the whole screen, letterbox bars included.
+    { name: 'paused', when: (f) => f.paused, draw: (s, f) => s.paused(f) },
+  ];
+
   readonly trail: Trail;
   readonly popups = new Popups();
   readonly fuelWarning = new FuelWarning();
@@ -248,6 +330,15 @@ export class Scene {
   private outroT = -1;
 
   /**
+   * How well the release is aimed, from the compass, for the glow the ship wears.
+   *
+   * A local until the draw order became a list. The two layers that need it are
+   * four rows apart, and threading a value through the rows between them would
+   * make every one of them carry something it does not use.
+   */
+  private bestAlign = 0;
+
+  /**
    * `makeCanvas` supplies the storm's offscreen buffer. Injectable so a test can
    * exercise the composited path rather than the no-`document` fallback, which is
    * a different renderer and the one nobody ships.
@@ -305,224 +396,347 @@ export class Scene {
   }
 
   draw(ctx: CanvasRenderingContext2D, cam: Camera, snap: RenderSnapshot, opts: DrawOpts): void {
-    const f = this.frame(ctx, cam, snap, opts);
-    // Destructured so the draw order below reads as it always has. Everything here
-    // is a field of the frame, and each layer takes the frame as its one argument
-    // once the order becomes a list.
-    const { sim, render, bodies, field, finishY, cer } = f;
+    runLayers(this, this.frame(ctx, cam, snap, opts), Scene.LAYERS);
+  }
 
-    // the bars
-    ctx.fillStyle = '#05070d';
-    ctx.fillRect(0, 0, opts.viewportW, opts.viewportH);
+  // ------------------------------------------------------------ layer bodies
+  //
+  // One method per layer, named for what it draws. They are private and the list
+  // below is module-level, so `runLayers` reaches them through `SceneInternals` —
+  // see the note there.
 
-    ctx.save();
-    clipToWindow(ctx, cam);
+  /** The letterbox bars, outside the clip. Nothing else may paint here. */
+  private letterbox(f: Frame): void {
+    f.ctx.fillStyle = LETTERBOX;
+    f.ctx.fillRect(0, 0, f.viewportW, f.viewportH);
+  }
 
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, opts.viewportW, opts.viewportH);
+  /** The ground the world is drawn on. */
+  private ground(f: Frame): void {
+    f.ctx.fillStyle = GROUND;
+    f.ctx.fillRect(0, 0, f.viewportW, f.viewportH);
+  }
 
-    // Charged: a purple nebula storm, centred on the ship and travelling with it.
-    //
-    // Under the starfield deliberately. Stars parallax THROUGH the storm as the
-    // camera moves, which is what makes it read as a volume the ship is inside of
-    // rather than as a filter laid over the picture. See `src/render/nebula.ts`.
-    //
-    // The closing animation is clocked HERE and not in the drawing, because it
-    // describes a window that has already ended: `chargedFrac` is 0 throughout it,
-    // so the drawing has nothing left to derive a phase from. Frozen while paused,
-    // for the same reason the popups are — an animation must not age out behind an
-    // overlay.
-    if (snap.chargedFrac > 0) {
+  /**
+   * Charged: a purple storm, centred on the ship and travelling with it.
+   *
+   * The closing animation is clocked HERE and not in the drawing, because it
+   * describes a window that has already ended: `chargedFrac` is 0 throughout it,
+   * so the drawing has nothing left to derive a phase from. Frozen while paused,
+   * for the same reason the popups are — an animation must not age out behind an
+   * overlay.
+   */
+  private storm(f: Frame): void {
+    if (f.snap.chargedFrac > 0) {
       this.chargedWas = true;
       this.outroT = -1;
     } else if (this.chargedWas) {
       this.chargedWas = false;
       this.outroT = 0;
-    } else if (this.outroT >= 0 && !opts.paused) {
-      this.outroT += opts.frameDt;
+    } else if (this.outroT >= 0 && !f.paused) {
+      this.outroT += f.frameDt;
       if (this.outroT >= OUTRO_SECS) this.outroT = -1;
     }
     this.nebula.draw(
-      ctx,
-      cam,
-      snap,
-      opts.timeMs,
+      f.ctx,
+      f.cam,
+      f.snap,
+      f.timeMs,
       this.outroT >= 0 ? Math.min(1, this.outroT / OUTRO_SECS) : null,
     );
+  }
 
-    this.stars.draw(ctx, cam, render, cer ? cer.warp : 0, cer ? cer.shift : 0);
+  private starfield(f: Frame): void {
+    this.stars.draw(f.ctx, f.cam, f.render, f.cer ? f.cer.warp : 0, f.cer ? f.cer.shift : 0);
+  }
 
-    // ---- the world falls away
-    //
-    // The ship is frozen where it crossed, so "flying on" is the world receding
-    // rather than the ship advancing. Everything in world space is shifted down
-    // together — bodies, runway, chequers — and slides off the bottom while the
-    // ship holds its place. The ship and its trail are drawn AFTER this is
-    // restored, so they stay put while the field leaves.
-    const receding = cer !== null && cer.shift > 0;
-    if (receding) {
-      ctx.save();
-      ctx.translate(0, cer.shift * cam.scale);
-    }
-    drawHazardZones(ctx, cam, render, field);
-    drawBacktrackFloor(ctx, cam, sim, render, snap.highWaterY);
-    // Under the line it feeds into, so the chequers stay the brightest thing in
-    // that part of the sky.
-    // Kept up THROUGH the coast, and only then dropped. Cutting them at the
-    // crossing meant the chequers — the thing the whole runway exists to deliver
-    // the player to — were gone before they could be looked at. They recede with
-    // the rest of the world instead, and by the time the warp starts they have
-    // left the screen on their own.
-    if (!cer || cer.warp < 1) {
-      // The band's own depth rather than the config key, so the chevrons cover
-      // exactly the stretch the funnel acts on. See `finishLineY`.
-      const band = runInBand(sim, field);
-      drawSpeedCarpet(ctx, cam, field, finishY, band ? band.bottom - band.top : 0, opts.timeMs);
-      // Over the chevrons and under the chequers, which is where they sit in the
-      // world: a dot is a thing IN the carpet, and the line is still the brightest
-      // thing in that stretch of sky.
-      drawMotes(ctx, cam, snap.motes, opts.timeMs);
-      drawFinishLine(ctx, cam, field, finishY);
-    }
+  private hazardZones(f: Frame): void {
+    drawHazardZones(f.ctx, f.cam, f.render, f.field);
+  }
+
+  private backtrackFloor(f: Frame): void {
+    drawBacktrackFloor(f.ctx, f.cam, f.sim, f.render, f.snap.highWaterY);
+  }
+
+  /**
+   * The runway: chevrons, the dots in them, and the chequered line they feed.
+   *
+   * Kept up THROUGH the coast, and only then dropped. Cutting them at the crossing
+   * meant the chequers — the thing the whole runway exists to deliver the player
+   * to — were gone before they could be looked at. They recede with the rest of
+   * the world instead, and by the time the warp starts they have left the screen
+   * on their own.
+   */
+  private runway(f: Frame): void {
+    // The band's own depth rather than the config key, so the chevrons cover
+    // exactly the stretch the funnel acts on. See `finishLineY`.
+    const band = runInBand(f.sim, f.field);
+    drawSpeedCarpet(f.ctx, f.cam, f.field, f.finishY, band ? band.bottom - band.top : 0, f.timeMs);
+    // Over the chevrons and under the chequers, which is where they sit in the
+    // world: a dot is a thing IN the carpet, and the line is still the brightest
+    // thing in that stretch of sky.
+    drawMotes(f.ctx, f.cam, f.snap.motes, f.timeMs);
+    drawFinishLine(f.ctx, f.cam, f.field, f.finishY);
+  }
+
+  private bodies(f: Frame): void {
     this.bodyRenderer.draw(
-      ctx,
-      cam,
-      sim,
-      bodies,
-      snap.capture ? snap.capture.planet : -1,
-      opts.timeMs,
+      f.ctx,
+      f.cam,
+      f.sim,
+      f.bodies,
+      f.snap.capture ? f.snap.capture.planet : -1,
+      f.timeMs,
     );
+  }
 
-    if (receding) ctx.restore();
-
-    const cap = snap.capture;
-    if (cap) {
-      const anchor = bodies[cap.planet];
-      if (anchor) {
-        drawOrbitCurve(ctx, cam, sim, snap, anchor);
-        drawAnchorLine(ctx, cam, sim, snap, anchor);
-      }
-      drawBoostHalo(ctx, cam, sim, render, snap, opts.timeMs);
+  /** The orbit the ship is on, the line to its anchor, and the boost it is building. */
+  private capture(f: Frame): void {
+    const cap = f.snap.capture;
+    if (!cap) return;
+    const anchor = f.bodies[cap.planet];
+    if (anchor) {
+      drawOrbitCurve(f.ctx, f.cam, f.sim, f.snap, anchor);
+      drawAnchorLine(f.ctx, f.cam, f.sim, f.snap, anchor);
     }
+    drawBoostHalo(f.ctx, f.cam, f.sim, f.render, f.snap, f.timeMs);
+  }
 
-    // Under the ship and its wake: it describes where the ship is going, and
-    // nothing about it should ever obscure the ship itself.
-    //
-    // The follower advances here rather than where the deadline is fed, so the mark
-    // glides at display rate instead of stepping at the ten-times-a-second the
-    // prediction is recomputed at. Frozen while paused, like the popups: a mark
-    // must not slide to a new place behind an overlay.
-    if (!opts.paused) this.deadline.update(opts.frameDt, render);
-    this.deadline.draw(ctx, cam, render);
+  /**
+   * The point of no return.
+   *
+   * The follower advances here rather than where the deadline is fed, so the mark
+   * glides at display rate instead of stepping at the ten-times-a-second the
+   * prediction is recomputed at. Frozen while paused, like the popups: a mark must
+   * not slide to a new place behind an overlay.
+   */
+  private deadlineMark(f: Frame): void {
+    if (!f.paused) this.deadline.update(f.frameDt, f.render);
+    this.deadline.draw(f.ctx, f.cam, f.render);
+  }
 
-    const compass = drawCompass(ctx, cam, sim, render, snap, bodies, opts.timeMs);
+  /**
+   * The compass, which also answers how well the release is aimed.
+   *
+   * The answer is kept on the scene because the ship layer draws the glow for it
+   * and the two are several layers apart. It was a local before the list existed.
+   */
+  private compass(f: Frame): void {
+    this.bestAlign = drawCompass(
+      f.ctx,
+      f.cam,
+      f.sim,
+      f.render,
+      f.snap,
+      f.bodies,
+      f.timeMs,
+    ).bestAlign;
+  }
 
-    // Paused means paused: a popup must not age out behind the overlay.
-    if (!opts.paused) {
-      this.popups.update(opts.frameDt);
-      this.fuelWarning.update(opts.frameDt);
-      // Catches in ~0.03s and dies over ~0.25s. The rise is deliberately quicker
-      // than it first was: a flare runs about 0.2s, so a follower that needed a
-      // tenth of that to catch was shaving the peak off the very thing it draws.
-      // A pause holds the flame where it was, for the same reason it holds the
-      // popups: nothing should burn down behind the overlay.
-      const target = opts.score.burnHeat;
-      const rate = target > this.burn ? 30 : 4;
-      this.burn += (target - this.burn) * Math.min(1, opts.frameDt * rate);
-      if (this.burn < 0.002) this.burn = 0;
-    }
+  /**
+   * Advance every clock that is not tick-locked. Draws nothing.
+   *
+   * A STEP IN THE FRAME RATHER THAN A DRAW, and it is in the list because its
+   * POSITION is the point: the flame it advances is read by the ship two layers
+   * down, and the popups and the fuel badge are drawn below that. Hoisting it out
+   * of the order would work today and silently stop working the first time
+   * something above it learns to read one of these.
+   *
+   * Paused means paused: nothing here may age behind an overlay.
+   */
+  private advance(f: Frame): void {
+    if (f.paused) return;
+    this.popups.update(f.frameDt);
+    this.fuelWarning.update(f.frameDt);
+    // Catches in ~0.03s and dies over ~0.25s. The rise is deliberately quicker
+    // than it first was: a flare runs about 0.2s, so a follower that needed a
+    // tenth of that to catch was shaving the peak off the very thing it draws.
+    const target = f.score.burnHeat;
+    const rate = target > this.burn ? 30 : 4;
+    this.burn += (target - this.burn) * Math.min(1, f.frameDt * rate);
+    if (this.burn < 0.002) this.burn = 0;
+  }
 
-    // The gold, over the world and under the ship: it should tint the sky the
-    // ship is flying through, never the ship itself.
-    if (cer) drawCeremonyWash(ctx, cam, cer);
-    this.drawShipLayer(ctx, cam, snap, cer, compass.bestAlign, opts);
+  /** The gold, over the world and under the ship: it tints the sky, never the ship. */
+  private ceremonyWash(f: Frame): void {
+    if (f.cer) drawCeremonyWash(f.ctx, f.cam, f.cer);
+  }
 
-    // Above the ship and its wake, below the HUD: it belongs to the world, but
-    // nothing in the world should ever cover it.
-    this.popups.draw(ctx, cam);
-    // Under the ship, in the lane the rising popups leave clear.
-    // Beside the ship, on the side away from the wall — clear of the fuel badge
-    // below it and of the popups above it. See `verdict.ts`.
-    // ---- the warning panel: every ship-local light, in one place
-    //
-    // The skull's two sources are resolved here. Drifting, the deadline knows;
-    // captured, the scorer does. They cannot both be true — `rescueDeadline`
-    // returns null during a capture, and `doomed` is armed only at the start of
-    // one — so this is one meaning in two states rather than a priority between
-    // two opinions, and `doomLight` never learns either source exists.
+  private ship(f: Frame): void {
+    this.drawShipLayer(f.ctx, f.cam, f.snap, f.cer, this.bestAlign, {
+      timeMs: f.timeMs,
+      score: f.score,
+    });
+  }
+
+  private floatingScores(f: Frame): void {
+    this.popups.draw(f.ctx, f.cam);
+  }
+
+  /**
+   * Every ship-local warning light, in one place.
+   *
+   * The skull's two sources are resolved here. Drifting, the deadline knows;
+   * captured, the scorer does. They cannot both be true — `rescueDeadline` returns
+   * null during a capture, and `doomed` is armed only at the start of one — so this
+   * is one meaning in two states rather than a priority between two opinions, and
+   * `doomLight` never learns either source exists.
+   */
+  private warnings(f: Frame): void {
     const fated = this.deadline.fated;
-    const doomed = opts.score.doomed;
+    const doomed = f.score.doomed;
     const doom = fated
       ? { wall: fated.wall, age: fated.age }
       : doomed
-        ? { wall: doomed.wall, age: (snap.tick - doomed.tick) * render.verdictTickSecs }
+        ? { wall: doomed.wall, age: (f.snap.tick - doomed.tick) * f.render.verdictTickSecs }
         : null;
     // Nothing during the ending hold: the notice is the explanation from there,
     // and a warning that outlives the thing it was warning about is noise.
     const lights = [
-      snap.ending.active ? null : doomLight(render, doom),
+      f.snap.ending.active ? null : doomLight(f.render, doom),
       this.fuelWarning.light(),
     ].filter((l): l is WarningLight => l !== null);
-    drawWarnings(ctx, cam, snap, lights);
+    drawWarnings(f.ctx, f.cam, f.snap, lights);
+  }
 
+  private edgeMarkers(f: Frame): void {
     drawEdgeMarkers(
-      ctx,
-      cam,
-      render,
-      snap,
-      bodies,
+      f.ctx,
+      f.cam,
+      f.render,
+      f.snap,
+      f.bodies,
       // The DOM header OR the canvas score band, whichever reaches further down.
       // The arrows have to clear both, and only one of them was ever measured.
-      Math.max(opts.headerBottom, SCORE_BAND_BOTTOM),
-      finishY,
+      Math.max(f.headerBottom, SCORE_BAND_BOTTOM),
+      f.finishY,
     );
+  }
 
-    const sheetAlpha = cer ? cer.sheet : (opts.deathSheet ?? 0);
-    this.sheetAlpha = sheetAlpha;
+  /**
+   * How far the results panel has faded in. Draws nothing.
+   *
+   * In the list because two layers below it read the answer and one of them
+   * cross-fades against it, and because it is published for the app — which
+   * refuses a dismissing tap until there is something to dismiss.
+   */
+  private resolveSheet(f: Frame): void {
+    this.sheetAlpha = f.cer ? f.cer.sheet : (f.deathSheet ?? 0);
+  }
 
-    // THE INSTRUMENTS BELONG TO A RUN, AND THE RUN IS OVER.
-    //
-    // The boxed notice explains a failure and there is none; the gauge reports a
-    // resource that is no longer being spent; the readout narrates a manoeuvre
-    // that has finished. Left up, they are three pieces of flight furniture
-    // sitting on top of a curtain call — and the notice in particular says FIELD
-    // CLEARED in a small industrial box while the whole sky is already saying it
-    // much better.
-    //
-    // The score band stays. It is the number the sheet is about to be built
-    // around, and cutting it at the crossing only to bring it back a beat later
-    // would be a flicker rather than a transition.
-    if (!cer) {
-      drawEndingNotice(ctx, cam, sim, snap, opts.score.lastEnding?.alight ?? false);
-      // HUD sits inside the clip too: it is laid out in design space, so it must
-      // never be drawn over a letterbox bar.
-      drawFuelGauge(ctx, cam, sim, snap, opts.timeMs);
+  /**
+   * THE INSTRUMENTS BELONG TO A RUN, AND THE RUN IS OVER.
+   *
+   * The boxed notice explains a failure and there is none; the gauge reports a
+   * resource that is no longer being spent. Left up during a ceremony they are
+   * flight furniture sitting on top of a curtain call — and the notice in
+   * particular says FIELD CLEARED in a small industrial box while the whole sky is
+   * already saying it much better.
+   */
+  private instruments(f: Frame): void {
+    drawEndingNotice(f.ctx, f.cam, f.sim, f.snap, f.score.lastEnding?.alight ?? false);
+    // HUD sits inside the clip too: it is laid out in design space, so it must
+    // never be drawn over a letterbox bar.
+    drawFuelGauge(f.ctx, f.cam, f.sim, f.snap, f.timeMs);
+  }
+
+  /**
+   * The band hands the score over to the sheet.
+   *
+   * Two readouts of one number, and only one should be lit. Before the sheet
+   * arrives the band is the ONLY place the score exists — `endLife` has already
+   * cleared the live figure, so the band is showing the sealed one — and once the
+   * sheet is up it says the same thing, larger, with everything that qualifies it.
+   * So they cross-fade rather than either being cut: no flicker, and no moment
+   * where the score is nowhere.
+   *
+   * This is why the band is NOT suppressed during a ceremony the way the
+   * instruments above it are.
+   */
+  private scoreBand(f: Frame): void {
+    const fade = 1 - this.sheetAlpha;
+    if (fade <= 0.005) return;
+    f.ctx.save();
+    f.ctx.globalAlpha = fade;
+    drawScore(f.ctx, f.cam, f.score, f.snap);
+    f.ctx.restore();
+  }
+
+  /** The telemetry line. Narrates a manoeuvre, so it goes when there is none left. */
+  private readout(f: Frame): void {
+    drawReadout(
+      f.ctx,
+      f.cam,
+      readoutLines(f.sim, f.snap, canAffordCircularise(f.sim, f.snap)),
+      f.timeMs,
+    );
+  }
+
+  /** Over everything: the only thing the player is meant to be reading by now. */
+  private sheet(f: Frame): void {
+    this.drawSheetLayer(f.ctx, f.cam, f.cer, this.sheetAlpha, {
+      score: f.score,
+      deathSheetT: f.deathSheetT,
+    });
+  }
+
+  private paused(f: Frame): void {
+    drawPaused(f.ctx, f.cam);
+  }
+}
+
+/** The two grounds. Neither is a theme colour: they are what a theme is painted ON. */
+const LETTERBOX = '#05070d';
+const GROUND = '#000';
+
+/**
+ * A step in the frame.
+ *
+ * Most of them draw. Two — `advance` and `resolveSheet` — move a clock or settle a
+ * number, and they are in the list because their POSITION relative to the drawing
+ * is the whole of what makes them correct.
+ */
+export interface Layer {
+  name: string;
+  /** Skip the layer entirely this frame. */
+  when?: (f: Frame) => boolean;
+  draw?: (s: Scene, f: Frame) => void;
+  /**
+   * Wrap `children` in a canvas state. Must balance its own save/restore.
+   *
+   * The alternative was a pair of pseudo-layers opening and closing a transform
+   * from opposite ends of a flat list, which is an unbalanced `restore` waiting to
+   * happen the first time someone reorders the rows between them.
+   */
+  wrap?: (f: Frame, inner: () => void) => void;
+  children?: readonly Layer[];
+}
+
+/**
+ * The order, flattened, outermost first and children in place.
+ *
+ * Exists for the pin in `test/render.test.ts`. Every row of the list carries a
+ * comment recording a defect someone paid for once — the storm under the stars,
+ * the deadline under the ship, the chequers over the chevrons — and a silent
+ * reorder undoes one of them without failing anything. Now it fails.
+ */
+export function layerOrder(layers: readonly Layer[] = Scene.LAYERS): string[] {
+  const out: string[] = [];
+  for (const l of layers) {
+    out.push(l.name);
+    if (l.children) out.push(...layerOrder(l.children));
+  }
+  return out;
+}
+
+function runLayers(s: Scene, f: Frame, layers: readonly Layer[]): void {
+  for (const l of layers) {
+    if (l.when && !l.when(f)) continue;
+    if (l.children) {
+      const inner = (): void => runLayers(s, f, l.children!);
+      if (l.wrap) l.wrap(f, inner);
+      else inner();
     }
-    // ---- the band hands the score over to the sheet
-    //
-    // Two readouts of one number, and only one of them should be lit. Before the
-    // sheet arrives the band is the ONLY place the score exists — `endLife` has
-    // already cleared the live figure, so the band is showing the sealed one —
-    // and once the sheet is up it says the same thing, larger, with everything
-    // that qualifies it. So they cross-fade rather than either being cut: no
-    // flicker, and no moment where the score is nowhere.
-    const bandFade = 1 - sheetAlpha;
-    if (bandFade > 0.005) {
-      ctx.save();
-      ctx.globalAlpha = bandFade;
-      drawScore(ctx, cam, opts.score, snap);
-      ctx.restore();
-    }
-    if (!cer) {
-      drawReadout(ctx, cam, readoutLines(sim, snap, canAffordCircularise(sim, snap)), opts.timeMs);
-    }
-
-    // Last, and over everything: the sheet is the only thing on screen the player
-    // is meant to be reading by this point.
-    this.drawSheetLayer(ctx, cam, cer, sheetAlpha, opts);
-
-    ctx.restore();
-
-    if (opts.paused) drawPaused(ctx, cam);
+    l.draw?.(s, f);
   }
 }

@@ -86,7 +86,7 @@ import { Trail } from '../src/render/ship.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import { createBodies, fieldBounds } from '../src/sim/world.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
-import { Scene } from '../src/render/scene.ts';
+import { Scene, layerOrder } from '../src/render/scene.ts';
 import { captureSnapshot } from '../src/render/snapshot.ts';
 import type { RenderSnapshot } from '../src/render/snapshot.ts';
 
@@ -203,6 +203,78 @@ describe('hazard zones', () => {
     drawHazardZones(r.ctx, c, rcfg, field);
     const ys = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[2]);
     expect(ys.some((y) => Math.abs(y - toScreenY(c, field.top)) < 1e-6)).toBe(false);
+  });
+});
+
+describe('the draw order', () => {
+  /**
+   * THIS IS A PIN, NOT A DESCRIPTION.
+   *
+   * Every row of `Scene.LAYERS` carries a comment recording a defect someone paid
+   * for once: the storm under the stars so they parallax through it, the deadline
+   * under the ship so it never obscures it, the chequers over the chevrons, the
+   * score band NOT suppressed during a ceremony because it cross-fades into the
+   * sheet. Before the order was a list it was 180 lines of statements, and a
+   * reorder undid one of those silently.
+   *
+   * If this fails, the question is not "update the expectation". It is "which of
+   * those comments did the move break".
+   */
+  it('draws in the order every one of its comments assumes', () => {
+    expect(layerOrder()).toEqual([
+      'letterbox',
+      'window',
+      'ground',
+      'storm',
+      'starfield',
+      'world',
+      'hazard-zones',
+      'backtrack-floor',
+      'runway',
+      'bodies',
+      'capture',
+      'deadline',
+      'compass',
+      'advance',
+      'ceremony-wash',
+      'ship',
+      'floating-scores',
+      'warnings',
+      'edge-markers',
+      'resolve-sheet',
+      'instruments',
+      'score-band',
+      'readout',
+      'sheet',
+      'paused',
+    ]);
+  });
+
+  it('names every layer once', () => {
+    // A duplicate name would make the pin above pass while two rows swapped.
+    const names = layerOrder();
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('keeps the two steps that draw nothing where their position matters', () => {
+    const order = layerOrder();
+    // `advance` moves the flame the ship reads two rows down, and the popups and
+    // fuel badge drawn below that. Hoisting it out would work today and stop
+    // working the first time something above it learns to read one of them.
+    expect(order.indexOf('advance')).toBeLessThan(order.indexOf('ship'));
+    expect(order.indexOf('advance')).toBeLessThan(order.indexOf('floating-scores'));
+    expect(order.indexOf('advance')).toBeLessThan(order.indexOf('warnings'));
+    // `resolve-sheet` settles the number the band cross-fades against and the
+    // sheet is drawn at.
+    expect(order.indexOf('resolve-sheet')).toBeLessThan(order.indexOf('score-band'));
+    expect(order.indexOf('resolve-sheet')).toBeLessThan(order.indexOf('sheet'));
+  });
+
+  it('puts the letterbox and the pause outside the clipped window', () => {
+    // The bars are what the window is letterboxed INTO, and a pause covers the
+    // whole screen, bars included. Both are siblings of `window`, never children.
+    const top = Scene.LAYERS.map((l) => l.name);
+    expect(top).toEqual(['letterbox', 'window', 'paused']);
   });
 });
 
