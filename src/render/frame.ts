@@ -69,18 +69,16 @@ export interface Frame {
    * deadline mark must not slide to a new place. Layers that animate check it;
    * layers that only draw the current state do not care.
    *
-   * DIRECTION 02'S HITSTOP IS THIS MECHANISM AT A DIFFERENT DURATION, and when it
-   * is built it belongs here rather than in a second one: 70ms at release and at
-   * capture, during which "the world dims and freezes… only the craft, the hand,
-   * and the dot keep full energy". That is a freeze with an EXEMPTION LIST, which
-   * is why it is a second field beside this one and not a wider meaning of it —
-   * and why the exemption is a column on `Layer` rather than a check each of
-   * twenty-five layers has to remember to make.
+   * DIRECTION 02'S HITSTOP IS NOT COMING, and this is where someone would put it,
+   * so the ruling belongs here. The board asks for a 70ms world freeze at release
+   * and at capture — "the pause is the punch" — and it was rejected on feel: even
+   * at 30ms a freeze reads as jarring rather than punchy.
    *
-   * The thing to settle first is what freezes. Stopping `stepSim` for 70ms would
-   * break the fixed timestep, so a hitstop is presentation: the layers hold, the
-   * simulation does not. Whether that is acceptable at 70ms is a question about
-   * feel, and it wants measuring on a phone rather than deciding here.
+   * What replaced it is `SimConfig.flybyKick` and `kickHold`: the punch is bought
+   * with speed instead of with stopped time, and it is priced by how well the
+   * release was flown. Same goal — make a release land — through the channel the
+   * simulation was already using. Do not reintroduce the freeze without a
+   * measurement that contradicts the one that removed it.
    */
   paused: boolean;
   viewportW: number;

@@ -4277,6 +4277,88 @@ the two position rules above. The pin's own comment says what to do when it
 fails, because "update the expectation" is the wrong answer: the question is
 which of those comments the move broke.
 
+---
+
+### 68 — The punch was bought with speed, because stopped time reads as jarring
+
+Direction 02 asks for a 70ms hitstop at every release and capture — "the pause is
+the punch", the world frozen while only the craft, the hand and the dot keep full
+energy. It was rejected before it was built, on feel: even at 30ms a freeze reads
+as jarring rather than punchy. It also could only ever have been presentation,
+since stopping `stepSim` for 70ms breaks the fixed timestep, so the simulation
+would have carried on inside a picture that had not.
+
+What was built instead is a kick after every release, priced by how well it was
+flown. And the useful part of the exercise was discovering that **the mechanism
+already existed and was already graded on both axes the design asked for**:
+
+```
+grab depth     cap.tightness = (grabR - rPeri) / (grabR - minR)
+               cap.boostFull = boostMax * over(tightness, boostThreshold)
+release timing cap.boost     = boostFull * envelope(boostT)
+               burstAdd      = boost * (1 - boostPermFrac) * boostPunch
+               ship.burstX/Y, decaying over boostBurstDecay
+```
+
+VISION's second pillar asks for exactly this check — "look for the mechanic the
+simulation is already performing and has no word for, before adding one it isn't"
+— and it paid off: no new system, one gate removed and two knobs added.
+
+**What was actually missing was who gets one.** The kick fired only on `earned`,
+and measured across 366 releases in the 28 diagnostics reports that replay
+faithfully:
+
+```
+releases with no kick at all      196   54%
+  still a flyby                   128
+  never reached periapsis         165
+  earned but boostFull == 0        15
+  earned, in envelope, boost 0     16
+```
+
+Only 31 of the 196 flew badly. The other 165 were manoeuvres that were flown,
+committed to, and paid nothing — which is what "letting go feels like nothing
+happening" actually was.
+
+**A flyby's quality is its deflection, and the signal was already there.** It has
+no `tightness` and no `boostFull` because it never froze an orbit, but `cap.defl`
+says how hard the body is bending the heading. Instantaneous, not accumulated —
+which is what makes it a skill rather than a stopwatch: letting go at the top of
+the turn pays and letting go on the way in does not, so a flyby gets the same
+SHAPE of timing skill the boost envelope gives a conversion. `defl` was documented
+as "for the trace recorder, not physics", and is now physics.
+
+The span is the p90 of deflection at a real flyby release, 2.1 deg/tick, against a
+distribution of p25 0.32, p50 0.61, p75 1.11, p90 2.10, p99 3.32. A round number
+would have been wrong in both directions for the reasons `praise.ts` sets out.
+
+**Sized against conversion, median to median.** A median flyby now pays +10px/s
+and a median conversion +36; the ceilings are +36 and +97. Comparing a top-decile
+flyby to a median conversion — which reads as "a flyby is worth as much as a
+capture" — is the wrong frame, because the two populations are not equally hard to
+reach.
+
+**Duration is the second channel and deliberately the smaller.** `kickHold` 0.5
+lets a release at the top of its envelope hold its kick half again as long.
+Quality therefore enters twice, once as strength and once as duration, which
+widens the gap between a good release and a great one faster than either knob
+suggests — so the second one is gentle and the first keeps the range. `burstDecay`
+moved onto the ship for this, and is excluded from `fingerprint()` on the same
+grounds `chargedT`, `carveDir` and `burstT` all are: it changes the trajectory the
+moment it acts, and position and velocity already catch that.
+
+Both keys are 0 in `PROTOTYPE_CONFIG`, so the equality gate never moved. The
+golden's recapture shows it: three keys added, six removed, and **not one
+trajectory sample changed**.
+
+**And it found a hole in the golden.** The config check walked
+`Object.entries(PROTOTYPE_CONFIG)` alone, so a key the baseline HELD and the
+config no longer has was never compared — deleting a config key passed silently,
+and note 66's six deletions were still sitting in the file. The sample comparison
+is the real proof and would have caught a deletion that moved a trajectory, but a
+check that reports a key appearing and says nothing about one disappearing looks
+symmetric and is not. It walks the union now.
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
