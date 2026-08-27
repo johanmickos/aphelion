@@ -4082,6 +4082,68 @@ victory lap a reason to be replayed.
 
 ---
 
+### 65 — `kind` was carrying behaviour, and behaviour does not extend at the same rate as identity
+
+`Body` is a discriminated union, and `src/sim/types.ts` opened by defending it:
+"adding a `kind` makes the compiler enumerate every site that must handle it."
+That is true, and it turned out to be the problem rather than the answer. The
+compiler enumerated **eighteen sites across nine files**, and only one of them —
+`contactPolicy` — was written as a table. The other seventeen were inline
+`kind === 'anomaly'` tests.
+
+They were not seventeen copies of one question. They were **six capabilities** an
+anomaly happens to hold at once:
+
+```
+authored   the orbit a capture settles into        capture.ts x2, step.ts, main.ts
+shelter    the side boundary is suspended here     world.ts, camera.ts x2, burn.ts
+charges    a release opens the charged window      capture.ts
+claimable  arriving pays its own award, once       score.ts x2
+routable   offered to aim and the compass          aim.ts x2, sheet.ts
+landmark   signposted on its own channel           aim.ts, edge-markers.ts, sheet.ts
+```
+
+The next body type holds a *different* subset — a pulsar authors no orbit but is
+an ordinary target; a black hole is strange enough to signpost and still worth
+flying to — so written as more name tests, each of those eighteen sites grows a
+five-way switch. In files that must not know about each other: `src/score/aim.ts`
+would have ended up holding an opinion about how a pulsar draws, because the
+exclusion list is where the knowledge lived.
+
+**The fix was already argued for in the file it was missing from.** `Anomaly` held
+its bubble and its orbit on the BODY rather than reading them from config at the
+point of use, and said why: "so that anomalies of different kinds can differ
+without any of this moving." `BodyTraits` is that reasoning carried to the other
+four.
+
+Three things worth keeping in view:
+
+- **`routable`, `landmark` and `counted` hold the same value today and are still
+  three names.** They are exact complements across the two kinds that exist, so
+  collapsing them would compile and pass. They come apart on the very next type,
+  and finding that out as a bug in three files is the expensive way. Same argument
+  `FieldBounds` makes for `crest` versus `top`.
+- **`claimable` is a boolean, not an amount.** Score weights live in `ScoreConfig`
+  and never in `SimConfig`; an amount on the trait would have dragged one into the
+  equality gate's config compare and forced a golden recapture. The body says what
+  it is, the scorer says what it is worth — the same split `palette.ts` and
+  `accolade.ts` keep between defining a colour and picking one.
+- **`Anomaly` is now structurally identical to `Planet`.** That is honest rather
+  than a smell: what separates them is what they do, and that now lives where it
+  can be read. The separate union member stays because `kind` is what the
+  renderer's draw switch is checked against, which is the one job a discriminated
+  union is genuinely good at.
+
+`inAnomalyField` became `sheltered` in the same pass. Reading `traits.shelter`
+under a name that says "anomaly" would have gone on implying the exemption belongs
+to one body type rather than to any body that projects one.
+
+Two of the eighteen survive, both in `edge-markers.ts`, and both pick a colour off
+the name. They belong to the renderer's palette work rather than to this.
+
+The gate is what proves the whole thing: every substitution is behaviour-preserving
+by construction, and it read `0.000e+0` across all ten scenarios at each step.
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

@@ -221,13 +221,13 @@ export function aimTargets(
   for (let i = 0; i < bodies.length; i++) {
     if (i === anchorIndex) continue;
     const b = bodies[i]!;
-    // Anomalies are signposted on their own channel, never as one of these.
-    // Letting one in here would displace a real planet from a reading capped at
-    // `AIM_MAX_TARGETS`, and this reading is not only what the compass draws — it
-    // is the quantity the aim score is paid on, and the aim thresholds in
-    // `praise.ts` are percentiles of measured aim scores. An anomaly in the field
-    // would silently re-scale ordinary play's aim.
-    if (b.kind === 'anomaly') continue;
+    // A body that is not routable is signposted on its own channel, never as one
+    // of these. Letting one in here would displace a real planet from a reading
+    // capped at `AIM_MAX_TARGETS`, and this reading is not only what the compass
+    // draws — it is the quantity the aim score is paid on, and the aim thresholds
+    // in `praise.ts` are percentiles of measured aim scores. An extra body in the
+    // field would silently re-scale ordinary play's aim.
+    if (!b.traits.routable) continue;
     if (b.y >= anchor.y) continue; // not upward
     const d = hypot(b.x - anchor.x, b.y - anchor.y);
     if (d <= maxDistance) out.push({ body: b, index: i, distance: d });
@@ -315,13 +315,15 @@ export function readAnomalyAim(
   shipAng: number,
   maxDistance: number = ANOMALY_AIM_RANGE,
 ): AimTarget | null {
+  // No landmark-to-landmark signposting: the channel exists to point OFF the
+  // corridor, and from a body that is already off it there is nothing to point at.
   const anchor = bodies[anchorIndex];
-  if (!anchor || anchor.kind === 'anomaly') return null;
+  if (!anchor || !anchor.traits.routable) return null;
 
   let found: { body: Body; index: number; distance: number } | null = null;
   for (let i = 0; i < bodies.length; i++) {
     const b = bodies[i]!;
-    if (b.kind !== 'anomaly') continue;
+    if (!b.traits.landmark) continue;
     const d = hypot(b.x - anchor.x, b.y - anchor.y);
     if (d > maxDistance) continue;
     if (!found || d < found.distance) found = { body: b, index: i, distance: d };

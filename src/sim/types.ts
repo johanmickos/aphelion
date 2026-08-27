@@ -17,15 +17,18 @@ export interface Vec {
  * What a body DOES, as opposed to what it is called.
  *
  * WHY THIS EXISTS. `kind` was carrying behaviour as well as identity, and the two
- * do not extend at the same rate. Sixteen sites across nine files asked
- * `kind === 'anomaly'`, and they were not sixteen copies of one question — they
- * were six different capabilities an anomaly happens to hold at once. The next
- * body type holds a DIFFERENT subset: a pulsar authors no orbit but is an
- * ordinary target; a black hole is strange enough to signpost and still worth
- * flying to. Written as more name tests, every one of those sixteen sites grows a
- * five-way switch, in files that have no business knowing about each other —
- * `src/score/aim.ts` would end up holding an opinion about how a pulsar draws,
- * because the exclusion list is where the knowledge would live.
+ * do not extend at the same rate. Eighteen sites across nine files tested a body's
+ * name, and they were not eighteen copies of one question — they were six
+ * different capabilities an anomaly happens to hold at once. The next body type
+ * holds a DIFFERENT subset: a pulsar authors no orbit but is an ordinary target;
+ * a black hole is strange enough to signpost and still worth flying to. Written
+ * as more name tests, every one of those sites grows a five-way switch, in files
+ * that have no business knowing about each other — `src/score/aim.ts` would end
+ * up holding an opinion about how a pulsar draws, because the exclusion list is
+ * where the knowledge would live.
+ *
+ * Sixteen of the eighteen are gone. The two that remain pick a COLOUR off the
+ * name, and they belong to the renderer's own palette work rather than here.
  *
  * So a subsystem asks for the CAPABILITY it needs, and never for the name of a
  * type. `Anomaly` already worked this way for two of these and said why: the

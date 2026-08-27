@@ -170,17 +170,17 @@ export function planetsCleared(
   let total = 0;
   let done = 0;
   for (const b of bodies) {
-    if (b.kind !== 'planet') continue;
+    if (!b.traits.counted) continue;
     total++;
     if (b.y >= run.highWaterY) done++;
   }
   return { done, total };
 }
 
-/** Anomalies in the field, so `2 / 3` has a denominator. */
+/** Landmarks in the field, so `2 / 3` has a denominator. */
 function anomalyCount(bodies: readonly Body[]): number {
   let n = 0;
-  for (const b of bodies) if (b.kind === 'anomaly') n++;
+  for (const b of bodies) if (b.traits.landmark) n++;
   return n;
 }
 

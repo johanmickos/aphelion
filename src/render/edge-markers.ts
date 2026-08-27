@@ -86,9 +86,9 @@ export function drawEdgeMarkers(
       continue;
     }
 
-    // Upward only, EXCEPT anomalies. The rule exists because an arrow pointing
-    // back down the climb is clutter and a suggestion to turn around — but an
-    // anomaly is the one thing in the field worth turning toward, it is placed
+    // Upward only, EXCEPT landmarks. The rule exists because an arrow pointing
+    // back down the climb is clutter and a suggestion to turn around — but a
+    // landmark is the thing in the field worth turning toward, it is placed
     // off to the side rather than ahead, and a release aimed at one routinely
     // leaves the ship above it.
     //
@@ -98,7 +98,7 @@ export function drawEdgeMarkers(
     // always-on indicator for the whole approach: no compass either, because that
     // needs a capture, and the anomaly itself was off screen until 0.24s before
     // arrival. There was nothing at all to read.
-    if (b.kind !== 'anomaly' && b.y >= snap.y) continue; // behind us, down the climb
+    if (!b.traits.landmark && b.y >= snap.y) continue; // behind us, down the climb
     const dist = hypot(b.x - snap.x, b.y - snap.y);
     if (dist > rcfg.edgeMarkerRange) continue;
 

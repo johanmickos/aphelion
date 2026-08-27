@@ -808,11 +808,11 @@ function awardGrab(
   // the window silently paid nothing because it landed a tick late — punishing the
   // player for the one thing the window is asking them to do, which is hurry.
   //
-  // An anomaly is never a hop even when zipped to. Arriving at one is the thing
-  // `anomalyBonus` exists to pay for, and it opens the next window; calling that a
-  // hop would replace the largest award in the game with a flat 500 and quietly
-  // make chaining anomalies worth less than chaining planets.
-  if (cap.zipped && body && body.kind !== 'anomaly' && !sc.hopped.includes(body.name)) {
+  // A body that pays its own way is never a hop, even when zipped to. Arriving at
+  // one is the thing `anomalyBonus` exists to pay for, and it opens the next
+  // window; calling that a hop would replace the largest award in the game with a
+  // flat 500 and quietly make chaining anomalies worth less than chaining planets.
+  if (cap.zipped && body && !body.traits.claimable && !sc.hopped.includes(body.name)) {
     sc.hopped.push(body.name);
     award.kind = 'hop';
     // Flat. The only award in the game that does not take the multiplier — see
@@ -826,12 +826,16 @@ function awardGrab(
     return award;
   }
 
-  // An anomaly pays its own flat award on top of whatever the arrival was worth.
+  // A claimable body pays a flat award on top of whatever the arrival was worth.
   // Once per life: without the claim log a player could orbit out and back to
   // refresh the window indefinitely, which is the same faucet the grab award
   // already refuses to open by paying at the press.
+  //
+  // The body says it is claimable; `ScoreConfig` says what a claim is worth. Score
+  // weights do not belong in the simulation, so the amount cannot travel on the
+  // trait — see `BodyTraits.claimable`.
   let anomaly = 0;
-  if (body?.kind === 'anomaly' && !sc.claimed.includes(body.name)) {
+  if (body?.traits.claimable && !sc.claimed.includes(body.name)) {
     sc.claimed.push(body.name);
     sc.run.anomalies++;
     anomaly = scfg.anomalyBonus;
