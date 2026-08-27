@@ -4214,6 +4214,69 @@ like.
 Neither `SIM_VERSION` nor the golden moved, because nothing under `src/sim/`
 changed behaviour.
 
+---
+
+### 67 — The draw order was load-bearing and invisible, which is the worst combination
+
+`Scene.draw` was 180 lines of statements that encoded a draw order, and almost
+every line of it carried a comment recording a defect someone had already paid
+for:
+
+```
+the storm under the stars, so stars parallax THROUGH it and it reads as
+  a volume rather than a filter laid over the picture
+the deadline under the ship, because it describes where the ship is going
+  and nothing about it should ever obscure the ship
+the motes over the chevrons and under the chequers, which is where a dot
+  sits in the world
+the chequers kept up through the coast, because cutting them at the
+  crossing meant the thing the whole runway delivers you to was gone
+  before it could be looked at
+the score band NOT suppressed during a ceremony, unlike the instruments
+  beside it, because it cross-fades into the sheet and cutting it would be
+  a flicker rather than a transition
+```
+
+Each of those is a rule that a reorder undoes silently. None of them was
+checkable, because the order was not a value — it was control flow.
+
+It is twenty-five rows now, each carrying its own comment, and `draw()` is one
+line. Three things came out of the conversion worth recording.
+
+**The two transforms became groups.** A `save`/`translate` at the top of the
+function and its `restore` two hundred lines later is the shape that makes
+reordering dangerous. The alternative considered first — pseudo-layers that open
+and close a transform from opposite ends of a flat list — is worse, because it
+looks reorderable and is not. A layer with `children` and a `wrap` that must
+balance its own save is the version where the nesting is visible.
+
+**Two rows draw nothing and belong in the list anyway.** `advance` moves the
+popups, the fuel badge and the burn follower; `resolve-sheet` settles the alpha
+the score band cross-fades against. Both were tempting to hoist out of the order
+as "bookkeeping", and both would have worked today: nothing above `advance`
+currently reads the flame it moves. That is exactly the property that stops being
+true without warning, so their POSITION is the thing being asserted, and the list
+is where an assertion about position lives.
+
+**The list had to go inside the class, and the reason is a TypeScript detail
+worth knowing.** The rows call private methods, and privacy is checked where a
+closure is DEFINED, not where it is called — so a module-level array cannot, but
+a `static readonly` member can, while `runLayers` stays outside because it only
+invokes what the rows hand it. An earlier attempt widened the private surface
+through a mapped type instead, which made every method optional at the call site
+and produced nine "possibly undefined" errors — a loosening pretending to be a
+solution.
+
+`Frame` landed one commit earlier and carries the theme from the start, which is
+why F07 was pulled ahead of the rest of F03: threading a `theme` parameter into
+some forty draw functions and then deleting it again when the frame arrived is
+the same work twice.
+
+The order is now pinned by `test/render.test.ts`, along with name uniqueness and
+the two position rules above. The pin's own comment says what to do when it
+fails, because "update the expectation" is the wrong answer: the question is
+which of those comments the move broke.
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

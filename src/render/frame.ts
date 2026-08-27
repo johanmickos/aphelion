@@ -68,6 +68,19 @@ export interface Frame {
    * A popup must not decay behind an overlay, a flame must not burn down, a
    * deadline mark must not slide to a new place. Layers that animate check it;
    * layers that only draw the current state do not care.
+   *
+   * DIRECTION 02'S HITSTOP IS THIS MECHANISM AT A DIFFERENT DURATION, and when it
+   * is built it belongs here rather than in a second one: 70ms at release and at
+   * capture, during which "the world dims and freezes… only the craft, the hand,
+   * and the dot keep full energy". That is a freeze with an EXEMPTION LIST, which
+   * is why it is a second field beside this one and not a wider meaning of it —
+   * and why the exemption is a column on `Layer` rather than a check each of
+   * twenty-five layers has to remember to make.
+   *
+   * The thing to settle first is what freezes. Stopping `stepSim` for 70ms would
+   * break the fixed timestep, so a hitstop is presentation: the layers hold, the
+   * simulation does not. Whether that is acceptable at 70ms is a question about
+   * feel, and it wants measuring on a phone rather than deciding here.
    */
   paused: boolean;
   viewportW: number;
