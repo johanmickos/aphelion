@@ -8,7 +8,13 @@
  * single-seed versions of these assertions could not tell the difference.
  */
 import { describe, expect, it } from 'vitest';
-import { createBodies, fieldBounds, inAnomalyField, DESIGN_W } from '../src/sim/world.ts';
+import {
+  createBodies,
+  fieldBounds,
+  inAnomalyField,
+  DESIGN_W,
+  PLANET_TRAITS,
+} from '../src/sim/world.ts';
 import { DEFAULT_CONFIG, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import type { Body } from '../src/sim/types.ts';
@@ -110,7 +116,14 @@ describe('world generation', () => {
     expect(proto).toHaveLength(8);
     // The authored layout is the prototype's world and the equality gate compares
     // against it, so retuning the game's field must not touch it.
-    expect(proto[0]).toEqual({ kind: 'planet', x: 189, y: 0, R: 46, name: 'P1' });
+    expect(proto[0]).toEqual({
+      kind: 'planet',
+      x: 189,
+      y: 0,
+      R: 46,
+      name: 'P1',
+      traits: PLANET_TRAITS,
+    });
     expect(Math.min(...proto.map((b) => b.y))).toBeCloseTo(-5.98 * 844, 6);
   });
 

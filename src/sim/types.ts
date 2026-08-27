@@ -13,6 +13,93 @@ export interface Vec {
 
 // --------------------------------------------------------------------- bodies
 
+/**
+ * What a body DOES, as opposed to what it is called.
+ *
+ * WHY THIS EXISTS. `kind` was carrying behaviour as well as identity, and the two
+ * do not extend at the same rate. Sixteen sites across nine files asked
+ * `kind === 'anomaly'`, and they were not sixteen copies of one question — they
+ * were six different capabilities an anomaly happens to hold at once. The next
+ * body type holds a DIFFERENT subset: a pulsar authors no orbit but is an
+ * ordinary target; a black hole is strange enough to signpost and still worth
+ * flying to. Written as more name tests, every one of those sixteen sites grows a
+ * five-way switch, in files that have no business knowing about each other —
+ * `src/score/aim.ts` would end up holding an opinion about how a pulsar draws,
+ * because the exclusion list is where the knowledge would live.
+ *
+ * So a subsystem asks for the CAPABILITY it needs, and never for the name of a
+ * type. `Anomaly` already worked this way for two of these and said why: the
+ * bubble and the orbit it authors are "held on the BODY rather than read from
+ * config at the point of use… so that anomalies of different kinds can differ
+ * without any of this moving". This is that reasoning carried to the rest of it.
+ *
+ * `kind` STAYS, and stays a discriminated union, because the renderer's draw
+ * switch is exactly what a union is for: the compiler checking that every kind
+ * knows how to draw itself. What it stops being is the carrier of behaviour.
+ *
+ * THREE OF THESE HOLD THE SAME VALUE TODAY AND ARE STILL THREE NAMES.
+ * `routable`, `landmark` and `counted` are exact complements across the two kinds
+ * that exist, so collapsing them into one would compile and would pass every
+ * test. They come apart on the very next body type — a pulsar is routable,
+ * counted, and not a landmark — and finding that out as a bug in three files is
+ * the expensive way. `FieldBounds` makes the identical argument for `crest`
+ * versus `top`: "Named rather than left implicit because two different lines hang
+ * off it and they mean opposite things."
+ */
+export interface BodyTraits {
+  /**
+   * The orbit a capture here settles into, or null to inherit one from the dive.
+   *
+   * Non-null means the arrival is authored: the freeze happens at the press
+   * rather than at a periapsis, and the ship glides to a stated circle at a
+   * stated pace. See `AuthoredOrbit`.
+   */
+  authored: AuthoredOrbit | null;
+  /**
+   * Radius within which the field's side boundary is suspended. 0 for none.
+   *
+   * The anomaly's whole mechanic, and the reason it is a distance rather than a
+   * flag: what lets a well-aimed release coast THROUGH the barrier is that the
+   * exemption has an edge to leave by. See `inAnomalyField`.
+   */
+  shelter: number;
+  /** Seconds of charged window a release from here opens. 0 for none. */
+  charges: number;
+  /**
+   * Arriving here is an achievement in itself, claimable once per life.
+   *
+   * A BOOLEAN AND NOT AN AMOUNT, deliberately. Score weights live in
+   * `ScoreConfig` and never in `SimConfig` — putting one here would drag it into
+   * the equality gate's config compare and force a golden recapture, which is the
+   * rule `AGENTS.md` states. So the body says WHAT IT IS and the scorer says what
+   * it is worth, the same split `palette.ts` and `accolade.ts` keep between
+   * defining a colour and picking one.
+   *
+   * Named for the claim log it gates: `ScoreState.claimed` is what stops a player
+   * orbiting out and back to collect the same body twice.
+   */
+  claimable: boolean;
+  /**
+   * Offered to aim, the compass and hop scoring as an ordinary target.
+   *
+   * False keeps a body out of a reading that is capped at `AIM_MAX_TARGETS` and
+   * that the aim score is paid on — see `aim.ts`, where letting one in would
+   * silently re-scale ordinary play's aim.
+   */
+  routable: boolean;
+  /**
+   * Signposted on its own channel, and worth pointing back down the climb at.
+   *
+   * The edge markers suppress arrows to anything behind the ship, because an
+   * arrow pointing back down is clutter and a suggestion to turn around. A
+   * landmark is the exception: it sits off to the side rather than ahead, and a
+   * release aimed at one routinely leaves the ship above it.
+   */
+  landmark: boolean;
+  /** Counts toward "planets cleared" on the results sheet. */
+  counted: boolean;
+}
+
 export interface Planet {
   kind: 'planet';
   x: number;
@@ -20,6 +107,7 @@ export interface Planet {
   /** Surface radius. */
   R: number;
   name: string;
+  traits: BodyTraits;
 }
 
 /**
@@ -69,6 +157,7 @@ export interface Anomaly {
    * for.
    */
   settleDur: number;
+  traits: BodyTraits;
 }
 
 export type Body = Planet | Anomaly;
