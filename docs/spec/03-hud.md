@@ -54,7 +54,7 @@ One layout, five states. Nothing moves between states; only energy and content c
 | **1 · FREE FLIGHT** (coasting) | BANK at 55%. Bodies in range show a lit rim and a tide facing the craft. Off-screen bodies are screen-edge dots in identity hue — no labels, no collision handling. Fuel halo present |
 | **2 · HELD** (the board calls this state CAPTURED) | The compass at rest: windows E1, hand thin, crossing dots quiet. The whole instrument sits above the thumb line. During a hold the thumb covers only trail the craft has already left. BANK at full |
 | **3 · PEAK** (near release) | Hand closes on the dot; window E2; hand thick; ghost bright. Velocity heats to CORE. BANK states the armed value — a fact, not an instruction to release |
-| **4 · BOUNDARY** | The ION gradient scales with **closing speed**, not proximity. Boundary motes glimmer in the outer bands, each band **labelled with its multiplier** (spec [07](./07-boundary.md) §2). Fuel halo has gone ION. Velocity subline reads `M/S · TOWARD EDGE` in ION |
+| **4 · BOUNDARY** | The ION gradient scales with **closing speed**, not proximity. Boundary motes glimmer in the outer bands, one per band **captioned with its multiplier** (spec [07](./07-boundary.md) §2). This board is where that label is drawn, and it is canonical for it. Fuel halo has gone ION. Velocity subline reads `M/S · TOWARD EDGE` in ION |
 | **5 · ANOMALY** | **Nothing about the HUD changes.** The world changed, not the instruments. Chip backgrounds go true black so labels hold against the curtains |
 
 ## 4 · Severity states
@@ -103,7 +103,7 @@ collision resolution between them — they may overlap.
 - The top band contains exactly two readable elements in every state.
 - The BANK chip's opacity is a pure function of engagement; toggling coasting toggles it and
   nothing else.
-- Each boundary band's multiplier is drawn in the world, at the band, and is legible at every altitude the band spans.
+- Each boundary band in frame shows exactly one multiplier label, captioning a mote.
 - No **instruction** text — arrows, `RISK ZONE`, `TURN` — is drawn anywhere in the world. A label that states what a band pays is a fact; a label that tells the player what to do is not.
 - The deadline window's drawn length is independent of fuel; only its lit fraction depends on
   fuel. A test at 0%, 50% and 100% fuel finds three identical geometries and three different lit

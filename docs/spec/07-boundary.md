@@ -43,17 +43,30 @@ Motes drift at world speed, strictly parallel, like dust.
 
 ### The band label
 
+Taken from [Direction 03](../design/Aphelion%2003%20-%20HUD%20Five%20Pressures.dc.html)'s boundary
+state, which is where the label was drawn. **The label captions a mote — it does not label the band
+as a region.** The mote is the reward; the label says what that reward is worth. That keeps it
+inside VISION pillar 6's rule that every good cue is drawn on the thing it describes.
+
 | Property | Value |
 |---|---|
 | Content | `×2` or `×3`. The multiplier, and nothing else |
 | Type | Archivo **700**, 9px, tracked 0.1em |
 | Colour | **ION**, at E1 |
-| Position | In **world space**, centred in its band, repeating every **500 m** of altitude so a label is always in frame while the band is |
-| Behaviour | Rises with `heat` (§3) exactly as the gradient does — it is part of the band, not an overlay on it |
+| Anchor | **A mote.** The label sits ~14 design px directly above the mote it captions, and travels with it at world speed |
+| Which mote | **One label per band in frame**, on the band's topmost mote — the one the craft is climbing toward. When that mote leaves the top of the viewport, the label transfers to the next mote up |
+| Behaviour | Rises with `heat` (§3) exactly as the gradient and the motes do — it is part of the band, not an overlay on it |
 | Never | Animated on its own, never pulsed, never enlarged to draw attention. It is a price tag, not a prompt |
 
 The band multiplier prices a swing's cash (spec [08](./08-economy.md)), and it is now printed where
-it is earned — the label *is* axiom 5's pixel, alongside the motes.
+it is earned — the label *is* axiom 5's pixel, alongside the mote it sits on.
+
+### Band boundaries
+
+The two band boundaries are drawn in world space as **dashed vertical ION lines**, 1px, dash 4/6:
+`line − 220 m` at α 0.25 and `line − 90 m` at α 0.40. They come from Direction 07's own live
+component, and they are what makes the bands read as three named regions rather than one smooth
+ramp — which the ruling in the header requires. They do not scale with `heat`.
 
 ## 3 · The gradient
 
@@ -143,7 +156,8 @@ run in the field, and the standings show which players lived where.
 - Flying parallel to the line inside the fire band produces `heat ≤ 0.25` sustained; turning to
   dive at the same distance raises it above 0.6 within 500ms. Distance did not change.
 - Mote density is a pure function of band; no mote exists past the line.
-- Each band's multiplier label is drawn in world space, repeats every 500 m, and is legible against the gradient at maximum `heat`.
+- Each band in frame shows exactly one multiplier label, anchored to a mote, legible against the gradient at maximum `heat`. Scrolling the band past the viewport transfers the label rather than duplicating or dropping it.
+- The two band boundaries are drawn as dashed lines at the stated distances and do not move with `heat`.
 - No arrow, banner or instruction text is drawn in the world anywhere in the boundary system.
 - The death sequence contains no velocity vector that is not parallel to the craft's velocity at
   the line.

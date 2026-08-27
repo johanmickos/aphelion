@@ -65,6 +65,21 @@ daily field's difficulty curve.
 > `01-swing` is counted, which the earlier draft of this README already required. Eighteen files
 > exist. The lists agree; only the cardinal number was stale.
 
+## The visual pass
+
+The boards were opened and driven in a browser on **2026-08-27**, not only read as source. Two
+things that changed as a result, both of which the HTML had misled a source-only reading about:
+
+- **The band multiplier captions a mote**, sitting directly above one and travelling with it — it
+  is not a banner over the band. In the source the label and the mote are unrelated SVG elements;
+  on screen they are obviously one unit. Spec [07 · §2](./07-boundary.md).
+- **Direction 05's live component prints rung labels in metres** — `125`, `250`, `375` — which is
+  real evidence on the open question below, though not a ruling. Spec [05 · §3](./05-field.md).
+
+Direction 07's own live component draws **dashed band boundary lines**, now spec'd, and confirms it
+uses no in-world label of its own — the cross-section's `OUTER BAND ×2` / `FIRE BAND ×3` are
+diagram annotations, not world elements.
+
 ## Open questions
 
 Each of these is a hole a spec left deliberately rather than an invented ruling. They are the
@@ -106,7 +121,7 @@ Do not re-litigate them.
 
 | Date | Ruling | Where it bites |
 |---|---|---|
-| 2026-08-27 | **In-world multipliers and boost labels are in.** Direction 03 draws a `×3` band label in the world and Direction 07 forbids it; **Direction 07 lost**, against the higher-number convention, by author ruling — *"I want to keep it arcade-like and obvious what rewards you."* Each boundary band carries its multiplier as an ION label in world space, and a powerup states what it pays before it pays it. What stays refused is **instruction**: no arrows, no `RISK ZONE`, nothing that says *turn*. A price is a fact; a command is not (`VISION.md`, pillar 4) | [03](./03-hud.md), [07 · §2](./07-boundary.md), [08 · axiom 5](./08-economy.md), [16 · §3](./16-powerups.md) |
+| 2026-08-27 | **In-world multipliers and boost labels are in.** Direction 03 draws a `×3` band label in the world and Direction 07 forbids it; **Direction 07 lost**, against the higher-number convention, by author ruling — *"I want to keep it arcade-like and obvious what rewards you."* The label **captions a mote** rather than banner-labelling the band, and a powerup states what it pays before it pays it. What stays refused is **instruction**: no arrows, no `RISK ZONE`, nothing that says *turn*. A price is a fact; a command is not (`VISION.md`, pillar 4) | [03](./03-hud.md), [07 · §2](./07-boundary.md), [08 · axiom 5](./08-economy.md), [16 · §3](./16-powerups.md) |
 | 2026-08-27 | **The rung system holds**; its spacing and label numbers are deferred until there is a swing to measure them against | [05 · §3](./05-field.md) |
 | 2026-08-27 | **The palette is flagged for a colour-vision sweep**, with authority over hue values and separation numbers and none over the grammar | [00 · §2a](./00-tokens.md) |
 | 2026-08-27 | **The recipe line's length is revisited at implementation** | [10 · §5](./10-results.md) |

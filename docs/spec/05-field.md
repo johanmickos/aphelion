@@ -86,12 +86,18 @@ an emitted ring.
 >
 > **Open — what an addressed rung says.** The board's prose reads *"every 5th carrying its
 > address (the same numbers the planets wear)"* and *"'died at 23' has a place"*, which puts
-> body addresses (1–40) on the rungs. The board's own live component prints metres
-> (`25, 50, 75 …`). At 25m spacing these cannot both be true, and boards 09, 10 and 11 all report
-> altitude on the 0–40 address scale. Two readings survive: (a) an addressed rung prints its
-> altitude in metres and the address scale lives only on cards; (b) the rung nearest each body
-> is the addressed one and prints that body's address. This spec fixes the spacing and the
-> alphas and leaves the **label content unresolved**. It needs the author.
+> body addresses (1–40) on the rungs. The board's own live component, run in a browser, prints
+> **metres** — `125`, `250`, `375`, one label every 5th rung at 25 m spacing. At 25 m spacing these
+> cannot both be true, and boards 09, 10 and 11 all report altitude on the 0–40 address scale. Two
+> readings survive: (a) an addressed rung prints its altitude in metres and the address scale lives
+> only on cards; (b) the rung nearest each body is the addressed one and prints that body's
+> address. This spec fixes the spacing and the alphas and leaves the **label content unresolved**.
+> It needs the author.
+>
+> **The evidence leans to (a).** The live component is the only place the board actually draws a
+> rung label, and it draws metres. Against that, three later boards report altitude on the address
+> scale. A reading that satisfies both — rungs print metres, the address scale belongs to the cards
+> — is available and cheap, but it is still a ruling, and not one this spec makes.
 
 ## 4 · The sky
 
