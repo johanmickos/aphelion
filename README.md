@@ -58,7 +58,8 @@ src/app/              The fixed-timestep loop, run lifecycle, tuning, diagnostic
 tools/                Headless harness, golden capture, replay, QR + Vite plugins.
 test/                 The equality gate, invariants, scenario matrix, render guards.
 golden/               Recorded reference trajectories.
-docs/                 PORT_NOTES.md — what the port changed, and why.
+docs/                 VISION.md — the pillars and where the game is going.
+                      PORT_NOTES.md — what the port changed, and why.
 ```
 
 **`index.html` is the reference implementation and must not be modified.** It is
@@ -204,8 +205,10 @@ rejected approach is recorded at the site that would tempt you to retry it.
 
 - [`docs/PORT_NOTES.md`](docs/PORT_NOTES.md) — every bug reproduced, every change
   made deliberately, and why.
-- `docs/VISION.md` — an earlier, broader design. Kept locally for reference and
-  deliberately untracked; it describes a different game from the one being built.
+- [`docs/VISION.md`](docs/VISION.md) — the pillars, the target look and sound,
+  what the field should become, and the open design calls. Intent only: it names
+  no config key and describes no behaviour, so it cannot drift the way a design
+  document does.
 
 ---
 

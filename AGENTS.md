@@ -118,10 +118,17 @@ sheets are `src/render/`, authored rather than simulated, for the reasons
 **The carpet is a play zone, and the button means something else in it.** Inside
 `runInBand` a press does not grab: `grabTarget` returns `carved`, which is a
 fourth kind of answer beside `captured` and the refusals. That is a rule and not
-an emergence, and the measurement is why — `grabRange` and `finishFunnelDepth`
-are both 560, so the topmost planet is in reach from every point of the carpet
-and every press there took it. Do not "simplify" it back to carving only when no
-grab is on offer; that was the first version and it never fired once.
+an emergence, and the measurement is why — the crest body stays grabbable for
+`grabRange` (560) above itself, which is the lower two thirds of an 840-tall band,
+so a press over most of the carpet took the planet. Do not "simplify" it back to
+carving only when no grab is on offer; that was the first version and it never
+fired once, and it would now be worst exactly where the carpet is busiest.
+
+The two numbers were equal once and `finishAboveCrest` is where they stopped
+being: `grabRange` is the correctness FLOOR (below it the run ends while the
+player is still reaching for the last planet) and `finishFunnelDepth` is the FEEL
+setting (how much sky the carpet gets). Read the band from `runInBand`; never
+reconstruct it by adding a depth to the finish line.
 
 The carve is a flat LATERAL acceleration, never a turning force. A sideways push
 on a ship that is always rising cannot reverse the climb however long it is held,
