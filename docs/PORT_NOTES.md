@@ -4400,6 +4400,79 @@ is the real proof and would have caught a deletion that moved a trajectory, but 
 check that reports a key appearing and says nothing about one disappearing looks
 symmetric and is not. It walks the union now.
 
+---
+
+### 69 — Eight colours replaced eighty-seven, and the law decided most of them
+
+`palette.ts` was written to collect the colours that meant something, and its own
+header admitted how far it had got: four hazard reds, of which "it is not known
+whether all four are deliberate". Outside it, the renderer held **208 colour
+literals, 87 of them distinct**. Direction 01 specifies eight.
+
+The adoption landed in two passes. The first moved the definitions into
+`theme.ts` and turned `palette.ts` into a MAPPING — from a role the code already
+has ("this will end the run", "this is about burning") onto a token — which is a
+thing that can be argued about, unlike a triple. The second converted the
+literals in the thirteen modules that draw.
+
+**Most of the decisions were made by the law rather than by taste**, which is the
+point of having one:
+
+```
+the fuel ramp   red -> amber -> green spent three hues on one fact. Severity
+                is ordinal, so it rides energy: DUSK (not short) to ION (this
+                can end the run).
+the crash       was yellow, a fourth meaning on the hue channel. It ends the
+                run, so it is ION at a different energy — which also frees gold
+                to mean exactly one thing.
+the starfield   was three blue-greys by depth. Depth is parallax, which the
+                stars already have; a hue that shifts with distance is another
+                fourth meaning. One colour, three brightnesses.
+the boost       was amber. Stored energy belongs to the player, so CORE, and it
+                grades by brightness. An amber would have been a fifth hue
+                meaning "good", which is the one thing hue may not mean.
+a hop           is AURORA, because a hop only exists inside a charged window and
+                violet is what the anomaly means.
+every ground    is VOID, never #000. True black belongs to the anomaly's cloud
+                gaps, and that is what makes the anomaly read deeper than space.
+```
+
+**Two of Direction 01's own numbers did not survive measurement.** The board says
+identity greens sit "≥20° clear of LUMEN"; LUMEN is at hue 157.1 and the stated
+teal of 170 clears it by 12.9. And walked in the order they were listed, teal to
+azure is 45° against a stated minimum of 50. The band is reordered and teal moved
+to 185; the minimum consecutive gap is now 80°.
+
+**The test stopped transcribing and started asserting.** It pinned 140 literals
+against the tokens that replaced them — right for the extraction it guarded, and
+useless afterwards, since re-pinning the new hexes fails on the next retune nobody
+disagrees with. It pins the laws instead: identities equally loud in OKLCH,
+neighbours ≥50° apart, every reserved band cleared, quality colours off world
+geometry except LUMEN's finish monopoly, nothing as bright as the craft.
+
+**The last two name tests went with it.** Edge markers wore a hardcoded purple
+for an anomaly and a hardcoded blue for everything else; they read the body's
+identity hue now, indexed by position in the field. AURORA comes from
+`BodyType.strange`, which is deliberately not `landmark`: one says "outside the
+identity band", the other "signposted on its own channel", and they coincide on
+both types that exist today and will not on the next. `Body` gained `type` to
+address the table — not a duplicate of `kind`, because Direction 04's ringed,
+pulsar and binary are all the same STRUCTURE as a planet and none of them is the
+same TYPE.
+
+**What is deliberately not done.** Fifteen literals remain, all inside
+`drawPlanet` and `drawAnomaly`. Direction 04 rebuilds those bodies rather than
+recolouring them — "a planet is a lamp, not a rock", with a rim in the identity
+hue, concentric strata, a glyph core and a tide that faces the craft — so
+recolouring shaded spheres now would be throwaway work.
+
+**And the headline goal is still open.** `palette.ts` resolves from
+`DEFAULT_THEME` at module load, so there is one palette and it is not yet
+SWAPPABLE: a region cannot supply its own until the draw functions read
+`Frame.theme` instead of the module constants. `Frame` carries it and the edge
+markers already do. That is a third pass, and it buys nothing until there is a
+second region to put in it.
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

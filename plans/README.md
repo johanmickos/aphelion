@@ -24,21 +24,21 @@ When `plans/` is empty, the refactor is finished and the directory goes too.
 
 ## Status
 
-| #   | Plan                                                | Severity | Blocks                  | State                    |
-| --- | --------------------------------------------------- | -------- | ----------------------- | ------------------------ |
-| F01 | Body traits                                         | BLOCKS   | Dir 04 body types       | **done** — PORT_NOTES 65 |
-| F02 | Body type table                                     | BLOCKS   | Dir 04, VISION field    | **done** — PORT_NOTES 66 |
-| F03 | [Theme as a value](F03-theme-value.md)              | BLOCKS   | Dir 01, regions         | **a** done — **b** ready |
-| F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | needs a call             |
-| F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | needs F04                |
-| F06 | [Effects stack](F06-effects-stack.md)               | COSTS    | powerups                | deferred                 |
-| F07 | Draw layer list                                     | COSTS    | Dir 02, 05              | **done** — PORT_NOTES 67 |
-| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | ready                    |
-| F09 | [Award vocabulary](F09-award-vocabulary.md)         | COSTS    | Dir 06                  | needs a call             |
-| F10 | [HUD grid](F10-hud-grid.md)                         | COSTS    | Dir 03                  | ready                    |
-| F11 | [Screen machine](F11-screen-machine.md)             | COSTS    | Dir 09, 10, 11          | deferred                 |
-| F12 | [Audio observer](F12-audio-observer.md)             | COSTS    | VISION sound            | deferred                 |
-| F13 | Design-width duplication                            | —        | —                       | **done** 2026-08-27      |
+| #   | Plan                                                | Severity | Blocks                  | State                                        |
+| --- | --------------------------------------------------- | -------- | ----------------------- | -------------------------------------------- |
+| F01 | Body traits                                         | BLOCKS   | Dir 04 body types       | **done** — PORT_NOTES 65                     |
+| F02 | Body type table                                     | BLOCKS   | Dir 04, VISION field    | **done** — PORT_NOTES 66                     |
+| F03 | [Theme as a value](F03-theme-value.md)              | BLOCKS   | Dir 01, regions         | **a+b** done — PORT_NOTES 69; **c** deferred |
+| F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | needs a call                                 |
+| F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | needs F04                                    |
+| F06 | [Effects stack](F06-effects-stack.md)               | COSTS    | powerups                | deferred                                     |
+| F07 | Draw layer list                                     | COSTS    | Dir 02, 05              | **done** — PORT_NOTES 67                     |
+| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | ready                                        |
+| F09 | [Award vocabulary](F09-award-vocabulary.md)         | COSTS    | Dir 06                  | needs a call                                 |
+| F10 | [HUD grid](F10-hud-grid.md)                         | COSTS    | Dir 03                  | ready                                        |
+| F11 | [Screen machine](F11-screen-machine.md)             | COSTS    | Dir 09, 10, 11          | deferred                                     |
+| F12 | [Audio observer](F12-audio-observer.md)             | COSTS    | VISION sound            | deferred                                     |
+| F13 | Design-width duplication                            | —        | —                       | **done** 2026-08-27                          |
 
 F13 was fixed in the review session: `DEFAULT_RENDER_CONFIG.designW` now reads
 `DESIGN_W` from `src/sim/world.ts` instead of repeating the literal `390`. No plan
@@ -53,9 +53,15 @@ Dependencies, not severity. Steps 1 and 2 are independent and can run together.
    refactor and wants the author's call: what a ringed body does, how many a field
    holds, and where.
 2. ~~**F03a**~~ — the eight tokens landed 2026-08-27; the game is repainted.
-3. ~~**F07**~~ → **F03b** → **F10**. The layer list landed 2026-08-27 and `Frame`
-   carries the theme, so converting the remaining 87 literals now costs no
-   signature churn — a layer already has the theme in hand.
+3. ~~**F07**~~ → ~~**F03b**~~ → **F10**. The layer list and the repaint both landed
+   2026-08-27. 95 colour literals are down to 25, and the 15 in `world.ts` are all
+   inside `drawPlanet`/`drawAnomaly`, which **Direction 04 rebuilds** rather than
+   recolours — do those with the planet language, not before.
+
+   **F03c is what is left and is deferred**: `palette.ts` still resolves from
+   `DEFAULT_THEME` at module load, so there is one palette and it is not yet
+   swappable. Threading `Frame.theme` into the draw functions is the remaining
+   pass, and it buys nothing until there is a second region to put in it.
 
    Direction 02's hitstop is **rejected** — flown, even 30ms reads as jarring. The
    punch is bought with speed instead: `SimConfig.releaseKick`, entirely transient
