@@ -5,7 +5,17 @@ import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
-import { BOOST_AMBER, FLAME_DEEP, FLAME_FADE, FLAME_HOT, FLAME_MID, withAlpha } from './palette.ts';
+import {
+  AURORA,
+  BOOST_AMBER,
+  CORE,
+  FLAME_DEEP,
+  FLAME_FADE,
+  FLAME_HOT,
+  FLAME_MID,
+  solid,
+  withAlpha,
+} from './palette.ts';
 
 /**
  * Trail.
@@ -241,7 +251,7 @@ function drawBurn(ctx: CanvasRenderingContext2D, heat: number, s: number, timeMs
   wake.addColorStop(0, `rgba(${cr},${cg},${cb},${(alpha * h).toFixed(3)})`);
   wake.addColorStop(0.3, withAlpha(FLAME_HOT, (0.72 * alpha * h).toFixed(3)));
   wake.addColorStop(0.68, withAlpha(FLAME_DEEP, (0.4 * alpha * h).toFixed(3)));
-  wake.addColorStop(1, 'rgba(150,16,8,0)');
+  wake.addColorStop(1, withAlpha(FLAME_FADE, 0));
   ctx.fillStyle = wake;
   ctx.beginPath();
   ctx.moveTo(-2 * s, -5.4 * s);
@@ -372,7 +382,7 @@ export function drawShip(
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
     const a = (0.16 + 0.3 * heat) * snap.chargedFrac;
     g.addColorStop(0, `rgba(198,150,255,${a.toFixed(3)})`);
-    g.addColorStop(1, 'rgba(168,92,255,0)');
+    g.addColorStop(1, withAlpha(AURORA, 0));
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -384,7 +394,10 @@ export function drawShip(
   // of the fire — the ship is what the player is steering.
   if (burn > 0) drawBurn(ctx, burn, s, timeMs);
   shipPath(ctx, s);
-  ctx.fillStyle = snap.held ? '#fff' : '#cfdcf2';
+  // The craft is the brightest object on screen, always — CORE, and nothing else
+  // may reach it. Holding lifts it to pure white, which is the one moment the
+  // player outshines their own token.
+  ctx.fillStyle = snap.held ? '#fff' : solid(CORE);
   ctx.fill();
 
   if (phase === 'flyby') {
@@ -393,7 +406,7 @@ export function drawShip(
     ctx.lineWidth = 1.6 * s;
     ctx.stroke();
   } else if (snap.held) {
-    ctx.strokeStyle = 'rgba(185,140,255,.9)';
+    ctx.strokeStyle = withAlpha(AURORA, 0.9);
     ctx.lineWidth = 1.4 * s;
     ctx.stroke();
   }

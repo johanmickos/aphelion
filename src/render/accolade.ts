@@ -32,7 +32,24 @@
  * earned, so the two are alternatives rather than neighbours.
  */
 import type { PraiseLevel } from '../score/index.ts';
-import { BURN, FINISH, LADDER_EXCEPTIONAL, LADDER_GOOD, LADDER_GREAT, solid } from './palette.ts';
+import {
+  AURORA,
+  BURN,
+  CORE,
+  FINISH,
+  HAZARD,
+  INK,
+  LADDER_EXCEPTIONAL,
+  LADDER_GOOD,
+  LADDER_GOOD_RGB,
+  LADDER_GREAT,
+  LADDER_GREAT_RGB,
+  SUMMIT_RGB,
+  VOID,
+  solid,
+  withAlpha,
+} from './palette.ts';
+import { mix } from './theme.ts';
 
 export interface AccoladeStyle {
   /** Colour of the word and the number. */
@@ -44,9 +61,15 @@ export interface AccoladeStyle {
 }
 
 export const LEVEL: Record<PraiseLevel, AccoladeStyle> = {
-  good: { color: LADDER_GOOD, labelColor: 'rgba(120,165,200,.75)', size: 13 },
-  great: { color: LADDER_GREAT, labelColor: 'rgba(130,190,145,.75)', size: 15 },
-  exceptional: { color: LADDER_EXCEPTIONAL, labelColor: 'rgba(210,180,110,.8)', size: 18 },
+  // The detail line is the rung's own colour, dimmed. Derived rather than picked
+  // so a retune of a rung cannot leave its label behind on the old hue.
+  good: { color: LADDER_GOOD, labelColor: withAlpha(LADDER_GOOD_RGB, 0.75), size: 13 },
+  great: { color: LADDER_GREAT, labelColor: withAlpha(LADDER_GREAT_RGB, 0.75), size: 15 },
+  exceptional: {
+    color: LADDER_EXCEPTIONAL,
+    labelColor: withAlpha(SUMMIT_RGB, 0.8),
+    size: 18,
+  },
 };
 
 /**
@@ -79,8 +102,8 @@ export const LEVEL: Record<PraiseLevel, AccoladeStyle> = {
  * rather than as a label pasted on top.
  */
 export const ROUTINE: AccoladeStyle = {
-  color: 'rgba(232,240,255,.66)',
-  labelColor: 'rgba(214,226,246,.5)',
+  color: withAlpha(CORE, 0.66),
+  labelColor: withAlpha(INK, 0.5),
   size: 13,
 };
 
@@ -118,7 +141,7 @@ export const ROUTINE: AccoladeStyle = {
  */
 export const BURN_WORD: AccoladeStyle = {
   color: BURN,
-  labelColor: '#b8341f',
+  labelColor: withAlpha(mix(HAZARD, VOID, 0.35), 1),
   size: 15,
 };
 
@@ -141,8 +164,10 @@ export const BURN_WORD: AccoladeStyle = {
  * clears this set's closest pair — `ROUTINE` vs `good` at dE 36.6.
  */
 export const HOP: AccoladeStyle = {
-  color: '#a85cff',
-  labelColor: 'rgba(168,124,220,.85)',
+  // AURORA. A hop only exists inside a charged window, which is the anomaly's
+  // reward — and violet is what the anomaly means: the rules are different here.
+  color: solid(AURORA),
+  labelColor: withAlpha(AURORA, 0.85),
   // Small on purpose, and smaller than anything else that floats. Three or four
   // of these arrive inside seven seconds, on top of whatever else is in the air:
   // at a praise word's size they were the loudest thing on screen during the
@@ -159,8 +184,8 @@ export const HOP: AccoladeStyle = {
  * is size, which is the one dimension the small per-hop numbers left free.
  */
 export const HOP_TALLY: AccoladeStyle = {
-  color: '#c89aff',
-  labelColor: 'rgba(200,154,255,.9)',
+  color: solid(mix(AURORA, CORE, 0.3)),
+  labelColor: withAlpha(mix(AURORA, CORE, 0.2), 0.9),
   size: 26,
 };
 
@@ -186,7 +211,7 @@ export const HOP_TALLY: AccoladeStyle = {
  */
 export const DOT: AccoladeStyle = {
   color: solid(FINISH),
-  labelColor: 'rgba(92,226,140,.8)',
+  labelColor: withAlpha(FINISH, 0.8),
   size: 11,
 };
 
@@ -204,7 +229,8 @@ export const DOT: AccoladeStyle = {
  * capture crosses the hard line about one time in eight.
  */
 export const SHOUT: AccoladeStyle = {
-  color: '#ff45c8',
-  labelColor: 'rgba(220,130,190,.8)',
+  // ION. A shout names something reckless, and risk is the one thing pink means.
+  color: solid(HAZARD),
+  labelColor: withAlpha(mix(HAZARD, CORE, 0.2), 0.8),
   size: 15,
 };

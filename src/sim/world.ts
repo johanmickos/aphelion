@@ -70,6 +70,7 @@ export function createBodies(cfg: SimConfig): Body[] {
   if (!cfg.proceduralLayout) {
     return DEFS.slice(0, cfg.bodyCount).map((d, i) => ({
       kind: 'planet' as const,
+      type: 'planet',
       x: cx + d.dx,
       y: d.y * DESIGN_H,
       R: d.R,
@@ -130,6 +131,7 @@ export function createBodies(cfg: SimConfig): Body[] {
 
   const bodies: Body[] = placed.map((b, i) => ({
     kind: 'planet' as const,
+    type: 'planet',
     ...b,
     name: 'P' + (i + 1),
     traits: BODY_TYPES.planet.traits,
@@ -185,6 +187,7 @@ function placeAnomalies(
     const x = side < 0 ? wallL - off : wallR + off;
     out.push({
       kind: 'anomaly',
+      type: 'anomaly',
       x,
       y,
       R: radiusOf('anomaly', rnd),

@@ -289,7 +289,7 @@ describe('the finish marker', () => {
       y: 0,
     };
     const finishY = finish ? -(dist ?? 0) : null;
-    drawEdgeMarkers(r.ctx, c, rcfg, snap, [], 0, finishY);
+    drawEdgeMarkers(r.ctx, c, rcfg, DEFAULT_THEME, snap, [], 0, finishY);
     const text = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     return { r, text, label: text.find((t) => t.startsWith('FINISH')) };
   }
@@ -3534,7 +3534,7 @@ describe('edge markers point up the climb', () => {
     const snap = { ...captureSnapshot(state, false, sim), x: 195, y: shipY };
     centerCamera(c, snap.x, snap.y, field, null);
     const r = recordingContext();
-    drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies);
+    drawEdgeMarkers(r.ctx, c, rcfg, DEFAULT_THEME, snap, bodies);
     // each arrow is translate(ex, ey) followed by rotate
     return (r.calls('translate') as Array<[string, number, number]>).map((o) => o[2]);
   }
@@ -3546,7 +3546,7 @@ describe('edge markers point up the climb', () => {
     const snap = { ...captureSnapshot(state, false, sim), x, y, grabOffer: offer };
     centerCamera(c, snap.x, snap.y, field, null);
     const r = recordingContext();
-    drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies);
+    drawEdgeMarkers(r.ctx, c, rcfg, DEFAULT_THEME, snap, bodies);
     return (r.calls('arc') as Array<[string, number, number, number]>).length;
   }
 
@@ -3649,11 +3649,19 @@ describe('the fuel gauge pills', () => {
     return out.sort((a, b) => a.y - b.y);
   }
 
-  const rgb = (c: string): [number, number, number] => [
-    parseInt(c.slice(1, 3), 16),
-    parseInt(c.slice(3, 5), 16),
-    parseInt(c.slice(5, 7), 16),
-  ];
+  /**
+   * Channel values from either notation.
+   *
+   * The ramp used to be seven hand-written hexes and is now derived from two
+   * tokens, so it arrives as `rgb(r,g,b)`. A hex-only parser silently returned NaN
+   * and the assertion below failed as `expected NaN to be greater than NaN`, which
+   * reads like a broken test rather than a changed palette.
+   */
+  const rgb = (c: string): [number, number, number] => {
+    const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c);
+    if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+    return [1, 3, 5].map((k) => parseInt(c.slice(k, k + 2), 16)) as [number, number, number];
+  };
 
   it('draws one pill per graduation the ticks used to mark', () => {
     expect(pills(sim.fuelMax)).toHaveLength(GAUGE.pills);
@@ -3688,18 +3696,28 @@ describe('the fuel gauge pills', () => {
     }
   });
 
-  it('runs the ramp green at the top to red at the bottom', () => {
+  it('runs the ramp DUSK at the top to ION at the bottom', () => {
+    // THIS PIN USED TO SAY "green at the top to red at the bottom", and the design
+    // deliberately repealed it. The ramp spent three hues — red, amber, green — on
+    // one fact, and Direction 03 rules that "yellow would add a fourth meaning to
+    // hue; severity is ordinal, so it rides the energy channel like everything
+    // else. If it's pink, it can cost you the bank."
+    //
+    // So an empty tank is ION, the one colour that means "this can end the run",
+    // and a full one is DUSK, the unlit state of everything — fuel you are not
+    // short of is not information. What SURVIVES from the old pin is the property
+    // it existed to protect: the ramp is ordinal and never doubles back, so no
+    // pill reads as out of order.
     const p = pills(sim.fuelMax);
     const top = rgb(p[0]!.color);
     const bottom = rgb(p[p.length - 1]!.color);
-    expect(top[1], 'the top of the tank is not the greenest').toBeGreaterThan(bottom[1]);
-    expect(bottom[0] - bottom[2], 'the bottom of the tank is not the reddest').toBeGreaterThan(
-      top[0] - top[2],
+    const ionness = (c: [number, number, number]): number => c[0] - c[1];
+    expect(ionness(bottom), 'the bottom of the tank is not the most ION').toBeGreaterThan(
+      ionness(top),
     );
-    // monotone all the way down, so no pill reads as out of order — steps repeat
-    // but never go back up
-    const greens = p.map((x) => rgb(x.color)[1]);
-    for (let i = 1; i < greens.length; i++) expect(greens[i]).toBeLessThanOrEqual(greens[i - 1]!);
+    // monotone all the way down — steps repeat but never go back up
+    const ramp = p.map((x) => ionness(rgb(x.color)));
+    for (let i = 1; i < ramp.length; i++) expect(ramp[i]).toBeGreaterThanOrEqual(ramp[i - 1]!);
   });
 
   it('burns the pills below the level and leaves the rest showing faintly', () => {
@@ -3747,7 +3765,7 @@ describe('edge markers clear the header text', () => {
     centerCamera(c, snap.x, snap.y, field, null);
 
     const r = recordingContext();
-    drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies, HEADER_BOTTOM);
+    drawEdgeMarkers(r.ctx, c, rcfg, DEFAULT_THEME, snap, bodies, HEADER_BOTTOM);
     const ys = (r.calls('translate') as Array<[string, number, number]>).map((o) => o[2]);
     expect(ys.length, 'no arrows drawn').toBeGreaterThan(0);
 
@@ -3766,7 +3784,7 @@ describe('edge markers clear the header text', () => {
     const snap = { ...captureSnapshot(state, false, sim), x: -600, y: bodies[4]!.y };
     centerCamera(c, snap.x, snap.y, field, null);
     const r = recordingContext();
-    drawEdgeMarkers(r.ctx, c, rcfg, snap, bodies, HEADER_BOTTOM);
+    drawEdgeMarkers(r.ctx, c, rcfg, DEFAULT_THEME, snap, bodies, HEADER_BOTTOM);
     const xs = (r.calls('translate') as Array<[string, number, number]>).map((o) => o[1]);
     const left = c.offsetX + rcfg.edgeMarkerInset * c.scale;
     const right = c.offsetX + c.designW * c.scale - rcfg.edgeMarkerInset * c.scale;

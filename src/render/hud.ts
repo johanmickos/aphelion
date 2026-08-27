@@ -16,7 +16,21 @@ import type { AccoladeStyle } from './accolade.ts';
 import { BURN_WORD, DOT, HOP, LEVEL, ROUTINE } from './accolade.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
-import { FINISH, HAZARD, HAZARD_FUEL, HAZARD_WARN, solid, withAlpha } from './palette.ts';
+import {
+  AURORA,
+  CORE,
+  DUSK,
+  FINISH,
+  HAZARD,
+  HAZARD_FUEL,
+  HAZARD_WARN,
+  IMPACT,
+  INK,
+  VOID,
+  solid,
+  withAlpha,
+} from './palette.ts';
+import { mix } from './theme.ts';
 
 export interface ReadoutLine {
   text: string;
@@ -55,15 +69,24 @@ export const GAUGE = { x: 16, w: 15, h: 78, bottomGap: 44, pills: 10, gap: 2, ra
  *
  * Ordered empty-first, so the index climbs with the tank.
  */
-export const FUEL_RAMP: readonly string[] = Object.freeze([
-  '#FF465A', // empty
-  '#FF7550',
-  '#FFA346',
-  '#FFD23C', // half
-  '#C6DD5B',
-  '#8DE87B',
-  '#54F39A', // full
-]);
+export const FUEL_RAMP: readonly string[] = Object.freeze(
+  // ION AT THE BOTTOM, DUSK AT THE TOP, and the rainbow is gone.
+  //
+  // It ran red through amber to green, which spent three hues on one fact.
+  // Direction 03 rules on exactly this: "Yellow would add a fourth meaning to hue;
+  // severity is ordinal, so it rides the energy channel like everything else. If
+  // it's pink, it can cost you the bank — one rule, no exceptions."
+  //
+  // So an empty tank is ION, because that is the only thing that can end the run,
+  // and a full one is DUSK, because fuel you are not short of is not information —
+  // DUSK is "the unlit state of everything". The seven steps stay: they were
+  // chosen so the bar reads as a countable ladder rather than a smooth wash, and
+  // that reasoning is about the number of steps, not about their hues.
+  //
+  // The whole gauge moves onto the craft as a halo arc under Direction 03. This is
+  // the colour law arriving first; the geometry follows with the HUD grid.
+  [1, 0.82, 0.64, 0.46, 0.3, 0.15, 0].map((t) => solid(mix(DUSK, HAZARD, t))),
+);
 
 /**
  * The step a given height of the bar sits on.
@@ -255,7 +278,7 @@ export function drawFuelGauge(
   const flash = low ? 0.55 + 0.45 * Math.sin(timeMs / 110) : 1;
 
   ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,.55)';
+  ctx.fillStyle = withAlpha(VOID, 0.55);
   ctx.fillRect(gx - 3 * s, gy - 3 * s, gw + 6 * s, gh + 6 * s);
 
   // The pills. Each one's colour is fixed by where it sits; what the level
@@ -281,15 +304,15 @@ export function drawFuelGauge(
   }
   ctx.globalAlpha = 1;
 
-  ctx.strokeStyle = low ? withAlpha(HAZARD, flash) : 'rgba(150,170,205,.5)';
+  ctx.strokeStyle = low ? withAlpha(HAZARD, flash) : withAlpha(DUSK, 0.55);
   ctx.lineWidth = (low ? 2 : 1) * s;
   ctx.strokeRect(gx, gy, gw, gh);
 
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(190,205,235,.7)';
+  ctx.fillStyle = withAlpha(INK, 0.7);
   ctx.font = `${9 * s}px ui-monospace, monospace`;
   ctx.fillText('FUEL', gx + gw / 2, gy - 7 * s);
-  ctx.fillStyle = low ? solid(HAZARD_FUEL) : 'rgba(190,205,235,.75)';
+  ctx.fillStyle = low ? solid(HAZARD_FUEL) : withAlpha(INK, 0.75);
   ctx.fillText(String(Math.round(snap.fuel)), gx + gw / 2, gbot + 14 * s);
   if (low) {
     ctx.fillStyle = withAlpha(HAZARD, flash);
@@ -361,8 +384,8 @@ const PRESS_LINE: Record<Exclude<GrabResult, 'captured'>, ReadoutLine> = {
   carved: { text: '↯ CARVING THE CARPET', color: solid(FINISH) },
   'refused-crash-cone': { text: '✕ TOO LATE — crash course', color: HAZARD_WARN, pulse: 1 },
   'refused-no-fuel': { text: '✕ TANK EMPTY — cannot grab', color: HAZARD_WARN, pulse: 1 },
-  'refused-out-of-range': { text: '✕ TOO FAR — get closer', color: '#8fb8e8' },
-  'refused-no-body': { text: '✕ nothing in range', color: '#8595b0' },
+  'refused-out-of-range': { text: '✕ TOO FAR — get closer', color: withAlpha(INK, 0.8) },
+  'refused-no-body': { text: '✕ nothing in range', color: solid(DUSK) },
 };
 
 export function readoutLines(
@@ -385,10 +408,10 @@ export function readoutLines(
       if (snap.fuel <= 0) {
         out.push({ text: '⚠ OUT OF FUEL — sailing past', color: HAZARD_WARN, pulse: 1 });
       } else if (cap.overEscape > FLYBY_HARD) {
-        out.push({ text: `⚡ TOO FAST — ${pct}% over`, color: '#ffb020', pulse: 1 });
-        out.push({ text: 'holding costs a lot of fuel', color: '#c8a86a' });
+        out.push({ text: `⚡ TOO FAST — ${pct}% over`, color: solid(HAZARD), pulse: 1 });
+        out.push({ text: 'holding costs a lot of fuel', color: withAlpha(HAZARD, 0.75) });
       } else {
-        out.push({ text: `BRAKING — ${pct}% over`, color: '#8fb8e8' });
+        out.push({ text: `BRAKING — ${pct}% over`, color: withAlpha(INK, 0.8) });
       }
     } else if (!canCircularise) {
       out.push({ text: '⚠ LOW FUEL — will not round out', color: HAZARD_WARN, pulse: 1 });
@@ -399,10 +422,10 @@ export function readoutLines(
       const peak = Math.abs(cap.boostT - sim.boostArmTime) < 0.15;
       out.push(
         peak
-          ? { text: '◀ BOOST PEAK — release!', color: '#b98cff', pulse: 1 }
+          ? { text: '◀ BOOST PEAK — release!', color: solid(CORE), pulse: 1 }
           : arming
-            ? { text: 'BOOST arming…', color: '#8595b0' }
-            : { text: 'BOOST fading', color: '#8595b0' },
+            ? { text: 'BOOST arming…', color: solid(DUSK) }
+            : { text: 'BOOST fading', color: solid(DUSK) },
       );
     }
   } else {
@@ -418,7 +441,7 @@ export function readoutLines(
   if (snap.ending.active) {
     out.push(
       snap.ending.reason === 'impact'
-        ? { text: '⚠ CRASHED', color: '#ffcd32' }
+        ? { text: '⚠ CRASHED', color: solid(IMPACT) }
         : { text: '⚠ LOST — OFF COURSE', color: HAZARD_WARN },
     );
   }
@@ -450,7 +473,7 @@ export function drawReadout(
     ctx.globalAlpha = line.pulse ? 0.65 + 0.35 * Math.sin(timeMs / 130) : 1;
     // a dark backing so the text stays readable over stars and planets
     const w = ctx.measureText(line.text).width;
-    ctx.fillStyle = 'rgba(0,0,0,.45)';
+    ctx.fillStyle = withAlpha(VOID, 0.45);
     ctx.fillRect(x - 5 * s, y - 11 * s, w + 10 * s, 16 * s);
     ctx.fillStyle = line.color;
     ctx.fillText(line.text, x, y);
@@ -506,7 +529,7 @@ export function drawScore(
   // beat, is the whole reason the reset reads as a cost rather than as a bug.
   if (score.best > (snap.ending.active && score.lastRun ? score.lastRun.score : score.score)) {
     ctx.font = `${9 * s}px ui-monospace, monospace`;
-    ctx.fillStyle = 'rgba(120,140,175,.75)';
+    ctx.fillStyle = withAlpha(DUSK, 0.75);
     ctx.fillText(`BEST ${formatScore(score.best)}`, cx, cam.offsetY + SCORE.bestY * s);
   }
 
@@ -518,7 +541,7 @@ export function drawScore(
   // the one readout nobody thought to check.
   const shown = snap.ending.active && score.lastRun ? score.lastRun.score : score.score;
   ctx.font = `600 ${24 * s}px ui-monospace, monospace`;
-  ctx.fillStyle = 'rgba(214,228,250,.92)';
+  ctx.fillStyle = withAlpha(INK, 0.92);
   ctx.fillText(formatScore(shown), cx, cam.offsetY + SCORE.y * s);
 
   const multY = cam.offsetY + SCORE.multY * s;
@@ -555,9 +578,9 @@ export function drawScore(
     const w = 64 * s;
     const h = 3 * s;
     const y = multY + 5 * s;
-    ctx.fillStyle = 'rgba(168,92,255,.22)';
+    ctx.fillStyle = withAlpha(AURORA, 0.22);
     ctx.fillRect(cx - w / 2, y, w, h);
-    ctx.fillStyle = 'rgba(214,164,255,.9)';
+    ctx.fillStyle = withAlpha(AURORA, 0.9);
     ctx.fillRect(cx - w / 2, y, w * snap.chargedFrac, h);
   }
 

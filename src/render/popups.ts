@@ -118,6 +118,7 @@ const STACK_X = 80;
 const RECEIPT_TAIL = 1.8;
 
 import { BURN_WORD, DOT, HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+import { VOID, withAlpha } from './palette.ts';
 
 /**
  * The dark rim that keeps text legible over planets and stars.
@@ -129,7 +130,14 @@ import { BURN_WORD, DOT, HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolad
  * text reads as a sticker.
  */
 const RIM_WIDTH = 2;
-const RIM = 'rgba(0,0,0,.38)';
+/**
+ * The rim behind floating text.
+ *
+ * VOID rather than true black. "The sky. Violet-black, never pure — true #000
+ * exists only in the anomaly's cloud gaps", so a rim drawn in black would be the
+ * darkest thing on screen and would read as a hole rather than as a shadow.
+ */
+const RIM = withAlpha(VOID, 0.38);
 
 function easeOutCubic(u: number): number {
   const k = 1 - u;

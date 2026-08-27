@@ -113,6 +113,7 @@ describe('world generation', () => {
     // against it, so retuning the game's field must not touch it.
     expect(proto[0]).toEqual({
       kind: 'planet',
+      type: 'planet',
       x: 189,
       y: 0,
       R: 46,

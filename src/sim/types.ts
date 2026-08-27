@@ -113,6 +113,21 @@ export interface BodyTraits {
 
 export interface Planet {
   kind: 'planet';
+  /**
+   * Which row of `BODY_TYPES` built this.
+   *
+   * NOT A DUPLICATE OF `kind`, and the difference is about to matter. `kind` is
+   * the structural union member, which is what gives the renderer's draw switch
+   * its exhaustiveness check; `type` is which entry of the table this came from,
+   * which is what carries identity — the colour, and later the glyph. Direction
+   * 04's ringed, pulsar and binary bodies are all the same STRUCTURE as a planet
+   * and none of them is the same TYPE, so the two diverge the moment any of them
+   * lands.
+   *
+   * Typed as a string rather than importing `BodyTypeId`, because `bodies.ts`
+   * imports this file and the cycle is not worth the nominal typing.
+   */
+  type: string;
   x: number;
   y: number;
   /** Surface radius. */
@@ -145,6 +160,8 @@ export interface Planet {
  */
 export interface Anomaly {
   kind: 'anomaly';
+  /** Which row of `BODY_TYPES` built this. See `Planet.type`. */
+  type: string;
   x: number;
   y: number;
   /** Surface radius. */

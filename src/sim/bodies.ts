@@ -54,6 +54,20 @@ export interface BodyType {
    * to the wall; the course says how many walls' worth there are.
    */
   wallOffset: number;
+  /**
+   * The rules are different here, so it wears AURORA rather than an identity hue.
+   *
+   * The one exception to the identity band, by decree: violet means STRANGE, and
+   * it belongs to the anomaly and to the bodies that should not exist. A player's
+   * spine learns one association — purple is not a colour a planet can be — which
+   * is why this is a property of the TYPE and not a lookup in the renderer.
+   *
+   * It is deliberately NOT `landmark`. That says "signposted on its own channel",
+   * which is a navigation question; this says "outside the identity band", which
+   * is a palette one. They coincide on both types that exist today and will not on
+   * the next: a pulsar is worth signposting and is an ordinary body.
+   */
+  strange: boolean;
   /** What a body of this type can do. See `BodyTraits`. */
   traits: BodyTraits;
 }
@@ -77,6 +91,7 @@ export const BODY_TYPES: Readonly<Record<BodyTypeId, BodyType>> = Object.freeze(
     // up until they do not.
     radius: [34, 56] as const,
     wallOffset: 0,
+    strange: false,
     traits: Object.freeze({
       authored: null,
       shelter: 0,
@@ -105,6 +120,7 @@ export const BODY_TYPES: Readonly<Record<BodyTypeId, BodyType>> = Object.freeze(
     kind: 'anomaly',
     radius: [40, 56] as const,
     wallOffset: 250,
+    strange: true,
     traits: Object.freeze({
       authored: Object.freeze({ orbitR: 130, orbitPeriod: 3, refuel: 30, settleDur: 0.45 }),
       // Reaches 150px back inside the corridor at a `wallOffset` of 250, so a

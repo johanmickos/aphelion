@@ -36,6 +36,7 @@
 import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
+import { VOID, solid } from './palette.ts';
 
 /**
  * Which light, in severity order. The array IS the priority: earlier is worse
@@ -55,7 +56,8 @@ export type WarningKind = (typeof WARNING_ORDER)[number];
  * `destination-out` — which erased the game behind the badge rather than the
  * badge itself, and could not work at all once there was a plate to erase too.
  */
-const PLATE = 'rgb(8,10,17)';
+/** The plate a warning light sits on. The sky, opaque. */
+const PLATE = solid(VOID);
 
 /** Design units below the ship the panel starts at. The fuel badge's own drop. */
 const DROP = 26;

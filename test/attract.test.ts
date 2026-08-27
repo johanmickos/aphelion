@@ -20,6 +20,7 @@ import {
 import { DEFAULT_CONFIG } from '../src/sim/config.ts';
 import { circSpeed } from '../src/sim/orbit.ts';
 import { boostEnvelope } from '../src/sim/boost.ts';
+import { VOID, solid } from '../src/render/palette.ts';
 
 const loop = createAttractLoop(DEFAULT_CONFIG);
 
@@ -228,7 +229,11 @@ describe('attract loop', () => {
     drawAttractLoop(rec.ctx, loop, 0, 360, 176);
     const first = rec.ops.findIndex(([k]) => k === 'fillRect');
     const fillStyle = rec.ops.slice(0, first).filter(([k]) => k === '=fillStyle');
-    expect(fillStyle[fillStyle.length - 1]?.[1]).toBe('#000');
+    // VOID, not '#000'. "The sky. Violet-black, never pure — true #000 exists only
+    // in the anomaly's cloud gaps", which is what makes the anomaly read deeper
+    // than ordinary space. The claim being pinned is that the region is painted
+    // opaque before anything else, not which opaque colour it is.
+    expect(fillStyle[fillStyle.length - 1]?.[1]).toBe(solid(VOID));
     expect(rec.ops[first]).toEqual(['fillRect', 0, 0, 360, 176]);
   });
 

@@ -7,13 +7,16 @@ import type { Camera } from './camera.ts';
 import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 import {
+  AURORA,
+  FINISH,
   HAZARD_NOTICE,
   HAZARD_NOTICE_BORDER,
   HAZARD_NOTICE_FILL,
   IMPACT_NOTICE_BORDER,
   IMPACT_NOTICE_FILL,
   IMPACT_TEXT,
-  FINISH,
+  VOID,
+  solid,
   withAlpha,
 } from './palette.ts';
 
@@ -180,9 +183,9 @@ export function drawEndingNotice(
 export function drawPaused(ctx: CanvasRenderingContext2D, cam: Camera): void {
   const s = cam.scale;
   ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,.45)';
+  ctx.fillStyle = withAlpha(VOID, 0.45);
   ctx.fillRect(cam.offsetX, cam.offsetY, cam.designW * s, cam.viewH * s);
-  ctx.fillStyle = '#b98cff';
+  ctx.fillStyle = solid(AURORA);
   ctx.textAlign = 'center';
   ctx.font = `600 ${22 * s}px ui-monospace, monospace`;
   ctx.fillText(

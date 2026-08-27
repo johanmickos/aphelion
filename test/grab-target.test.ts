@@ -16,7 +16,7 @@ import { BODY_TYPES } from '../src/sim/bodies.ts';
 
 /** A bare planet at a chosen spot. Only x, y and R are ever read here. */
 function planet(x: number, y: number, R: number, name: string): Body {
-  return { kind: 'planet', x, y, R, name, traits: BODY_TYPES.planet.traits };
+  return { kind: 'planet', type: 'planet', x, y, R, name, traits: BODY_TYPES.planet.traits };
 }
 
 /** Park the ship relative to two bodies and hand it a velocity. */

@@ -12,6 +12,8 @@
 import type { Camera } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import { mulberry32 } from '../sim/rng.ts';
+import { DUSK, INK, solid } from './palette.ts';
+import { mix } from './theme.ts';
 
 interface Star {
   x: number;
@@ -19,11 +21,20 @@ interface Star {
   z: number;
 }
 
-/** Three depth tiers, so the whole field draws in six state changes, not ~320. */
+/**
+ * Three depth tiers, so the whole field draws in six state changes, not ~320.
+ *
+ * ONE COLOUR AT THREE BRIGHTNESSES, where it used to be three separate blue-greys
+ * picked by eye. Direction 05 is explicit that the sky varies "in brightness,
+ * never in velocity" — depth cues belong to parallax, which the stars already
+ * have, and a hue that shifts with distance is a fourth meaning on a channel that
+ * is spoken for. The ramp runs DUSK to INK: structure at the back, utility-white
+ * at the front, and nothing reaching CORE, which is the craft's alone.
+ */
 const TIERS = [
-  { max: 0.6, color: '#7788a8', size: 1 },
-  { max: 0.85, color: '#aebbd8', size: 1 },
-  { max: 1.01, color: '#dfe8ff', size: 1.8 },
+  { max: 0.6, color: solid(mix(DUSK, INK, 0.15)), size: 1 },
+  { max: 0.85, color: solid(mix(DUSK, INK, 0.5)), size: 1 },
+  { max: 1.01, color: solid(mix(DUSK, INK, 0.9)), size: 1.8 },
 ] as const;
 
 export class Starfield {

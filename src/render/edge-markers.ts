@@ -18,11 +18,31 @@ import { toScreenX, toScreenY, visibleWorldY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 import { FINISH, withAlpha } from './palette.ts';
+import type { RGB, Theme } from './theme.ts';
+import { BODY_TYPES } from '../sim/bodies.ts';
+import type { BodyTypeId } from '../sim/bodies.ts';
+
+/**
+ * What colour an off-screen body's marker wears.
+ *
+ * "Off-screen bodies are edge dots in identity hue" — so the marker is the body's
+ * own colour and needs no legend, because it is the colour that body will be when
+ * it arrives on screen. A strange body wears AURORA instead: violet is outside the
+ * identity band by decree, and means the rules are different there.
+ *
+ * Indexed by POSITION IN THE FIELD, which is what makes neighbours differ: the
+ * band steps at least 50 degrees between consecutive entries, so two bodies a
+ * player meets one after another can never be confused for each other.
+ */
+function markerHue(theme: Theme, b: Body, index: number): RGB {
+  return BODY_TYPES[b.type as BodyTypeId]?.strange ? theme.aurora : theme.identity(index);
+}
 
 export function drawEdgeMarkers(
   ctx: CanvasRenderingContext2D,
   cam: Camera,
   rcfg: RenderConfig,
+  theme: Theme,
   snap: RenderSnapshot,
   bodies: readonly Body[],
   /**
@@ -76,7 +96,11 @@ export function drawEdgeMarkers(
       // around the body instead of around an arrow to it.
       if (i === snap.grabOffer) {
         ctx.save();
-        ctx.strokeStyle = b.kind === 'anomaly' ? 'rgba(214,164,255,.7)' : 'rgba(190,215,245,.6)';
+        // Identity, or AURORA for a body outside the band. The last two places
+        // the renderer asked a body its NAME rather than its type — see
+        // `BodyType.strange`, which is where "purple means the rules are
+        // different here" now lives.
+        ctx.strokeStyle = withAlpha(markerHue(theme, b, i), 0.7);
         ctx.lineWidth = 1.5 * s;
         ctx.beginPath();
         ctx.arc(bx, by, r + 10 * s, 0, Math.PI * 2);
@@ -128,10 +152,7 @@ export function drawEdgeMarkers(
     ctx.save();
     ctx.translate(ex, ey);
     ctx.rotate(ang);
-    const purple = b.kind === 'anomaly';
-    ctx.fillStyle = purple
-      ? `rgba(206,150,255,${0.6 * near + 0.3})`
-      : `rgba(150,200,255,${0.5 * near + 0.2})`;
+    ctx.fillStyle = withAlpha(markerHue(theme, b, i), (0.55 * near + 0.25).toFixed(3));
     ctx.beginPath();
     ctx.moveTo(7 * s, 0);
     ctx.lineTo(-4 * s, 4.5 * s);
@@ -144,7 +165,7 @@ export function drawEdgeMarkers(
     // reads at a glance from the same place the eye already is.
     if (offered) {
       ctx.save();
-      ctx.strokeStyle = purple ? 'rgba(214,164,255,.85)' : 'rgba(190,215,245,.8)';
+      ctx.strokeStyle = withAlpha(markerHue(theme, b, i), 0.85);
       ctx.lineWidth = 1.5 * s;
       ctx.beginPath();
       ctx.arc(ex, ey, 9 * s, 0, Math.PI * 2);
@@ -153,9 +174,7 @@ export function drawEdgeMarkers(
     }
 
     const label = dist >= 1000 ? `${(dist / 1000).toFixed(1)}k` : String(Math.round(dist));
-    ctx.fillStyle = purple
-      ? `rgba(214,164,255,${0.6 * near + 0.3})`
-      : `rgba(190,215,245,${0.55 * near + 0.25})`;
+    ctx.fillStyle = withAlpha(markerHue(theme, b, i), (0.55 * near + 0.25).toFixed(3));
     ctx.font = `${8 * s}px ui-monospace, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

@@ -9,6 +9,7 @@ import { toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 import { BOOST_AMBER, HAZARD_FUEL, withAlpha } from './palette.ts';
+import { DUSK } from './palette.ts';
 
 /**
  * The frozen ellipse the phase clock is sweeping.
@@ -68,7 +69,10 @@ export function drawOrbitCurve(
   }
   // Settled: this is the curve. Diving: this is a prediction, drawn fainter and
   // finer so it reads as provisional.
-  ctx.strokeStyle = settled ? 'rgba(185,140,255,.35)' : 'rgba(185,140,255,.18)';
+  // Structure, so DUSK — "rings at rest, field lines… DUSK never glows, it is the
+  // unlit state of everything". It brightens as the orbit settles, which is energy
+  // rather than hue, exactly as the emission ladder requires.
+  ctx.strokeStyle = withAlpha(DUSK, settled ? 0.42 : 0.22);
   ctx.setLineDash(settled ? [3 * cam.scale, 5 * cam.scale] : [2 * cam.scale, 6 * cam.scale]);
   ctx.lineWidth = (settled ? 1.2 : 1) * cam.scale;
   ctx.stroke();
@@ -150,7 +154,10 @@ export function drawAnchorLine(
   } else if (!canAffordCircularise(sim, snap)) {
     ctx.strokeStyle = withAlpha(HAZARD_FUEL, 0.6);
   } else {
-    ctx.strokeStyle = 'rgba(150,170,205,.32)';
+    // DUSK for now. Direction 04 wants this filament in the anchor's IDENTITY hue
+    // — "press, and the tide flares into the grab filament" — which needs the
+    // body's index and belongs with the planet language rather than here.
+    ctx.strokeStyle = withAlpha(DUSK, 0.36);
   }
   ctx.lineWidth = Math.max(1, cam.scale);
   ctx.stroke();

@@ -54,6 +54,7 @@ import type { SimConfig } from '../sim/config.ts';
 import { boostEnvelope } from '../sim/boost.ts';
 import { circSpeed } from '../sim/orbit.ts';
 import { shipPath } from './ship.ts';
+import { CORE, DUSK, INK, VOID, solid, withAlpha } from './palette.ts';
 
 /**
  * Orbit radius at the larger body.
@@ -127,9 +128,9 @@ export const PLAYBACK_RATE = 1.6;
 
 /** Colours. Grey enough that the violet wordmark below is the only hue. */
 export const ATTRACT = {
-  planetFill: 'rgba(255,255,255,.04)',
-  planetLine: 'rgba(200,210,230,.35)',
-  ship: '#cfdcf2',
+  planetFill: withAlpha(INK, 0.04),
+  planetLine: withAlpha(DUSK, 0.5),
+  ship: solid(CORE),
   /**
    * The box shrinks with the viewport; below this the ship stops shrinking. Set
    * against the smallest canvas the layout produces — the ship has to stay a
@@ -372,7 +373,7 @@ export function drawAttractLoop(
   w: number,
   h: number,
 ): void {
-  ctx.fillStyle = '#000';
+  ctx.fillStyle = solid(VOID);
   ctx.fillRect(0, 0, w, h);
   if (w <= 0 || h <= 0) return;
 

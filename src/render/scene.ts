@@ -45,6 +45,8 @@ import type { Frame } from './frame.ts';
 import { DEFAULT_THEME } from './theme.ts';
 import type { Theme } from './theme.ts';
 import type { ScoreState } from '../score/types.ts';
+import { VOID, solid } from './palette.ts';
+import { mix } from './theme.ts';
 
 export interface SceneDeps {
   sim: SimConfig;
@@ -604,6 +606,7 @@ export class Scene {
       f.ctx,
       f.cam,
       f.render,
+      f.theme,
       f.snap,
       f.bodies,
       // The DOM header OR the canvas score band, whichever reaches further down.
@@ -685,9 +688,16 @@ export class Scene {
   }
 }
 
-/** The two grounds. Neither is a theme colour: they are what a theme is painted ON. */
-const LETTERBOX = '#05070d';
-const GROUND = '#000';
+/**
+ * The two grounds.
+ *
+ * GROUND is the sky itself — VOID, "violet-black, never pure", because true black
+ * belongs to the anomaly's cloud gaps and nothing else. LETTERBOX is what the
+ * window is letterboxed INTO, so it has to be darker than the world or the bars
+ * read as more sky; it is the one place the palette is deliberately undershot.
+ */
+const GROUND = solid(VOID);
+const LETTERBOX = solid(mix(VOID, [0, 0, 0], 0.55));
 
 /**
  * A step in the frame.

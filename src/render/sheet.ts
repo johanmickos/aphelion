@@ -27,7 +27,7 @@
 import type { Body } from '../sim/types.ts';
 import type { RunStats, ScoreState } from '../score/types.ts';
 import type { Camera } from './camera.ts';
-import { DEBRIEF, HAZARD, SUMMIT, SUMMIT_RGB, withAlpha } from './palette.ts';
+import { DEBRIEF, DUSK, HAZARD, INK, SUMMIT, SUMMIT_RGB, VOID, withAlpha } from './palette.ts';
 import type { DeadlineWall } from '../sim/rescue.ts';
 
 /**
@@ -293,8 +293,8 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
     cam.offsetY + vh * 0.4,
     vh * 0.78,
   );
-  vig.addColorStop(0, 'rgba(2,3,8,0)');
-  vig.addColorStop(1, 'rgba(2,3,8,0.66)');
+  vig.addColorStop(0, withAlpha(VOID, 0));
+  vig.addColorStop(1, withAlpha(VOID, 0.66));
   ctx.fillStyle = vig;
   ctx.fillRect(cam.offsetX, cam.offsetY, vw, vh);
 
@@ -303,7 +303,10 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
   // the sheet in competition with the ceremony behind it.
   const pad = 18 * s;
   const height = (196 + sheetRows(run, max).length * 22 + (ending ? 18 : 0)) * s;
-  ctx.fillStyle = 'rgba(4,6,12,0.72)';
+  // Direction 09 wants the crash site visible through the card — "death is a
+  // place and the card is parked on it" — so the glass is the sky at 72% rather
+  // than an opaque panel.
+  ctx.fillStyle = withAlpha(VOID, 0.72);
   ctx.fillRect(cx - w / 2 - pad, top - 34 * s, w + pad * 2, height);
   ctx.strokeStyle = withAlpha(style.accentRGB, 0.45);
   ctx.lineWidth = Math.max(1, 1.2 * s);
@@ -358,7 +361,7 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
   // What the score was made of, small: how long it took, and how much of the
   // field it covered. The old headlines, demoted to their real job of qualifying
   // the number above them.
-  ctx.fillStyle = 'rgba(150,170,205,.8)';
+  ctx.fillStyle = withAlpha(DUSK, 0.85);
   ctx.font = `${9 * s}px ui-monospace, monospace`;
   const anomalies = anomalyCount(bodies);
   const progress = style.cleared
@@ -407,7 +410,7 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
   let y = top + 66 * s;
   if (anyBest) {
     ctx.font = `${8 * s}px ui-monospace, monospace`;
-    ctx.fillStyle = 'rgba(120,140,175,.65)';
+    ctx.fillStyle = withAlpha(DUSK, 0.65);
     ctx.textAlign = 'right';
     ctx.fillText('RUN', cx + w / 2 - 46 * s, y);
     ctx.fillText('SESSION', cx + w / 2, y);
@@ -417,16 +420,16 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
   ctx.font = `${10 * s}px ui-monospace, monospace`;
   for (const row of rows) {
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(150,170,205,.75)';
+    ctx.fillStyle = withAlpha(DUSK, 0.8);
     ctx.fillText(row.label, cx - w / 2, y);
     ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(214,228,250,.92)';
+    ctx.fillStyle = withAlpha(INK, 0.92);
     ctx.fillText(row.value, cx + w / 2 - (anyBest ? 46 * s : 0), y);
     // The session's best, quiet and to the right, and only where it differs.
     // Quiet because it is context rather than news; absent where it would only
     // repeat the number beside it.
     if (anyBest && row.best !== row.value) {
-      ctx.fillStyle = 'rgba(120,140,175,.7)';
+      ctx.fillStyle = withAlpha(DUSK, 0.7);
       ctx.font = `${8 * s}px ui-monospace, monospace`;
       ctx.fillText(row.best, cx + w / 2, y);
       ctx.font = `${10 * s}px ui-monospace, monospace`;
@@ -464,7 +467,7 @@ export function drawSheet(ctx: CanvasRenderingContext2D, cam: Camera, d: SheetDr
     y += 18 * s;
   }
 
-  ctx.fillStyle = 'rgba(120,140,175,.6)';
+  ctx.fillStyle = withAlpha(DUSK, 0.6);
   ctx.font = `${8 * s}px ui-monospace, monospace`;
   ctx.fillText('TAP TO CONTINUE', cx, y + 14 * s);
   ctx.restore();
