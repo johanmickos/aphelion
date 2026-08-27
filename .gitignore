@@ -1,0 +1,27 @@
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# editor scratch
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+.DS_Store
+
+*.zip
+
+
+# build
+dist/
+.vite/
+
