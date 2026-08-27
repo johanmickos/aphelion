@@ -4682,6 +4682,126 @@ still the one that was reasoned rather than felt.
 
 ---
 
+### 73 — Five of the scoring constitution's claims were wrong, and one of its keys was not on its own list
+
+F04 asked whether Direction 08 supersedes the current economy wholesale, and it sat
+unanswered since the structural review because nobody had put numbers on it. The
+ruling that unblocked it is a split rather than a verdict: **the axioms rule and the
+numbers get measured.** A values statement — "progress is the only base currency" —
+cannot be refuted by a measurement, so the corpus has no standing against it. Every
+magnitude is a threshold, and `AGENTS.md` says thresholds are percentiles of real
+play. Under that line, everything the board says about THE BUILD is checkable, and
+five things did not survive.
+
+The measurements, from the 28 reports that replay faithfully, one sim replay
+feeding one scorer per zeroed weight. Drop is in corpus total `best`:
+
+```
+streakStep       54.6%   24/27 sessions      climbPerPx       19.1%   25/27
+aimBonus         16.2%   25/27               linkBase         13.0%   25/27
+closeBonus       12.8%   24/27               rescueBonus      11.5%   18/27
+timingBonus       8.0%   24/27               flybyCloseBonus   6.3%   19/27
+nerveBonus        4.5%   14/27               flybyBase         3.1%   19/27
+anomalyBonus      2.4%    1/27               hopBonus          0.0%    0/27
+```
+
+**The axiom was already half true.** `streakStep` is the single largest lever in the
+economy — the multiplier already does more than every minting key put together. What
+Direction 08 actually changes is that the carry becomes the ONLY source, and the
+carry is 19.1%.
+
+**"The two largest awards in the game" was a config reading, not a play reading.**
+`anomalyBonus` (800) and `hopBonus` (500) are the two largest NUMBERS in
+`ScoreConfig`, which is where the plan's "not recoverable by a retune" came from.
+They are the two smallest contributors.
+
+**And those zeros are blind spots, which is the `fuelRegen` lesson again.** The
+corpus holds **0 charged-window ticks** and **0 zipped captures**, so no session
+could pay a hop; **25 of 28 reports have no clearable field at all**, so none could
+pay a mote. One anomaly capture in 28 sessions prices the anomaly's REACHABILITY —
+a course finding, recorded against F08 — and says nothing about its award. A census
+returning zero is a claim about the corpus until proven to be a claim about the
+game.
+
+**There was an eleventh minting key, and the plan's own table had filed it as a
+curve.** `sc.burnBank += heat * dt * scfg.burnRate` mints points per second spent
+near the wall. The board bans exactly that, twice: axiom 1 ("metres climbed while
+engaged. **Not time**") and, under what deliberately earns nothing, "**survival
+time — never**… not from a per-second trickle". `burnBank` becomes the band's
+selector instead — it already accumulates edge depth across a capture, which is
+precisely what the plan's own step 3 says the band must be.
+
+**The band cannot be drawn by mote density.** `createMotes` returns empty without a
+`runInBand` and lays its dots on a sine through the run-in carpet; motes are a
+finish-line object, and the band applies to every swing everywhere. The hazard
+gradient draws it instead — already on screen, and `burnEdgeSpan` is already pinned
+by test to that band's own width, so there is no third definition of where the edge
+is.
+
+**The formula prices only the swing, so it silently deleted `awardGrab`.** That
+award is `close * closeBonus + nerveBonus + anomaly` — 17.3% of corpus best, 17.7%
+of every point paid — and `priceSwing(carry, tier, band, streak)` has no term for
+how the ship ARRIVED, against a trap in the same plan insisting a capture is two
+scoring events. Grab tightness prices the carry instead, which is where the board
+already puts chain.
+
+**The tier was angular only, which drops the boost envelope.** VISION pillar 2 says
+the envelope and the release marker FIGHT, and that "the scoring layer only gives it
+a name" — an angle-only tier grades a perfectly aimed release at a dead envelope as
+PERFECT. Both pixels already exist, so the tier grades the conjunction.
+
+**63.7% of all climb is coasted, and the board's own gap threshold does not
+survive it.** Axiom 3 ("disengaged metres earn ×0") and VISION pillar 5 ("altitude
+is banked, not paid — it cashes at the next release") reconcile if "disengaged"
+takes the board's own chain definition, one rung of 25m. But over 401 coasts, median
+220px and p90 574px:
+
+```
+cut  25px   382/401 coasts exceed it    58.6% of ALL climb unpaid
+cut 280px   166/401                     22.7%
+cut 560px    47/401                      7.3%
+```
+
+At a rung the gate is 93% of the way to paying only for captured metres, which
+re-decides by the back door a question that was answered the other way. It cuts at
+`grabRange`: not a new number, and the rule then states itself — metres stop
+counting once the ship has climbed out of reach of everything without engaging.
+
+**The one prediction that was wrong was mine, and the measurement reversed it.** A
+rescue is a lateral save and the constitution pays only for climb, so a rescue
+looked structurally unpayable — carry ≈ 0, and `0 × band = 0`. The opposite is true:
+the link after a rescue banks a median carry of 1352px against 554px for an ordinary
+link, **2.44×**, because a rescue means the ship drifted a long way and saved it.
+The 560 gate costs it nothing, since a drift toward a SIDE wall accrues little
+vertical climb per coast. A rescue swing prices at ~2.4× carry × ×3 fire band ≈ **7×
+an ordinary swing** with no `rescueBonus` and no exception, so VISION pillar 4 gets
+stronger by deleting the key that was serving it.
+
+**What the deletion buys beyond the economy.** `grab`, `rescue` and `burn` all stop
+being awards, and PORT_NOTES 59 measured what that is worth: 74% of awards carried
+nothing but a number, and the composition was link 36% / grab 32% / rescue 11% /
+flyby 10% / shouts 7% / burn 4%. **47% of every popup in the game goes structurally**
+— the reported defect, "so many at so many different points that the user doesn't
+know what they're being rewarded for", cured by the economy rather than by a popup
+policy.
+
+**One rule's justification expires at stage (b), and the rule does not.**
+`AGENTS.md` forbids the grab being simplified to pay at the press, because "beside a
+planet you are already close to the surface, so every tap would be a tight grab and
+tapping in place would be a points faucet". That argument is entirely about an
+ADDITIVE economy. Under `carry × tier × band × streak` a tap in place has climbed
+zero metres, so `0 × anything = 0` and the faucet is structurally impossible. The
+rule survives on the receipt timing instead — arrival and departure are graded at
+different moments and must stay separable. **It is still live today**, because the
+economy is still additive; the pin gets updated when the formula does, not before.
+
+Stage (a) has landed and changed no number: `score` became `bank`, which is what it
+already meant, and the gap-gated carry accrues beside the existing economy without
+being spent by it. Nothing under `src/sim/` moved — the equality gate read
+`0.000e+0`, the golden did not move, `SIM_VERSION` did not need a bump.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -4704,12 +4824,12 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    render 203 · score 94 · camera 55 · invariants 32 · charged 26
+tests    render 203 · score 99 · camera 55 · invariants 32 · charged 26
          diagnostics 25 · world 23 · carpet 22 · anomaly 19 · cleared 16
          backtrack 15 · palette 15 · rescue 15 · clearance 14 · flyby-fuel 14
          attract 13 · kick 13 · tune 13 · input 12 · port-equality 11
          run-stats 10 · course 9 · grab-target 8 · boost-envelope 6
-         escape 6 · link-fuel 6 · outbound-grab 6 · 701 total
+         escape 6 · link-fuel 6 · outbound-grab 6 · 706 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
