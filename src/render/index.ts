@@ -4,11 +4,12 @@
  *
  * This is the one layer permitted to touch the browser, which is why `pnpm
  * portable` scans `src/sim/` and `src/state/` and deliberately does not scan
- * here. Whether these pixels arrive via Canvas2D, a WebGL post pass, a
- * hand-rolled WebGL2 renderer or PixiJS is
- * [M0.5](../../docs/plan/m0-foundations.md#m05--the-renderer-spike)'s to decide
- * with a measurement, so what follows draws text into an element and will be
- * replaced wholesale.
+ * here. How the pixels arrive is settled:
+ * [ADR-0011](../../docs/adr/0011-canvas2d-carries-the-design.md) measured the
+ * ladder on a phone and Canvas2D held the first rung, with bloom hand-rolled as
+ * an offscreen blur chain composited with `lighter`. What follows still draws
+ * text into an element and will be replaced wholesale — the decision is made,
+ * the renderer is [M3](../../docs/plan/m3-the-field.md)'s to build.
  */
 import type { PresentationState } from '../state/types.ts';
 

@@ -2,8 +2,8 @@
  * The diagnostics endpoint writes files, on a server bound to every interface so
  * that a phone can reach it. `parseDiagReport` is the thing standing between
  * "something POSTed" and "a file was written", so it is tested rather than
- * trusted — and it stays tested after `app/spike/` is deleted, because the
- * endpoint outlives the spike that needed it.
+ * trusted — and it stays tested now that `app/spike/` is gone, because the
+ * endpoint outlived the spike that needed it (ADR-0011).
  */
 import { describe, expect, it } from 'vitest';
 import { formatDiagReport, parseDiagReport } from '../tools/vite-plugin-diag.ts';
