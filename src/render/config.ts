@@ -8,9 +8,27 @@
  * now game rules, and a render-only value that silently re-tunes the score would
  * be the worst of both. What is left here is the drawing — ring sizes and hues.
  */
+import { DESIGN_W } from '../sim/world.ts';
+
 export interface RenderConfig {
   // --- camera ---
-  /** Width of the design window in world units. The playfield is wider; we pan. */
+  /**
+   * Width of the design window in world units. The playfield is wider; we pan.
+   *
+   * NOT A KNOB, AND NOT ITS OWN NUMBER. The world's layout is authored at
+   * `DESIGN_W` and `fieldBounds` measures the corridor as `DESIGN_W *
+   * fieldWidthFrac`, so the framing and the field are two readings of one width.
+   * It sat here as a literal 390 beside the simulation's literal 390 — the same
+   * two-definitions-of-one-line defect `finishLineY` and `runInBand` were each
+   * written to close, and silent in the same way: change one and the camera frames
+   * a window the corridor is no longer measured against, so `followCamera`'s
+   * `field.width <= cam.designW` test decides whether to pan at all against the
+   * wrong number.
+   *
+   * It stays a `RenderConfig` field rather than being read from `world.ts` at
+   * every call site, because the camera is constructed from a config and a test
+   * may want to frame a narrower window. What is gone is the second literal.
+   */
   designW: number;
   /** Start panning when the ship comes within this fraction of a window edge. */
   cameraMarginFrac: number;
@@ -346,7 +364,7 @@ export interface RenderConfig {
 }
 
 export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
-  designW: 390,
+  designW: DESIGN_W,
   cameraMarginFrac: 0.22,
   cameraFollow: 3,
   cameraLookAhead: 0.18,
