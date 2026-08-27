@@ -13,9 +13,10 @@ enforced by machine, and the author as the judge of feel.
 
 ## M1.1 · The characteristics document
 
-**Do this before writing any physics.** Produce `docs/spec/01-the-swing.md`: a list of the
-characteristics the swing must have, each one paired with the prototype's observed
-behaviour.
+**Do this before writing any physics.** Produce [`docs/spec/01-swing.md`](../spec/01-swing.md):
+a list of the characteristics the swing must have, each one paired with the prototype's
+observed behaviour. (Earlier drafts of this step called the file `01-the-swing.md`. That was
+drift, not a second file.)
 
 The prototype at `~/git/aphelion` is a running program. Play it, instrument it, read
 `src/sim/capture.ts` and the rationale above `DEFAULT_CONFIG`, and use its replay tooling.
@@ -34,6 +35,12 @@ keep closed, and the prototype is a wasting asset (ADR-0001).
 
 **Acceptance**: every characteristic has a measurement, a source, and a tolerance.
 **Verify**: read it.
+
+**Done.** The tension is measured in [spec 01 · §11](../spec/01-swing.md): at peak boost the
+craft can reach only **43%** of the circle of release headings, and never more than 49% at any
+sampled geometry — so §11's first criterion, *the peak arc covers strictly less than a full
+revolution*, is M1.3's acceptance gate. Three rulings are the author's and are listed in
+[spec 01 · §13](../spec/01-swing.md) and the [spec README](../spec/README.md)'s open questions.
 
 ---
 
