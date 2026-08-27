@@ -33,12 +33,8 @@ import {
   toScreenY,
 } from '../src/render/camera.ts';
 import { Starfield } from '../src/render/starfield.ts';
-import {
-  BodyRenderer,
-  drawFinishLine,
-  drawHazardZones,
-  drawSpeedCarpet,
-} from '../src/render/world.ts';
+import { drawFinishLine, drawHazardZones, drawSpeedCarpet } from '../src/render/world.ts';
+import { BodyRenderer } from '../src/render/body.ts';
 import { drawEdgeMarkers } from '../src/render/edge-markers.ts';
 import { ceremonyPhase, ceremonyShipPos, drawCeremonyWash } from '../src/render/ceremony.ts';
 import { SCORE_BAND_BOTTOM } from '../src/render/hud.ts';
@@ -77,7 +73,8 @@ import {
 } from '../src/score/aim.ts';
 import { createScoreState } from '../src/score/score.ts';
 import type { ScoreState } from '../src/score/types.ts';
-import type { EndingReason } from '../src/sim/types.ts';
+import type { Body, EndingReason } from '../src/sim/types.ts';
+import type { Frame } from '../src/render/frame.ts';
 import { drawEndingNotice } from '../src/render/overlays.ts';
 import { WARNING_ORDER, drawWarnings } from '../src/render/warnings.ts';
 import { DOOM_WORD, doomLight } from '../src/render/verdict.ts';
@@ -2297,9 +2294,14 @@ describe('scene', () => {
 
     expect(r.calls('arc').length).toBeGreaterThan(0); // bodies + rings
     expect(r.calls('fillText').length).toBeGreaterThan(0); // planet labels
-    expect(
-      r.calls('createRadialGradient').length + r.calls('=createRadialGradient').length,
-    ).toBeGreaterThan(0);
+    // This used to count radial gradients, which stood in for "a body was drawn
+    // as a shaded sphere". Direction 04's bodies are flat anatomy and have no
+    // gradient at all, so the pin asks for what actually replaced it: a rim in
+    // the body's own identity hue. That is a sharper question than the old one —
+    // a gradient count could not tell a planet from the nebula behind it.
+    const rim = rgbaOf(DEFAULT_THEME.identity(0));
+    const strokes = (r.calls('=strokeStyle') as Array<[string, string]>).map((o) => o[1]);
+    expect(strokes.some((v) => v.startsWith(rim))).toBe(true);
   });
 });
 
@@ -3597,29 +3599,170 @@ describe('edge markers point up the climb', () => {
   });
 });
 
-describe('the captured body is highlighted', () => {
-  it('draws a halo only around the body holding the ship', () => {
-    const sim = DEFAULT_CONFIG;
-    const bodies = createBodies(sim);
+/**
+ * A `Frame` carrying only what a body draw reads. The rest is filled with the
+ * quiet value: no ceremony, nothing ending, nothing paused.
+ */
+function bodyFrame(
+  ctx: CanvasRenderingContext2D,
+  c: ReturnType<typeof cam>,
+  bodies: readonly Body[],
+  snap: RenderSnapshot,
+  over: Partial<Frame> = {},
+): Frame {
+  return {
+    ctx,
+    cam: c,
+    snap,
+    sim: DEFAULT_CONFIG,
+    render: rcfg,
+    theme: DEFAULT_THEME,
+    bodies,
+    field,
+    score: createScoreState(),
+    cer: null,
+    finishY: null,
+    timeMs: 0,
+    frameDt: 1 / 60,
+    paused: false,
+    viewportW: 390,
+    viewportH: 844,
+    headerBottom: 0,
+    deathSheet: null,
+    deathSheetT: 0,
+    ...over,
+  };
+}
+
+describe('a body says what it is doing for you', () => {
+  const sim = DEFAULT_CONFIG;
+  const bodies = createBodies(sim);
+  const base = captureSnapshot(createInitialState(sim), false, sim);
+
+  /**
+   * What was drawn, counted at ONE body's centre.
+   *
+   * A whole-frame count cannot answer any of these questions: the field is dense
+   * enough that several bodies are on screen at once, so "an extra arc appeared"
+   * is true whichever body grew it. Every arc records its centre, so the arcs
+   * belonging to body `i` can be separated from its neighbours'.
+   */
+  function arcsFor(over: Partial<RenderSnapshot>, frameOver: Partial<Frame> = {}) {
+    const r = recordingContext();
     const c = cam();
-    const state = createInitialState(sim);
+    const b0 = bodies[0]!;
+    centerCamera(c, b0.x, b0.y, field, null);
+    const snap = { ...base, x: b0.x + 200, y: b0.y, capture: null, grabOffer: -1, ...over };
+    new BodyRenderer().draw(bodyFrame(r.ctx, c, bodies, snap, frameOver));
+    return r;
+  }
 
-    const drift = { ...captureSnapshot(state, false, sim), capture: null };
-    const held = {
-      ...captureSnapshot(state, true, sim),
-      capture: captureOf({ phase: 'orbit', planet: 0 }),
+  function arcsAt(r: RecordingContext, i: number, c: ReturnType<typeof cam>): number {
+    const b = bodies[i]!;
+    const x = toScreenX(c, b.x);
+    const y = toScreenY(c, b.y);
+    return (r.calls('arc') as Array<[string, number, number]>).filter(
+      (o) => Math.abs(o[1] - x) < 0.5 && Math.abs(o[2] - y) < 0.5,
+    ).length;
+  }
+
+  function bodyCam() {
+    const c = cam();
+    centerCamera(c, bodies[0]!.x, bodies[0]!.y, field, null);
+    return c;
+  }
+
+  it('lights the rim harder the harder it is pulling you', () => {
+    // The AHEAD -> IN REACH ramp, and it is a ramp rather than a threshold: the
+    // brightness IS the felt gravity, so there is no cliff to fall off. Direction
+    // 04 wanted this off mass; `GM` is global, so mass could not supply it.
+    const alphaOfRim = (dist: number) => {
+      const b0 = bodies[0]!;
+      const r = arcsFor({ x: b0.x + dist, y: b0.y });
+      const strokes = r.calls('=strokeStyle') as Array<[string, string]>;
+      const rims = strokes.map((o) => o[1]).filter((v) => v.startsWith('rgba'));
+      return rims;
     };
+    const near = alphaOfRim(80).join('|');
+    const far = alphaOfRim(2000).join('|');
+    expect(near, 'a body you are on top of draws like one far away').not.toBe(far);
+  });
 
-    const a = recordingContext();
-    const b = recordingContext();
-    new BodyRenderer().draw(a.ctx, c, sim, bodies, -1);
-    new BodyRenderer().draw(b.ctx, c, sim, bodies, held.capture!.planet);
+  it('reaches for the body a press would actually take, and only that one', () => {
+    // TIDE_ONLY_ON_THE_OFFER. Measured over the corpus, two to seven bodies are in
+    // grab range 79% of the time that any are, so "every body in range" and "the
+    // one that catches your press" are different pictures. `grabOffer` is the
+    // simulation's own answer, crash cone and charged window included.
+    const c = bodyCam();
+    const withOffer = arcsAt(arcsFor({ grabOffer: 0 }), 0, c);
+    const without = arcsAt(arcsFor({ grabOffer: -1 }), 0, c);
+    expect(withOffer, 'the offered body drew no extra limb').toBeGreaterThan(without);
+  });
 
-    // the halo is an extra radial gradient beyond the per-radius sphere cache
-    const gradsIdle = a.calls('=createRadialGradient').length;
-    const gradsHeld = b.calls('=createRadialGradient').length;
-    expect(gradsHeld).toBeGreaterThan(gradsIdle);
-    void drift;
+  it('does not reach from a body that is merely nearby', () => {
+    // The half that matters: a tide on a body the press will not take teaches the
+    // wrong press. Body 0 is right beside the ship here and still gets no tide,
+    // because the offer is elsewhere.
+    const c = bodyCam();
+    const near = arcsAt(arcsFor({ grabOffer: 1 }), 0, c);
+    const none = arcsAt(arcsFor({ grabOffer: -1 }), 0, c);
+    expect(near, 'a body that was not on offer still reached for the craft').toBe(none);
+  });
+
+  it('marks the body it just let go of, and lets the mark recover', () => {
+    // NOT PERMANENT: 15 of the 28 faithful sessions re-grab a body they had
+    // already held. A mark that never lifts would be calling a body used up while
+    // the player is on their way back to use it.
+    const r = recordingContext();
+    const c = cam();
+    const b0 = bodies[0]!;
+    centerCamera(c, b0.x, b0.y, field, null);
+    const held = { ...base, x: b0.x + 80, y: b0.y, capture: captureOf({ planet: 0 }) };
+    const free = { ...held, capture: null };
+
+    const br = new BodyRenderer();
+    br.draw(bodyFrame(r.ctx, c, bodies, held));
+    const releasedStyles = () => {
+      const rr = recordingContext();
+      br.draw(bodyFrame(rr.ctx, c, bodies, free));
+      return (rr.calls('=strokeStyle') as Array<[string, string]>).map((o) => o[1]).join('|');
+    };
+    const justReleased = releasedStyles();
+
+    // Age past the recovery window a frame at a time.
+    for (let i = 0; i < 200; i++) {
+      const rr = recordingContext();
+      br.draw(bodyFrame(rr.ctx, c, bodies, free, { frameDt: 1 / 60 }));
+    }
+    const recovered = releasedStyles();
+    expect(justReleased, 'the spent mark never lifted').not.toBe(recovered);
+  });
+
+  it('forgets a spent body only when the run does', () => {
+    // A new run gets a new field but not necessarily a new renderer, and body
+    // counts repeat. `snap.tick` running backwards is the reset, and it is the
+    // same one the simulation just performed.
+    const r = recordingContext();
+    const c = cam();
+    const b0 = bodies[0]!;
+    centerCamera(c, b0.x, b0.y, field, null);
+    const br = new BodyRenderer();
+    const at = (tick: number, capture: RenderSnapshot['capture']) => ({
+      ...base,
+      tick,
+      x: b0.x + 80,
+      y: b0.y,
+      capture,
+    });
+    br.draw(bodyFrame(r.ctx, c, bodies, at(100, captureOf({ planet: 0 }))));
+    const styles = (snap: RenderSnapshot) => {
+      const rr = recordingContext();
+      br.draw(bodyFrame(rr.ctx, c, bodies, snap));
+      return (rr.calls('=strokeStyle') as Array<[string, string]>).map((o) => o[1]).join('|');
+    };
+    const spent = styles(at(101, null));
+    const newRun = styles(at(0, null));
+    expect(spent, "a new run inherited the last one's spent marks").not.toBe(newRun);
   });
 });
 

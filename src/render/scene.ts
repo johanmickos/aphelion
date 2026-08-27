@@ -14,7 +14,6 @@ import { clipToWindow, toScreenX, toScreenY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import { Starfield } from './starfield.ts';
 import {
-  BodyRenderer,
   drawBacktrackFloor,
   drawFinishLine,
   drawHazardZones,
@@ -38,6 +37,7 @@ import { CLEARED_SHEET, DEATH_SHEET, drawSheet } from './sheet.ts';
 
 import { SCORE_BAND_BOTTOM, drawFuelGauge, drawReadout, drawScore, readoutLines } from './hud.ts';
 import { drawAlignGlow, drawCompass } from './compass.ts';
+import { BodyRenderer } from './body.ts';
 import { drawEdgeMarkers } from './edge-markers.ts';
 import { canAffordCircularise } from './capture.ts';
 import type { RenderSnapshot } from './snapshot.ts';
@@ -482,14 +482,7 @@ export class Scene {
   }
 
   private bodies(f: Frame): void {
-    this.bodyRenderer.draw(
-      f.ctx,
-      f.cam,
-      f.sim,
-      f.bodies,
-      f.snap.capture ? f.snap.capture.planet : -1,
-      f.timeMs,
-    );
+    this.bodyRenderer.draw(f);
   }
 
   /** The orbit the ship is on, the line to its anchor, and the boost it is building. */
