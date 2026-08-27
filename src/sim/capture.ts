@@ -625,7 +625,7 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
   //
   // Opened even on a weak release. A player who fumbles the exit of the hardest
   // thing in the game has already been punished by the link they did not get.
-  if (body.traits.charges > 0) state.chargedT = body.traits.charges;
+  if (cfg.chargedSecs > 0 && body.traits.charges) state.chargedT = cfg.chargedSecs;
 
   const spd = hypot(cap.vx, cap.vy) || 1;
   const bx = cap.vx / spd;

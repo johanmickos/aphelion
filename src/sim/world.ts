@@ -52,7 +52,7 @@ const DEFS: ReadonlyArray<{ dx: number; y: number; R: number }> = [
 export const PLANET_TRAITS: Readonly<BodyTraits> = Object.freeze({
   authored: null,
   shelter: 0,
-  charges: 0,
+  charges: false,
   claimable: false,
   routable: true,
   landmark: false,
@@ -170,7 +170,7 @@ function anomalyTraits(cfg: SimConfig): BodyTraits {
       settleDur: cfg.anomalySettleDur,
     },
     shelter: cfg.anomalyBubble,
-    charges: cfg.chargedSecs,
+    charges: true,
     claimable: true,
     routable: false,
     landmark: true,

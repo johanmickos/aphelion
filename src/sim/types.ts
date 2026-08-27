@@ -66,8 +66,16 @@ export interface BodyTraits {
    * exemption has an edge to leave by. See `sheltered`.
    */
   shelter: number;
-  /** Seconds of charged window a release from here opens. 0 for none. */
-  charges: number;
+  /**
+   * A release from here opens the charged window.
+   *
+   * A BOOLEAN AND NOT A DURATION, for the reason `claimable` gives: the body says
+   * what it does and the config says how much. `SimConfig.chargedSecs` owns the
+   * length, and it has to — `render/snapshot.ts` divides by it to draw the window
+   * running down, and `tools/replay-core.ts` counts windows by it, and neither has
+   * a body in hand when it asks.
+   */
+  charges: boolean;
   /**
    * Arriving here is an achievement in itself, claimable once per life.
    *
