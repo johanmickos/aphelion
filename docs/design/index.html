@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aphelion — Design Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Anton&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:      #060510;
+    --panel:    #0C0A1C;
+    --line:     #1E1A38;
+    --dim:      #6F6893;
+    --body:     #A9A3C9;
+    --hot:      #FFF4E0;
+    --violet:   #9D6BFF;
+    --ion:      #FF5FA2;
+    --lumen:    #4BE39B;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    font-family: 'Archivo', sans-serif;
+    color: var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--violet); text-decoration: none; }
+  a:hover { color: var(--ion); }
+
+  .field {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(900px 520px at 18% -10%, rgba(157,107,255,0.16), transparent 70%),
+      radial-gradient(700px 460px at 88% 8%, rgba(255,95,162,0.10), transparent 70%),
+      repeating-linear-gradient(to bottom, rgba(157,107,255,0.055) 0 1px, transparent 1px 88px);
+  }
+
+  .wrap {
+    position: relative; z-index: 1;
+    max-width: 1240px; margin: 0 auto;
+    padding: 72px 40px 96px 40px;
+  }
+
+  .eyebrow {
+    font-size: 12px; letter-spacing: 0.32em; color: var(--dim);
+    font-weight: 600; text-transform: uppercase;
+  }
+  h1 {
+    font-family: 'Unbounded', sans-serif; font-weight: 900;
+    font-size: clamp(38px, 6vw, 62px); line-height: 1.04;
+    color: var(--hot); margin: 20px 0 0 0;
+    text-shadow: 0 0 34px rgba(255,244,224,0.28); text-wrap: balance;
+  }
+  .lede {
+    margin-top: 20px; max-width: 60ch; font-size: 16px; line-height: 1.62;
+  }
+  .lede strong { color: var(--hot); font-weight: 600; }
+
+  .meta {
+    margin-top: 32px; padding-top: 22px; border-top: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; gap: 28px; align-items: baseline;
+    font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim);
+  }
+  .meta b { color: var(--body); font-weight: 600; }
+
+  .sectionhead {
+    margin: 64px 0 22px 0; display: flex; align-items: baseline; gap: 18px;
+  }
+  .sectionhead h2 {
+    font-family: 'Anton', sans-serif; font-size: 22px; letter-spacing: 0.06em;
+    color: var(--hot); margin: 0; text-transform: uppercase;
+  }
+  .sectionhead .rule { flex: 1; height: 1px; background: var(--line); }
+  .sectionhead .count { font-size: 12px; letter-spacing: 0.2em; color: var(--dim); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+
+  .card {
+    display: block; position: relative;
+    background: linear-gradient(160deg, var(--panel), #080614);
+    border: 1px solid var(--line); border-radius: 4px;
+    padding: 22px 24px 24px 24px;
+    color: var(--body);
+    transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  }
+  .card:hover {
+    border-color: var(--violet); transform: translateY(-2px); color: var(--body);
+    box-shadow: 0 0 0 1px rgba(157,107,255,0.28), 0 18px 44px rgba(0,0,0,0.55);
+  }
+  .card::after {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: var(--accent, var(--violet)); opacity: 0.55; border-radius: 4px 0 0 4px;
+  }
+  .card:hover::after { opacity: 1; }
+
+  .num {
+    font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 13px;
+    letter-spacing: 0.18em; color: var(--accent, var(--violet));
+  }
+  .title {
+    font-family: 'Anton', sans-serif; font-size: 21px; letter-spacing: 0.03em;
+    color: var(--hot); margin-top: 10px; text-transform: uppercase; line-height: 1.15;
+  }
+  .claim {
+    margin-top: 12px; font-size: 14px; line-height: 1.5; color: var(--hot);
+    font-weight: 600; opacity: 0.86;
+  }
+  .deck { margin-top: 10px; font-size: 13.5px; line-height: 1.58; color: var(--body); }
+  .tag {
+    margin-top: 16px; display: inline-block; font-size: 10.5px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--dim);
+    border: 1px solid var(--line); border-radius: 2px; padding: 4px 8px;
+  }
+
+  footer {
+    margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line);
+    font-size: 13px; line-height: 1.7; color: var(--dim);
+  }
+  footer b { color: var(--body); font-weight: 600; }
+
+  @media (max-width: 640px) { .wrap { padding: 48px 20px 64px 20px; } }
+</style>
+</head>
+<body>
+<div class="field"></div>
+<div class="wrap">
+
+  <div class="eyebrow">Aphelion &nbsp;·&nbsp; Design Directions &nbsp;·&nbsp; 01 – 12</div>
+  <h1>Twelve directions,<br>one instrument.</h1>
+  <p class="lede">
+    Every page below is a <strong>design canvas</strong> — a single wide artboard arguing one decision
+    about how Aphelion looks, reads, and pays out. They share a palette and a grammar:
+    <strong>brightness is commitment, colour is identity, pink is risk, green is sanctuary.</strong>
+    Read them next to <a href="../VISION.md">VISION.md</a>, which says what the game is for;
+    these say what it looks like when it is.
+  </p>
+
+  <div class="meta">
+    <span><b>12</b> directions</span>
+    <span><b>.dc.html</b> — open in a browser</span>
+    <span>Palette locked in <b>Direction 01</b></span>
+  </div>
+
+  <div class="sectionhead">
+    <h2>The Language</h2><div class="rule"></div><span class="count">01 · 04 · 05 · 08</span>
+  </div>
+  <div class="grid">
+
+    <a class="card" style="--accent:#9D6BFF" href="./Aphelion%2001%20-%20Tokens%20%2B%20Compass.dc.html">
+      <div class="num">01</div>
+      <div class="title">Tokens + Compass</div>
+      <div class="claim">Brightness is commitment. Colour is identity. Pink is risk.</div>
+      <div class="deck">The token system and the signature element — a white-hot craft inside a set of coloured windows. Nothing glows as decoration; everything luminous is stored energy or a fact about the future.</div>
+      <div class="tag">Foundation · palette</div>
+    </a>
+
+    <a class="card" style="--accent:#9D6BFF" href="./Aphelion%2004%20-%20Planet%20Language.dc.html">
+      <div class="num">04</div>
+      <div class="title">Planet Language</div>
+      <div class="claim">A planet is a lamp, not a rock.</div>
+      <div class="deck">Flat vector anatomy that emits its own identity — no gradients, no terminator, no implied depth. Plus the tide: a bright limb segment that always faces the craft. Gravity made visible.</div>
+      <div class="tag">Foundation · bodies</div>
+    </a>
+
+    <a class="card" style="--accent:#9D6BFF" href="./Aphelion%2005%20-%20Living%20Field.dc.html">
+      <div class="num">05</div>
+      <div class="title">Living Field</div>
+      <div class="claim">You climb through a medium, not past a backdrop.</div>
+      <div class="deck">Altitude rungs every 25m, perpendicular to travel — a ladder, not a floor. They bow toward mass, part around the craft, and sweep past as you climb. The Geometry Wars tribute, minus the horizon.</div>
+      <div class="tag">Foundation · world</div>
+    </a>
+
+    <a class="card" style="--accent:#9D6BFF" href="./Aphelion%2008%20-%20Scoring%20Constitution.dc.html">
+      <div class="num">08</div>
+      <div class="title">Scoring Constitution</div>
+      <div class="claim">The field pays for progress. Skill sets the price. The bank remembers.</div>
+      <div class="deck">Five axioms every number answers to. Progress is the only base currency, skill only multiplies, coasting is unpaid but never punished — and no rule may score what no instrument announced.</div>
+      <div class="tag">Foundation · economy</div>
+    </a>
+
+  </div>
+
+  <div class="sectionhead">
+    <h2>The Run</h2><div class="rule"></div><span class="count">02 · 03 · 06 · 07 · 12</span>
+  </div>
+  <div class="grid">
+
+    <a class="card" style="--accent:#FFC85C" href="./Aphelion%2002%20-%20Release%20Storyboard.dc.html">
+      <div class="num">02</div>
+      <div class="title">Release Storyboard</div>
+      <div class="claim">The pause is the punch. The word lands on the dot.</div>
+      <div class="deck">The 400ms payoff, frame by frame: a 70ms hitstop where only the player's energy stays lit, every motion along the exit tangent, and the award landing at the dot that earned it.</div>
+      <div class="tag">In-run · the moment</div>
+    </a>
+
+    <a class="card" style="--accent:#FFC85C" href="./Aphelion%2003%20-%20HUD%20Five%20Pressures.dc.html">
+      <div class="num">03</div>
+      <div class="title">HUD — Five Pressures</div>
+      <div class="claim">Velocity is the headline. Everything else orbits it.</div>
+      <div class="deck">One layout that never changes between states; only the pressure does. Velocity to the masthead, score demoted to a chip, fuel moved onto the craft as a halo — and the bottom third kept clear.</div>
+      <div class="tag">In-run · layout</div>
+    </a>
+
+    <a class="card" style="--accent:#FFC85C" href="./Aphelion%2006%20-%20Awards%20%2B%20Callouts.dc.html">
+      <div class="num">06</div>
+      <div class="title">Awards + Callouts</div>
+      <div class="claim">Points for the make. Words for the mastery.</div>
+      <div class="deck">A vocabulary of exactly three — TRUE, SHARP, PERFECT — on the rarity ladder players already know. The baseline tier speaks in points alone, and streaks escalate by counting, not by synonym.</div>
+      <div class="tag">In-run · praise</div>
+    </a>
+
+    <a class="card" style="--accent:#FF5FA2" href="./Aphelion%2007%20-%20Boundary.dc.html">
+      <div class="num">07</div>
+      <div class="title">Boundary</div>
+      <div class="claim">The edge is a place, not a wall.</div>
+      <div class="deck">Three bands of increasing heat and reward. Intensity tracks closing speed rather than proximity, so the edge answers "how fast are you approaching" — a risk gradient you aim at, not a vignette you flee.</div>
+      <div class="tag">In-run · risk</div>
+    </a>
+
+    <a class="card" style="--accent:#4BE39B" href="./Aphelion%2012%20-%20The%20Finish%20Line.dc.html">
+      <div class="num">12</div>
+      <div class="title">The Finish Line</div>
+      <div class="claim">The carpet takes you home.</div>
+      <div class="deck">The boundary's mirror: same grammar, opposite verdict. Cross into the safety carpet and the run is mathematically over — gravity lets go and the lift throws you past the top of the screen. Green becomes sanctuary.</div>
+      <div class="tag">In-run · the win</div>
+    </a>
+
+  </div>
+
+  <div class="sectionhead">
+    <h2>The Aftermath</h2><div class="rule"></div><span class="count">09 · 10 · 11</span>
+  </div>
+  <div class="grid">
+
+    <a class="card" style="--accent:#FF5FA2" href="./Aphelion%2009%20-%20The%20Debrief.dc.html">
+      <div class="num">09</div>
+      <div class="title">The Debrief</div>
+      <div class="claim">A card over the crash site.</div>
+      <div class="deck">A translucent modal floating over the still-living field — embers settling, boundary still breathing, your bank ring planted at the death altitude. 1.6 seconds, then the insert-coin blink. Arcade cabinets cut; they do not fade.</div>
+      <div class="tag">After · death</div>
+    </a>
+
+    <a class="card" style="--accent:#FFC85C" href="./Aphelion%2010%20-%20Results%20Sheet.dc.html">
+      <div class="num">10</div>
+      <div class="title">Results Sheet</div>
+      <div class="claim">The route is the trophy.</div>
+      <div class="deck">A score is a claim; a route is a proof. The run drawn as a light-line through the whole field, composed inside a 4:5 safe frame — plus a recipe line, so a shared run is a replayable fact rather than a picture of one.</div>
+      <div class="tag">After · share</div>
+    </a>
+
+    <a class="card" style="--accent:#9D6BFF" href="./Aphelion%2011%20-%20Daily%20Front%20%2B%20Leaderboard.dc.html">
+      <div class="num">11</div>
+      <div class="title">Daily Front + Leaderboard</div>
+      <div class="claim">One field. One run. The door says so.</div>
+      <div class="deck">The front screen is not a menu — it is the bottom of today's field, and pressing anywhere begins the run. Ranks are drawn as altitude, any name replays as a ghost, and percentile leads over position.</div>
+      <div class="tag">After · the return</div>
+    </a>
+
+  </div>
+
+  <footer>
+    <b>Reading these.</b> Each <code>.dc.html</code> is a self-contained canvas — open it directly in a browser;
+    <code>support.js</code> in this folder is the shared runtime and is not a design page.
+    Directions are numbered in the order they were argued, and later ones cite earlier ones by number.
+    Where two disagree, the <b>higher-numbered revision wins</b> and says so on its own canvas.
+  </footer>
+
+</div>
+</body>
+</html>

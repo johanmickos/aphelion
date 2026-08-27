@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER + TIMING RULER -->
+  <div style="display: grid; grid-template-columns: 1fr 640px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 02 &nbsp;·&nbsp; THE RELEASE MOMENT — 400ms</div>
+      <div style="font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 48px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; text-shadow: 0 0 34px rgba(255,244,224,0.28);">The pause is the punch.<br>The word lands on the dot.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">The compass spends a whole orbit building tension; these 400ms are the payoff. Three rules govern everything below: a <span style="color: #EDEAF7; font-weight: 600;">70ms hitstop</span> where only the player's energy stays lit; every motion strictly <span style="color: #EDEAF7; font-weight: 600;">along the exit tangent</span> — the line the nose has been pointing down all orbit — never radial, never a shake; and the award word landing <span style="color: #EDEAF7; font-weight: 600;">at the dot that earned it</span>, not in a band at the top of the screen. The hand said <em>when</em>; the nose said <em>where</em>; the release proves both at once.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 20px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">TIMING RULER — WHAT LIVES WHEN</div>
+      <svg viewBox="0 0 592 190" width="592" style="display: block; margin-top: 12px;">
+        <defs>
+          <linearGradient id="dk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFF4E0" stop-opacity="0.9"></stop><stop offset="1" stop-color="#FFF4E0" stop-opacity="0"></stop></linearGradient>
+          <linearGradient id="dj" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9D6BFF" stop-opacity="0.8"></stop><stop offset="1" stop-color="#9D6BFF" stop-opacity="0"></stop></linearGradient>
+        </defs>
+        <g font-family="Archivo" font-size="10" fill="#6F6893" font-weight="600">
+          <text x="118" y="176">0</text><text x="228" y="176">100</text><text x="343" y="176">200</text><text x="458" y="176">300</text><text x="565" y="176">400ms</text>
+        </g>
+        <g stroke="#6C64A6" stroke-width="1" opacity="0.18"><line x1="120" y1="8" x2="120" y2="164"></line><line x1="235" y1="8" x2="235" y2="164"></line><line x1="350" y1="8" x2="350" y2="164"></line><line x1="465" y1="8" x2="465" y2="164"></line><line x1="580" y1="8" x2="580" y2="164"></line></g>
+        <g font-family="Archivo" font-size="10.5" font-weight="600" fill="#A9A3C9">
+          <text x="0" y="22">HITSTOP</text><rect x="120" y="12" width="80.5" height="12" rx="2" fill="#FFF4E0" opacity="0.9"></rect>
+          <text x="0" y="47">E3 FLASH</text><rect x="200.5" y="37" width="379.5" height="12" rx="2" fill="url(#dk)"></rect>
+          <text x="0" y="72">CRAFT DEFORM</text><rect x="200.5" y="62" width="207" height="12" rx="2" fill="#FFF4E0" opacity="0.45"></rect>
+          <text x="0" y="97">CAMERA KICK</text><rect x="200.5" y="87" width="207" height="12" rx="2" fill="#FFF4E0" opacity="0.3"></rect>
+          <text x="0" y="122">FAREWELL RING</text><rect x="200.5" y="112" width="379.5" height="12" rx="2" fill="url(#dj)"></rect>
+          <text x="0" y="147">AWARD WORD</text><rect x="223.5" y="137" width="356.5" height="12" rx="2" fill="url(#dk)" opacity="0.8"></rect><text x="530" y="147" fill="#6F6893" font-size="9">→ dies 510</text>
+        </g>
+      </svg>
+      <div style="font-size: 12px; line-height: 1.5; margin-top: 10px;">Hitstop is a full world freeze — attack ≤ 2 frames, every decay ≥ 10× its attack, per the motion tokens.</div>
+    </div>
+  </div>
+
+  <!-- SIX FRAMES -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 30px 34px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">FRAME BY FRAME — A DEADEYE RELEASE OFF P11 TOWARD P12</div>
+    <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; margin-top: 20px;">
+      <!-- F1 T-80 MATCHED -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <text x="16" y="34" fill="#EDEAF7" font-family="Unbounded" font-weight="700" font-size="15">842</text><text x="16" y="48" fill="#6F6893" font-family="Archivo" font-size="8" letter-spacing="1.5">M/S</text>
+          <circle cx="105" cy="180" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.9"></circle>
+          <circle cx="105" cy="180" r="60" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.25"></circle>
+          <circle cx="105" cy="180" r="105" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+          <circle cx="105" cy="180" r="105" pathLength="360" fill="none" stroke="#E89A5F" stroke-width="4" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="220" opacity="0.5"></circle>
+          <circle cx="14.1" cy="232.5" r="3.5" fill="#E89A5F" opacity="0.7"></circle>
+          <circle cx="105" cy="180" r="90" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.15"></circle>
+          <circle cx="105" cy="180" r="90" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="5" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="40" style="filter: drop-shadow(0 0 4px #C8FFDF) drop-shadow(0 0 12px #5FC88F);"></circle>
+          <line x1="157" y1="150" x2="196" y2="127.5" stroke="#FFF4E0" stroke-width="3" style="filter: drop-shadow(0 0 5px #FFF4E0);"></line>
+          <circle cx="182.9" cy="135" r="6" fill="#FFF4E0" style="filter: drop-shadow(0 0 6px #FFF4E0) drop-shadow(0 0 14px #C8FFDF);"></circle>
+          <g transform="translate(157 150) rotate(-120)"><path d="M 12 0 L -8 7 L -4 0 L -8 -7 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 16px #FFF4E0);"></path></g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">T−80 · MATCHED</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">Peak tension. The hand lies on the perfect dot, one white point; the window is E2-hot. The player already knows the grade.</div></div>
+      </div>
+      <!-- F2 T0 HITSTOP -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <text x="16" y="34" fill="#EDEAF7" font-family="Unbounded" font-weight="700" font-size="15" opacity="0.45">842</text><text x="16" y="48" fill="#6F6893" font-family="Archivo" font-size="8" letter-spacing="1.5" opacity="0.6">M/S · FROZEN</text>
+          <circle cx="105" cy="180" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.4"></circle>
+          <circle cx="105" cy="180" r="60" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.1"></circle>
+          <circle cx="105" cy="180" r="105" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.06"></circle>
+          <circle cx="105" cy="180" r="105" pathLength="360" fill="none" stroke="#E89A5F" stroke-width="4" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="220" opacity="0.2"></circle>
+          <circle cx="105" cy="180" r="90" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.06"></circle>
+          <circle cx="105" cy="180" r="90" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="5" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="40" opacity="0.45"></circle>
+          <line x1="157" y1="150" x2="196" y2="127.5" stroke="#FFF4E0" stroke-width="3" style="filter: drop-shadow(0 0 5px #FFF4E0);"></line>
+          <circle cx="182.9" cy="135" r="7" fill="#FFF4E0" style="filter: drop-shadow(0 0 8px #FFF4E0) drop-shadow(0 0 18px #C8FFDF);"></circle>
+          <g transform="translate(157 150) rotate(-120)"><path d="M 12 0 L -8 7 L -4 0 L -8 -7 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 22px #FFF4E0);"></path></g>
+          <text x="105" y="282" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-size="9" letter-spacing="2">WORLD FROZEN · 70ms</text>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">T0 · RELEASE — HITSTOP</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">Thumb lifts. The world dims and freezes for 70ms; only the craft, the hand, and the dot keep full energy. The pause is the punch.</div></div>
+      </div>
+      <!-- F3 T+70 IMPULSE -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <text x="16" y="34" fill="#EDEAF7" font-family="Unbounded" font-weight="700" font-size="15">842</text><text x="16" y="48" fill="#6F6893" font-family="Archivo" font-size="8" letter-spacing="1.5">M/S</text>
+          <circle cx="105" cy="180" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.85"></circle>
+          <circle cx="105" cy="180" r="68" fill="none" stroke="#9D6BFF" stroke-width="2" opacity="0.4" style="filter: drop-shadow(0 0 6px rgba(157,107,255,0.6));"></circle>
+          <circle cx="105" cy="180" r="90" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.1"></circle>
+          <circle cx="105" cy="180" r="90" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="5" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="40" style="filter: drop-shadow(0 0 5px #C8FFDF) drop-shadow(0 0 14px #5FC88F);"></circle>
+          <circle cx="157" cy="150" r="14" fill="#FFF4E0" opacity="0.85" style="filter: blur(5px);"></circle>
+          <circle cx="157" cy="150" r="5" fill="#FFF4E0" style="filter: drop-shadow(0 0 12px #FFF4E0);"></circle>
+          <circle cx="182.9" cy="135" r="6" fill="#FFF4E0" style="filter: drop-shadow(0 0 6px #FFF4E0);"></circle>
+          <g transform="translate(142 124) rotate(-120)">
+            <line x1="-26" y1="4" x2="-13" y2="4" stroke="#FFF4E0" stroke-width="1.5" opacity="0.5"></line>
+            <line x1="-30" y1="-4" x2="-15" y2="-4" stroke="#FFF4E0" stroke-width="1.5" opacity="0.35"></line>
+            <g transform="scale(1.5 0.7)"><path d="M 12 0 L -8 7 L -4 0 L -8 -7 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 20px #FFF4E0);"></path></g>
+          </g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">T+70 · IMPULSE</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">E3 flash at the release point; the craft leaves along its nose — the tangent — stretched 1.5×/0.7. The orbit itself detaches and expands off the planet: the farewell ring, in AURORA. Camera kicks 6px along the exit line.</div></div>
+      </div>
+      <!-- F4 T+160 CONFIRM -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <text x="16" y="34" fill="#FFF4E0" font-family="Unbounded" font-weight="700" font-size="18" style="filter: drop-shadow(0 0 8px rgba(255,244,224,0.8));">1 287</text><text x="16" y="48" fill="#A9A3C9" font-family="Archivo" font-size="8" letter-spacing="1.5">M/S · +445</text>
+          <circle cx="105" cy="180" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.7"></circle>
+          <circle cx="105" cy="180" r="82" fill="none" stroke="#9D6BFF" stroke-width="1.5" opacity="0.22"></circle>
+          <circle cx="105" cy="180" r="90" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="40" opacity="0.8" style="filter: drop-shadow(0 0 10px #5FC88F);"></circle>
+          <circle cx="157" cy="150" r="26" fill="#FFF4E0" opacity="0.28" style="filter: blur(8px);"></circle>
+          <line x1="157" y1="150" x2="119.5" y2="85" stroke="#FFF4E0" stroke-width="2.5" opacity="0.5" stroke-linecap="round" style="filter: drop-shadow(0 0 4px rgba(255,244,224,0.6));"></line>
+          <text x="182.9" y="112" text-anchor="middle" fill="#FFF4E0" font-family="Unbounded" font-weight="900" font-size="17" style="filter: drop-shadow(0 0 10px rgba(255,244,224,0.9));">DEADEYE</text>
+          <circle cx="182.9" cy="135" r="6" fill="#FFF4E0" style="filter: drop-shadow(0 0 8px #FFF4E0) drop-shadow(0 0 18px #C8FFDF);"></circle>
+          <g transform="translate(119.5 85) rotate(-120)"><g transform="scale(1.2 0.85)"><path d="M 12 0 L -8 7 L -4 0 L -8 -7 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 18px #FFF4E0);"></path></g></g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">T+160 · CONFIRM</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The word blooms <em>at the dot that earned it</em> — the exact point the player has been staring at all orbit. Unused rings die instantly; the taken window stays lit. Velocity slams: digits pop 120%, and the value never lies.</div></div>
+      </div>
+      <!-- F5 T+260 RIDE -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <text x="16" y="34" fill="#EDEAF7" font-family="Unbounded" font-weight="700" font-size="15.5">1 287</text><text x="16" y="48" fill="#6F6893" font-family="Archivo" font-size="8" letter-spacing="1.5">M/S</text>
+          <circle cx="105" cy="180" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.6"></circle>
+          <circle cx="105" cy="180" r="98" fill="none" stroke="#9D6BFF" stroke-width="1" opacity="0.08"></circle>
+          <circle cx="105" cy="180" r="90" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="40" opacity="0.4" style="filter: drop-shadow(0 0 6px #5FC88F);"></circle>
+          <line x1="157" y1="150" x2="97" y2="46.1" stroke="#FFF4E0" stroke-width="2" opacity="0.35" stroke-linecap="round"></line>
+          <text x="182.9" y="112" text-anchor="middle" fill="#FFF4E0" font-family="Unbounded" font-weight="900" font-size="14" opacity="0.55" style="filter: drop-shadow(0 0 6px rgba(255,244,224,0.6));">DEADEYE</text>
+          <circle cx="182.9" cy="135" r="4.5" fill="#FFF4E0" opacity="0.6"></circle>
+          <g transform="translate(97 46.1) rotate(-120)"><g transform="scale(0.97 1.04)"><path d="M 12 0 L -8 7 L -4 0 L -8 -7 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 16px #FFF4E0);"></path></g></g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">T+260 · RIDE</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The word decays in place on the dot while the craft runs. Deformation recovers with one overshoot. The trail is a solid luminous line — motion blurs; breadcrumbs are gone.</div></div>
+      </div>
+      <!-- F6 T+400 SETTLED -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <text x="16" y="34" fill="#EDEAF7" font-family="Unbounded" font-weight="700" font-size="15.5">1 287</text><text x="16" y="48" fill="#6F6893" font-family="Archivo" font-size="8" letter-spacing="1.5">M/S</text>
+          <circle cx="105" cy="180" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.55"></circle>
+          <line x1="157" y1="150" x2="87" y2="28.8" stroke="#FFF4E0" stroke-width="1.5" opacity="0.2" stroke-linecap="round"></line>
+          <g transform="translate(87 28.8) rotate(-120)"><path d="M 12 0 L -8 7 L -4 0 L -8 -7 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 22px #FFF4E0) drop-shadow(0 0 38px rgba(255,244,224,0.7));"></path></g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">T+400 · SETTLED</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">Quiet again. The planet is spent grey, the word is gone, and the only permanent change is the true one: chain +1, so the craft's bloom is 4px wider than it was an orbit ago.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE REPLAY + DETAIL PANELS -->
+  <div style="display: grid; grid-template-columns: 460px 1fr; gap: 28px; align-items: stretch;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 24px 26px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">LIVE — THE FULL SWING, LOOPED</div>
+      <svg viewBox="0 0 340 420" width="100%" style="display: block; margin-top: 14px; background: #0A0814; border-radius: 10px;">
+        <g ref="{{camRef}}">
+          <circle cx="150" cy="250" r="140" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.1"></circle>
+          <circle ref="{{orbitRef}}" cx="150" cy="250" r="70" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.25"></circle>
+          <circle cx="150" cy="250" r="110" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.13"></circle>
+          <circle cx="150" cy="250" r="40" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.9"></circle>
+          <circle ref="{{arcRef}}" cx="150" cy="250" r="110" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="24 336" stroke-dashoffset="47" opacity="0.55"></circle>
+          <circle ref="{{fwRef}}" cx="150" cy="250" r="70" fill="none" stroke="#9D6BFF" stroke-width="2" opacity="0"></circle>
+          <line ref="{{trailRef}}" x1="0" y1="0" x2="0" y2="0" stroke="#FFF4E0" stroke-width="2" opacity="0" stroke-linecap="round"></line>
+          <line ref="{{handRef}}" x1="0" y1="0" x2="0" y2="0" stroke="#FFF4E0" stroke-width="1.25" opacity="0.35"></line>
+          <circle ref="{{ghostRef}}" cx="0" cy="0" r="3" fill="#FFF4E0" opacity="0"></circle>
+          <circle ref="{{dotRef}}" cx="240.1" cy="186.9" r="4.5" fill="#5FC88F" style="filter: drop-shadow(0 0 5px #5FC88F);"></circle>
+          <rect ref="{{dimRef}}" x="0" y="0" width="340" height="420" fill="#060510" opacity="0"></rect>
+          <circle ref="{{flashRef}}" cx="207.3" cy="209.8" r="10" fill="#FFF4E0" opacity="0" style="filter: blur(6px);"></circle>
+          <text ref="{{wordRef}}" x="240.1" y="164" text-anchor="middle" fill="#FFF4E0" font-family="Unbounded" font-weight="900" font-size="24" opacity="0" style="filter: drop-shadow(0 0 12px rgba(255,244,224,0.9));">DEADEYE</text>
+          <g ref="{{craftRef}}"><g ref="{{craftScaleRef}}"><path d="M 13 0 L -9 7.5 L -4.5 0 L -9 -7.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 18px #FFF4E0);"></path></g></g>
+        </g>
+        <text ref="{{velRef}}" x="22" y="46" fill="#EDEAF7" font-family="Unbounded" font-weight="700" font-size="24">842</text>
+        <text x="22" y="64" fill="#6F6893" font-family="Archivo" font-size="10" letter-spacing="2">M/S</text>
+      </svg>
+      <div style="font-size: 12.5px; line-height: 1.55; margin-top: 12px;">Orbit → match → hitstop → impulse → confirm, looped. Tweak <em>tier</em> to feel how CLEAN, SHAVED and DEADEYE differ — release offset, word scale and bloom only, never hue — and <em>playRate</em> to scrub it slow.</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 28px;">
+      <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 24px 26px; flex: 1;">
+        <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">CRAFT DEFORMATION — SQUASH ON THE TANGENT AXIS ONLY</div>
+        <svg viewBox="0 0 420 110" width="100%" style="display: block; margin-top: 14px;">
+          <g transform="translate(70 48)"><path d="M 18 0 L -12 10.5 L -6.75 0 L -12 -10.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 14px #FFF4E0);"></path><text y="42" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-size="10" letter-spacing="1">REST · 1.0 / 1.0</text></g>
+          <g transform="translate(210 48)"><g transform="scale(1.5 0.7)"><path d="M 18 0 L -12 10.5 L -6.75 0 L -12 -10.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 5px #FFF4E0) drop-shadow(0 0 20px #FFF4E0);"></path></g><text y="42" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-size="10" letter-spacing="1">T+70 · 1.5 / 0.7</text></g>
+          <g transform="translate(350 48)"><g transform="scale(0.95 1.06)"><path d="M 18 0 L -12 10.5 L -6.75 0 L -12 -10.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 14px #FFF4E0);"></path></g><text y="42" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-size="10" letter-spacing="1">T+220 · 0.95 / 1.06</text></g>
+        </svg>
+        <div style="font-size: 12.5px; line-height: 1.55; margin-top: 10px;">Stretch is always along the velocity vector, recovering in 180ms with one overshoot. The dart here is a stand-in silhouette — a signature, icon-worthy craft shape is queued as its own exploration once the system settles.</div>
+      </div>
+      <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 24px 26px; flex: 1;">
+        <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">CAMERA — A KICK, NEVER A SHAKE</div>
+        <svg viewBox="0 0 420 96" width="100%" style="display: block; margin-top: 14px;">
+          <rect x="10" y="16" width="120" height="66" rx="6" fill="none" stroke="#6C64A6" opacity="0.4"></rect>
+          <rect x="18" y="10" width="120" height="66" rx="6" fill="none" stroke="#FFF4E0" opacity="0.7" stroke-dasharray="4 4"></rect>
+          <line x1="66" y1="54" x2="82" y2="42" stroke="#FFF4E0" stroke-width="1.5" opacity="0.8" marker-end="none"></line>
+          <text x="200" y="38" fill="#A9A3C9" font-family="Archivo" font-size="12" font-weight="600">6px displacement along the exit tangent at T+70,</text>
+          <text x="200" y="56" fill="#A9A3C9" font-family="Archivo" font-size="12" font-weight="600">home in 180ms with one overshoot. Never rotational,</text>
+          <text x="200" y="74" fill="#A9A3C9" font-family="Archivo" font-size="12" font-weight="600">never random — the kick states the direction of travel.</text>
+        </svg>
+        <div style="font-size: 12.5px; line-height: 1.55; margin-top: 8px;">A shake says "damage." A directional kick says "departure." Aphelion has no damage — only commitment. The same kick, scaled to 3px, marks capture; its direction reverses (into the orbit), so even the camera distinguishes catching from letting go.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">03</span> HUD in five pressures &nbsp;·&nbsp; <span style="color: #A9A3C9;">04</span> the living baseline field &nbsp;·&nbsp; <span style="color: #A9A3C9;">05</span> award + callout system &nbsp;·&nbsp; <span style="color: #A9A3C9;">06</span> boundary as risk gradient &nbsp;·&nbsp; <span style="color: #A9A3C9;">07</span> daily front / results / leaderboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">08</span> three regions + zen subtraction</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;tier&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;DEADEYE&quot;, &quot;options&quot;: [&quot;DEADEYE&quot;, &quot;SHAVED&quot;, &quot;CLEAN&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Live loop&quot;, &quot;description&quot;: &quot;Award tier — changes release offset, word scale and bloom, never hue&quot;},
+  &quot;playRate&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 1, &quot;min&quot;: 0.15, &quot;max&quot;: 1.5, &quot;step&quot;: 0.05, &quot;unit&quot;: &quot;×&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Live loop&quot;},
+  &quot;hitstopMs&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 70, &quot;min&quot;: 30, &quot;max&quot;: 140, &quot;step&quot;: 10, &quot;unit&quot;: &quot;ms&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Live loop&quot;, &quot;description&quot;: &quot;World-freeze length at release&quot;}
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    ['camRef','orbitRef','arcRef','fwRef','trailRef','handRef','ghostRef','dotRef','dimRef','flashRef','wordRef','craftRef','craftScaleRef','velRef'].forEach(k => { this[k] = React.createRef(); });
+    this._raf = null; this._t = 0; this._last = null;
+  }
+  tierCfg() {
+    const t = this.props.tier ?? 'DEADEYE';
+    if (t === 'CLEAN') return { off: 10, word: 'CLEAN', size: 15, w: 500, vel: '988', flash: 0.55 };
+    if (t === 'SHAVED') return { off: 4.5, word: 'SHAVED', size: 19, w: 700, vel: '1 104', flash: 0.8 };
+    return { off: 0, word: 'DEADEYE', size: 24, w: 900, vel: '1 287', flash: 1 };
+  }
+  componentDidMount() {
+    const C = { x: 150, y: 250 }, R = 70, RING = 110, DOTA = -35;
+    const rad = d => d * Math.PI / 180;
+    const loop = (ts) => {
+      this._raf = requestAnimationFrame(loop);
+      if (this._last == null) { this._last = ts; return; }
+      const dt = Math.min(0.05, (ts - this._last) / 1000) * (this.props.playRate ?? 1);
+      this._last = ts;
+      const cfg = this.tierCfg();
+      const T1 = 1.3, T2 = (this.props.hitstopMs ?? 70) / 1000, T3 = 0.75, T4 = 0.45, TT = T1 + T2 + T3 + T4;
+      this._t = (this._t + dt) % TT;
+      const t = this._t;
+      const endA = DOTA + cfg.off;
+      const els = ['orbitRef','arcRef','fwRef','trailRef','handRef','ghostRef','dotRef','dimRef','flashRef','wordRef','craftRef','craftScaleRef','velRef'].map(k => this[k].current);
+      if (els.some(e => !e)) return;
+      const [orbit, arc, fw, trail, hand, ghost, dot, dim, flash, word, craft, cs, vel] = els;
+      const setCraft = (x, y, ang, sx, sy) => { craft.setAttribute('transform', 'translate(' + x + ' ' + y + ') rotate(' + ang + ')'); cs.setAttribute('transform', 'scale(' + sx + ' ' + sy + ')'); };
+      const posAt = A => ({ x: C.x + R * Math.cos(rad(A)), y: C.y + R * Math.sin(rad(A)) });
+      const P = posAt(endA);
+      const exitAng = endA - 90;
+      const ex = Math.sin(rad(endA)), ey = -Math.cos(rad(endA));
+      const drawHand = (A, heat) => {
+        const p = posAt(A);
+        hand.setAttribute('x1', p.x); hand.setAttribute('y1', p.y);
+        hand.setAttribute('x2', C.x + 134 * Math.cos(rad(A))); hand.setAttribute('y2', C.y + 134 * Math.sin(rad(A)));
+        hand.setAttribute('stroke-width', (1.25 + 1.8 * heat).toFixed(2));
+        hand.style.opacity = (0.35 + 0.6 * heat).toFixed(2);
+        ghost.setAttribute('cx', C.x + RING * Math.cos(rad(A))); ghost.setAttribute('cy', C.y + RING * Math.sin(rad(A)));
+        ghost.style.opacity = (0.25 + 0.75 * heat).toFixed(2);
+        ghost.setAttribute('r', (3 + 2 * heat).toFixed(2));
+        arc.style.opacity = (0.55 + 0.45 * heat).toFixed(2);
+        arc.style.filter = heat > 0.05 ? 'drop-shadow(0 0 ' + (3 + 10 * heat).toFixed(1) + 'px #5FC88F)' : 'none';
+        dot.setAttribute('r', (4.5 + 3 * heat).toFixed(2));
+        dot.style.fill = heat > 0.93 ? '#FFF4E0' : '#5FC88F';
+        dot.style.filter = 'drop-shadow(0 0 ' + (5 + 8 * heat).toFixed(1) + 'px ' + (heat > 0.93 ? '#FFF4E0' : '#5FC88F') + ')';
+        return p;
+      };
+      if (t < T1) { // orbit
+        const u = t / T1;
+        const A = 90 - (90 - endA) * u;
+        const heat = Math.max(0, 1 - Math.abs(A - endA) / 40);
+        const p = drawHand(A, heat);
+        setCraft(p.x, p.y, A - 90, 1, 1);
+        dim.style.opacity = 0; flash.style.opacity = 0; word.style.opacity = 0; fw.style.opacity = 0; trail.style.opacity = 0;
+        orbit.style.opacity = 0.25;
+        vel.textContent = '842'; vel.style.fill = '#EDEAF7'; vel.style.fontSize = '24px';
+      } else if (t < T1 + T2) { // hitstop
+        drawHand(endA, 1);
+        setCraft(P.x, P.y, endA - 90, 1, 1);
+        dim.style.opacity = 0.55;
+      } else if (t < T1 + T2 + T3) { // flight
+        const u = (t - T1 - T2) / T3;
+        const e = 1 - Math.pow(1 - u, 2.2);
+        const d = 265 * e;
+        const x = P.x + ex * d, y = P.y + ey * d;
+        dim.style.opacity = Math.max(0, 0.55 - u * 4);
+        const fl = Math.max(0, 1 - u * 2.6);
+        flash.setAttribute('cx', P.x); flash.setAttribute('cy', P.y);
+        flash.style.opacity = (fl * cfg.flash).toFixed(3);
+        flash.setAttribute('r', (10 + 40 * Math.min(1, u * 2.6)).toFixed(1));
+        fw.style.opacity = Math.max(0, 0.5 - u * 0.7).toFixed(2);
+        fw.setAttribute('r', (70 + 50 * e).toFixed(1));
+        const sq = Math.max(0, 1 - u * 3);
+        setCraft(x, y, exitAng, 1 + 0.5 * sq, 1 - 0.3 * sq);
+        trail.setAttribute('x1', P.x); trail.setAttribute('y1', P.y);
+        trail.setAttribute('x2', x); trail.setAttribute('y2', y);
+        trail.style.opacity = (0.45 * (1 - u * 0.6)).toFixed(2);
+        hand.style.opacity = Math.max(0, 0.9 - u * 2);
+        ghost.style.opacity = 0;
+        word.textContent = cfg.word;
+        word.setAttribute('font-size', cfg.size);
+        word.setAttribute('font-weight', cfg.w);
+        const pop = u < 0.12 ? (0.85 + 2 * u) : 1;
+        word.setAttribute('transform', 'translate(240.1 164) scale(' + pop.toFixed(3) + ') translate(-240.1 -164)');
+        word.style.opacity = u < 0.7 ? Math.min(1, u * 9).toFixed(2) : Math.max(0, 1 - (u - 0.7) * 3.3).toFixed(2);
+        arc.style.opacity = Math.max(0.3, 1 - u * 0.8);
+        vel.textContent = cfg.vel;
+        vel.style.fill = u < 0.3 ? '#FFF4E0' : '#EDEAF7';
+        vel.style.fontSize = (u < 0.3 ? 29 - u * 16 : 24) + 'px';
+      } else { // settle + respawn
+        const u = (t - T1 - T2 - T3) / T4;
+        flash.style.opacity = 0; word.style.opacity = 0; fw.style.opacity = 0;
+        trail.style.opacity = Math.max(0, 0.2 - u * 0.4);
+        arc.style.opacity = Math.max(0, 0.3 - u * 0.6);
+        dot.style.fill = '#5FC88F'; dot.setAttribute('r', 4.5);
+        const p0 = posAt(90);
+        drawHand(90, 0);
+        hand.style.opacity = (u * 0.35).toFixed(2);
+        ghost.style.opacity = 0;
+        setCraft(p0.x, p0.y, 0, 1, 1);
+        craft.style.opacity = u.toFixed(2);
+        vel.textContent = '842';
+      }
+      if (t >= T4 && craft.style.opacity !== '1') craft.style.opacity = 1;
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); }
+  renderVals() {
+    const v = {};
+    ['camRef','orbitRef','arcRef','fwRef','trailRef','handRef','ghostRef','dotRef','dimRef','flashRef','wordRef','craftRef','craftScaleRef','velRef'].forEach(k => { v[k] = this[k]; });
+    return v;
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 05 &nbsp;·&nbsp; THE LIVING BASELINE FIELD</div>
+      <div style="font-family: 'Anton', sans-serif; font-size: 54px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; letter-spacing: 0.02em; text-shadow: 0 0 34px rgba(255,244,224,0.28);">YOU CLIMB THROUGH<br>A MEDIUM, NOT PAST<br>A BACKDROP.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">The Geometry Wars grid is loved for a quality, not a shape: <span style="color: #EDEAF7; font-weight: 600;">a continuous medium that bends around mass and reacts to the player</span>. The shape can't come with us — a grid is a floor plane. The quality can. Aphelion's field is made of <span style="color: #EDEAF7; font-weight: 600;">altitude rungs</span>: horizontal strata hung across the world every 25m, perpendicular to travel — a ladder, not a floor. They bow toward every mass, part around the craft, and sweep past as you climb, so speed, gravity, and your own passage are all visible in the one system.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE TRIBUTE, EARNED — WHAT TRANSLATES, WHAT DIES</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #6F6893;">Mesh carpet under the world</span> → <span style="color: #EDEAF7;">rungs across it.</span> Horizontal lines perpendicular to travel imply no floor and no horizon.</div>
+        <div><span style="color: #6F6893;">Mesh deformation</span> → <span style="color: #EDEAF7;">gravity bow.</span> Rungs sag toward every body — real equipotential behaviour, and the tide (Direction 04) is its close-up.</div>
+        <div><span style="color: #6F6893;">Ripples radiating from action</span> → <span style="color: #EDEAF7;">the wake.</span> Rungs part around the craft and relax behind it. Nothing radiates; radiation implies a point of view.</div>
+        <div><span style="color: #6F6893;">Parallax star layers</span> → <span style="color: #EDEAF7;">refused entirely.</span> Layers at different speeds are implied depth. Everything in the field moves at world speed; dust varies in brightness, never in velocity.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE DEMO + LAYERS -->
+  <div style="display: grid; grid-template-columns: 460px 1fr; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 24px 26px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">LIVE — THE FIELD IN MOTION</div>
+      <canvas ref="{{canvasRef}}" width="820" height="1240" style="width: 100%; display: block; margin-top: 14px; border-radius: 10px; background: #0A0814;"></canvas>
+      <div style="font-size: 12.5px; line-height: 1.55; margin-top: 12px;">Rungs sweep past as you climb — each one a real altitude, every 5th carrying its address (the same numbers the planets wear). They bow toward the planet, part around the craft, and dust falls in strict parallel at world speed. Tweak <em>gravityBend</em>, <em>wake</em>, and <em>climbSpeed</em>.</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 28px;">
+      <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+        <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">WHAT THE RUNGS DO — THREE JOBS, ONE SYSTEM</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; margin-top: 16px; font-size: 13px; line-height: 1.6;">
+          <div><div style="color: #EDEAF7; font-weight: 700; margin-bottom: 6px;">SPEED, FELT</div>The trail says where you've been; the rungs say how fast the world is passing. At high velocity they streak; hanging at an orbit's apex they barely drift. The dotted-breadcrumb problem dies here — motion is read from the world, not sampled from the path.</div>
+          <div><div style="color: #EDEAF7; font-weight: 700; margin-bottom: 6px;">GRAVITY, DRAWN</div>Every body bows the rungs toward itself, radius scaled by mass — the field states which planets pull hardest before you ever press. Heavy bodies announce themselves at a distance; the tide is this same statement at the rim.</div>
+          <div><div style="color: #EDEAF7; font-weight: 700; margin-bottom: 6px;">ALTITUDE, ADDRESSED</div>Every 5th rung carries its altitude number, utility-face, E0-quiet. The field is a ruler you climb: banked score has a visible geography, "died at 23" has a place, and the results sheet's route recap maps straight back onto the world. And the rule generalizes: rungs are <em>level sets of progress</em>, perpendicular to intended travel — horizontal in the vertical field, radial ticks on a ring course. Authored corridors of any shape inherit the whole field grammar unchanged.</div>
+        </div>
+      </div>
+      <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px; flex: 1;">
+        <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE STACK — EVERYTHING AT WORLD SPEED</div>
+        <div style="display: flex; flex-direction: column; gap: 0; margin-top: 16px;">
+          <div style="display: grid; grid-template-columns: 130px 1fr 210px; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 12.5px; align-items: baseline;"><div style="color: #EDEAF7; font-weight: 700;">SKY</div><div>VOID, with a slow altitude ramp: the violet-black warms almost imperceptibly toward AURORA as an anomaly approaches — weather on the horizon, never spent early. Outside that, the sky changes only by region.</div><div style="color: #6F6893;">static · tint ≤ 6% outside anomaly</div></div>
+          <div style="display: grid; grid-template-columns: 130px 1fr 210px; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 12.5px; align-items: baseline;"><div style="color: #EDEAF7; font-weight: 700;">DUST</div><div>Sparse motes, strictly parallel fall, brightness varied (α .1–.3), velocity identical to the rungs. Density rises gently with chain level — a hot run flies through a livelier field.</div><div style="color: #6F6893;">world speed · E0</div></div>
+          <div style="display: grid; grid-template-columns: 130px 1fr 210px; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 12.5px; align-items: baseline;"><div style="color: #EDEAF7; font-weight: 700;">STRATA</div><div>The rungs: DUSK α .16, addressed every 5th at α .28. Gravity bow toward bodies; wake parting around the craft, relaxing in ~400ms behind it.</div><div style="color: #6F6893;">world speed · E0, bow ≤ 30px</div></div>
+          <div style="display: grid; grid-template-columns: 130px 1fr 210px; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 12.5px; align-items: baseline;"><div style="color: #EDEAF7; font-weight: 700;">BODIES</div><div>The planet language (Direction 04): rims, tides, strata, glyph cores.</div><div style="color: #6F6893;">world speed · E0–E2</div></div>
+          <div style="display: grid; grid-template-columns: 130px 1fr 210px; gap: 16px; padding: 10px 0; font-size: 12.5px; align-items: baseline;"><div style="color: #EDEAF7; font-weight: 700;">PLAYER</div><div>Craft, solid trail, compass, deadline track. The only E3 lives here.</div><div style="color: #6F6893;">world speed · E2–E3</div></div>
+        </div>
+        <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(140,130,190,0.15); font-size: 13px; line-height: 1.6;">One flat world, five kinds of light. Depth cues — parallax, scale drift, blur-by-distance — are banned in all five. The anomaly keeps its crown: it is the only event allowed to repaint the sky, and the baseline's restraint is what keeps it rare.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">06</span> award + callout system &nbsp;·&nbsp; <span style="color: #A9A3C9;">07</span> boundary as risk gradient &nbsp;·&nbsp; <span style="color: #A9A3C9;">08</span> daily front / results / leaderboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">09</span> three regions + zen subtraction</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;gravityBend&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 24, &quot;min&quot;: 0, &quot;max&quot;: 44, &quot;step&quot;: 2, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Field&quot;, &quot;description&quot;: &quot;How far rungs sag toward a body&quot;},
+  &quot;wake&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 16, &quot;min&quot;: 0, &quot;max&quot;: 34, &quot;step&quot;: 2, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Field&quot;, &quot;description&quot;: &quot;How far rungs part around the craft&quot;},
+  &quot;climbSpeed&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 46, &quot;min&quot;: 10, &quot;max&quot;: 140, &quot;step&quot;: 4, &quot;unit&quot;: &quot;px/s&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Field&quot;},
+  &quot;streakGain&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 1, &quot;min&quot;: 0, &quot;max&quot;: 3, &quot;step&quot;: 0.25, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Field&quot;, &quot;description&quot;: &quot;Long-exposure dust streaking — velocity as streak length, never as layer speed&quot;}
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.canvasRef = React.createRef();
+    this._raf = null; this._scroll = 0; this._last = null;
+    this._motes = Array.from({ length: 16 }, (_, i) => ({ x: 23 + (i * 137) % 380, y: (i * 211) % 610, a: 0.1 + (i % 5) * 0.05 }));
+  }
+  componentDidMount() {
+    const cv = this.canvasRef.current;
+    const ctx = cv.getContext('2d');
+    const W = 410, H = 620, S = 2;
+    const planet = { x: 205, y: 250, r: 58 };
+    const craft = { x: 205, y: 480 };
+    const loop = (ts) => {
+      this._raf = requestAnimationFrame(loop);
+      if (this._last == null) { this._last = ts; return; }
+      const dt = Math.min(0.05, (ts - this._last) / 1000);
+      this._last = ts;
+      const speed = this.props.climbSpeed ?? 46;
+      const G = this.props.gravityBend ?? 24;
+      const WAKE = this.props.wake ?? 16;
+      this._scroll += speed * dt;
+      ctx.setTransform(S, 0, 0, S, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0A0814'; ctx.fillRect(0, 0, W, H);
+      // dust — world speed, parallel
+      ctx.shadowBlur = 0;
+      this._motes.forEach(m => {
+        m.y += speed * dt;
+        if (m.y > H + 8) { m.y = -8; }
+        ctx.strokeStyle = 'rgba(169,163,201,' + m.a + ')';
+        ctx.lineWidth = 1;
+        const sg = this.props.streakGain ?? 1;
+        const len = Math.min(64, speed * 0.09 * sg * sg);
+        ctx.strokeStyle = 'rgba(169,163,201,' + (m.a * Math.max(0.45, 1 - len / 90)) + ')';
+        ctx.beginPath(); ctx.moveTo(m.x, m.y - len); ctx.lineTo(m.x, m.y); ctx.stroke();
+      });
+      // rungs
+      const SP = 46;
+      const k0 = Math.ceil(this._scroll / SP), k1 = Math.floor((this._scroll + H) / SP);
+      for (let k = k0; k <= k1; k++) {
+        const baseY = H - (k * SP - this._scroll);
+        const addressed = k % 5 === 0;
+        ctx.strokeStyle = addressed ? 'rgba(108,100,166,0.34)' : 'rgba(108,100,166,0.17)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x <= W; x += 10) {
+          let px = x, py = baseY;
+          let dx = planet.x - px, dy = planet.y - py;
+          let d = Math.hypot(dx, dy);
+          let m = Math.min(30, (G * 90) / (d + 26)) * Math.exp(-d / 150);
+          px += (dx / (d || 1)) * m; py += (dy / (d || 1)) * m;
+          dx = px - craft.x; dy = py - craft.y;
+          d = Math.hypot(dx, dy);
+          const w = WAKE * Math.exp(-d / 34);
+          px += (dx / (d || 1)) * w; py += (dy / (d || 1)) * w;
+          if (x === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        if (addressed) {
+          ctx.fillStyle = 'rgba(111,104,147,0.75)';
+          ctx.font = '600 9px Archivo, sans-serif';
+          ctx.fillText(String(k * 25), 8, baseY - 5);
+        }
+      }
+      // planet — rim + strata + core + tide toward craft
+      ctx.fillStyle = '#100C20';
+      ctx.beginPath(); ctx.arc(planet.x, planet.y, planet.r, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(95,200,143,0.8)'; ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(95,200,143,0.7)'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(planet.x, planet.y, planet.r, 0, 7); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(95,200,143,0.16)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(planet.x, planet.y, planet.r * 0.68, 0, 7); ctx.stroke();
+      ctx.fillStyle = 'rgba(95,200,143,0.5)';
+      ctx.beginPath(); ctx.arc(planet.x, planet.y, 5, 0, 7); ctx.fill();
+      const ta = Math.atan2(craft.y - planet.y, craft.x - planet.x);
+      ctx.strokeStyle = '#C8FFDF'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.shadowColor = '#5FC88F'; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(planet.x, planet.y, planet.r, ta - 0.3, ta + 0.3); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // craft — trail + dart, brightest
+      ctx.strokeStyle = 'rgba(255,244,224,0.4)'; ctx.lineWidth = 2.5;
+      ctx.shadowColor = 'rgba(255,244,224,0.5)'; ctx.shadowBlur = 4;
+      ctx.beginPath(); ctx.moveTo(craft.x, craft.y + 14); ctx.lineTo(craft.x, craft.y + 110); ctx.stroke();
+      ctx.fillStyle = '#FFF4E0';
+      ctx.shadowColor = '#FFF4E0'; ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.moveTo(craft.x, craft.y - 14);
+      ctx.lineTo(craft.x - 8, craft.y + 10);
+      ctx.lineTo(craft.x, craft.y + 5);
+      ctx.lineTo(craft.x + 8, craft.y + 10);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); }
+  renderVals() { return { canvasRef: this.canvasRef }; }
+}
+</script>
+</body>
+</html>

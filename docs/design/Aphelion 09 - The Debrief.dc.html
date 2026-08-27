@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+  @keyframes blink { 0%, 60% { opacity: 1; } 61%, 100% { opacity: 0; } }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 09 &nbsp;·&nbsp; THE DEBRIEF — REV 2</div>
+      <div style="font-family: 'Anton', sans-serif; font-size: 54px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; letter-spacing: 0.02em; text-shadow: 0 0 34px rgba(255,244,224,0.28);">A CARD OVER THE CRASH SITE.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">The debrief is a <span style="color: #EDEAF7; font-weight: 600;">translucent modal floating over the living field</span> — the place you died stays visible and animate behind it: embers settling, the boundary still breathing, your bank ring planted at the death altitude. The card itself speaks pure arcade: sharp corners, double rule, dot-leader tallies, a headline number in display type, and a <span style="color: #EDEAF7; font-weight: 600;">blinking verb</span> — the insert-coin cadence. It snaps in over two frames. Arcade cabinets cut; they do not fade.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE SEQUENCE — 1.6s, THEN THE BLINK</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #EDEAF7; font-weight: 600;">0.0s</span> — burn-up completes (Direction 07). The field stays fully alive; no dimming yet. Silence after the last SOS strobe.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">0.8s</span> — the card <span style="color: #EDEAF7;">snaps in</span> (2 frames, no fade, no slide). Field dims to 65% behind it only through the card's own translucency.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">0.9–1.4s</span> — tally rows land top to bottom, one per ~120ms, each with a tick. Arcade scoreboards count; they don't fade in.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">1.6s</span> — the verb starts blinking at 1Hz and the game is listening: <span style="color: #EDEAF7; font-weight: 600;">tap anywhere = primary verb, hold = secondary.</span> No buttons. Press, hold, release is the entire control scheme, even here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOCKUPS -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 30px 34px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE CARD — INFINITE DEATH, DAILY DEATH · FIELD ALIVE BEHIND BOTH</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 24px; margin-top: 20px;">
+
+      <!-- INFINITE DEATH -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 330 716" style="background: #0A0814; border-radius: 12px; width: 100%; display: block;">
+          <!-- living field behind -->
+          <g opacity="0.5"><line x1="0" y1="130" x2="330" y2="130" stroke="#6C64A6" stroke-width="1" opacity="0.3"></line><line x1="0" y1="270" x2="330" y2="270" stroke="#6C64A6" stroke-width="1" opacity="0.2"></line><line x1="0" y1="410" x2="330" y2="410" stroke="#6C64A6" stroke-width="1" opacity="0.3"></line><line x1="0" y1="550" x2="330" y2="550" stroke="#6C64A6" stroke-width="1" opacity="0.2"></line><text x="8" y="124" fill="#6F6893" font-family="Archivo" font-size="8" letter-spacing="1">27</text></g>
+          <circle cx="66" cy="200" r="30" fill="#0D0A1C" stroke="#6C64A6" stroke-width="1.25" opacity="0.8"></circle>
+          <circle cx="250" cy="560" r="38" fill="#0D0A1C" stroke="#6C64A6" stroke-width="1.25" opacity="0.7"></circle>
+          <line x1="324" y1="0" x2="324" y2="716" stroke="#FF5FA2" stroke-width="2" opacity="0.65" style="filter: drop-shadow(0 0 7px #FF5FA2);"></line>
+          <line x1="140" y1="180" x2="268" y2="92" stroke="#FFF4E0" stroke-width="1.5" opacity="0.2" stroke-linecap="round"></line>
+          <circle cx="276" cy="88" r="2" fill="#FF5FA2" opacity="0.8"></circle>
+          <circle cx="262" cy="102" r="1.6" fill="#FF5FA2" opacity="0.6"></circle>
+          <circle cx="247" cy="112" r="1.4" fill="#FF5FA2" opacity="0.4"></circle>
+          <g transform="translate(287 76)"><circle r="15" fill="none" stroke="#6C64A6" stroke-width="1.5" opacity="0.9"></circle><text y="3" text-anchor="middle" fill="#A9A3C9" font-family="Archivo" font-weight="700" font-size="7.5" letter-spacing="0.5">1 240</text></g>
+          <!-- modal -->
+          <g>
+            <rect x="26" y="216" width="278" height="316" fill="#060510" opacity="0.82"></rect>
+            <rect x="26" y="216" width="278" height="316" fill="none" stroke="#6C64A6" stroke-width="2"></rect>
+            <rect x="31" y="221" width="268" height="306" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.35"></rect>
+            <rect x="26" y="216" width="278" height="26" fill="#6C64A6" opacity="0.18"></rect>
+            <text x="165" y="233" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-weight="700" font-size="9" letter-spacing="3">FLIGHT LOG · RUN 4021</text>
+            <text x="165" y="296" text-anchor="middle" fill="#FFC94A" font-family="Anton" font-size="40" letter-spacing="1" style="filter: drop-shadow(0 0 10px rgba(255,201,74,0.5));">+9 780</text>
+            <text x="165" y="314" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-weight="600" font-size="8.5" letter-spacing="2">CASHED · KEPT</text>
+            <text x="165" y="345" text-anchor="middle" fill="#EDEAF7" font-family="Archivo" font-weight="800" font-size="11.5" letter-spacing="1">LEFT THE FIELD AT THE RIGHT WALL</text>
+            <text x="165" y="362" text-anchor="middle" fill="#FF5FA2" font-family="Archivo" font-weight="800" font-size="10.5" letter-spacing="2">· ON FIRE · 1 240 STAYS AT 27 ·</text>
+            <g font-family="Archivo" font-size="10" letter-spacing="1">
+              <text x="52" y="400" fill="#A9A3C9">BEST CHAIN</text><text x="165" y="400" fill="#6C64A6" opacity="0.6">··········</text><text x="278" y="400" fill="#EDEAF7" text-anchor="end" font-weight="800">×11</text>
+              <text x="52" y="424" fill="#A9A3C9">PERFECT STREAK</text><text x="185" y="424" fill="#6C64A6" opacity="0.6">······</text><text x="278" y="424" fill="#FFC94A" text-anchor="end" font-weight="800">×4</text>
+              <text x="52" y="448" fill="#A9A3C9">TOP VELOCITY</text><text x="172" y="448" fill="#6C64A6" opacity="0.6">·······</text><text x="278" y="448" fill="#EDEAF7" text-anchor="end" font-weight="800">1 458</text>
+            </g>
+            <line x1="52" y1="470" x2="278" y2="470" stroke="#6C64A6" stroke-width="1" opacity="0.4"></line>
+            <text x="165" y="498" text-anchor="middle" fill="#FFF4E0" font-family="Archivo" font-weight="800" font-size="12" letter-spacing="3" style="animation: blink 1.1s steps(1) infinite;">TAP TO FLY AGAIN</text>
+            <text x="165" y="516" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-weight="600" font-size="8.5" letter-spacing="2">HOLD TO SHARE</text>
+          </g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">INFINITE — THE TALLY</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">Cashed score is the headline in SOLAR display type. Behind the card, the death is still there: ember trail, and the carried 1 240 planted as a ring at altitude 27 — visible <em>around</em> the modal, not listed in it. The blink is the invitation.</div></div>
+      </div>
+
+      <!-- DAILY DEATH -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 330 716" style="background: #0A0814; border-radius: 12px; width: 100%; display: block;">
+          <g opacity="0.5"><line x1="0" y1="110" x2="330" y2="110" stroke="#6C64A6" stroke-width="1" opacity="0.3"></line><line x1="0" y1="250" x2="330" y2="250" stroke="#6C64A6" stroke-width="1" opacity="0.2"></line><line x1="0" y1="390" x2="330" y2="390" stroke="#6C64A6" stroke-width="1" opacity="0.3"></line><line x1="0" y1="530" x2="330" y2="530" stroke="#6C64A6" stroke-width="1" opacity="0.2"></line><text x="8" y="104" fill="#6F6893" font-family="Archivo" font-size="8" letter-spacing="1">23</text></g>
+          <circle cx="235" cy="150" r="42" fill="#0D0A1C" stroke="#43CDA8" stroke-width="1.5" opacity="0.85"></circle>
+          <circle cx="235" cy="150" r="42" fill="none" stroke="#43CDA8" stroke-width="0.75" opacity="0.3" transform="scale(0.72) translate(91 58)"></circle>
+          <circle cx="70" cy="480" r="30" fill="#0D0A1C" stroke="#6C64A6" stroke-width="1.25" opacity="0.7"></circle>
+          <line x1="120" y1="260" x2="205" y2="185" stroke="#FFF4E0" stroke-width="1.5" opacity="0.2" stroke-linecap="round"></line>
+          <circle cx="212" cy="179" r="2" fill="#FF5FA2" opacity="0.7"></circle>
+          <circle cx="200" cy="192" r="1.5" fill="#FF5FA2" opacity="0.5"></circle>
+          <g transform="translate(185 205)"><circle r="15" fill="none" stroke="#6C64A6" stroke-width="1.5" opacity="0.8" stroke-dasharray="3 4"></circle><text y="3" text-anchor="middle" fill="#6C64A6" font-family="Archivo" font-weight="700" font-size="6.5" letter-spacing="0.5">12 450</text></g>
+          <!-- modal -->
+          <g>
+            <rect x="26" y="246" width="278" height="316" fill="#060510" opacity="0.82"></rect>
+            <rect x="26" y="246" width="278" height="316" fill="none" stroke="#FF5FA2" stroke-width="2" opacity="0.7"></rect>
+            <rect x="31" y="251" width="268" height="306" fill="none" stroke="#FF5FA2" stroke-width="1" opacity="0.25"></rect>
+            <rect x="26" y="246" width="278" height="26" fill="#FF5FA2" opacity="0.14"></rect>
+            <text x="165" y="263" text-anchor="middle" fill="#FF5FA2" font-family="Archivo" font-weight="700" font-size="9" letter-spacing="3" opacity="0.9">DAY 214 · ONE RUN · SPENT</text>
+            <text x="165" y="326" text-anchor="middle" fill="#6C64A6" font-family="Anton" font-size="40" letter-spacing="1">12 450</text>
+            <text x="165" y="344" text-anchor="middle" fill="#FF5FA2" font-family="Archivo" font-weight="600" font-size="8.5" letter-spacing="2" opacity="0.9">STAYS AT 23 · THE FIELD KEEPS THE WAGER</text>
+            <text x="165" y="375" text-anchor="middle" fill="#EDEAF7" font-family="Archivo" font-weight="800" font-size="11.5" letter-spacing="1">FELL INTO THE JADE ONE AT 23</text>
+            <text x="165" y="392" text-anchor="middle" fill="#FF5FA2" font-family="Archivo" font-weight="800" font-size="10.5" letter-spacing="2">· CHAIN ×11 WENT WITH YOU ·</text>
+            <g font-family="Archivo" font-size="10" letter-spacing="1">
+              <text x="52" y="430" fill="#A9A3C9">REACHED</text><text x="145" y="430" fill="#6C64A6" opacity="0.6">·········</text><text x="278" y="430" fill="#EDEAF7" text-anchor="end" font-weight="800">23 OF 40</text>
+              <text x="52" y="454" fill="#A9A3C9">PERFECT STREAK</text><text x="185" y="454" fill="#6C64A6" opacity="0.6">······</text><text x="278" y="454" fill="#FFC94A" text-anchor="end" font-weight="800">×3</text>
+              <text x="52" y="478" fill="#A9A3C9">FRIENDS PAST 23</text><text x="188" y="478" fill="#6C64A6" opacity="0.6">·····</text><text x="278" y="478" fill="#EDEAF7" text-anchor="end" font-weight="800">2 OF 9</text>
+            </g>
+            <line x1="52" y1="500" x2="278" y2="500" stroke="#FF5FA2" stroke-width="1" opacity="0.3"></line>
+            <text x="165" y="528" text-anchor="middle" fill="#FFF4E0" font-family="Archivo" font-weight="800" font-size="12" letter-spacing="3" style="animation: blink 1.1s steps(1) infinite;">TAP TO SHARE THE EPITAPH</text>
+            <text x="165" y="546" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-weight="600" font-size="8.5" letter-spacing="2">FIELD RESEEDS IN 6H 12M · HOLD FOR STANDINGS</text>
+          </g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">DAILY — THE WAGER, LOST</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The card borders in ION — the one debrief that cost something. The number renders in DUSK (spent, like a taken planet), the jade planet that killed you is right there behind the glass, and the hollow-dashed bank ring hangs beside the modal. No retry exists, so the blinking verb is SHARE and the reseed countdown converts grief into appetite.</div></div>
+      </div>
+
+      <!-- ANATOMY -->
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="background: #0A0814; border-radius: 10px; padding: 20px 24px;">
+          <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE GLASS — WHY TRANSLUCENT, WHY SHARP</div>
+          <div style="margin-top: 12px; font-size: 13px; line-height: 1.6;">82% VOID over the living field: the crash site stays visible and moving behind the card, because death is a <em>place</em> and the card is parked on it. The frame is a double rule with square corners — the one rectangle in a game of circles and arcs. The world is orbital; the scoreboard is a machine. That contrast is the retro register, earned structurally rather than pasted on with scanlines.</div>
+        </div>
+        <div style="background: #0A0814; border-radius: 10px; padding: 20px 24px;">
+          <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE TALLY — DOT LEADERS, TICKED IN</div>
+          <div style="margin-top: 12px; font-size: 13px; line-height: 1.6;">Three rows, dot leaders, values right-flush in 800 weight — the arcade high-score table's grammar. Rows land one per ~120ms with a tick; numbers slam in whole (arcade boards count, they never fade). The headline number is the mode's verdict: SOLAR for what you kept (Infinite), DUSK for what the field kept (Daily). The debrief line keeps its grammar: cause + place + one number, machine-assembled, one dry pink clause.</div>
+        </div>
+        <div style="background: #0A0814; border-radius: 10px; padding: 20px 24px;">
+          <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE BLINK — ONE INPUT, EVEN HERE</div>
+          <div style="margin-top: 12px; font-size: 13px; line-height: 1.6;">No buttons on the card. <span style="color: #EDEAF7; font-weight: 600;">Tap anywhere = the blinking verb; hold = the quiet one under it.</span> Press, hold, release survives as the entire interface — menus included. The blink runs at 1Hz on a steps() cadence (on 60%, off 40%): the insert-coin rhythm, the oldest "your move" signal in the arcade. Nothing else on the card ever animates after the tally lands; the blink owns the silence.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">10</span> the results sheet — victory as a share artifact &nbsp;·&nbsp; <span style="color: #A9A3C9;">11</span> daily front + leaderboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">12</span> adventure regions + zen</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 12 &nbsp;·&nbsp; THE FINISH LINE</div>
+      <div style="font-family: 'Anton', sans-serif; font-size: 54px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; letter-spacing: 0.02em; text-shadow: 0 0 34px rgba(255,244,224,0.28);">THE CARPET<br>TAKES YOU HOME.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">The finish is the boundary's mirror. The pink edge is the end that kills; the green line is the end that saves — <span style="color: #EDEAF7; font-weight: 600;">same grammar, band + line + gradient, opposite verdict</span>. Half a screen below the checkered line begins the <span style="color: #7FE0A8; font-weight: 600;">safety carpet</span>: cross into it and the run is mathematically over — gravity lets go, the carpet lift blends your velocity into its own, opens the throttle halfway up, and throws you up past the top of the screen. FINISH! bubbles at the line like every other callout. The game's most dangerous instrument gets a twin that only ever says yes.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE LAW AMENDMENT — GREEN IS SANCTUARY</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #7FE0A8; font-weight: 600;">LUMEN gains one world monopoly: the finish system.</span> Carpet, chevrons, checkered line, carpet dots — nothing else in the world may wear green, exactly as nothing but risk wears pink. Recorded in the 01 palette.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">Why it doesn't collide with SHARP:</span> the two greens agree — green means <em>good news</em>, in type and in terrain. Confusion needs contradiction; there is none.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">The checker is the game's only pattern fill.</span> Everything else is line and glow. The checkered flag is the one universal racing glyph — spending our single texture on it makes the finish unmistakable at any speed.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">One input, honored by removing it:</span> the carpet is the game's only no-input zone. The run ended when you earned the carpet; the lift is the bow, not a level.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEQUENCE + DEMO -->
+  <div style="display: grid; grid-template-columns: 1fr 460px; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE SEQUENCE — ~2.2s FROM CARPET EDGE TO GONE</div>
+      <div style="display: flex; flex-direction: column; gap: 0; margin-top: 14px;">
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 18px; padding: 12px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; line-height: 1.55;">
+          <div style="color: #7FE0A8; font-weight: 800;">CARPET EDGE</div>
+          <div><span style="color: #EDEAF7; font-weight: 600;">Gravity lets go — your last swing doesn't.</span> The trajectory and velocity of the final release carry into the carpet: swing dead straight and you ride the centre; fling hard left and you travel far left while the lift gently trues you up to a <em>left-side finish</em>. The carpet corrects, it never erases — the finish position is the last release's signature. Compass and gauges die instantly (nothing left to decide); the velocity readout stays for the show.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 18px; padding: 12px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; line-height: 1.55;">
+          <div style="color: #7FE0A8; font-weight: 800;">THE LIFT · 0–50%</div>
+          <div>Vertical speed blends toward carpet speed over ~400ms — a smooth catch, never a jerk. The chunky chevron mat brightens row by row under the craft, a retro speed-up strip in strict parallel. <span style="color: #EDEAF7; font-weight: 600;">Carpet dots</span> are scattered loose across the carpet, visible on approach — your line sweeps up whichever it happens to cross, +150 flat each. Pocket change outside the wager: no tiers, no multipliers, no aiming. Found money, not earned money.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 18px; padding: 12px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; line-height: 1.55;">
+          <div style="color: #7FE0A8; font-weight: 800;">THE SURGE · 50%</div>
+          <div>Halfway up the carpet the lift opens the throttle — early enough that most of the ride is the fast part: velocity readout climbs, dust streaks stretch, the mat blurs. <span style="color: #EDEAF7; font-weight: 600;">The game spends its speed vocabulary on you one last time.</span></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 18px; padding: 12px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; line-height: 1.55;">
+          <div style="color: #7FE0A8; font-weight: 800;">THE CROSSING</div>
+          <div>No hitstop — the finish never interrupts momentum; that grammar belongs to decisions, and there is nothing left to decide. The checker flashes once (E3, the only green E3 in the game), <span style="color: #7FE0A8; font-weight: 700;">FINISH!</span> bubbles up at the crossing point — wherever your lane ended up — and the craft leaves the top of the screen at full song.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 18px; padding: 12px 0; font-size: 13px; line-height: 1.55;">
+          <div style="color: #7FE0A8; font-weight: 800;">THE EMPTY SKY</div>
+          <div>The camera does not follow. It holds on the checkered line cooling and the trail fading for ~800ms — the same "let it go" the release taught — then the results card (Direction 10) snaps in over the empty field. Victory is the screen the craft is no longer on.</div>
+        </div>
+      </div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 24px 26px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">LIVE — THE CARPET LIFT, LOOPED</div>
+      <canvas ref="{{finRef}}" width="820" height="1240" style="width: 100%; display: block; margin-top: 14px; border-radius: 10px; background: #0A0814;"></canvas>
+      <div style="font-size: 12.5px; line-height: 1.55; margin-top: 12px;">The loop alternates three final swings — straight, hard left, hard right — and the finish lane follows each one. Tweak <em>liftCatch</em>, <em>surge</em>, and <em>lane correction</em>.</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">13</span> adventure regions + zen — the last chapter</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;liftCatch&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 5, &quot;min&quot;: 1.5, &quot;max&quot;: 12, &quot;step&quot;: 0.5, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Carpet&quot;, &quot;description&quot;: &quot;How softly the carpet takes over your vertical speed&quot;},
+  &quot;surge&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 2.6, &quot;min&quot;: 1.2, &quot;max&quot;: 4, &quot;step&quot;: 0.1, &quot;unit&quot;: &quot;×&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Carpet&quot;, &quot;description&quot;: &quot;Throttle the lift opens from the carpet's halfway point&quot;},
+  &quot;laneCorrection&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 1.1, &quot;min&quot;: 0.3, &quot;max&quot;: 4, &quot;step&quot;: 0.1, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Carpet&quot;, &quot;description&quot;: &quot;How firmly the carpet trues up your lateral drift — low keeps more of the last swing's signature&quot;}
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.finRef = React.createRef();
+    this._raf = null; this._last = null;
+    this._variant = 0;
+    this._s = null;
+    this._pops = [];
+  }
+  resetSim() {
+    const vx0 = [0, -150, 165][this._variant % 3];
+    this._variant += 1;
+    const dots = Array.from({ length: 6 }, () => ({ x: 36 + Math.random() * 338, y: 175 + Math.random() * 195, hit: 0 }));
+    this._s = { x: 205 - vx0 * 0.55, y: 600, vx: vx0, vy: 190, t: 0, hold: 0, crossX: null, dots };
+    this._pops = [];
+  }
+  componentDidMount() {
+    const cv = this.finRef.current;
+    const ctx = cv.getContext('2d');
+    const W = 410, H = 620, S = 2;
+    const LINE = 150, CARPET_BOT = 390;
+    const rows = [190, 244, 298, 352];
+    this.resetSim();
+    const loop = (ts) => {
+      this._raf = requestAnimationFrame(loop);
+      if (this._last == null) { this._last = ts; return; }
+      const dt = Math.min(0.05, (ts - this._last) / 1000);
+      this._last = ts;
+      const catchK = this.props.liftCatch ?? 5;
+      const surgeM = this.props.surge ?? 2.6;
+      const corrK = this.props.laneCorrection ?? 1.1;
+      const s = this._s;
+      s.t += dt;
+      const inCarpet = s.y < CARPET_BOT;
+      if (s.y > -40) {
+        if (inCarpet) {
+          const prog = Math.min(1, (CARPET_BOT - s.y) / (CARPET_BOT - LINE));
+          const target = 270 * (1 + (prog > 0.5 ? (prog - 0.5) / 0.5 * (surgeM - 1) : 0));
+          s.vy += (target - s.vy) * Math.min(1, catchK * dt);
+          s.vx += (0 - s.vx) * Math.min(1, corrK * dt);
+        }
+        s.x = Math.max(24, Math.min(386, s.x + s.vx * dt));
+        s.y -= s.vy * dt;
+        if (s.crossX == null && s.y < LINE) s.crossX = s.x;
+      } else {
+        s.hold += dt;
+        if (s.hold > 1.3) { this.resetSim(); return; }
+      }
+      // dot collection
+      s.dots.forEach(d => {
+        if (!d.hit && Math.abs(s.y - d.y) < 16 && Math.abs(s.x - d.x) < 22) { d.hit = 1; this._pops.push({ x: d.x + 34, y: d.y, born: s.t }); }
+      });
+      // ---- draw ----
+      ctx.setTransform(S, 0, 0, S, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0A0814'; ctx.fillRect(0, 0, W, H);
+      for (let y = 60; y < H; y += 92) { ctx.strokeStyle = 'rgba(108,100,166,0.14)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      const g = ctx.createLinearGradient(0, CARPET_BOT, 0, LINE);
+      g.addColorStop(0, 'rgba(127,224,168,0)');
+      g.addColorStop(1, 'rgba(127,224,168,0.12)');
+      ctx.fillStyle = g; ctx.fillRect(0, LINE, W, CARPET_BOT - LINE);
+      // chunky chevron mat: full-width rows of thick chevrons
+      const w = 46, h = 26, th = 15;
+      rows.forEach(ry => {
+        const near = s.y > -40 ? Math.max(0, 1 - Math.abs(ry - s.y) / 100) : 0;
+        ctx.fillStyle = 'rgba(127,224,168,' + (0.22 + 0.55 * near).toFixed(2) + ')';
+        if (near > 0.25) { ctx.shadowColor = '#7FE0A8'; ctx.shadowBlur = 10 * near; }
+        for (let cxx = 50; cxx < W; cxx += 106) {
+          ctx.beginPath();
+          ctx.moveTo(cxx - w, ry + h);
+          ctx.lineTo(cxx, ry);
+          ctx.lineTo(cxx + w, ry + h);
+          ctx.lineTo(cxx + w, ry + h - th);
+          ctx.lineTo(cxx, ry - th);
+          ctx.lineTo(cxx - w, ry + h - th);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      });
+      // checkered line
+      const crossed = s.crossX != null;
+      const flash = crossed && s.y > -40 ? Math.max(0, 1 - (LINE - s.y) / 120) : 0;
+      const sq = 20;
+      for (let i = 0; i < Math.ceil(W / sq); i++) {
+        for (let r = 0; r < 2; r++) {
+          if ((i + r) % 2 === 0) {
+            ctx.fillStyle = 'rgba(127,224,168,' + (0.75 + flash * 0.25).toFixed(2) + ')';
+            ctx.shadowColor = '#7FE0A8'; ctx.shadowBlur = 6 + flash * 18;
+            ctx.fillRect(i * sq, LINE - sq + r * sq, sq - 2.5, sq - 2.5);
+          }
+        }
+      }
+      ctx.shadowBlur = 0;
+      // dots
+      s.dots.forEach(d => {
+        if (!d.hit) {
+          ctx.fillStyle = 'rgba(127,224,168,0.9)';
+          ctx.shadowColor = '#7FE0A8'; ctx.shadowBlur = 8;
+          ctx.beginPath(); ctx.arc(d.x, d.y, 5.5, 0, 7); ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      });
+      // +150 pops
+      this._pops.forEach(p => {
+        const a = s.t - p.born;
+        if (a < 0.9) {
+          const rise = Math.min(1, a / 0.12) * 22;
+          ctx.fillStyle = 'rgba(127,224,168,' + Math.max(0, 1 - a / 0.9).toFixed(2) + ')';
+          ctx.font = '600 12px Archivo, sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('+150', Math.min(370, p.x), p.y - rise);
+          ctx.textAlign = 'left';
+        }
+      });
+      // FINISH! at the crossing lane
+      if (crossed) {
+        const a = Math.min(1, Math.max(0, (LINE - s.y) / 40 + (s.y < -40 ? 1 : 0)));
+        const stay = Math.max(0, 1 - Math.max(0, s.hold - 0.5) / 0.8);
+        const fx = Math.max(60, Math.min(350, s.crossX));
+        ctx.fillStyle = 'rgba(127,224,168,' + (a * stay).toFixed(2) + ')';
+        ctx.shadowColor = '#7FE0A8'; ctx.shadowBlur = 12;
+        ctx.font = '800 24px Archivo, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('FINISH!', fx, LINE - 44);
+        ctx.shadowBlur = 0; ctx.textAlign = 'left';
+      }
+      // velocity readout
+      if (s.y > -40) {
+        ctx.fillStyle = s.vy > 320 ? '#FFF4E0' : '#EDEAF7';
+        ctx.font = '400 26px Anton, sans-serif';
+        ctx.fillText(String(Math.round(s.vy * 3.2)), 20, 42);
+        ctx.fillStyle = '#6F6893'; ctx.font = '600 9px Archivo, sans-serif';
+        ctx.fillText('M / S', 20, 56);
+      }
+      // craft + trail, nose along true velocity
+      if (s.y > -40) {
+        const ang = Math.atan2(s.vx, s.vy); // 0 = straight up
+        ctx.strokeStyle = 'rgba(255,244,224,0.4)'; ctx.lineWidth = 2.5;
+        ctx.shadowColor = 'rgba(255,244,224,0.5)'; ctx.shadowBlur = 4;
+        const tl = Math.min(150, s.vy * 0.45);
+        ctx.beginPath(); ctx.moveTo(s.x, s.y + 12); ctx.lineTo(s.x - Math.sin(ang) * tl, s.y + 12 + Math.cos(ang) * tl); ctx.stroke();
+        ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(ang);
+        ctx.fillStyle = '#FFF4E0'; ctx.shadowColor = '#FFF4E0'; ctx.shadowBlur = 18;
+        ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(-8, 10); ctx.lineTo(0, 5); ctx.lineTo(8, 10);
+        ctx.closePath(); ctx.fill(); ctx.restore(); ctx.shadowBlur = 0;
+      }
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); }
+  renderVals() { return { finRef: this.finRef }; }
+}
+</script>
+</body>
+</html>

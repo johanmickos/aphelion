@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 04 &nbsp;·&nbsp; THE PLANET LANGUAGE</div>
+      <div style="font-family: 'Anton', sans-serif; font-size: 54px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; letter-spacing: 0.02em; text-shadow: 0 0 34px rgba(255,244,224,0.28);">A PLANET IS A LAMP,<br>NOT A ROCK.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">The prototype's planets are shaded spheres — simulation vocabulary, and shading implies a light source somewhere in depth, which this world doesn't have. The replacement: <span style="color: #EDEAF7; font-weight: 600;">flat vector anatomy that emits its own identity</span>. No gradients, no terminator, no 3D. And one new idea doing most of the work: <span style="color: #EDEAF7; font-weight: 600;">the tide</span> — a bright limb segment that faces the craft, always. Gravity made visible. The planet notices you before you press, works under you while you orbit, and goes dark when you've taken what it had.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #FF5FA2; font-weight: 700;">EASY PATHS, REFUSED</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #6F6893;">Soft gradient shading</span> → flat disc + concentric internal structure. Side-on has no light source to shade from.</div>
+        <div><span style="color: #6F6893;">Texture / craters / noise</span> → anatomy. Internal rings and a core, like a cross-section — a diagram that glows, matching the compass it sits inside.</div>
+        <div><span style="color: #6F6893;">Full-colour fill</span> → identity lives on the rim and core only. A filled disc would compete with the craft; the body stays near-VOID so the player stays brightest.</div>
+        <div><span style="color: #6F6893;">Static props</span> → four live states. A planet is always telling you its relationship to you: ahead, in reach, held, spent.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANATOMY + LIVE TIDE -->
+  <div style="display: grid; grid-template-columns: 1fr 460px; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">ANATOMY — A CROSS-SECTION THAT EMITS</div>
+      <div style="display: grid; grid-template-columns: 380px 1fr; gap: 30px; align-items: center; margin-top: 8px;">
+        <svg viewBox="0 0 380 360" width="380" style="display: block;">
+          <circle cx="190" cy="185" r="110" fill="#100C20"></circle>
+          <circle cx="190" cy="185" r="110" fill="none" stroke="#5FC88F" stroke-width="2.5" opacity="0.9" style="filter: drop-shadow(0 0 6px rgba(95,200,143,0.7));"></circle>
+          <path d="M 285.3 130 A 110 110 0 0 1 297.5 160.4" fill="none" stroke="#C8FFDF" stroke-width="4" stroke-linecap="round" style="filter: drop-shadow(0 0 3px #C8FFDF) drop-shadow(0 0 9px #5FC88F);"></path>
+          <circle cx="190" cy="185" r="76" fill="none" stroke="#5FC88F" stroke-width="1.25" opacity="0.22"></circle>
+          <circle cx="190" cy="185" r="44" fill="none" stroke="#5FC88F" stroke-width="1" opacity="0.14"></circle>
+          <circle cx="190" cy="185" r="9" fill="#5FC88F" opacity="0.65" style="filter: drop-shadow(0 0 7px rgba(95,200,143,0.8));"></circle>
+          <line x1="190" y1="75" x2="190" y2="34" stroke="#6C64A6" stroke-width="1" opacity="0.4"></line>
+          <text x="190" y="24" text-anchor="middle" fill="#A9A3C9" font-family="Archivo" font-size="10.5" font-weight="600" letter-spacing="1">RIM — IDENTITY HUE, E1</text>
+          <line x1="298" y1="147" x2="342" y2="126" stroke="#6C64A6" stroke-width="1" opacity="0.4"></line>
+          <text x="345" y="120" fill="#A9A3C9" font-family="Archivo" font-size="10.5" font-weight="600" letter-spacing="1" text-anchor="end" transform="rotate(0)">TIDE</text>
+          <line x1="190" y1="185" x2="88" y2="286" stroke="#6C64A6" stroke-width="1" opacity="0.4"></line>
+          <text x="10" y="302" text-anchor="start" fill="#A9A3C9" font-family="Archivo" font-size="10.5" font-weight="600" letter-spacing="1">CORE — MASS GLYPH LIVES HERE</text>
+          <line x1="248" y1="238" x2="306" y2="286" stroke="#6C64A6" stroke-width="1" opacity="0.4"></line>
+          <text x="308" y="302" text-anchor="middle" fill="#A9A3C9" font-family="Archivo" font-size="10.5" font-weight="600" letter-spacing="1">STRATA — α .22 / .14</text>
+          <text x="190" y="348" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-size="10" letter-spacing="1.5">BODY FILL #100C20 — NEVER BRIGHTER THAN THE CRAFT</text>
+        </svg>
+        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13.5px; line-height: 1.6;">
+          <div><span style="color: #EDEAF7; font-weight: 600;">Rim</span> — the identity hue, always on. The planet is a lamp seen edge-on; its colour is the same colour its compass ring wears, so target and window never need a legend.</div>
+          <div><span style="color: #EDEAF7; font-weight: 600;">Tide</span> — a brighter limb segment that faces the craft at all times, on every planet in range. It is the gravity vector drawn on the thing that owns it. Press, and the tide flares into the grab filament (Direction 01, frame 1). While you orbit, it races around the rim under you. And it scales with mass: a heavy body reaches for you with a longer, brighter, tighter-tracking tide — gravity strength read at a glance, no gauge.</div>
+          <div><span style="color: #EDEAF7; font-weight: 600;">Strata + core</span> — concentric internal rings at low alpha and a soft core dot. Structure without texture: reads as a living diagram at speed, echoes the compass rings around it. Body types replace the core with their glyph — the same glyph the compass ring shows.</div>
+          <div style="color: #6F6893; font-size: 12.5px;">Scale rule: rim 2.5px and tide 4px are constant in design px regardless of planet radius — small bodies read as bright rings, giants as thin luminous horizons. Mass is size; nothing else changes.</div>
+        </div>
+      </div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 24px 26px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">LIVE — THE TIDE TRACKS THE CRAFT</div>
+      <svg viewBox="0 0 340 340" width="100%" style="display: block; margin-top: 14px; background: #0A0814; border-radius: 10px;">
+        <circle cx="170" cy="170" r="95" fill="#100C20"></circle>
+        <circle cx="170" cy="170" r="95" fill="none" stroke="#5FC88F" stroke-width="2" opacity="0.75" style="filter: drop-shadow(0 0 5px rgba(95,200,143,0.6));"></circle>
+        <circle ref="{{tideRef}}" cx="170" cy="170" r="95" pathLength="360" fill="none" stroke="#C8FFDF" stroke-width="4" stroke-linecap="round" stroke-dasharray="56 304" style="filter: drop-shadow(0 0 3px #C8FFDF) drop-shadow(0 0 10px #5FC88F);"></circle>
+        <circle ref="{{rippleRef}}" cx="170" cy="170" r="66" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="2" stroke-linecap="round" stroke-dasharray="40 320" opacity="0.3"></circle>
+        <circle cx="170" cy="170" r="66" fill="none" stroke="#5FC88F" stroke-width="1" opacity="0.12"></circle>
+        <circle cx="170" cy="170" r="8" fill="#5FC88F" opacity="0.55" style="filter: drop-shadow(0 0 6px rgba(95,200,143,0.7));"></circle>
+        <circle cx="170" cy="170" r="140" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.2"></circle>
+        <g ref="{{craftRef}}"><path d="M 13 0 L -9 7.5 L -4.5 0 L -9 -7.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 16px #FFF4E0);"></path></g>
+      </svg>
+      <div style="font-size: 12.5px; line-height: 1.55; margin-top: 12px;">The bright limb stays under the craft with a slight fluid lag, and an inner stratum ripples after it. The planet is <em>working</em>. Tweak <em>tideLag</em> to tune how liquid it feels.</div>
+    </div>
+  </div>
+
+  <!-- LIFECYCLE -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 28px 34px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">FOUR STATES — THE PLANET'S RELATIONSHIP TO YOU, ALWAYS LEGIBLE</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 20px;">
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 260 240" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <circle cx="130" cy="120" r="62" fill="#100C20"></circle>
+          <circle cx="130" cy="120" r="62" fill="none" stroke="#E89A5F" stroke-width="2" opacity="0.4"></circle>
+          <circle cx="130" cy="120" r="43" fill="none" stroke="#E89A5F" stroke-width="1" opacity="0.1"></circle>
+          <circle cx="130" cy="120" r="6" fill="#E89A5F" opacity="0.3"></circle>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">AHEAD · E0–E1</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">Distant: rim at 40%, structure faint, no tide. Present and identifiable, but quiet — the field ahead is a constellation of dim coloured rings, not a row of grey balls.</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 260 240" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <circle cx="130" cy="120" r="62" fill="#100C20"></circle>
+          <circle cx="130" cy="120" r="62" fill="none" stroke="#E89A5F" stroke-width="2.25" opacity="0.85" style="filter: drop-shadow(0 0 5px rgba(232,154,95,0.6));"></circle>
+          <path d="M 178 81 A 62 62 0 0 1 190.4 108.3" fill="none" stroke="#FFD9B8" stroke-width="4" stroke-linecap="round" style="filter: drop-shadow(0 0 3px #FFD9B8) drop-shadow(0 0 9px #E89A5F);"></path>
+          <circle cx="130" cy="120" r="43" fill="none" stroke="#E89A5F" stroke-width="1" opacity="0.18"></circle>
+          <circle cx="130" cy="120" r="6" fill="#E89A5F" opacity="0.5"></circle>
+          <g transform="translate(228 40) rotate(115)"><path d="M 10 0 L -7 6 L -3.5 0 L -7 -6 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 12px #FFF4E0);"></path></g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">IN REACH · E1+TIDE</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The craft enters grab range: rim wakes to full E1 and the tide appears, facing the craft. The planet that would catch your press is the one already reaching for you — the press is taught without a word.</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 260 240" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <circle cx="130" cy="120" r="62" fill="#100C20"></circle>
+          <circle cx="130" cy="120" r="62" fill="none" stroke="#E89A5F" stroke-width="2.5" opacity="1" style="filter: drop-shadow(0 0 7px rgba(232,154,95,0.8));"></circle>
+          <path d="M 155.8 63.7 A 62 62 0 0 1 185.5 90.1" fill="none" stroke="#FFD9B8" stroke-width="4.5" stroke-linecap="round" style="filter: drop-shadow(0 0 4px #FFD9B8) drop-shadow(0 0 12px #E89A5F);"></path>
+          <circle cx="130" cy="120" r="43" fill="none" stroke="#E89A5F" stroke-width="1.25" opacity="0.3"></circle>
+          <circle cx="130" cy="120" r="6" fill="#E89A5F" opacity="0.8" style="filter: drop-shadow(0 0 6px rgba(232,154,95,0.9));"></circle>
+          <circle cx="130" cy="120" r="92" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.25"></circle>
+          <g transform="translate(176 40.4) rotate(-60)"><path d="M 10 0 L -7 6 L -3.5 0 L -7 -6 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 14px #FFF4E0);"></path></g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">HELD · E2 — THE ANCHOR</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">Full brightness, core lit, tide racing under the orbit. The compass draws itself around this glow. Correction to Direction 01: the held planet is <em>alive</em>, not grey — it goes to DUSK only after release.</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 260 240" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <circle cx="130" cy="120" r="62" fill="#0D0A1C"></circle>
+          <circle cx="130" cy="120" r="62" fill="none" stroke="#6C64A6" stroke-width="1.5" opacity="0.5"></circle>
+          <circle cx="130" cy="120" r="43" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+          <circle cx="130" cy="120" r="6" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.4"></circle>
+          <line x1="171" y1="73.5" x2="196" y2="45" stroke="#FFF4E0" stroke-width="2" opacity="0.3" stroke-linecap="round"></line>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">SPENT · DUSK</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">Released: the lamp goes out — rim to DUSK, core hollow, tide gone. Its light didn't vanish; it moved into the chain, and the craft's bloom is wider for it. A spent field behind you is the run's scoreboard, drawn in the world.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BODY TYPES + NAMING -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">BODY TYPES — THE COMPASS GLYPH, AT PLANETARY SCALE</div>
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 18px;">
+        <div style="text-align: center;">
+          <svg viewBox="0 0 150 150" width="100%"><circle cx="75" cy="75" r="48" fill="#100C20"></circle><circle cx="75" cy="75" r="48" fill="none" stroke="#5FC88F" stroke-width="2" opacity="0.8" style="filter: drop-shadow(0 0 5px rgba(95,200,143,0.5));"></circle><circle cx="75" cy="75" r="33" fill="none" stroke="#5FC88F" stroke-width="1" opacity="0.16"></circle><circle cx="75" cy="75" r="5" fill="#5FC88F" opacity="0.55"></circle></svg>
+          <div style="font-size: 11px; font-weight: 600; color: #A9A3C9; letter-spacing: 0.12em; margin-top: 8px;">STANDARD<div style="font-weight: 400; color: #6F6893; margin-top: 2px;">one core</div></div>
+        </div>
+        <div style="text-align: center;">
+          <svg viewBox="0 0 150 150" width="100%"><circle cx="75" cy="75" r="48" fill="#100C20"></circle><circle cx="75" cy="75" r="48" fill="none" stroke="#E89A5F" stroke-width="2" opacity="0.8" style="filter: drop-shadow(0 0 5px rgba(232,154,95,0.5));"></circle><circle cx="59" cy="75" r="5" fill="#E89A5F" opacity="0.6"></circle><circle cx="91" cy="75" r="5" fill="#E89A5F" opacity="0.6"></circle><ellipse cx="75" cy="75" rx="30" ry="14" fill="none" stroke="#E89A5F" stroke-width="1" opacity="0.2"></ellipse></svg>
+          <div style="font-size: 11px; font-weight: 600; color: #A9A3C9; letter-spacing: 0.12em; margin-top: 8px;">BINARY<div style="font-weight: 400; color: #6F6893; margin-top: 2px;">twin cores</div></div>
+        </div>
+        <div style="text-align: center;">
+          <svg viewBox="0 0 150 150" width="100%"><circle cx="75" cy="75" r="48" fill="#100C20"></circle><circle cx="75" cy="75" r="48" fill="none" stroke="#3EC1D6" stroke-width="2" opacity="0.8" style="filter: drop-shadow(0 0 5px rgba(62,193,214,0.5));"></circle><circle cx="75" cy="75" r="5" fill="#3EC1D6" style="filter: drop-shadow(0 0 8px #3EC1D6);"></circle><line x1="75" y1="20" x2="75" y2="34" stroke="#3EC1D6" stroke-width="2" opacity="0.8"></line><line x1="75" y1="116" x2="75" y2="130" stroke="#3EC1D6" stroke-width="2" opacity="0.8"></line></svg>
+          <div style="font-size: 11px; font-weight: 600; color: #A9A3C9; letter-spacing: 0.12em; margin-top: 8px;">PULSAR<div style="font-weight: 400; color: #6F6893; margin-top: 2px;">core beats · beam ticks</div></div>
+        </div>
+        <div style="text-align: center;">
+          <svg viewBox="0 0 150 150" width="100%"><circle cx="75" cy="75" r="42" fill="#100C20"></circle><circle cx="75" cy="75" r="42" fill="none" stroke="#8FA0FF" stroke-width="2" opacity="0.8" style="filter: drop-shadow(0 0 5px rgba(143,160,255,0.5));"></circle><ellipse cx="75" cy="75" rx="62" ry="16" fill="none" stroke="#8FA0FF" stroke-width="1.5" opacity="0.5"></ellipse><circle cx="75" cy="75" r="5" fill="#8FA0FF" opacity="0.55"></circle></svg>
+          <div style="font-size: 11px; font-weight: 600; color: #A9A3C9; letter-spacing: 0.12em; margin-top: 8px;">RINGED<div style="font-weight: 400; color: #6F6893; margin-top: 2px;">flat band — no tilt, no depth</div></div>
+        </div>
+        <div style="text-align: center;">
+          <svg viewBox="0 0 150 150" width="100%"><circle cx="75" cy="75" r="34" fill="#000000"></circle><circle cx="75" cy="75" r="34" fill="none" stroke="#9D6BFF" stroke-width="2.5" opacity="0.9" style="filter: drop-shadow(0 0 7px rgba(157,107,255,0.7));"></circle><circle cx="75" cy="75" r="48" fill="none" stroke="#9D6BFF" stroke-width="1" opacity="0.3" stroke-dasharray="3 6"></circle></svg>
+          <div style="font-size: 11px; font-weight: 600; color: #A9A3C9; letter-spacing: 0.12em; margin-top: 8px;">BLACK HOLE<div style="font-weight: 400; color: #6F6893; margin-top: 2px;">true black body · no core</div></div>
+        </div>
+      </div>
+      <div style="font-size: 13px; line-height: 1.6; margin-top: 18px;">One anatomy, one variable each — the region discipline applied to bodies. The core is the type slot: standard has one, binary two, pulsar's beats, black hole's is absent (the only body filled with true #000 outside the anomaly — it reads as a hole in the world). Black holes wear AURORA violet — the one exception to the identity band: violet means <em>strange</em>. It belongs to the anomaly and to the bodies that shouldn't exist, so the player's spine learns one association: purple = the rules are different here. The compass ring wears the matching miniature, so a body you've met once is recognizable in the instrument before it's on screen.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">NAMING — RETIRING THE TELEMETRY VOICE</div>
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 16px; font-size: 13px; line-height: 1.55;">
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <div style="flex: none; background: #0A0814; border-radius: 8px; padding: 8px 14px; font-family: 'Archivo', sans-serif; font-weight: 600; color: #6F6893; font-size: 13px;">P11 · P19 · P12</div>
+          <div><span style="color: #6F6893;">Status quo.</span> Reads as debug output — hard-sim register, and the source of the label-collision garbage.</div>
+        </div>
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <div style="flex: none; background: #0A0814; border-radius: 8px; padding: 8px 14px; display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #5FC88F; box-shadow: 0 0 6px rgba(95,200,143,0.8); display: inline-block;"></span><span style="font-family: 'Archivo', sans-serif; font-weight: 700; color: #EDEAF7; font-size: 13px;">12</span></div>
+          <div><span style="color: #EDEAF7; font-weight: 600;">Recommended: hue + glyph carry identity in-run; the number is an altitude address, shown only when needed.</span> Numbers are assigned bottom-to-top in the seeded field, so every player's "23" is the same body that day. In-run chips show a number in exactly one case: two live targets too close in hue. Post-run, numbers own the stage — results, routes, shared recipes.</div>
+        </div>
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <div style="flex: none; background: #0A0814; border-radius: 8px; padding: 8px 14px; font-family: 'Anton', sans-serif; color: #EDEAF7; font-size: 14px; letter-spacing: 0.06em;">KILN · HARROW</div>
+          <div><span style="color: #6F6893;">Authored names — reserved.</span> Too much voice for a procedural daily field, exactly right for adventure regions' signature bodies. A region's black hole deserves a name; the 14th jade planet of Tuesday does not.</div>
+        </div>
+      </div>
+      <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(140,130,190,0.15); font-size: 13px; line-height: 1.6;">Doctrine: <span style="color: #EDEAF7; font-weight: 600;">in the run, a planet's name is its colour; in the retelling, it's its altitude.</span> Addresses stay small, utility-face, chip-bound, and appear mid-play only to break a hue tie. Nothing floats loose near a planet ever again.</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">05</span> the living baseline field &nbsp;·&nbsp; <span style="color: #A9A3C9;">06</span> award + callout system &nbsp;·&nbsp; <span style="color: #A9A3C9;">07</span> boundary as risk gradient &nbsp;·&nbsp; <span style="color: #A9A3C9;">08</span> daily front / results / leaderboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">09</span> three regions + zen subtraction</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;tideLag&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 6, &quot;min&quot;: 1.5, &quot;max&quot;: 14, &quot;step&quot;: 0.5, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Tide&quot;, &quot;description&quot;: &quot;How tightly the tide tracks the craft — low = liquid and heavy, high = snappy&quot;}
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.tideRef = React.createRef();
+    this.rippleRef = React.createRef();
+    this.craftRef = React.createRef();
+    this._raf = null; this._A = 0; this._tide = -40; this._ripple = -70; this._last = null;
+  }
+  componentDidMount() {
+    const loop = (ts) => {
+      this._raf = requestAnimationFrame(loop);
+      if (this._last == null) { this._last = ts; return; }
+      const dt = Math.min(0.05, (ts - this._last) / 1000);
+      this._last = ts;
+      this._A = (this._A + 55 * dt) % 360;
+      const lag = this.props.tideLag ?? 6;
+      const follow = (cur, target, k) => {
+        let d = ((target - cur) % 360 + 540) % 360 - 180;
+        return cur + d * Math.min(1, k * dt);
+      };
+      this._tide = follow(this._tide, this._A, lag);
+      this._ripple = follow(this._ripple, this._tide, lag * 0.6);
+      const t = this.tideRef.current, r = this.rippleRef.current, c = this.craftRef.current;
+      if (!t || !r || !c) return;
+      t.setAttribute('stroke-dashoffset', (28 - this._tide).toFixed(2));
+      r.setAttribute('stroke-dashoffset', (20 - this._ripple).toFixed(2));
+      const rad = this._A * Math.PI / 180;
+      const x = 170 + 140 * Math.cos(rad), y = 170 + 140 * Math.sin(rad);
+      c.setAttribute('transform', 'translate(' + x.toFixed(2) + ' ' + y.toFixed(2) + ') rotate(' + (this._A + 90).toFixed(2) + ')');
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); }
+  renderVals() {
+    return { tideRef: this.tideRef, rippleRef: this.rippleRef, craftRef: this.craftRef };
+  }
+}
+</script>
+</body>
+</html>

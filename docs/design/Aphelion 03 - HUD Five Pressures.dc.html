@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&amp;family=Anton&amp;family=Space+Grotesk:wght@500;700&amp;family=Archivo:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 03 &nbsp;·&nbsp; THE IN-RUN HUD — ONE LAYOUT, FIVE PRESSURES</div>
+      <div style="font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 48px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; text-shadow: 0 0 34px rgba(255,244,224,0.28);" data-display="1">Velocity is the headline.<br>Everything else orbits it.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">Everything is drawn in world space, in design coordinates — identical composition on every device, nothing on a letterbox bar. The layout never changes between states; only the pressure does. The bottom third belongs to the thumb: <span style="color: #EDEAF7; font-weight: 600;">nothing readable lives there, ever</span>.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">WHAT MOVED WHERE — AND WHY</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #EDEAF7; font-weight: 600;">Velocity</span> — top-left, display face, largest type in the game. It governs every capture, release, and boundary call. Promoted from the results sheet to the masthead.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">Score → BANK</span> — demoted to a utility-face chip, top-right. It governs no decision. It dims while coasting: nothing is confiscated, it is simply not earning.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">Fuel</span> — off the bottom-left corner, onto the craft: a halo arc that doubles as a light source. The cause and the gauge finally share a pixel. It turns ION pink only when it can cost you the run.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">Chain</span> — live at last: ×N beside velocity, and physically visible as the craft's bloom radius.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">Awards</span> — world-space, at the compass dot that earned them (Direction 02). The top band now holds exactly two readables.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIVE STATES -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 30px 34px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">FIVE PRESSURES — SAME LAYOUT EVERY FRAME · 1170×2532 DESIGN SPACE, SHOWN AT 330×716</div>
+    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; margin-top: 20px;">
+
+      <!-- S1 FREE FLIGHT -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 330 716" style="background: #0A0814; border-radius: 12px; width: 100%; display: block;">
+          <circle cx="96" cy="0" r="3" fill="#3EC1D6" opacity="0.7"></circle>
+          <circle cx="228" cy="0" r="3" fill="#E89A5F" opacity="0.7"></circle>
+          <circle cx="80" cy="195" r="42" fill="#100C20" stroke="#6C64A6" stroke-width="1.25"></circle>
+          <path d="M 45 218 A 42 42 0 0 0 115 218" fill="none" stroke="#5FC88F" stroke-width="2" opacity="0.6" style="filter: drop-shadow(0 0 4px rgba(95,200,143,0.6));"></path>
+          <circle cx="258" cy="122" r="28" fill="#100C20" stroke="#6C64A6" stroke-width="1.25"></circle>
+          <path d="M 236 139 A 28 28 0 0 0 280 139" fill="none" stroke="#E89A5F" stroke-width="2" opacity="0.6" style="filter: drop-shadow(0 0 4px rgba(232,154,95,0.6));"></path>
+          <line x1="60" y1="380" x2="60" y2="420" stroke="#6C64A6" stroke-width="1" opacity="0.3"></line>
+          <line x1="285" y1="300" x2="285" y2="352" stroke="#6C64A6" stroke-width="1" opacity="0.3"></line>
+          <line x1="130" y1="520" x2="130" y2="560" stroke="#6C64A6" stroke-width="1" opacity="0.25"></line>
+          <line x1="165" y1="470" x2="165" y2="648" stroke="#FFF4E0" stroke-width="2.5" opacity="0.4" stroke-linecap="round" style="filter: blur(0.5px);"></line>
+          <circle cx="165" cy="470" r="15" pathLength="100" fill="none" stroke="#FFF4E0" stroke-width="2" stroke-dasharray="76 24" stroke-dashoffset="-12" opacity="0.75" stroke-linecap="round"></circle>
+          <g transform="translate(165 470) rotate(-90)"><path d="M 14 0 L -10 8 L -5 0 L -10 -8 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 16px #FFF4E0);"></path></g>
+          <text x="20" y="52" fill="#EDEAF7" font-family="Unbounded" font-weight="700" font-size="30" data-display="1">874</text>
+          <text x="20" y="70" fill="#6F6893" font-family="Archivo" font-size="9" letter-spacing="2">M/S</text>
+          <text x="20" y="92" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">CHAIN ×7</text>
+          <text x="310" y="48" text-anchor="end" fill="#6F6893" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1" opacity="0.55">BANK 12 450</text>
+          <line x1="0" y1="477" x2="330" y2="477" stroke="#6C64A6" stroke-width="1" opacity="0.25" stroke-dasharray="5 6"></line>
+          <text x="165" y="700" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-size="8.5" letter-spacing="2" opacity="0.7">THUMB ZONE · NOTHING READABLE</text>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;" data-display="1">1 · FREE FLIGHT</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">Coasting. BANK dims to 55% — earning nothing, losing nothing, a fact not a scold. Planets show a lit limb facing the craft: the world notices you (Direction 04 builds on this). Off-screen bodies are edge dots in identity hue — no labels, no collisions. Fuel is the halo arc on the craft.</div></div>
+      </div>
+
+      <!-- S2 CAPTURED -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 330 716" style="background: #0A0814; border-radius: 12px; width: 100%; display: block;">
+          <circle cx="165" cy="345" r="52" fill="#100C20" stroke="#6C64A6" stroke-width="1.5" opacity="0.95"></circle>
+          <text x="165" y="350" text-anchor="middle" fill="#6C64A6" font-size="11" font-weight="600" letter-spacing="2" font-family="Archivo">P11</text>
+          <circle cx="165" cy="345" r="92" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.25"></circle>
+          <circle cx="165" cy="345" r="135" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+          <circle cx="165" cy="345" r="160" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+          <circle cx="165" cy="345" r="135" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4" stroke-linecap="round" stroke-dasharray="22 338" stroke-dashoffset="59" opacity="0.7" style="filter: drop-shadow(0 0 4px rgba(95,200,143,0.6));"></circle>
+          <circle cx="255.3" cy="244.7" r="4" fill="#5FC88F" style="filter: drop-shadow(0 0 5px #5FC88F);"></circle>
+          <circle cx="165" cy="345" r="160" pathLength="360" fill="none" stroke="#E89A5F" stroke-width="4" stroke-linecap="round" stroke-dasharray="16 344" stroke-dashoffset="108" opacity="0.7" style="filter: drop-shadow(0 0 4px rgba(232,154,95,0.6));"></circle>
+          <circle cx="137.2" cy="187.4" r="4" fill="#E89A5F" style="filter: drop-shadow(0 0 5px #E89A5F);"></circle>
+          <g transform="translate(285 232)"><rect x="-24" y="-10" width="48" height="20" rx="10" fill="rgba(10,8,20,0.88)" stroke="#5FC88F" stroke-opacity="0.6"></rect><circle cx="-12" cy="0" r="3" fill="#5FC88F"></circle><text x="5" y="3.5" text-anchor="middle" fill="#EDEAF7" font-size="10" font-weight="600" font-family="Archivo">P12</text></g>
+          <g transform="translate(120 160)"><rect x="-24" y="-10" width="48" height="20" rx="10" fill="rgba(10,8,20,0.88)" stroke="#E89A5F" stroke-opacity="0.6"></rect><circle cx="-12" cy="0" r="3" fill="#E89A5F"></circle><text x="5" y="3.5" text-anchor="middle" fill="#EDEAF7" font-size="10" font-weight="600" font-family="Archivo">P15</text></g>
+          <line x1="248.4" y1="306.1" x2="328.1" y2="268.9" stroke="#FFF4E0" stroke-width="1.25" opacity="0.35"></line>
+          <circle cx="287.3" cy="287.9" r="2.5" fill="#FFF4E0" opacity="0.5"></circle>
+          <circle cx="310" cy="277.4" r="2.5" fill="#FFF4E0" opacity="0.5"></circle>
+          <circle cx="248.4" cy="306.1" r="15" pathLength="100" fill="none" stroke="#FFF4E0" stroke-width="2" stroke-dasharray="70 30" stroke-dashoffset="-12" opacity="0.75" stroke-linecap="round"></circle>
+          <g transform="translate(248.4 306.1) rotate(-115)"><path d="M 14 0 L -10 8 L -5 0 L -10 -8 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 16px #FFF4E0);"></path></g>
+          <text x="20" y="52" fill="#EDEAF7" font-family="Unbounded" font-weight="700" font-size="30" data-display="1">618</text>
+          <text x="20" y="70" fill="#6F6893" font-family="Archivo" font-size="9" letter-spacing="2">M/S</text>
+          <text x="20" y="92" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">CHAIN ×7</text>
+          <text x="310" y="48" text-anchor="end" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">BANK 12 450</text>
+          <ellipse cx="255" cy="640" rx="130" ry="120" fill="#FFF4E0" opacity="0.035"></ellipse>
+          <path d="M 125 716 Q 255 520 330 560" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.3" stroke-dasharray="5 6"></path>
+          <text x="240" y="690" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-size="8.5" letter-spacing="2" opacity="0.8">THUMB</text>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;" data-display="1">2 · CAPTURED · ORBITING</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The compass at rest: windows E1, hand thin, crossing dots quiet. The whole instrument sits in the upper two-thirds — during a hold the thumb (shown) covers only trail the craft has already left. Labels ride their arc tips.</div></div>
+      </div>
+
+      <!-- S3 PEAK -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 330 716" style="background: #0A0814; border-radius: 12px; width: 100%; display: block;">
+          <circle cx="165" cy="345" r="52" fill="#100C20" stroke="#6C64A6" stroke-width="1.5" opacity="0.95"></circle>
+          <text x="165" y="350" text-anchor="middle" fill="#6C64A6" font-size="11" font-weight="600" letter-spacing="2" font-family="Archivo">P11</text>
+          <circle cx="165" cy="345" r="92" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.25"></circle>
+          <circle cx="165" cy="345" r="160" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+          <circle cx="165" cy="345" r="160" pathLength="360" fill="none" stroke="#E89A5F" stroke-width="4" stroke-linecap="round" stroke-dasharray="16 344" stroke-dashoffset="108" opacity="0.55"></circle>
+          <circle cx="137.2" cy="187.4" r="4" fill="#E89A5F" opacity="0.8"></circle>
+          <circle cx="165" cy="345" r="135" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+          <circle cx="165" cy="345" r="135" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="5" stroke-linecap="round" stroke-dasharray="22 338" stroke-dashoffset="59" style="filter: drop-shadow(0 0 4px #C8FFDF) drop-shadow(0 0 13px #5FC88F);"></circle>
+          <g transform="translate(285 232)"><rect x="-24" y="-10" width="48" height="20" rx="10" fill="rgba(10,8,20,0.88)" stroke="#5FC88F" stroke-opacity="0.8"></rect><circle cx="-12" cy="0" r="3" fill="#5FC88F"></circle><text x="5" y="3.5" text-anchor="middle" fill="#EDEAF7" font-size="10" font-weight="600" font-family="Archivo">P12</text></g>
+          <line x1="235.5" y1="285.9" x2="293.5" y2="238.2" stroke="#FFF4E0" stroke-width="2.75" opacity="0.95" style="filter: drop-shadow(0 0 4px rgba(255,244,224,0.9));"></line>
+          <circle cx="268.4" cy="258.2" r="4.5" fill="#FFF4E0" style="filter: drop-shadow(0 0 6px #FFF4E0);"></circle>
+          <circle cx="255.3" cy="244.7" r="6" fill="#5FC88F" style="filter: drop-shadow(0 0 5px #C8FFDF) drop-shadow(0 0 11px #5FC88F);"></circle>
+          <circle cx="255.3" cy="244.7" r="2" fill="#FFF4E0"></circle>
+          <circle cx="235.5" cy="285.9" r="15" pathLength="100" fill="none" stroke="#FFF4E0" stroke-width="2" stroke-dasharray="66 34" stroke-dashoffset="-12" opacity="0.8" stroke-linecap="round"></circle>
+          <g transform="translate(235.5 285.9) rotate(-130)"><path d="M 14 0 L -10 8 L -5 0 L -10 -8 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 5px #FFF4E0) drop-shadow(0 0 22px #FFF4E0);"></path></g>
+          <text x="20" y="52" fill="#FFF4E0" font-family="Unbounded" font-weight="700" font-size="30" data-display="1" style="filter: drop-shadow(0 0 8px rgba(255,244,224,0.6));">1 042</text>
+          <text x="20" y="70" fill="#6F6893" font-family="Archivo" font-size="9" letter-spacing="2">M/S · RISING</text>
+          <text x="20" y="92" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">CHAIN ×7</text>
+          <text x="310" y="48" text-anchor="end" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">BANK 12 450</text>
+          <text x="310" y="66" text-anchor="end" fill="#EDEAF7" font-family="Archivo" font-size="10" font-weight="600" letter-spacing="1">+445 ON RELEASE</text>
+          <line x1="0" y1="477" x2="330" y2="477" stroke="#6C64A6" stroke-width="1" opacity="0.25" stroke-dasharray="5 6"></line>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;" data-display="1">3 · PEAK · NEAR RELEASE</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The hand closes on the dot; window at E2, hand thick, ghost bright. Velocity heats with the moment — it is about to be cashed. BANK states the armed value: a fact, not an instruction to release.</div></div>
+      </div>
+
+      <!-- S4 BOUNDARY -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 330 716" style="background: #0A0814; border-radius: 12px; width: 100%; display: block;">
+          <defs>
+            <linearGradient id="edge4" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#FF5FA2" stop-opacity="0"></stop>
+              <stop offset="0.55" stop-color="#FF5FA2" stop-opacity="0.1"></stop>
+              <stop offset="1" stop-color="#FF5FA2" stop-opacity="0.5"></stop>
+            </linearGradient>
+          </defs>
+          <circle cx="70" cy="200" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25"></circle>
+          <rect x="200" y="0" width="130" height="716" fill="url(#edge4)"></rect>
+          <line x1="328" y1="0" x2="328" y2="716" stroke="#FF5FA2" stroke-width="2.5" opacity="0.9" style="filter: drop-shadow(0 0 8px #FF5FA2);"></line>
+          <circle cx="296" cy="150" r="2.5" fill="#FF5FA2" opacity="0.9" style="filter: drop-shadow(0 0 5px #FF5FA2);"></circle>
+          <circle cx="308" cy="330" r="2.5" fill="#FF5FA2" opacity="0.9" style="filter: drop-shadow(0 0 5px #FF5FA2);"></circle>
+          <circle cx="290" cy="470" r="2.5" fill="#FF5FA2" opacity="0.7" style="filter: drop-shadow(0 0 5px #FF5FA2);"></circle>
+          <text x="298" y="128" text-anchor="middle" fill="#FF5FA2" font-family="Archivo" font-size="9" font-weight="700" letter-spacing="1">×3</text>
+          <line x1="255" y1="420" x2="211" y2="464" stroke="#FFF4E0" stroke-width="2.5" opacity="0.4" stroke-linecap="round" style="filter: blur(0.5px);"></line>
+          <circle cx="262" cy="413" r="15" pathLength="100" fill="none" stroke="#FF5FA2" stroke-width="2.25" stroke-dasharray="24 76" stroke-dashoffset="-12" opacity="0.95" stroke-linecap="round" style="filter: drop-shadow(0 0 4px #FF5FA2);"></circle>
+          <g transform="translate(262 413) rotate(-45)"><path d="M 14 0 L -10 8 L -5 0 L -10 -8 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 18px #FFF4E0);"></path></g>
+          <text x="20" y="52" fill="#FFF4E0" font-family="Unbounded" font-weight="700" font-size="30" data-display="1" style="filter: drop-shadow(0 0 8px rgba(255,244,224,0.6));">1 458</text>
+          <text x="20" y="70" fill="#FF5FA2" font-family="Archivo" font-size="9" letter-spacing="2" font-weight="700">M/S · TOWARD EDGE</text>
+          <text x="20" y="92" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">CHAIN ×7</text>
+          <text x="310" y="48" text-anchor="end" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">BANK 12 450</text>
+          <line x1="0" y1="477" x2="330" y2="477" stroke="#6C64A6" stroke-width="1" opacity="0.25" stroke-dasharray="5 6"></line>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;" data-display="1">4 · NEAR THE BOUNDARY</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The edge is a risk gradient, not a wall: the ION bloom scales with closing speed, and scoring motes (×3 band) glimmer in the outer band — the reward is signposted, never prompted. Fuel arc has gone ION: low enough to matter. Velocity subline states the fact.</div></div>
+      </div>
+
+      <!-- S5 ANOMALY -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 330 716" style="background: #000000; border-radius: 12px; width: 100%; display: block;">
+          <g style="filter: blur(16px);" opacity="0.55">
+            <path d="M 70 -20 C 100 120 30 260 75 400 C 110 520 50 640 85 736" fill="none" stroke="#9D6BFF" stroke-width="58"></path>
+            <path d="M 185 -20 C 160 140 230 280 190 430 C 165 550 215 660 195 736" fill="none" stroke="#FF5FA2" stroke-width="40" opacity="0.7"></path>
+            <path d="M 290 -20 C 310 130 250 300 295 450 C 320 560 270 660 300 736" fill="none" stroke="#6C64A6" stroke-width="52"></path>
+          </g>
+          <circle cx="165" cy="345" r="52" fill="#0D0A1C" stroke="#C9BDF2" stroke-width="1.5" opacity="0.95"></circle>
+          <text x="165" y="350" text-anchor="middle" fill="#C9BDF2" font-size="11" font-weight="600" letter-spacing="2" font-family="Archivo" opacity="0.8">P14</text>
+          <circle cx="165" cy="345" r="92" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.3"></circle>
+          <circle cx="165" cy="345" r="135" fill="none" stroke="#C9BDF2" stroke-width="1" opacity="0.18"></circle>
+          <circle cx="165" cy="345" r="135" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4" stroke-linecap="round" stroke-dasharray="22 338" stroke-dashoffset="59" opacity="0.85" style="filter: drop-shadow(0 0 5px rgba(95,200,143,0.8));"></circle>
+          <circle cx="255.3" cy="244.7" r="4" fill="#5FC88F" style="filter: drop-shadow(0 0 5px #5FC88F);"></circle>
+          <g transform="translate(285 232)"><rect x="-24" y="-10" width="48" height="20" rx="10" fill="rgba(0,0,0,0.8)" stroke="#5FC88F" stroke-opacity="0.7"></rect><circle cx="-12" cy="0" r="3" fill="#5FC88F"></circle><text x="5" y="3.5" text-anchor="middle" fill="#EDEAF7" font-size="10" font-weight="600" font-family="Archivo">P12</text></g>
+          <line x1="248.4" y1="306.1" x2="328.1" y2="268.9" stroke="#FFF4E0" stroke-width="1.5" opacity="0.45"></line>
+          <circle cx="287.3" cy="287.9" r="2.5" fill="#FFF4E0" opacity="0.6"></circle>
+          <circle cx="248.4" cy="306.1" r="15" pathLength="100" fill="none" stroke="#FFF4E0" stroke-width="2" stroke-dasharray="60 40" stroke-dashoffset="-12" opacity="0.8" stroke-linecap="round"></circle>
+          <g transform="translate(248.4 306.1) rotate(-115)"><path d="M 14 0 L -10 8 L -5 0 L -10 -8 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 5px #FFF4E0) drop-shadow(0 0 24px #FFF4E0) drop-shadow(0 0 40px rgba(255,244,224,0.7));"></path></g>
+          <text x="20" y="52" fill="#EDEAF7" font-family="Unbounded" font-weight="700" font-size="30" data-display="1">1 121</text>
+          <text x="20" y="70" fill="#6F6893" font-family="Archivo" font-size="9" letter-spacing="2">M/S</text>
+          <text x="20" y="92" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">CHAIN ×9</text>
+          <text x="310" y="48" text-anchor="end" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">BANK 18 210</text>
+          <line x1="0" y1="477" x2="330" y2="477" stroke="#C9BDF2" stroke-width="1" opacity="0.2" stroke-dasharray="5 6"></line>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;" data-display="1">5 · INSIDE AN ANOMALY</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The reference standard, untouched: aurora curtains over true black, planets reading through the tint. Nothing about the HUD changes — the world changed, not the instruments. Chip backgrounds go true black so labels hold against the curtains.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WARNINGS -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 28px 34px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">WARNINGS — ONE HUE, THREE ENERGIES, SAME GRAMMAR AS THE COMPASS</div>
+    <div style="display: grid; grid-template-columns: 420px 1fr 1fr 1.4fr; gap: 22px; margin-top: 18px; align-items: stretch;">
+      <div style="display: flex; flex-direction: column; gap: 11px; font-size: 13px; line-height: 1.6;">
+        <div>The prototype's yellow-low / red-empty / red-skull ladder becomes <span style="color: #EDEAF7; font-weight: 600;">ION at three energies</span> — E1 pulse (0.8Hz), E2 strobe (2Hz), E3 strobe + word. Yellow would add a fourth meaning to hue; severity is ordinal, so it rides the energy channel like everything else. If it's pink, it can cost you the bank — one rule, no exceptions.</div>
+        <div>The skull goes. A skull judges; <span style="color: #EDEAF7; font-weight: 600;">SOS states a fact</span> — a distress signal is diegetic, arcade, and already the game's voice ("LEFT THE FIELD AT THE RIGHT WALL · ON FIRE").</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">The deadline track is the compass inverted.</span> Green windows on orbits say <em>release here</em>; the ION window on your own projected line says <em>a press here still saves you</em>, its dot the last possible moment. Same window-and-dot grammar the player already reads — which means it also quietly teaches that the press is steering, before the first orbit ever forms.</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <svg viewBox="0 0 300 340" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <line x1="150" y1="200" x2="150" y2="300" stroke="#FFF4E0" stroke-width="2" opacity="0.3" stroke-linecap="round"></line>
+          <circle cx="150" cy="180" r="30" fill="none" stroke="#FF5FA2" stroke-width="1" opacity="0.3"></circle>
+          <circle cx="150" cy="180" r="21" pathLength="100" fill="none" stroke="#FF5FA2" stroke-width="2.5" stroke-dasharray="25 75" stroke-dashoffset="-12" opacity="0.95" stroke-linecap="round" style="filter: drop-shadow(0 0 4px #FF5FA2);"></circle>
+          <g transform="translate(150 180) rotate(-90)"><path d="M 15 0 L -11 8.5 L -5.5 0 L -11 -8.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 16px #FFF4E0);"></path></g>
+          <text x="150" y="238" text-anchor="middle" fill="#FF5FA2" font-family="Archivo" font-size="10" font-weight="700" letter-spacing="2">FUEL 25%</text>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;" data-display="1">LOW · E1 PULSE</div><div style="font-size: 11.5px; line-height: 1.5; margin-top: 4px;">The halo arc is already ION; it breathes at 0.8Hz with a soft outer ring. The number is the label — no icon, no banner.</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <svg viewBox="0 0 300 340" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <line x1="150" y1="200" x2="150" y2="290" stroke="#FFF4E0" stroke-width="1.5" opacity="0.18" stroke-linecap="round"></line>
+          <circle cx="150" cy="180" r="21" fill="none" stroke="#6C64A6" stroke-width="1.5" stroke-dasharray="3 5" opacity="0.6"></circle>
+          <circle cx="150" cy="180" r="27" fill="none" stroke="#FF5FA2" stroke-width="2" opacity="0.85" style="filter: drop-shadow(0 0 7px #FF5FA2);"></circle>
+          <g transform="translate(150 180) rotate(-90)"><path d="M 15 0 L -11 8.5 L -5.5 0 L -11 -8.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 16px #FFF4E0);"></path></g>
+          <text x="150" y="238" text-anchor="middle" fill="#FF5FA2" font-family="Archivo" font-size="10" font-weight="700" letter-spacing="2">FUEL 0 · DRIFTING</text>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;" data-display="1">EMPTY · E2 STROBE</div><div style="font-size: 11.5px; line-height: 1.5; margin-top: 4px;">The arc hollows to DUSK structure — spent, like a taken planet — while an ION ring strobes at 2Hz. The craft itself never dims: the player is still the brightest thing alive.</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <svg viewBox="0 0 440 340" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <defs><linearGradient id="edgeW" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF5FA2" stop-opacity="0"></stop><stop offset="1" stop-color="#FF5FA2" stop-opacity="0.45"></stop></linearGradient></defs>
+          <rect x="330" y="0" width="110" height="340" fill="url(#edgeW)"></rect>
+          <line x1="438" y1="0" x2="438" y2="340" stroke="#FF5FA2" stroke-width="2.5" opacity="0.9" style="filter: drop-shadow(0 0 8px #FF5FA2);"></line>
+          <path d="M 90 250 Q 220 170 330 128" fill="none" stroke="#FFF4E0" stroke-width="1.25" opacity="0.35"></path>
+          <path d="M 330 128 Q 380 110 425 100" fill="none" stroke="#FF5FA2" stroke-width="1.25" opacity="0.4" stroke-dasharray="4 6"></path>
+          <path d="M 196 185 Q 240 162 285 143" fill="none" stroke="#FF5FA2" stroke-width="5" stroke-linecap="round" opacity="0.95" style="filter: drop-shadow(0 0 5px #FF5FA2);"></path>
+          <circle cx="285" cy="143" r="5" fill="#FF5FA2" style="filter: drop-shadow(0 0 4px #FFD4E6) drop-shadow(0 0 9px #FF5FA2);"></circle>
+          <circle cx="285" cy="143" r="1.8" fill="#FFF4E0"></circle>
+          <g transform="translate(90 250) rotate(-31)"><path d="M 15 0 L -11 8.5 L -5.5 0 L -11 -8.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 18px #FFF4E0);"></path></g>
+          <text x="90" y="292" text-anchor="middle" fill="#FF5FA2" font-family="Unbounded" font-weight="900" font-size="16" data-display="1" style="filter: drop-shadow(0 0 8px rgba(255,95,162,0.8));">SOS</text>
+          <text x="240" y="205" fill="#6F6893" font-family="Archivo" font-size="9" letter-spacing="1.5">RECOVERY WINDOW</text>
+          <text x="300" y="122" fill="#6F6893" font-family="Archivo" font-size="9" letter-spacing="1.5">LAST PRESS</text>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;" data-display="1">DEADLINE TRACK · E3</div><div style="font-size: 11.5px; line-height: 1.5; margin-top: 4px;">On an out-of-bounds trajectory: the ION window rides the ship's own projected line, dot = last possible recovery press. Press inside it and you survive a flaming burn through the edge; miss it and SOS strobes at the craft until the burn-up. Past the dot the line goes dashed — the future thins out. Fuel couples by luminance, never geometry: the window is drawn at its true physical size, but only the portion the tank can afford stays lit — half a tank lights the early half; an empty tank shows the whole window in DUSK. A moment exists, and you cannot buy it.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TYPE CONTEST -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 28px 34px;">
+    <div style="display: flex; align-items: baseline; gap: 20px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE DISPLAY FACE, CONTESTED</div>
+      <div style="font-size: 12.5px; color: #6F6893;">flip <em>displayFace</em> in Tweaks — every display-face element on this sheet swaps live, including the HUD frames above</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 20px;">
+      <div style="background: #0A0814; border-radius: 10px; padding: 22px 24px;">
+        <div style="font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 34px; color: #FFF4E0; text-shadow: 0 0 18px rgba(255,244,224,0.4);">DEADEYE</div>
+        <div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 22px; color: #EDEAF7; margin-top: 6px;">1 458 <span style="font-size: 12px; color: #6F6893;">m/s</span></div>
+        <div style="font-size: 12.5px; line-height: 1.55; margin-top: 14px;"><span style="color: #EDEAF7; font-weight: 700;">UNBOUNDED</span> — the incumbent. Case for it: circular counters echo orbits; unmistakably a game. Case against: wide set eats space at large sizes, and its quirk can read "crypto-brand" rather than arcade.</div>
+      </div>
+      <div style="background: #0A0814; border-radius: 10px; padding: 22px 24px;">
+        <div style="font-family: 'Anton', sans-serif; font-size: 38px; color: #FFF4E0; letter-spacing: 0.03em; text-shadow: 0 0 18px rgba(255,244,224,0.4);">DEADEYE</div>
+        <div style="font-family: 'Anton', sans-serif; font-size: 25px; color: #EDEAF7; margin-top: 6px; letter-spacing: 0.03em;">1 458 <span style="font-size: 12px; color: #6F6893; font-family: 'Archivo', sans-serif;">m/s</span></div>
+        <div style="font-size: 12.5px; line-height: 1.55; margin-top: 14px;"><span style="color: #EDEAF7; font-weight: 700;">ANTON</span> — the poster voice. Tall, dense, hits hard at any size and never collides (narrow set). Reads scoreboard/stadium — pure arcade lineage, zero sci-fi baggage. Weakest at small data sizes, but Archivo owns those anyway.</div>
+      </div>
+      <div style="background: #0A0814; border-radius: 10px; padding: 22px 24px;">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 36px; color: #FFF4E0; text-shadow: 0 0 18px rgba(255,244,224,0.4);">DEADEYE</div>
+        <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 24px; color: #EDEAF7; margin-top: 6px;">1 458 <span style="font-size: 12px; color: #6F6893; font-family: 'Archivo', sans-serif;">m/s</span></div>
+        <div style="font-size: 12.5px; line-height: 1.55; margin-top: 14px;"><span style="color: #EDEAF7; font-weight: 700;">SPACE GROTESK</span> — the quiet option. Handsome numerals, pairs seamlessly with Archivo, ages well. Risk: it whispers where the game shouts — closer to the "orbital simulation" register we are escaping.</div>
+      </div>
+    </div>
+    <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(140,130,190,0.15); font-size: 13px; line-height: 1.6; max-width: 1100px;">My read: <span style="color: #EDEAF7; font-weight: 600;">Anton is the strongest fit for the thesis</span> — award words and velocity are shouted facts, and Anton shouts without implying depth, tech, or brand. Unbounded stays defensible if the orbit-echo justification carries weight for you. Space Grotesk is the fallback if play shows the HUD needs to recede. The utility face stays Archivo in all three worlds.</div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">04</span> the planet language &nbsp;·&nbsp; <span style="color: #A9A3C9;">05</span> the living baseline field &nbsp;·&nbsp; <span style="color: #A9A3C9;">06</span> award + callout system &nbsp;·&nbsp; <span style="color: #A9A3C9;">07</span> boundary as risk gradient &nbsp;·&nbsp; <span style="color: #A9A3C9;">08</span> daily front / results / leaderboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">09</span> three regions + zen subtraction</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;displayFace&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;Unbounded&quot;, &quot;options&quot;: [&quot;Unbounded&quot;, &quot;Anton&quot;, &quot;Space Grotesk&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Typography&quot;, &quot;description&quot;: &quot;Display face for velocity, awards, titles — swaps live across the whole sheet&quot;}
+}">
+class Component extends DCLogic {
+  applyFace() {
+    const f = this.props.displayFace ?? 'Unbounded';
+    const fam = f === 'Anton' ? "'Anton', sans-serif" : f === 'Space Grotesk' ? "'Space Grotesk', sans-serif" : "'Unbounded', sans-serif";
+    document.querySelectorAll('[data-display]').forEach(el => {
+      el.style.fontFamily = fam;
+      el.style.letterSpacing = f === 'Anton' ? '0.03em' : '';
+      if (el.tagName.toLowerCase() === 'text') {
+        el.setAttribute('font-weight', f === 'Anton' ? '400' : '700');
+      } else {
+        el.style.fontWeight = f === 'Anton' ? '400' : '';
+      }
+    });
+  }
+  componentDidMount() { this.applyFace(); }
+  componentDidUpdate() { this.applyFace(); }
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

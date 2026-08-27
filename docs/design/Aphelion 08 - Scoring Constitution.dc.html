@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 08 &nbsp;·&nbsp; THE SCORING CONSTITUTION</div>
+      <div style="font-family: 'Anton', sans-serif; font-size: 54px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; letter-spacing: 0.02em; text-shadow: 0 0 34px rgba(255,244,224,0.28);">THE FIELD PAYS FOR PROGRESS.<br>SKILL SETS THE PRICE.<br>THE BANK REMEMBERS.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">Every number in the game now answers to one law: <span style="color: #EDEAF7; font-weight: 600;">points are earned by moving through the world, and multiplied by how well you moved.</span> Nothing pays for waiting, nothing pays twice, and every multiplier is a fact the player already saw drawn on an instrument before it touched the score. If a scoring rule can't point at the pixel that announced it, the rule is wrong.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE FIVE AXIOMS</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #EDEAF7; font-weight: 600;">1 · Progress is the only base currency.</span> Metres climbed while engaged. Not time, not kills, not combos of combos.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">2 · Skill only multiplies.</span> Accuracy, risk, consistency, engagement — none of them mint points; they price the metres.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">3 · Coasting is unpaid, never punished.</span> Disengaged metres earn ×0. No decay, no drain.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">4 · Points exist in two states.</span> Carried (at stake, glowing) or banked (safe, dim). Death takes only what's carried… in most modes — see the matrix.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">5 · Every multiplier has a pixel.</span> Tier = the dot. Band = the motes. Streak = the ×N. Chain = the craft's bloom. No invisible math.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE LOOP -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 28px 34px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE EARN → CASH → BANK LOOP — SCORING FOLLOWS THE SWING</div>
+    <div style="display: grid; grid-template-columns: 1.15fr 1fr; gap: 34px; margin-top: 18px; align-items: start;">
+      <div>
+        <svg viewBox="0 0 760 300" width="100%" style="display: block;">
+          <defs>
+            <linearGradient id="carry" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFF4E0" stop-opacity="0.15"></stop><stop offset="1" stop-color="#FFF4E0" stop-opacity="0.8"></stop></linearGradient>
+          </defs>
+          <g font-family="Archivo" font-weight="800" font-size="14" letter-spacing="2">
+            <text x="90" y="40" fill="#A9A3C9">GRAB</text>
+            <text x="330" y="40" fill="#FFF4E0">RELEASE</text>
+            <text x="600" y="40" fill="#A9A3C9">NEXT GRAB</text>
+          </g>
+          <line x1="100" y1="60" x2="100" y2="240" stroke="#6C64A6" stroke-width="1" opacity="0.4"></line>
+          <line x1="360" y1="60" x2="360" y2="240" stroke="#FFF4E0" stroke-width="1.5" opacity="0.5"></line>
+          <line x1="640" y1="60" x2="640" y2="240" stroke="#6C64A6" stroke-width="1" opacity="0.4"></line>
+          <rect x="100" y="86" width="260" height="14" rx="7" fill="url(#carry)"></rect>
+          <text x="110" y="78" fill="#EDEAF7" font-family="Archivo" font-size="11.5" font-weight="700" letter-spacing="1">CARRY — metres accrue, glowing, at stake</text>
+          <circle cx="360" cy="93" r="10" fill="#FFC94A" style="filter: drop-shadow(0 0 8px #FFC94A);"></circle>
+          <text x="380" y="86" fill="#FFC94A" font-family="Archivo" font-size="11.5" font-weight="700" letter-spacing="1">CASH — the grade prices the carry:</text>
+          <text x="380" y="103" fill="#FFC94A" font-family="Archivo" font-size="11.5" font-weight="600" letter-spacing="0.5" opacity="0.9">carry × tier × band × streak → BANK</text>
+          <rect x="360" y="150" width="280" height="14" rx="7" fill="#6C64A6" opacity="0.35"></rect>
+          <text x="370" y="142" fill="#A9A3C9" font-family="Archivo" font-size="11.5" font-weight="700" letter-spacing="1">COAST — unpaid metres, BANK dimmed, nothing lost</text>
+          <rect x="100" y="206" width="540" height="1" fill="#6C64A6" opacity="0.3"></rect>
+          <text x="100" y="232" fill="#6F6893" font-family="Archivo" font-size="11" letter-spacing="1">DEATH AT ANY POINT — takes the carry and (Daily/Infinite) the bank. The stake is deliberate.</text>
+          <text x="100" y="272" fill="#A9A3C9" font-family="Archivo" font-size="12" letter-spacing="0.5">The unit of scoring is the swing, because the unit of play is the swing.</text>
+          <text x="100" y="290" fill="#6F6893" font-family="Archivo" font-size="11.5">A release isn't a bonus moment — it is payday, and the compass spent the whole orbit setting the wage.</text>
+        </svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13.5px; line-height: 1.62;">
+        <div><span style="color: #EDEAF7; font-weight: 600;">The carry is visible on the craft.</span> Carried points ride as the brightness of the trail (E-channel, like everything at stake); banked points are the dim BANK chip. The player can always see what death would cost, without reading a number.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">The grade prices the whole carry, not just the moment.</span> A PERFECT doesn't award a flat bonus — it doubles everything you carried through that orbit. High carries into hard windows are the game's core bet, and the compass arc width is the posted odds.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">Chain is engagement, not accuracy</span> — it counts consecutive engaged swings (no coasting gap over one full rung, 25m), gates the craft's bloom, and adds its flat +10%/link inside the carry accrual. Streaks (Direction 06) are accuracy and live in the cash step. Two systems, two pixels, no overlap.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKED EXAMPLE + MULTIPLIER STACK -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">ONE SWING, PRICED — THE WHOLE FORMULA IN ACTION</div>
+      <div style="display: flex; flex-direction: column; gap: 0; margin-top: 14px;">
+        <div style="display: grid; grid-template-columns: 200px 1fr 150px; gap: 16px; padding: 11px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; align-items: baseline;">
+          <div style="color: #EDEAF7; font-weight: 700;">CARRY</div><div>142m climbed engaged, chain ×6 (+10%/link accrual)</div><div style="text-align: right; color: #EDEAF7; font-weight: 600;">227 pts</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px 1fr 150px; gap: 16px; padding: 11px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; align-items: baseline;">
+          <div style="color: #FFC94A; font-weight: 700;">TIER — PERFECT</div><div>released within ±8% of the dot · the pixel: the dot itself</div><div style="text-align: right; color: #FFC94A; font-weight: 600;">× 2.0</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px 1fr 150px; gap: 16px; padding: 11px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; align-items: baseline;">
+          <div style="color: #FF5FA2; font-weight: 700;">BAND — FIRE</div><div>the orbit sat in the ×3 band · the pixel: mote density</div><div style="text-align: right; color: #FF5FA2; font-weight: 600;">× 3.0</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px 1fr 150px; gap: 16px; padding: 11px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; align-items: baseline;">
+          <div style="color: #B48CFF; font-weight: 700;">STREAK — PERFECT ×3</div><div>third consecutive · +10%/step · the pixel: the ×N</div><div style="text-align: right; color: #B48CFF; font-weight: 600;">× 1.2</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 200px 1fr 150px; gap: 16px; padding: 13px 0; font-size: 14px; align-items: baseline;">
+          <div style="color: #FFF4E0; font-weight: 800;">CASHED TO BANK</div><div style="color: #6F6893; font-size: 12px;">callout shows the result: PERFECT ×3 · +1 634</div><div style="text-align: right; color: #FFF4E0; font-weight: 800; font-size: 17px;">+1 634</div>
+        </div>
+      </div>
+      <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(140,130,190,0.15); font-size: 13px; line-height: 1.6;">Multipliers <span style="color: #EDEAF7; font-weight: 600;">multiply — they never add to each other</span> — so the theoretical max per swing is legible: 2.0 × 3.0 × 1.5 = ×9 over base. The +445-style floating gain of the old build is gone; the callout <em>is</em> the receipt, and the BANK tick is its confirmation.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">WHAT DELIBERATELY EARNS NOTHING</div>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px; font-size: 13px; line-height: 1.55;">
+        <div><span style="color: #6F6893;">Velocity</span> — the headline number and worth zero points. It's the *cause* of scoring (more speed → more metres per swing → bigger carries), never scored itself. That's what keeps it a fun number instead of a grind meter.</div>
+        <div><span style="color: #6F6893;">Orbiting</span> — holding an orbit earns nothing per lap. Altitude while orbiting ≈ 0, so the formula already says so; no special rule needed. Waiting is priced at exactly its altitude value: none.</div>
+        <div><span style="color: #6F6893;">Near-misses, grazes, style</span> — no invisible judges. If the game can't point at the instrument that graded it, it doesn't grade it.</div>
+        <div><span style="color: #6F6893;">Survival time</span> — never. Time pressure comes from the field escalating (Infinite) or the clock being the score (Corridors), not from a per-second trickle.</div>
+      </div>
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(140,130,190,0.15); font-size: 12.5px; line-height: 1.6; color: #6F6893;">Design smell this prevents: "engagement rewards" that pay players for not playing well. Aphelion pays for exactly one thing — skilled forward motion — priced four ways.</div>
+    </div>
+  </div>
+
+  <!-- MODE MATRIX -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 28px 34px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE MODE MATRIX — SAME CONSTITUTION, FIVE ECONOMIES</div>
+    <div style="display: flex; flex-direction: column; margin-top: 16px;">
+      <div style="display: grid; grid-template-columns: 170px 1.2fr 1fr 1fr 1.3fr; gap: 18px; padding: 10px 0; border-bottom: 1px solid rgba(140,130,190,0.25); font-size: 11px; letter-spacing: 0.18em; color: #6F6893; font-weight: 700;">
+        <div>MODE</div><div>CURRENCY</div><div>DEATH TAKES…</div><div>STREAKS &amp; CHAIN</div><div>THE FEELING IT PRODUCES</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 170px 1.2fr 1fr 1fr 1.3fr; gap: 18px; padding: 13px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; line-height: 1.5; align-items: baseline;">
+        <div style="color: #EDEAF7; font-weight: 800;">DAILY</div>
+        <div>Full constitution. One run, one bank.</div>
+        <div style="color: #FF5FA2;">Carry <em>and</em> bank — the run is the wager.</div>
+        <div>All live. Longest PERFECT streak is a posted stat.</div>
+        <div>High ceremony. Every swing matters because nothing can be re-run until tomorrow.</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 170px 1.2fr 1fr 1fr 1.3fr; gap: 18px; padding: 13px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; line-height: 1.5; align-items: baseline;">
+        <div style="color: #EDEAF7; font-weight: 800;">INFINITE</div>
+        <div>Full constitution, field escalates, no top.</div>
+        <div>Carry only — banked survives to the final tally. The long game needs a floor or nobody risks the fire band at altitude.</div>
+        <div>All live; chain is the run's spine.</div>
+        <div>Endurance gambling. "One more swing" forever; the fire band gets scarier the richer you are.</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 170px 1.2fr 1fr 1fr 1.3fr; gap: 18px; padding: 13px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; line-height: 1.5; align-items: baseline;">
+        <div style="color: #EDEAF7; font-weight: 800;">CORRIDORS<div style="font-weight: 500; color: #6F6893; font-size: 11px;">speed trials + puzzle</div></div>
+        <div style="color: #EDEAF7;">Time. Points don't exist — tiers pay <em>seconds</em>: PERFECT −2.0s, SHARP −1.0s, TRUE −0.5s.</div>
+        <div>The attempt. Retry is free and instant.</div>
+        <div>Streaks intact (consecutive PERFECTs compound the rebate ×N). Chain idles — engagement is mandatory on a course.</div>
+        <div>Time-attack purity. The racing line and the scoring line are the same line.</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 170px 1.2fr 1fr 1fr 1.3fr; gap: 18px; padding: 13px 0; border-bottom: 1px solid rgba(140,130,190,0.12); font-size: 13px; line-height: 1.5; align-items: baseline;">
+        <div style="color: #EDEAF7; font-weight: 800;">ADVENTURE</div>
+        <div>Full constitution per region + one authored goal (reach, find, survive) that gates progress.</div>
+        <div>Carry only; region checkpoints hold the bank.</div>
+        <div>All live. New body types plug into the same carry/cash cycle — no per-region scoring rules, ever.</div>
+        <div>Exploration with stakes that reset kindly. The score teaches the region; the goal ends it.</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 170px 1.2fr 1fr 1fr 1.3fr; gap: 18px; padding: 13px 0; font-size: 13px; line-height: 1.5; align-items: baseline;">
+        <div style="color: #EDEAF7; font-weight: 800;">ZEN</div>
+        <div style="color: #6F6893;">None. The subtraction proves the system: remove points and the tiers still speak — the dot still flashes, the word still pops. Grading survives; pricing doesn't.</div>
+        <div style="color: #6F6893;">Nothing. There is no death, only drifting back.</div>
+        <div style="color: #6F6893;">Words and ×N remain (they're feedback); multipliers and BANK are gone.</div>
+        <div>Motion and light. What's left when the ledger is taken away — and the proof the ledger was never the point.</div>
+      </div>
+    </div>
+    <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(140,130,190,0.15); font-size: 13px; line-height: 1.6; max-width: 1200px;"><span style="color: #EDEAF7; font-weight: 600;">The rule that holds the matrix together:</span> modes may change <em>what the currency is</em> and <em>what death takes</em> — they may never change how a swing is graded. TRUE/SHARP/PERFECT, the zones, the bands, the streak rules: identical everywhere, so skill transfers across every mode and the compass never has to be relearned.</div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">09</span> daily front / results / leaderboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">10</span> adventure regions + zen subtraction</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- ============ HEADER / POINT OF VIEW ============ -->
+  <div style="display: grid; grid-template-columns: 1fr 460px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 01 &nbsp;·&nbsp; TOKEN SYSTEM + PLANET COMPASS</div>
+      <div style="font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 54px; color: #FFF4E0; line-height: 1.06; margin-top: 18px; text-shadow: 0 0 34px rgba(255,244,224,0.28); text-wrap: balance;">Brightness is commitment.<br>Colour is identity.<br>Pink is risk.</div>
+      <div style="margin-top: 20px; font-size: 15.5px; line-height: 1.65; max-width: 780px; color: #A9A3C9;">The point of view: Aphelion is an <span style="color: #EDEAF7; font-weight: 600;">instrument you fly</span>. Everything luminous on screen is either the player's stored energy or a fact about the future — nothing glows as decoration. The signature element, the thing a screenshot is recognised by, is the <span style="color: #EDEAF7; font-weight: 600;">compass: a white-hot craft inside a set of coloured windows</span>. Everything around it stays disciplined so the compass can spend the boldness.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #FF5FA2; font-weight: 700;">WHAT THE DEFAULT WOULD HAVE BEEN — REJECTED</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #6F6893;">Acid accent on near-black</span> → palette derived from the aurora's violet–pink and a stellar identity band.</div>
+        <div><span style="color: #6F6893;">Monospace HUD</span> → arcade display face + grotesk data face. This is a game, not a simulator.</div>
+        <div><span style="color: #6F6893;">Radial glow bursts</span> → every streak falls in parallel. Side-on, no vanishing point, ever.</div>
+        <div><span style="color: #6F6893;">Score-first hierarchy</span> → velocity is the headline; score is bookkeeping.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ROW: HUE DECISION + PALETTE ============ -->
+  <div style="display: grid; grid-template-columns: 560px 1fr; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 28px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE OPEN CALL — RESOLVED</div>
+      <div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 24px; color: #EDEAF7; margin-top: 12px; line-height: 1.25;">Hue is identity.<br>Quality is energy.</div>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px; font-size: 13.5px; line-height: 1.55;">
+        <div>Identity needs <span style="color: #EDEAF7;">many distinguishable values</span> and must extend — every adventure region adds body types. Hue is the only channel with enough levels.</div>
+        <div>Quality is <span style="color: #EDEAF7;">ordinal</span>. Luminance, bloom radius and motion natively mean "more". The ship already obeys this rule: its glow builds with the chain.</div>
+        <div>They coexist because they <span style="color: #EDEAF7;">never share an element</span>: an arc keeps its hue forever and heats in place. Nothing on screen ever changes hue to mean "better".</div>
+        <div>Award tiers inherit it: DEADEYE and CLEAN differ by bloom and scale, never by colour.</div>
+      </div>
+      <svg viewBox="0 0 480 116" width="480" height="116" style="margin-top: 18px; display: block;">
+        <text x="0" y="14" fill="#6F6893" font-size="10" letter-spacing="2" font-family="Archivo">SAME HUE, FOUR ENERGIES — HOW AN ARC HEATS AS AIM CLOSES</text>
+        <circle cx="60" cy="164" r="100" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4" stroke-linecap="round" stroke-dasharray="46 314" stroke-dashoffset="113" opacity="0.35"></circle>
+        <circle cx="180" cy="164" r="100" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="46 314" stroke-dashoffset="113" opacity="0.6" style="filter: drop-shadow(0 0 4px #5FC88F);"></circle>
+        <circle cx="300" cy="164" r="100" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="5" stroke-linecap="round" stroke-dasharray="46 314" stroke-dashoffset="113" opacity="0.9" style="filter: drop-shadow(0 0 9px #5FC88F);"></circle>
+        <circle cx="420" cy="164" r="100" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="5.5" stroke-linecap="round" stroke-dasharray="46 314" stroke-dashoffset="113" style="filter: drop-shadow(0 0 6px #C8FFDF) drop-shadow(0 0 16px #5FC88F);"></circle>
+        <circle cx="420" cy="64" r="4.5" fill="#FFF4E0" style="filter: drop-shadow(0 0 8px #FFF4E0);"></circle>
+      </svg>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 28px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">PALETTE — EIGHT NAMES, EIGHT MEANINGS · THE CANONICAL RECORD</div>
+      <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 14px; margin-top: 18px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="height: 84px; border-radius: 8px; background: #0A0814; border: 1px solid rgba(140,130,190,0.25);"></div>
+          <div style="font-weight: 700; color: #EDEAF7; font-size: 14px;">VOID <span style="color: #6F6893; font-weight: 500; font-size: 12px;">#0A0814</span></div>
+          <div style="font-size: 12px; line-height: 1.5;">The sky. Violet-black, never pure. True #000 exists only in the anomaly's cloud gaps — so the anomaly reads <em>deeper</em> than ordinary space.</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="height: 84px; border-radius: 8px; background: #6C64A6;"></div>
+          <div style="font-weight: 700; color: #EDEAF7; font-size: 14px;">DUSK <span style="color: #6F6893; font-weight: 500; font-size: 12px;">#6C64A6</span></div>
+          <div style="font-size: 12px; line-height: 1.5;">Structure. Rings at rest, field lines, spent bodies, secondary data. DUSK never glows — it is the unlit state of everything.</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="height: 84px; border-radius: 8px; background: #9D6BFF; box-shadow: 0 0 22px rgba(157,107,255,0.5);"></div>
+          <div style="font-weight: 700; color: #EDEAF7; font-size: 14px;">AURORA <span style="color: #6F6893; font-weight: 500; font-size: 12px;">#9D6BFF</span></div>
+          <div style="font-size: 12px; line-height: 1.5;">Strange: anomaly sky, black holes, farewell rings. Purple means the rules are different here — never "good," never identity. (Dir. 04)</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="height: 84px; border-radius: 8px; background: #FF5FA2; box-shadow: 0 0 22px rgba(255,95,162,0.5);"></div>
+          <div style="font-weight: 700; color: #EDEAF7; font-size: 14px;">ION <span style="color: #6F6893; font-weight: 500; font-size: 12px;">#FF5FA2</span></div>
+          <div style="font-size: 12px; line-height: 1.5;">Risk and tension: boundary gradient, deadline, low fuel. Pink is never decoration — if it's pink, it can cost you the bank.</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="height: 84px; border-radius: 8px; background: #FFF4E0; box-shadow: 0 0 30px rgba(255,244,224,0.65);"></div>
+          <div style="font-weight: 700; color: #EDEAF7; font-size: 14px;">CORE <span style="color: #6F6893; font-weight: 500; font-size: 12px;">#FFF4E0</span></div>
+          <div style="font-size: 12px; line-height: 1.5;">The player. Craft, trail, release hand, TRUE callouts. The brightest value in the game — nothing else may reach it.</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="height: 84px; border-radius: 8px; background: #7FE0A8; box-shadow: 0 0 22px rgba(127,224,168,0.5);"></div>
+          <div style="font-weight: 700; color: #EDEAF7; font-size: 14px;">LUMEN <span style="color: #6F6893; font-weight: 500; font-size: 12px;">#7FE0A8</span></div>
+          <div style="font-size: 12px; line-height: 1.5;">Quality, mid tier: SHARP callouts — type only. One world monopoly: the finish system (carpet, checkered line). Green = sanctuary, ION's mirror. (Dir. 06, 12)</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="height: 84px; border-radius: 8px; background: #FFC94A; box-shadow: 0 0 22px rgba(255,201,74,0.5);"></div>
+          <div style="font-weight: 700; color: #EDEAF7; font-size: 14px;">SOLAR <span style="color: #6F6893; font-weight: 500; font-size: 12px;">#FFC94A</span></div>
+          <div style="font-size: 12px; line-height: 1.5;">Quality, top tier: PERFECT callouts and their ×N. Type only, same law as LUMEN. (Dir. 06)</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="height: 84px; border-radius: 8px; background: #EDEAF7;"></div>
+          <div style="font-weight: 700; color: #EDEAF7; font-size: 14px;">INK <span style="color: #6F6893; font-weight: 500; font-size: 12px;">#EDEAF7</span></div>
+          <div style="font-size: 12px; line-height: 1.5;">Utility text at full strength: data, labels, chips. Never blooms — text light belongs to the quality colours.</div>
+        </div>
+      </div>
+      <div style="margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(140,130,190,0.15); display: flex; align-items: center; gap: 20px;">
+        <div style="display: flex; gap: 10px;">
+          <div style="width: 34px; height: 34px; border-radius: 50%; background: #E89A5F; box-shadow: 0 0 12px rgba(232,154,95,0.6);"></div>
+          <div style="width: 34px; height: 34px; border-radius: 50%; background: #43CDA8; box-shadow: 0 0 12px rgba(67,205,168,0.6);"></div>
+          <div style="width: 34px; height: 34px; border-radius: 50%; background: #3FB0E0; box-shadow: 0 0 12px rgba(63,176,224,0.6);"></div>
+          <div style="width: 34px; height: 34px; border-radius: 50%; background: #7B9DFF; box-shadow: 0 0 12px rgba(123,157,255,0.6);"></div>
+        </div>
+        <div style="font-size: 12.5px; line-height: 1.55; max-width: 620px;"><span style="color: #EDEAF7; font-weight: 600;">The identity band is a rule, not a list:</span> planet hues are generated at <span style="font-weight: 600; color: #EDEAF7;">oklch(0.72&nbsp;0.13&nbsp;H)</span>, H stepped ≥50° between neighbours, excluding the violet–pink band (strange + risk: AURORA, ION) and the quality bands (LUMEN green, SOLAR gold). Exemplar slots: ember 55° · teal 170° · azure 215° · blue 265° — greens sit at teal, ≥20° clear of LUMEN; blues stop at 265°, short of AURORA's violet. Fixed lightness and chroma keep every identity equally loud; the rule extends to every region's new bodies. One exception, by decree: black holes wear AURORA.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ROW: TYPE + EMISSION + MOTION ============ -->
+  <div style="display: grid; grid-template-columns: 1fr 430px 430px; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 28px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">TYPE — DISPLAY SPEAKS, UTILITY REPORTS</div>
+      <div style="margin-top: 20px; display: flex; align-items: baseline; gap: 26px;">
+        <div style="font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 46px; color: #FFF4E0; text-shadow: 0 0 26px rgba(255,244,224,0.4);">DEADEYE</div>
+        <div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 34px; color: #EDEAF7;">1 284 <span style="font-size: 15px; font-weight: 500; color: #6F6893;">m/s</span></div>
+      </div>
+      <div style="margin-top: 10px; font-size: 13px; color: #6F6893;">Unbounded — award words, velocity, mode titles. Circular counters echo orbits; reads arcade at a glance, at speed.</div>
+      <div style="margin-top: 20px; padding: 12px 16px; background: #0A0814; border-radius: 8px; font-size: 14px; font-weight: 600; letter-spacing: 0.14em; color: #A9A3C9;">CHAIN ×7 &nbsp;·&nbsp; BANK 12 450 &nbsp;·&nbsp; P12 IN 3.2s</div>
+      <div style="margin-top: 10px; font-size: 13px; color: #6F6893;">Archivo — data, labels, telemetry. Deliberately <span style="color: #A9A3C9;">not monospace</span>: the current build's mono reads as hard-sim, not arcade. Tracked caps do the "instrument" work instead.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 28px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">EMISSION — FOUR TIERS, NO EXCEPTIONS</div>
+      <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 20px;">
+        <div style="display: flex; align-items: center; gap: 18px;">
+          <div style="width: 14px; height: 14px; border-radius: 50%; background: #6C64A6; flex: none;"></div>
+          <div style="font-size: 12.5px; line-height: 1.45;"><span style="color: #EDEAF7; font-weight: 700;">E0 STRUCTURE</span> — no bloom. Rings at rest, field lines, spent bodies.</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 18px;">
+          <div style="width: 14px; height: 14px; border-radius: 50%; background: #5FC88F; box-shadow: 0 0 6px rgba(95,200,143,0.7); flex: none;"></div>
+          <div style="font-size: 12.5px; line-height: 1.45;"><span style="color: #EDEAF7; font-weight: 700;">E1 LIT</span> — 6px bloom @ 35%. Active windows, planet limbs, labels.</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 18px;">
+          <div style="width: 14px; height: 14px; border-radius: 50%; background: #FFF4E0; box-shadow: 0 0 6px #FFF4E0, 0 0 18px rgba(255,244,224,0.7); flex: none;"></div>
+          <div style="font-size: 12.5px; line-height: 1.45;"><span style="color: #EDEAF7; font-weight: 700;">E2 HOT</span> — 18px bloom @ 60% + white core. Craft baseline, a window under live aim, the perfect dot when matched.</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 18px;">
+          <div style="width: 14px; height: 14px; border-radius: 50%; background: #FFF4E0; box-shadow: 0 0 10px #FFF4E0, 0 0 28px rgba(255,244,224,0.9), 0 0 48px rgba(255,95,162,0.5); flex: none;"></div>
+          <div style="font-size: 12.5px; line-height: 1.45;"><span style="color: #EDEAF7; font-weight: 700;">E3 FLASH</span> — 48px, additive, 400ms decay. Release, capture, award. Only one E3 alive at a time.</div>
+        </div>
+      </div>
+      <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(140,130,190,0.15); font-size: 12.5px; line-height: 1.55;">Bloom radius is the quality channel. Chain level adds +4px per link to the craft's E2 — a hot run is visibly hotter, in radius, never in hue.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 28px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">MOTION — WHAT "PUNCHY" MEANS HERE</div>
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 20px; font-size: 12.5px; line-height: 1.5;">
+        <div style="display: flex; gap: 14px;"><div style="width: 84px; flex: none; color: #EDEAF7; font-weight: 700;">ENTER</div><div>120ms, overshoot cubic-bezier(.2,&nbsp;1.6,&nbsp;.3,&nbsp;1), from 92% scale. Things arrive; they don't fade in.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 84px; flex: none; color: #EDEAF7; font-weight: 700;">DECAY</div><div>420ms exponential. Nothing persists past 600ms except the trail.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 84px; flex: none; color: #EDEAF7; font-weight: 700;">HITSTOP</div><div>70ms world freeze at release and capture. The pause is the punch.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 84px; flex: none; color: #EDEAF7; font-weight: 700;">KICK</div><div>Camera 6px along the exit tangent, home in 180ms. Along the tangent only — never a shake.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 84px; flex: none; color: #EDEAF7; font-weight: 700;">RULE</div><div>Attack ≤ 2 frames; decay ≥ 10× attack. All streaks parallel to velocity — nothing ever radiates from a point.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ THE COMPASS ============ -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 32px 36px;">
+    <div style="display: flex; align-items: baseline; gap: 22px;">
+      <div style="font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 30px; color: #FFF4E0; text-shadow: 0 0 22px rgba(255,244,224,0.3);">THE PLANET COMPASS</div>
+      <div style="font-size: 13px; color: #6F6893;">same information as today, arcade presentation — and it now grades your aim before you release</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 500px 1fr; gap: 40px; margin-top: 26px; align-items: start;">
+      <svg viewBox="0 0 430 760" width="500" style="background: #0A0814; border-radius: 14px; display: block; border: 1px solid rgba(140,130,190,0.12);">
+        <line x1="70" y1="0" x2="70" y2="760" stroke="#6C64A6" stroke-width="1" opacity="0.05"></line>
+        <line x1="200" y1="0" x2="200" y2="760" stroke="#6C64A6" stroke-width="1" opacity="0.04"></line>
+        <line x1="352" y1="0" x2="352" y2="760" stroke="#6C64A6" stroke-width="1" opacity="0.05"></line>
+        <!-- rings at rest -->
+        <circle cx="215" cy="470" r="190" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+        <circle cx="215" cy="470" r="225" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+        <circle cx="215" cy="470" r="262" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+        <circle cx="215" cy="470" r="300" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+        <!-- spent planet -->
+        <circle cx="215" cy="470" r="92" fill="#100C20" stroke="#6C64A6" stroke-width="1.5" opacity="0.95"></circle>
+        <circle cx="215" cy="470" r="86" fill="none" stroke="#6C64A6" stroke-width="0.75" opacity="0.35"></circle>
+        <text x="215" y="475" text-anchor="middle" fill="#6C64A6" font-size="13" font-weight="600" letter-spacing="2" font-family="Archivo">P11</text>
+        <!-- orbit path -->
+        <circle cx="215" cy="470" r="148" fill="none" stroke="#FFF4E0" stroke-width="1.25" opacity="0.28"></circle>
+        <!-- trail -->
+        <circle cx="215" cy="470" r="148" pathLength="360" fill="none" stroke="#FFF4E0" stroke-width="2.5" opacity="0.22" stroke-linecap="round" stroke-dasharray="26 334" stroke-dashoffset="62"></circle>
+        <circle cx="215" cy="470" r="148" pathLength="360" fill="none" stroke="#FFF4E0" stroke-width="4" opacity="0.42" stroke-linecap="round" stroke-dasharray="12 348" stroke-dashoffset="62" style="filter: drop-shadow(0 0 5px rgba(255,244,224,0.8));"></circle>
+        <!-- windows -->
+        <circle cx="215" cy="470" r="190" pathLength="360" fill="none" stroke="#E89A5F" stroke-width="5" stroke-linecap="round" stroke-dasharray="34 326" stroke-dashoffset="-4" opacity="0.8" style="filter: drop-shadow(0 0 5px rgba(232,154,95,0.7));"></circle>
+        <circle cx="392.4" cy="538.1" r="4.5" fill="#E89A5F" style="filter: drop-shadow(0 0 6px #E89A5F);"></circle>
+        <circle cx="215" cy="470" r="262" pathLength="360" fill="none" stroke="#3EC1D6" stroke-width="5" stroke-linecap="round" stroke-dasharray="22 338" stroke-dashoffset="140" opacity="0.8" style="filter: drop-shadow(0 0 5px rgba(62,193,214,0.7));"></circle>
+        <circle cx="50.1" cy="266.4" r="4.5" fill="#3EC1D6" style="filter: drop-shadow(0 0 6px #3EC1D6);"></circle>
+        <circle cx="215" cy="470" r="300" pathLength="360" fill="none" stroke="#8FA0FF" stroke-width="5" stroke-linecap="round" stroke-dasharray="14 346" stroke-dashoffset="109" opacity="0.8" style="filter: drop-shadow(0 0 5px rgba(143,160,255,0.7));"></circle>
+        <circle cx="152.6" cy="176.6" r="4.5" fill="#8FA0FF" style="filter: drop-shadow(0 0 6px #8FA0FF);"></circle>
+        <!-- jade window: under live aim, HOT -->
+        <circle cx="215" cy="470" r="225" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="5.5" stroke-linecap="round" stroke-dasharray="14 346" stroke-dashoffset="77" style="filter: drop-shadow(0 0 4px #5FC88F) drop-shadow(0 0 12px rgba(95,200,143,0.8));"></circle>
+        <circle cx="215" cy="470" r="225" pathLength="360" fill="none" stroke="#C8FFDF" stroke-width="6.5" stroke-linecap="round" stroke-dasharray="4 356" stroke-dashoffset="72" style="filter: drop-shadow(0 0 7px #C8FFDF);"></circle>
+        <!-- gap indicator: ghost -> perfect -->
+        <circle cx="215" cy="470" r="225" pathLength="360" fill="none" stroke="#FFF4E0" stroke-width="1.2" opacity="0.5" stroke-dasharray="8 352" stroke-dashoffset="70"></circle>
+        <!-- release hand: the radius through the craft — crossing dots mark each ring -->
+        <line x1="284.5" y1="339.3" x2="365.2" y2="187.5" stroke="#FFF4E0" stroke-width="1.5" opacity="0.35"></line>
+        <line x1="284.5" y1="339.3" x2="320.6" y2="271.3" stroke="#FFF4E0" stroke-width="2.75" opacity="0.95" style="filter: drop-shadow(0 0 4px rgba(255,244,224,0.9));"></line>
+        <!-- hand crossings: one small dot per ring, active ring's is the ghost -->
+        <circle cx="304.2" cy="302.2" r="2.5" fill="#FFF4E0" opacity="0.55"></circle>
+        <circle cx="320.6" cy="271.3" r="3.5" fill="#FFF4E0" style="filter: drop-shadow(0 0 5px #FFF4E0);"></circle>
+        <circle cx="337.9" cy="238.6" r="2.5" fill="#FFF4E0" opacity="0.55"></circle>
+        <circle cx="355.8" cy="205.1" r="2.5" fill="#FFF4E0" opacity="0.55"></circle>
+        <circle cx="291.9" cy="258.6" r="5.5" fill="#5FC88F" style="filter: drop-shadow(0 0 4px #C8FFDF) drop-shadow(0 0 10px #5FC88F);"></circle>
+        <circle cx="291.9" cy="258.6" r="2" fill="#FFF4E0"></circle>
+        <!-- craft -->
+        <g transform="translate(284.5 339.3) rotate(-152)">
+          <path d="M 17 0 L -11 10 L -5 0 L -11 -10 Z" fill="#FFF4E0" ref="{{heroCraftRef}}" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 20px #FFF4E0) drop-shadow(0 0 39px rgba(255,244,224,0.8));"></path>
+        </g>
+        <!-- labels: chip at each arc's tip, on its own radius -->
+        <g transform="translate(361.7 611.7)">
+          <rect x="-27" y="-11" width="54" height="22" rx="11" fill="rgba(10,8,20,0.88)" stroke="#E89A5F" stroke-opacity="0.5"></rect>
+          <circle cx="-14" cy="0" r="3" fill="#E89A5F"></circle>
+          <text x="6" y="4" text-anchor="middle" fill="#EDEAF7" font-size="11" font-weight="600" font-family="Archivo">P15</text>
+        </g>
+        <g transform="translate(256.7 226.7)">
+          <rect x="-27" y="-11" width="54" height="22" rx="11" fill="rgba(10,8,20,0.88)" stroke="#5FC88F" stroke-opacity="0.6"></rect>
+          <circle cx="-14" cy="0" r="3" fill="#5FC88F"></circle>
+          <text x="6" y="4" text-anchor="middle" fill="#EDEAF7" font-size="11" font-weight="600" font-family="Archivo">P12</text>
+        </g>
+        <g transform="translate(96.7 217.8)">
+          <rect x="-27" y="-11" width="54" height="22" rx="11" fill="rgba(10,8,20,0.88)" stroke="#3EC1D6" stroke-opacity="0.5"></rect>
+          <circle cx="-14" cy="0" r="3" fill="#3EC1D6"></circle>
+          <text x="6" y="4" text-anchor="middle" fill="#EDEAF7" font-size="11" font-weight="600" font-family="Archivo">P19</text>
+        </g>
+        <g transform="translate(209.5 148.1)">
+          <rect x="-27" y="-11" width="54" height="22" rx="11" fill="rgba(10,8,20,0.88)" stroke="#8FA0FF" stroke-opacity="0.5"></rect>
+          <circle cx="-14" cy="0" r="3" fill="#8FA0FF"></circle>
+          <text x="6" y="4" text-anchor="middle" fill="#EDEAF7" font-size="11" font-weight="600" font-family="Archivo">P22</text>
+        </g>
+        <!-- thumb line -->
+        <line x1="0" y1="507" x2="430" y2="507" stroke="#6C64A6" stroke-width="1" opacity="0.3" stroke-dasharray="6 6"></line>
+        <!-- numbered markers -->
+        <sc-if value="{{showMarkers}}" hint-placeholder-val="{{ true }}">
+          <g font-family="Archivo" font-size="10" font-weight="700">
+            <g transform="translate(252 364)"><circle r="9" fill="#1A1530" stroke="#9D6BFF" stroke-opacity="0.7"></circle><text y="3.5" text-anchor="middle" fill="#C9BDF2">1</text></g>
+            <g transform="translate(330 302)"><circle r="9" fill="#1A1530" stroke="#9D6BFF" stroke-opacity="0.7"></circle><text y="3.5" text-anchor="middle" fill="#C9BDF2">2</text></g>
+            <g transform="translate(348 258)"><circle r="9" fill="#1A1530" stroke="#9D6BFF" stroke-opacity="0.7"></circle><text y="3.5" text-anchor="middle" fill="#C9BDF2">3</text></g>
+            <g transform="translate(262 232)"><circle r="9" fill="#1A1530" stroke="#9D6BFF" stroke-opacity="0.7"></circle><text y="3.5" text-anchor="middle" fill="#C9BDF2">4</text></g>
+            <g transform="translate(260 158)"><circle r="9" fill="#1A1530" stroke="#9D6BFF" stroke-opacity="0.7"></circle><text y="3.5" text-anchor="middle" fill="#C9BDF2">5</text></g>
+            <g transform="translate(215 545)"><circle r="9" fill="#1A1530" stroke="#9D6BFF" stroke-opacity="0.7"></circle><text y="3.5" text-anchor="middle" fill="#C9BDF2">6</text></g>
+            <g transform="translate(48 560)"><circle r="9" fill="#1A1530" stroke="#9D6BFF" stroke-opacity="0.7"></circle><text y="3.5" text-anchor="middle" fill="#C9BDF2">7</text></g>
+            <g transform="translate(392 520)"><circle r="9" fill="#1A1530" stroke="#9D6BFF" stroke-opacity="0.7"></circle><text y="3.5" text-anchor="middle" fill="#C9BDF2">8</text></g>
+          </g>
+        </sc-if>
+      </svg>
+      <div style="display: flex; flex-direction: column; gap: 14px; font-size: 13.5px; line-height: 1.6; max-width: 720px;">
+        <div style="display: flex; gap: 14px;"><div style="width: 22px; height: 22px; border-radius: 50%; background: #1A1530; border: 1px solid rgba(157,107,255,0.7); color: #C9BDF2; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none;">1</div><div><span style="color: #EDEAF7; font-weight: 600;">The craft is the brightest object on screen, always.</span> CORE white, E2 baseline; each chain link adds bloom radius — try the <em>chain</em> tweak. It carries no identity hue: the player is not a target.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 22px; height: 22px; border-radius: 50%; background: #1A1530; border: 1px solid rgba(157,107,255,0.7); color: #C9BDF2; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none;">2</div><div><span style="color: #EDEAF7; font-weight: 600;">Live aim quality, on the release hand.</span> The hand is the prototype's play-tested radius through the craft — kept. The nose says <em>where</em> (it always points along the tangent it will depart on); the hand says <em>when</em>. The segment to the ghost dot thickens and brightens as the gap closes; the window under the hand heats from E1 to E2. Luminance only — nothing changes hue. The award word after release confirms what the player already saw.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 22px; height: 22px; border-radius: 50%; background: #1A1530; border: 1px solid rgba(157,107,255,0.7); color: #C9BDF2; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none;">3</div><div><span style="color: #EDEAF7; font-weight: 600;">Ghost dots ride the hand</span> — one per ring crossing, the active ring's brightest. The visible gap between ghost and perfect dot <em>is</em> the grade — a fact drawn on the geometry, never a command.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 22px; height: 22px; border-radius: 50%; background: #1A1530; border: 1px solid rgba(157,107,255,0.7); color: #C9BDF2; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none;">4</div><div><span style="color: #EDEAF7; font-weight: 600;">The arc carries the rarity ladder.</span> Full arc = CLEAN, bright inner zone = SHAVED, the dot = DEADEYE. Arc length still encodes difficulty; now it also names its own rewards.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 22px; height: 22px; border-radius: 50%; background: #1A1530; border: 1px solid rgba(157,107,255,0.7); color: #C9BDF2; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none;">5</div><div><span style="color: #EDEAF7; font-weight: 600;">Labels live at their arc's tip, on their own radius.</span> They cannot collide across rings because they never share one; if two tips come within 12°, the outer label slides along its own ring until clear. No more P11P9.P3894510k.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 22px; height: 22px; border-radius: 50%; background: #1A1530; border: 1px solid rgba(157,107,255,0.7); color: #C9BDF2; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none;">6</div><div><span style="color: #EDEAF7; font-weight: 600;">The held body is spent.</span> On capture, a planet drops to DUSK structure. Colour belongs only to what still pulls — so the compass answers "where next?" before the eye asks.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 22px; height: 22px; border-radius: 50%; background: #1A1530; border: 1px solid rgba(157,107,255,0.7); color: #C9BDF2; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none;">7</div><div><span style="color: #EDEAF7; font-weight: 600;">Rings at rest are E0 structure.</span> Only windows carry colour. That's why four-plus targets stay readable: the quiet parts are actually quiet.</div></div>
+        <div style="display: flex; gap: 14px;"><div style="width: 22px; height: 22px; border-radius: 50%; background: #1A1530; border: 1px solid rgba(157,107,255,0.7); color: #C9BDF2; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none;">8</div><div><span style="color: #EDEAF7; font-weight: 600;">The thumb line.</span> During a hold, nothing below the lower third needs reading — the instrument lives in the upper two-thirds, above the thumb, around where the eye already is.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FIVE STATES ============ -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 32px 36px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE COMPASS THROUGH ONE SWING — INCLUDING BEFORE THE ORBIT EXISTS</div>
+    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-top: 20px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <line x1="105" y1="20" x2="105" y2="70" stroke="#FFF4E0" stroke-width="2.5" opacity="0.35" stroke-linecap="round"></line>
+          <g transform="translate(105 82) rotate(90)"><path d="M 11 0 L -7 6.5 L -3.5 0 L -7 -6.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 12px #FFF4E0);"></path></g>
+          <path d="M 105 90 Q 118 150 145 182" fill="none" stroke="#8FA0FF" stroke-width="2" stroke-linecap="round" style="filter: drop-shadow(0 0 5px #8FA0FF);"></path>
+          <circle cx="150" cy="218" r="38" fill="#100C20" stroke="#8FA0FF" stroke-width="1.5" opacity="0.9" style="filter: drop-shadow(0 0 6px rgba(143,160,255,0.6));"></circle>
+          <circle cx="150" cy="218" r="66" fill="none" stroke="#8FA0FF" stroke-width="1" opacity="0.28"></circle>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">1 · PRESS</div><div style="font-size: 12px; line-height: 1.55; margin-top: 5px;">The grab line: holding bends a filament to the body that pulls hardest, in its identity hue, and its orbit fades in. The press is taught by the same instrument that grades the release.</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <circle cx="105" cy="170" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.9"></circle>
+          <circle cx="105" cy="170" r="60" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.25"></circle>
+          <circle cx="105" cy="170" r="90" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.15"></circle>
+          <circle cx="105" cy="170" r="90" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="40" opacity="0.55"></circle>
+          <line x1="157" y1="200" x2="196" y2="222.5" stroke="#FFF4E0" stroke-width="1.25" opacity="0.4"></line>
+          <circle cx="182.9" cy="215" r="2.5" fill="#FFF4E0" opacity="0.4"></circle>
+          <g transform="translate(157 200) rotate(-60)"><path d="M 11 0 L -7 6.5 L -3.5 0 L -7 -6.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 12px #FFF4E0);"></path></g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">2 · ORBIT</div><div style="font-size: 12px; line-height: 1.55; margin-top: 5px;">Captured. Windows drawn at E1, aim cold, line thin. The instrument is at rest — tension hasn't started.</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <circle cx="105" cy="170" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.9"></circle>
+          <circle cx="105" cy="170" r="60" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.25"></circle>
+          <circle cx="105" cy="170" r="90" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.15"></circle>
+          <circle cx="105" cy="170" r="90" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="40" opacity="0.85" style="filter: drop-shadow(0 0 6px rgba(95,200,143,0.8));"></circle>
+          <circle cx="182.9" cy="125" r="4" fill="#5FC88F" style="filter: drop-shadow(0 0 5px #5FC88F);"></circle>
+          <line x1="160.6" y1="147.5" x2="202.3" y2="130.6" stroke="#FFF4E0" stroke-width="2" opacity="0.75" style="filter: drop-shadow(0 0 3px rgba(255,244,224,0.7));"></line>
+          <circle cx="188.4" cy="136.3" r="3" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0);"></circle>
+          <g transform="translate(160.6 147.5) rotate(-112)"><path d="M 11 0 L -7 6.5 L -3.5 0 L -7 -6.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 12px #FFF4E0);"></path></g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">3 · CLOSING</div><div style="font-size: 12px; line-height: 1.55; margin-top: 5px;">The gap is the grade. Ghost dot approaches the perfect dot; the line thickens; the window heats toward E2.</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <circle cx="105" cy="170" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.9"></circle>
+          <circle cx="105" cy="170" r="60" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.25"></circle>
+          <circle cx="105" cy="170" r="90" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.15"></circle>
+          <circle cx="105" cy="170" r="90" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="5" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="40" style="filter: drop-shadow(0 0 4px #C8FFDF) drop-shadow(0 0 12px #5FC88F);"></circle>
+          <line x1="157" y1="140" x2="196" y2="117.5" stroke="#FFF4E0" stroke-width="3" style="filter: drop-shadow(0 0 5px #FFF4E0);"></line>
+          <circle cx="182.9" cy="125" r="6" fill="#FFF4E0" style="filter: drop-shadow(0 0 6px #FFF4E0) drop-shadow(0 0 14px #C8FFDF);"></circle>
+          <g transform="translate(157 140) rotate(-120)"><path d="M 11 0 L -7 6.5 L -3.5 0 L -7 -6.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 14px #FFF4E0);"></path></g>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">4 · MATCHED</div><div style="font-size: 12px; line-height: 1.55; margin-top: 5px;">Ghost and perfect dot merge white-hot. The player knows it's a DEADEYE <em>before</em> letting go — the instrument states the fact; the release is still theirs.</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <svg viewBox="0 0 210 300" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+          <circle cx="105" cy="170" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.6"></circle>
+          <circle cx="105" cy="170" r="60" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.08"></circle>
+          <circle cx="105" cy="170" r="90" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.06"></circle>
+          <circle cx="157" cy="140" r="22" fill="none" stroke="#9D6BFF" stroke-width="2" opacity="0.55" style="filter: drop-shadow(0 0 6px rgba(157,107,255,0.6));"></circle>
+          <circle cx="157" cy="140" r="8" fill="#FFF4E0" style="filter: drop-shadow(0 0 10px #FFF4E0) drop-shadow(0 0 28px #FFF4E0) drop-shadow(0 0 48px rgba(255,95,162,0.5));"></circle>
+          <line x1="157" y1="140" x2="109.5" y2="57.7" stroke="#FFF4E0" stroke-width="3.5" stroke-linecap="round" opacity="0.9" style="filter: drop-shadow(0 0 6px #FFF4E0);"></line>
+          <g transform="translate(109.5 57.7) rotate(-120)"><path d="M 12 0 L -8 7 L -4 0 L -8 -7 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 16px #FFF4E0);"></path></g>
+          <circle cx="105" cy="170" r="90" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4" stroke-linecap="round" stroke-dasharray="20 340" stroke-dashoffset="40" opacity="0.7" style="filter: drop-shadow(0 0 8px #5FC88F);"></circle>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">5 · RELEASE</div><div style="font-size: 12px; line-height: 1.55; margin-top: 5px;">E3 flash, 70ms hitstop, exit streak along the tangent. The taken arc stays lit and decays behind you; the unused rings die instantly. The compass resolves — it doesn't vanish.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ROW: AWARDS + EXTENSIBILITY + DEMO ============ -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr 420px; gap: 28px; align-items: stretch;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 28px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE ARC, UNROLLED — 45 AWARD WORDS BECOME 3</div>
+      <svg viewBox="0 0 560 120" width="100%" style="display: block; margin-top: 22px;">
+        <text x="280" y="18" text-anchor="middle" fill="#FFF4E0" font-family="Unbounded" font-weight="900" font-size="17" style="filter: drop-shadow(0 0 8px rgba(255,244,224,0.6));">DEADEYE</text>
+        <text x="140" y="34" text-anchor="middle" fill="#C8FFDF" font-family="Unbounded" font-weight="700" font-size="13">SHAVED</text>
+        <text x="30" y="50" text-anchor="middle" fill="#5FC88F" font-family="Unbounded" font-weight="500" font-size="11" opacity="0.85">CLEAN</text>
+        <rect x="10" y="62" width="540" height="10" rx="5" fill="#5FC88F" opacity="0.3"></rect>
+        <rect x="118" y="60" width="324" height="14" rx="7" fill="#5FC88F" opacity="0.65" style="filter: drop-shadow(0 0 6px rgba(95,200,143,0.6));"></rect>
+        <circle cx="280" cy="67" r="9" fill="#FFF4E0" style="filter: drop-shadow(0 0 8px #FFF4E0) drop-shadow(0 0 18px #C8FFDF);"></circle>
+        <line x1="280" y1="24" x2="280" y2="54" stroke="#FFF4E0" stroke-width="1" opacity="0.4"></line>
+        <line x1="140" y1="40" x2="140" y2="56" stroke="#C8FFDF" stroke-width="1" opacity="0.4"></line>
+        <text x="280" y="100" text-anchor="middle" fill="#6F6893" font-size="10.5" letter-spacing="1.5" font-family="Archivo">A WORD IS A PLACE ON THE INSTRUMENT</text>
+      </svg>
+      <div style="font-size: 13px; line-height: 1.6; margin-top: 10px;">One word per tier, so every word repeats often enough to become a signal. The word lands <span style="color: #EDEAF7;">at the release point on the arc</span> — not in a band at the top of the screen — then rides the exit tangent and decays in 420ms. Tiers differ by type scale and bloom, never hue. Queueing is structural: one release, one word, and the E3 rule means two can't fight.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 28px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">BUILT TO EXTEND — BODY TYPE IS A GLYPH ON THE RING</div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 20px;">
+        <div style="text-align: center;">
+          <svg viewBox="0 0 110 110" width="100%"><circle cx="55" cy="55" r="38" fill="none" stroke="#6C64A6" opacity="0.2"></circle><circle cx="55" cy="55" r="38" pathLength="360" fill="none" stroke="#E89A5F" stroke-width="4" stroke-linecap="round" stroke-dasharray="46 314" stroke-dashoffset="113" opacity="0.85" style="filter: drop-shadow(0 0 4px rgba(232,154,95,0.7));"></circle><circle cx="43" cy="19.5" r="4" fill="#E89A5F" style="filter: drop-shadow(0 0 4px #E89A5F);"></circle><circle cx="70" cy="21.8" r="4" fill="#E89A5F" style="filter: drop-shadow(0 0 4px #E89A5F);"></circle></svg>
+          <div style="font-size: 11px; font-weight: 600; color: #A9A3C9; letter-spacing: 0.12em; margin-top: 6px;">BINARY<div style="font-weight: 400; color: #6F6893; margin-top: 2px;">twin dots</div></div>
+        </div>
+        <div style="text-align: center;">
+          <svg viewBox="0 0 110 110" width="100%"><circle cx="55" cy="55" r="38" fill="none" stroke="#6C64A6" opacity="0.2"></circle><circle cx="55" cy="55" r="38" pathLength="360" fill="none" stroke="#3EC1D6" stroke-width="4" stroke-linecap="round" stroke-dasharray="30 330" stroke-dashoffset="105" opacity="0.85" style="filter: drop-shadow(0 0 4px rgba(62,193,214,0.7));"></circle><line x1="55" y1="9" x2="55" y2="25" stroke="#3EC1D6" stroke-width="2" style="filter: drop-shadow(0 0 3px #3EC1D6);"></line><circle cx="55" cy="17" r="3.5" fill="#3EC1D6"></circle></svg>
+          <div style="font-size: 11px; font-weight: 600; color: #A9A3C9; letter-spacing: 0.12em; margin-top: 6px;">PULSAR<div style="font-weight: 400; color: #6F6893; margin-top: 2px;">dot that beats</div></div>
+        </div>
+        <div style="text-align: center;">
+          <svg viewBox="0 0 110 110" width="100%"><circle cx="55" cy="55" r="38" fill="none" stroke="#6C64A6" opacity="0.2"></circle><circle cx="55" cy="55" r="38" pathLength="360" fill="none" stroke="#9D6BFF" stroke-width="4" stroke-linecap="round" stroke-dasharray="40 320" stroke-dashoffset="110" opacity="0.85" style="filter: drop-shadow(0 0 4px rgba(157,107,255,0.7));"></circle><circle cx="55" cy="55" r="30" fill="none" stroke="#9D6BFF" stroke-width="1" opacity="0.4" stroke-dasharray="3 5"></circle><circle cx="55" cy="17" r="4" fill="#0A0814" stroke="#9D6BFF" stroke-width="1.5"></circle></svg>
+          <div style="font-size: 11px; font-weight: 600; color: #A9A3C9; letter-spacing: 0.12em; margin-top: 6px;">BLACK HOLE<div style="font-weight: 400; color: #6F6893; margin-top: 2px;">hollow dot, inner echo</div></div>
+        </div>
+        <div style="text-align: center;">
+          <svg viewBox="0 0 110 110" width="100%"><circle cx="55" cy="55" r="38" fill="none" stroke="#6C64A6" opacity="0.2"></circle><circle cx="55" cy="55" r="34" fill="none" stroke="#8FA0FF" stroke-width="1" opacity="0.4"></circle><circle cx="55" cy="55" r="38" pathLength="360" fill="none" stroke="#8FA0FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="40 320" stroke-dashoffset="110" opacity="0.85" style="filter: drop-shadow(0 0 4px rgba(143,160,255,0.7));"></circle><circle cx="55" cy="17" r="4" fill="#8FA0FF" style="filter: drop-shadow(0 0 4px #8FA0FF);"></circle></svg>
+          <div style="font-size: 11px; font-weight: 600; color: #A9A3C9; letter-spacing: 0.12em; margin-top: 6px;">RINGED<div style="font-weight: 400; color: #6F6893; margin-top: 2px;">double line</div></div>
+        </div>
+      </div>
+      <div style="font-size: 13px; line-height: 1.6; margin-top: 16px;">Identity stays hue; body type becomes a <span style="color: #EDEAF7;">glyph vocabulary on the ring and its dot</span>; quality stays luminance everywhere. A new region introduces one glyph, calmly, and the compass never needs redesigning — the anomaly pattern, applied to the instrument.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 28px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">LIVE — AIM QUALITY BEFORE RELEASE</div>
+      <svg viewBox="0 0 340 340" width="100%" style="display: block; margin-top: 14px; background: #0A0814; border-radius: 10px;">
+        <circle cx="170" cy="170" r="40" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.9"></circle>
+        <circle cx="170" cy="170" r="95" fill="none" stroke="#FFF4E0" stroke-width="1" opacity="0.22"></circle>
+        <circle cx="170" cy="170" r="130" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+        <circle cx="170" cy="170" r="150" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+        <circle ref="{{jadeArcRef}}" cx="170" cy="170" r="130" pathLength="360" fill="none" stroke="#5FC88F" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="30 330" stroke-dashoffset="85" opacity="0.55"></circle>
+        <circle ref="{{jadeDotRef}}" cx="214.5" cy="47.8" r="4.5" fill="#5FC88F" style="filter: drop-shadow(0 0 5px #5FC88F);"></circle>
+        <circle ref="{{emberArcRef}}" cx="170" cy="170" r="150" pathLength="360" fill="none" stroke="#E89A5F" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="30 330" stroke-dashoffset="265" opacity="0.55"></circle>
+        <circle ref="{{emberDotRef}}" cx="118.7" cy="311" r="4.5" fill="#E89A5F" style="filter: drop-shadow(0 0 5px #E89A5F);"></circle>
+        <g ref="{{rotRef}}" transform="rotate(0 170 170)">
+          <circle cx="170" cy="170" r="95" pathLength="360" fill="none" stroke="#FFF4E0" stroke-width="3" opacity="0.35" stroke-linecap="round" stroke-dasharray="22 338" stroke-dashoffset="22"></circle>
+          <line ref="{{aimRef}}" x1="265" y1="170" x2="336" y2="170" stroke="#FFF4E0" stroke-width="1" opacity="0.4"></line>
+          <circle ref="{{ghost1Ref}}" cx="300" cy="170" r="3" fill="#FFF4E0" opacity="0.15" style="filter: drop-shadow(0 0 4px #FFF4E0);"></circle>
+          <circle ref="{{ghost2Ref}}" cx="320" cy="170" r="3" fill="#FFF4E0" opacity="0.15" style="filter: drop-shadow(0 0 4px #FFF4E0);"></circle>
+          <circle ref="{{flashRef}}" cx="300" cy="170" r="16" fill="#FFF4E0" opacity="0"></circle>
+          <g transform="translate(265 170) rotate(90)"><path d="M 12 0 L -8 7 L -4 0 L -8 -7 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 14px #FFF4E0);"></path></g>
+        </g>
+        <g transform="translate(248 30)"><rect x="-24" y="-10" width="48" height="20" rx="10" fill="rgba(10,8,20,0.88)" stroke="#5FC88F" stroke-opacity="0.6"></rect><circle cx="-12" cy="0" r="3" fill="#5FC88F"></circle><text x="5" y="3.5" text-anchor="middle" fill="#EDEAF7" font-size="10" font-weight="600" font-family="Archivo">P4</text></g>
+        <g transform="translate(88 328)"><rect x="-24" y="-10" width="48" height="20" rx="10" fill="rgba(10,8,20,0.88)" stroke="#E89A5F" stroke-opacity="0.6"></rect><circle cx="-12" cy="0" r="3" fill="#E89A5F"></circle><text x="5" y="3.5" text-anchor="middle" fill="#EDEAF7" font-size="10" font-weight="600" font-family="Archivo">P7</text></g>
+      </svg>
+      <div style="font-size: 12.5px; line-height: 1.55; margin-top: 12px;">The whole mechanism, moving: the aim line heats as it approaches each window, the ghost dot rides the crossing, and the pass through a perfect dot flashes E3. Tweak <em>demoSpeed</em> to feel the timing window change.</div>
+    </div>
+  </div>
+
+  <!-- ============ FOOTER / ROADMAP ============ -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">02</span> the release moment, ~400ms storyboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">03</span> HUD in five pressures &nbsp;·&nbsp; <span style="color: #A9A3C9;">04</span> the living baseline field &nbsp;·&nbsp; <span style="color: #A9A3C9;">05</span> award + callout system &nbsp;·&nbsp; <span style="color: #A9A3C9;">06</span> boundary as risk gradient &nbsp;·&nbsp; <span style="color: #A9A3C9;">07</span> daily front / results / leaderboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">08</span> three regions + zen subtraction</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;chain&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 3, &quot;min&quot;: 0, &quot;max&quot;: 8, &quot;step&quot;: 1, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Compass&quot;, &quot;description&quot;: &quot;Chain level — feeds the hero craft's bloom radius&quot;},
+  &quot;demoSpeed&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 40, &quot;min&quot;: 15, &quot;max&quot;: 90, &quot;step&quot;: 5, &quot;unit&quot;: &quot;°/s&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Live demo&quot;},
+  &quot;markers&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Compass&quot;, &quot;description&quot;: &quot;Numbered annotation markers on the hero frame&quot;}
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.heroCraftRef = React.createRef();
+    this.rotRef = React.createRef();
+    this.aimRef = React.createRef();
+    this.jadeArcRef = React.createRef();
+    this.emberArcRef = React.createRef();
+    this.jadeDotRef = React.createRef();
+    this.emberDotRef = React.createRef();
+    this.ghost1Ref = React.createRef();
+    this.ghost2Ref = React.createRef();
+    this.flashRef = React.createRef();
+    this._raf = null;
+    this._A = 20;
+    this._last = null;
+    this._flash = 0;
+  }
+  applyChain() {
+    const c = this.props.chain ?? 3;
+    const el = this.heroCraftRef.current;
+    if (el) el.style.filter = 'drop-shadow(0 0 3px #FFF4E0) drop-shadow(0 0 ' + (8 + c * 4) + 'px #FFF4E0) drop-shadow(0 0 ' + (18 + c * 7) + 'px rgba(255,244,224,0.8))';
+  }
+  componentDidMount() {
+    this.applyChain();
+    const dist = (a, b) => { const d = Math.abs(((a - b) % 360 + 360) % 360); return d > 180 ? 360 - d : d; };
+    const loop = (ts) => {
+      this._raf = requestAnimationFrame(loop);
+      if (this._last == null) { this._last = ts; return; }
+      const dt = Math.min(0.05, (ts - this._last) / 1000);
+      this._last = ts;
+      const speed = this.props.demoSpeed ?? 40;
+      this._A = (this._A + speed * dt) % 360;
+      const A = this._A;
+      const dJ = dist(A, 290), dE = dist(A, 110);
+      const tJ = Math.max(0, 1 - dJ / 26), tE = Math.max(0, 1 - dE / 26);
+      const t = Math.max(tJ, tE);
+      if (Math.min(dJ, dE) < 1.6 && this._flash < 0.25) this._flash = 1;
+      this._flash *= Math.exp(-dt * 6);
+      const g = this.rotRef.current;
+      if (!g) return;
+      g.setAttribute('transform', 'rotate(' + A + ' 170 170)');
+      const aim = this.aimRef.current;
+      aim.setAttribute('stroke-width', (1 + 2.2 * t).toFixed(2));
+      aim.style.opacity = (0.4 + 0.6 * t).toFixed(2);
+      aim.style.filter = t > 0.4 ? 'drop-shadow(0 0 4px rgba(255,244,224,0.9))' : 'none';
+      const jl = 0.55 + 0.45 * tJ, el2 = 0.55 + 0.45 * tE;
+      const ja = this.jadeArcRef.current, ea = this.emberArcRef.current;
+      ja.style.opacity = jl.toFixed(2);
+      ja.style.filter = tJ > 0.05 ? 'drop-shadow(0 0 ' + (3 + 10 * tJ).toFixed(1) + 'px #5FC88F)' : 'none';
+      ea.style.opacity = el2.toFixed(2);
+      ea.style.filter = tE > 0.05 ? 'drop-shadow(0 0 ' + (3 + 10 * tE).toFixed(1) + 'px #E89A5F)' : 'none';
+      this.jadeDotRef.current.setAttribute('r', (4.5 + 3.5 * tJ).toFixed(2));
+      this.jadeDotRef.current.style.fill = tJ > 0.92 ? '#FFF4E0' : '#5FC88F';
+      this.emberDotRef.current.setAttribute('r', (4.5 + 3.5 * tE).toFixed(2));
+      this.emberDotRef.current.style.fill = tE > 0.92 ? '#FFF4E0' : '#E89A5F';
+      this.ghost1Ref.current.style.opacity = (0.1 + 0.9 * tJ).toFixed(2);
+      this.ghost2Ref.current.style.opacity = (0.1 + 0.9 * tE).toFixed(2);
+      const f = this.flashRef.current;
+      f.style.opacity = this._flash.toFixed(3);
+      f.setAttribute('r', (14 + 26 * (1 - this._flash)).toFixed(1));
+      f.style.filter = 'blur(6px)';
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  componentDidUpdate() { this.applyChain(); }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); }
+  renderVals() {
+    return {
+      showMarkers: this.props.markers ?? true,
+      heroCraftRef: this.heroCraftRef, rotRef: this.rotRef, aimRef: this.aimRef,
+      jadeArcRef: this.jadeArcRef, emberArcRef: this.emberArcRef,
+      jadeDotRef: this.jadeDotRef, emberDotRef: this.emberDotRef,
+      ghost1Ref: this.ghost1Ref, ghost2Ref: this.ghost2Ref, flashRef: this.flashRef
+    };
+  }
+}
+</script>
+</body>
+</html>

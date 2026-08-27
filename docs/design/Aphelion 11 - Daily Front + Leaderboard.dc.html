@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+  @keyframes blink { 0%, 60% { opacity: 1; } 61%, 100% { opacity: 0; } }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 11 &nbsp;·&nbsp; THE DAILY FRONT + LEADERBOARD</div>
+      <div style="font-family: 'Anton', sans-serif; font-size: 54px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; letter-spacing: 0.02em; text-shadow: 0 0 34px rgba(255,244,224,0.28);">ONE FIELD. ONE RUN.<br>THE DOOR SAYS SO.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">The front screen is not a menu — it is <span style="color: #EDEAF7; font-weight: 600;">the bottom of today's field</span>. The camera idles below rung zero, today's first planets visible and breathing above, and the craft waits on the pad. Pressing anywhere begins the run: the front door and the game share one verb. Everything else — modes, standings, yesterday — is a hold away, on glass cards over this same living field. You never leave the world; you only park cards on it.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">WHY THE LEADERBOARD EARNS ONE MORE DAY, NOT ONE MORE TRY</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #EDEAF7; font-weight: 600;">Ranks are altitude.</span> The board is drawn as the field itself — names planted at the height they reached, scores at their death or top-out points. Your near-miss is a visible 40 metres, not an abstract 3 places.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">The ghost is the rematch.</span> Any name's recipe replays as a CORE ghost tomorrow-you can race. "One more day" has a face.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">Percentile over position.</span> TOP 4% reads as pride at rank 139 of 3 481; position alone reads as defeat. Both shown, percentile leads.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">Friends are a rung, not a tab.</span> The friend band lives inside the same field view at your altitude — the people you actually race are always in frame.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOCKUPS -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 30px 34px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE FRONT DOOR AND THE STANDINGS — SAME FIELD, ONE CARD APART</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 24px; margin-top: 20px;">
+
+      <!-- FRONT DOOR -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 330 716" style="background: #0A0814; border-radius: 12px; width: 100%; display: block;">
+          <!-- field bottom, alive -->
+          <line x1="0" y1="560" x2="330" y2="560" stroke="#6C64A6" stroke-width="1" opacity="0.35"></line>
+          <text x="10" y="554" fill="#6F6893" font-family="Archivo" font-size="8" letter-spacing="1">0</text>
+          <line x1="0" y1="420" x2="330" y2="420" stroke="#6C64A6" stroke-width="1" opacity="0.22"></line>
+          <line x1="0" y1="280" x2="330" y2="280" stroke="#6C64A6" stroke-width="1" opacity="0.3"></line>
+          <text x="10" y="274" fill="#6F6893" font-family="Archivo" font-size="8" letter-spacing="1">5</text>
+          <line x1="0" y1="140" x2="330" y2="140" stroke="#6C64A6" stroke-width="1" opacity="0.22"></line>
+          <line x1="4" y1="0" x2="4" y2="716" stroke="#FF5FA2" stroke-width="1.5" opacity="0.3"></line>
+          <line x1="326" y1="0" x2="326" y2="716" stroke="#FF5FA2" stroke-width="1.5" opacity="0.3"></line>
+          <!-- today's first bodies, breathing -->
+          <circle cx="96" cy="330" r="34" fill="#100C20" stroke="#E89A5F" stroke-width="2" opacity="0.85" style="filter: drop-shadow(0 0 6px rgba(232,154,95,0.4));"></circle>
+          <circle cx="96" cy="330" r="23" fill="none" stroke="#E89A5F" stroke-width="1" opacity="0.15"></circle>
+          <circle cx="96" cy="330" r="4" fill="#E89A5F" opacity="0.5"></circle>
+          <circle cx="242" cy="196" r="26" fill="#100C20" stroke="#43CDA8" stroke-width="2" opacity="0.8" style="filter: drop-shadow(0 0 6px rgba(67,205,168,0.4));"></circle>
+          <circle cx="242" cy="196" r="4" fill="#43CDA8" opacity="0.5"></circle>
+          <circle cx="278" cy="64" r="18" fill="#100C20" stroke="#3FB0E0" stroke-width="1.5" opacity="0.6"></circle>
+          <!-- title block -->
+          <text x="165" y="84" text-anchor="middle" fill="#FFF4E0" font-family="Anton" font-size="34" letter-spacing="4" style="filter: drop-shadow(0 0 14px rgba(255,244,224,0.4));">APHELION</text>
+          <text x="165" y="106" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-weight="700" font-size="9.5" letter-spacing="3">DAY 214 · THE LONG CLIMB · 40 BODIES</text>
+          <!-- craft on pad -->
+          <g transform="translate(165 520)"><path d="M 0 -16 L 9 10 L 0 5 L -9 10 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 18px #FFF4E0);"></path></g>
+          <line x1="120" y1="560" x2="210" y2="560" stroke="#FFF4E0" stroke-width="2" opacity="0.5" stroke-linecap="round"></line>
+          <!-- verb -->
+          <text x="165" y="612" text-anchor="middle" fill="#FFF4E0" font-family="Archivo" font-weight="800" font-size="13" letter-spacing="3" style="animation: blink 1.1s steps(1) infinite;">PRESS TO FLY</text>
+          <text x="165" y="632" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-weight="600" font-size="8.5" letter-spacing="2">HOLD FOR STANDINGS · MODES · YESTERDAY</text>
+          <!-- social whisper -->
+          <text x="165" y="674" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-weight="600" font-size="9" letter-spacing="1.5">3 481 FLYING · BEST SO FAR 51 002 · 2 FRIENDS DONE</text>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">THE FRONT DOOR</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The bottom of today's field, live: real first planets (scouting the opening is part of the daily ritual), boundary walls already present, craft on the pad at rung zero. One blinking verb; the social line whispers the day's stakes. No logo screen, no menu tree — the title floats over the sky like a constellation label.</div></div>
+      </div>
+
+      <!-- LEADERBOARD -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <svg viewBox="0 0 330 716" style="background: #0A0814; border-radius: 12px; width: 100%; display: block;">
+          <!-- field behind -->
+          <g opacity="0.4">
+            <line x1="0" y1="120" x2="330" y2="120" stroke="#6C64A6" stroke-width="1" opacity="0.3"></line>
+            <line x1="0" y1="260" x2="330" y2="260" stroke="#6C64A6" stroke-width="1" opacity="0.2"></line>
+            <line x1="0" y1="400" x2="330" y2="400" stroke="#6C64A6" stroke-width="1" opacity="0.3"></line>
+            <line x1="0" y1="540" x2="330" y2="540" stroke="#6C64A6" stroke-width="1" opacity="0.2"></line>
+            <circle cx="70" cy="180" r="26" fill="#0D0A1C" stroke="#6C64A6" stroke-width="1.25"></circle>
+            <circle cx="256" cy="470" r="30" fill="#0D0A1C" stroke="#6C64A6" stroke-width="1.25"></circle>
+          </g>
+          <!-- glass -->
+          <rect x="20" y="44" width="290" height="628" fill="#060510" opacity="0.85"></rect>
+          <rect x="20" y="44" width="290" height="628" fill="none" stroke="#6C64A6" stroke-width="2"></rect>
+          <rect x="25" y="49" width="280" height="618" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.35"></rect>
+          <rect x="20" y="44" width="290" height="26" fill="#6C64A6" opacity="0.18"></rect>
+          <text x="165" y="61" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-weight="700" font-size="9" letter-spacing="3">DAY 214 · STANDINGS · 3 481 FLEW</text>
+          <!-- the board AS the field: altitude axis -->
+          <line x1="60" y1="96" x2="60" y2="600" stroke="#6C64A6" stroke-width="1" opacity="0.4"></line>
+          <g font-family="Archivo" font-size="7.5" fill="#6F6893" letter-spacing="1">
+            <text x="52" y="100" text-anchor="end">40</text>
+            <text x="52" y="240" text-anchor="end">30</text>
+            <text x="52" y="380" text-anchor="end">20</text>
+            <text x="52" y="520" text-anchor="end">10</text>
+            <text x="52" y="602" text-anchor="end">0</text>
+          </g>
+          <!-- topped-out cluster -->
+          <line x1="60" y1="108" x2="290" y2="108" stroke="#FFC94A" stroke-width="1" opacity="0.35"></line>
+          <g font-family="Archivo" font-size="9.5" letter-spacing="1">
+            <text x="72" y="100" fill="#FFC94A" font-weight="800">TOPPED OUT · 61</text>
+            <text x="290" y="100" text-anchor="end" fill="#FFC94A" font-weight="800">51 002 BEST</text>
+          </g>
+          <!-- rank markers planted at death altitudes -->
+          <g font-family="Archivo" font-size="9.5">
+            <circle cx="84" cy="176" r="3" fill="none" stroke="#A9A3C9" stroke-width="1.25"></circle><text x="94" y="180" fill="#A9A3C9" font-weight="700" letter-spacing="1">VELA</text><text x="290" y="180" text-anchor="end" fill="#EDEAF7" font-weight="800">44 913</text>
+            <circle cx="100" cy="238" r="3" fill="none" stroke="#A9A3C9" stroke-width="1.25"></circle><text x="110" y="242" fill="#A9A3C9" font-weight="700" letter-spacing="1">KESTREL</text><text x="290" y="242" text-anchor="end" fill="#EDEAF7" font-weight="800">39 508</text>
+            <!-- friend band -->
+            <rect x="62" y="288" width="246" height="64" fill="#FFF4E0" opacity="0.05"></rect>
+            <circle cx="90" cy="308" r="3" fill="#7FE0A8"></circle><text x="100" y="312" fill="#7FE0A8" font-weight="700" letter-spacing="1">MARA</text><text x="290" y="312" text-anchor="end" fill="#EDEAF7" font-weight="800">31 224</text>
+            <g><circle cx="112" cy="336" r="4" fill="#FFF4E0" style="filter: drop-shadow(0 0 5px #FFF4E0);"></circle><text x="122" y="340" fill="#FFF4E0" font-weight="800" letter-spacing="1">YOU · TOP 4%</text><text x="290" y="340" text-anchor="end" fill="#FFF4E0" font-weight="800">29 861</text></g>
+            <circle cx="96" cy="384" r="3" fill="#7FE0A8"></circle><text x="106" y="388" fill="#7FE0A8" font-weight="700" letter-spacing="1">OSSA</text><text x="290" y="388" text-anchor="end" fill="#EDEAF7" font-weight="800">24 480</text>
+            <circle cx="120" cy="472" r="3" fill="none" stroke="#6C64A6" stroke-width="1.25"></circle><text x="130" y="476" fill="#6F6893" font-weight="700" letter-spacing="1">HUSK</text><text x="290" y="476" text-anchor="end" fill="#6F6893" font-weight="800">12 450</text>
+          </g>
+          <!-- your gap, drawn -->
+          <line x1="112" y1="308" x2="112" y2="330" stroke="#FF5FA2" stroke-width="1.5" opacity="0.7"></line>
+          <text x="128" y="322" fill="#FF5FA2" font-family="Archivo" font-size="8" font-weight="700" letter-spacing="1">+1 363 · ONE SWING</text>
+          <line x1="52" y1="620" x2="278" y2="620" stroke="#6C64A6" stroke-width="1" opacity="0.4"></line>
+          <text x="165" y="646" text-anchor="middle" fill="#FFF4E0" font-family="Archivo" font-weight="800" font-size="11" letter-spacing="3" style="animation: blink 1.1s steps(1) infinite;">TAP A NAME TO RACE ITS GHOST</text>
+          <text x="165" y="662" text-anchor="middle" fill="#6F6893" font-family="Archivo" font-weight="600" font-size="8.5" letter-spacing="2">HOLD TO CLOSE · RESEEDS 6H 12M</text>
+        </svg>
+        <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">THE STANDINGS — RANKS ARE ALTITUDE</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 5px;">The board is the field: names planted where they died or topped out, the friend band highlighted at your height, and the gap to the next friend drawn in ION with its true size — +1 363 · ONE SWING. That line is the entire retention design: the near-miss is measured in the game's own units, and the rematch (their ghost) is one tap away.</div></div>
+      </div>
+
+      <!-- ANATOMY -->
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="background: #0A0814; border-radius: 10px; padding: 20px 24px;">
+          <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE RITUAL — WHAT A DAY LOOKS LIKE</div>
+          <div style="margin-top: 12px; font-size: 13px; line-height: 1.6;">Open → the door shows today's opening bodies (scouting is free and part of the fun) → PRESS TO FLY → one run → debrief or topped-out card → standings with the gap drawn → share or race a ghost → the reseed countdown starts the appetite for tomorrow. Every step is either the field or one glass card over it; there is no screen in the game that isn't the world.</div>
+        </div>
+        <div style="background: #0A0814; border-radius: 10px; padding: 20px 24px;">
+          <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">GHOST RACING — THE LEADERBOARD'S VERB</div>
+          <div style="margin-top: 12px; font-size: 13px; line-height: 1.6;">Every entry is a recipe (Direction 10), so every name is playable: tap one and tomorrow's field offers their ghost — a CORE-white craft flying their exact line, your instruments live against theirs. The board stops being a ranking you read and becomes a queue of opponents you choose. Verification comes free: a score without a valid recipe simply can't exist on the board.</div>
+        </div>
+        <div style="background: #0A0814; border-radius: 10px; padding: 20px 24px;">
+          <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">NAMES — THE VOICE EXTENDS</div>
+          <div style="margin-top: 12px; font-size: 13px; line-height: 1.6;">Pilot handles are single words, 3–8 characters, rendered in tracked caps: VELA, KESTREL, MARA. No avatars, no flags, no clan tags — on this board a player <em>is</em> a name at an altitude, same as a planet. Dead runs show hollow DUSK rings (the spent vocabulary again); topped-out runs sit above the gold line. The field names itself daily from a curated list — THE LONG CLIMB, THIN AIR, THE NARROWS — one more thing two players can say to each other about the same day.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">12</span> the finish line &nbsp;·&nbsp; <span style="color: #A9A3C9;">13</span> adventure regions + zen</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

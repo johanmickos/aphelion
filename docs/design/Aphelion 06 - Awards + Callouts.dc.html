@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 06 &nbsp;·&nbsp; AWARDS + CALLOUTS — REV 2</div>
+      <div style="font-family: 'Anton', sans-serif; font-size: 54px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; letter-spacing: 0.02em; text-shadow: 0 0 34px rgba(255,244,224,0.28);">POINTS FOR THE MAKE.<br>WORDS FOR THE MASTERY.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">A word that never repeats never becomes a signal — and a word for "merely made it" devalues every word above it. So the baseline tier speaks in <span style="color: #EDEAF7; font-weight: 600;">points alone</span>, and the vocabulary is exactly three, on the rarity ladder players already know: <span style="color: #FFF4E0; font-weight: 700;">TRUE</span> in white, <span style="color: #7FE0A8; font-weight: 700;">SHARP</span> in green, <span style="color: #FFC94A; font-weight: 700;">PERFECT</span> in gold. Streaks escalate by counting — PERFECT ×4, not a synonym. The word, its points, and its colour arrive as <span style="color: #EDEAF7; font-weight: 600;">one unit at the release point</span>: pop, linger, and fall behind as you fly on.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #FF5FA2; font-weight: 700;">RETIRED, AND WHY</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #6F6893;">CLEAN · SHAVED · DEADEYE (rev 1)</span> → read as grooming and slang, not marksmanship. Words must survive being said aloud by a twelve-year-old and a broadcaster alike.</div>
+        <div><span style="color: #6F6893;">SURGICAL, IMMACULATE, FLAWLESS…</span> → absorbed into <span style="color: #FFC94A;">PERFECT ×N</span>. Synonyms flatter; counters testify.</div>
+        <div><span style="color: #6F6893;">Event words (anomaly entry, boundary graze…)</span> → deleted. The aurora <em>is</em> the callout; a word on a spectacle is a caption on a firework.</div>
+        <div><span style="color: #6F6893;">Heavy display face in motion</span> → retired from callouts. Anton keeps the masthead; moving text belongs to the utility face, bold, tracked.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LADDER + LIVE DEMO -->
+  <div style="display: grid; grid-template-columns: 1fr 460px; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE LADDER — ZONES OF THE WINDOW, PRICED AND COLOURED</div>
+      <svg viewBox="0 0 720 244" width="100%" style="display: block; margin-top: 18px;">
+        <g font-family="Archivo" font-weight="800" letter-spacing="2">
+          <text x="360" y="26" text-anchor="middle" fill="#FFC94A" font-size="26" style="filter: drop-shadow(0 0 10px rgba(255,201,74,0.8));">PERFECT</text>
+          <text x="360" y="44" text-anchor="middle" fill="#FFC94A" font-size="13" font-weight="600" opacity="0.95">+890</text>
+          <text x="262" y="40" text-anchor="middle" fill="#7FE0A8" font-size="19" style="filter: drop-shadow(0 0 7px rgba(127,224,168,0.6));">SHARP</text>
+          <text x="262" y="56" text-anchor="middle" fill="#7FE0A8" font-size="12" font-weight="600" opacity="0.9">+668</text>
+          <text x="150" y="50" text-anchor="middle" fill="#FFF4E0" font-size="16" style="filter: drop-shadow(0 0 5px rgba(255,244,224,0.5));">TRUE</text>
+          <text x="150" y="66" text-anchor="middle" fill="#FFF4E0" font-size="12" font-weight="600" opacity="0.85">+556</text>
+          <text x="46" y="66" text-anchor="middle" fill="#FFF4E0" font-size="13" font-weight="600" opacity="0.55">+445</text>
+        </g>
+        <rect x="14" y="96" width="692" height="12" rx="6" fill="#FFF4E0" opacity="0.16"></rect>
+        <rect x="150" y="94" width="420" height="16" rx="8" fill="#FFF4E0" opacity="0.4"></rect>
+        <rect x="255" y="92" width="210" height="20" rx="10" fill="#7FE0A8" opacity="0.5" style="filter: drop-shadow(0 0 7px rgba(127,224,168,0.5));"></rect>
+        <circle cx="360" cy="102" r="12" fill="#FFC94A" style="filter: drop-shadow(0 0 9px #FFC94A) drop-shadow(0 0 20px rgba(255,201,74,0.7));"></circle>
+        <line x1="360" y1="50" x2="360" y2="86" stroke="#FFC94A" stroke-width="1" opacity="0.5"></line>
+        <line x1="262" y1="62" x2="262" y2="88" stroke="#7FE0A8" stroke-width="1" opacity="0.4"></line>
+        <line x1="150" y1="72" x2="150" y2="90" stroke="#FFF4E0" stroke-width="1" opacity="0.35"></line>
+        <line x1="46" y1="72" x2="46" y2="92" stroke="#FFF4E0" stroke-width="1" opacity="0.25"></line>
+        <g font-family="Archivo" font-size="11" fill="#6F6893" font-weight="600">
+          <text x="14" y="136">WINDOW EDGE</text>
+          <text x="150" y="136">INNER 60%</text>
+          <text x="255" y="136">INNER 30%</text>
+          <text x="338" y="150">±8% OF W</text>
+          <text x="706" y="136" text-anchor="end">WINDOW EDGE</text>
+        </g>
+        <g font-family="Archivo" font-size="12" fill="#A9A3C9">
+          <text x="14" y="176">IN THE WINDOW — points only, white at 70%. ×1. The make speaks in numbers; no word spent.</text>
+          <text x="14" y="196">TRUE — inner 60%. ×1.25, white. The word for a release you meant.</text>
+          <text x="14" y="216">SHARP — inner 30%. ×1.5, LUMEN green, one bloom step.</text>
+          <text x="14" y="236">PERFECT — within ±8% of centre (never under 1.5°). ×2, SOLAR gold, E3, streaks count ×N.</text>
+        </g>
+      </svg>
+      <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(140,130,190,0.15); display: flex; gap: 34px; font-size: 13px; line-height: 1.6;">
+        <div style="flex: 1;"><span style="color: #EDEAF7; font-weight: 600;">Zones scale with the window, so difficulty prices the words automatically</span> — a PERFECT on a needle-thin arc is a different feat than on a barn door, and the arc's width already said so.</div>
+        <div style="flex: 1;"><span style="color: #EDEAF7; font-weight: 600;">A miss gets silence.</span> Outside the window: no word, no points, no sting. The capture you didn't make is the feedback. Nothing is confiscated; rewards are withheld.</div>
+      </div>
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(140,130,190,0.15);">
+        <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">STREAK RULES — PINNED</div>
+        <div style="display: flex; gap: 34px; margin-top: 12px; font-size: 13px; line-height: 1.6;">
+          <div style="flex: 1;"><span style="color: #EDEAF7; font-weight: 600;">Per-word, broken only downward.</span> PERFECT ×N counts consecutive PERFECTs; any lesser result resets it. A PERFECT doesn't break a SHARP streak — it upgrades it, opening a PERFECT ×1. <span style="color: #EDEAF7; font-weight: 600;">No timer:</span> coasting between grabs can't expire a streak — only a graded release or death changes it. Expiry-by-clock would punish route-reading.</div>
+          <div style="flex: 1;"><span style="color: #EDEAF7; font-weight: 600;">×N appears at the second occurrence</span> — a repeat within the linger merges in place (counter ticks, smaller re-pop). Each step adds +10% to the tier multiplier, capped at 5 steps: enough to chase, not enough to warp the field's own pricing. Longest PERFECT streak is a headline stat on the results sheet.</div>
+        </div>
+      </div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 24px 26px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">LIVE — POP, LINGER, FALL BEHIND</div>
+      <svg viewBox="0 0 340 420" width="100%" style="display: block; margin-top: 14px; background: #0A0814; border-radius: 10px;">
+        <text x="20" y="40" fill="#EDEAF7" font-family="Anton" font-size="21" letter-spacing="0.5">1 287</text>
+        <text x="20" y="56" fill="#6F6893" font-family="Archivo" font-size="9" letter-spacing="2">M/S</text>
+        <text ref="{{chainRef}}" x="20" y="78" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">CHAIN ×7</text>
+        <text ref="{{bankRef}}" x="320" y="40" text-anchor="end" fill="#A9A3C9" font-family="Archivo" font-size="11" font-weight="600" letter-spacing="1">BANK 12 450</text>
+        <circle cx="110" cy="330" r="42" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.8"></circle>
+        <circle cx="240" cy="170" r="34" fill="#100C20" stroke="#6C64A6" stroke-width="1.25" opacity="0.8"></circle>
+        <circle cx="110" cy="330" r="68" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+        <circle cx="240" cy="170" r="58" fill="none" stroke="#6C64A6" stroke-width="1" opacity="0.14"></circle>
+        <circle ref="{{dotARef}}" cx="164" cy="285" r="5" fill="#5FC88F" style="filter: drop-shadow(0 0 5px #5FC88F);"></circle>
+        <circle ref="{{dotBRef}}" cx="272" cy="122" r="5" fill="#E89A5F" style="filter: drop-shadow(0 0 5px #E89A5F);"></circle>
+        <text ref="{{wordRef}}" x="0" y="0" text-anchor="middle" fill="#FFF4E0" font-family="Archivo" font-weight="800" font-size="19" letter-spacing="2" opacity="0"></text>
+        <text ref="{{ptsRef}}" x="0" y="0" text-anchor="middle" fill="#FFF4E0" font-family="Archivo" font-weight="600" font-size="13" letter-spacing="1" opacity="0"></text>
+      </svg>
+      <div style="font-size: 12.5px; line-height: 1.55; margin-top: 12px;">Word over points, one unit, in tier colour: 120ms pop upward with overshoot, then anchored to the world — it drifts past as you climb and fades. PERFECTs merge to ×N; a new callout snaps the old to its decay tail. Tweak <em>cadence</em> and <em>drift</em>.</div>
+    </div>
+  </div>
+
+  <!-- ANATOMY + CEILING + VOICE -->
+  <div style="display: grid; grid-template-columns: 1.2fr 1fr 1.1fr; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">CALLOUT ANATOMY — TYPE, COLOUR, MOTION</div>
+      <div style="display: flex; gap: 24px; align-items: center; margin-top: 16px;">
+        <svg viewBox="0 0 190 150" width="190" style="background: #0A0814; border-radius: 10px; flex: none;">
+          <circle cx="52" cy="112" r="5" fill="#5FC88F" style="filter: drop-shadow(0 0 5px #5FC88F);"></circle>
+          <text x="98" y="62" text-anchor="middle" fill="#FFC94A" font-family="Archivo" font-weight="800" font-size="20" letter-spacing="2" style="filter: drop-shadow(0 0 10px rgba(255,201,74,0.8));">PERFECT</text>
+          <text x="98" y="82" text-anchor="middle" fill="#FFC94A" font-family="Archivo" font-weight="600" font-size="13" letter-spacing="1" opacity="0.9">+890</text>
+          <path d="M 62 104 Q 66 84 78 74" fill="none" stroke="#6F6893" stroke-width="1" stroke-dasharray="3 4" opacity="0.7"></path>
+        </svg>
+        <div style="display: flex; flex-direction: column; gap: 9px; font-size: 12.5px; line-height: 1.55;">
+          <div><span style="color: #EDEAF7; font-weight: 600;">Type</span> — utility face, 800 caps, tracked 0.1em. Moving text needs open counters, not display weight; Anton stays on the masthead.</div>
+          <div><span style="color: #EDEAF7; font-weight: 600;">Unit</span> — word over points, born at the release point, 8–30px off the dot. Score meets attention where attention already is.</div>
+          <div><span style="color: #EDEAF7; font-weight: 600;">Motion</span> — 120ms pop upward, one overshoot, then <em>world-anchored</em>: it lingers ~1.2s and falls behind at world speed. The pop buys the glance; leaving it behind sells the speed.</div>
+        </div>
+      </div>
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(140,130,190,0.15); font-size: 13px; line-height: 1.6;">The callout ladder is <span style="color: #FFF4E0; font-weight: 700;">white</span> → <span style="color: #7FE0A8; font-weight: 700;">green</span> → <span style="color: #FFC94A; font-weight: 700;">gold</span> — the rarity convention players arrive knowing. Violet is deliberately absent: it belongs to the anomaly and to black holes — <span style="color: #EDEAF7; font-weight: 600;">purple means strange</span>, never good. <span style="color: #7FE0A8; font-weight: 700;">LUMEN #7FE0A8</span> and <span style="color: #FFC94A; font-weight: 700;">SOLAR #FFC94A</span> join the palette with one law: <span style="color: #EDEAF7; font-weight: 600;">quality colours live only in type</span> — no planet, ring, or gauge ever wears them, no callout ever wears an identity hue, and the identity band excludes both (green identities shift toward jade-cyan, clear of LUMEN). Geometry and typography never share the colour channel, so hue-as-identity survives intact — and the word–score–colour fusion the prototype proved satisfying is kept whole.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE PINNED CEILING — A SYSTEMS NOTE</div>
+      <div style="font-size: 13px; line-height: 1.62; margin-top: 14px;">The multiplier binds ~22s in and never moves again — a dead number wearing live paint. Recommendation: <span style="color: #EDEAF7; font-weight: 600;">once the ceiling binds, over-ceiling links convert to visible bank sparks</span> — a mote of light fires from the craft to the BANK chip and the number ticks on arrival. The channel stays alive, the reward is honest, and the chip earns its home by being the destination of things worth watching.</div>
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(140,130,190,0.15); font-size: 12.5px; line-height: 1.55; color: #6F6893;">Chain milestones (×5, ×10, ×15) get a masthead pulse and one bloom step on the craft — no word. The number is the callout; vocabulary is reserved for releases.</div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE DEBRIEF VOICE — HOW APHELION SAYS YOU DIED</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px;">
+        <div style="background: #0A0814; border-radius: 8px; padding: 10px 16px; font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 13.5px; letter-spacing: 0.08em; color: #EDEAF7;">LEFT THE FIELD AT THE RIGHT WALL · ON FIRE</div>
+        <div style="background: #0A0814; border-radius: 8px; padding: 10px 16px; font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 13.5px; letter-spacing: 0.08em; color: #EDEAF7;">RAN DRY AT 23 · THE FIELD KEPT GOING</div>
+        <div style="background: #0A0814; border-radius: 8px; padding: 10px 16px; font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 13.5px; letter-spacing: 0.08em; color: #EDEAF7;">MISSED THE LAST PRESS BY 0.2s · 1 450 M/S AT THE LINE</div>
+        <div style="background: #0A0814; border-radius: 8px; padding: 10px 16px; font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 13.5px; letter-spacing: 0.08em; color: #EDEAF7;">FELL INTO THE JADE ONE · CHAIN ×11 WENT WITH YOU</div>
+      </div>
+      <div style="font-size: 12.5px; line-height: 1.6; margin-top: 14px;">Rules of the register: <span style="color: #EDEAF7; font-weight: 600;">state what happened, name the place, one true number, never scold, never joke at the player.</span> The line is assembled by the run itself — cause + altitude address + telemetry — so every death reads like a black-box recording.</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">07</span> boundary as risk gradient &nbsp;·&nbsp; <span style="color: #A9A3C9;">08</span> daily front / results / leaderboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">09</span> adventure regions + zen subtraction</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;cadence&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 1.8, &quot;min&quot;: 0.5, &quot;max&quot;: 3, &quot;step&quot;: 0.1, &quot;unit&quot;: &quot;s&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Live demo&quot;, &quot;description&quot;: &quot;Seconds between releases — drop it to stress-test collisions&quot;},
+  &quot;drift&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 22, &quot;min&quot;: 0, &quot;max&quot;: 60, &quot;step&quot;: 2, &quot;unit&quot;: &quot;px/s&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Live demo&quot;, &quot;description&quot;: &quot;World drift after the pop — the linger falling behind&quot;}
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    ['wordRef','ptsRef','chainRef','bankRef','dotARef','dotBRef'].forEach(k => { this[k] = React.createRef(); });
+    this._raf = null; this._last = null; this._t = 0; this._next = 1;
+    this._k = 0; this._word = null; this._chain = 7; this._bank = 12450;
+    this._seq = [
+      { tier: 'PERFECT', gain: 890 }, { tier: 'PERFECT', gain: 920 },
+      { tier: null, gain: 445 }, { tier: 'TRUE', gain: 556 },
+      { tier: 'SHARP', gain: 668 }, { tier: 'PERFECT', gain: 890 }
+    ];
+    this._dots = [{ x: 164, y: 285 }, { x: 272, y: 122 }];
+  }
+  componentDidMount() {
+    const cfgOf = t => t === 'PERFECT' ? { size: 21, blur: 12, col: '#FFC94A', glow: 'rgba(255,201,74,0.85)' }
+      : t === 'SHARP' ? { size: 18, blur: 8, col: '#7FE0A8', glow: 'rgba(127,224,168,0.8)' }
+      : t === 'TRUE' ? { size: 15, blur: 5, col: '#FFF4E0', glow: 'rgba(255,244,224,0.6)' }
+      : { size: 0, blur: 3, col: '#FFF4E0', glow: 'rgba(255,244,224,0.4)' };
+    const loop = (ts) => {
+      this._raf = requestAnimationFrame(loop);
+      if (this._last == null) { this._last = ts; return; }
+      const dt = Math.min(0.05, (ts - this._last) / 1000);
+      this._last = ts;
+      this._t += dt;
+      const cad = this.props.cadence ?? 1.8;
+      const drift = this.props.drift ?? 22;
+      const els = ['wordRef','ptsRef','chainRef','bankRef','dotARef','dotBRef'].map(k => this[k].current);
+      if (els.some(e => !e)) return;
+      const [word, pts, chain, bank, dA, dB] = els;
+      if (this._t >= this._next) {
+        this._next = this._t + cad;
+        const ev = this._seq[this._k % this._seq.length];
+        const dot = this._dots[this._k % 2];
+        if (this._word && ev.tier && this._word.tier === ev.tier && (this._t - this._word.born) < 2.4) {
+          this._word = { tier: ev.tier, n: this._word.n + 1, born: this._t, dot, gain: ev.gain };
+        } else {
+          this._word = { tier: ev.tier, n: 1, born: this._t, dot, gain: ev.gain };
+        }
+        this._chain += 1; this._bank += ev.gain; this._k += 1;
+      }
+      chain.textContent = 'CHAIN ×' + this._chain;
+      bank.textContent = 'BANK ' + this._bank.toLocaleString('en-US').replace(/,/g, ' ');
+      if (this._word) {
+        const w = this._word, a = this._t - w.born, c = cfgOf(w.tier);
+        const life = Math.min(1.6, cad * 0.9);
+        // pop up 30px with overshoot over 120ms, then world drift downward
+        const popT = Math.min(1, a / 0.12);
+        const over = popT < 1 ? popT * 1.25 - 0.25 * popT * popT * 5 : 1; // quick overshoot approx
+        const rise = 30 * (popT < 1 ? (1.3 * popT - 0.3 * popT * popT) : 1);
+        const fall = a > 0.12 ? (a - 0.12) * drift : 0;
+        const wx = Math.min(Math.max(w.dot.x, 74), 258);
+        const wy = Math.max(w.dot.y - 10 - rise + fall, 26);
+        const op = a < life ? 1 : Math.max(0, 1 - (a - life) / 0.4);
+        if (w.tier) {
+          word.textContent = w.tier + (w.n > 1 ? ' ×' + w.n : '');
+          word.setAttribute('font-size', c.size);
+          word.setAttribute('x', wx); word.setAttribute('y', wy);
+          word.style.fill = c.col;
+          word.style.opacity = op.toFixed(2);
+          word.style.filter = 'drop-shadow(0 0 ' + c.blur + 'px ' + c.glow + ')';
+          pts.setAttribute('y', wy + 18);
+        } else {
+          word.style.opacity = 0;
+          pts.setAttribute('y', wy + 6);
+        }
+        pts.textContent = '+' + w.gain;
+        pts.setAttribute('x', wx);
+        pts.style.fill = c.col;
+        pts.style.opacity = (op * (w.tier ? 0.9 : 0.7)).toFixed(2);
+        pts.style.filter = 'drop-shadow(0 0 ' + (c.blur * 0.5).toFixed(1) + 'px ' + c.glow + ')';
+        const active = this._k % 2 === 1 ? dA : dB;
+        if (a < 0.3) active.setAttribute('r', (5 + 4 * (1 - a / 0.3)).toFixed(2));
+        else { dA.setAttribute('r', 5); dB.setAttribute('r', 5); }
+      }
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); }
+  renderVals() {
+    const v = {};
+    ['wordRef','ptsRef','chainRef','bankRef','dotARef','dotBRef'].forEach(k => { v[k] = this[k]; });
+    return v;
+  }
+}
+</script>
+</body>
+</html>

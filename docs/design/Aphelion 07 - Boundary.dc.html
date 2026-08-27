@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Unbounded:wght@500;700;900&amp;family=Archivo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #060510; font-family: 'Archivo', sans-serif; color: #A9A3C9; }
+  a { color: #9D6BFF; text-decoration: none; }
+  a:hover { color: #FF5FA2; }
+</style>
+</helmet>
+<div style="min-width: 1680px; max-width: 1680px; margin: 0 auto; padding: 56px 48px 72px 48px; display: flex; flex-direction: column; gap: 28px; background: #060510;">
+
+  <!-- HEADER -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px; align-items: end;">
+    <div>
+      <div style="font-size: 12px; letter-spacing: 0.32em; color: #6F6893; font-weight: 600;">APHELION &nbsp;·&nbsp; DIRECTION 07 &nbsp;·&nbsp; THE BOUNDARY AS RISK GRADIENT</div>
+      <div style="font-family: 'Anton', sans-serif; font-size: 54px; color: #FFF4E0; line-height: 1.08; margin-top: 18px; letter-spacing: 0.02em; text-shadow: 0 0 34px rgba(255,244,224,0.28);">THE EDGE IS A PLACE,<br>NOT A WALL.</div>
+      <div style="margin-top: 18px; font-size: 15px; line-height: 1.65; max-width: 760px;">The most memorable discovery in a playtest was a scoring anomaly found <em>outside</em> the boundary by accident. That is the design brief in one sentence: the edge should be somewhere you <span style="color: #EDEAF7; font-weight: 600;">aim at</span>, not away from. So the boundary becomes three bands of increasing heat and reward, and its light answers a question no static vignette can: <span style="color: #EDEAF7; font-weight: 600;">not "where is the edge" but "how fast are you approaching it."</span></div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 22px 24px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE THREE LAWS OF THE EDGE</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px; font-size: 13px; line-height: 1.5;">
+        <div><span style="color: #EDEAF7; font-weight: 600;">Intensity = closing speed, not proximity.</span> Coast along the outer band and the edge glows softly — you can live there. Dive at it and it flares. A wall reacts to where you are; a risk reacts to what you're doing.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">Reward is shown, never spoken.</span> Scoring motes drift in the outer bands, denser and brighter deeper in. No multiplier labels in the world, no arrows, no "RISK ZONE" text. The glimmer is the signpost.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">The line is the only absolute.</span> Bands are negotiable; the line is not. Past it, physics stops negotiating too — that stake is the game's one deliberate cruelty.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CROSS-SECTION + LIVE DEMO -->
+  <div style="display: grid; grid-template-columns: 1fr 460px; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">CROSS-SECTION — THE BANDS, PRICED</div>
+      <svg viewBox="0 0 720 250" width="100%" style="display: block; margin-top: 18px;">
+        <defs>
+          <linearGradient id="xsec" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#FF5FA2" stop-opacity="0"></stop>
+            <stop offset="0.55" stop-color="#FF5FA2" stop-opacity="0.05"></stop>
+            <stop offset="0.8" stop-color="#FF5FA2" stop-opacity="0.18"></stop>
+            <stop offset="1" stop-color="#FF5FA2" stop-opacity="0.45"></stop>
+          </linearGradient>
+        </defs>
+        <rect x="14" y="40" width="640" height="130" fill="url(#xsec)" rx="4"></rect>
+        <line x1="654" y1="30" x2="654" y2="180" stroke="#FF5FA2" stroke-width="3" style="filter: drop-shadow(0 0 9px #FF5FA2);"></line>
+        <line x1="400" y1="40" x2="400" y2="170" stroke="#FF5FA2" stroke-width="1" opacity="0.3" stroke-dasharray="4 5"></line>
+        <line x1="540" y1="40" x2="540" y2="170" stroke="#FF5FA2" stroke-width="1" opacity="0.45" stroke-dasharray="4 5"></line>
+        <circle cx="452" cy="86" r="2" fill="#FF5FA2" opacity="0.55"></circle>
+        <circle cx="492" cy="128" r="2" fill="#FF5FA2" opacity="0.6"></circle>
+        <circle cx="566" cy="74" r="2.5" fill="#FF5FA2" opacity="0.85" style="filter: drop-shadow(0 0 4px #FF5FA2);"></circle>
+        <circle cx="590" cy="140" r="2.5" fill="#FF5FA2" opacity="0.9" style="filter: drop-shadow(0 0 4px #FF5FA2);"></circle>
+        <circle cx="618" cy="100" r="3" fill="#FF5FA2" style="filter: drop-shadow(0 0 6px #FF5FA2);"></circle>
+        <g font-family="Archivo" font-size="12" font-weight="700" fill="#A9A3C9" letter-spacing="1">
+          <text x="120" y="105">THE FIELD</text>
+          <text x="420" y="62" fill="#FF5FA2" opacity="0.8">OUTER BAND · ×2</text>
+          <text x="548" y="62" fill="#FF5FA2">FIRE BAND · ×3</text>
+          <text x="668" y="105" fill="#FF5FA2">GONE</text>
+        </g>
+        <g font-family="Archivo" font-size="10.5" fill="#6F6893" font-weight="600">
+          <text x="400" y="192">EDGE − 220m</text>
+          <text x="530" y="192" text-anchor="end">EDGE − 90m</text>
+          <text x="654" y="210" text-anchor="end">THE LINE</text>
+        </g>
+        <g font-family="Archivo" font-size="12" fill="#A9A3C9">
+          <text x="14" y="222">Motes are the only signage: sparse at ×2, dense and bright at ×3, absent past the line — even the reward stops promising.</text>
+          <text x="14" y="242">Band positions are drawn in world space; the gradient never sits on screen edges, so it reads as geography, not vignette.</text>
+        </g>
+      </svg>
+      <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(140,130,190,0.15); display: flex; gap: 34px; font-size: 13px; line-height: 1.6;">
+        <div style="flex: 1;"><span style="color: #EDEAF7; font-weight: 600;">Why hugging is calm:</span> a player skimming the fire band parallel to the line has near-zero closing speed, so the edge idles at a low ION glow — high reward, held nerve, quiet screen. The game respects the racing line instead of screaming at it.</div>
+        <div style="flex: 1;"><span style="color: #EDEAF7; font-weight: 600;">Why diving is loud:</span> closing speed multiplies the bloom, the deadline track (Direction 03) appears on the projected line with its recovery window, and fuel prices the save via lit-fraction. All three systems converge on the same 2 seconds — that convergence <em>is</em> the boundary experience.</div>
+      </div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 24px 26px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">LIVE — THE EDGE ANSWERS YOUR SPEED</div>
+      <canvas ref="{{canvasRef}}" width="820" height="1100" style="width: 100%; display: block; margin-top: 14px; border-radius: 10px; background: #0A0814;"></canvas>
+      <div style="font-size: 12.5px; line-height: 1.55; margin-top: 12px;">The craft weaves toward and away from the line while climbing. Watch the edge: bright only while closing fast; calm when skimming. On a committed dive the deadline track appears — ION window on the projected line, dot = last press. Tweak <em>aggression</em>.</div>
+    </div>
+  </div>
+
+  <!-- BURN-UP + DOCTRINE -->
+  <div style="display: grid; grid-template-columns: 1fr 560px; gap: 28px;">
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE BURN — CROSSING, SURVIVED OR NOT</div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <svg viewBox="0 0 220 190" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+            <defs><linearGradient id="b1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF5FA2" stop-opacity="0"></stop><stop offset="1" stop-color="#FF5FA2" stop-opacity="0.4"></stop></linearGradient></defs>
+            <rect x="120" y="0" width="100" height="190" fill="url(#b1)"></rect>
+            <line x1="216" y1="0" x2="216" y2="190" stroke="#FF5FA2" stroke-width="2.5" style="filter: drop-shadow(0 0 7px #FF5FA2);"></line>
+            <line x1="60" y1="130" x2="150" y2="80" stroke="#FFF4E0" stroke-width="1.25" opacity="0.35"></line>
+            <path d="M 96 110 L 128 92" fill="none" stroke="#FF5FA2" stroke-width="4.5" stroke-linecap="round" style="filter: drop-shadow(0 0 5px #FF5FA2);"></path>
+            <circle cx="128" cy="92" r="4" fill="#FF5FA2" style="filter: drop-shadow(0 0 4px #FFD4E6) drop-shadow(0 0 8px #FF5FA2);"></circle>
+            <g transform="translate(60 130) rotate(-29)"><path d="M 13 0 L -9 7.5 L -4.5 0 L -9 -7.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 4px #FFF4E0) drop-shadow(0 0 16px #FFF4E0);"></path></g>
+          </svg>
+          <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">1 · THE CHOICE</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 4px;">Committed dive: deadline track live, window lit to the fuel's affordable fraction, edge flaring with closing speed. Everything true is on screen; nothing says "turn."</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <svg viewBox="0 0 220 190" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+            <defs><linearGradient id="b2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF5FA2" stop-opacity="0"></stop><stop offset="1" stop-color="#FF5FA2" stop-opacity="0.6"></stop></linearGradient></defs>
+            <rect x="100" y="0" width="120" height="190" fill="url(#b2)"></rect>
+            <line x1="216" y1="0" x2="216" y2="190" stroke="#FF5FA2" stroke-width="2.5" style="filter: drop-shadow(0 0 10px #FF5FA2);"></line>
+            <path d="M 70 150 Q 150 110 196 60 Q 205 48 196 40" fill="none" stroke="#FFF4E0" stroke-width="2.5" opacity="0.5" stroke-linecap="round"></path>
+            <path d="M 150 96 Q 180 78 196 60" fill="none" stroke="#FF5FA2" stroke-width="3" opacity="0.8" stroke-linecap="round" style="filter: drop-shadow(0 0 6px #FF5FA2);"></path>
+            <g transform="translate(196 40) rotate(-115)"><path d="M 13 0 L -9 7.5 L -4.5 0 L -9 -7.5 Z" fill="#FFF4E0" style="filter: drop-shadow(0 0 5px #FFF4E0) drop-shadow(0 0 20px #FFF4E0);"></path></g>
+          </svg>
+          <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">2 · THE SAVE — FLAMING BURN</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 4px;">Press inside the window: the craft carves back with an ION-tinged trail — the one time the player's white light wears pink, because the edge is writing on them. Fuel visibly drains from the halo during the carve. Survived skims become the game's best clips.</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <svg viewBox="0 0 220 190" style="background: #0A0814; border-radius: 10px; width: 100%; display: block;">
+            <defs><linearGradient id="b3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF5FA2" stop-opacity="0"></stop><stop offset="1" stop-color="#FF5FA2" stop-opacity="0.7"></stop></linearGradient></defs>
+            <rect x="80" y="0" width="140" height="190" fill="url(#b3)"></rect>
+            <line x1="216" y1="0" x2="216" y2="190" stroke="#FF5FA2" stroke-width="2.5" style="filter: drop-shadow(0 0 12px #FF5FA2);"></line>
+            <line x1="60" y1="140" x2="190" y2="70" stroke="#FFF4E0" stroke-width="2" opacity="0.3" stroke-linecap="round"></line>
+            <circle cx="196" cy="67" r="7" fill="#FFF4E0" opacity="0.8" style="filter: blur(2px) drop-shadow(0 0 14px #FF5FA2);"></circle>
+            <circle cx="207" cy="61" r="3" fill="#FF5FA2" opacity="0.7" style="filter: blur(1px);"></circle>
+            <text x="110" y="170" fill="#FF5FA2" font-family="Archivo" font-weight="800" font-size="12" letter-spacing="2" style="filter: drop-shadow(0 0 6px rgba(255,95,162,0.8));">SOS</text>
+          </svg>
+          <div><div style="font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 12px; color: #EDEAF7;">3 · THE LOSS</div><div style="font-size: 11.5px; line-height: 1.55; margin-top: 4px;">Missed press: SOS strobes, the craft's white core dissolves into ION embers at the line — the only death animation in the game, ~900ms, no slow-mo, no shake. Then the debrief: LEFT THE FIELD AT THE RIGHT WALL · ON FIRE.</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 26px 30px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">WHY THIS STAYS AN INSTRUMENT</div>
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px; font-size: 13.5px; line-height: 1.62;">
+        <div>The boundary never issues a command. It states four facts — <span style="color: #EDEAF7;">where the bands are</span> (gradient in world space), <span style="color: #EDEAF7;">what they pay</span> (mote density), <span style="color: #EDEAF7;">how fast you're closing</span> (bloom), <span style="color: #EDEAF7;">when saving stops being possible</span> (deadline dot) — and lets the player price the trade.</div>
+        <div>ION keeps its monopoly: this is the only place the world glows pink, so peripheral vision alone knows the difference between "near planets" and "near the end of the world."</div>
+        <div>And the bands make the score-chase spatial: the optimal run lives in the fire band, the safe run in the field, and the leaderboard will show which players lived where — geography as skill expression, which is exactly what the daily needs (Direction 08).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE BURN, ANIMATED -->
+  <div style="background: #0D0A1C; border: 1px solid rgba(140,130,190,0.18); border-radius: 12px; padding: 28px 34px;">
+    <div style="display: flex; align-items: baseline; gap: 20px;">
+      <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700;">THE BURN, ANIMATED — DEATH IS THE ANTI-RELEASE</div>
+      <div style="font-size: 12.5px; color: #6F6893;">tweak <em>burnOutcome</em> to lock a branch, <em>burnRate</em> to scrub slow</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 430px; gap: 30px; margin-top: 16px; align-items: start;">
+      <canvas ref="{{burnRef}}" width="1560" height="680" style="width: 100%; display: block; border-radius: 10px; background: #0A0814;"></canvas>
+      <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; line-height: 1.6;">
+        <div><span style="color: #EDEAF7; font-weight: 600;">Same hitstop as the release — 70ms at the line.</span> The release condenses your light into a word; the loss disperses it into the field. Mirrored grammar makes death feel like the game's own physics, not a punishment layer.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">No explosion.</span> The craft unravels along its velocity over ~900ms: stretch, core thinning, embers streaming strictly parallel behind. The streak rule holds even in death — nothing ever radiates.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">SOS is a signal, not a scream.</span> It strobes until the line, then stops. The silence after the last strobe is the loudest frame in the sequence.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">The save is priced, visibly.</span> The carve drains the fuel halo in real time and paints the trail ION — the only pink the player's light ever wears. No award word for surviving: the clip is the reward, and the debrief logs the skim.</div>
+        <div><span style="color: #EDEAF7; font-weight: 600;">BANK never counts down.</span> On death it snaps to DUSK and the debrief states the number once. A draining counter is mockery; a stated fact is an epitaph.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; align-items: baseline; gap: 26px; padding: 8px 4px 0 4px;">
+    <div style="font-size: 11px; letter-spacing: 0.26em; color: #6F6893; font-weight: 700; flex: none;">NEXT, IN ORDER</div>
+    <div style="font-size: 13px; line-height: 1.7; color: #6F6893;"><span style="color: #A9A3C9;">09</span> the debrief &nbsp;·&nbsp; <span style="color: #A9A3C9;">10</span> the results sheet &nbsp;·&nbsp; <span style="color: #A9A3C9;">11</span> daily front + leaderboard &nbsp;·&nbsp; <span style="color: #A9A3C9;">12</span> adventure regions + zen</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;aggression&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 1, &quot;min&quot;: 0.3, &quot;max&quot;: 2, &quot;step&quot;: 0.1, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Edge demo&quot;, &quot;description&quot;: &quot;How hard the demo craft dives at the edge — watch the bloom answer&quot;},
+  &quot;burnOutcome&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;ALTERNATE&quot;, &quot;options&quot;: [&quot;ALTERNATE&quot;, &quot;SAVE&quot;, &quot;LOSS&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Burn demo&quot;, &quot;description&quot;: &quot;Lock the animated branch, or alternate save/loss&quot;},
+  &quot;burnRate&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 1, &quot;min&quot;: 0.2, &quot;max&quot;: 1.5, &quot;step&quot;: 0.05, &quot;unit&quot;: &quot;×&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Burn demo&quot;}
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.canvasRef = React.createRef();
+    this.burnRef = React.createRef();
+    this._b = { t: 0, last: null, outcome: 'SAVE', embers: [], trail: [], raf: null };
+    this._raf = null; this._last = null; this._t = 0; this._scroll = 0;
+    this._motes = Array.from({ length: 22 }, (_, i) => ({
+      x: 300 + (i * 53) % 96, y: (i * 131) % 550, s: 0.5 + (i % 4) * 0.2
+    }));
+  }
+  componentDidMount() {
+    const cv = this.canvasRef.current;
+    const ctx = cv.getContext('2d');
+    const W = 410, H = 550, S = 2;
+    const LINE = 396, B2 = 300, B3 = 350;
+    let px = 170, vx = 0;
+    const loop = (ts) => {
+      this._raf = requestAnimationFrame(loop);
+      if (this._last == null) { this._last = ts; return; }
+      const dt = Math.min(0.05, (ts - this._last) / 1000);
+      this._last = ts;
+      this._t += dt;
+      const agg = this.props.aggression ?? 1;
+      const speed = 52;
+      this._scroll += speed * dt;
+      // craft weave: sinusoid toward/away from edge
+      const target = 205 + 150 * Math.sin(this._t * 0.55 * agg) * Math.min(1, 0.6 + 0.4 * agg);
+      const nvx = (target - px) / Math.max(dt, 0.001);
+      vx = vx * 0.92 + (target - px) * 4 * dt * 60 * 0.08;
+      px = px + vx * dt;
+      const closing = Math.max(0, vx);
+      const dist = Math.max(8, LINE - px);
+      ctx.setTransform(S, 0, 0, S, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0A0814'; ctx.fillRect(0, 0, W, H);
+      // rungs
+      const SP = 46;
+      ctx.lineWidth = 1;
+      for (let k = Math.ceil(this._scroll / SP); k <= Math.floor((this._scroll + H) / SP); k++) {
+        const y = H - (k * SP - this._scroll);
+        ctx.strokeStyle = k % 5 === 0 ? 'rgba(108,100,166,0.3)' : 'rgba(108,100,166,0.15)';
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+      // edge gradient — intensity from closing speed + proximity
+      const heat = Math.min(0.85, (0.1 + closing / 120) * (1 + 60 / dist));
+      const g = ctx.createLinearGradient(B2 - 40, 0, LINE, 0);
+      g.addColorStop(0, 'rgba(255,95,162,0)');
+      g.addColorStop(0.6, 'rgba(255,95,162,' + (heat * 0.22).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,95,162,' + (heat * 0.6).toFixed(3) + ')');
+      ctx.fillStyle = g; ctx.fillRect(B2 - 40, 0, LINE - B2 + 40, H);
+      // band markers
+      ctx.setLineDash([4, 6]);
+      ctx.strokeStyle = 'rgba(255,95,162,0.25)';
+      ctx.beginPath(); ctx.moveTo(B2, 0); ctx.lineTo(B2, H); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,95,162,0.4)';
+      ctx.beginPath(); ctx.moveTo(B3, 0); ctx.lineTo(B3, H); ctx.stroke();
+      ctx.setLineDash([]);
+      // the line
+      ctx.strokeStyle = 'rgba(255,95,162,' + (0.6 + heat * 0.4).toFixed(2) + ')';
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = 6 + heat * 18;
+      ctx.beginPath(); ctx.moveTo(LINE, 0); ctx.lineTo(LINE, H); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // motes
+      this._motes.forEach(m => {
+        m.y += speed * dt;
+        if (m.y > H + 6) m.y = -6;
+        const depth = (m.x - B2) / (LINE - B2);
+        ctx.fillStyle = 'rgba(255,95,162,' + (0.25 + 0.6 * depth).toFixed(2) + ')';
+        ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = depth > 0.55 ? 5 : 0;
+        ctx.beginPath(); ctx.arc(m.x, m.y, 1.6 + depth * 1.4, 0, 7); ctx.fill();
+      });
+      ctx.shadowBlur = 0;
+      const cy = 300;
+      // deadline track on committed dives
+      if (closing > 40) {
+        const a = Math.min(1, (closing - 40) / 50);
+        ctx.strokeStyle = 'rgba(255,244,224,' + (0.3 * a).toFixed(2) + ')';
+        ctx.lineWidth = 1.25;
+        ctx.beginPath(); ctx.moveTo(px + 16, cy); ctx.lineTo(LINE, cy); ctx.stroke();
+        const dotX = Math.min(LINE - 14, px + 40 + closing * 0.5);
+        const winX = Math.max(px + 20, dotX - 44);
+        ctx.strokeStyle = 'rgba(255,95,162,' + (0.9 * a).toFixed(2) + ')';
+        ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+        ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = 6;
+        ctx.beginPath(); ctx.moveTo(winX, cy); ctx.lineTo(dotX, cy); ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255,95,162,' + a.toFixed(2) + ')';
+        ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(dotX, cy, 4, 0, 7); ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+      // craft — nose along velocity
+      const ang = Math.atan2(-speed * 0.35, vx);
+      ctx.save();
+      ctx.translate(px, cy);
+      ctx.rotate(ang);
+      ctx.fillStyle = '#FFF4E0';
+      ctx.shadowColor = '#FFF4E0'; ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.moveTo(13, 0); ctx.lineTo(-9, 7.5); ctx.lineTo(-4.5, 0); ctx.lineTo(-9, -7.5);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.shadowBlur = 0;
+      // trail
+      ctx.strokeStyle = 'rgba(255,244,224,0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px - Math.cos(ang) * 14, cy - Math.sin(ang) * 14);
+      ctx.lineTo(px - Math.cos(ang) * 90, cy - Math.sin(ang) * 90 + 30);
+      ctx.stroke();
+    };
+    this._raf = requestAnimationFrame(loop);
+    this.startBurn();
+  }
+  startBurn() {
+    const cv = this.burnRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const W = 780, H = 340, S = 2, LINE = 720;
+    const b = this._b;
+    const start = { x: 80, y: 250 }, dir = { x: 0.986, y: -0.164 }, SPD = 355;
+    const TP = 1.5, TCROSS = 1.8, TDOT = 1.58;
+    const P0 = { x: 612, y: 171 }, P1 = { x: 716, y: 150 }, P2 = { x: 628, y: 60 };
+    const quad = (u) => ({
+      x: (1-u)*(1-u)*P0.x + 2*(1-u)*u*P1.x + u*u*P2.x,
+      y: (1-u)*(1-u)*P0.y + 2*(1-u)*u*P1.y + u*u*P2.y
+    });
+    const quadD = (u) => ({ x: 2*(1-u)*(P1.x-P0.x) + 2*u*(P2.x-P1.x), y: 2*(1-u)*(P1.y-P0.y) + 2*u*(P2.y-P1.y) });
+    const drawCraft = (x, y, ang, sx, sy, coreA, bloom) => {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(sx, sy);
+      ctx.fillStyle = 'rgba(255,244,224,' + coreA + ')';
+      ctx.shadowColor = '#FFF4E0'; ctx.shadowBlur = bloom;
+      ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(-9, 7.5); ctx.lineTo(-4.5, 0); ctx.lineTo(-9, -7.5); ctx.closePath(); ctx.fill();
+      ctx.restore(); ctx.shadowBlur = 0;
+    };
+    const loop = (ts) => {
+      b.raf = requestAnimationFrame(loop);
+      if (b.last == null) { b.last = ts; return; }
+      const rate = this.props.burnRate ?? 1;
+      const dt = Math.min(0.05, (ts - b.last) / 1000) * rate;
+      b.last = ts;
+      const save = b.outcome === 'SAVE';
+      const TEND = save ? 3.0 : 4.2;
+      b.t += dt;
+      if (b.t >= TEND) {
+        b.t = 0; b.embers = []; b.trail = [];
+        const pref = this.props.burnOutcome ?? 'ALTERNATE';
+        b.outcome = pref === 'ALTERNATE' ? (save ? 'LOSS' : 'SAVE') : pref;
+      }
+      const t = b.t;
+      // craft state
+      let pos = null, ang = Math.atan2(dir.y, dir.x), sx = 1, sy = 1, coreA = 1, bloom = 16, vel = { x: dir.x*SPD, y: dir.y*SPD };
+      let dead = false, carving = false, u = 0;
+      if (t < TP || (!save && t < TCROSS)) {
+        pos = { x: start.x + dir.x*SPD*t, y: start.y + dir.y*SPD*t };
+      } else if (save) {
+        if (t < TP + 0.85) {
+          u = (t - TP) / 0.85; carving = true;
+          pos = quad(u); const d = quadD(u); ang = Math.atan2(d.y, d.x); vel = d;
+          sx = 1 + 0.25*Math.sin(u*Math.PI); sy = 1 - 0.15*Math.sin(u*Math.PI);
+        } else {
+          const d = quadD(1), n = Math.hypot(d.x,d.y), e = (t - TP - 0.85);
+          pos = { x: P2.x + d.x/n*300*e, y: P2.y + d.y/n*300*e };
+          ang = Math.atan2(d.y, d.x); vel = { x: d.x/n*300, y: d.y/n*300 };
+        }
+      } else {
+        const hs = Math.min(0.07, Math.max(0, t - TCROSS));
+        const tu = Math.max(0, t - TCROSS - 0.07);
+        const frozen = t < TCROSS + 0.07;
+        const drift = frozen ? 0 : tu * SPD * 0.3;
+        pos = { x: start.x + dir.x*(SPD*TCROSS + drift), y: start.y + dir.y*(SPD*TCROSS + drift) };
+        if (!frozen) {
+          u = Math.min(1, tu / 0.9); dead = u >= 1;
+          sx = 1 + 0.8*u; sy = 1 - 0.4*u; coreA = Math.max(0, 1 - u*1.1); bloom = 16 + 30*u;
+          if (u < 0.3 && b.embers.length < 46) {
+            for (let i = 0; i < 3; i++) {
+              const j = (Math.random()-0.5);
+              b.embers.push({ x: pos.x, y: pos.y, vx: -dir.x*(50+Math.random()*140) + j*30*dir.y, vy: -dir.y*(50+Math.random()*140) - j*30*dir.x, a: 0.95, r: 1.2+Math.random()*1.8 });
+            }
+          }
+        }
+      }
+      // trail
+      if (pos && coreA > 0.1) { b.trail.push({ x: pos.x, y: pos.y, ion: carving ? 1 : 0 }); if (b.trail.length > 30) b.trail.shift(); }
+      // embers physics
+      b.embers.forEach(p => { p.x += p.vx*dt; p.y += p.vy*dt; p.a -= dt*1.3; });
+      b.embers = b.embers.filter(p => p.a > 0);
+      // ---- draw ----
+      ctx.setTransform(S, 0, 0, S, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0A0814'; ctx.fillRect(0, 0, W, H);
+      const closing = Math.max(0, vel.x) / SPD;
+      const heat = (dead || (!save && t > TCROSS)) ? 0.9 : 0.15 + closing*0.6;
+      const g = ctx.createLinearGradient(LINE-160, 0, LINE, 0);
+      g.addColorStop(0, 'rgba(255,95,162,0)');
+      g.addColorStop(1, 'rgba(255,95,162,' + (heat*0.5).toFixed(3) + ')');
+      ctx.fillStyle = g; ctx.fillRect(LINE-160, 0, 160, H);
+      ctx.strokeStyle = 'rgba(255,95,162,' + (0.55 + heat*0.45).toFixed(2) + ')';
+      ctx.lineWidth = 2.5; ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = 5 + heat*16;
+      ctx.beginPath(); ctx.moveTo(LINE, 0); ctx.lineTo(LINE, H); ctx.stroke(); ctx.shadowBlur = 0;
+      // deadline track during approach
+      if (t > 0.5 && t < (save ? TP : TCROSS) + 0.02) {
+        const fade = Math.min(1, (t - 0.5) / 0.3);
+        const yAt = x => start.y + dir.y/dir.x*(x - start.x);
+        ctx.strokeStyle = 'rgba(255,244,224,' + (0.3*fade).toFixed(2) + ')'; ctx.lineWidth = 1.25;
+        ctx.beginPath(); ctx.moveTo(pos.x+16, yAt(pos.x+16)); ctx.lineTo(Math.min(640, LINE), yAt(640)); ctx.stroke();
+        if (!save && t > TDOT) { ctx.setLineDash([4,6]); ctx.strokeStyle = 'rgba(255,95,162,' + (0.4*fade).toFixed(2) + ')'; ctx.beginPath(); ctx.moveTo(640, yAt(640)); ctx.lineTo(LINE, yAt(LINE)); ctx.stroke(); ctx.setLineDash([]); }
+        ctx.strokeStyle = 'rgba(255,95,162,' + (0.95*fade).toFixed(2) + ')';
+        ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+        ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = 6;
+        ctx.beginPath(); ctx.moveTo(Math.max(pos.x+18, 580), yAt(Math.max(pos.x+18, 580))); ctx.lineTo(640, yAt(640)); ctx.stroke(); ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255,95,162,' + fade + ')';
+        ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(640, yAt(640), 4.5, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+      }
+      // trail
+      b.trail.forEach((p, i) => {
+        const a = (i / b.trail.length) * 0.5 * (dead ? Math.max(0, 1 - (t - TCROSS - 0.97)) : 1);
+        ctx.fillStyle = p.ion ? 'rgba(255,95,162,' + a + ')' : 'rgba(255,244,224,' + a + ')';
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, 7); ctx.fill();
+      });
+      // embers
+      b.embers.forEach(p => {
+        ctx.fillStyle = 'rgba(255,95,162,' + p.a.toFixed(2) + ')';
+        ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = 4;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+      });
+      ctx.shadowBlur = 0;
+      // carve embers + fuel arc
+      if (carving) {
+        if (b.embers.length < 30) {
+          const n = Math.hypot(vel.x, vel.y) || 1;
+          b.embers.push({ x: pos.x, y: pos.y, vx: -vel.x/n*90, vy: -vel.y/n*90, a: 0.8, r: 1.4 });
+        }
+        ctx.strokeStyle = '#FF5FA2'; ctx.lineWidth = 2.25; ctx.lineCap = 'round';
+        ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = 5;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, 13, -Math.PI/2, -Math.PI/2 + Math.PI*1.5*(1 - u*0.55), false); ctx.stroke(); ctx.shadowBlur = 0;
+      }
+      // SOS strobe (loss approach)
+      if (!save && t > 1.15 && t < TCROSS && Math.floor(t*4) % 2 === 0) {
+        ctx.fillStyle = '#FF5FA2'; ctx.font = '800 13px Archivo, sans-serif';
+        ctx.shadowColor = '#FF5FA2'; ctx.shadowBlur = 8;
+        ctx.fillText('SOS', pos.x - 12, pos.y + 32); ctx.shadowBlur = 0;
+      }
+      // craft
+      if (pos && coreA > 0.02) drawCraft(pos.x, pos.y, ang, sx, sy, coreA, bloom);
+      // re-entry flash (save)
+      if (save && t > TP + 0.85 && t < TP + 1.0) {
+        const f = 1 - (t - TP - 0.85) / 0.15;
+        ctx.strokeStyle = 'rgba(255,244,224,' + (0.7*f).toFixed(2) + ')';
+        ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(P2.x, P2.y, 14 + 26*(1-f), 0, 7); ctx.stroke();
+      }
+      // world dim + debrief (loss)
+      if (!save && t > TCROSS + 0.4) {
+        const d = Math.min(0.5, (t - TCROSS - 0.4) * 0.6);
+        ctx.fillStyle = 'rgba(6,5,16,' + d.toFixed(2) + ')'; ctx.fillRect(0, 0, W, H);
+        if (t > TCROSS + 1.1) {
+          const a = Math.min(1, (t - TCROSS - 1.1) / 0.4);
+          ctx.fillStyle = 'rgba(237,234,247,' + a.toFixed(2) + ')';
+          ctx.font = '800 16px Archivo, sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('LEFT THE FIELD AT THE RIGHT WALL · ON FIRE', W/2, H/2);
+          ctx.fillStyle = 'rgba(111,104,147,' + a.toFixed(2) + ')';
+          ctx.font = '600 11px Archivo, sans-serif';
+          ctx.fillText('BANK 12 450 · STAYS IN THE FIELD', W/2, H/2 + 24);
+          ctx.textAlign = 'left';
+        }
+      }
+      // debrief (save)
+      if (save && t > TP + 1.1) {
+        const a = Math.min(1, (t - TP - 1.1) / 0.4);
+        ctx.fillStyle = 'rgba(111,104,147,' + (a*0.9).toFixed(2) + ')';
+        ctx.font = '800 13px Archivo, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('SKIMMED THE RIGHT WALL · FUEL −38%', W/2, H - 26);
+        ctx.textAlign = 'left';
+      }
+    };
+    b.raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); if (this._b.raf) cancelAnimationFrame(this._b.raf); }
+  renderVals() { return { canvasRef: this.canvasRef, burnRef: this.burnRef }; }
+}
+</script>
+</body>
+</html>
