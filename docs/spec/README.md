@@ -22,6 +22,11 @@ So every number in these files is one of three kinds, and says which it is:
   something to measure. Spec [17](./17-daily-field.md)'s whole difficulty curve is this kind, and
   says so.
 
+And per [ADR-0013](../adr/0013-carry-the-behaviour-re-derive-the-mechanism.md), every number is a
+number about **behaviour a test can observe from outside** — a position, a speed, a time, an angle,
+a ratio. A characteristic that can only be checked by reaching inside the simulation is specified
+wrong, and gets rewritten rather than tested as it stands.
+
 An opening position that is still an opening position after the thing it describes has been flown
 is a bug in the process, not a property of the spec.
 
@@ -128,5 +133,6 @@ Do not re-litigate them.
 | 2026-08-27 | **The palette is flagged for a colour-vision sweep**, with authority over hue values and separation numbers and none over the grammar | [00 · §2a](./00-tokens.md) |
 | 2026-08-27 | **The recipe line's length is revisited at implementation** | [10 · §5](./10-results.md) |
 | 2026-08-27 | **The swing's characteristics are measured and written**, from 474s of recorded phone play under the prototype's current physics tuning plus headless sweeps of its own simulation. The load-bearing one: at peak boost the craft can reach only **43%** of the circle of release headings (never above 49% at any sampled geometry), so the boost and the aim genuinely compete — `VISION.md` pillar 2 as a number a test can hold | [01](./01-swing.md) §11 |
+| 2026-08-27 | **The domain language is binding on specs, code and tests, and the prototype's names do not cross.** `CONTEXT.md` gains **dive, floor, clearance, freeze, settle, depth** and **punch** — words spec 01 was using heavily without a glossary entry — and **hitstop** is kept as a refused term so a reader meeting it in an older document knows it was decided against rather than forgotten. Spec 01 was restated in these words ([ADR-0013](../adr/0013-carry-the-behaviour-re-derive-the-mechanism.md), [AGENTS.md](../../AGENTS.md)) | [CONTEXT.md](../../CONTEXT.md), [01](./01-swing.md) |
 | 2026-08-27 | **The swing is real physics with three authored transitions in it** — the clearance impulse, the freeze, and the 1.2s settle — and the freeze is **deliberately physically inconsistent**: it clamps the orbit's *shape* at e ≤ 0.6 while carrying the dive's *speed* uncapped. Measured, dives differing only in approach speed produce an **identical ellipse ridden at 400/415/435**, and all of them decay to the same circular speed by the end of the settle. The reward for a good dive is a speed advantage with a **1.2-second shelf life**, and that is what makes letting go a decision | [01 · §5 and §6a](./01-swing.md) |
 | 2026-08-27 | **The hitstop is rejected; the punch is bought with speed instead.** Flown in the prototype, even a 30ms stop read as the game buffering. A **kick on every release, scaled by the quality of the swing** replaces it — transient, so it can be large without touching the economy, and read from a number the simulation already produces. ADR-0006's layering stands; only its hitstop example is withdrawn ([ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)) | [02](./02-release.md) — **needs rebasing in M2**, [01 · §7 and §13.1](./01-swing.md) |

@@ -37,7 +37,7 @@ worse than one that does not scale it at all. This repo's design space is **1170
 > **Conversion, ruled 2026-08-27 (author to confirm — see §13).** To make the rewrite feel the
 > same on the same phone, lengths, speeds and accelerations all scale by **k = 3**, and the
 > gravitational parameter by **k³ = 27** (it has units of length³ / time²). **Times, angles,
-> ratios and tick counts are unchanged.** So `GM` becomes 148 500 000, the softening length 54,
+> ratios and tick counts are unchanged.** So `μ` becomes 148 500 000, the softening length 54,
 > the floor gap 36 — and every duration, every angle and every fraction in this file transfers
 > untouched.
 
@@ -88,11 +88,15 @@ are evidence about the session and are immune to the drift.
 
 ## 2 · Gravity
 
+`μ` and `ε` below are the standard names for a gravitational parameter and a softening length.
+They are **not** carried config keys, and nothing requires the rewrite to hold them under those
+names or at all — the row that matters is the first one, which is a curve a test can sample.
+
 | Property | Value | Kind |
 |---|---|---|
-| Force law | `a(r) = GM / (r² + soft²)`, directed at the body | Measured |
-| `GM` | 5 500 000 (units³/s²) | Measured |
-| `soft` | 18 | Measured |
+| Force law | `a(r) = μ / (r² + ε²)`, directed at the body | Measured |
+| `μ` — gravitational parameter | 5 500 000 (units³/s²) | Measured |
+| `ε` — softening length | 18 | Measured |
 | Departure from inverse-square | 9.4% weaker at the floor (r ≈ 56), 3.1% at r = 100, 0.8% at r = 200 | Measured |
 | Where gravity acts | **Only while a body is held, and only from the held body** | Measured |
 
@@ -100,21 +104,21 @@ Three things here are surprising enough to state plainly, because a rewrite will
 wrong by default.
 
 **Gravity is not ambient.** A coasting craft feels no force from anything. Measured: 300 ticks (5
-simulated seconds) of free flight leave the speed **bit-identical** — not nearly constant,
+simulated seconds) of coasting leave the speed **bit-identical** — not nearly constant,
 identical. The field is not an n-body problem and never was; it is a sequence of two-body problems
 with straight lines between them. That is also what makes the compass exactly solvable (§11).
 
 **A held craft feels only its own body.** Other bodies contribute a bounce if touched, never a
 pull. So a swing is genuinely one grab, one body, one orbit — the unit `CONTEXT.md` names.
 
-**Mass is not a function of radius.** Every body in the prototype has the same `GM` regardless of
+**Mass is not a function of radius.** Every body in the prototype has the same `μ` regardless of
 its radius, which runs 34.3 – 55.5 in the generated field. Radius sets only the orbit floor and the
 collision surface. Spec 01's brief asked for "the mass-to-radius relation"; **there is not one to
 carry**, and inventing one here would be exactly the kind of plausible number this project
 refuses. See §13.
 
 > **Tolerance.** Coasting speed constant to within 1 part in 10⁹ over 600 ticks. Acceleration
-> under a held body within **2%** of `GM / (r² + soft²)` at every radius from the floor to the
+> under a held body within **2%** of `μ / (r² + ε²)` at every radius from the floor to the
 > grab range. No measurable acceleration on a coasting craft from any body at any distance.
 
 ---
@@ -179,7 +183,7 @@ in §5 catches the remainder — expensive, but survivable, where being flung ou
 neither.
 
 **And a grab converts a lethal line into an orbit.** Measured: a straight approach that would
-strike the body kills a coasting craft on contact; the same approach grabbed reaches a stable orbit
+strike the body kills a coasting craft on contact; the same approach, grabbed, reaches a stable orbit
 at 339 units/s. One second after the press, a grabbed path has separated from the line it was on by
 11 – 154 units, bending the heading by up to 122°.
 
@@ -206,7 +210,7 @@ design rather than a compromise (author, 2026-08-27). The transitions are:
 
 Everything between them is simulated and must stay so. Between the press and the closest approach
 the craft is on **real integrated gravity and nothing else**. Nothing authors the shape of a dive. That decoupling — clearance, then simulated shape,
-then authored tightness only at the end — is what took the prototype sixteen failed attempts, and
+then authored depth only at the end — is what took the prototype sixteen failed attempts, and
 the failures were all the same failure: rigid or snapped orbit insertion. **Keep the dive
 simulated.**
 
@@ -271,7 +275,7 @@ momentum. This is closed-form and therefore cannot accumulate integration error.
 | Real-play eccentricity | p25 0.58, p50 **0.60**, p75 0.60 — the cap binds on most swings | Measured |
 | Radius over time | Tightens toward a circle at the periapsis radius over **1.2s**, on a smootherstep | Measured |
 | Angular rate at the freeze | `v_peri / r_peri` — measured 400 – 450 °/s | Measured |
-| Angular rate settled | `√(GM/r) / r` — measured 320 °/s at r = 56 | Measured |
+| Angular rate settled | `√(μ/r) / r` — measured 320 °/s at r = 56 | Measured |
 | Revolution, settled | **1.12s** at the median body (R 44); 0.84s smallest, 1.49s largest | Measured |
 
 **Eccentricity comes from the dive's peak energy for a reason.** A head-on dive that clips the
@@ -324,7 +328,7 @@ with a **1.2-second shelf life**, and cashing it before it expires is the whole 
 problem. A rewrite where holding indefinitely preserves the advantage has removed the reason to let
 go.
 
-> **Tolerance.** Settled revolution period within **±10%** of `2πr / √(GM/r)`. Angular rate at the
+> **Tolerance.** Settled revolution period within **±10%** of `2πr / √(μ/r)`. Angular rate at the
 > freeze within **±10%** of `v_peri / r_peri`. Eccentricity at the freeze **≤ 0.6** on 100% of
 > swings, with p50 over real play inside **0.50 – 0.62**. Radius monotone toward the settled circle
 > over the settle — **no overshoot at all**, which is exact. The floor is **never breached**, at any
@@ -358,37 +362,53 @@ a circularisation used to guarantee missing the window it was meant to reward.
               arm            settle      zero
 ```
 
+**Stated as something a test can see from outside.** The boost is not a variable to be inspected;
+it is **how much faster a release leaves than the orbit it left from**. Everything below is written
+on that observable — exit speed measured against the orbital speed at the radius the craft let go
+at — so a test never reaches inside the simulation and the rewrite is free to compute it however it
+likes.
+
 | Property | Value | Kind |
 |---|---|---|
-| Ramp | Linear, 0 → peak over **0.45s** | Measured |
-| Plateau | Peak held until the settle ends at **1.2s** | Measured |
-| Decay | Linear, peak → 0 over **1.4s**, reaching zero at **2.6s** | Measured |
-| Peak magnitude | `boostMax × (tightness − 0.5) / 0.5`, floored at 0 | Measured |
-| `tightness` | `(grabDistance − r_peri) / (grabDistance − floor)` | Measured |
-| `boostMax` | **60** units/s | Measured, and tuning — see §13 |
-| Real-play peak | p05 0, p25 38, p50 **59**, p75 60, p95 60 — the cap binds on most swings | Measured |
+| Ramp | Linear, 0 → full over **0.45s** after the freeze | Measured |
+| Plateau | Full boost held until the settle ends at **1.2s** | Measured |
+| Decay | Linear, full → 0 over **1.4s**, reaching zero at **2.6s** | Measured |
+| Full boost | `peak × (depth − ½) / ½`, floored at 0 | Measured |
+| **Depth** | `(grab radius − periapsis) / (grab radius − floor)` — how far the dive committed | Measured |
+| Peak | **60** units/s at full depth | Measured, and tuning — see §13 |
+| Real-play full boost | p05 0, p25 38, p50 **59**, p75 60, p95 60 — the cap binds on most swings | Measured |
+
+**Depth is an Aphelion quantity, not a carried variable.** It is stated as a ratio of two things a
+test can measure — where the grab happened and where the craft got to — precisely so that it does
+not require the rewrite to keep a number by that name. Whether the implementation stores it, derives
+it, or never names it at all is not this file's business.
 
 **The ramp is the footgun's safety catch.** A reflexive tap-through earns almost nothing; you must
 hold a moment to arm it. That is what turned the boost from an always-loaded weapon into a skill
 window, and it is not negotiable.
 
-**A dive pays only if it halves the gap.** The threshold at 0.5 tightness means, exactly:
-`r_peri < (grabDistance + floor) / 2`. Committing halfway to the floor is the price of admission,
+**A dive pays only if it halves the gap.** A depth of ½ means, exactly:
+`periapsis < (grab radius + floor) / 2`. Committing halfway to the floor is the price of admission,
 and it is a clean statement a test can hold. Measured, the envelope of impact parameters that still
 pay runs **0.67 – 0.99 of the grab distance**, tightening as the approach gets faster and the grab
 gets longer: close and slow, almost any aim pays; far and fast, you must be within about seven
 tenths.
 
-**Tightness follows the depth of the dive, not the quality of the aim.** The prototype's own design
-document claimed the opposite and that mechanic was never implemented. Commit harder, hold tighter
-— the aim is paid for separately, by the compass.
+**Depth is depth, not aim.** What the boost pays for is how far the dive committed, and nothing
+about where the craft was pointing. The prototype's own design document claimed the opposite and
+that mechanic was never implemented — so this is a place where the document and the program
+disagreed, and the program is the evidence. Commit harder, hold tighter; the aim is paid for
+separately, by the compass.
 
-> **Tolerance.** Arm time within **±0.05s** of 0.45. Plateau ending within **±0.1s** of the settle's
-> end. Zero within **±0.15s** of 2.6s. The envelope is **exactly zero at the freeze** and
-> **monotone non-decreasing to the plateau and non-increasing after it** — both exact. Paying
-> threshold at `r_peri = (grabDistance + floor)/2` within **±3%**. Over real play, median peak
-> magnitude **≥ 0.9 of the maximum**, because the cap binding on most swings is the measured shape
-> and a rewrite where it rarely binds has made a different game.
+> **Tolerance**, and every one of these is read from exit speeds alone, with no access to the
+> simulation's internals. Release the same swing at successive ticks and measure how much faster
+> each release leaves than the orbital speed at its own release radius. That curve must: be
+> **exactly zero at the freeze**; reach its maximum at **0.45s ± 0.05**; hold within 1% of that
+> maximum until **1.2s ± 0.1**; reach zero at **2.6s ± 0.15**; and be **monotone non-decreasing
+> before the plateau and non-increasing after it**, exactly. The paying threshold sits at
+> `periapsis = (grab radius + floor) / 2` within **±3%**. Over real play, the median maximum is
+> **≥ 0.9 of the largest seen**, because the cap binding on most swings is the measured shape and a
+> rewrite where it rarely binds has made a different game.
 
 ---
 
@@ -616,7 +636,7 @@ carries a notice and is rebased in M2.
 [§2](./04-bodies.md) hands the mapping here: *"the exact mapping from mass to (arc, α, k) is set in
 M1 alongside the gravity model (spec 01); the three must move together and monotonically with
 mass."* So mass varying with size is settled and the tide is already specified to read it. **The
-prototype implements none of it** (§2): one `GM` for every body, radius entering only the orbit
+prototype implements none of it** (§2): one `μ` for every body, radius entering only the orbit
 floor and the collision surface.
 
 **The exponent is not being chosen yet, and the reason is §6a.** The prototype's feel came from
@@ -626,7 +646,7 @@ phone at the M1 gate, against the rewrite's own field. Until then the simulation
 a parameter:
 
 ```
-GM(R) = GM_ref × (R / R_ref)ⁿ        n is an OPENING POSITION at 2, marked as one
+μ(R) = μ_median × (R / R_median)ⁿ     n is an OPENING POSITION at 2, marked as one
 ```
 
 `n = 0` is the prototype exactly, so the parameter costs nothing to leave open and every value is
@@ -634,7 +654,7 @@ one number away.
 
 What the measurement says the choice is between, normalised so the median body is unchanged:
 
-| n | peak arc, small → large | periapsis speed | dive duration | bound catches at typical range |
+| n | peak arc, small → large | periapsis speed | dive duration | bound grabes at typical range |
 |---|---|---|---|---|
 | 0 — constant *(prototype)* | 56% → 35% | 463 → 387 | 0.57 → 0.50s | same for every body |
 | 2 — constant surface gravity | 45% → 42% | 368 → 465 | 0.68 → 0.45s | 3/12 → 9/12 |
@@ -653,7 +673,7 @@ somewhere to land:
 
 - **Grab range scales with mass.** Today it is a flat 560 for every body. A weak body reaching less
   far is legible on its own terms, and it is what keeps a small body grabbable at a distance where
-  the grab is still a bound catch rather than a braked one. This is what pays for a steep `n`.
+  the grab is still a bound grab rather than a braked one. This is what pays for a steep `n`.
 - **Braked small bodies are accepted as texture, not treated as a defect.** 52% of real planet
   grabs already begin as flybys, so this is a difference of degree; small bodies becoming the ones
   you brake into is a difficulty lever spec [17](./17-daily-field.md) may use. It is bounded by the
@@ -662,13 +682,13 @@ somewhere to land:
 The radius range is left where it is. Narrowing it was the third option and is not needed while the
 grab range moves.
 
-**3 · The design-space conversion.** §0 rules ×3 on lengths and ×27 on `GM` on the arithmetic that
+**3 · The design-space conversion.** §0 rules ×3 on lengths and ×27 on `μ` on the arithmetic that
 the design space is exactly three times the prototype's and the phone is the same phone.
 **Author to confirm the intent**, because it is the highest-leverage number in the file: confirming
 it says the rewrite should feel the same in the hand, and declining it says the rewrite should feel
 different, which is a legitimate thing to want and would change every absolute figure here at once.
 
-**4 · `boostMax` at 60 is tuning, and M4 owns it.** The envelope's **shape and timing** are M1's and
+**4 · The 60-units/s peak boost is tuning, and M4 owns it.** The envelope's **shape and timing** are M1's and
 are fixed above. Its **magnitude** is an economy number that spec [08](./08-economy.md) will move, and
 every tolerance in §7 is written on the shape so that moving it does not invalidate them. Flagged so
 that nobody later reads 60 as a physics constant.

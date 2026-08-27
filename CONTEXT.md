@@ -64,6 +64,41 @@ _Avoid_: capture, catch, hook
 Letting go, along the exit tangent. Payday: the moment a swing is graded and priced.
 _Avoid_: launch, slingshot, fling
 
+**Dive**:
+The part of a swing between the grab and the craft's closest approach. Real gravity and
+nothing else: the dive is simulated, and no part of it is authored.
+_Avoid_: approach (that is the whole run-up, before the grab), capture arc
+
+**Floor**:
+The closest a craft may orbit — a fixed clearance above a body's surface. A hard limit
+that is never crossed, and the one guarantee a grab makes.
+_Avoid_: minimum radius, surface, collision radius
+
+**Clearance**:
+The turn a grab applies to a path that would otherwise strike the body, lifting it to the
+floor without adding energy. What makes the grab a rescue as well as a hook.
+
+**Freeze**:
+The moment at the end of the dive when the orbit is fixed and the craft passes from
+simulated gravity onto a fixed orbit. Every clock the swing is graded by starts here.
+_Avoid_: capture, insertion, lock
+
+**Settle**:
+The stretch after the freeze in which the orbit rounds toward a circle and the speed the
+dive earned is spent. It ends at a fixed time, which is what gives a good dive a shelf life.
+_Avoid_: circularisation, decay
+
+**Depth**:
+How far a dive committed, as a fraction of the distance from the grab to the floor. What
+the boost is paid on. Depth is not aim: it says how hard you dived, never where you pointed.
+_Avoid_: tightness, closeness, commitment
+
+**Punch**:
+The kick a release lands, scaled by the quality of the swing and gone within a second or so.
+Bought with speed rather than with stopped time (ADR-0012), and carried entirely by the
+transient, so it never changes what a run is worth.
+_Avoid_: kick, impulse, boost (the boost is the lasting part, and they are different things)
+
 **Compass**:
 The signature instrument — the coloured windows drawn on the orbit path around a body,
 which say where the craft will go if it lets go now, and grade the aim before it does.
@@ -84,8 +119,10 @@ The moving indicator on the compass showing where a release would land right now
 The orbit detaching from the body and expanding away at release, in AURORA.
 
 **Hitstop**:
-The brief world freeze at grab and at release. The pause is the punch.
-_Avoid_: freeze frame, time stop, slow-mo
+**Refused** (ADR-0012). It named a brief world freeze at grab and release — *"the pause is the
+punch"* — and flown, even 30ms read as the game buffering. The punch is bought with speed
+instead: see **Punch**. The word is kept here so that a reader who meets it in an older
+document knows it was decided against rather than forgotten.
 
 **Coasting**:
 Flying without being engaged with a body. Earns nothing and costs nothing.
