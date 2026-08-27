@@ -57,10 +57,10 @@ Dependencies, not severity. Steps 1 and 2 are independent and can run together.
    carries the theme, so converting the remaining 87 literals now costs no
    signature churn — a layer already has the theme in hand.
 
-   What is left of F07 is Direction 02's hitstop, which is content rather than
-   refactor: 70ms at release and capture with an exemption list, and a call to make
-   first about whether a presentation-only freeze reads right at that length. The
-   note lives at `Frame.paused`, which is the mechanism it would extend.
+   Direction 02's hitstop is **rejected** — flown, even 30ms reads as jarring. The
+   punch is bought with speed instead: `SimConfig.releaseKick`, entirely transient
+   so it can be large without touching the economy. PORT_NOTES 68, and the ruling
+   is at `Frame.paused` where someone would otherwise reach for the freeze.
 
 4. **F04** + **F05** — together; splitting the score without the pricing gives two
    numbers that mean the same thing.
