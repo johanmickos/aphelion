@@ -39,7 +39,7 @@ if a layer boundary is crossed.
 |---|---|---|
 | [00 · Tokens and the compass](./00-tokens.md) | Direction 01 | Palette, identity hues, energy steps, type, motion, the compass, layout |
 | [01 · The swing](./01-swing.md) | none | Gravity, grab, clearance, the dive, the orbit, the boost envelope, release, coasting, death, the tick — and the measurement of pillar 2's tension. Written in [M1.1](../plan/m1-the-swing.md) |
-| [02 · The release](./02-release.md) | Direction 02 | The 400ms: hitstop, impulse, deformation, camera kick, farewell ring |
+| [02 · The release](./02-release.md) | Direction 02 | The 400ms: impulse, deformation, camera kick, farewell ring. **The hitstop is withdrawn (ADR-0012) and the timeline is rebased in M2** |
 | [03 · The HUD](./03-hud.md) | Direction 03 | One layout, five pressures; the readouts; the deadline track |
 | [04 · Bodies](./04-bodies.md) | Direction 04 | Anatomy, the tide, four states, types, naming |
 | [05 · The field](./05-field.md) | Direction 05 | Rungs, gravity bow, wake, the stack, the sky, the anomaly |
@@ -95,8 +95,7 @@ author's to close.
 | [00 · Tokens](./00-tokens.md) §2a | **The colour-vision sweep** — flagged, not scheduled. It has authority over every hue value and separation number, and none over the grammar |
 | [10 · The results sheet](./10-results.md) §5 | The recipe line's length — 12 today, revisited when the codec and store exist |
 | [17 · The daily field](./17-daily-field.md) | Every number in the difficulty curve is an opening position, not a measurement |
-| [01 · The swing](./01-swing.md) §13.1 | **The hitstop.** ADR-0006 and spec 02 require a 70ms world freeze at grab and release. The prototype built it, flew it, and the author **ruled it rejected on 2026-08-27** — even 30ms reads as jarring — shipping a graded, entirely transient release kick instead. That ruling was made next door and carrying it here is a decision, not a transcription. Keep the hitstop, adopt the ruling and amend ADR-0006 and spec 02, or keep both — and whichever, spec 02 and spec 01 must end up agreeing |
-| [01 · The swing](./01-swing.md) §13.2 | Whether a body's radius affects anything but its orbit floor and its surface. The prototype gives every body the same mass regardless of size, so there is no relation to carry |
+| [01 · The swing](./01-swing.md) §13.2 | **The mass-to-radius exponent.** Spec [04 · §1](./04-bodies.md) already rules *mass is size* and hands the mapping to spec 01; the prototype implements none of it, giving every body the same mass. Measured, scaling mass with size *flattens* §11's tension (which today runs 56%→35% across the field) and turns size into a speed lever instead — at the cost of small bodies no longer being catchable at the ranges players grab from. The exponent, and whether the radius range moves with it, is the ruling |
 | [01 · The swing](./01-swing.md) §13.3 | Confirmation that the rewrite should feel the same in the hand, which is what the ×3 / ×27 conversion from the prototype's units assumes. Declining it changes every absolute figure in that spec at once |
 
 ## Rulings applied
@@ -129,3 +128,4 @@ Do not re-litigate them.
 | 2026-08-27 | **The palette is flagged for a colour-vision sweep**, with authority over hue values and separation numbers and none over the grammar | [00 · §2a](./00-tokens.md) |
 | 2026-08-27 | **The recipe line's length is revisited at implementation** | [10 · §5](./10-results.md) |
 | 2026-08-27 | **The swing's characteristics are measured and written**, from 474s of recorded phone play under the prototype's current physics tuning plus headless sweeps of its own simulation. The load-bearing one: at peak boost the craft can reach only **43%** of the circle of release headings (never above 49% at any sampled geometry), so the boost and the aim genuinely compete — `VISION.md` pillar 2 as a number a test can hold | [01](./01-swing.md) §11 |
+| 2026-08-27 | **The hitstop is rejected; the punch is bought with speed instead.** Flown in the prototype, even a 30ms stop read as the game buffering. A **kick on every release, scaled by the quality of the swing** replaces it — transient, so it can be large without touching the economy, and read from a number the simulation already produces. ADR-0006's layering stands; only its hitstop example is withdrawn ([ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)) | [02](./02-release.md) — **needs rebasing in M2**, [01 · §7 and §13.1](./01-swing.md) |

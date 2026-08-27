@@ -65,10 +65,20 @@ to identical tiers. **Verify**: `pnpm test`.
 ## M2.4 · The release — 400ms
 
 Spec `02-release`. The most choreographed moment in the game, and the numbers are pinned:
-70ms hitstop where the world freezes and only the craft, the hand and the dot keep full
-energy; E3 flash at the release point; the craft leaving along its nose, stretched 1.5/0.7
-along the velocity vector, recovering in 180ms with one overshoot; the orbit detaching as
-the farewell ring in AURORA; a camera kick of 6px along the exit tangent, home in 180ms.
+E3 flash at the release point; the craft leaving along its nose, stretched 1.5/0.7 along the
+velocity vector, recovering in 180ms with one overshoot; the orbit detaching as the farewell
+ring in AURORA; a camera kick of 6px along the exit tangent, home in 180ms.
+
+**Rebase spec 02 first, and it is a real edit rather than a find-and-replace.**
+[ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md) withdrew the
+70ms hitstop the file's whole timeline was dated from — flown, it read as buffering rather
+than as punch. Spec 02 carries a notice saying exactly which lines move; this step is where
+they move. What arrives in its place is **the release kick**, scaled by the quality of the
+swing, which spec [01 · §7](../spec/01-swing.md) already defines for a swing that reached a
+frozen orbit and [ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)
+defines for one that did not. It is a **simulation** output, so this step presents it rather
+than inventing it — and it can be presented loudly, because it carries none of itself into
+permanent velocity and so cannot move what a run is worth.
 
 **Never a shake.** A shake says damage; a directional kick says departure, and this game has
 no damage — only commitment. The same kick at 3px marks the grab, reversed into the orbit,

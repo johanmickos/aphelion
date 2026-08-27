@@ -12,8 +12,9 @@ the day it stops being consultable.
 
 **Depends on**: [07 · Boundary](./07-boundary.md) for the boundary predicate,
 [17 · The daily field](./17-daily-field.md) for the field the numbers have to survive,
-[08 · The economy](./08-economy.md) for what a swing is worth. It **does not** depend on
-[02 · The release](./02-release.md), and §13.1 says why that is a problem.
+[08 · The economy](./08-economy.md) for what a swing is worth. Spec
+[02 · The release](./02-release.md) reads §7's envelope for the quality a release kick is scaled
+by (ADR-0012), and is rebased on this file in M2.
 
 ---
 
@@ -534,32 +535,60 @@ measured; it is not measured at the top, and §13 records that as a gap to close
 Nothing above is open. What follows is, and each is the author's to close rather than an
 implementing agent's.
 
-**1 · Hitstop, and it is a genuine contradiction — with a ruling already made next door.** This
-spec's fixed item 5, ADR-0006 and spec [02](./02-release.md) all require a 70ms full-world freeze at
-grab and at release, applied by the simulation as a time-scale — *"the pause is the punch"*. **The
-prototype built it, flew it, and the author ruled it rejected**, in writing and on 2026-08-27: even
-at 30ms a freeze reads as jarring rather than punchy, and stopping the step for 70ms breaks the
-fixed timestep besides. What shipped instead is a **kick after every release, priced by how well the
-swing was flown, and entirely transient** — so it can be large enough to read at a glance without
-touching what a run is worth. The useful part of that exercise was discovering that the mechanism
-already existed and was already graded on both axes the design asked for, which is exactly what
-pillar 2 tells us to look for: *find the mechanic the simulation is already performing and has no
-word for, before adding one it isn't.*
+**1 · Hitstop — closed, 2026-08-27.** This spec's fixed item 5, ADR-0006 and spec
+[02](./02-release.md) all required a 70ms full-world freeze at grab and at release, applied by the
+simulation as a time-scale. **The author has ruled it rejected**: flown in the prototype, even a
+30ms stop read as the game buffering rather than as punch. What replaces it is **a kick on every
+release, scaled by the quality of the swing** — recorded in
+[ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md).
 
-So M1 is being asked to build a mechanic its own author has already rejected while flying it, and
-ADR-0004 makes the author the gate on precisely that question. **That ruling was made in the
-prototype's repo and has not been carried across; carrying it is a decision, not a transcription,
-and it is not mine.** The options are: keep the hitstop as specified and re-judge it on the phone
-here; adopt the ruling and amend ADR-0006, spec [02](./02-release.md) and item 5 of this file's
-fixed list; or keep both. Whichever way it goes, spec 02 and this file must end up agreeing, and
-this is the ruling that most changes what M1.3 builds.
+The half of that mechanism this file owns is already measured: **quality for a swing that reached a
+frozen orbit is its position on the boost envelope in §7**, and §8 records that the kick is a
+transient carrying none of itself into permanent velocity, which is what lets it be large without
+touching the economy. The other half — quality for a release that never froze an orbit, read from
+how hard the body is bending the heading — is M1.3's to implement and M2's to present. Spec 02
+carries a notice and is rebased in M2.
 
-**2 · Mass and radius.** There is no relation to carry (§2): every body pulls identically regardless
-of size. Spec [04](./04-bodies.md) names four body types and spec 17's difficulty curve wants
-variety, and the plan's own note says difficulty comes from geometry first so that when types arrive
-there is something to measure them against — which is an argument for leaving `GM` uniform in v1, but
-it is not the same question and it is not mine. **Ruling wanted**: does a v1 body's radius affect
-anything but its floor and its surface?
+**2 · The mass-to-radius exponent — and spec 04 has already ruled the half of this I asked
+about.** Spec [04 · §1](./04-bodies.md) says **"Mass is size; nothing else changes"**, and
+[§2](./04-bodies.md) hands the mapping here: *"the exact mapping from mass to (arc, α, k) is set in
+M1 alongside the gravity model (spec 01); the three must move together and monotonically with
+mass."* So mass varying with size is settled, and the tide is already specified to read it. **The
+prototype does not implement any of it** (§2): one `GM` for every body, with radius entering only
+the orbit floor and the collision surface. What is open is the **exponent**, and it is not a free
+choice — measured, it decides how much of the swing changes with size and in which direction.
+
+Today, size already changes the swing **backwards**, because periapsis pins at a floor of `R + 12`:
+a bigger body is further away at its closest, so it is *slower and lazier*. Orbital speed at the
+floor falls 345 → 285 across the field's radii, the settled revolution rises 0.84s → 1.49s, and
+**§11's peak arc runs 56% → 35%** — so the tension is not the flat 43% §11 quotes for the median
+body, it varies by 21 points across the field, and the timing skill a player learns on a small body
+does not transfer cleanly to a large one. That is a finding, not a design.
+
+Scaling mass with size does not add variation on top of that — **it cancels it**, because the two
+effects pull opposite ways. Measured, normalised so the median body is unchanged:
+
+| Law | peak arc, small → large | periapsis speed | dive duration | bound catches at typical range |
+|---|---|---|---|---|
+| Constant (today) | 56% → 35% | 463 → 387 | 0.57 → 0.50s | same for every body |
+| Mass ∝ R² *(constant surface gravity)* | 45% → 42% | 368 → 465 | 0.68 → 0.45s | 3/12 → 9/12 |
+| Mass ∝ R³ *(constant density)* | 40% → 46% | 332 → 513 | 0.72 → 0.43s | 2/12 → 9/12 |
+
+**Both scalings flatten the tension and turn size into a speed lever instead** — which is arguably
+the better trade, since it makes the timing skill transfer between bodies while size stays legible
+in the hand. The cost is in the last column and it is real: **a small body stops being catchable at
+the distances players actually grab from.** Today's `GM` is tuned so the *median* grab — 150 units
+out at 271 units/s — sits almost exactly on the line between a bound catch and one that must be
+braked with fuel. Any mass scaling moves that line per body: under R³ a small body is bound only
+inside ≈71 units, which is essentially at its surface, so every grab of one becomes a braked flyby.
+That lands the difficulty on **fuel**, which ADR-0009 and spec [13](./13-fuel.md) reserve for what a
+*save* costs.
+
+**Ruling wanted: the exponent, and whether the radius range moves with it.** Three levers can pay
+for the catchability if the exponent is steep — narrowing the radius range from today's 1.6×,
+scaling the grab range with mass so a weak body reaches less far, or accepting braked small bodies
+as a deliberate texture (52% of real grabs already begin as flybys, so this is a difference of
+degree). Whatever is chosen, spec [04 · §2](./04-bodies.md)'s tide mapping is written from it.
 
 **3 · The design-space conversion.** §0 rules ×3 on lengths and ×27 on `GM` on the arithmetic that
 the design space is exactly three times the prototype's and the phone is the same phone.
@@ -599,10 +628,11 @@ this file had numbers in it and they still are.
 3. **The craft has timing and shape, never throttle.** No acceleration input exists.
 4. **Release is along the exit tangent.** The nose points along it for the whole orbit. Measured
    above at §8, and exact.
-5. **The simulation owns the only clock**, and it counts ticks, not seconds (ADR-0006). Hitstop is a
-   time-scale the simulation applies, so wall-clock and simulated time diverge and nothing in the
-   game measures itself in seconds. **See §13.1**: the hitstop half of this item is contested by a
-   ruling the author has already made in the prototype; the clock half is not.
+5. **The simulation owns the only clock**, and it counts ticks, not seconds (ADR-0006). Nothing in
+   the game measures itself in seconds. Time-scaling remains the simulation's to apply and is
+   currently applied by nothing: **the hitstop this item used to cite is withdrawn**
+   ([ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md), §13.1). The
+   clock is unaffected — it was never the freeze that made ticks the unit.
 6. **A run is fully described by its configuration, its seed and its input log** — the recipe. The
    simulation is pure, imports nothing, and runs headless under plain node (ADR-0004, ADR-0006).
 7. **The two things worth optimising must fight each other**, and §11 is now the measurement of

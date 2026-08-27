@@ -13,6 +13,25 @@ for what word is chosen, [08 · Economy](./08-economy.md) for what is cashed.
 
 ---
 
+> ## ⚠ The hitstop is rejected — this file needs rebasing in M2
+>
+> **[ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md) (2026-08-27)
+> withdraws the 70ms hitstop.** It was built and flown in the prototype and read as buffering
+> rather than as punch, at every length down to 30ms. What replaces it is **a kick on every
+> release, scaled by the quality of the swing** — transient, so it can be large without touching
+> the economy, and read from a number the simulation already produces.
+>
+> Everything below still stands *except* the freeze and the offsets dated from it. Concretely:
+> rule 1 is withdrawn; every `T+70ms` in §2 and §3 becomes `T0`; the award word moves from
+> `T+90ms` to `T+20ms`; §7's grab hitstop is withdrawn; and the acceptance criterion about
+> hitstop advancing zero world state goes. The **exit-tangent rule, the award-lands-at-the-dot
+> rule, and every duration measured from the start of its own element are untouched** — they were
+> never the freeze.
+>
+> **Not rewritten here on purpose.** The timeline is [M2](../plan/m2-the-instrument.md)'s and
+> rebasing it is a careful edit that wants the compass in front of it. Spec
+> [01 · §7](./01-swing.md) already fixes the envelope the release kick's quality is read from.
+
 ## 1 · The three rules
 
 1. **A 70ms hitstop where only the player's energy stays lit.** The pause is the punch.
