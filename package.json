@@ -5,7 +5,7 @@
   "type": "module",
   "description": "A game about swinging a spacecraft through gravity, where the only thing you do is decide when to let go",
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "packageManager": "pnpm@11.22.0",
   "scripts": {
@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^24.13.3",
+    "@types/node": "^26.3.0",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.6",

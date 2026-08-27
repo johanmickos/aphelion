@@ -71,7 +71,7 @@ in `CONTEXT.md`. **Verify**: read them.
 
 ## M0.2 · Repo scaffold
 
-TypeScript, Vite, Vitest, ESLint, Prettier, pnpm, Node 24. `app/` is the Vite root, `src/`
+TypeScript, Vite, Vitest, ESLint, Prettier, pnpm, Node 26. `app/` is the Vite root, `src/`
 is the game. Relative base path (`base: './'`) because GitHub Pages serves from a subpath.
 A CI workflow running the full check on push, and a Pages deploy from `main`.
 

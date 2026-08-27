@@ -12,7 +12,7 @@ decide when to let go.
 
 ## Running it
 
-Node 24 or newer, and pnpm.
+Node 26 or newer, and pnpm.
 
 ```sh
 pnpm install
