@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
+import { qrPlugin } from './tools/vite-plugin-qr.ts';
 
 export default defineConfig(({ command }) => ({
   // The game lives in app/; src/ holds the game's modules, imported from here.
   root: 'app',
+  plugins: [qrPlugin()],
   // Relative, not '/': GitHub Pages serves a project site from a subpath
   // (/aphelion-2/), so absolute asset URLs 404 there. './' is correct at any
   // mount point, and Vite resolves it back to '/' for the dev server
