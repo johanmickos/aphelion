@@ -3,9 +3,72 @@
 **Severity** BLOCKS · **Blocks** Direction 06, Direction 08 · **Depends on** an author decision
 
 > **BLOCKING CALL.** Does Direction 08 supersede the current economy wholesale?
-> Ten `ScoreConfig` keys are **deleted, not moved**, including `anomalyBonus` and
-> `hopBonus` — the two largest awards in the game. This is not recoverable by a
-> retune. Get the call before step 2.
+> Ten `ScoreConfig` keys are **deleted, not moved**. Get the call before step 2.
+>
+> **Two of this box's own claims did not survive the corpus** — see "What the
+> corpus says" below. `anomalyBonus` and `hopBonus` are the two largest NUMBERS in
+> `ScoreConfig` and the two smallest contributors in play; and the plan deletes the
+> grab award's entire quality channel without saying so.
+
+## What the corpus says
+
+Measured 2026-08-27 by replaying the 28 diagnostics reports that replay faithfully
+through today's scorer, one sim replay feeding one scorer per zeroed weight —
+`scratch/f04-census.ts`. 27 sessions with a non-zero `best`, 193 links, 193 grabs,
+73 rescues, 63 flybys, 32 burns. Drop is in corpus total `best`, which is the
+metric `AGENTS.md` names because a death zeroes the live score.
+
+| weight            | drop  | sessions changed | fate in Dir 08 |
+| ----------------- | ----- | ---------------- | -------------- |
+| `streakStep`      | 54.6% | 24/27            | kept           |
+| `climbPerPx`      | 19.1% | 25/27            | kept           |
+| `aimBonus`        | 16.2% | 25/27            | deleted        |
+| `linkBase`        | 13.0% | 25/27            | deleted        |
+| `closeBonus`      | 12.8% | 24/27            | deleted        |
+| `rescueBonus`     | 11.5% | 18/27            | deleted        |
+| `timingBonus`     | 8.0%  | 24/27            | deleted        |
+| `flybyCloseBonus` | 6.3%  | 19/27            | deleted        |
+| `nerveBonus`      | 4.5%  | 14/27            | deleted        |
+| `flybyBase`       | 3.1%  | 19/27            | deleted        |
+| `anomalyBonus`    | 2.4%  | **1/27**         | deleted        |
+| `hopBonus`        | 0.0%  | **0/27**         | deleted        |
+| `moteBonus`       | 0.0%  | **0/27**         | kept           |
+
+**The axiom is already half-true.** `streakStep` is the single largest lever in the
+economy at 54.6%: the multiplier does more than every minting key put together
+already. What Direction 08 changes is not "add multipliers" — it is that the carry
+becomes the ONLY thing that mints, and the carry is currently 19.1%.
+
+**The urgency in the box above is a config reading, not a play reading.**
+`anomalyBonus` (800) and `hopBonus` (500) are the two largest numbers in
+`ScoreConfig`, which is where "the two largest awards in the game" comes from. In
+play they are the two smallest: one anomaly capture across 28 sessions, and zero
+hops. Deleting them costs 2.4% and 0.0% of the corpus.
+
+**And those zeros are blind spots, not verdicts** — `scratch/f04-verify.ts`, the
+same discipline `fuelRegen` needed. The corpus contains **0 charged-window ticks**
+and **0 zipped captures**, so no session could pay a hop; **25 of 28 reports have
+no clearable field at all** and none reaches `runInBand`, so none could pay a mote.
+The corpus cannot price the anomaly economy or the carpet. It says only that
+whatever those keys are worth, nobody has collected it yet — which is an argument
+about how rarely the anomaly is reached, and belongs to the field, not the scorer.
+
+**The plan deletes the grab award entirely, and does not say so.** `awardGrab` is
+`close * closeBonus + nerveBonus + anomaly` — three keys, all on the delete list,
+17.3% of corpus best between them and 17.7% of all points paid. `priceSwing(carry,
+tier, band, streak)` has no term for how the ship ARRIVED. That contradicts this
+plan's own trap: "a capture is two scoring events… do not let that collapse the
+two." Either the grab keeps a quality channel Direction 08 does not name, or the
+call is knowingly to delete it.
+
+**The cleanest substitution is the tier.** `timingBonus` + `aimBonus` = 24.2%, and
+Direction 06 replaces exactly those two with one position-in-window tier at
+×1.25/×1.5/×2.0. That is the one step whose sizing the corpus supports.
+
+**Caveat on freshness.** All 67 recordings are 20–25 August and 20 of the 28
+faithful ones are 20–21 August, so the flying predates the flyby rework, the burn,
+the rescue retune and the release kick. The WEIGHTS are current — a replay is
+scored by today's rules, which is the point — but the trajectories are not.
 
 ## Why
 
