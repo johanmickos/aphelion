@@ -1,0 +1,11 @@
+# Author-owned material: not ours to restyle. Everything under docs/ belongs to
+# the author — the vision, the ADRs, the plan and the specs.
+docs/
+CONTEXT.md
+
+dist/
+pnpm-lock.yaml
+
+# Claude Code's own state, including git worktrees — those are full checkouts of
+# this repo and are formatted on their own branch, not from this working tree.
+.claude/

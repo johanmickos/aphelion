@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Mobile portrait is the design target (ADR-0010): the viewport is pinned
+         so a double-tap cannot zoom the game out from under a player whose
+         entire input is tapping, and `viewport-fit=cover` lets the field reach
+         under the notch while the safe-area insets keep readable things out of
+         it. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="dark" />
+    <!-- VOID. The sky is the darkest thing on screen and the browser chrome
+         should not be brighter than it. -->
+    <meta name="theme-color" content="#000000" />
+    <title>Aphelion</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        /* iOS raises a selection loupe and a Look Up menu on a long press or a
+           quick double tap. The game's whole input is pressing and holding, so
+           all three mechanisms — selection, the callout menu and the gesture —
+           are turned off here. */
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      html,
+      body {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        background: #000;
+        overflow: hidden;
+        /* `position: fixed` rather than `overflow: hidden` alone: iOS Safari
+           rubber-bands the document on a drag regardless of the latter. */
+        position: fixed;
+        inset: 0;
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #app {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #46516b;
+        font:
+          10px/1.6 ui-monospace,
+          'SFMono-Regular',
+          Menlo,
+          monospace;
+        letter-spacing: 0.18em;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+# esbuild ships its native binary as an optional platform package, so its
+# postinstall script is not needed. Denied rather than approved: no third-party
+# install script runs in this repo.
+allowBuilds:
+  esbuild: false

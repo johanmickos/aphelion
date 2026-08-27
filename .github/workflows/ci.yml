@@ -1,0 +1,35 @@
+# The full check, on every push and every pull request.
+#
+# Deliberately separate from deploy.yml. The check is the gate for a branch and
+# has to run on branches; the deploy is a consequence of landing on main. Fusing
+# them would mean either that a branch cannot be checked, or that every branch
+# tries to publish.
+name: Check
+
+on:
+  push:
+  pull_request:
+
+# A superseded run proves nothing about the commit that replaced it.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      # `--frozen-lockfile`: a check that quietly resolves a different dependency
+      # tree than the one committed is checking something nobody can reproduce.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      # The build is part of the check, not part of the deploy alone: a change
+      # that typechecks and passes tests can still fail to bundle, and finding
+      # that out on main is finding it out too late.
+      - run: pnpm build
