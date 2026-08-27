@@ -161,51 +161,63 @@ export interface SimConfig {
   /** Seconds for the transient escape burst to fade during drift. */
   boostBurstDecay: number;
   /**
-   * The kick a release earns when it never converted, at full deflection.
+   * The punch every release lands, at full quality. Pure transient.
    *
-   * WHY EVERY RELEASE NOW PAYS SOMETHING. Measured across 366 releases in the 28
-   * diagnostics reports that replay faithfully, 54% earned no kick at all — and
-   * only 31 of those flew badly. The rest were excluded by the gate: 128 were
-   * still flybys and 165 never reached periapsis. A manoeuvre that did not convert
-   * is not a manoeuvre that was not flown, and letting go of one felt like nothing
-   * happening.
+   * WHY EVERY RELEASE, AND WHY IT ALL FADES. Measured across 366 releases in the
+   * 28 diagnostics reports that replay faithfully, 54% earned no kick at all — and
+   * only 31 of those flew badly. The rest were manoeuvres that were flown and paid
+   * nothing: 128 still flybys, 165 that never reached periapsis. Letting go felt
+   * like nothing happening.
    *
-   * SCALED BY DEFLECTION, which is the quality a flyby actually has. It has no
-   * `tightness` and no `boostFull` — it never froze an orbit — but `cap.defl` says
-   * how hard the planet is bending the heading at the instant the button comes up.
-   * So releasing at the top of the turn is worth more than releasing on the way
-   * in, which gives a flyby the same shape of timing skill the boost envelope
-   * gives a converted capture. The simulation was already computing it; nothing new
-   * is measured.
+   * SO THIS IS FEEL AND `boostMax` IS ECONOMY, and the split is the whole design.
+   * The punch goes ENTIRELY into `ship.burstX/Y` and none of it into the permanent
+   * velocity, so it can be large enough to read at a glance without changing what
+   * a run is worth. A player tapping beside planets gets the punch and keeps none
+   * of it; a player flying well gets the punch AND the boost underneath it.
    *
-   * 22 against `flybyKickSpan`, so a top-decile flyby pays about 65% of a median
-   * converted release (34px/s) and a median flyby pays about 6. Converting is still
-   * clearly the better outcome; letting go of a hard swing is no longer silent.
+   * That is also what makes it safe to pay on an earned release too, on top of the
+   * boost it already earned. The boost economy is untouched — `boostMax`,
+   * `boostPermFrac` and `boostPunch` all mean exactly what they meant — and a weak
+   * conversion now lands instead of dribbling.
+   *
+   * A TAP PAYS NOTHING, structurally rather than by a guard. Quality for a
+   * non-converting release is deflection, `lastAngle` is seeded from the real
+   * velocity at the grab and `defl` starts at 0, so a press-and-release with no
+   * arc between them has no quality to be paid for.
    */
-  flybyKick: number;
+  releaseKick: number;
   /**
-   * Deflection, in degrees per tick, at which `flybyKick` pays in full.
+   * Deflection, in degrees per tick, at which a non-converting release is at full
+   * quality.
    *
-   * 2.1, the p90 of deflection at a flyby release across the corpus — so about one
-   * flyby in ten earns the whole kick, which is the same shape as the praise
-   * tiers. The distribution is p25 0.32, p50 0.61, p75 1.11, p90 2.10, p99 3.32.
+   * 2.1, the p90 of deflection at a real flyby release across the corpus, against
+   * a distribution of p25 0.32, p50 0.61, p75 1.11, p90 2.10, p99 3.32. A
+   * percentile rather than a round number for the reason `praise.ts` gives at
+   * length: a plausible value gets this wrong in both directions.
    *
-   * A percentile rather than a round number for the reason `praise.ts` gives at
-   * length: a plausible value gets this wrong in both directions, and only
-   * measurement knows what "harder than you usually manage" is.
+   * A converted release does not use this — its quality is how close to the top of
+   * the boost envelope it let go, which it already knows.
    */
-  flybyKickSpan: number;
+  flybyDeflSpan: number;
+  /**
+   * Shapes quality into punch. 1 is linear; below 1 lifts the weak end.
+   *
+   * 0.5 — a square root — and the reason is that linear made the bottom of the
+   * range invisible. At the median recorded flyby the linear punch was 29% of full
+   * and read as nothing at all on a ship doing several hundred px/s. The square
+   * root lifts that to 54% while leaving the top exactly where it was, which is
+   * the shape the ask actually described: noticeable even when weak, without
+   * making a great release worth less by comparison.
+   *
+   * It cannot lift a tap, because it cannot lift zero.
+   */
+  kickShape: number;
   /**
    * How much longer a full-quality kick lasts, as a fraction of `boostBurstDecay`.
    *
-   * 0.5, so a release at the top of its envelope holds its kick half again as long
-   * as a scraped one. Quality therefore enters twice — once as strength, once as
-   * duration — which is a real risk and is the point: they read differently in the
-   * hand. Strength is the punch and duration is how far it carries.
-   *
-   * Deliberately the smaller of the two channels. Doubling down on quality widens
-   * the gap between a good release and a great one faster than either knob
-   * suggests, so the second channel is gentle and the first one keeps the range.
+   * 0.5, so a release at the top of its envelope holds its punch half again as
+   * long. Quality therefore enters twice — once as size, once as duration — which
+   * is a real risk and the reason the second channel is the gentler one.
    */
   kickHold: number;
   releaseFlingBoost: number;
@@ -986,8 +998,9 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   boostPermFrac: 0.22,
   boostPunch: 1.8,
   boostBurstDecay: 1.3,
-  flybyKick: 0,
-  flybyKickSpan: 2.1,
+  releaseKick: 0,
+  flybyDeflSpan: 2.1,
+  kickShape: 0.5,
   kickHold: 0,
   releaseFlingBoost: 1.0,
 
@@ -1183,9 +1196,9 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   rowPairChance: 0.4,
   boostMax: 60,
   boostHoldsThroughSettle: true,
-  // Every release pays something now. See the keys' own notes for the measurement:
+  // Every release lands a punch now, and all of it fades. See the keys' own notes:
   // 54% of releases earned no kick at all, and only 31 of 366 flew badly.
-  flybyKick: 22,
+  releaseKick: 54,
   kickHold: 0.5,
   grabLeadTime: 0.2,
   crashConeSeverityFloor: 0,
@@ -1212,7 +1225,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 28;
+export const SIM_VERSION = 29;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

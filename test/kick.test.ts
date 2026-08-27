@@ -108,11 +108,11 @@ describe('a release that never converted', () => {
   });
 
   it('saturates at the measured span rather than running away', () => {
-    // `flybyKickSpan` is the p90 of deflection at a real flyby release. Past it
+    // `flybyDeflSpan` is the p90 of deflection at a real flyby release. Past it
     // the kick is full — an unbounded ramp would make one freak sample the best
     // release in the session.
-    const atSpan = gain(DEFAULT_CONFIG, { defl: DEFAULT_CONFIG.flybyKickSpan });
-    const wayPast = gain(DEFAULT_CONFIG, { defl: DEFAULT_CONFIG.flybyKickSpan * 40 });
+    const atSpan = gain(DEFAULT_CONFIG, { defl: DEFAULT_CONFIG.flybyDeflSpan });
+    const wayPast = gain(DEFAULT_CONFIG, { defl: DEFAULT_CONFIG.flybyDeflSpan * 40 });
     expect(wayPast).toBeCloseTo(atSpan, 6);
   });
 
@@ -133,23 +133,76 @@ describe('a release that never converted', () => {
     };
     expect(burstOf(DEFAULT_CONFIG)).toBeGreaterThan(0);
     // ...and it is the swing that put it there.
-    expect(burstOf({ ...DEFAULT_CONFIG, flybyKick: 0 })).toBe(0);
+    expect(burstOf({ ...DEFAULT_CONFIG, releaseKick: 0 })).toBe(0);
   });
 });
 
-describe('converting still beats not converting', () => {
-  it('pays a median conversion more than a median flyby', () => {
-    // Median against median, which is the honest frame: comparing a top-decile
-    // flyby to a median conversion flatters the flyby, because the two
-    // populations are not equally hard to reach.
-    const flyby = gain(DEFAULT_CONFIG, { defl: 0.608 });
-    const link = gain(DEFAULT_CONFIG, converted(0.369));
-    expect(link).toBeGreaterThan(flyby * 3);
+/** Speed a release KEEPS once the punch has decayed, in px/s. */
+function kept(cfg: SimConfig, over: Partial<Capture>): number {
+  const state: SimState = createInitialState(cfg);
+  const cap = captured(over);
+  state.capture = cap;
+  const before = Math.hypot(cap.vx, cap.vy);
+  releaseCapture(state, cfg, false);
+  return Math.hypot(state.ship.vx, state.ship.vy) - before;
+}
+
+/** Speed a release adds transiently, all of which decays, in px/s. */
+function punch(cfg: SimConfig, over: Partial<Capture>): number {
+  const state: SimState = createInitialState(cfg);
+  state.capture = captured(over);
+  releaseCapture(state, cfg, false);
+  return Math.hypot(state.ship.burstX, state.ship.burstY);
+}
+
+describe('feel and economy are separate channels', () => {
+  /**
+   * THIS REPLACED A PIN THAT COMPARED TOTALS, and the change is the point.
+   *
+   * It used to assert that a median conversion out-paid a median flyby threefold,
+   * measured on the speed immediately after release. That was the right assertion
+   * while the kick was part of the economy. It is the wrong one now: the punch is
+   * deliberately generous to weak releases — that is the whole ask — so totals
+   * converge while the thing that decides what a run is WORTH does not.
+   */
+  it('keeps nothing at all from a release that never converted', () => {
+    // The whole of "it does not impact gameplay too much when just tapping". A
+    // flyby buys a punch and banks none of it, however hard it was turning.
+    for (const defl of [0.323, 0.608, 1.112, 2.1, 90]) {
+      expect(kept(DEFAULT_CONFIG, { defl }), `defl ${defl}`).toBe(0);
+    }
   });
 
-  it('leaves a perfect conversion the best release in the game', () => {
-    const best = gain(DEFAULT_CONFIG, converted(1));
-    const bestFlyby = gain(DEFAULT_CONFIG, { defl: DEFAULT_CONFIG.flybyKickSpan * 10 });
+  it('keeps speed only from a conversion, and more from a better one', () => {
+    const weak = kept(DEFAULT_CONFIG, converted(0.1));
+    const good = kept(DEFAULT_CONFIG, converted(0.75));
+    const perfect = kept(DEFAULT_CONFIG, converted(1));
+    expect(weak).toBeGreaterThan(0);
+    expect(good).toBeGreaterThan(weak);
+    expect(perfect).toBeGreaterThan(good);
+  });
+
+  it('pays a tap nothing, structurally rather than by a guard', () => {
+    // `lastAngle` is seeded from the real velocity at the grab and `defl` starts
+    // at 0, so a press and release with no arc between them has no quality to be
+    // paid for. The shaping curve lifts the weak end and cannot lift zero.
+    expect(punch(DEFAULT_CONFIG, { defl: 0 })).toBe(0);
+    expect(kept(DEFAULT_CONFIG, { defl: 0 })).toBe(0);
+  });
+
+  it('lands a punch on a weak release that a linear ramp would have hidden', () => {
+    // The measured p25 flyby. Linear it was 15% of full and read as nothing on a
+    // ship doing several hundred px/s; shaped it is nearer 40%.
+    const full = punch(DEFAULT_CONFIG, { defl: DEFAULT_CONFIG.flybyDeflSpan });
+    const weak = punch(DEFAULT_CONFIG, { defl: 0.323 });
+    expect(weak / full).toBeGreaterThan(0.3);
+    // ...and the top of the range did not move to get there.
+    expect(full).toBeCloseTo(DEFAULT_CONFIG.releaseKick, 6);
+  });
+
+  it('leaves a perfect conversion the hardest-landing release in the game', () => {
+    const best = punch(DEFAULT_CONFIG, converted(1));
+    const bestFlyby = punch(DEFAULT_CONFIG, { defl: DEFAULT_CONFIG.flybyDeflSpan * 10 });
     expect(best).toBeGreaterThan(bestFlyby * 2);
   });
 });

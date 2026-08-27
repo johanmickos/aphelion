@@ -643,16 +643,22 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
     ? cap.boostFull > 0
       ? Math.max(0, Math.min(1, cap.boost / cap.boostFull))
       : 0
-    : cfg.flybyKickSpan > 0
-      ? Math.max(0, Math.min(1, cap.defl / cfg.flybyKickSpan))
+    : cfg.flybyDeflSpan > 0
+      ? Math.max(0, Math.min(1, cap.defl / cfg.flybyDeflSpan))
       : 0;
 
-  // The swing: what a release that never converted is worth.
+  // The punch. EVERY release lands one, and all of it fades.
   //
-  // Measured, 54% of releases earned no kick at all and only 31 of 366 flew badly
-  // — the rest were flybys and dives that never reached periapsis, which are
-  // manoeuvres that were flown and did not pay. See `SimConfig.flybyKick`.
-  const swing = earned ? 0 : cfg.flybyKick * quality;
+  // Feel and economy are separate channels here, which is what lets this be large:
+  // it goes entirely into the burst below and none of it into the permanent
+  // velocity, so tapping beside planets buys a punch and keeps nothing, while the
+  // boost economy underneath it is untouched. See `SimConfig.releaseKick`.
+  //
+  // Shaped rather than linear, because linear left the bottom of the range
+  // invisible — the median recorded flyby paid 29% of full and read as nothing.
+  // The curve lifts weak releases and leaves the top where it was; it cannot lift
+  // a tap, because it cannot lift zero.
+  const punch = cfg.releaseKick * Math.pow(quality, cfg.kickShape);
 
   const spd = hypot(cap.vx, cap.vy) || 1;
   const bx = cap.vx / spd;
@@ -672,10 +678,13 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
   // four escapes in five — which is most of the mechanic.
   const escape = cap.escaped ? cfg.escapeFling : 0;
 
-  const permAdd = (add + escape + swing) * cfg.boostPermFrac;
+  // The punch is deliberately absent from `permAdd`. That is the whole of "it does
+  // not impact gameplay too much when just tapping": what a run is worth is
+  // decided by the boost and the escape, and the punch is gone within a second and
+  // a bit however hard it hit.
+  const permAdd = (add + escape) * cfg.boostPermFrac;
   const burstAdd = add * (1 - cfg.boostPermFrac) * cfg.boostPunch;
   const escapeBurst = escape * (1 - cfg.boostPermFrac) * cfg.boostPunch;
-  const swingBurst = swing * (1 - cfg.boostPermFrac) * cfg.boostPunch;
   ship.vx = (cap.vx + bx * permAdd) * flingScale;
   ship.vy = (cap.vy + by * permAdd) * flingScale;
   ship.burstX = bx * burstAdd;
@@ -695,11 +704,11 @@ export function releaseCapture(state: SimState, cfg: SimConfig, weak: boolean): 
   // out of the fire still got out of the fire, and this was earned by the escape
   // rather than by the exit.
   //
-  // The swing is added here for the same reason. A putter-out is a release like
+  // The punch is added here for the same reason. A putter-out is a release like
   // any other and the body was still bending it; the tank running dry is already
-  // paid for by the link that did not happen, and taking the kick away as well
+  // paid for by the link that did not happen, and taking the punch away as well
   // would be confiscating rather than withholding.
-  ship.burstX += bx * (escapeBurst + swingBurst);
-  ship.burstY += by * (escapeBurst + swingBurst);
+  ship.burstX += bx * (escapeBurst + punch);
+  ship.burstY += by * (escapeBurst + punch);
   return { boostApplied: add, weak };
 }

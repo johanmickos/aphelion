@@ -4332,24 +4332,65 @@ The span is the p90 of deflection at a real flyby release, 2.1 deg/tick, against
 distribution of p25 0.32, p50 0.61, p75 1.11, p90 2.10, p99 3.32. A round number
 would have been wrong in both directions for the reasons `praise.ts` sets out.
 
-**Sized against conversion, median to median.** A median flyby now pays +10px/s
-and a median conversion +36; the ceilings are +36 and +97. Comparing a top-decile
-flyby to a median conversion — which reads as "a flyby is worth as much as a
-capture" — is the wrong frame, because the two populations are not equally hard to
-reach.
+**The first sizing was wrong in the hand, and the correction is the interesting
+part.** It shipped as a flyby-only kick with a permanent component, linearly
+scaled, at 22px/s full — and the note back from flying it was that weak releases
+still felt like nothing, and that the fix must not turn tapping beside planets
+into a way to accumulate speed.
+
+Those two pull in opposite directions only while the kick is part of the ECONOMY.
+Separated, they do not:
+
+```
+punch   ship.burstX/Y   large, shaped, on EVERY release, decays to nothing
+kept    ship.vx/vy      unchanged: the boost and the escape, and only those
+```
+
+So the punch goes entirely into the burst and none of it into the permanent
+velocity. That is what lets it be big enough to read — 54px/s at full quality
+against a boost economy that is untouched — while a player tapping beside planets
+buys a punch and banks none of it. It is also what makes it safe to pay on a
+CONVERTED release too, on top of the boost already earned, which is what stops a
+weak conversion dribbling.
+
+**A tap pays nothing structurally, not by a guard.** `lastAngle` is seeded from
+the real velocity at the grab and `defl` starts at 0, so a press and release with
+no arc between them has no quality to be paid for. Worth knowing because the
+obvious implementation — a floor, or a minimum kick — would have broken exactly
+that and needed a guard to put it back.
+
+**`kickShape` lifts the weak end without moving the top.** Linear, the median
+recorded flyby paid 29% of full; square-rooted it pays 54%, and full is still
+full. A curve rather than a raised floor for the same reason: a floor pays a tap,
+and a curve cannot lift zero.
+
+```
+NON-CONVERTING RELEASE        punch (fades)   kept
+  tap        defl 0                    0.0    0.0
+  p25        defl 0.323               21.2    0.0
+  p50        defl 0.608               29.1    0.0
+  p90        defl 2.100               54.0    0.0
+CONVERTED RELEASE             punch (fades)   kept
+  envelope 0.100                      25.5    1.3
+  envelope 0.369 (median)             63.9    4.9
+  envelope 1.000                     138.2   13.2
+```
+
+The `kept` column is the whole economy and it did not move. The `punch` column is
+the whole of what changed.
 
 **Duration is the second channel and deliberately the smaller.** `kickHold` 0.5
-lets a release at the top of its envelope hold its kick half again as long.
-Quality therefore enters twice, once as strength and once as duration, which
-widens the gap between a good release and a great one faster than either knob
-suggests — so the second one is gentle and the first keeps the range. `burstDecay`
-moved onto the ship for this, and is excluded from `fingerprint()` on the same
-grounds `chargedT`, `carveDir` and `burstT` all are: it changes the trajectory the
-moment it acts, and position and velocity already catch that.
+lets a release at the top of its envelope hold its punch half again as long.
+Quality therefore enters twice, once as size and once as duration, which widens
+the gap between a good release and a great one faster than either knob suggests —
+so the second one is gentle and the first keeps the range. `burstDecay` moved onto
+the ship for it, and is excluded from `fingerprint()` on the same grounds
+`chargedT`, `carveDir` and `burstT` all are: it changes the trajectory the moment
+it acts, and position and velocity already catch that.
 
-Both keys are 0 in `PROTOTYPE_CONFIG`, so the equality gate never moved. The
-golden's recapture shows it: three keys added, six removed, and **not one
-trajectory sample changed**.
+`releaseKick` and `kickHold` are both 0 in `PROTOTYPE_CONFIG`, so the equality
+gate never moved through any of it. The golden's recaptures show it twice: keys
+added, keys renamed, keys removed, and **not one trajectory sample changed**.
 
 **And it found a hole in the golden.** The config check walked
 `Object.entries(PROTOTYPE_CONFIG)` alone, so a key the baseline HELD and the
