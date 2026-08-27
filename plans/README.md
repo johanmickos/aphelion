@@ -29,11 +29,11 @@ When `plans/` is empty, the refactor is finished and the directory goes too.
 | F01 | Body traits                                         | BLOCKS   | Dir 04 body types       | **done** — PORT_NOTES 65                         |
 | F02 | Body type table                                     | BLOCKS   | Dir 04, VISION field    | **done** — PORT_NOTES 66                         |
 | F03 | [Theme as a value](F03-theme-value.md)              | BLOCKS   | Dir 01, regions         | **a+b** done — PORT_NOTES 69, 71; **c** deferred |
-| F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | needs a call                                     |
-| F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | needs F04                                        |
+| F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | **decided** 2026-08-27 — stage (a) in progress   |
+| F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | unblocked — wants F04 stage (b)                  |
 | F06 | [Effects stack](F06-effects-stack.md)               | COSTS    | powerups                | deferred                                         |
 | F07 | Draw layer list                                     | COSTS    | Dir 02, 05              | **done** — PORT_NOTES 67                         |
-| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | ready                                            |
+| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | ready — **plus an F04 finding**, below           |
 | F09 | [Award vocabulary](F09-award-vocabulary.md)         | COSTS    | Dir 06                  | needs a call                                     |
 | F10 | [HUD grid](F10-hud-grid.md)                         | COSTS    | Dir 03                  | ready                                            |
 | F11 | [Screen machine](F11-screen-machine.md)             | COSTS    | Dir 09, 10, 11          | deferred                                         |
@@ -70,9 +70,23 @@ Dependencies, not severity. Steps 1 and 2 are independent and can run together.
    so it can be large without touching the economy. PORT_NOTES 68, and the ruling
    is at `Frame.paused` where someone would otherwise reach for the freeze.
 
-4. **F04** + **F05** — together; splitting the score without the pricing gives two
-   numbers that mean the same thing.
-5. **F08** — unblocked; the type table landed.
+4. **F04** → **F05**. F04's call was made 2026-08-27 and the ruling is at the top
+   of its file: **the axioms rule and the numbers get measured.** It lands in three
+   stages — (a) split the live score into `carry` and `bank`, behaviour-preserving;
+   (b) swap the formula and delete the eleven minting keys; (c) calibrate, and
+   **only against recordings from the current build**, because the whole existing
+   corpus is 20–25 August and predates the release kick, the flyby retune and the
+   ending.
+
+   F05 wants stage (b), not the whole thing: the mode matrix needs the formula to
+   exist, not to be calibrated.
+
+5. **F08** — unblocked; the type table landed. It also inherits a measurement from
+   F04: **one anomaly capture across 28 faithful sessions**, and zero charged
+   windows in any of them. `anomalyBonus` and `hopBonus` measured at 2.4% and 0.0%
+   for that reason and not because the awards are wrong — the anomaly's problem is
+   that nobody reaches it, which is a course question. Do not re-derive this as a
+   scoring finding.
 6. **F06**, **F11**, **F12** — when there is a first powerup, a second screen, and
    a first sound respectively. Cheap once, expensive repeatedly, and not urgent
    while the count is one.
