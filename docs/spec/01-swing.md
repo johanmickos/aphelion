@@ -193,8 +193,19 @@ at 339 units/s. One second after the press, a grabbed path has separated from th
 
 ## 5 · The dive, and the freeze
 
-Between the press and the closest approach the craft is on **real integrated gravity and nothing
-else**. Nothing authors the shape of a dive. That decoupling — clearance, then simulated shape,
+The swing is **real physics with three authored transitions in it**, and that combination is the
+design rather than a compromise (author, 2026-08-27). The transitions are:
+
+1. **The clearance impulse at the grab** (§4) — lifts a striking path clear of the floor, by
+   turning at constant speed wherever turning suffices, so it cannot invent energy.
+2. **The freeze at closest approach** (§5, §6) — hands the craft from integrated gravity to a
+   closed-form phase clock, clamping the orbit's *shape* while carrying the dive's *speed*
+   uncapped. §6a is the whole of why that inconsistency is deliberate.
+3. **The 1.2s settle** (§6) — eases angular momentum from what the dive earned to what a circle
+   needs, spending the advantage on a fixed clock.
+
+Everything between them is simulated and must stay so. Between the press and the closest approach
+the craft is on **real integrated gravity and nothing else**. Nothing authors the shape of a dive. That decoupling — clearance, then simulated shape,
 then authored tightness only at the end — is what took the prototype sixteen failed attempts, and
 the failures were all the same failure: rigid or snapped orbit insertion. **Keep the dive
 simulated.**
@@ -274,10 +285,61 @@ momentum is eased toward the circular value over the same 1.2s, which is what ke
 seamless. A rewrite that rounds the shape without easing the momentum will produce an orbit that
 looks right and moves wrong.
 
+### 6a · The floor sets the radius, the cap sets the shape, the dive sets the **speed**
+
+This is the mechanism the whole swing turns on, it is not what a physics engine does by default,
+and a tidy-minded rewrite will delete it. Confirmed by measurement, author 2026-08-27.
+
+Same body, same grab distance, head-on, varying only the approach speed:
+
+| Approach | a | e | periapsis | apoapsis | speed at the freeze | ← speed at 0.3 / 0.6 / 0.9 / **1.2s** |
+|---|---|---|---|---|---|---|
+| 80 | 119.5 | 0.530 | 56.1 | 182.8 | 387 | 277 / 239 / 285 / **313** |
+| 120 | 140.0 | 0.600 | 56.0 | 224.0 | 400 | 275 / 232 / 277 / **313** |
+| 160 | 140.0 | 0.600 | 56.0 | 224.0 | 415 | 280 / 234 / 278 / **313** |
+| 200 | 140.0 | 0.600 | 56.0 | 224.0 | 435 | 285 / 236 / 279 / **313** |
+| 260 | 140.0 | 0.600 | 56.0 | 224.0 | 435 | 285 / 236 / 279 / **313** |
+
+Read the middle four rows. **The ellipse is identical** — same semi-major axis, same eccentricity,
+same periapsis, same apoapsis — and the craft rides it at **400, 415, 435, 435**. A faster dive
+does not buy a different orbit. It buys **the same orbit, flown faster.**
+
+Three separate quantities produce that, and they are deliberately not consistent with each other:
+
+- **The floor sets the radius.** Periapsis lands on `R + 12` for essentially every dive (§5a).
+  Swept from a gap of 4 to 24, it is **never breached at any setting** — the floor is a floor, not
+  a suggestion. The gap is low and it is a **feel choice**: 16 read as too loose and 10 as a touch
+  tight, and below 8 the craft would clip the surface. Nothing else in the swing depends on it.
+- **The cap sets the shape.** Eccentricity is clamped at 0.6, and the clamp binds on all but the
+  slowest dives — which is why four of five rows above are the same ellipse.
+- **The dive sets the speed, and the cap does not apply to it.** The sweep rate is seeded from the
+  dive's **peak** orbital energy, uncapped. So the craft sweeps an e = 0.6 oval at a rate derived
+  from an orbit that would have been more eccentric than that. **This is physically inconsistent on
+  purpose.** Making the two agree — the obvious correction — throws away the only channel by which
+  the quality of a dive survives into the orbit.
+
+**And the settle spends it.** By the end of the 1.2s every row above is at **exactly 313** — the
+circular speed at the floor — however it arrived. The reward for a good dive is a speed advantage
+with a **1.2-second shelf life**, and cashing it before it expires is the whole of §11's timing
+problem. A rewrite where holding indefinitely preserves the advantage has removed the reason to let
+go.
+
 > **Tolerance.** Settled revolution period within **±10%** of `2πr / √(GM/r)`. Angular rate at the
 > freeze within **±10%** of `v_peri / r_peri`. Eccentricity at the freeze **≤ 0.6** on 100% of
 > swings, with p50 over real play inside **0.50 – 0.62**. Radius monotone toward the settled circle
-> over the settle — **no overshoot at all**, which is exact.
+> over the settle — **no overshoot at all**, which is exact. The floor is **never breached**, at any
+> gap setting — exact, and it is the one guarantee a grab makes.
+>
+> And §6a is three tests, because it is three claims:
+>
+> 1. **Two dives differing only in approach speed produce the same frozen ellipse** — semi-major
+>    axis and eccentricity within 1% — **and different sweep rates**, differing by at least 5%.
+>    A rewrite that returns the same rate has collapsed the channel; one that returns a different
+>    ellipse has let the cap leak into the shape.
+> 2. **Speed at the end of the settle is the circular speed at the settled radius, within 1%, for
+>    every dive** — so the advantage is fully spent and no dive keeps a permanent edge.
+> 3. **Speed at the freeze exceeds the settled circular speed by 20 – 45%** across the real-play
+>    envelope. Measured 1.24× – 1.40×; the band is the room the rewrite has.
 
 ---
 
@@ -549,46 +611,56 @@ touching the economy. The other half — quality for a release that never froze 
 how hard the body is bending the heading — is M1.3's to implement and M2's to present. Spec 02
 carries a notice and is rebased in M2.
 
-**2 · The mass-to-radius exponent — and spec 04 has already ruled the half of this I asked
-about.** Spec [04 · §1](./04-bodies.md) says **"Mass is size; nothing else changes"**, and
+**2 · The mass-to-radius exponent — deferred by the author, 2026-08-27, and deliberately.** Spec
+[04 · §1](./04-bodies.md) already rules **"Mass is size; nothing else changes"**, and
 [§2](./04-bodies.md) hands the mapping here: *"the exact mapping from mass to (arc, α, k) is set in
 M1 alongside the gravity model (spec 01); the three must move together and monotonically with
-mass."* So mass varying with size is settled, and the tide is already specified to read it. **The
-prototype does not implement any of it** (§2): one `GM` for every body, with radius entering only
-the orbit floor and the collision surface. What is open is the **exponent**, and it is not a free
-choice — measured, it decides how much of the swing changes with size and in which direction.
+mass."* So mass varying with size is settled and the tide is already specified to read it. **The
+prototype implements none of it** (§2): one `GM` for every body, radius entering only the orbit
+floor and the collision surface.
 
-Today, size already changes the swing **backwards**, because periapsis pins at a floor of `R + 12`:
-a bigger body is further away at its closest, so it is *slower and lazier*. Orbital speed at the
-floor falls 345 → 285 across the field's radii, the settled revolution rises 0.84s → 1.49s, and
-**§11's peak arc runs 56% → 35%** — so the tension is not the flat 43% §11 quotes for the median
-body, it varies by 21 points across the field, and the timing skill a player learns on a small body
-does not transfer cleanly to a large one. That is a finding, not a design.
+**The exponent is not being chosen yet, and the reason is §6a.** The prototype's feel came from
+real physics plus three authored transitions, not from the gravity law alone, and picking an
+exponent against the prototype's field would be tuning the wrong end of that. It is chosen on the
+phone at the M1 gate, against the rewrite's own field. Until then the simulation carries the law as
+a parameter:
 
-Scaling mass with size does not add variation on top of that — **it cancels it**, because the two
-effects pull opposite ways. Measured, normalised so the median body is unchanged:
+```
+GM(R) = GM_ref × (R / R_ref)ⁿ        n is an OPENING POSITION at 2, marked as one
+```
 
-| Law | peak arc, small → large | periapsis speed | dive duration | bound catches at typical range |
+`n = 0` is the prototype exactly, so the parameter costs nothing to leave open and every value is
+one number away.
+
+What the measurement says the choice is between, normalised so the median body is unchanged:
+
+| n | peak arc, small → large | periapsis speed | dive duration | bound catches at typical range |
 |---|---|---|---|---|
-| Constant (today) | 56% → 35% | 463 → 387 | 0.57 → 0.50s | same for every body |
-| Mass ∝ R² *(constant surface gravity)* | 45% → 42% | 368 → 465 | 0.68 → 0.45s | 3/12 → 9/12 |
-| Mass ∝ R³ *(constant density)* | 40% → 46% | 332 → 513 | 0.72 → 0.43s | 2/12 → 9/12 |
+| 0 — constant *(prototype)* | 56% → 35% | 463 → 387 | 0.57 → 0.50s | same for every body |
+| 2 — constant surface gravity | 45% → 42% | 368 → 465 | 0.68 → 0.45s | 3/12 → 9/12 |
+| 3 — constant density | 40% → 46% | 332 → 513 | 0.72 → 0.43s | 2/12 → 9/12 |
 
-**Both scalings flatten the tension and turn size into a speed lever instead** — which is arguably
-the better trade, since it makes the timing skill transfer between bodies while size stays legible
-in the hand. The cost is in the last column and it is real: **a small body stops being catchable at
-the distances players actually grab from.** Today's `GM` is tuned so the *median* grab — 150 units
-out at 271 units/s — sits almost exactly on the line between a bound catch and one that must be
-braked with fuel. Any mass scaling moves that line per body: under R³ a small body is bound only
-inside ≈71 units, which is essentially at its surface, so every grab of one becomes a braked flyby.
-That lands the difficulty on **fuel**, which ADR-0009 and spec [13](./13-fuel.md) reserve for what a
-*save* costs.
+**Today size already changes the swing backwards**, because periapsis pins at `R + 12`: a bigger
+body is further out at its closest, so it is slower and lazier. Orbital speed at the floor falls
+345 → 285, the settled revolution rises 0.84s → 1.49s, and **§11's peak arc runs 56% → 35%** — so
+the tension is not the flat 43% §11 quotes for the median body; it varies by 21 points across the
+field, and timing learned on a small body does not transfer to a large one. Scaling mass with size
+does not add variation on top of that, **it cancels it**, and turns size into a speed lever instead.
+Whether that is the better game is the question the gate answers.
 
-**Ruling wanted: the exponent, and whether the radius range moves with it.** Three levers can pay
-for the catchability if the exponent is steep — narrowing the radius range from today's 1.6×,
-scaling the grab range with mass so a weak body reaches less far, or accepting braked small bodies
-as a deliberate texture (52% of real grabs already begin as flybys, so this is a difference of
-degree). Whatever is chosen, spec [04 · §2](./04-bodies.md)'s tide mapping is written from it.
+**Two consequences are already ruled** (author, 2026-08-27), so that whatever `n` is chosen has
+somewhere to land:
+
+- **Grab range scales with mass.** Today it is a flat 560 for every body. A weak body reaching less
+  far is legible on its own terms, and it is what keeps a small body grabbable at a distance where
+  the grab is still a bound catch rather than a braked one. This is what pays for a steep `n`.
+- **Braked small bodies are accepted as texture, not treated as a defect.** 52% of real planet
+  grabs already begin as flybys, so this is a difference of degree; small bodies becoming the ones
+  you brake into is a difficulty lever spec [17](./17-daily-field.md) may use. It is bounded by the
+  first bullet rather than left to run.
+
+The radius range is left where it is. Narrowing it was the third option and is not needed while the
+grab range moves.
 
 **3 · The design-space conversion.** §0 rules ×3 on lengths and ×27 on `GM` on the arithmetic that
 the design space is exactly three times the prototype's and the phone is the same phone.

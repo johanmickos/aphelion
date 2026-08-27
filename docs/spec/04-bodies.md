@@ -44,8 +44,14 @@ The tide is the gravity vector drawn on the thing that owns it.
 
 **Scaling with mass**: a heavier body reaches with a **longer, brighter, tighter-tracking** tide
 — longer arc, higher α, larger lag coefficient. Gravity strength is read at a glance, with no
-gauge. The exact mapping from mass to (arc, α, k) is set in M1 alongside the gravity model
-(spec [01](./01-swing.md)); the three must move together and monotonically with mass.
+gauge. The three must move together and monotonically with mass.
+
+The mapping is written from `GM(R)`, which spec [01 · §13.2](./01-swing.md) carries as a parameter
+`GM_ref × (R / R_ref)ⁿ` with `n` deferred to the M1 gate — so **this arc is drawn from the number
+the simulation actually uses**, and moving `n` moves the tide with it rather than leaving the
+picture describing a gravity the world no longer has. Note that the prototype ran `n = 0`, one mass
+for every body, and therefore had nothing for this arc to read: the tide is specified ahead of the
+physics it draws, and M1.3 is where the two meet.
 
 On press, the tide flares into the **grab filament** — the line drawn from the craft to the body
 (spec [00](./00-tokens.md), compass state 1). While the craft orbits, the tide races around the
