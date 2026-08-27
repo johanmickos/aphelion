@@ -14,3 +14,8 @@ pnpm-lock.yaml
 
 # Throwaway measurement scripts, gitignored. Not ours to keep tidy.
 scratch
+
+# Claude Design's exported boards and its runtime. Source material, not source:
+# the .dc.html files carry an embedded script format Prettier cannot parse, and
+# support.js is a vendored bundle.
+design

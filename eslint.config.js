@@ -16,6 +16,10 @@ export default tseslint.config(
   // `scratch/` is gitignored and holds throwaway measurement scripts (AGENTS,
   // "thresholds are measured"). Linting them blocks `pnpm check` on code that is
   // never shipped — the same trap `dist` and `.claude` were fixed for.
+  // `design/` holds Claude Design's exported canvas boards and the runtime that
+  // renders them. `support.js` is a vendored bundle written against the browser,
+  // so it reports 93 `document is not defined` errors — the fourth instance of
+  // the same trap, and the boards are source material rather than source.
   {
     ignores: [
       '**/dist/**',
@@ -24,6 +28,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '.claude/**',
       'scratch/**',
+      'design/**',
     ],
   },
   js.configs.recommended,
