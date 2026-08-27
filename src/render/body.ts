@@ -103,17 +103,17 @@ const CORE_R = 0.17;
  */
 const FILL = withAlpha(mix(VOID, DUSK, 0.07), 1);
 
-/** Rim alpha for a body the craft is nowhere near. "A constellation of dim rings." */
-const RIM_REST = 0.4;
-
 /**
- * The pull at which a rim starts to bloom, which is where AHEAD becomes IN REACH.
+ * THE FEEL SETTINGS ARE IN `RenderConfig`, NOT HERE — `bodyRimRest`, `bodyEmitAt`,
+ * `bodyTideLagRest`, `bodyTideLagFull` and `bodySpentRecover`, each with its
+ * reasoning at its declaration.
  *
- * Not a gameplay threshold — the tide is what says a press will land, and it has
- * no threshold at all. This one only decides where the lamp is worth lighting, so
- * being a little wrong here costs nothing that a player could name.
+ * They moved because none of them has been flown. Every number in this file was
+ * argued from the corpus or from the board, and the corpus can only say what the
+ * picture must not CLAIM — it cannot say how fast a limb should swing. What is
+ * left here is anatomy that a still frame can judge; what went is everything whose
+ * answer only exists in motion, on the phone, behind a slider.
  */
-const EMIT_AT = 0.3;
 
 // ---------------------------------------------------------------------- tide
 
@@ -145,25 +145,6 @@ const EMIT_AT = 0.3;
 const TIDE_SPAN_REST = 0.5;
 const TIDE_SPAN_FULL = 1.9;
 const TIDE_ALPHA_REST = 0.35;
-/** How tightly the tide tracks the craft. Low is liquid and heavy, high is snappy. */
-const TIDE_LAG_REST = 4;
-const TIDE_LAG_FULL = 14;
-
-/**
- * How long a released body stays dark, in seconds.
- *
- * NOT PERMANENT, AND THE CORPUS IS WHY. The board wants the lamp to go out for
- * good — "a spent field behind you is the run's scoreboard, drawn in the world".
- * A session holds a median of 6 distinct bodies (p90 12, max 17), so there would
- * be something to draw. But 15 of the 28 faithful sessions RE-GRAB a body they had
- * already held, a median of once. A permanent mark would be telling the player a
- * body is used up in over half of sessions where they go back and successfully use
- * it again, and a cue that lies about availability is worse than no cue.
- *
- * So it decays: hard at the release, recovered by the time going back is a real
- * option. Three seconds is roughly the fastest observed return to a body.
- */
-const SPENT_RECOVER = 3;
 
 // --------------------------------------------------------------------- state
 
@@ -302,7 +283,7 @@ export class BodyRenderer {
   }
 
   draw(f: Frame): void {
-    const { ctx, cam, sim, theme, bodies, snap } = f;
+    const { ctx, cam, theme, bodies, snap, render: rc } = f;
     if (bodies.length !== this.tide.length || snap.tick < this.prevTick) this.reset(bodies.length);
     this.prevTick = snap.tick;
 
@@ -313,7 +294,7 @@ export class BodyRenderer {
     // in front of anyone again, so distinguishing the two would be untestable
     // bookkeeping for a case nobody can see.
     if (this.prevAnchor >= 0 && this.prevAnchor !== anchor) {
-      this.spent[this.prevAnchor] = SPENT_RECOVER;
+      this.spent[this.prevAnchor] = rc.bodySpentRecover;
     }
     this.prevAnchor = anchor;
 
@@ -340,30 +321,33 @@ export class BodyRenderer {
         continue;
       }
 
-      const p = pull(sim, b, snap.x, snap.y);
+      const p = pull(f.sim, b, snap.x, snap.y);
       const bearing = Math.atan2(snap.y - b.y, snap.x - b.x);
       const cur = this.tide[i]!;
       this.tide[i] = Number.isNaN(cur)
         ? bearing
         : f.paused
           ? cur
-          : follow(cur, bearing, lerp(TIDE_LAG_REST, TIDE_LAG_FULL, p), f.frameDt);
+          : follow(cur, bearing, lerp(rc.bodyTideLagRest, rc.bodyTideLagFull, p), f.frameDt);
 
       const v: BodyView = {
         hue: bodyHue(theme, b, i),
         pull: p,
         held: i === anchor,
         offered: i === snap.grabOffer,
-        spent: this.spent[i]! / SPENT_RECOVER,
+        // Clamped rather than divided blind: `bodySpentRecover` is a live slider,
+        // so dragging it downward mid-run leaves marks on the field that were
+        // seeded at the old, longer length.
+        spent: rc.bodySpentRecover > 0 ? clamp01(this.spent[i]! / rc.bodySpentRecover) : 0,
       };
 
       switch (b.kind) {
         case 'planet':
-          this.drawBody(ctx, cam, sim, theme, b, v, this.tide[i]!);
+          this.drawBody(f, b, v, this.tide[i]!);
           break;
         case 'anomaly':
           drawShelter(ctx, cam, b, v);
-          this.drawBody(ctx, cam, sim, theme, b, v, this.tide[i]!, f.timeMs);
+          this.drawBody(f, b, v, this.tide[i]!, f.timeMs);
           break;
       }
     }
@@ -378,16 +362,14 @@ export class BodyRenderer {
    * that is offering itself, and never brighter than the craft.
    */
   private drawBody(
-    ctx: CanvasRenderingContext2D,
-    cam: Camera,
-    sim: SimConfig,
-    theme: Theme,
+    f: Frame,
     b: Body,
     v: BodyView,
     tideAngle: number,
     /** Wall clock, anomalies only, for the breath. Nothing here feeds the sim. */
     timeMs = 0,
   ): void {
+    const { ctx, cam, sim, theme, render: rc } = f;
     const x = toScreenX(cam, b.x);
     const y = toScreenY(cam, b.y);
     const s = cam.scale;
@@ -433,11 +415,11 @@ export class BodyRenderer {
     // "present and identifiable, but quiet" means and the only version that is
     // affordable: a shadowed stroke is a Gaussian over the arc's bounding box, and
     // a dense field puts ten of them on screen at once.
-    const tier: EmissionTier = v.held ? 'E2' : v.pull > EMIT_AT ? 'E1' : 'E0';
+    const tier: EmissionTier = v.held ? 'E2' : v.pull > rc.bodyEmitAt ? 'E1' : 'E0';
     emit(ctx, theme, tier, hue, s);
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.strokeStyle = withAlpha(hue, RIM_REST + (1 - RIM_REST) * v.pull);
+    ctx.strokeStyle = withAlpha(hue, rc.bodyRimRest + (1 - rc.bodyRimRest) * v.pull);
     ctx.lineWidth = RIM_W * s;
     ctx.stroke();
     clearEmit(ctx);

@@ -7,7 +7,7 @@
 import { DEFAULT_CONFIG, FIXED_DT, MAX_CATCHUP_STEPS } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createLifecycle } from '../src/app/lifecycle.ts';
-import { KNOBS } from '../src/app/tune.ts';
+import { KNOBS, RENDER_KNOBS } from '../src/app/tune.ts';
 import { isGrabKey, keydownAction, sheetDismissible } from '../src/app/input.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { COURSES, courseOf, withCourse } from '../src/sim/course.ts';
@@ -888,10 +888,32 @@ function startRun(): void {
 // Editing is only possible while armed, which is what makes a run reproducible:
 // the config is fixed before the first tick, so (config, seed, inputLog) really
 // does describe everything that happened.
-function buildTuneRows(): void {
-  tuneRows.innerHTML = '';
+interface AnyKnob {
+  key: string;
+  label: string;
+  group: string;
+  min: number;
+  max: number;
+  step: number;
+  hint: string;
+  dp: number;
+}
+
+/**
+ * One table's worth of sliders, writing into one object.
+ *
+ * Two tables and not one, because the two write to different places and mean
+ * different things — see `RenderKnob` in `src/app/tune.ts`. The DOM they build is
+ * identical, which is the whole reason this takes the target as an argument
+ * rather than being copied: a second copy would be where the two drift.
+ */
+function appendKnobRows(
+  table: readonly AnyKnob[],
+  target: Record<string, number>,
+  afterChange: () => void,
+): void {
   let group = '';
-  for (const knob of KNOBS) {
+  for (const knob of table) {
     if (knob.group !== group) {
       group = knob.group;
       const h = document.createElement('div');
@@ -911,21 +933,19 @@ function buildTuneRows(): void {
     input.min = String(knob.min);
     input.max = String(knob.max);
     input.step = String(knob.step);
-    input.value = String(sim[knob.key]);
+    input.value = String(target[knob.key]);
 
     const value = document.createElement('span');
     value.className = 'tv';
     const show = (): void => {
-      value.textContent = (sim[knob.key] as number).toFixed(knob.dp);
+      value.textContent = (target[knob.key] as number).toFixed(knob.dp);
     };
     show();
 
     input.addEventListener('input', () => {
-      (sim as unknown as Record<string, number>)[knob.key] = Number(input.value);
+      target[knob.key] = Number(input.value);
       show();
-      // Rebuilding on every change means the armed screen is a live preview:
-      // move SPACING and the field behind the panel is already the new one.
-      rearm();
+      afterChange();
     });
 
     row.append(label, input, value);
@@ -936,6 +956,21 @@ function buildTuneRows(): void {
     hint.textContent = knob.hint;
     tuneRows.appendChild(hint);
   }
+}
+
+function buildTuneRows(): void {
+  tuneRows.innerHTML = '';
+  // Rebuilding on every change means the armed screen is a live preview: move
+  // SPACING and the field behind the panel is already the new one.
+  appendKnobRows(KNOBS as readonly AnyKnob[], sim as unknown as Record<string, number>, rearm);
+  // A render knob rebuilds nothing. It cannot change the field, so re-arming
+  // would throw away a preview to redraw the same one — the next frame already
+  // reads the new value.
+  appendKnobRows(
+    RENDER_KNOBS as readonly AnyKnob[],
+    rcfg as unknown as Record<string, number>,
+    () => {},
+  );
 }
 
 tuneBtn.addEventListener('click', (e) => {
@@ -972,6 +1007,11 @@ tuneReset.addEventListener('click', (e) => {
   e.stopPropagation();
   for (const knob of KNOBS) {
     (sim as unknown as Record<string, number>)[knob.key] = DEFAULT_CONFIG[knob.key] as number;
+  }
+  for (const knob of RENDER_KNOBS) {
+    (rcfg as unknown as Record<string, number>)[knob.key] = DEFAULT_RENDER_CONFIG[
+      knob.key
+    ] as number;
   }
   rearm();
   buildTuneRows();

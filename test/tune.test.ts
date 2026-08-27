@@ -3,11 +3,21 @@
  * or whose range excludes the default, is worse than no slider.
  */
 import { describe, expect, it } from 'vitest';
-import { KNOBS } from '../src/app/tune.ts';
+import { KNOBS, RENDER_KNOBS } from '../src/app/tune.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import type { Input } from '../src/sim/types.ts';
+import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
+import type { RenderConfig } from '../src/render/config.ts';
+import { DEFAULT_THEME } from '../src/render/theme.ts';
+import { centerCamera, createCamera, fitCamera } from '../src/render/camera.ts';
+import { BodyRenderer } from '../src/render/body.ts';
+import { createBodies, fieldBounds } from '../src/sim/world.ts';
+import { captureSnapshot } from '../src/render/snapshot.ts';
+import { recordingContext } from './canvas-stub.ts';
+import { createScoreState } from '../src/score/index.ts';
+import type { Frame } from '../src/render/frame.ts';
 
 describe('tunable parameters', () => {
   it('every knob names a real config key', () => {
@@ -248,6 +258,147 @@ describe('tunable parameters', () => {
 
   it('gives every knob a hint that says what it does', () => {
     for (const k of KNOBS) {
+      expect(k.hint.length, `${String(k.key)} has no hint`).toBeGreaterThan(20);
+      expect(k.label.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+/**
+ * The render table keeps the same promise through a different instrument.
+ *
+ * A `SimConfig` knob is measured by how far it moves the ship, which is the only
+ * honest question to ask of something that is part of `(config, seed, inputLog)`.
+ * A `RenderConfig` knob cannot move the ship — that is the whole reason it is a
+ * separate table — so the equivalent promise is that it changes what gets DRAWN.
+ * A slider that does nothing is worse than no slider either way.
+ */
+describe('render-only tunable parameters', () => {
+  it('every knob names a real render key', () => {
+    for (const k of RENDER_KNOBS) {
+      expect(DEFAULT_RENDER_CONFIG, `${String(k.key)} is not in RenderConfig`).toHaveProperty(
+        k.key as string,
+      );
+      expect(typeof DEFAULT_RENDER_CONFIG[k.key]).toBe('number');
+    }
+  });
+
+  it('never names a key the simulation would read', () => {
+    // The separation IS the safety: a render knob is absent from a diagnostics
+    // report's config compare, so a key that both tables could claim would be
+    // tunable on the panel and invisible to the replay that has to explain it.
+    for (const k of RENDER_KNOBS) {
+      expect(DEFAULT_CONFIG, `${String(k.key)} is in SimConfig too`).not.toHaveProperty(
+        k.key as string,
+      );
+    }
+  });
+
+  it('every default sits inside its slider range, and on-step', () => {
+    for (const k of RENDER_KNOBS) {
+      const v = DEFAULT_RENDER_CONFIG[k.key];
+      expect(v, `${String(k.key)} default ${v} is below its minimum`).toBeGreaterThanOrEqual(k.min);
+      expect(v, `${String(k.key)} default ${v} is above its maximum`).toBeLessThanOrEqual(k.max);
+      const steps = (v - k.min) / k.step;
+      expect(
+        Math.abs(steps - Math.round(steps)),
+        `${String(k.key)} default is off-step`,
+      ).toBeLessThan(1e-6);
+    }
+  });
+
+  it('exposes no knob that leaves the picture unchanged', () => {
+    const sim = DEFAULT_CONFIG;
+    const bodies = createBodies(sim);
+    const field = fieldBounds(sim, bodies);
+    const b0 = bodies[0]!;
+    const base = captureSnapshot(createInitialState(sim), false, sim);
+
+    /**
+     * A body held, then let go of, while the craft keeps moving.
+     *
+     * One sequence rather than one per knob, and every part of it is load-bearing.
+     * The ship sits where `pull` lands mid-ramp, so neither end of the tide's lag
+     * ramp is weighted out of the measurement; it MOVES every frame, because a lag
+     * that never has to catch up draws the same arc at any rate; and the capture
+     * ends part-way through, because a spent mark that is never seeded cannot
+     * decay. This is the same blind-spot trap the simulation scenarios above are
+     * prone to — a knob measures as dead when nothing reached the mechanism.
+     */
+    const draw = (over: Partial<RenderConfig>): string => {
+      const render = { ...DEFAULT_RENDER_CONFIG, ...over };
+      const cam = createCamera(render);
+      fitCamera(cam, { w: 390, h: 844, dpr: 1 });
+      centerCamera(cam, b0.x, b0.y, field, null);
+      const br = new BodyRenderer();
+      const ops: string[] = [];
+      // p = (R + minOrbitGap) / dist, so twice the minimum orbit is half pull.
+      const dist = 2 * (b0.R + sim.minOrbitGap);
+      for (let i = 0; i < 24; i++) {
+        const r = recordingContext();
+        const a = i * 0.12;
+        const f: Frame = {
+          ctx: r.ctx,
+          cam,
+          snap: {
+            ...base,
+            tick: 100 + i,
+            x: b0.x + Math.cos(a) * dist,
+            y: b0.y + Math.sin(a) * dist,
+            // Held for the first third, then let go of and merely offered.
+            capture: i < 8 ? { ...base.capture!, planet: 0 } : null,
+            grabOffer: 0,
+          },
+          sim,
+          render,
+          theme: DEFAULT_THEME,
+          bodies,
+          field,
+          score: createScoreState(),
+          cer: null,
+          finishY: null,
+          timeMs: 0,
+          frameDt: 1 / 60,
+          paused: false,
+          viewportW: 390,
+          viewportH: 844,
+          headerBottom: 0,
+          deathSheet: null,
+          deathSheetT: 0,
+        };
+        br.draw(f);
+        ops.push(r.ops.map((o) => o.join(',')).join('|'));
+      }
+      return ops.join('\n');
+    };
+
+    const reference = draw({});
+    for (const k of RENDER_KNOBS) {
+      const v = DEFAULT_RENDER_CONFIG[k.key];
+      let changed = false;
+      for (const alt of [k.min, k.max]) {
+        if (alt === v) continue;
+        if (draw({ [k.key]: alt }) !== reference) changed = true;
+      }
+      expect(changed, `${String(k.key)} draws the same picture across its whole range`).toBe(true);
+    }
+  });
+
+  it('groups knobs contiguously, so the panel reads as sections', () => {
+    const seen = new Set<string>();
+    let current = '';
+    for (const k of RENDER_KNOBS) {
+      if (k.group !== current) {
+        expect(seen.has(k.group), `group ${k.group} appears twice`).toBe(false);
+        seen.add(k.group);
+        current = k.group;
+      }
+    }
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it('gives every knob a hint that says what it does', () => {
+    for (const k of RENDER_KNOBS) {
       expect(k.hint.length, `${String(k.key)} has no hint`).toBeGreaterThan(20);
       expect(k.label.length).toBeGreaterThan(0);
     }

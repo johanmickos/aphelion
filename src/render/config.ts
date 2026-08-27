@@ -145,6 +145,64 @@ export interface RenderConfig {
   /** Width of the danger gradient, measured INWARD from the field edge. */
   hazardZoneWidth: number;
 
+  // --- the body lamp ---
+  //
+  // Direction 04's feel settings, and they are HERE rather than as consts in
+  // `src/render/body.ts` because none of them has been flown. They were reasoned
+  // from the corpus, which can say what the picture must not claim and cannot say
+  // what it should feel like — and a value that can only be judged in motion has
+  // to be reachable from the phone that is doing the moving. Nothing here can
+  // touch a trajectory, which is what keeps them out of `SimConfig`.
+  /**
+   * How tightly the tide tracks the craft, in units of 1/second, at the two ends
+   * of the pull ramp: `Rest` when the body is barely pulling, `Full` at its own
+   * minimum orbit.
+   *
+   * Low is liquid and heavy, high is snappy. The pair is a ramp rather than one
+   * number because that is the claim: a body reaches lazily from far away and
+   * snaps to you when it has you, so the tracking rate is itself a reading of how
+   * hard the gravity is. 4 and 14 are the board's intent expressed as rates, and
+   * are the single most conspicuously unflown thing on the body — the board names
+   * `tideLag` as its feel setting and never says what it should be.
+   */
+  bodyTideLagRest: number;
+  bodyTideLagFull: number;
+  /**
+   * How long a released body stays dark, in seconds.
+   *
+   * NOT PERMANENT, AND THE CORPUS IS WHY. The board wants the lamp to go out for
+   * good — "a spent field behind you is the run's scoreboard, drawn in the world"
+   * — and there would be something to draw: a session holds a median of 6 distinct
+   * bodies, p90 12, max 17. But 15 of the 28 faithful sessions RE-GRAB a body they
+   * had already held, a median of once. A permanent mark tells the player a body
+   * is used up in over half of the sessions where they go back and successfully
+   * use it again, and a cue that lies about availability is worse than no cue.
+   *
+   * So it decays: hard at the release, recovered by the time going back is a real
+   * option. 3 is roughly the fastest observed return to a body. What is unflown is
+   * whether the mark reads at all at that length — 0 turns it off, which is the
+   * comparison worth making before defending the number.
+   */
+  bodySpentRecover: number;
+  /**
+   * Rim alpha for a body the craft is nowhere near. "A constellation of dim
+   * rings" — this sets how dim, and therefore how much a field ahead reads as
+   * structure rather than as noise.
+   */
+  bodyRimRest: number;
+  /**
+   * The pull at which a rim starts to bloom, which is where AHEAD becomes IN
+   * REACH.
+   *
+   * Not a gameplay threshold — the tide is what says a press will land, and it has
+   * no threshold at all. This one only decides where the lamp is worth lighting,
+   * so being a little wrong here costs nothing a player could name. It is a knob
+   * anyway because "a little wrong" is exactly the kind of judgement a still frame
+   * cannot make: what it really sets is how many rims are blooming at once in a
+   * dense stretch.
+   */
+  bodyEmitAt: number;
+
   // --- the deadline: the point of no return ---
   /**
    * Seconds-to-cross at which the deadline starts fading in, and at which it
@@ -387,6 +445,12 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   trailHeadGap: 12,
 
   hazardZoneWidth: 60,
+
+  bodyTideLagRest: 4,
+  bodyTideLagFull: 14,
+  bodySpentRecover: 3,
+  bodyRimRest: 0.4,
+  bodyEmitAt: 0.3,
 
   deadlineFadeInSecs: 2.63,
   deadlineFullSecs: 1.35,
