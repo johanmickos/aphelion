@@ -16,6 +16,23 @@ The whole world of a single run — one climb with a top. Its shape is not fixed
 vertical corridor today, a ring or an authored course later.
 _Avoid_: level, stage, map
 
+**Craft**:
+The ship the player flies. It has timing and shape and never a throttle: no acceleration
+input exists, and the nose points along the exit tangent for the whole of an orbit. One
+craft, one field, one run.
+_Avoid_: ship, player, ship object
+
+**Tick**:
+The game's unit of time, and the only clock in it (ADR-0006). Sixty to the simulated second,
+fixed. Nothing in the game measures itself in seconds, because the simulation may scale time
+and wall-clock time may then diverge from it permanently.
+_Avoid_: frame (a frame is the renderer's and there may be more or fewer of them), step, update
+
+**Substep**:
+One of the equal slices a tick is integrated in. An implementation detail with a number
+attached, named here because the number is load-bearing and has to be argued for rather than
+chosen.
+
 **Rung**:
 A stratum of the field hung perpendicular to intended travel, marking one unit of
 altitude. Rungs bow toward mass and part around the craft, so the field states gravity
@@ -27,6 +44,12 @@ orbit's, below)
 Anything in the field with mass that the craft can be caught by. A planet is the common
 kind; black holes, pulsars and binaries are others.
 _Avoid_: object, entity, obstacle
+
+**Mass**:
+How strongly a body pulls. It **is** size — a body's radius is the only thing that sets it,
+and nothing else about a body changes with it. The player reads mass off the disc and off
+the tide, never off a gauge.
+_Avoid_: gravity strength, GM, weight
 
 **Tide**:
 The bright limb segment of a body that always faces the craft — gravity drawn at
@@ -58,7 +81,9 @@ One grab, one orbit, one release. The unit of play and therefore the unit of sco
 
 **Grab**:
 Being caught by a body. Begins when the player presses; the swing is not paid for
-until it is released.
+until it is released. Between the grab and the release the body is **held**, and that is the
+only condition under which gravity acts at all — a coasting craft feels nothing, from
+anything, at any distance.
 _Avoid_: capture, catch, hook
 
 **Release**:

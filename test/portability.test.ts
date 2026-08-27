@@ -35,7 +35,7 @@ function check(fixture?: string): Result {
 describe('the real src/', () => {
   it('is portable, and proves it by running under plain node', () => {
     const { code, output } = check();
-    expect(output).toContain('ticks under plain node');
+    expect(output).toContain('under plain node');
     expect(code).toBe(0);
   });
 });
@@ -68,6 +68,27 @@ describe('the checker fails loudly when', () => {
     expect(code).toBe(1);
     expect(output).toContain('Math.random');
     expect(output).toContain('ADR-0004');
+  });
+
+  /**
+   * ADR-0014's half of the rule. `Math.hypot` was already banned because the
+   * prototype was bitten by it; the rest of the implementation-approximated
+   * family is banned for exactly the same reason, measured — V8 and
+   * JavaScriptCore disagree on `Math.atan2` for 17.9% of arguments.
+   */
+  it('the simulation reaches for an implementation-approximated Math function', () => {
+    const { code, output } = check('approximated-math-in-sim');
+    expect(code).toBe(1);
+    expect(output).toContain('Math.sin');
+    expect(output).toContain('Math.atan2');
+    expect(output).toContain('ADR-0014');
+  });
+
+  it('the simulation uses ** , which carries the same latitude as Math.pow', () => {
+    const { code, output } = check('exponent-operator-in-sim');
+    expect(code).toBe(1);
+    expect(output).toContain('**');
+    expect(output).toContain('power()');
   });
 
   it('a file uses TypeScript that plain node cannot strip', () => {

@@ -117,9 +117,14 @@ The stated deliverable is **a technical architecture that is easy to maintain an
 
 - **Node 26. TypeScript is pinned to 6.x on purpose** — the reason is at the top of
   `eslint.config.js`. Read it before touching the pin. Otherwise this project tracks latest.
-- **`pnpm portable`** scans `src/sim/` and `src/state/`: no `Math.random`, `Math.hypot`,
-  `Date.now`, `performance`, or DOM globals there. `enum`, `namespace` and parameter
-  properties are banned across all of `src/`.
+- **`pnpm portable`** scans `src/sim/` and `src/state/`: no `Math.random`, `Date.now`,
+  `performance`, or DOM globals there, and **no `Math` function ECMA-262 leaves
+  implementation-approximated** — `hypot`, `pow`, `sin`, `cos`, `atan2` and the rest — nor the
+  `**` operator, which carries the same latitude as `Math.pow`. Two engines return different
+  bits for those, a recipe recorded on the phone is replayed on a laptop, and the two failures
+  look identical in the numbers (ADR-0014). The simulation writes its own in `src/sim/trig.ts`
+  and `src/sim/math.ts`. `enum`, `namespace` and parameter properties are banned across all of
+  `src/`.
 - **`pnpm dev`** prints a QR for the LAN address; `s` reprints it, `S` prints it larger.
 - **`tools/vite-plugin-diag.ts`** receives a JSON report from the author's phone and writes
   it to `diagnostics/`. Read its header before extending it — it writes files on a server

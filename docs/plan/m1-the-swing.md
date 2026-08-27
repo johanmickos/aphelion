@@ -47,8 +47,11 @@ revolution*, is M1.3's acceptance gate. Three rulings are the author's and are l
 ## M1.2 · The simulation core
 
 Fixed timestep with substeps. **Ticks are the only clock in the game** (ADR-0006) — nothing
-measures itself in seconds, because hitstop is a time-scale the simulation applies and
-wall-clock time and simulated time diverge permanently the first time it fires.
+measures itself in seconds, because the simulation may scale time and wall-clock time would then
+diverge from it permanently. (Earlier drafts of this paragraph cited the hitstop as the thing that
+scales it. The hitstop is withdrawn — [ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)
+— and nothing applies a time scale today. The clock is unaffected: it was never the freeze that
+made ticks the unit.)
 
 Bodies, gravity, the craft, integration. Pure, headless, no DOM, no `Math.random` — seeded
 RNG only. A run is fully described by `(config, seed, input log)` and by nothing else.
@@ -57,12 +60,41 @@ RNG only. A run is fully described by `(config, seed, input log)` and by nothing
 state; `pnpm portable` passes. **Verify**: `pnpm portable`, plus a determinism test that runs
 the same recipe twice and compares final state exactly.
 
+**Done.** The core is `src/sim/`: a tick of 1/60s integrated in six substeps by semi-implicit
+Euler, a fixed-timestep clock with the catch-up bounded at three ticks, bodies whose mass is
+derived from their radius, gravity that acts **only while a body is held and only from that
+body**, coasting that is force-free, a seeded stream, and a byte-level snapshot of the whole
+state. There is no grab, no freeze, no settle and no release — those are M1.3, and the dive is
+set up in tests by a fixture rather than by a mechanism.
+
+Three things worth carrying forward:
+
+- **Six substeps is proved on this integrator, not inherited.** Against a 96-substep reference
+  over six dives spanning the measured periapsis band, six agrees to **0.37 design units** of
+  closest approach and **1.8 units/s** — a factor of four inside spec 01 §12's tolerances — while
+  one substep misses both. The worst integrated step is **3.43 design units**, or 1.14 in the
+  units the prototype measured 1.45 in.
+- **[Spec 01 · §12a](../spec/01-swing.md) is closed.** The simulation owns `sin`, `cos` and
+  `atan2` ([ADR-0014](../adr/0014-the-simulation-owns-its-transcendentals.md)), because V8 and
+  JavaScriptCore — the engine the author's phone runs — disagree on them for 4.3%, 4.6% and 17.9%
+  of arguments, and a recipe recorded on the phone is replayed on a laptop.
+- **[Spec 01 · §13.3](../spec/01-swing.md) is closed by the author**: the ×3 / ×27 conversion is
+  confirmed, and carried as one named constant with every length derived from it.
+
 ---
 
 ## M1.3 · Grab, orbit, release
 
-The one verb: press to be caught, hold to swing, release to leave along the tangent. Hitstop
-fires at both ends as a simulated time-scale, not a rendering pause.
+The one verb: press to be caught, hold to swing, release to leave along the tangent. There is
+**no hitstop** at either end — it was rejected after being flown
+([ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)), and what
+replaces it is a kick on every release scaled by the quality of the swing, read from spec 01 §7's
+envelope. Time-scaling remains the simulation's to apply and is applied by nothing.
+
+The simulation core is [M1.2](#m12--the-simulation-core) and is done: bodies, gravity, the craft
+and the integrator exist, `heldBody` exists as state with no transition into it, and spec 01 §4's
+clearance impulse is the first thing this step needs — without it a dive at a realistic aim
+strikes the body.
 
 **Acceptance**: every characteristic from M1.1 is inside its tolerance, as an automated test.
 **Verify**: `pnpm test`.

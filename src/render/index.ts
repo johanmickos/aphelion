@@ -17,5 +17,8 @@ import type { PresentationState } from '../state/types.ts';
 declare const __BUILD_STAMP__: string;
 
 export function draw(presentation: PresentationState, target: HTMLElement): void {
-  target.textContent = `APHELION · SCAFFOLD · ${__BUILD_STAMP__} · tick ${presentation.tick}`;
+  const { craft } = presentation;
+  target.textContent =
+    `APHELION · SCAFFOLD · ${__BUILD_STAMP__} · tick ${presentation.tick} · ` +
+    `${craft.x.toFixed(1)}, ${craft.y.toFixed(1)} @ ${craft.speed.toFixed(1)}/s`;
 }

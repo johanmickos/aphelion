@@ -86,16 +86,62 @@ const BANNED_GLOBALS = new Map<string, string>([
   ['globalThis', 'reaches every banned global without naming one'],
 ]);
 
+/**
+ * `Math` functions ECMA-262 leaves **implementation-approximated**, so two
+ * engines may return different bits for the same argument.
+ *
+ * This is not theoretical and it is not small. Measured over 20 000 arguments,
+ * V8 and JavaScriptCore — which is what the author's phone runs — disagree on
+ * `Math.hypot` 36.4% of the time, on `Math.atan2` 17.9%, and on `Math.sin` and
+ * `Math.cos` about 4.5%. Each disagreement is one unit in the last place, which
+ * is why it is invisible until it is fatal: spec 01 §12a records a phone session
+ * diverging 5.63 units on `hypot` alone, with whole decisions flipping past ten
+ * seconds — a grab becoming a fly-past.
+ *
+ * The simulation computes its own, out of operations IEEE-754 requires to be
+ * correctly rounded. The reason lives in
+ * `docs/adr/0014-the-simulation-owns-its-transcendentals.md` and in
+ * `src/sim/trig.ts`, and it is written out there rather than only here, because
+ * a rule whose reason lives somewhere else is a rule someone deletes.
+ */
+const APPROXIMATED = [
+  'sin',
+  'cos',
+  'tan',
+  'asin',
+  'acos',
+  'atan',
+  'atan2',
+  'sinh',
+  'cosh',
+  'tanh',
+  'asinh',
+  'acosh',
+  'atanh',
+  'exp',
+  'expm1',
+  'log',
+  'log2',
+  'log10',
+  'log1p',
+  'pow',
+  'cbrt',
+  'hypot',
+];
+
 /** Member reads that are banned even though the object itself is legitimate. */
 const BANNED_MEMBERS = new Map<string, string>([
   ['Math.random', 'unseeded randomness — a run must replay from its recipe (ADR-0004)'],
   ['Date.now', 'wall-clock read — time is counted in ticks, never in seconds (ADR-0006)'],
-  [
-    'Math.hypot',
-    'not correctly rounded, and differs between engines — the prototype was bitten by this; ' +
-      'write a hypot in src/sim/ and import it',
-  ],
 ]);
+
+for (const name of APPROXIMATED) {
+  BANNED_MEMBERS.set(
+    `Math.${name}`,
+    'implementation-approximated — engines disagree, and a recipe must replay across them ' +
+      '(ADR-0014); use src/sim/trig.ts and src/sim/math.ts',
+  );
+}
 
 interface Violation {
   file: string;
@@ -237,6 +283,21 @@ function checkLayer(dir: string, mayImport: readonly string[]): void {
       ) {
         report(source, node, 'new Date — wall-clock read; time is counted in ticks (ADR-0006)');
       }
+      // `**` is not sugar for repeated multiplication: ECMA-262 gives it exactly
+      // the same latitude as Math.pow, and it is far easier to reach for without
+      // noticing. Banning the function and leaving the operator would have left
+      // the door open beside the lock.
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.AsteriskAsteriskToken
+      ) {
+        report(
+          source,
+          node,
+          '** — implementation-approximated, exactly as Math.pow is (ADR-0014); ' +
+            'use power() from src/sim/math.ts',
+        );
+      }
       if (ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword) {
         report(source, node, 'import.meta — bundler-coupled; a pure layer has no build context');
       }
@@ -302,27 +363,50 @@ if (!isRealSrc) {
 // The proof of life. Dynamic, and down here, so it runs only once the scan is
 // clean: a static rule can only catch what it was told to look for, and actually
 // executing the simulation with no bundler and no DOM is what catches the rest.
+//
+// It flies something rather than counting ticks. The two behaviours below are
+// the ones spec 01 says a rewrite gets wrong by default — a held craft is pulled
+// by exactly one body, and a coasting craft is pulled by nothing at all — and
+// the second is asserted as bit-identity, because §9 measures it as bit-identity
+// rather than as "nearly constant".
 const { createInitialState, stepSim } = await import('../src/sim/step.ts');
 const { NO_INPUT } = await import('../src/sim/types.ts');
+const { createBody } = await import('../src/sim/body.ts');
+const { createCraft, speedOf } = await import('../src/sim/craft.ts');
 const { derive } = await import('../src/state/derive.ts');
 
-const TICKS = 120;
-const sim = createInitialState();
-for (let i = 0; i < TICKS; i++) stepSim(sim, NO_INPUT);
+const field = { bodies: [createBody(0, 0, 132)] };
+const sim = createInitialState(field, createCraft(-900, -420, 260, 0), 1);
+
+const HELD_TICKS = 120;
+const COAST_TICKS = 300;
 
 let failed = false;
-if (sim.tick !== TICKS) {
-  console.error(`proof of life: expected tick ${TICKS}, got ${sim.tick}`);
+const fail = (message: string): void => {
+  console.error(`proof of life: ${message}`);
   failed = true;
-}
+};
+
+sim.heldBody = 0;
+const speedAtGrab = speedOf(sim.craft);
+for (let i = 0; i < HELD_TICKS; i++) stepSim(sim, NO_INPUT);
+if (sim.tick !== HELD_TICKS) fail(`expected tick ${HELD_TICKS}, got ${sim.tick}`);
+if (speedOf(sim.craft) === speedAtGrab) fail('a held craft was not accelerated by its body');
+
+sim.heldBody = null;
+const speedAtRelease = speedOf(sim.craft);
+const headingAtRelease = derive(sim).craft.heading;
+for (let i = 0; i < COAST_TICKS; i++) stepSim(sim, NO_INPUT);
+if (speedOf(sim.craft) !== speedAtRelease)
+  fail('a coasting craft changed speed — gravity is ambient');
+if (derive(sim).craft.heading !== headingAtRelease) fail('a coasting craft turned');
 if (derive(sim).tick !== sim.tick) {
-  console.error(
-    'proof of life: presentation state does not agree with the simulation it came from',
-  );
-  failed = true;
+  fail('presentation state does not agree with the simulation it came from');
 }
+
 if (failed) process.exit(1);
 
 console.log(
-  `src/sim and src/state are portable — ${TICKS} ticks under plain node, no bundler, no DOM`,
+  `src/sim and src/state are portable — ${HELD_TICKS} ticks held and ${COAST_TICKS} coasting ` +
+    'under plain node, no bundler, no DOM',
 );

@@ -34,12 +34,14 @@ that is what every measurement was taken in, and a spec that silently rescales i
 worse than one that does not scale it at all. This repo's design space is **1170 × 2532**
 (ADR-0010, spec [00 · §7](./00-tokens.md)), exactly **3×** in each direction.
 
-> **Conversion, ruled 2026-08-27 (author to confirm — see §13).** To make the rewrite feel the
-> same on the same phone, lengths, speeds and accelerations all scale by **k = 3**, and the
-> gravitational parameter by **k³ = 27** (it has units of length³ / time²). **Times, angles,
-> ratios and tick counts are unchanged.** So `μ` becomes 148 500 000, the softening length 54,
-> the floor gap 36 — and every duration, every angle and every fraction in this file transfers
-> untouched.
+> **Conversion, ruled 2026-08-27 and confirmed by the author 2026-08-27 (§13.3 is closed).** To
+> make the rewrite feel the same on the same phone, lengths, speeds and accelerations all scale by
+> **k = 3**, and the gravitational parameter by **k³ = 27** (it has units of length³ / time²).
+> **Times, angles, ratios and tick counts are unchanged.** So `μ` becomes 148 500 000, the
+> softening length 54, the floor gap 36 — and every duration, every angle and every fraction in
+> this file transfers untouched. The simulation carries the factor as one constant
+> (`SCALE` in `src/sim/units.ts`) and derives every length from it and from the figure stated
+> here, so both numbers stay visible at the point of use.
 
 Wherever a characteristic can be stated as a ratio, an angle or a duration, **it is**, and the
 tolerance is written on that form. Those survive the conversion; absolute pixel figures are given
@@ -616,16 +618,32 @@ against a float64 ceiling of 1.8e308.
 why**, and the reason belongs here rather than only in the checker, because a rule whose reason
 lives somewhere else is a rule someone deletes.
 
-**`sin`, `cos` and `atan2` are the same class of hazard and are not yet solved.** They are
-implementation-approximated too, the prototype's orbit clock calls them every tick, and a long
-unbroken swing amplifies the difference — which is why §1 treats late-session replay figures as
+**`sin`, `cos` and `atan2` were the same class of hazard. Closed in M1.2:
+[ADR-0014](../adr/0014-the-simulation-owns-its-transcendentals.md) — the simulation owns them.**
+
+They are implementation-approximated too, the prototype's orbit clock calls them every tick, and a
+long unbroken swing amplifies the difference — which is why §1 treats late-session replay figures as
 weaker evidence, and why the prototype records its scoring events rather than trusting a replay to
-recompute them. **This is an open engineering problem for M1.2**, not a solved one: the options are
-a table-based or polynomial implementation owned by the simulation, an orbit clock that advances by
-composing rotations rather than by re-evaluating a trig function at an accumulated angle, or
-accepting single-engine determinism and saying so in the recipe. It should be decided deliberately
-and recorded, because it is the difference between "the simulation is non-deterministic" and "you
-were running a different engine", and those look identical in the numbers.
+recompute them. The three options were a polynomial implementation owned by the simulation, an orbit
+clock that composes rotations rather than re-evaluating at an accumulated angle, or accepting
+single-engine determinism and saying so in the recipe.
+
+**The hazard was measured before it was decided**, against V8 and JavaScriptCore — the second being
+what Safari on the author's phone runs, so it is the pair a recipe actually has to cross. Over 20 000
+arguments each, the two engines return different bits for `Math.sin` **4.3%** of the time, `Math.cos`
+**4.6%**, `Math.atan2` **17.9%**, and `Math.hypot` **36.4%** — the last reproducing this section's
+independently-measured 36% and confirming the method before it was pointed at the unknown rows.
+`sqrt(x*x + y*y)` disagreed **0%** of the time.
+
+`src/sim/trig.ts` computes `sin`, `cos` and the angle of a vector from `+`, `-`, `*`, `/` and
+`Math.sqrt` alone, all of which IEEE-754 requires to be correctly rounded. The same probe finds the
+two engines **identical to the bit** across 80 000 values of it. Accuracy costs nothing — worst error
+0.73 ulp against a 256-bit reference, where V8's own `Math.sin` scores 0.81 — and speed costs 2.8× on
+`sin`, which is a handful of calls a tick and does not appear in the frame budget ADR-0011 measured.
+
+Composing rotations was rejected because it relocates the problem rather than removing it: the rotor
+still needs a `sin` and a `cos`, §6's angular rate changes every tick through the settle so the rotor
+is rebuilt constantly, and it does nothing for `atan2`, which the compass reads every frame.
 
 > **Tolerance.** A recipe replayed twice on the same engine produces **byte-identical** state at
 > every tick — exact, and it is M1.2's acceptance. Across two engines, the same recipe holds
@@ -653,7 +671,8 @@ measured; it is not measured at the top, and §13 records that as a gap to close
 ## 13 · Open
 
 Nothing above is open. What follows is, and each is the author's to close rather than an
-implementing agent's.
+implementing agent's — except §12a's trig question, which was explicitly M1.2's and is now closed
+above.
 
 **1 · Hitstop — closed, 2026-08-27.** This spec's fixed item 5, ADR-0006 and spec
 [02](./02-release.md) all required a 70ms full-world freeze at grab and at release, applied by the
@@ -720,11 +739,18 @@ somewhere to land:
 The radius range is left where it is. Narrowing it was the third option and is not needed while the
 grab range moves.
 
-**3 · The design-space conversion.** §0 rules ×3 on lengths and ×27 on `μ` on the arithmetic that
-the design space is exactly three times the prototype's and the phone is the same phone.
-**Author to confirm the intent**, because it is the highest-leverage number in the file: confirming
-it says the rewrite should feel the same in the hand, and declining it says the rewrite should feel
-different, which is a legitimate thing to want and would change every absolute figure here at once.
+**3 · The design-space conversion — closed, 2026-08-27.** §0 rules ×3 on lengths and ×27 on `μ` on
+the arithmetic that the design space is exactly three times the prototype's and the phone is the
+same phone. **The author has confirmed the intent**: the rewrite should feel the same in the hand.
+M1.2 carries the factor as a single named constant with every length derived from it, so declining
+it later, or moving to a different design size, remains one number in one file.
+
+One consequence is recorded rather than acted on. Spec [17 · §4](./17-daily-field.md)'s difficulty
+curve is written in *prototype* magnitudes wearing design-space labels — body radii 55 → 32 against
+this file's measured 34.3 – 55.5, and a corridor half-width of 480 in a 1170-wide space. Every
+number in that curve is marked an opening position and is M3's to measure, so this is not a
+contradiction to resolve now; it is a note for whoever measures it, so the ×3 is applied once rather
+than discovered twice.
 
 **4 · The 60-units/s peak boost is tuning, and M4 owns it.** The envelope's **shape and timing** are M1's and
 are fixed above. Its **magnitude** is an economy number that spec [08](./08-economy.md) will move, and
@@ -776,3 +802,5 @@ this file had numbers in it and they still are.
 - The author has flown the build on a phone and signed off (ADR-0004). The sign-off is a scheduled
   human checkpoint, not a formality to be routed around.
 - A recipe replayed twice produces byte-identical simulation state at every tick (M1.2, M1.5).
+  **Met for the core** in M1.2, at every one of 3600 ticks and not only at the end; M1.5 extends it
+  to a recorded run and a replay CLI.
