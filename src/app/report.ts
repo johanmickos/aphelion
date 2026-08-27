@@ -1,9 +1,9 @@
 /**
  * The diagnostics report: everything needed to re-run a session elsewhere.
  *
- * Config is stored as a *diff* against DEFAULT_CONFIG, so the common case costs
- * nothing and any tuning the player changed is explicit. Nothing here is a
- * recording of what happened — it is the recipe that produces it.
+ * The FULL config is stored, not a diff — see `DiagReport.config` for why a diff
+ * was wrong. Nothing here is a recording of what happened; it is the recipe that
+ * produces it.
  */
 import type { SimConfig } from '../sim/config.ts';
 import { FIXED_DT, PROTOTYPE_CONFIG, SIM_VERSION } from '../sim/config.ts';

@@ -4144,6 +4144,76 @@ the name. They belong to the renderer's palette work rather than to this.
 The gate is what proves the whole thing: every substitution is behaviour-preserving
 by construction, and it read `0.000e+0` across all ten scenarios at each step.
 
+---
+
+### 66 — Eight of seventy-eight config keys described one body, and the config is not where a body goes
+
+`SimConfig` had eight keys that were all about anomalies: the offset past the
+wall, the shelter radius, the four numbers of the authored orbit, the count, and
+a dev placement flag. None of them varied per run — an anomaly is the same anomaly
+in every field — and every one was paying the full config toll:
+
+```
+a value in PROTOTYPE_CONFIG and a value in DEFAULT_CONFIG
+a slot in the equality gate's config compare
+a golden recapture when it is added
+a line in every diagnostics header, in the classification that decides
+  whether the report can be trusted at all
+```
+
+That toll is right for a key that tunes the simulation. It is wrong for saying how
+wide a shelter is. At eight keys a type, Direction 04's four new body types would
+have taken `SimConfig` past a hundred and twenty.
+
+So six of them became `src/sim/bodies.ts` — a table of what each type IS, beside
+the generator that builds them, the same way `KNOBS` sits beside the tune panel.
+
+**The line between the table and the config is "what one is" versus "how many, and
+where".** `bodyCount`, `anomalyCount` and `worldSeed` stayed: they are the course
+and the field. `chargedSecs` stayed too, and that one is worth recording because
+the trait moved the other way — `charges` became a BOOLEAN. The body says it opens
+a window and `SimConfig` says how long, because `render/snapshot.ts` divides by the
+length to draw the window running down and `replay-core.ts` counts windows by it,
+and neither has a body in hand when it asks. Same split `claimable` already makes,
+and the same one `palette.ts` and `accolade.ts` keep.
+
+**`wallOffset` is placement and it is in the table anyway**, which looks like a
+mistake and is not. `anomalyBubble` used to say of itself: "Sized against
+`anomalyOffset` rather than chosen freely, and the relationship is what matters" —
+at 400 against 250 the shelter reaches 150px back inside the corridor, so a ship
+crosses the barrier already protected. Split that pair across a table and a config
+and the relationship has nowhere to be stated, which is how it stops being true.
+
+**Deleting a config key breaks every report that ever stored one.** A `DiagReport`
+holds the FULL config, deliberately — a diff is taken against whatever
+`DEFAULT_CONFIG` the client had, so it reads empty however far the replaying
+source has moved. All sixty-seven reports in `diagnostics/` therefore carry the six
+deleted keys, and without handling each would have announced six differences and
+cried "THIS REPORT CAME FROM A DIFFERENT BUILD" — the crying-wolf failure the
+category split exists to end, arriving for the third time after `DEV_KEYS` and
+`COURSE_KEYS`.
+
+`RETIRED_KEYS` is the sixth category, and it is deliberately not a blanket pardon:
+it maps each dead key to what the table now holds, so a report that ran the same
+value is reported as retired, while one that ran a DIFFERENT value is still skew —
+correctly, because the table is not config and a replay cannot honour what that
+session flew. Verified across all sixty-seven: no retired key reaches the skew
+list, and the sixty-three reports that still show the banner show it for the
+reasons they showed it before (`simVersion` 26 vs 27, and the carpet keys).
+
+**How the field was proved unmoved.** The golden covers `PROTOTYPE_CONFIG`, which
+uses the authored `DEFS` and never runs the procedural generator — so it says
+nothing about the thing most at risk here. The check that does is a digest of every
+body and mote across four seeds and both courses, taken before and after:
+identical at `b1c6ceba`. The two literals that mattered were `34 + rnd() * 22` and
+`40 + rnd() * 16`, rewritten as ranges of `[34, 56]` and `[40, 56]` drawn as
+`lo + rnd() * (hi - lo)` — the same expression, so the same float, so the same
+field. Draw order is part of the field, and this is what checking that claim looks
+like.
+
+Neither `SIM_VERSION` nor the golden moved, because nothing under `src/sim/`
+changed behaviour.
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:

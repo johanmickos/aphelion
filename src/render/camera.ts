@@ -287,7 +287,7 @@ function panBounds(
 
   // The field rule may not prevent framing the thing being framed.
   //
-  // An anomaly sits `anomalyOffset` beyond the barrier, so centring it puts the
+  // An anomaly sits its type's `wallOffset` beyond the barrier, so centring it puts the
   // view a further half-window out — about 445px past the field edge, well past
   // anything `relax` opens. Without this the bound yanked the view back toward the
   // corridor every time the orbit swung that way and let it settle again on the

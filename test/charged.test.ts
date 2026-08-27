@@ -8,6 +8,7 @@
  * degenerate.
  */
 import { describe, expect, it } from 'vitest';
+import { BODY_TYPES } from '../src/sim/bodies.ts';
 import { DEFAULT_CONFIG, FIXED_DT } from '../src/sim/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
@@ -17,6 +18,9 @@ import type { ScoreAward, ScoreState, Tally } from '../src/score/index.ts';
 import { DEFAULT_SCORE_CONFIG, createScoreState, scoreTick } from '../src/score/index.ts';
 
 const ANOMALY = createBodies(DEFAULT_CONFIG).find((b) => b.kind === 'anomaly' && b.x > 195)!;
+
+/** The anomaly's authored orbit, which used to be four `SimConfig` keys. */
+const REST_STOP = BODY_TYPES.anomaly.traits.authored!;
 
 /**
  * Out to the right-hand anomaly, then a second press inside the window it opens.
@@ -371,7 +375,7 @@ describe('the orbit a hop lands on', () => {
     // Clear of the tightest orbit in the game on every body...
     expect(DEFAULT_CONFIG.chargedOrbitR).toBeGreaterThan(Math.max(...minRs));
     // ...and still tighter than the anomaly's own rest stop, so a hop is not one.
-    expect(DEFAULT_CONFIG.chargedOrbitR).toBeLessThan(DEFAULT_CONFIG.anomalyOrbitR);
+    expect(DEFAULT_CONFIG.chargedOrbitR).toBeLessThan(REST_STOP.orbitR);
   });
 
   it('never orbits inside a body, however large', () => {

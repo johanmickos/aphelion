@@ -651,7 +651,7 @@ describe('what the camera watches', () => {
     // it. I was en route to crash into it." Reconstructed from that session — the
     // approach is pure drift, so it is exact rather than a replay — the anomaly's
     // disc first appeared 0.15s AFTER the press and 0.23s before impact, at
-    // 303px/s. It sits `anomalyOffset` past the wall and the view may not reach it
+    // 303px/s. It sits its type's `wallOffset` past the wall and the view may not reach it
     // until the bubble opens the barrier, so it arrives on screen with the ship.
     //
     // The ceiling worth knowing: an instant camera glued to the anomaly reaches

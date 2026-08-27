@@ -424,7 +424,7 @@ function zipOrbit(state: SimState, cfg: SimConfig, cap: Capture, body: Body): Au
   // A frenzy is a rhythm, and a rhythm needs every beat to be the same. Absolute
   // rather than a multiple of `minR`, so height AND period are literally
   // identical on every body — which is how an anomaly already authors its own
-  // rest stop (`anomalyOrbitR`), and the reason that reads as a place rather than
+  // rest stop (the anomaly's authored `orbitR`), and the reason that reads as a place rather than
   // as a result.
   //
   // Clamped above `minR` because a body big enough would otherwise put this orbit

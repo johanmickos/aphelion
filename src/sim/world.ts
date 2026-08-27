@@ -10,7 +10,8 @@
  * Here the layout is evaluated once at the design viewport (390x844) and baked in.
  * Resize is inert. The renderer scales and letterboxes to fit. See PORT_NOTES 10.
  */
-import type { Body, BodyTraits, Mote } from './types.ts';
+import type { Body, Mote } from './types.ts';
+import { BODY_TYPES } from './bodies.ts';
 import type { SimConfig } from './config.ts';
 import { mulberry32 } from './rng.ts';
 
@@ -37,27 +38,11 @@ const DEFS: ReadonlyArray<{ dx: number; y: number; R: number }> = [
   { dx: 30, y: -5.98, R: 36 },
 ];
 
-/**
- * A plain planet: every capability off, every ordinary role on.
- *
- * The baseline the whole field is made of, and the thing every other body type
- * is described as a departure from. Frozen and shared rather than built per
- * body: it holds no per-body value, and a thousand identical objects would be a
- * thousand allocations saying the same thing.
- *
- * Exported so a test can build a planet without restating seven fields it does
- * not care about — and so that when a trait is added, every hand-built planet in
- * the suite gains it rather than failing to compile one file at a time.
- */
-export const PLANET_TRAITS: Readonly<BodyTraits> = Object.freeze({
-  authored: null,
-  shelter: 0,
-  charges: false,
-  claimable: false,
-  routable: true,
-  landmark: false,
-  counted: true,
-});
+/** Draw a radius from a type's range. `min + rnd() * (max - min)`, once. */
+function radiusOf(type: keyof typeof BODY_TYPES, rnd: () => number): number {
+  const [lo, hi] = BODY_TYPES[type].radius;
+  return lo + rnd() * (hi - lo);
+}
 
 /**
  * Build the world's bodies. Deterministic and viewport-independent.
@@ -89,7 +74,7 @@ export function createBodies(cfg: SimConfig): Body[] {
       y: d.y * DESIGN_H,
       R: d.R,
       name: 'P' + (i + 1),
-      traits: PLANET_TRAITS,
+      traits: BODY_TYPES.planet.traits,
     }));
   }
 
@@ -127,10 +112,10 @@ export function createBodies(cfg: SimConfig): Body[] {
       const lean = cfg.bodySpacing * 0.12 * (rnd() * 2 - 1);
       const left = cx - cfg.bodySpread * (0.6 + rnd() * 0.4);
       const right = cx + cfg.bodySpread * (0.6 + rnd() * 0.4);
-      placed.push({ x: left, y: rowY - lean, R: 34 + rnd() * 22 });
+      placed.push({ x: left, y: rowY - lean, R: radiusOf('planet', rnd) });
       x = right;
       y = rowY + lean;
-      R = 34 + rnd() * 22;
+      R = radiusOf('planet', rnd);
       continue;
     }
 
@@ -139,7 +124,7 @@ export function createBodies(cfg: SimConfig): Body[] {
     x = cx + side * (8 + rnd() * (cfg.bodyWeave - 8));
     rowY -= cfg.bodySpacing * (0.9 + rnd() * 0.2);
     y = rowY;
-    R = 34 + rnd() * 22; // 34..56, the authored range
+    R = radiusOf('planet', rnd);
     side = -side;
   }
 
@@ -147,35 +132,9 @@ export function createBodies(cfg: SimConfig): Body[] {
     kind: 'planet' as const,
     ...b,
     name: 'P' + (i + 1),
-    traits: PLANET_TRAITS,
+    traits: BODY_TYPES.planet.traits,
   }));
   return bodies.concat(placeAnomalies(cfg, rnd, placed));
-}
-
-/**
- * What an anomaly can do, built from the keys that describe one.
- *
- * A FUNCTION AND NOT A CONSTANT, unlike `PLANET_TRAITS`: every field here is
- * configured, so there is nothing to freeze at module load. The authored orbit is
- * assembled rather than aliased onto the body, which is what lets the four loose
- * fields on `Anomaly` go away — they were `AuthoredOrbit` all along and were only
- * satisfying it structurally, by coincidence of naming.
- */
-function anomalyTraits(cfg: SimConfig): BodyTraits {
-  return {
-    authored: {
-      orbitR: cfg.anomalyOrbitR,
-      orbitPeriod: cfg.anomalyOrbitPeriod,
-      refuel: cfg.anomalyRefuel,
-      settleDur: cfg.anomalySettleDur,
-    },
-    shelter: cfg.anomalyBubble,
-    charges: true,
-    claimable: true,
-    routable: false,
-    landmark: true,
-    counted: false,
-  };
 }
 
 /**
@@ -222,14 +181,15 @@ function placeAnomalies(
     // seed produces is otherwise a different field, and the flag would quietly
     // change the corridor it was supposed to leave alone.
     const y = cfg.anomalyAtSpawn && i === 0 ? bottomY : bottomY - span * t;
-    const x = side < 0 ? wallL - cfg.anomalyOffset : wallR + cfg.anomalyOffset;
+    const off = BODY_TYPES.anomaly.wallOffset;
+    const x = side < 0 ? wallL - off : wallR + off;
     out.push({
       kind: 'anomaly',
       x,
       y,
-      R: 40 + rnd() * 16,
+      R: radiusOf('anomaly', rnd),
       name: 'A' + (i + 1),
-      traits: anomalyTraits(cfg),
+      traits: BODY_TYPES.anomaly.traits,
     });
     side = -side;
   }

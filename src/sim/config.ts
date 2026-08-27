@@ -297,62 +297,6 @@ export interface SimConfig {
    */
   anomalyCount: number;
   /**
-   * How far BEYOND the side boundary an anomaly's centre sits.
-   *
-   * The point is that it is outside the world. Inside the corridor it would just
-   * be an oddly-coloured planet, and the barrier crossing — which is the whole
-   * feeling — would not happen.
-   */
-  anomalyOffset: number;
-  /**
-   * Radius of the bubble in which the side boundary does not kill.
-   *
-   * Sized against `anomalyOffset` rather than chosen freely, and the relationship
-   * is what matters: at 400 against an offset of 250 the bubble reaches 150px
-   * back INSIDE the corridor, so a ship crosses the barrier already protected and
-   * the transition is never a surprise. Make it smaller than the offset and the
-   * barrier kills you before the exemption starts, which reads as the mechanic
-   * being broken.
-   *
-   * It is also the miss window: at a release speed near 300px/s it buys about
-   * 1.3s of flight past the anomaly before the far edge, which is long enough to
-   * see the mistake arrive and short enough to be clearly over.
-   */
-  anomalyBubble: number;
-  /**
-   * Radius a capture at an anomaly settles to, whatever the dive did.
-   *
-   * An anomaly is a rest stop. Measured, an ordinary capture there settled at
-   * 62-69px with a 1.3-1.5s lap — indistinguishable from a planet, and too quick
-   * to take stock in. 130 is twice a planet's orbit so it reads as somewhere else
-   * the moment you arrive, and it sits inside the 177px the camera can hold
-   * perfectly still for; beyond that the view has to pan to keep the ship, which
-   * is what an over-wide orbit was reported as.
-   */
-  anomalyOrbitR: number;
-  /** Seconds per lap once settled there. Roughly two laps inside a bonus window. */
-  anomalyOrbitPeriod: number;
-  /**
-   * Fuel per second restored while parked at an anomaly.
-   *
-   * A capture suppresses `fuelRegen` outright, so before this there was no way for
-   * the tank to recover without leaving — "catch your breath" was not something
-   * the economy could express. Matched to `fuelRegen` so there is no second number
-   * to tune, and it still costs the resource a streak run is actually short of,
-   * which is time.
-   */
-  anomalyRefuel: number;
-  /**
-   * Seconds a capture at an anomaly takes to settle, against `settleDur` 1.2 for
-   * a planet.
-   *
-   * The arrival is not what an anomaly is for. Reported as a wasted second spent
-   * waiting to stabilise before the thing that was committed to actually arrives.
-   * Short enough to feel immediate, long enough that carrying the ship from its
-   * dive radius out to `anomalyOrbitR` is still a glide rather than a jump.
-   */
-  anomalySettleDur: number;
-  /**
    * How far below the highest point reached a run may fall before it ends.
    * 0 disables it entirely.
    */
@@ -754,7 +698,9 @@ export interface SimConfig {
    * and the ride home is the flattest: median 3.42s from press to parked, of which
    * 2.22 is a dive the player has already earned the right to skip.
    *
-   * Its own key rather than `anomalySettleDur`, because a zip is not an anomaly.
+   * Its own key rather than the anomaly's authored `settleDur`, because a zip is not
+   * an anomaly — and because a zip is a per-run tuning, where the rest stop's glide
+   * is part of what an anomaly IS. See `src/sim/bodies.ts`.
    * The two happen to be equal today and have no reason to stay so.
    *
    * Inert in the prototype config, which has no anomalies and therefore nothing
@@ -792,7 +738,7 @@ export interface SimConfig {
    * ABSOLUTE, not a multiple of the body's minimum orbit, so that height and
    * period are literally identical on every hop — 247px/s and 2.29s a lap at 90.
    * That is the point: a frenzy is a rhythm, and a rhythm needs every beat to be
-   * the same. It is the same idiom `anomalyOrbitR` already uses, which is part of
+   * the same. It is the same idiom the anomaly's authored `orbitR` already uses, which is part of
    * why a rest stop reads as a place rather than as a result.
    *
    * WHY IT EXISTS. A zip used to land on `max(minR, predictedCaptureOrbit())` —
@@ -1008,12 +954,6 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   fieldWidthFrac: 1.2,
   bodyCount: 8,
   anomalyCount: 0,
-  anomalyOffset: 250,
-  anomalyBubble: 400,
-  anomalyOrbitR: 130,
-  anomalyOrbitPeriod: 3,
-  anomalyRefuel: 30,
-  anomalySettleDur: 0.45,
   backtrackLimit: 0,
   clearAtTop: false,
   finishFunnelDepth: 0,

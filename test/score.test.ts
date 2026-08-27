@@ -347,7 +347,7 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
    * window, so the multiplier addition is actually paid on something.
    *
    * The release tick is chosen from the parked orbit's PHASE, not from the clock:
-   * the ship goes round the anomaly once every `anomalyOrbitPeriod`, so which way
+   * the ship goes round the anomaly once every authored `orbitPeriod`, so which way
    * it is thrown depends entirely on when it is let go, and only part of that
    * circle is aimed back at the corridor. Letting go at the wrong point sends it
    * out through the far side of the bubble, where the barrier resumes and the run

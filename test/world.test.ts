@@ -8,8 +8,9 @@
  * single-seed versions of these assertions could not tell the difference.
  */
 import { describe, expect, it } from 'vitest';
-import { createBodies, fieldBounds, sheltered, DESIGN_W, PLANET_TRAITS } from '../src/sim/world.ts';
+import { createBodies, fieldBounds, sheltered, DESIGN_W } from '../src/sim/world.ts';
 import { DEFAULT_CONFIG, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
+import { BODY_TYPES } from '../src/sim/bodies.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import type { Body } from '../src/sim/types.ts';
 import { mulberry32 } from '../src/sim/rng.ts';
@@ -116,7 +117,7 @@ describe('world generation', () => {
       y: 0,
       R: 46,
       name: 'P1',
-      traits: PLANET_TRAITS,
+      traits: BODY_TYPES.planet.traits,
     });
     expect(Math.min(...proto.map((b) => b.y))).toBeCloseTo(-5.98 * 844, 6);
   });
@@ -313,7 +314,9 @@ describe('anomalies', () => {
   });
 
   it('projects a bubble that reaches back inside the barrier', () => {
-    // The load-bearing relationship between `anomalyBubble` and `anomalyOffset`.
+    // The load-bearing relationship between the anomaly type's `shelter` and its
+    // `wallOffset` — which is why both live in `BODY_TYPES` rather than being split
+    // across a table and a config with nowhere to state the pairing.
     // If the bubble does not overlap the wall, the wall kills the ship before the
     // exemption starts and the mechanic simply does not work. Asserted as a real
     // margin rather than as mere contact, so a ship crosses already protected.

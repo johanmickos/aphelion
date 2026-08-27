@@ -7,6 +7,10 @@
  * and that the bonus lands on top of the streak ceiling rather than inside it.
  */
 import { describe, expect, it } from 'vitest';
+import { BODY_TYPES } from '../src/sim/bodies.ts';
+
+/** The anomaly's authored orbit, which used to be four `SimConfig` keys. */
+const ANOMALY = BODY_TYPES.anomaly.traits.authored!;
 import { DEFAULT_CONFIG, FIXED_DT, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import { DEFAULT_SCORE_CONFIG } from '../src/score/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
@@ -222,9 +226,9 @@ describe('an anomaly authors its own orbit', () => {
     for (const press of [88, 92, 96, 100]) {
       const r = park(DEFAULT_CONFIG, press);
       expect(r.radii.length, `press ${press} never settled`).toBeGreaterThan(30);
-      expect(Math.min(...r.radii)).toBeCloseTo(DEFAULT_CONFIG.anomalyOrbitR, 0);
-      expect(Math.max(...r.radii)).toBeCloseTo(DEFAULT_CONFIG.anomalyOrbitR, 0);
-      expect(r.lap).toBeCloseTo(DEFAULT_CONFIG.anomalyOrbitPeriod, 2);
+      expect(Math.min(...r.radii)).toBeCloseTo(ANOMALY.orbitR, 0);
+      expect(Math.max(...r.radii)).toBeCloseTo(ANOMALY.orbitR, 0);
+      expect(r.lap).toBeCloseTo(ANOMALY.orbitPeriod, 2);
     }
   });
 
@@ -297,7 +301,7 @@ describe('an anomaly authors its own orbit', () => {
     // authored settle was 0.45 — the rest was 1.9-2.1s of braking and up to 2.0s
     // of falling to a periapsis. The press is the arrival now, so what is left is
     // the authored clock and nothing else, whatever the arrival was.
-    const ticks = Math.round(DEFAULT_CONFIG.anomalySettleDur / FIXED_DT);
+    const ticks = Math.round(ANOMALY.settleDur / FIXED_DT);
     for (const [dx, dy, vx, vy] of ARRIVALS) {
       const r = arrive(DEFAULT_CONFIG, dx, dy, vx, vy);
       expect(r.parked - r.press, `arrival (${dx},${dy}) v(${vx},${vy})`).toBe(ticks);
@@ -339,7 +343,7 @@ describe('an anomaly authors its own orbit', () => {
     for (const [dx, dy, vx, vy] of ARRIVALS) {
       const r = arrive(DEFAULT_CONFIG, dx, dy, vx, vy);
       const started = hypot(dx, dy);
-      const floor = Math.min(started, DEFAULT_CONFIG.anomalyOrbitR);
+      const floor = Math.min(started, ANOMALY.orbitR);
       expect(r.minR, `arrival (${dx},${dy}) v(${vx},${vy})`).toBeGreaterThanOrEqual(floor - 1);
     }
   });
@@ -388,7 +392,7 @@ describe('an anomaly authors its own orbit', () => {
     // was reported as. Asserted here because the number lives in the sim config
     // and the constraint lives in the renderer, so nothing else connects them.
     const halfWindow = DESIGN_W / 2 - DEFAULT_RENDER_CONFIG.cameraBackstopEdge;
-    expect(DEFAULT_CONFIG.anomalyOrbitR).toBeLessThan(halfWindow);
+    expect(ANOMALY.orbitR).toBeLessThan(halfWindow);
   });
 
   it('pays full boost however late the press was', () => {
@@ -431,7 +435,7 @@ describe('an anomaly authors its own orbit', () => {
     // — the screen with just the purple orb is really powerful and I don't want
     // to delay that effect". The settle is the delay between committing and
     // getting the thing you committed for.
-    expect(DEFAULT_CONFIG.anomalySettleDur).toBeLessThan(DEFAULT_CONFIG.settleDur / 2);
+    expect(ANOMALY.settleDur).toBeLessThan(DEFAULT_CONFIG.settleDur / 2);
     const state = createInitialState(DEFAULT_CONFIG);
     const a = rightAnomaly(DEFAULT_CONFIG);
     Object.assign(state.ship, { x: a.x - 520, y: a.y - 70, vx: 320, vy: 0 });
@@ -452,7 +456,7 @@ describe('an anomaly authors its own orbit', () => {
     }
     expect(frozeAt).toBeGreaterThan(-1);
     expect(orbitAt).toBeGreaterThan(-1);
-    expect((orbitAt - frozeAt) / 60).toBeCloseTo(DEFAULT_CONFIG.anomalySettleDur, 1);
+    expect((orbitAt - frozeAt) / 60).toBeCloseTo(ANOMALY.settleDur, 1);
   });
 
   it('expands to the authored orbit without a snap', () => {

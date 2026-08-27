@@ -100,7 +100,7 @@ export interface RenderConfig {
    * How far the view leans toward an anomaly while inside its bubble, 0..1, as a
    * weight on the same subject blend a settled orbit uses.
    *
-   * WHY. An anomaly sits `anomalyOffset` past the wall and the view may not reach
+   * WHY. An anomaly sits `BODY_TYPES.anomaly.wallOffset` past the wall and the view may not reach
    * it until the bubble opens the barrier, so on a fast approach it arrives on
    * screen almost at the same moment as the ship. Measured on the session that
    * reported it: the anomaly's disc first appeared 0.15s AFTER the press and 0.23s

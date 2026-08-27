@@ -15,6 +15,7 @@ import type { AwardRecord } from '../src/app/recorder.ts';
 import { KINK_THRESHOLD_DEG, createInitialState, shipWorldPos, stepSim } from '../src/sim/step.ts';
 import { fingerprintHex } from '../src/sim/serialize.ts';
 import { fieldBounds } from '../src/sim/world.ts';
+import { BODY_TYPES } from '../src/sim/bodies.ts';
 import { courseOf } from '../src/sim/course.ts';
 import type { GrabResult, Input, SimState } from '../src/sim/types.ts';
 import { createScoreState, praiseFor, scoreTick } from '../src/score/index.ts';
@@ -44,6 +45,36 @@ const DEV_KEYS = new Set<string>(['anomalyAtSpawn']);
  * same run, and a cadence figure from one says nothing about the other.
  */
 export const COURSE_KEYS = new Set<string>(['bodyCount', 'anomalyCount']);
+
+/**
+ * Keys that USED to be config and are now data, mapped to what the data says now.
+ *
+ * A sixth meaning, and it needed one for the same reason the fifth did. Every
+ * report ever filed stores a FULL config, so the six keys that described an
+ * anomaly are in all sixty-seven of them. Deleting the keys without this would
+ * have made every historical report announce six differences and cry "DIFFERENT
+ * BUILD" — the crying-wolf failure this split exists to end, arriving for the
+ * third time.
+ *
+ * IT IS NOT A BLANKET PARDON. The value is here so it can be COMPARED: a report
+ * that ran the same number the table now holds changed nothing and is reported as
+ * retired, while one that ran a different number really would replay differently,
+ * because the table is not config and the replay cannot honour what the session
+ * flew. That case is genuine skew and still says so.
+ */
+const RETIRED_KEYS = new Map<string, number>([
+  ['anomalyOffset', BODY_TYPES.anomaly.wallOffset],
+  ['anomalyBubble', BODY_TYPES.anomaly.traits.shelter],
+  ['anomalyOrbitR', BODY_TYPES.anomaly.traits.authored!.orbitR],
+  ['anomalyOrbitPeriod', BODY_TYPES.anomaly.traits.authored!.orbitPeriod],
+  ['anomalyRefuel', BODY_TYPES.anomaly.traits.authored!.refuel],
+  ['anomalySettleDur', BODY_TYPES.anomaly.traits.authored!.settleDur],
+]);
+
+/** A difference in a retired key that the body-type table still agrees with. */
+function isRetired(key: string, theirs: number | boolean): boolean {
+  return RETIRED_KEYS.get(key) === theirs;
+}
 
 export interface Frame {
   tick: number;
@@ -542,7 +573,8 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   // different build; a COURSE is a different length of world, chosen on purpose;
   // a DEV key is what the dev server always sets, and since dev sessions are
   // where reports come from, treating it as skew would fire the banner on every
-  // single one. Everything else is skew — the session ran code that is no longer
+  // single one; a RETIRED key stopped being config and became body-type data, and
+  // the report still holds the value the table holds. Everything else is skew — the session ran code that is no longer
   // what this checkout does — and that is what the banner is for. Lumping them
   // together made the banner fire on ordinary play and then blame the knob for a
   // divergence it had nothing to do with.
@@ -550,12 +582,14 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   const field = delta.find((d) => d.key === 'worldSeed');
   const dev = delta.filter((d) => DEV_KEYS.has(d.key));
   const course = delta.filter((d) => COURSE_KEYS.has(d.key));
+  const retired = delta.filter((d) => isRetired(d.key, d.theirs));
   const skew = delta.filter(
     (d) =>
       !TUNED_KEYS.has(d.key) &&
       d.key !== 'worldSeed' &&
       !DEV_KEYS.has(d.key) &&
-      !COURSE_KEYS.has(d.key),
+      !COURSE_KEYS.has(d.key) &&
+      !isRetired(d.key, d.theirs),
   );
   out.push(
     `  config     ${skew.length ? `${skew.length} value(s) differ from current defaults` : 'matches current defaults'}` +
@@ -577,6 +611,11 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
   }
   for (const d of dev) {
     out.push(`  dev        ${d.key}: ${d.theirs} — dev-server default, not build skew`);
+  }
+  if (retired.length) {
+    out.push(
+      `  retired    ${retired.length} key(s) became body-type data and still hold the recorded value`,
+    );
   }
   const skewed = report.simVersion !== SIM_VERSION || skew.length > 0;
   if (skewed) {

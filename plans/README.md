@@ -27,13 +27,13 @@ When `plans/` is empty, the refactor is finished and the directory goes too.
 | #   | Plan                                                | Severity | Blocks                  | State                    |
 | --- | --------------------------------------------------- | -------- | ----------------------- | ------------------------ |
 | F01 | Body traits                                         | BLOCKS   | Dir 04 body types       | **done** — PORT_NOTES 65 |
-| F02 | [Body type table](F02-body-type-table.md)           | BLOCKS   | Dir 04, VISION field    | ready                    |
+| F02 | Body type table                                     | BLOCKS   | Dir 04, VISION field    | **done** — PORT_NOTES 66 |
 | F03 | [Theme as a value](F03-theme-value.md)              | BLOCKS   | Dir 01, regions         | ready                    |
 | F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | needs a call             |
 | F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | needs F04                |
 | F06 | [Effects stack](F06-effects-stack.md)               | COSTS    | powerups                | deferred                 |
 | F07 | [Draw layer list](F07-layer-list.md)                | COSTS    | Dir 02, 05              | needs F03                |
-| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | needs F02                |
+| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | ready                    |
 | F09 | [Award vocabulary](F09-award-vocabulary.md)         | COSTS    | Dir 06                  | needs a call             |
 | F10 | [HUD grid](F10-hud-grid.md)                         | COSTS    | Dir 03                  | needs F03                |
 | F11 | [Screen machine](F11-screen-machine.md)             | COSTS    | Dir 09, 10, 11          | deferred                 |
@@ -48,13 +48,15 @@ file; the note lives at the field it explains.
 
 Dependencies, not severity. Steps 1 and 2 are independent and can run together.
 
-1. ~~**F01**~~ → **F02** — traits landed 2026-08-27, gate held at every step; the
-   type table is unblocked.
+1. ~~**F01**~~ → ~~**F02**~~ — both landed 2026-08-27, gate held throughout. What is
+   left of F02 is shipping the first NEW body type, which is content rather than
+   refactor and wants the author's call: what a ringed body does, how many a field
+   holds, and where.
 2. **F03** — mechanical, large, and never touches the gate.
 3. **F07** → **F10** — both want F03 done first.
 4. **F04** + **F05** — together; splitting the score without the pricing gives two
    numbers that mean the same thing.
-5. **F08** — needs the type table.
+5. **F08** — unblocked; the type table landed.
 6. **F06**, **F11**, **F12** — when there is a first powerup, a second screen, and
    a first sound respectively. Cheap once, expensive repeatedly, and not urgent
    while the count is one.
