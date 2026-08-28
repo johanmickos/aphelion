@@ -230,9 +230,21 @@ export function drawFuelGauge(
   sim: SimConfig,
   snap: RenderSnapshot,
   timeMs: number,
+  /**
+   * What to DRAW, when that differs from what the tank holds.
+   *
+   * The gauge eases upward so an awarded lump fills rather than jumps — see
+   * `RenderConfig.fuelGaugeFillSecs`, which also says why it never eases down.
+   * Defaults to the truth, so a caller that has no eased value drawn nothing
+   * different from before.
+   */
+  shown = snap.fuel,
 ): void {
   const s = cam.scale;
-  const frac = Math.max(0, Math.min(1, snap.fuel / sim.fuelMax));
+  // Never above the real tank: the ease only ever lags a RISE, and a readout that
+  // overstated the fuel would be promising a grab the simulation will refuse.
+  const fuel = Math.min(shown, snap.fuel);
+  const frac = Math.max(0, Math.min(1, fuel / sim.fuelMax));
   const gx = cam.offsetX + GAUGE.x * s;
   const gh = GAUGE.h * s;
   const gw = GAUGE.w * s;
@@ -278,7 +290,7 @@ export function drawFuelGauge(
   ctx.font = `${9 * s}px ui-monospace, monospace`;
   ctx.fillText('FUEL', gx + gw / 2, gy - 7 * s);
   ctx.fillStyle = low ? solid(HAZARD_FUEL) : withAlpha(INK, 0.75);
-  ctx.fillText(String(Math.round(snap.fuel)), gx + gw / 2, gbot + 14 * s);
+  ctx.fillText(String(Math.round(fuel)), gx + gw / 2, gbot + 14 * s);
   if (low) {
     ctx.fillStyle = withAlpha(HAZARD, flash);
     ctx.font = `600 ${8 * s}px ui-monospace, monospace`;

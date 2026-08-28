@@ -24,6 +24,7 @@ const SUMMIT_RGBA = rgbaOf(DEFAULT_THEME.solar);
 import { recordingContext } from './canvas-stub.ts';
 import type { RecordingContext } from './canvas-stub.ts';
 import type { OffscreenTarget } from '../src/render/nebula.ts';
+import type { RenderConfig } from '../src/render/config.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import {
   centerCamera,
@@ -3841,6 +3842,118 @@ describe('a body says what it is doing for you', () => {
     const spent = styles(at(101, null));
     const newRun = styles(at(0, null));
     expect(spent, "a new run inherited the last one's spent marks").not.toBe(newRun);
+  });
+});
+
+describe('the fuel gauge fills over frames', () => {
+  const sim = DEFAULT_CONFIG;
+
+  /**
+   * Drive one Scene across a fuel trace and report what the gauge printed each
+   * frame. Cross-frame on purpose — the ease lives in `Scene`, so a single-frame
+   * test cannot see it at all.
+   */
+  function trace(fuels: number[], over: Partial<RenderConfig> = {}): number[] {
+    const render = { ...DEFAULT_RENDER_CONFIG, ...over };
+    const state = createInitialState(sim);
+    const field = fieldBounds(sim, state.bodies);
+    const scene = new Scene({ sim, render, bodies: state.bodies, field }, 3);
+    const base = captureSnapshot(state, false, sim);
+    const out: number[] = [];
+    for (const fuel of fuels) {
+      const r = recordingContext();
+      scene.draw(
+        r.ctx,
+        cam(),
+        { ...base, fuel },
+        {
+          timeMs: 0,
+          paused: false,
+          viewportW: 390,
+          viewportH: 844,
+          headerBottom: 0,
+          frameDt: 1 / 60,
+          score: createScoreState(),
+        },
+      );
+      const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+      out.push(texts.map(Number).filter(Number.isFinite)[0]!);
+    }
+    return out;
+  }
+
+  it('opens on the real tank rather than winding up from empty', () => {
+    // The first frame of a life, and of every respawn the Scene outlives.
+    expect(trace([50])[0]).toBe(50);
+  });
+
+  it('fills a lump over several frames instead of teleporting', () => {
+    // The reported defect: "the payout seems HUGE". The aggregate is measured and
+    // small; what read as huge was a bar that moved in one frame.
+    // Enough frames to LAND, which is part of the claim: an exponential ease has
+    // an asymptote and a gauge that stopped a fraction short would print a number
+    // one below the tank forever.
+    const t = trace([50, ...Array<number>(60).fill(80)]);
+    expect(t[1]!).toBeGreaterThan(50);
+    expect(t[1]!, 'arrived in a single frame').toBeLessThan(80);
+    expect(t.at(-1)).toBe(80);
+    // Monotone on the way up, so it reads as a fill and never as a stutter.
+    for (let i = 2; i < t.length; i++) expect(t[i]!).toBeGreaterThanOrEqual(t[i - 1]!);
+  });
+
+  it('snaps a fall, because a gauge must never lag bad news', () => {
+    // The rule the whole ease lives under. Lagging a drop would show a tank the
+    // simulation will refuse the next grab on.
+    expect(trace([80, 20])[1]).toBe(20);
+  });
+
+  it('fills faster when the knob says to, which is the control', () => {
+    // A render key the drawing genuinely reads. Without this the two tests above
+    // would pass against a gauge that ignored `fuelGaugeFillSecs` entirely and
+    // merely happened to lag.
+    const slow = trace([50, 80, 80], { fuelGaugeFillSecs: 2 });
+    const fast = trace([50, 80, 80], { fuelGaugeFillSecs: 0.1 });
+    expect(fast[1]!).toBeGreaterThan(slow[1]!);
+  });
+});
+
+describe('the fuel gauge trails a rise and never a fall', () => {
+  const sim = DEFAULT_CONFIG;
+
+  /** The number under the bar, which is the gauge's own reading of the tank. */
+  function shownBy(r: ReturnType<typeof recordingContext>): number {
+    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    const n = texts.map((t) => Number(t)).filter((v) => Number.isFinite(v));
+    return n[0]!;
+  }
+
+  function drawAt(fuel: number, shown: number): number {
+    const r = recordingContext();
+    const base = captureSnapshot(createInitialState(sim), false, sim);
+    drawFuelGauge(r.ctx, cam(), sim, { ...base, fuel }, 0, shown);
+    return shownBy(r);
+  }
+
+  it('draws the eased value when the tank has risen above it', () => {
+    // The reported defect is a bar that teleports: the tank now takes fuel in
+    // lumps, an arrival award at the freeze and a refund at the release.
+    expect(drawAt(60, 42)).toBe(42);
+  });
+
+  it('never draws MORE than the tank holds, whatever it is handed', () => {
+    // The rule the ease exists under. A readout above the real tank would promise
+    // a grab the simulation refuses at `fuel <= 0.5`, so the clamp is inside the
+    // gauge rather than trusted to every caller.
+    expect(drawAt(30, 90)).toBe(30);
+    expect(drawAt(0, 50)).toBe(0);
+  });
+
+  it('defaults to the truth, so a caller with no eased value changes nothing', () => {
+    expect(drawAt(37, 37)).toBe(37);
+    const r = recordingContext();
+    const base = captureSnapshot(createInitialState(sim), false, sim);
+    drawFuelGauge(r.ctx, cam(), sim, { ...base, fuel: 37 }, 0);
+    expect(shownBy(r)).toBe(37);
   });
 });
 

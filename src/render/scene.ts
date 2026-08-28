@@ -333,6 +333,19 @@ export class Scene {
   private outroT = -1;
 
   /**
+   * The fuel the GAUGE is showing, which trails the tank on the way up.
+   *
+   * Render bookkeeping of exactly the kind `burn` above is: the fuel is in the
+   * tank the moment it is awarded, nothing here can reach the simulation, and a
+   * replay reproduces the tank rather than the needle. `RenderConfig.fuelGaugeFillSecs`
+   * carries the pacing and the reason a fall is never eased.
+   *
+   * `-1` until the first frame, so the gauge opens at whatever the tank actually
+   * holds instead of winding up from empty on every respawn.
+   */
+  private gaugeFuel = -1;
+
+  /**
    * How well the release is aimed, from the compass, for the glow the ship wears.
    *
    * A local until the draw order became a list. The two layers that need it are
@@ -635,7 +648,30 @@ export class Scene {
     drawEndingNotice(f.ctx, f.cam, f.sim, f.snap, f.score.lastEnding?.alight ?? false);
     // HUD sits inside the clip too: it is laid out in design space, so it must
     // never be drawn over a letterbox bar.
-    drawFuelGauge(f.ctx, f.cam, f.sim, f.snap, f.timeMs);
+    // Ease UP only, and snap down. A rise is paced over `fuelGaugeFillSecs` so an
+    // awarded lump fills the bar instead of teleporting it; a fall is the one
+    // thing the player must never see late.
+    const tank = f.snap.fuel;
+    if (this.gaugeFuel < 0 || tank < this.gaugeFuel) {
+      this.gaugeFuel = tank;
+    } else if (this.gaugeFuel < tank) {
+      const secs = Math.max(1e-6, f.render.fuelGaugeFillSecs);
+      // EXPONENTIAL, AND A FIXED RATE WAS TRIED FIRST AND WAS WRONG. A rate in
+      // fuel-per-second makes the fill's duration proportional to the lump, and
+      // the lump this exists for is small: at a full tank in 0.45s a 7.4 arrival
+      // award landed in TWO FRAMES, which is the teleport it was meant to replace.
+      // Closing a fraction of the gap instead takes about the same time whatever
+      // the size, so an award and a respawn both read as a sweep.
+      //
+      // `3 / secs` puts ~95% of the gap behind it at `secs`, which is what makes
+      // the knob mean something a person can set.
+      const k = 1 - Math.exp((-3 * f.frameDt) / secs);
+      this.gaugeFuel += (tank - this.gaugeFuel) * k;
+      // Land it. An asymptote never arrives, and a gauge that sat a tenth of a
+      // fuel short forever would print a number one below the tank.
+      if (tank - this.gaugeFuel < 0.05) this.gaugeFuel = tank;
+    }
+    drawFuelGauge(f.ctx, f.cam, f.sim, f.snap, f.timeMs, this.gaugeFuel);
   }
 
   /**

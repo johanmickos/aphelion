@@ -145,6 +145,36 @@ export interface RenderConfig {
   /** Width of the danger gradient, measured INWARD from the field edge. */
   hazardZoneWidth: number;
 
+  /**
+   * Seconds the fuel gauge takes to close ~95% of a GAIN. Rises only.
+   *
+   * A time rather than a rate, and the difference decides whether this works at
+   * all: the gap is closed by a fraction each frame, so a lump takes about this
+   * long whatever its size. A fixed fuel-per-second was tried first and made the
+   * duration proportional to the lump — at a full tank in 0.45s the 7.4 an arrival
+   * award actually pays landed in two frames, which is the teleport being fixed.
+   *
+   * The tank now takes fuel in lumps — an arrival award at the periapsis freeze
+   * and a refund at the release — and reported from play as "the payout seems
+   * HUGE". The aggregate is not: it is a measured 5.6 fuel at the median arrival,
+   * and it is what takes a session that hit empty back to a minimum of 40. What
+   * reads as huge is a bar that jumps in one frame, so the bar is what changed.
+   *
+   * IT ONLY EVER EASES UPWARD, AND THAT IS THE RULE RATHER THAN THE SETTING. A
+   * gauge may lag good news; it must never lag bad news. Easing a fall would show
+   * a tank fuller than the one the simulation will refuse the next grab on, which
+   * is the one thing this readout exists to prevent — so a drop snaps and only a
+   * rise is paced. The displayed value is therefore never above the real one, and
+   * `LOW` stays lit a fraction longer rather than a fraction less.
+   *
+   * RENDER-ONLY, and it has to be: the fuel is already in the tank the instant it
+   * is awarded, and the simulation must stay a pure function of
+   * `(config, seed, inputLog)`. Making the fuel itself trickle would put a window
+   * in the game where a grab is refused for a tank that has already been paid,
+   * which is a mechanic nobody asked for. See `Scene.gaugeFuel`.
+   */
+  fuelGaugeFillSecs: number;
+
   // --- the body lamp ---
   //
   // Direction 04's feel settings, and they are HERE rather than as consts in
@@ -461,6 +491,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   trailHeadGap: 12,
 
   hazardZoneWidth: 60,
+  fuelGaugeFillSecs: 0.35,
 
   bodyTideLagRest: 4,
   bodyTideLagFull: 14,
