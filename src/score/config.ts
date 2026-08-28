@@ -145,16 +145,30 @@ export interface ScoreConfig {
   /**
    * Shaping exponents on the two release qualities, before they are graded.
    *
-   * The underlying measures are generous ramps — alignment is linear over a full
-   * 90 degrees, the boost envelope over ~1.8 seconds — which is right for a gauge
-   * you read at a glance and far too soft for a grade. Raising them pushes the
-   * rungs toward the tip, so "close enough" reads on the compass and only precise
-   * clears a rung.
+   * THEY DO NOT SET HOW STRICT THE LADDER IS, AND AN EARLIER VERSION OF THIS NOTE
+   * SAID THEY DID — "raising them pushes the rungs toward the tip, so only precise
+   * clears a rung". That is algebraically false, because the thresholds below are
+   * derived from the SAME exponents. A rung asks
    *
-   * THE THREE THRESHOLDS BELOW ARE DERIVED FROM THESE. Each is
-   * `zone^aimSharpness * zone^timingSharpness` for Direction 06's zone fractions,
-   * so moving a sharpness here silently moves what "inner 30%" means. If either
-   * changes, re-derive all three rather than leaving them where they are.
+   *   aim^sa * timing^st  >=  zone^(sa + st)
+   *
+   * and dividing through by `sa + st` turns it into: the WEIGHTED GEOMETRIC MEAN
+   * of the two axes, with weights `sa : st`, is at least `zone`. Scaling both is
+   * an exact no-op. Swept over the 47 recorded releases from (1,1) to (10,8) the
+   * rung mix moves by one swing, which is rounding in the report's two decimals.
+   * For a flyby, which passes one quality as both axes, the exponents cancel
+   * completely and the sweep does not move a single pass.
+   *
+   * WHAT IS LIVE IS THE RATIO, and it decides one thing: how far a strong aim can
+   * carry a weak boost, and the reverse. Swept 1:5 to 9:1 over the same releases,
+   * PERFECT moves 17 -> 12 and the unrewarded tail 12 -> 9. At 3:2 aim carries
+   * three fifths of the weight, which is the claim being made about which half of
+   * VISION pillar 2's fight matters more.
+   *
+   * SO THE STRICTNESS IS THE ZONE FRACTIONS ALONE. The thresholds below still
+   * have to be re-derived if a sharpness moves — `zone^(sa+st)` changes value —
+   * but re-deriving them is book-keeping that puts the ladder back exactly where
+   * it was, not a way to tighten it.
    */
   aimSharpness: number;
   timingSharpness: number;
@@ -213,10 +227,29 @@ export interface ScoreConfig {
    * using one. Reported from play as: fly past at speed, tap beside each planet,
    * collect 1000+ a time.
    *
-   * Sixty degrees is p73 of the 249 paid flybys in `diagnostics/`, whose swept
-   * turn runs p10 9.6, p25 17.8, p50 34.3, p75 63.5, p90 90.4 — so the median
-   * real pass reaches about 57% of the span, which is between the TRUE and SHARP
-   * rungs, and a strong one clears the top.
+   * 81 degrees, and the number it replaced is a worked example of the trap this
+   * key's last paragraph warns about. Sixty was p73 of the 249 paid flybys in
+   * `diagnostics/`, whose swept turn runs p10 9.6, p25 17.8, p50 34.3 — but those
+   * passes are RECONSTRUCTIONS off replays that predate the award. Measured
+   * instead over the 42 passes RECORDED by a phone under it, the distribution is
+   * p10 22, p25 35, p50 62, p90 123, max 156: sixty degrees had ended up BELOW
+   * the median real pass, so 21 of the 42 clamped `turnFrac` to 1 and took the
+   * top rung automatically. A 64-degree pass and a 156-degree pass graded
+   * identically, and half of every pass in the game was a PERFECT.
+   *
+   * 81 IS WHERE THE TWO MANOEUVRES GRADE ALIKE, which is the only reading of "one
+   * ladder" that survives the two distributions being different shapes. Sweeping
+   * the span and comparing the rung mix against the 47 recorded releases:
+   *
+   *   releases                   19% none  23% TRUE  38% SHARP  19% PERFECT
+   *   passes at span 60          12%       24%       12%        52%
+   *   passes at span 81          21%       26%       26%        26%
+   *   passes at span 120         43%       33%       12%        12%
+   *
+   * The error surface is flat from 81 to 91 on n=42, so this is a range and not a
+   * point; 81 is its minimum rather than a number chosen for looking like one.
+   * The rungs land at 32 / 57 / 75 degrees, which is p21 / p48 / p74 of recorded
+   * passes.
    *
    * A SPAN AND NOT A FLOOR, which is the half a gate cannot do. The passes that
    * pay wrongly are not the near-zero ones but the mid band riding a ladder built
@@ -284,11 +317,45 @@ export interface ScoreConfig {
   bandTwoAt: number;
   bandThreeAt: number;
   /**
-   * What each band step adds to the multiplier. 1 gives the board's x1/x2/x3.
+   * What each band step adds to the multiplier. 2 gives x1 / x3 / x5.
    *
    * A step rather than three separate multipliers, because unlike the tier the
    * board's band ratios ARE uniform, and three keys where one will do is three
-   * things to keep in step at stage (c).
+   * things to keep in step.
+   *
+   * THE BAND IS A JACKPOT, NOT A DIAL, AND THAT IS THE AUTHOR'S CALL. Direction
+   * 08 wants the fire to be a temptation aimed at every swing; the measurement
+   * says it cannot be one. Across the 28 faithful reports the ship is inside the
+   * red band for 6% of its captured time and drags it 2.1 times a session, and
+   * the one session flown under the constitution recorded heat on 1 of 63 swings.
+   * The ruling: leave it rare, and price it high enough that going for it is a
+   * strategy rather than an accident.
+   *
+   * 2 IS WHERE THE BET TURNS OVER. A drag risks the whole carry, because a death
+   * zeroes it — so the swing is `p(survive) x band` against `1` for not going,
+   * and the band has to beat `1 / p(survive)` to be worth flying. Measured over
+   * the 60 drags in the faithful corpus, by the rung each one reached:
+   *
+   *   x1  bank < 85        n=20   survive 75%   break-even x1.33
+   *   x3  85 <= bank < 333  n=35   survive 23%   break-even x4.38
+   *   x5  bank >= 333       n= 5   survive 40%   break-even x2.50
+   *
+   * So x1/x3/x5 prices the half-committed drag BELOW its cost and the committed
+   * one at 2x it. That is the shape the call asks for: the graze the player did
+   * not mean to take still pays nothing worth having, and the ride they chose is
+   * lucrative. Survival against depth is a U — 92% at the shallowest bucket, 17%
+   * through the middle, 42% at the deepest — which is what makes the top rung
+   * both the jackpot and the one you have to commit to.
+   *
+   * TWO THINGS TO RE-MEASURE BEFORE TRUSTING THIS. The 60 drags are ACCIDENTS:
+   * ships in trouble, not players farming the rung, so 23-40% is a floor on the
+   * survival a deliberate skim would see and the break-evens are ceilings. And
+   * n=5 on the top rung is not a distribution. Re-measure once the jackpot has
+   * been flown for.
+   *
+   * It costs ordinary play nothing, which is the point of a jackpot: applied to
+   * the one session flown under the constitution it moves 1 swing of 63 and the
+   * session total by 117 points in 100,045.
    */
   bandStep: number;
 
@@ -435,13 +502,13 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   tierTrue: 1.25,
   tierSharp: 1.5,
   tierPerfect: 2,
-  flybyTurnSpan: 60,
+  flybyTurnSpan: 81,
 
   burnEdgeSpan: 60,
   burnRate: 555,
   bandTwoAt: 85,
   bandThreeAt: 333,
-  bandStep: 1,
+  bandStep: 2,
 
   streakStep: 0.4,
   streakMax: 5,

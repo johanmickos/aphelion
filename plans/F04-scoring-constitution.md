@@ -1,9 +1,13 @@
 # F04 · Scoring constitution
 
-**Severity** BLOCKS · **Blocks** Direction 06, Direction 08, F05 · **State** stages
-(a) and (b) LANDED 2026-08-27 — PORT_NOTES 73, 74. **Only (c) is left, and it is
-blocked on flying.** F05 is unblocked: it wanted the formula to exist, not to be
-calibrated.
+**Severity** BLOCKS · **Blocks** Direction 06, Direction 08, F05 · **State** (a) and
+(b) LANDED 2026-08-27 — PORT_NOTES 73, 74. **(c) is part done and the rest is
+blocked on flying** — PORT_NOTES 76. F05 is unblocked: it wanted the formula to
+exist, not to be calibrated.
+
+> **PORT_NOTES 76 CORRECTS THREE READINGS THIS FILE USED TO CARRY**, all of them
+> artefacts of the instrument rather than of the game. Read it before trusting a
+> number here.
 
 > **DO NOT RE-DERIVE ANY OF THIS.** The formula, the deletions and the two pixels
 > are in the code with their reasoning at each site. What is below is kept only
@@ -204,69 +208,71 @@ retune and the ending — VISION's standing hazard is staleness, not error: "a
 threshold measured under tuning that has since moved is worse than an unmeasured
 one, because it looks defensible."
 
-#### The first session flown under it — 2026-08-28, 128s, 67 swings
+#### What stage (c) has done, 2026-08-28
 
-One session, stated with its sample size because the interesting end of every
-distribution here is rare by construction. It predates the recorder carrying
-`tier`/`band`/`carry`, so the split is reconstructed: PORT_NOTES 75 has the method
-and `scratch/f04c-recover.ts` does it. **Re-measure on the next session, which
-carries the fields directly.**
+**Read PORT_NOTES 76 first.** Three of the readings this section used to carry
+were artefacts of how they were measured, and the corrections are there with the
+method. The short version: PERFECT fires 27% of swings rather than never, the fire
+band is not held back by its reset rule, and the sharpness keys cannot tighten the
+tier ladder at all.
+
+Landed:
+
+- **`bandStep` 1 -> 2**, so the band is x1 / x3 / x5. The author's call is that
+  the fire stays a rare jackpot and is priced so that skimming the wall is a
+  lucrative strategy; 2 is where the bet turns over against the measured survival
+  of a drag. Reasoning and both caveats at the declaration.
+- **`flybyTurnSpan` 60 -> 81**, re-measured off the 42 passes recorded under the
+  award rather than the 249 reconstructed before it. 60 had ended up below the
+  median real pass, so half of every pass in the game took the top rung
+  automatically.
+- **`SimConfig.boostPeakAt` 0.75**, narrowing the boost envelope's flat top from
+  the left so the tier's timing axis grades over it. `SIM_VERSION` 30, golden
+  recaptured, gate unmoved.
+- **`ScoreAward.boostT` recorded**, because the plateau's width was a threshold
+  with no measurement available: `timing` saturates across the flat top, so 118
+  of 652 recorded links cannot be placed inside it.
+- **`climbPerPx` stays 0.25.** The author's call is that the best single life
+  stays the score, and at 0.25 a good session's displayed best is 77k against a
+  stated 100k ceiling.
+
+#### What stage (c) still wants, and it is a phone
+
+**Everything below needs a session flown on the current build**, and the two
+values landed this session are the reason it is worth flying rather than reasoning
+about:
+
+- **`boostPeakAt` is a fit, not a percentile**, and `boostT` now makes the real
+  measurement available. This is the one to do first: it is the only threshold in
+  the game that was calibrated by extrapolating a density.
+- **Whether the jackpot is lucrative enough.** The survival rates behind
+  `bandStep` are from drags that were ACCIDENTS, so they are floors. A session
+  flown going FOR the top rung is what prices it.
+- **`flybyTurnSpan` on more than 42 passes**, whose error surface is flat from 81
+  to 91.
+- **`tightMax` and `chainStep`.** 2 and 0.1, both legible rather than measured.
+  The pair currently multiplies the carry by a median 2.7x over `climbPerPx`.
+- **Whether a rescue at ~7x is too generous**, which needs a rescue flown under
+  the new economy — neither session so far had one.
+- **The tier's zone fractions.** Direction 06's 0.40 / 0.70 / 0.92 are design
+  intent and a measurement cannot refute them; where they LAND is still 84 / 60 /
+  27% of swings against an intent of 60 / 30 / +-8%. Fixing the two saturating
+  inputs was the agreed first move and it is done; whether anything is left to fix
+  is the next session's question, not this one's.
+
+#### The reading from the first session, corrected
+
+One session, 128s, 63 swings, stated with its sample size because the interesting
+end of every distribution here is rare by construction. The tier row is recomputed
+from the recorded `aim` / `timing` / `turn` rather than factorised out of the
+multiplier; the band row is read off recorded `heat`, which pins it exactly.
 
 ```
-tier   x1 10 · TRUE 14 · SHARP 22 · PERFECT 0     (46 of 63 factorise uniquely)
-band   x1 45 · x2 1 · x3 0
+tier   x1 10 · TRUE 14 · SHARP 22 · PERFECT 17
+band   x1 62 · x2 1                (62 swings recorded zero heat)
 carry  p10 52 · p50 187 · p90 481 · max 1462
-carry per px climbed   p10 0.43 · p50 0.67 · p90 1.18   (climbPerPx is 0.25)
-multiplier             p50 x6.25 · p90 x10.00 · max x11.50
+lives  3,981 · 18,573 · 77,491     total 100,045, best life 77,491
 ```
-
-**The band is very nearly inert, and the cause looks structural rather than a
-threshold set too high.** `burnBank` is emptied by every cash, and this session
-cashed a swing every 2.03 seconds — 63 of them, 47 links and 16 flybys — so a
-threshold denominated in heat-seconds has two seconds to fill rather than a
-capture. Lowering `bandTwoAt` is the obvious move
-and probably the wrong one: it would pay a graze at the rate of a drag. The
-question to answer first is whether the band should survive a cash the way the
-chain survives one, and **that is a rule rather than a magnitude**, so it wants
-deciding before (c) tunes anything.
-
-It has a reported feel attached: "I find myself being more careful and conservative
-with my burns." That is the opposite of what Direction 08 asks the fire band for —
-"the fire band gets scarier the richer you are" is a temptation, and VISION pillar
-4 says the whole point of the marker is to be able to aim at it. A multiplier that
-fires once in 46 swings is not a dial.
-
-**SHARP is the modal rung and PERFECT never fired.** 22 of 46 at SHARP, where the
-board's zone says the inner 30% — and a CONJUNCTION of two axes should be rarer
-than either zone alone, not commoner. The rungs are too loose. Re-derive rather
-than nudge: each threshold is `zone^aimSharpness * zone^timingSharpness`, so they
-move with the sharpnesses and all three have to move together.
-
-**The displayed number and the played number are different numbers.** That session
-totalled 100,045 across its lives; the game shows the best SINGLE life. The
-author's reading of it — "I struggle to reach 100k points, which is a good thing, I
-want that to be a tough ceiling" — is calibrated on the total. This is VISION's
-standing open call on aggregation arriving with fresh evidence, and it is upstream
-of the scale question below: decide what a RUN is worth before tuning what a swing
-is worth.
-
-#### The open magnitudes
-
-Every provisional number says so at its declaration in `src/score/config.ts`.
-
-- **Points per metre.** `climbPerPx` is still 0.25 and Direction 08's worked
-  example is 1 pt/m. This is the scale of every number the player sees, and it is
-  downstream of the aggregation call above.
-- **The tier rungs.** The zone FRACTIONS are Direction 06's design intent and a
-  measurement cannot refute them; where the resulting thresholds land is the
-  question, and the first session says too loose.
-- **The band**, once its reset rule is settled. `bandTwoAt` 85 is the median
-  surviving drag and `bandThreeAt` 333 is two thirds of the hottest on record,
-  both from `burnRate`'s own measurement.
-- **`tightMax` and `chainStep`.** 2 and 0.1, both legible rather than measured. The
-  pair currently multiplies the carry by a median 2.7x over `climbPerPx`.
-- **Whether a rescue at ~7x is too generous**, which needs a rescue flown under the
-  new economy — the first session had none.
 
 ## Gates
 

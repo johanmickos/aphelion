@@ -4950,6 +4950,10 @@ multiplier             p50 x6.25 · p90 x10.00 · max x11.50
 6% of swings cashed nothing
 ```
 
+**TWO ROWS OF THAT TABLE ARE WRONG AND NOTE 76 CORRECTS THEM.** The tier row is a
+factorisation artefact — PERFECT fired 17 times, not zero — and the band's stated
+cause is refuted. Read 76 before using anything above.
+
 Two of those are stage (c) findings and are recorded against it rather than
 decided here: SHARP is the modal rung at 48% where the board's zone says 30%, and
 PERFECT did not fire once; and the fire band is very nearly inert. The band has a
@@ -4964,6 +4968,178 @@ block, which is the discipline this report exists to teach.** That block reporte
 once in this note's first draft before being caught. It also reported six deaths
 where the checkpoints show two respawns, and a best life of 12,924 where the
 recorded awards sum to 77,491 in a single life.
+
+---
+
+### 76 — Three of the first session's readings were artefacts, and one of them had already been quoted
+
+Stage (c)'s first tuning pass. What it mostly did was overturn the measurements
+note 75 left it, which is the third time in this file a finding has been reversed
+by looking at the same session through a different instrument — and the lesson is
+the same one every time: prefer the quantity that was RECORDED to the quantity
+that was reconstructed, even when the reconstruction looks clean.
+
+**PERFECT fired 17 times of 63, not zero, and the ×2 band is why.** `f04c-recover.ts`
+recovered the tier by factorising `multiplier` into `tier × band × streak`, and
+`tierPerfect` is 2 while `bandStep` gave a ×2 band — so a PERFECT in band 1 and a
+tierless swing in band 2 factorise identically. The script dropped exactly those
+as ambiguous, all 17 of them, and reported the remaining 46 as the distribution.
+It did not have to guess at all: `aim`, `timing` and `turn` are in the award
+tuple, so the tier can be RECOMPUTED. Recomputed, and with the streak run forward
+from the sequence instead of searched for, 62 of the 63 swings close exactly
+against the recorded multiplier — the 63rd is a rounding case, where `aim` stored
+at two decimals lands just under `tierSharpAt`. The corrected ladder is ×1 10,
+TRUE 14, SHARP 22, PERFECT 17.
+
+**The fire band's "structural cause" was refuted by a field already in the tuple.**
+Note 75 reasoned that `burnBank` is emptied by every cash and the session cashed
+every 2.03s, so a threshold in heat-seconds had two seconds to fill. `heat` in the
+award record is the swing's PEAK, and `burnBank` only accrues on ticks where heat
+is above the floor — so a recorded peak of 0 means the bank was 0 and the band was
+exactly ×1. **62 of 63 swings recorded zero heat.** There was nothing for a reset
+to have thrown away. The checkpoints agree: 2 of 320 samples were
+captured-and-burning, and of the 23 inside the red band's x-range, 21 were
+sheltered inside an anomaly bubble where there is no wall to be saved from.
+
+The real cause is geometry and it is not seed-specific. `bodySpread` 160 against a
+half-field of 370.5 means **no planet's centre is ever closer than 210px to a
+wall**; measured on this world, the nearest minimum-orbit ring clears the 60px
+band by 158px. A captured ship reaches the fire only on a wide tether around an
+outermost body. The corpus says the same thing from the other end: 60 drags across
+28 faithful sessions, 2.1 a session, 6% of captured time.
+
+**So the band was never going to be a dial, and the author's call was to make it a
+jackpot.** Direction 08 wants the fire aimed at on every swing; the exposure says
+it cannot be. The ruling: leave it rare and price it so that going for it is a
+strategy. `bandStep` 1 → 2, which is ×1 / ×3 / ×5, and the number comes from the
+bet rather than from taste. A drag risks the whole carry because a death zeroes
+it, so the swing is `p(survive) × band` against `1`, and the band has to beat
+`1 / p(survive)`. By the rung each of the 60 drags reached:
+
+```
+x1  bank < 85         n=20   survive 75%   break-even x1.33
+x3  85 <= bank < 333  n=35   survive 23%   break-even x4.38
+x5  bank >= 333       n= 5   survive 40%   break-even x2.50
+```
+
+×1/×3/×5 prices the half-committed drag below its cost and the committed one at
+2× it, which is the shape the call asks for: the graze nobody meant to take still
+pays nothing worth having, the ride they chose is lucrative. Survival against
+depth is a U — 92% shallowest, 17% through the middle, 42% deepest — so the top
+rung is both the jackpot and the one that has to be committed to. Two caveats
+belong with it and are at the declaration: the 60 drags are ACCIDENTS rather than
+players farming the rung, so those survival rates are floors and the break-evens
+ceilings; and n=5 on the top rung is not a distribution. It costs ordinary play
+nothing, which is the point — applied to the recorded session it moves one swing
+of 63 and the total by 117 points in 100,045.
+
+**`aimSharpness` and `timingSharpness` cannot tighten the tier ladder, and the
+declaration claimed they could.** Each rung is `zone^(sa+st)` and the quality is
+`aim^sa × timing^st`, so dividing through turns the rung test into: the weighted
+geometric mean of the two axes, weights `sa : st`, is at least `zone`. **Scaling
+both is an exact no-op.** Swept over the 47 recorded releases from (1,1) to
+(10,8), the rung mix moves by one swing, which is rounding in the report's two
+decimals; for a flyby, which passes one quality as both axes, the exponents cancel
+completely and nothing moves at all. What is live is the RATIO — swept 1:5 to 9:1,
+PERFECT moves 17 → 12 — and it decides only how far a strong aim carries a weak
+boost. The strictness is the zone fractions, alone.
+
+**Which left the ladder's looseness to be explained by its inputs, and both of
+them saturate.**
+
+`flybyTurnSpan` 60 had ended up BELOW the median real pass. It was set at p73 of
+249 flybys in `diagnostics/`, but those are reconstructions off replays that
+predate the award, and the key's own note says to calibrate against recorded ones.
+Over the 42 passes a phone actually recorded under it: p10 22, p25 35, **p50 62**,
+p90 123, max 156. So 21 of 42 clamped `turnFrac` to 1 and took the top rung
+automatically; a 64° pass and a 156° pass graded identically, and half of every
+pass in the game was a PERFECT. Re-measured to 81, which is where the pass ladder
+and the release ladder catch the same share of their own populations —
+
+```
+releases                19% none  23% TRUE  38% SHARP  19% PERFECT
+passes at span  60      12%       24%       12%        52%
+passes at span  81      21%       26%       26%        26%
+passes at span 120      43%       33%       12%        12%
+```
+
+— and the error surface is flat from 81 to 91 on n=42, so it is a range whose
+minimum is 81 rather than a number chosen for looking like one. **One ladder is
+not one distribution**, which is the thing that had to be measured to be seen: the
+rungs are shared by construction, but the quantities fed into them are different
+shapes, so the same rung caught half of all passes and a fifth of all releases.
+
+The other input is the boost envelope's **flat top**, and this one is the more
+interesting failure. `boostHoldsThroughSettle` (note 27) holds the peak from
+`boostArmTime` 0.45s to `settleDur` 1.2s, because the window used to close inside
+the manoeuvre it was rewarding. It fixed that and over-corrected into a 0.75s
+plain — 29% of the envelope — across which `timing` cannot grade anything. Over
+the 652 links recorded on the 31 sessions flown with it on, `timing` reads 1.00 on
+18.1% against `aim`'s 2.0%. A conjunction whose halves are nine times apart at the
+ceiling is a grade on the harder half.
+
+**The obvious narrowing re-opens the defect and the pixel rule forbids the
+scoring-side fix.** Cutting the plateau from the RIGHT — ending the hold before
+the settle does — puts the peak back inside the manoeuvre, which is note 27's bug
+verbatim. Re-grading `timing` in the scorer without touching the sim breaks a
+different law: the boost halo draws `cap.boost / cap.boostFull`, the exact
+quantity the tier grades, and a halo showing full while the score says 0.6 is the
+same defect the accolade table was built to end. So the cut is from the LEFT:
+`boostPeakAt`, a fraction of the settle at which the ramp ends, floored by
+`boostArmTime`. Both ends of the plateau now track `settleDur`, which is the rule
+note 27 already gave for the right-hand end and for the same reason — `settleDur`
+is a tune knob and a plateau written in seconds re-tunes itself silently.
+
+**And then the calibration was measured on the wrong population, caught, and
+redone.** The first derivation took `boostT` from the 28 faithful replays and
+graded it through the current envelope — but 20 of those 23 sessions predate
+`boostHoldsThroughSettle` entirely, so it was applying a plateau to players who
+had never had one. It produced a clean-looking median and a value of 0.75. The
+redone version reaches the same number by a weaker route and says so: where inside
+the plateau a saturating release sat **cannot be recovered from any recording**,
+because `timing` saturates across the whole flat top. What the recordings do show
+is the density on the other side, where `timing` inverts — releases peak at boostT
+1.35-1.80s, so the plateau sits on the rising flank, and a linear extrapolation
+back through it from the 54 releases in the 0.15s past its edge predicts ~135
+saturations against the 118 observed. Under that fit a peak at 0.75 of the settle
+leaves 64% still saturating, so 18.1% falls to about 12%.
+
+It cannot be pushed until the two axes match. A release at settle completion
+scores the peak BY CONSTRUCTION however narrow the plateau — that is the whole of
+what note 27 protects — so `timing` has a saturation floor `aim` does not have.
+Narrowing past it stops removing free marks and starts removing earned ones.
+
+**The unmeasurable threshold is the real finding, and it is note 75's defect one
+field later.** Note 75 records three fields added to `ScoreAward` and not to
+`AwardRecord`, which left a report unable to say what a swing was priced at. This
+is the same shape doing more damage: `timing` IS recorded, and it is the wrong
+quantity — the envelope's value rather than the position it was read at — so 118
+of 652 links cannot be placed and the plateau's own width had no measurement
+available at all. `ScoreAward.boostT` is now in the tuple, appended and optional,
+and a missing one decodes as **NaN rather than 0**: 0 is a real value there, a
+release on the tick the orbit froze, and defaulting to it would fill exactly the
+distribution the field exists to measure with phantoms.
+
+**Two of the session's numbers that survived.** The aggregation reading is
+confirmed — three lives of 3,981 / 18,573 / **77,491**, totalling 100,045 — and
+the author's call is that the best single life stays the score. That settles
+`climbPerPx`: at 0.25 a good session's displayed best already lands at 77k against
+a stated 100k ceiling, where Direction 08's worked example of 1 pt/m would put it
+at 310k. **It stays at 0.25**, and the worked example is not evidence about this
+game.
+
+The battery lost its top rung twice over and both were fixture holes rather than
+dead weights, which is now the fourth instance of that failure in this file. Under
+`flybyTurnSpan` 81 the flyby fixture caps at 68.4° whatever the hold, so
+`tierPerfect` measured inert; a `released on the top rung` session at tick 345
+(aim 0.942, peak 1.000, q 0.836) restores it. And the envelope's own pins asserted
+the ramp at exactly `boostArmTime`, which is now a floor — the property worth
+keeping is that a press that short is worth less than it was, never more.
+
+Nothing under `src/score/` changed shape. `src/sim/boost.ts` did, so `SIM_VERSION`
+went to 30 and the golden was recaptured — it gained one key and moved no number,
+which is the check that `boostPeakAt` is inert under `PROTOTYPE_CONFIG`. The
+equality gate read `0.000e+0` across all ten scenarios throughout.
 
 ---
 

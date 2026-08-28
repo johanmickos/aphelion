@@ -152,8 +152,68 @@ export interface SimConfig {
    * footgun stays disarmed. Only the start of the decay moves, and it tracks
    * `settleDur` rather than a second constant — `settleDur` is a tune knob, and a
    * hardcoded plateau would silently re-break the moment it was dragged.
+   *
+   * AND IT OVER-CORRECTED, WHICH IS WHY `boostPeakAt` EXISTS. Holding the peak
+   * from `boostArmTime` all the way to `settleDur` left a 0.75s plain — 29% of
+   * the envelope — over which a release could not be graded at all, and the tier
+   * reads that quantity as one of its two axes: across the 652 links recorded on
+   * sessions flown with this on, `timing` reads full on 18.1% against `aim`'s
+   * 2.0%. So this key still owns where the decay starts, `boostPeakAt` owns where
+   * the ramp ends, and between them the flat top is a window rather than a plain.
+   * Neither end is a constant and both move with the settle.
    */
   boostHoldsThroughSettle: boolean;
+  /**
+   * How far into the settle the boost reaches its peak, as a fraction of
+   * `settleDur`. Only read when `boostHoldsThroughSettle` is on.
+   *
+   * WHY IT IS NOT `boostArmTime`. That key answers a different question — how
+   * long a press has to be held before it has armed anything at all — and it is
+   * the floor here rather than the answer: `max(boostArmTime, boostPeakAt *
+   * settleDur)`, so the footgun stays disarmed however this is set and a settle
+   * dragged shorter than the ramp cannot invert the two.
+   *
+   * WHY IT IS A FRACTION. The same reason the decay's start tracks `settleDur`
+   * instead of a second constant: both ends of the plateau have to move with the
+   * manoeuvre they bracket, and both are tune knobs. A plateau written down in
+   * seconds would silently re-tune itself the first time `settleDur` was dragged,
+   * which is the trap `boostHoldsThroughSettle`'s own note names.
+   *
+   * WHAT IS WRONG AT 1.0. The plateau then spans the whole settle and the timing
+   * axis stops discriminating over 29% of the envelope — which matters because
+   * the tier grades the CONJUNCTION of that axis and aim, and a conjunction whose
+   * halves are not equally hard is really a grade on the harder half. Measured
+   * over the 652 links recorded by a phone across the 31 sessions flown with the
+   * plateau — the awards, so this survives a divergence — `timing` reads 1.00 on
+   * 118 of them (18.1%) against `aim`'s 13 (2.0%). Nine times apart.
+   *
+   * 0.75 IS A FIT AND NOT A PERCENTILE, WHICH IS THE HONEST DESCRIPTION. Where
+   * inside the plateau those 118 releases sat cannot be recovered from any
+   * recording: `timing` saturates across the whole flat top and `boostT` was not
+   * in the tuple. That is fixed going forward — `ScoreAward.boostT` is recorded
+   * now, and it exists because of this key — but it does not help the numbers
+   * that are already on disk.
+   *
+   * What the recordings DO say is the shape of the distribution on the other
+   * side, where `timing` inverts. Release density peaks at boostT 1.35-1.80s, so
+   * the plateau sits on its RISING flank: 54 releases land in the 0.15s just past
+   * the plateau's edge, and a density extrapolated linearly back through the
+   * plateau from there predicts ~135 saturations against the 118 observed. Under
+   * that fit, moving the peak to 0.75 of the settle — boostT 0.90 — leaves 64% of
+   * them still saturating, so 18.1% falls to about 12%.
+   *
+   * IT CANNOT BE PUSHED UNTIL THE TWO AXES MATCH, and the reason is worth knowing
+   * before someone tries. A release at settle completion scores the peak BY
+   * CONSTRUCTION however narrow the plateau — that is the whole of what
+   * `boostHoldsThroughSettle` protects — so there is a floor under `timing`'s
+   * saturation that aim does not have. Narrowing past it stops removing free
+   * marks and starts removing earned ones.
+   *
+   * PROVISIONAL, AND SAYS SO. A fit through one measured density is weaker than a
+   * percentile of the thing itself, and the thing itself is measurable from the
+   * next session. Re-measure it there rather than defending this.
+   */
+  boostPeakAt: number;
   /** Fraction of the boost that permanently carries into drift velocity. */
   boostPermFrac: number;
   /** Transient burst multiplier, for a punchy escape. */
@@ -995,6 +1055,10 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   boostArmTime: 0.45,
   boostDecayTime: 1.4,
   boostHoldsThroughSettle: false,
+  // Inert: nothing reads it while the hold is off, which is what keeps this key
+  // out of the equality gate. It carries the game's value rather than a second
+  // number nobody would maintain.
+  boostPeakAt: 0.75,
   boostPermFrac: 0.22,
   boostPunch: 1.8,
   boostBurstDecay: 1.3,
@@ -1196,6 +1260,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   rowPairChance: 0.4,
   boostMax: 60,
   boostHoldsThroughSettle: true,
+  boostPeakAt: 0.75,
   // Every release lands a punch now, and all of it fades. See the keys' own notes:
   // 54% of releases earned no kick at all, and only 31 of 366 flew badly.
   releaseKick: 54,
@@ -1225,7 +1290,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 29;
+export const SIM_VERSION = 30;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

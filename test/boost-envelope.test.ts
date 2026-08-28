@@ -14,6 +14,13 @@ import type { SimConfig } from '../src/sim/config.ts';
 import { DEFAULT_CONFIG, FIXED_DT, PROTOTYPE_CONFIG } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 
+/** Where the peak arrives: `boostArmTime` as a floor under a fraction of the settle. */
+function peakOf(cfg: SimConfig): number {
+  return cfg.boostHoldsThroughSettle
+    ? Math.max(cfg.boostArmTime, cfg.boostPeakAt * cfg.settleDur)
+    : cfg.boostArmTime;
+}
+
 /** The pre-plateau envelope, kept verbatim as the thing the flag must reproduce. */
 function legacyEnvelope(cfg: SimConfig, boostFull: number, boostT: number): number {
   const f =
@@ -38,12 +45,40 @@ describe('the boost envelope', () => {
   it('holds the peak from the end of the ramp to the end of the settle', () => {
     const cfg = DEFAULT_CONFIG;
     expect(cfg.boostHoldsThroughSettle).toBe(true);
+    // THIS PIN USED TO START THE PLATEAU AT `boostArmTime`, and that was the
+    // over-correction: the flat top spanned the whole settle, so 29% of the
+    // envelope could not grade a release at all and the tier reads that quantity
+    // as one of its two axes. `boostPeakAt` now owns where the ramp ends.
+    const peak = peakOf(cfg);
+    expect(peak).toBeGreaterThan(cfg.boostArmTime);
     // The plateau must be a real span, not a degenerate point — if the settle is
-    // ever tuned below the ramp this asserts nothing and the next test covers it.
-    expect(cfg.settleDur).toBeGreaterThan(cfg.boostArmTime);
-    for (let t = cfg.boostArmTime; t <= cfg.settleDur; t += 0.01) {
+    // ever tuned below the ramp this asserts nothing and a later test covers it.
+    expect(cfg.settleDur).toBeGreaterThan(peak);
+    for (let t = peak; t <= cfg.settleDur; t += 0.01) {
       expect(boostEnvelope(cfg, 60, t)).toBeCloseTo(60, 9);
     }
+  });
+
+  it('still lands the peak exactly on settle completion, which is the whole point', () => {
+    // The defect `boostHoldsThroughSettle` fixed, re-pinned from the other end.
+    // Narrowing the plateau is only safe while it is narrowed from the LEFT: a
+    // release at the moment the orbit goes round has to be worth full marks. Cut
+    // it from the right instead and the peak lands before the manoeuvre finishes,
+    // which is the defect this flag was added for.
+    const cfg = DEFAULT_CONFIG;
+    expect(boostEnvelope(cfg, 60, cfg.settleDur)).toBeCloseTo(60, 9);
+    expect(boostEnvelope(cfg, 60, cfg.settleDur + 0.01)).toBeLessThan(60);
+  });
+
+  it('grades the stretch the plateau used to pay flat', () => {
+    // The reason the key exists. A release halfway through the settle scored a
+    // full `timing` before and has to score strictly less now, or the tier's
+    // second axis is still a plain.
+    const cfg = DEFAULT_CONFIG;
+    const half = cfg.settleDur / 2;
+    expect(half).toBeGreaterThan(cfg.boostArmTime);
+    expect(boostEnvelope(cfg, 60, half)).toBeLessThan(60);
+    expect(boostEnvelope({ ...cfg, boostPeakAt: 0 }, 60, half)).toBeCloseTo(60, 9);
   });
 
   it('reaches zero a full decay after the settle, not after the ramp', () => {
@@ -58,12 +93,19 @@ describe('the boost envelope', () => {
     expect(boostEnvelope(cfg, 60, nowDeadAt + FIXED_DT)).toBe(0);
   });
 
-  it('leaves the arming ramp alone, so a tap-through still earns nothing', () => {
-    // The plateau is not a relaxation of the skill window. Moving the decay must
-    // not also arm the boost faster, or the footgun comes back.
+  it('never arms faster than boostArmTime, so a tap-through still earns nothing', () => {
+    // The plateau is not a relaxation of the skill window. Neither end of it may
+    // arm the boost faster, or the footgun comes back.
+    //
+    // THIS USED TO PIN THE RAMP AT EXACTLY `boostArmTime` and now pins it as a
+    // FLOOR, because `boostPeakAt` made the ramp longer rather than shorter. The
+    // property that mattered is the one kept: a press this short is worth less
+    // than it was, never more.
     const cfg = DEFAULT_CONFIG;
+    const peak = peakOf(cfg);
     for (let t = 0; t < cfg.boostArmTime; t += 0.01) {
-      expect(boostEnvelope(cfg, 60, t)).toBeCloseTo(60 * (t / cfg.boostArmTime), 9);
+      expect(boostEnvelope(cfg, 60, t)).toBeCloseTo(60 * (t / peak), 9);
+      expect(boostEnvelope(cfg, 60, t)).toBeLessThanOrEqual(60 * (t / cfg.boostArmTime) + 1e-9);
     }
     expect(boostEnvelope(cfg, 60, 0)).toBe(0);
   });

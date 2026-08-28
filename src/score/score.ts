@@ -312,6 +312,13 @@ function priceArrival(sc: ScoreState, scfg: ScoreConfig, clearance: number): voi
  * zone^timingSharpness`, so a single quality raised to the same total exponent
  * lands on exactly the same rungs, and there is one ladder rather than two sets
  * of thresholds free to drift apart.
+ *
+ * ONE LADDER IS NOT THE SAME AS ONE DISTRIBUTION, and it took a measurement to
+ * see it. The rungs are the same on both manoeuvres by construction, but the
+ * quantities fed into them are not the same shape, so the same rung can catch
+ * half of all passes and a fifth of all releases — which it did. That is what
+ * `ScoreConfig.flybyTurnSpan` is for, and why it is calibrated against the
+ * releases rather than against the passes alone.
  */
 function tierQuality(scfg: ScoreConfig, aim: number, timing: number): number {
   return Math.pow(aim, scfg.aimSharpness) * Math.pow(timing, scfg.timingSharpness);
@@ -945,6 +952,10 @@ function readPending(
     // boost has no window to hit, so it scores no timing rather than full marks
     // for a division that never happened.
     timing: cap.boostFull > 0 ? clamp01(cap.boost / cap.boostFull) : 0,
+    // Carried beside `timing` rather than instead of it: `timing` is what the
+    // tier grades and what the halo draws, and this is what says where in the
+    // envelope it came from once the envelope has a flat top to hide inside.
+    boostT: cap.boostT,
     aim,
     target,
   };
@@ -1029,6 +1040,7 @@ function awardMote(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
     defl: 0,
     timing: 0,
     aim: 0,
+    boostT: 0,
     climb: 0,
     heat: 0,
     turn: 0,
@@ -1130,6 +1142,7 @@ function awardFlyby(
     // Release qualities. There is no release: the ship never stopped.
     timing: 0,
     aim: 0,
+    boostT: 0,
     climb: cash.climb,
     heat: cash.heat,
   };
@@ -1216,6 +1229,7 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
     skim: Infinity,
     defl: p.defl,
     timing: p.timing,
+    boostT: p.boostT,
     aim: p.aim,
     climb: cash.climb,
     heat: cash.heat,

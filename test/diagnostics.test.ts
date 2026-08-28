@@ -563,6 +563,33 @@ describe('a report that survives its own replay diverging', () => {
     }
   });
 
+  it('carries where in the boost envelope a release landed, not only its value', () => {
+    // THE SAME GAP ONE FIELD LATER, and it cost a threshold rather than a report.
+    // `timing` is the envelope's VALUE and the envelope has a flat top, so every
+    // release inside the plateau records 1.00 and none of them can say where it
+    // was. That left `boostPeakAt` — the plateau's own width — with no measurement
+    // available at all: 118 of 652 recorded links saturate `timing`.
+    const parsed = parseReport(report());
+    const awards = recordedAwards(parsed)!;
+    const live = replayReport(parsed).awards;
+    expect(awards.map((w) => w.boostT)).toEqual(live.map((w) => Math.round(w.boostT * 100) / 100));
+    // A link that reached the plateau must round-trip a boostT that is INSIDE it,
+    // or the field is being written from somewhere that already lost the answer.
+    const links = awards.filter((w) => w.kind === 'link' && w.timing > 0);
+    expect(links.length).toBeGreaterThan(0);
+    for (const w of links) expect(w.boostT, `${w.tick}`).toBeGreaterThan(0);
+  });
+
+  it('reads a missing boostT as unknown rather than as a release at the freeze', () => {
+    // A report written before the field ends at `carry`, and 0 is a REAL value
+    // there — a release on the tick the orbit froze. Defaulting to it would put a
+    // pile of phantom instant-releases into exactly the distribution the field
+    // was added to measure, which is the shape of mistake PORT_NOTES 76 records.
+    const parsed = parseReport(report());
+    parsed.awards = (parsed.awards ?? []).map((a) => a.slice(0, 17) as typeof a);
+    for (const w of recordedAwards(parsed)!) expect(Number.isNaN(w.boostT), `${w.tick}`).toBe(true);
+  });
+
   it('carries every award the session paid, through a round trip', () => {
     const parsed = parseReport(report());
     const awards = recordedAwards(parsed);

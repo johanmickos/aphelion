@@ -142,6 +142,24 @@ export interface ScoreAward {
    * reached rather than on the arc it took to get there.
    */
   turn: number;
+  /**
+   * Seconds since the orbit froze, at the release. Link only; 0 for a pass.
+   *
+   * RECORDED BECAUSE `timing` CANNOT BE INVERTED WHERE IT MATTERS. `timing` is
+   * the envelope's value, and the envelope has a flat top — so every release
+   * inside the plateau reports 1.00 and the one number that would say WHERE in
+   * the plateau it was is gone. Calibrating the plateau's width therefore had no
+   * measurement available at all: 118 of 652 recorded links saturate `timing`
+   * and not one of them can say by how much.
+   *
+   * This is the same defect PORT_NOTES 75 records from the other side — a field
+   * that exists on the award and not in the tuple leaves a report unable to say
+   * what happened — and it is `boostT` rather than an unclamped fraction because
+   * `boostT` is the free variable: the envelope is derived from it and from three
+   * config keys the report already carries, so any envelope can be re-graded off
+   * it after the fact.
+   */
+  boostT: number;
 }
 
 /**
@@ -161,6 +179,11 @@ export interface PendingLink {
   skim: number;
   defl: number;
   timing: number;
+  /**
+   * Seconds since the orbit froze. The free variable `timing` is derived from,
+   * and the one the flat top of the envelope throws away. See `ScoreAward.boostT`.
+   */
+  boostT: number;
   aim: number;
   /** What the release was lined up with, for the readout. */
   target: Body | null;

@@ -24,21 +24,21 @@ When `plans/` is empty, the refactor is finished and the directory goes too.
 
 ## Status
 
-| #   | Plan                                                | Severity | Blocks                  | State                                                 |
-| --- | --------------------------------------------------- | -------- | ----------------------- | ----------------------------------------------------- |
-| F01 | Body traits                                         | BLOCKS   | Dir 04 body types       | **done** — PORT_NOTES 65                              |
-| F02 | Body type table                                     | BLOCKS   | Dir 04, VISION field    | **done** — PORT_NOTES 66                              |
-| F03 | [Theme as a value](F03-theme-value.md)              | BLOCKS   | Dir 01, regions         | **a+b** done — PORT_NOTES 69, 71; **c** deferred      |
-| F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | **a+b** done — PORT_NOTES 73, 74; **c** wants a phone |
-| F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | **ready** — F04 stage (b) landed                      |
-| F06 | [Effects stack](F06-effects-stack.md)               | COSTS    | powerups                | deferred                                              |
-| F07 | Draw layer list                                     | COSTS    | Dir 02, 05              | **done** — PORT_NOTES 67                              |
-| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | ready — **plus an F04 finding**, below                |
-| F09 | [Award vocabulary](F09-award-vocabulary.md)         | COSTS    | Dir 06                  | needs a call                                          |
-| F10 | [HUD grid](F10-hud-grid.md)                         | COSTS    | Dir 03                  | ready                                                 |
-| F11 | [Screen machine](F11-screen-machine.md)             | COSTS    | Dir 09, 10, 11          | deferred                                              |
-| F12 | [Audio observer](F12-audio-observer.md)             | COSTS    | VISION sound            | deferred                                              |
-| F13 | Design-width duplication                            | —        | —                       | **done** 2026-08-27                                   |
+| #   | Plan                                                | Severity | Blocks                  | State                                                      |
+| --- | --------------------------------------------------- | -------- | ----------------------- | ---------------------------------------------------------- |
+| F01 | Body traits                                         | BLOCKS   | Dir 04 body types       | **done** — PORT_NOTES 65                                   |
+| F02 | Body type table                                     | BLOCKS   | Dir 04, VISION field    | **done** — PORT_NOTES 66                                   |
+| F03 | [Theme as a value](F03-theme-value.md)              | BLOCKS   | Dir 01, regions         | **a+b** done — PORT_NOTES 69, 71; **c** deferred           |
+| F04 | [Scoring constitution](F04-scoring-constitution.md) | BLOCKS   | Dir 06, Dir 08          | **a+b** done — 73, 74; **c** part done — 76; wants a phone |
+| F05 | [Mode economy](F05-mode-economy.md)                 | BLOCKS   | Dir 08 matrix           | **ready** — F04 stage (b) landed                           |
+| F06 | [Effects stack](F06-effects-stack.md)               | COSTS    | powerups                | deferred                                                   |
+| F07 | Draw layer list                                     | COSTS    | Dir 02, 05              | **done** — PORT_NOTES 67                                   |
+| F08 | [Course segments](F08-course-segments.md)           | COSTS    | VISION difficulty curve | ready — **plus an F04 finding**, below                     |
+| F09 | [Award vocabulary](F09-award-vocabulary.md)         | COSTS    | Dir 06                  | needs a call                                               |
+| F10 | [HUD grid](F10-hud-grid.md)                         | COSTS    | Dir 03                  | ready                                                      |
+| F11 | [Screen machine](F11-screen-machine.md)             | COSTS    | Dir 09, 10, 11          | deferred                                                   |
+| F12 | [Audio observer](F12-audio-observer.md)             | COSTS    | VISION sound            | deferred                                                   |
+| F13 | Design-width duplication                            | —        | —                       | **done** 2026-08-27                                        |
 
 F13 was fixed in the review session: `DEFAULT_RENDER_CONFIG.designW` now reads
 `DESIGN_W` from `src/sim/world.ts` instead of repeating the literal `390`. No plan
@@ -77,12 +77,17 @@ Dependencies, not severity. Steps 1 and 2 are independent and can run together.
    to a constant, both required pixels drawn, and four of the seven award kinds
    removed with 47% of the game's popups. PORT_NOTES 73 and 74.
 
-   **What is left of F04 is (c), and it cannot be done at a desk.** Every magnitude
-   in the new formula is a threshold, `AGENTS.md` says thresholds are percentiles
-   of real play, and the whole corpus is 20–25 August — it predates the release
-   kick, the flyby retune and the ending. Calibrating on it produces numbers that
-   look measured, which VISION names as the worse failure. It needs a session flown
-   on the current build.
+   **Stage (c) is part done — PORT_NOTES 76.** What could be calibrated off the
+   recorded awards has been: the band became a jackpot at x1/x3/x5, `flybyTurnSpan`
+   was re-measured off passes recorded under the award, the boost envelope's flat
+   top was narrowed so the tier's second axis grades, and `climbPerPx` stays at
+   0.25 on the author's aggregation call. Three of the first session's readings
+   turned out to be artefacts and the note has the corrections.
+
+   **The rest cannot be done at a desk**, and one item is now sharper than
+   "needs a phone": `boostPeakAt` was fitted through an extrapolated density
+   because the quantity that would have measured it was not being recorded. It is
+   recorded now, so the next session measures it directly.
 
    **F05 is unblocked now**: the mode matrix needs the formula to exist, not to be
    calibrated.

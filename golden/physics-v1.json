@@ -31,6 +31,7 @@
   "boostArmTime": 0.45,
   "boostDecayTime": 1.4,
   "boostHoldsThroughSettle": false,
+  "boostPeakAt": 0.75,
   "boostPermFrac": 0.22,
   "boostPunch": 1.8,
   "boostBurstDecay": 1.3,

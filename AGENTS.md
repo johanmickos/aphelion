@@ -88,6 +88,16 @@ the craft's bloom; the streak is the ×N. A praise word after the fact does not
 count — it arrives after the score. If a rule cannot point at its pixel, the rule
 is wrong.
 
+**The fire band is a jackpot and not a dial, and that is a ruling rather than a
+tuning.** Direction 08 asks for a temptation aimed at on every swing; the field
+cannot supply one, because `bodySpread` keeps every planet's centre at least 210px
+from a wall and a captured ship reaches the red only on a wide tether. Measured:
+2.1 drags a session, 6% of captured time, and 62 of 63 swings in the one session
+flown under the constitution recorded no heat at all. So it is priced against the
+BET instead — `bandStep` is set so the committed ride beats `1 / p(survive)` and
+the half-committed one does not. Do not lower `bandTwoAt` to make it fire more
+often: that pays a graze at the rate of a drag, and the rarity is the point.
+
 **A capture is two scoring events.** The arrival is judged on how the ship arrived
 and prices the carry when the dive swings through periapsis; the release is judged
 on how it left and cashes at the release. Neither carries the other's qualities.
@@ -199,12 +209,23 @@ This is the main debugging loop, and the easiest thing in the repo to misread.
    calls every tick of a settle. A capture amplifies the difference and a respawn
    wipes it, so a long unbroken chain of captures forks while a crash-heavy
    session four times its length replays perfectly.
-3. **The recorded checkpoints are phone truth even when the replay is not.** They
+3. **Prefer the RECORDED quantity to the reconstructed one, and check whether the
+   recorded one can even answer the question.** This has now cost three findings.
+   A replay's award list was quoted for link and flyby counts the recording
+   contradicted (note 75); a tier distribution was factorised out of `multiplier`
+   when `aim`, `timing` and `turn` were sitting in the tuple, and the factorisation
+   silently dropped every PERFECT because `tierPerfect` collides with the x2 band
+   (note 76); and a threshold was calibrated on `timing`, which saturates, when
+   what it needed was the position `timing` was read at (note 76 again). Before
+   reconstructing anything, look at what the tuple already carries — and if the
+   tuple cannot answer it, **append a field rather than inferring one**, because
+   the inference will look defensible.
+4. **The recorded checkpoints are phone truth even when the replay is not.** They
    carry real positions, velocities and fuel every 60 ticks, and the world is pure
    arithmetic off a fixed seed — so a body's coordinates are identical however far
    the replay drifted. A grab can be reconstructed from the checkpoint before it
    plus straight-line drift. Do that rather than giving up on the report.
-4. **Check `loadedAt` against when the thing being reported on shipped.**
+5. **Check `loadedAt` against when the thing being reported on shipped.**
    `simVersion` and `config` describe the simulation and say nothing about the
    build around it, so a session played on a stale bundle is otherwise
    indistinguishable from one played on the current one.

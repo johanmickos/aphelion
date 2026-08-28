@@ -485,6 +485,7 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
     tier,
     band,
     carry,
+    boostT,
   ] of report.awards) {
     const kind = AWARD_KIND[code];
     if (!kind) {
@@ -501,8 +502,16 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       // no honest way to recover them from an ADDITIVE report: `multiplier` was
       // the streak alone, so it cannot be divided back into a tier and a band that
       // were never computed. 1 / 1 / 0 read as "unpriced", which is what an award
-      // from that economy is; `scratch/f04c-recover.ts` is what to reach for on a
-      // multiplicative report that predates the fields.
+      // from that economy is.
+      //
+      // DO NOT REACH FOR `scratch/f04c-recover.ts` HERE, which an earlier version
+      // of this comment recommended. It factorises `tier x band` out of the
+      // multiplier, and `tierPerfect` 2 collides with the x2 band — so every
+      // PERFECT in band 1 is indistinguishable from a tierless swing in band 2 and
+      // gets dropped as ambiguous. It reported zero PERFECTs on a session that had
+      // 17. Recompute the tier from `aim` / `timing` / `turn`, which the tuple
+      // carries, and read the band off `heat`: a recorded peak of 0 means the bank
+      // was 0 and the band was exactly x1. PORT_NOTES 76.
       tier: tier ?? 1,
       band: band ?? 1,
       carry: carry ?? 0,
@@ -523,6 +532,14 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       // those sessions but is the only honest thing a missing field can say — and
       // nothing recomputes an award from it.
       turn: turn ?? 0,
+      // And again, the newest field. `timing` cannot be inverted inside the
+      // envelope's flat top, so this is the only thing that can say where in the
+      // plateau a saturating release landed. Reports written before it end at
+      // `carry`, and for those NaN is the honest reading rather than 0 — 0 is a
+      // release at the periapsis freeze itself, which is a real and very
+      // different thing, and calibrating the plateau on a pile of them is exactly
+      // the mistake this field exists to prevent.
+      boostT: boostT ?? NaN,
     });
   }
   return out.length > 0 ? out : null;

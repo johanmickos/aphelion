@@ -104,7 +104,17 @@ export const KNOBS: readonly Knob[] = [
     max: 1.5,
     step: 0.05,
     dp: 2,
-    hint: 'seconds of holding before the boost peaks · this is where the skill window sits',
+    hint: 'shortest press that arms anything · a floor under PEAK, not the window itself',
+  },
+  {
+    group: 'BOOST',
+    key: 'boostPeakAt',
+    label: 'PEAK',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    dp: 2,
+    hint: 'how far into the settle the boost peaks · 1 is a flat top the tier cannot grade',
   },
   {
     group: 'BOOST',

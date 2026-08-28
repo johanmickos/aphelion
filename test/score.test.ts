@@ -335,6 +335,38 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
     ticks: 900,
   },
   /**
+   * The same capture, released on the TOP rung.
+   *
+   * Here for the reason the bottom-rung session above is, arriving from the other
+   * end of the ladder. The battery used to reach PERFECT through the flyby
+   * fixture, whose pass swept past `flybyTurnSpan` and topped out — and when the
+   * span was re-measured off recorded passes and moved 60 -> 81, that stopped
+   * being true and `tierPerfect` measured as dead. A blind spot in the fixture,
+   * not a dead weight, and the third time this exact shape has bitten: the
+   * fixture stopped reaching the mechanism because the mechanism moved.
+   *
+   * Tick 345 rather than a round number, and found by walking the release the way
+   * 330 was. The capture passes through aim 0.942 / peak 1.000 there, which is
+   * `q` 0.836 against the PERFECT line at 0.659. Fifteen ticks earlier it is
+   * 0.155 and TRUE, and twenty-five later it is 0.085 and TRUE again — the whole
+   * PERFECT window is about 20 ticks wide on this dive.
+   *
+   * IT ALSO PINS THE TIMING PLATEAU, which is worth having written down where it
+   * can be seen: `timing` is exactly 1.000 at releases 340 through 380 on this
+   * capture, so across that 0.67s only `aim` moves the grade. `boostArmTime` 0.45
+   * and `settleDur` 1.2 with `boostHoldsThroughSettle` on is what makes the flat
+   * top, and it is why the tier's timing axis discriminates over less of the
+   * envelope than it looks like it should.
+   */
+  {
+    name: 'released on the top rung',
+    edges: [
+      [240, 1],
+      [345, 0],
+    ],
+    ticks: 900,
+  },
+  /**
    * Drifting at the right wall, pressed while the cross is still ahead.
    *
    * Here for the same reason as the two above: without it `rescueBonus` and
@@ -1120,6 +1152,7 @@ const link = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   climb: 400,
   heat: 0,
   turn: 0,
+  boostT: 0,
   ...over,
 });
 
@@ -1758,9 +1791,15 @@ describe('a flyby that stays a flyby', () => {
     // pass DID to the ship. Grading it on the same three rungs a release gets is
     // what keeps one ladder in the game instead of two.
     //
-    // The longest hold swings past `flybyTurnSpan`, so it tops the ladder out.
-    expect(held[2]!.turn).toBeGreaterThan(DEFAULT_SCORE_CONFIG.flybyTurnSpan);
-    expect(held[2]!.tier).toBe(DEFAULT_SCORE_CONFIG.tierPerfect);
+    // THIS PIN USED TO SAY THE LONGEST HOLD TOPS THE LADDER OUT, and it did while
+    // `flybyTurnSpan` was 60. It is 81 now, re-measured off the 42 passes a phone
+    // actually recorded under the award — 60 had ended up below the median real
+    // pass — and this fixture's geometry caps at 68.4 degrees however long the
+    // button is held, so it lands on SHARP. That is the assertion's new truth and
+    // it is a better one: the pass is still graded, still monotone in the turn,
+    // and no longer automatically the best pass in the game for having happened.
+    expect(held[2]!.turn).toBeLessThan(DEFAULT_SCORE_CONFIG.flybyTurnSpan);
+    expect(held[2]!.tier).toBe(DEFAULT_SCORE_CONFIG.tierSharp);
     // ...and the shortest swings a fraction of it and cannot.
     expect(held[0]!.tier).toBeLessThan(held[2]!.tier);
   });

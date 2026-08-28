@@ -21,7 +21,7 @@ export type InputRecord = [number, 0 | 1];
 /**
  * One scoring event exactly as the phone paid it.
  *
- * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body, heat, turn]`
+ * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body, heat, turn, tier, band, carry, boostT]`
  * with `kind` 'g' for a grab, 'l' for a link, 'h' for a hop, 'f' for a flyby,
  * 'r' for a rescue and 'b' for a burn.
  *
@@ -86,6 +86,17 @@ export type AwardRecord = [
    */
   number?,
   number?,
+  number?,
+  /**
+   * `boostT` — seconds since the orbit froze, at the release.
+   *
+   * The envelope has a flat top, so `timing` reads 1.00 across the whole plateau
+   * and the report cannot say where inside it the release was. That made the
+   * plateau's own width the one threshold in the game with no measurement
+   * available: 118 of 652 recorded links saturate `timing` and not one of them
+   * can be placed. This is the free variable the envelope is computed from, so
+   * any envelope can be re-graded off it after the fact.
+   */
   number?,
 ];
 
@@ -201,6 +212,7 @@ export class RunRecorder {
         q(a.tier),
         a.band,
         Math.round(a.carry),
+        q(a.boostT),
       ]);
       if (this.awards.length > this.opts.maxAwards) {
         this.awards.shift();
