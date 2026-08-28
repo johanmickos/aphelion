@@ -556,6 +556,72 @@ Either way it is [M2](./m2-the-instrument.md) — craft deformation is already i
 presentation-state list — with the boundary half of *"any time there's a strain"* following in
 M3, off the same number.
 
+## Flown again, 2026-08-28 — two more, both measured
+
+Neither needed the diagnostic trail; both are visible headlessly.
+
+### The opening grab swerves away from the first body
+
+*"For the very first planet, no matter when I press, my ship seems to go outwards first to reach
+its orbit ... I don't think I've seen this with other planets."*
+
+**It never moves outward in radius** — measured, the radius falls monotonically from the press.
+What it does is swerve **laterally away from the body**, and that is the clearance doing exactly
+what spec [01 · §4](../spec/01-swing.md) asks: to orbit rather than strike, the craft has to go
+*around*, and from a near-radial approach the only way to buy that angular momentum at constant
+speed is to turn sideways. The turn is the minimum that lifts the periapsis to the floor and the
+radial component stays inward throughout, so nothing here is over-turning.
+
+**Why only the first body: it is the only near-radial approach in the run.** The craft spawns
+with `vx = 0`, **13° off the line to the first body**, and every later grab arrives carrying
+cross velocity from the release before it. And it is worse the later you press, which is why *no
+matter when* is the right description — the momentum the floor asks for barely changes as the
+craft closes, while the momentum a turn can buy is `r × speed`, so the turn needed grows as the
+range falls.
+
+The opening's lateral offset is the whole story, and it is a **fixture** number rather than a
+physics one:
+
+| Craft spawns this far left of the body | Off radial | Turn at the press, at three ranges |
+|---|---|---|
+| **84** (the prototype's, and what is built) | 13° | **29°** · 42° · 59° |
+| 130 | 20° | 21° · 28° · 48° |
+| 180 | 27° | 12° · 15° · 27° |
+| 230 | 33° | 3° · 3° · 2° |
+
+> **Open — where the run should open.** 84 units is the prototype's own spawn, converted, and
+> was carried on the grounds that the first approach is tuned. What the sweep says is that it is
+> also the **worst clearance geometry in the run**, and it is the first thing anyone flies. 180
+> puts the opening turn at 12 – 27°, inside the field's own p50 of 31° and well inside spec 01
+> §4's measured 3.6 – 62°; 230 removes the clearance from the opening altogether, which is
+> unrepresentative in the other direction, since clearance fires on about half of real grabs.
+> Moving it is a departure from the prototype's opening and therefore the author's.
+
+### The nose keeps turning for a frame or two after a release
+
+*"My release vector feels natural and expected, but the ship's nose continues pointing around the
+circle for a frame or two."*
+
+**The simulation is exact here**: measured across a release, the heading changes by `0.00°` on
+every tick from the release onward — a release scales speed and never touches direction, so the
+nose is nailed from the instant the button is read. What the eye is catching is entirely in
+front of that instant.
+
+A tick of settled orbit turns the nose **5.26°**. The button is read at a tick boundary (up to
+one tick), and the picture is drawn by interpolating between the last two ticks (exactly one
+more), so **up to ~11° of nose rotation can pass between the player letting go and the picture
+showing it.** That is the standard cost of a fixed timestep with render interpolation, and the
+prototype's loop is the same shape — an accumulator, a catch-up cap and `render(acc / dt)`.
+
+> **Open — how much latency the release may spend.** Two levers, and neither is free.
+> **(a)** Drop the render interpolation and draw the newest tick: the lag falls from exactly one
+> tick to an average of half of one, at the cost of judder wherever the display is not running at
+> the simulation's rate — which is the thing interpolation was added for, on a 120Hz phone.
+> **(b)** Accept it. What is *not* available is the prototype's other trick — releasing
+> synchronously inside the pointer event — because a release that happens between ticks is a
+> release a recipe cannot reproduce, and [ADR-0004](../adr/0004-determinism-is-the-contract-the-author-is-the-feel-gate.md)
+> makes determinism the contract.
+
 ## What the camera does now
 
 Built after the demo, as a correction to M1.6 rather than as a new step, on
