@@ -239,6 +239,17 @@ export function drawFuelGauge(
    * different from before.
    */
   shown = snap.fuel,
+  /**
+   * The size of the gain currently filling, or 0 for none.
+   *
+   * Announced because the gauge announced SPENDING and nothing else: it has
+   * printed `burning` since it was built, and the tank now also arrives in lumps
+   * that had no counterpart. Reported from play as "I didn't really notice the
+   * refuel", and the arithmetic agrees — ten pills at ten fuel each against a
+   * median arrival award of 6.1 is under two thirds of one pill, drawn as an alpha
+   * change on the pill the level sits inside. There was nothing to see.
+   */
+  gain = 0,
 ): void {
   const s = cam.scale;
   // Never above the real tank: the ease only ever lags a RISE, and a readout that
@@ -306,6 +317,25 @@ export function drawFuelGauge(
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText('◀ burning', gx + gw + 8 * s, gbot - gh * frac);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // ...and its counterpart, the one the gauge never had. Same slot, same size,
+  // opposite arrow, and it rides the top of the fill so it points at the part of
+  // the bar that is moving.
+  //
+  // NOT WHILE BURNING. A tank can take an award and pay a circularization in the
+  // same breath, and two labels in one slot would overprint into an unreadable
+  // smear — so the spend wins, because the spend is the one that ends runs.
+  if (!burning && gain >= 1) {
+    // The ramp's own full-tank colour rather than a new token. `palette.ts`
+    // defines a colour and this file picks one, and the colour that already means
+    // "fuel, healthy" is the honest pick for fuel arriving.
+    ctx.fillStyle = fuelColor(1);
+    ctx.font = `600 ${9 * s}px ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`+${Math.round(gain)} ▶`, gx + gw + 8 * s, gbot - gh * frac);
     ctx.textBaseline = 'alphabetic';
   }
   ctx.restore();

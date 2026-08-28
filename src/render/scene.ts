@@ -346,6 +346,22 @@ export class Scene {
   private gaugeFuel = -1;
 
   /**
+   * The size of the gain the gauge is currently filling, or 0 for none.
+   *
+   * Held across the fill rather than recomputed from the gap, so the label reads
+   * a steady `+7` instead of counting itself down to nothing. Lumps that land
+   * while a fill is already running ADD to it, because two awards half a second
+   * apart are one thing arriving as far as the eye is concerned.
+   */
+  private gaugeGain = 0;
+
+  /** The tank on the previous frame, so a LUMP can be told from the regen. */
+  private gaugeTank = -1;
+
+  /** Whether the previous frame was inside an ending, so a respawn can be seen. */
+  private gaugeEnding = false;
+
+  /**
    * How well the release is aimed, from the compass, for the glow the ship wears.
    *
    * A local until the draw order became a list. The two layers that need it are
@@ -652,9 +668,31 @@ export class Scene {
     // awarded lump fills the bar instead of teleporting it; a fall is the one
     // thing the player must never see late.
     const tank = f.snap.fuel;
-    if (this.gaugeFuel < 0 || tank < this.gaugeFuel) {
+    // A LUMP IS A RISE THE REGEN CANNOT EXPLAIN, so it is read off the tank's own
+    // step rather than off the gap the ease has left to close — the gap shrinks
+    // every frame, and a label computed from it would count itself down.
+    // `fuelRegen` would have delivered `trickle` anyway, so anything at that scale
+    // is the drift refilling and gets no announcement; without the subtraction the
+    // label would sit on screen for the whole of every coast.
+    const trickle = f.sim.fuelRegen * f.frameDt;
+    // A RESPAWN IS NOT AN AWARD. The tank refills to full on the tick the ending
+    // clears, which is a rise of up to the whole gauge — labelled, it would read
+    // as the largest payout in the game for having died. The gauge snaps there
+    // instead: a new life starts showing its tank rather than animating one.
+    const respawned = this.gaugeEnding && !f.snap.ending.active;
+    this.gaugeEnding = f.snap.ending.active;
+
+    if (respawned || this.gaugeFuel < 0 || tank < this.gaugeFuel) {
       this.gaugeFuel = tank;
-    } else if (this.gaugeFuel < tank) {
+      this.gaugeGain = 0;
+      this.gaugeTank = tank;
+    } else {
+      if (this.gaugeTank >= 0 && tank - this.gaugeTank > trickle * 1.5) {
+        this.gaugeGain += tank - this.gaugeTank;
+      }
+      this.gaugeTank = tank;
+    }
+    if (this.gaugeFuel < tank) {
       const secs = Math.max(1e-6, f.render.fuelGaugeFillSecs);
       // EXPONENTIAL, AND A FIXED RATE WAS TRIED FIRST AND WAS WRONG. A rate in
       // fuel-per-second makes the fill's duration proportional to the lump, and
@@ -669,9 +707,13 @@ export class Scene {
       this.gaugeFuel += (tank - this.gaugeFuel) * k;
       // Land it. An asymptote never arrives, and a gauge that sat a tenth of a
       // fuel short forever would print a number one below the tank.
-      if (tank - this.gaugeFuel < 0.05) this.gaugeFuel = tank;
+      if (tank - this.gaugeFuel < 0.05) {
+        this.gaugeFuel = tank;
+        // The fill landed, so the label has nothing left to describe.
+        this.gaugeGain = 0;
+      }
     }
-    drawFuelGauge(f.ctx, f.cam, f.sim, f.snap, f.timeMs, this.gaugeFuel);
+    drawFuelGauge(f.ctx, f.cam, f.sim, f.snap, f.timeMs, this.gaugeFuel, this.gaugeGain);
   }
 
   /**

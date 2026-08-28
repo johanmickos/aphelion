@@ -3907,6 +3907,72 @@ describe('the fuel gauge fills over frames', () => {
     expect(trace([80, 20])[1]).toBe(20);
   });
 
+  /** Every string the HUD printed, so the gain label can be looked for. */
+  function texts(fuels: number[], endings: boolean[] = []): string[][] {
+    const render = DEFAULT_RENDER_CONFIG;
+    const state = createInitialState(sim);
+    const field = fieldBounds(sim, state.bodies);
+    const scene = new Scene({ sim, render, bodies: state.bodies, field }, 3);
+    const base = captureSnapshot(state, false, sim);
+    const out: string[][] = [];
+    for (const [i, fuel] of fuels.entries()) {
+      const r = recordingContext();
+      const ending = endings[i]
+        ? { active: true, t: 1, x: 195, y: 0, reason: 'impact' as const }
+        : base.ending;
+      scene.draw(
+        r.ctx,
+        cam(),
+        { ...base, fuel, ending },
+        {
+          timeMs: 0,
+          paused: false,
+          viewportW: 390,
+          viewportH: 844,
+          headerBottom: 0,
+          frameDt: 1 / 60,
+          score: createScoreState(),
+        },
+      );
+      out.push((r.calls('fillText') as Array<[string, string]>).map((o) => o[1]));
+    }
+    return out;
+  }
+
+  const hasGain = (t: string[]) => t.some((x) => /^\+\d+ ▶$/.test(x));
+
+  it('announces a lump, which the gauge never did for a gain', () => {
+    // "I didn't really notice the refuel" — and the arithmetic agreed: ten pills
+    // at ten fuel each against a median award of 6.1 is under two thirds of one
+    // pill. The gauge has printed `burning` for spending since it was built.
+    const t = texts([50, 57, 57, 57]);
+    expect(hasGain(t[0]!)).toBe(false);
+    expect(t[1]!.some((x) => x === '+7 ▶')).toBe(true);
+  });
+
+  it('says nothing while the tank merely regenerates', () => {
+    // `fuelRegen` is 30/s, so a drifting frame adds 0.5. Announcing that would put
+    // the label on screen for the whole of every coast.
+    const step = sim.fuelRegen / 60;
+    const t = texts([50, 50 + step, 50 + 2 * step, 50 + 3 * step]);
+    for (const frame of t) expect(hasGain(frame)).toBe(false);
+  });
+
+  it('does not call a respawn an award', () => {
+    // The tank refills to full when the ending clears, which is a rise of most of
+    // the gauge. Labelled, it would read as the largest payout in the game for
+    // having died.
+    const t = texts([20, 20, 100, 100], [false, true, false, false]);
+    expect(hasGain(t[2]!), 'a respawn was announced as a gain').toBe(false);
+    expect(hasGain(t[3]!)).toBe(false);
+  });
+
+  it('clears the label once the fill has landed', () => {
+    const t = texts([50, 57, ...Array<number>(60).fill(57)]);
+    expect(hasGain(t[1]!)).toBe(true);
+    expect(hasGain(t.at(-1)!)).toBe(false);
+  });
+
   it('fills faster when the knob says to, which is the control', () => {
     // A render key the drawing genuinely reads. Without this the two tests above
     // would pass against a gauge that ignored `fuelGaugeFillSecs` entirely and
