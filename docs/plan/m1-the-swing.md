@@ -408,11 +408,11 @@ becomes a *playing* surface for a scored daily, it is an advantage and the bound
 argue about it. It does not replace M3.1's camera: **359 units of the craft's death still happen
 off the picture**, and the measurement above is still the handover.
 
-> **One sentence in an author-owned spec is now stale, and it is not edited here.** Spec 00 §7
-> reads *"the composition is identical on every device and nothing lands on a letterbox bar."*
-> The rule it encodes survives exactly — nothing the player reads lives outside the design space
-> — but there is no bar any more. The replacement sentence is *"nothing the player reads lives
-> outside the design space; what is beyond it is bleed"*, and it is the author's to make.
+> **And it made one sentence stale in three places, since rebased** (author, 2026-08-28). Spec
+> [00 · §7](../spec/00-tokens.md), `VISION.md`'s second look-rule and M3.1's restatement of it all
+> read *"nothing lands on a letterbox bar."* The rule they encode survives exactly — **nothing
+> the player reads is drawn outside the design space, ever** — and it is now stated that way,
+> with the leftover named as bleed. Nothing about the rule moved; the mechanism under it did.
 
 ### Four things worth carrying forward
 

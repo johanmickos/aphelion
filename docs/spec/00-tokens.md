@@ -203,8 +203,15 @@ type is a data change, not a redesign of the instrument.
 ## 7 · Layout
 
 The design space is **1170 × 2532** — a phone held in portrait (ADR-0010). Everything the player
-reads is drawn in world space in design coordinates, so the composition is identical on every
-device and nothing lands on a letterbox bar. DOM is developer chrome only.
+reads is drawn in world space in design coordinates, and **nothing the player reads is drawn
+outside it, ever**, so the composition is identical on every device. DOM is developer chrome only.
+
+**Outside it is bleed, not black.** The design space is fitted whole and centred; whatever the fit
+leaves over is filled with world — 179 design units either side on ADR-0011's measured phone,
+which is world the device could always draw and was painting over ([M1.4](../plan/m1-the-swing.md)).
+How much of it a device shows depends on the device, and that is exactly why the rule above is
+absolute: bleed is the world seen further, never part of the composition. It is bounded by the
+corridor's line, because past that there is no world to show.
 
 **The thumb line** sits at **2/3 of the screen height**. Nothing readable may live below it,
 ever. The compass, the masthead and every award live above it.

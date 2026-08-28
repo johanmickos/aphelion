@@ -11,8 +11,17 @@ field to the same standard.
 ## M3.1 · Camera and design space
 
 Everything the player reads is drawn in world space in the 1170×2532 design space, so the
-composition is identical on every device and nothing lands on a letterbox bar. DOM is developer
-chrome only. Desktop letterboxes the same world (ADR-0010).
+composition is identical on every device, and nothing the player reads is drawn outside it. What
+is outside it is **bleed** — world rather than black, bounded by the corridor's line, built in
+[M1.4](./m1-the-swing.md). DOM is developer chrome only. A desktop window bleeds wider than a
+phone, and that is accepted rather than hidden (ADR-0010).
+
+**And this step owes the camera a sideways axis.** M1.4 gave the field a corridor 1.9× the design
+width, which retired `camera.ts`'s *"it does not pan sideways"* — measured, the craft can be
+**538 design units outside the picture and still alive**, and 359 of those survive the bleed. The
+numbers and what they were measured over are under
+[M1.4 · The camera decision has expired](./m1-the-swing.md#m14--death-and-the-shape-of-a-run);
+they are not restated here, because two copies of a measurement are two copies that drift.
 
 **Acceptance**: identical composition across aspect ratios; nothing readable in the bottom
 third, ever. **Verify**: `pnpm test` on the projection, plus screenshots at three aspects.

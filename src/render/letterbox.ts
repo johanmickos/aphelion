@@ -3,9 +3,9 @@
  *
  * ADR-0010 rules that *"everything is drawn in world space in design
  * coordinates, identical on every device"*, and spec
- * [00 · §7](../../docs/spec/00-tokens.md) that *"nothing lands on a letterbox
- * bar"*. Both of those are one decision: the design space is fitted whole, at a
- * uniform scale, and centred. **Not a CSS scale on DOM elements** — the
+ * [00 · §7](../../docs/spec/00-tokens.md) that *"nothing the player reads is
+ * drawn outside it, ever"*. Both of those are one decision: the design space is
+ * fitted whole, at a uniform scale, and centred. **Not a CSS scale on DOM elements** — the
  * composition has to survive being a picture, not a layout.
  *
  * What is left over is the **bleed**, and it is world rather than black — see

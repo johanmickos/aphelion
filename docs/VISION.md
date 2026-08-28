@@ -189,8 +189,10 @@ as the foreground.
 Two rules the look must keep:
 
 - **Everything the player reads is drawn in the world, in design coordinates**,
-  so the composition is identical on every device and nothing lands on a
-  letterbox bar. DOM is developer chrome only.
+  and nothing the player reads is drawn outside the design space, so the
+  composition is identical on every device. What is beyond it is **bleed** —
+  world rather than black, and never part of the composition. DOM is developer
+  chrome only.
 - **The game is side-on and implies no depth.** Streaks fall in parallel, never
   radiating from a vanishing point. A cone would put a horizon in a world that
   has none.
