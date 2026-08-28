@@ -117,11 +117,60 @@ export interface SimConfig {
    * the 13 that converted spent 160 fuel and the 5 that sailed past spent 167. The
    * refund touches the first group and leaves the second exactly as expensive.
    *
+   * AND IT IS NOW A FLOOR RATHER THAN THE WHOLE FRACTION, graded up to a full
+   * return by how tightly the ship came in:
+   *
+   *   back = brakeSpent * (flybyConvertRefund + (1 - flybyConvertRefund) * tight)
+   *
+   * Reported as running dry while orbiting, "when I KNEW that my good capture
+   * would reward me" — and the measurement put the trough somewhere neither of us
+   * expected. It is not the wait for the release refund: the median gap between
+   * the periapsis freeze and the payment is 0.40s, and moving the whole refund
+   * back to the freeze leaves the session's minimum tank identical at 3. It is
+   * the BRAKE. 88% of the low-fuel samples in the harder of two sessions are
+   * inside a capture against a 75% baseline, the phase at the trough is `flyby`,
+   * and `flybyFuelPerSec` 40 is 2.2x what the circularization spends — so the
+   * money goes on committing, before any refund has been earned at all.
+   *
+   * This is the site that already answers that, and the paragraph above says so:
+   * the refund is paid HERE precisely because it has to arrive before the fuel is
+   * spent. What it did not do was ask whether the commit was any good. Now a
+   * tight arrival gets its whole brake back and a loose one still gets half.
+   *
+   * IT ONLY EVER PAYS MORE THAN THE FLAT 0.5 DID, which is the property that makes
+   * it safe to ship against a fuel complaint without a measured curve: the term
+   * added is non-negative and bounded by the brake actually spent, so no arrival
+   * is worse off and nothing is minted. It is also what makes "return more than it
+   * cost, if the capture AND release were of high quality" true — a tight commit
+   * returns the whole brake and a peak release returns `linkFuelReward` against a
+   * 21.6 settle, while a sloppy one at either end does not.
+   *
+   * THE CURVE IS UNMEASURED AND THE REASON IS A RECORDING GAP. Arrival tightness
+   * has not been recorded anywhere since F04 removed the grab award — a link award
+   * sets `close: 0` deliberately, because the arrival priced the carry rather than
+   * the cash — so the only `close` in the corpus belongs to passes that never
+   * converted, at a median 0.83 and 0.93. Whether converting arrivals sit there
+   * too decides whether this is a small correction or nearly doubles the brake
+   * refund. `ScoreAward.arrival` is recorded now; measure it before tuning it.
+   *
    * `brakeSpent` accumulates what was actually DEDUCTED rather than what was
    * quoted, so a brake held against an empty tank cannot earn a refund for fuel
    * that was never spent.
    */
   flybyConvertRefund: number;
+  /**
+   * Clearance above a body's minimum orbit at which an arrival stops counting as
+   * tight, in px. Grades `flybyConvertRefund`: a grab on the ring returns the whole
+   * brake, one this far out returns the flat fraction and nothing more.
+   *
+   * MUST MATCH `ScoreConfig.closeSpan`, and `test/score.test.ts` pins them the way
+   * it pins `burnEdgeSpan` to `RenderConfig.hazardZoneWidth`. Both answer the same
+   * question — how tightly did the ship arrive — off the same `grabR - minR`, and
+   * two spans would let the fuel call an arrival tight while the score called it
+   * loose. The sim owns this one because `src/sim/` cannot import from
+   * `src/score/`; the pin is what stops that being a second opinion.
+   */
+  arrivalTightSpan: number;
 
   // --- boost ---
   boostThreshold: number;
@@ -391,6 +440,56 @@ export interface SimConfig {
    * starved moved by under 8 fuel at their minimum. That is the shape of a defect
    * being fixed rather than a subsidy being added, and it is why the reward stayed
    * at 20 instead of going up.
+   *
+   * WHY 28 NOW, AND WHY THE CAUSE WAS `boostPeakAt` RATHER THAN THIS KEY. Narrowing
+   * the envelope's flat top made the tier's timing axis grade — and this refund
+   * reads the same fraction, so it was halved for every release that came before
+   * the new peak. Reported as running dry too often, and the report agrees. Netting
+   * each link's refund against its cost (`fuelPerSec` runs only while `u < 1`, so a
+   * capture costs about `18 x min(boostT, settleDur)`), the session's link economy
+   * was **-2 fuel under the old envelope and -55 under the new one** across 29
+   * links. The whole 53 lands on the eight early releases, which fell from netting
+   * +3.4..+10.6 each to +0.5..+1.7.
+   *
+   * That is the shape of the economy and it is worth stating plainly: an EARLY
+   * release is the fuel source — cheap to hold, and the ramp pays out over it — and
+   * a full settle is a sink, because 1.2s costs 21.6 and the refund caps at the
+   * reward. Holding PAST the settle is the worst of both, at -11 on this session's
+   * longest.
+   *
+   * 22 IS THE LARGEST VALUE THE HEADROOM PIN ALLOWS, AND IT IS NOT ENOUGH TO MEET
+   * THIS NOTE'S OTHER BENCHMARK. Laying a higher reward over the real tank trace,
+   * per life, cut at the one respawn the checkpoints actually show:
+   *
+   *   reward 20   minimum 24 / 3    9% of the session under a quarter tank
+   *   reward 24   minimum 35 / 15   3%
+   *   reward 27   minimum 44 / 23   2%
+   *   reward 28   minimum 47 / 26   0%
+   *
+   * SO TWO OF THIS NOTE'S OWN STANDARDS NOW CONFLICT, and that is the open
+   * question rather than the value. "Spent none of its life under a quarter tank"
+   * wants 28; "never recovers all of a capture" — pinned in
+   * `test/link-fuel.test.ts` — caps it at 22. They were compatible while hitting
+   * the peak was easy and are not now: `boostPeakAt` made the peak a 0.30s window,
+   * and 3 of this session's 29 links reached 0.9 of the envelope where 20 of 47
+   * used to. Paying above cost for a rare precise thing is a different proposition
+   * from paying it for the common case, which is what the headroom argument was
+   * written against — but reversing it is the author's call, not a retune.
+   *
+   * AND IT IS NO LONGER THE ONLY LEVER, WHICH IS WHY IT STAYED AT 22. The trough
+   * turned out not to be here at all: 88% of the low-fuel samples in the harder
+   * session sit inside a capture, in `flyby` phase, where `flybyFuelPerSec` 40 is
+   * 2.2x what this refund's own settle costs. `flybyConvertRefund` is graded on
+   * arrival tightness now and pays back up to the whole brake, which is both the
+   * measured drain and the half of "a good capture should reward immediately" that
+   * moving this payment earlier could not buy — the median gap between the freeze
+   * and this refund is 0.40s, and paying all of it at the freeze leaves the
+   * session's minimum tank identical at 3.
+   *
+   * WHATEVER IT SETTLES AT, IT MOVES WITH `boostPeakAt`. They are one economy:
+   * the refund reads the fraction the tier grades. The way to re-check is to net
+   * each link's refund against `fuelPerSec x min(boostT, settleDur)`, which the
+   * recorded `boostT` now makes possible.
    *
    * `earned` is `releaseCapture`'s own test — a real orbit, past periapsis, not a
    * flyby, not a putter-out — and is the SAME quantity the scorer reads as
@@ -1049,6 +1148,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyFuelTracksBrake: false,
   flybyBrakeShedsWhip: false,
   flybyConvertRefund: 0,
+  arrivalTightSpan: 200,
 
   boostThreshold: 0.5,
   boostMax: 95,
@@ -1223,8 +1323,9 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyFuelTracksBrake: true,
   flybyBrakeShedsWhip: true,
   flybyConvertRefund: 0.5,
+  arrivalTightSpan: 200,
   fuelRegen: 30,
-  linkFuelReward: 20,
+  linkFuelReward: 22,
   fieldWidthFrac: 1.9,
   bodyCount: 60,
   anomalyCount: 3,
@@ -1290,7 +1391,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 30;
+export const SIM_VERSION = 31;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

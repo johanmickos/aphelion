@@ -703,7 +703,13 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
         // the capture that is about to burn fuel — arriving at the release would
         // be after the putter-out it exists to prevent. See `flybyConvertRefund`.
         if (cfg.flybyConvertRefund > 0 && cap.brakeSpent > 0) {
-          const back = cfg.flybyConvertRefund * cap.brakeSpent;
+          // Graded by how tightly the ship came in, from the flat fraction at a
+          // loose arrival up to the whole brake at a grab off the ring. The
+          // fraction is a FLOOR now, so this can only ever pay more than it did.
+          const over = (cap.grabR - cap.minR) / Math.max(1e-6, cfg.arrivalTightSpan);
+          const tight = over < 0 ? 1 : over > 1 ? 0 : 1 - over;
+          const frac = cfg.flybyConvertRefund + (1 - cfg.flybyConvertRefund) * tight;
+          const back = frac * cap.brakeSpent;
           state.fuel = Math.min(cfg.fuelMax, state.fuel + back);
           cap.fuelBack += back;
           cap.brakeSpent = 0;

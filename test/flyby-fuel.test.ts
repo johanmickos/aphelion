@@ -209,7 +209,12 @@ function conversion(cfg: SimConfig): {
 }
 
 describe('a flyby that converts gets part of its brake back', () => {
-  it('pays exactly the configured fraction of what the brake actually cost', () => {
+  it('pays the configured fraction as a FLOOR, graded up by how tight the arrival was', () => {
+    // THIS PIN USED TO SAY "exactly the configured fraction", and the fraction is
+    // now the floor: the refund is graded from it to a full return of the brake by
+    // the arrival's clearance over `arrivalTightSpan`. Reported as running dry
+    // while orbiting, and the trough turned out to be the brake rather than the
+    // wait for the release refund — see `flybyConvertRefund` for both numbers.
     const cfg = DEFAULT_CONFIG;
     const c = conversion(cfg);
     expect(c.convertedAt).not.toBeNull();
@@ -217,7 +222,28 @@ describe('a flyby that converts gets part of its brake back', () => {
     // The tank must RISE across the conversion tick, by the refund less whatever
     // that same tick's braking took off it.
     expect(c.after).toBeGreaterThan(c.before);
-    expect(c.after - c.before).toBeCloseTo(cfg.flybyConvertRefund * c.brakeSpent, 4);
+    const back = c.after - c.before;
+    expect(back).toBeGreaterThanOrEqual(cfg.flybyConvertRefund * c.brakeSpent - 1e-9);
+    expect(back).toBeLessThanOrEqual(c.brakeSpent + 1e-9);
+    // And it is the arrival that decides where in that range it lands. The span is
+    // the clearance at which an arrival stops counting as tight, so shrinking it
+    // makes every arrival loose and pays the floor exactly...
+    const loose = conversion({ ...cfg, arrivalTightSpan: 1e-9 });
+    expect(loose.after - loose.before).toBeCloseTo(cfg.flybyConvertRefund * loose.brakeSpent, 4);
+    // ...and widening it past any real clearance makes every arrival tight, which
+    // returns the whole brake.
+    const tight = conversion({ ...cfg, arrivalTightSpan: 1e9 });
+    expect(tight.after - tight.before).toBeCloseTo(tight.brakeSpent, 4);
+  });
+
+  it('never pays a converting flyby more than its brake cost', () => {
+    // The refund is a REFUND. Bounded by what was actually deducted, so no
+    // arrival tightness and no span can turn braking into a way to make fuel.
+    for (const span of [0, 1, 50, 200, 1000, 1e9]) {
+      const c = conversion({ ...DEFAULT_CONFIG, arrivalTightSpan: span });
+      if (c.convertedAt === null) continue;
+      expect(c.after - c.before, `span ${span}`).toBeLessThanOrEqual(c.brakeSpent + 1e-9);
+    }
   });
 
   it('hands nothing back while the flyby is still running', () => {

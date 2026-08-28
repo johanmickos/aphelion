@@ -114,6 +114,7 @@ function captureOf(over: Partial<NonNullable<RenderSnapshot['capture']>> = {}) {
     boost: 0,
     boostFull: 0,
     boostT: 0,
+    arrival: 0,
     overEscape: 0,
     rx: 0,
     ry: -100,
@@ -3012,6 +3013,7 @@ describe('the score band', () => {
     heat: 0,
     turn: 0,
     boostT: 0,
+    arrival: 0,
     ...over,
   });
 

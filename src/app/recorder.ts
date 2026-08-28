@@ -21,7 +21,7 @@ export type InputRecord = [number, 0 | 1];
 /**
  * One scoring event exactly as the phone paid it.
  *
- * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body, heat, turn, tier, band, carry, boostT]`
+ * `[tick, kind, points, mult, close, clearance, skim, defl, timing, aim, climb, body, heat, turn, tier, band, carry, boostT, arrival]`
  * with `kind` 'g' for a grab, 'l' for a link, 'h' for a hop, 'f' for a flyby,
  * 'r' for a rescue and 'b' for a burn.
  *
@@ -96,6 +96,15 @@ export type AwardRecord = [
    * available: 118 of 652 recorded links saturate `timing` and not one of them
    * can be placed. This is the free variable the envelope is computed from, so
    * any envelope can be re-graded off it after the fact.
+   */
+  number?,
+  /**
+   * `arrival` — how tight the grab this swing began with was.
+   *
+   * Nothing has recorded it since F04 removed the grab award, because a link's
+   * `close` is deliberately 0: the arrival priced the carry, and reading it again
+   * at the cash would pay for it twice. `SimConfig.flybyConvertRefund` is now
+   * graded on exactly this quantity, so a report has to be able to show it.
    */
   number?,
 ];
@@ -213,6 +222,7 @@ export class RunRecorder {
         a.band,
         Math.round(a.carry),
         q(a.boostT),
+        q(a.arrival),
       ]);
       if (this.awards.length > this.opts.maxAwards) {
         this.awards.shift();

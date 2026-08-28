@@ -1041,6 +1041,7 @@ function awardMote(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
     timing: 0,
     aim: 0,
     boostT: 0,
+    arrival: 0,
     climb: 0,
     heat: 0,
     turn: 0,
@@ -1143,6 +1144,7 @@ function awardFlyby(
     timing: 0,
     aim: 0,
     boostT: 0,
+    arrival: 0,
     climb: cash.climb,
     heat: cash.heat,
   };
@@ -1230,6 +1232,8 @@ function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: Pendin
     defl: p.defl,
     timing: p.timing,
     boostT: p.boostT,
+    // For the record only — see `ScoreAward.arrival`. `close` above stays 0.
+    arrival: p.close,
     aim: p.aim,
     climb: cash.climb,
     heat: cash.heat,

@@ -1153,6 +1153,7 @@ const link = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   heat: 0,
   turn: 0,
   boostT: 0,
+  arrival: 0,
   ...over,
 });
 
@@ -2219,6 +2220,13 @@ describe('the burn', () => {
     // line — and the simulation pays an escape for leaving the same band, so a
     // third value drifting would pay for escaping a fire that started elsewhere.
     expect(DEFAULT_SCORE_CONFIG.burnEdgeSpan).toBe(DEFAULT_RENDER_CONFIG.hazardZoneWidth);
+    // The same discipline one span later. `SimConfig.arrivalTightSpan` grades the
+    // flyby conversion refund off `grabR - minR`, which is the quantity this file
+    // grades as `close` — so two spans would let the fuel call an arrival tight
+    // while the score called it loose. The sim owns its own copy because
+    // `src/sim/` may not import from `src/score/`; this is what stops it being a
+    // second opinion.
+    expect(DEFAULT_CONFIG.arrivalTightSpan).toBe(DEFAULT_SCORE_CONFIG.closeSpan);
     expect(DEFAULT_SCORE_CONFIG.burnEdgeSpan).toBe(DEFAULT_CONFIG.escapeBandWidth);
     // The prototype has no burn, but it still has to agree with itself: the band
     // is inert there only because `escapeFling` is 0, not because it is different.

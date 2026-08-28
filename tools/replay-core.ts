@@ -486,6 +486,7 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
     band,
     carry,
     boostT,
+    arrival,
   ] of report.awards) {
     const kind = AWARD_KIND[code];
     if (!kind) {
@@ -540,6 +541,10 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       // different thing, and calibrating the plateau on a pile of them is exactly
       // the mistake this field exists to prevent.
       boostT: boostT ?? NaN,
+      // NaN for the same reason as `boostT`: 0 is a real arrival — a grab right
+      // off the minimum-orbit ring is the tightest there is — so defaulting to it
+      // would fill the distribution with phantom perfect grabs.
+      arrival: arrival ?? NaN,
     });
   }
   return out.length > 0 ? out : null;

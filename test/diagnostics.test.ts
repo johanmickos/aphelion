@@ -573,6 +573,9 @@ describe('a report that survives its own replay diverging', () => {
     const awards = recordedAwards(parsed)!;
     const live = replayReport(parsed).awards;
     expect(awards.map((w) => w.boostT)).toEqual(live.map((w) => Math.round(w.boostT * 100) / 100));
+    expect(awards.map((w) => w.arrival)).toEqual(
+      live.map((w) => Math.round(w.arrival * 100) / 100),
+    );
     // A link that reached the plateau must round-trip a boostT that is INSIDE it,
     // or the field is being written from somewhere that already lost the answer.
     const links = awards.filter((w) => w.kind === 'link' && w.timing > 0);
@@ -587,7 +590,12 @@ describe('a report that survives its own replay diverging', () => {
     // was added to measure, which is the shape of mistake PORT_NOTES 76 records.
     const parsed = parseReport(report());
     parsed.awards = (parsed.awards ?? []).map((a) => a.slice(0, 17) as typeof a);
-    for (const w of recordedAwards(parsed)!) expect(Number.isNaN(w.boostT), `${w.tick}`).toBe(true);
+    for (const w of recordedAwards(parsed)!) {
+      expect(Number.isNaN(w.boostT), `${w.tick}`).toBe(true);
+      // Same again for the arrival: 0 is the TIGHTEST grab there is, so a missing
+      // field read as 0 would be a phantom perfect one.
+      expect(Number.isNaN(w.arrival), `${w.tick}`).toBe(true);
+    }
   });
 
   it('carries every award the session paid, through a round trip', () => {

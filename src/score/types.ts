@@ -160,6 +160,20 @@ export interface ScoreAward {
    * it after the fact.
    */
   boostT: number;
+  /**
+   * How tight the grab this swing BEGAN with was, 0..1. Link only.
+   *
+   * FOR THE RECORD AND NOT FOR PRICING, and the distinction is the reason `close`
+   * beside it is 0 on a link. Arrival qualities belong to the arrival, which
+   * already priced the carry this award is cashing — anything that reads them at
+   * the cash step is paying for them twice, and `close` stays zeroed so it cannot.
+   * This carries the same quantity where a REPORT can see it, because nothing has
+   * recorded an arrival's tightness since F04 removed the grab award, and
+   * `SimConfig.flybyConvertRefund` is now graded on exactly it.
+   *
+   * So: read it in a harness, never in a renderer and never in a weight.
+   */
+  arrival: number;
 }
 
 /**
