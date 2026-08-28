@@ -725,8 +725,23 @@ function stepPhysical(state: SimState, cfg: SimConfig, holding: boolean, dt: num
       cap.periR = nr;
       if (holding) {
         const anchor = state.bodies[cap.planet];
-        freezeOrbit(cap, cfg, anchor?.traits.authored ?? null);
+        const authored = anchor?.traits.authored ?? null;
+        freezeOrbit(cap, cfg, authored);
         cap.phase = 'settle';
+        // The arrival award: fuel for having come in tight, paid the moment the
+        // capture becomes provably real. A tap never reaches periapsis and neither
+        // does a pass that sails by, so this needs no gate of its own.
+        //
+        // NOT on an authored arrival — `freezeOrbit` hands those `tightness = 1`
+        // by fiat, so paying here would award every anomaly arrival and every zip
+        // charge in full. NOT through `cap.fuelBack` either: that counts refunds,
+        // and `test/escape.test.ts` pins it at no more than `fuelSpent`, which is
+        // exactly the bound an award is allowed to break.
+        if (!authored && cfg.arrivalFuelReward > 0) {
+          const over = (cap.grabR - cap.minR) / Math.max(1e-6, cfg.arrivalTightSpan);
+          const tight = over < 0 ? 1 : over > 1 ? 0 : 1 - over;
+          state.fuel = Math.min(cfg.fuelMax, state.fuel + cfg.arrivalFuelReward * tight);
+        }
       }
     }
     cap.prevR = nr;

@@ -27,6 +27,7 @@
   "flybyBrakeShedsWhip": false,
   "flybyConvertRefund": 0,
   "arrivalTightSpan": 200,
+  "arrivalFuelReward": 0,
   "boostThreshold": 0.5,
   "boostMax": 95,
   "boostArmTime": 0.45,

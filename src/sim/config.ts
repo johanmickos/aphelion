@@ -171,6 +171,57 @@ export interface SimConfig {
    * `src/score/`; the pin is what stops that being a second opinion.
    */
   arrivalTightSpan: number;
+  /**
+   * Fuel paid for a tight arrival, at the periapsis freeze. Scaled linearly by the
+   * same tightness `flybyConvertRefund` is graded on. 0 disables it.
+   *
+   * WHY IT EXISTS WHEN THE BRAKE REFUND ALREADY GRADES TIGHTNESS. That is a
+   * REFUND: bounded by `brakeSpent`, so a big burn into a tight capture gets its
+   * money back and never a penny more, and a direct dive that never braked gets
+   * nothing at all. This is the AWARD — asked for as "they do a big burn, get a
+   * tight capture, and then receive a fuel award for the tight capture". The two
+   * are kept apart deliberately and `Capture.fuelBack` counts only the refund,
+   * because `test/escape.test.ts` pins `fuelBack <= fuelSpent` and an award is
+   * exactly the thing that may exceed what was spent.
+   *
+   * WHY AT THE PERIAPSIS FREEZE. Of the three moments — the press, the
+   * circularization, the release — the freeze is the first at which the capture is
+   * provably real: a tap never reaches periapsis and neither does a pass that
+   * sails by, so nothing has to be clawed back and tapping beside a planet cannot
+   * farm it. It is also ahead of the settle burn, which is the half of "a good
+   * capture should reward immediately" that timing can actually buy. Moving the
+   * RELEASE refund earlier could not: the median gap from freeze to release is
+   * 0.40s in one session and 1.08s in another, and paying all of it at the freeze
+   * left the minimum tank identical.
+   *
+   * WHY NOT ON AN AUTHORED ARRIVAL. `freezeOrbit`'s authored path sets
+   * `tightness = 1` unconditionally — "a rest stop does not grade the approach" —
+   * so paying there would hand a full award to every anomaly arrival and every
+   * zip charge, which is a faucet rather than a reward. The award is credited at
+   * the periapsis detector in `stepSim` and nowhere else, which is the same site
+   * that decides a dive converted at all.
+   *
+   * WHY 10. The smallest value meeting `linkFuelReward`'s own benchmark — "never
+   * dropped below 39 fuel and spent none of its life under a quarter tank" — on
+   * the worst fuel session recorded. That session ran 47s at 94% captured, hit
+   * EMPTY, and spent 18% of itself under a quarter tank. Laid over its real trace
+   * with the payment on the recorded freeze tick:
+   *
+   *   award  0   minimum  0   18% under a quarter tank
+   *   award 10   minimum 40    0%
+   *   award 20   minimum 49    0%
+   *
+   * Its arrivals run p10 0.27, p50 0.56, p90 0.76 — nobody gets near 1.0 — so 10
+   * pays a median 5.6 and a good one 7.6, against `linkFuelReward` 22 at the
+   * release. The release stays the bigger prize on purpose.
+   *
+   * SIZED ON ONE SESSION, WHICH IS NOT A DISTRIBUTION. `arrival` has only been
+   * recorded since SIM_VERSION 31 and that is the only report carrying it. The
+   * conservative direction is down: this closes a deficit rather than removing a
+   * constraint, and 10 was chosen as the floor that does so rather than a value
+   * that felt right.
+   */
+  arrivalFuelReward: number;
 
   // --- boost ---
   boostThreshold: number;
@@ -1149,6 +1200,7 @@ export const PROTOTYPE_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyBrakeShedsWhip: false,
   flybyConvertRefund: 0,
   arrivalTightSpan: 200,
+  arrivalFuelReward: 0,
 
   boostThreshold: 0.5,
   boostMax: 95,
@@ -1324,6 +1376,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
   flybyBrakeShedsWhip: true,
   flybyConvertRefund: 0.5,
   arrivalTightSpan: 200,
+  arrivalFuelReward: 10,
   fuelRegen: 30,
   linkFuelReward: 22,
   fieldWidthFrac: 1.9,
@@ -1391,7 +1444,7 @@ export const DEFAULT_CONFIG: Readonly<SimConfig> = Object.freeze({
  * code" apart from "the simulation is non-deterministic". Those look identical in
  * the numbers and could not be more different in what they mean.
  */
-export const SIM_VERSION = 31;
+export const SIM_VERSION = 32;
 
 /** The canonical simulation timestep. Passed as a parameter, never read globally. */
 export const FIXED_DT = 1 / 60;

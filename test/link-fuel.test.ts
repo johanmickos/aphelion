@@ -72,6 +72,107 @@ function capture(cfg: SimConfig, pressTick: number, releaseTick: number, startFu
   return out;
 }
 
+/**
+ * Fly a dive and report the tank across the periapsis freeze, which is where the
+ * arrival award lands. Returns null if the dive never converted.
+ */
+function freeze(
+  cfg: SimConfig,
+  pressTick = 179,
+  ticks = 420,
+): { before: number; after: number; tight: number } | null {
+  const state = createInitialState(cfg);
+  // THE NERVE-GRAB LINE, not the default spawn's, and the difference decides
+  // whether this file tests anything. The spawn's dive arrives 228-291px above the
+  // minimum orbit at every press tick from 10 to 50 — always outside
+  // `arrivalTightSpan`, so the award is always exactly 0 and every assertion below
+  // would pass on a fixture that could never earn it. This line is
+  // `test/score.test.ts`'s 'head-on, pressed late' and arrives at 52px, which is
+  // a tightness of 0.74 against real play's median 0.56.
+  Object.assign(state.ship, { x: 189, y: 400, vx: 0, vy: -97 });
+  for (let i = 0; i < ticks; i++) {
+    // Set at the PRESS, not at the start: the dive-in drifts for three seconds and
+    // `fuelRegen` refills the tank to full over it, which clips the award to zero
+    // and hides the scaling being asserted.
+    if (i === pressTick) state.fuel = cfg.fuelMax * 0.5;
+    // BY VALUE, not by reference. `state.capture` is mutated in place rather than
+    // replaced, so holding the object and reading `.phase` after the step reads
+    // the NEW phase and the transition is never seen — which is how the first
+    // version of this helper returned null on every config.
+    const wasPhase = state.capture?.phase ?? null;
+    const before = state.fuel;
+    const grabR = state.capture?.grabR ?? 0;
+    const minR = state.capture?.minR ?? 0;
+    stepSim(
+      state,
+      cfg,
+      { held: i >= pressTick, pressed: i === pressTick, released: false },
+      FIXED_DT,
+    );
+    if (wasPhase !== null && wasPhase !== 'settle' && state.capture?.phase === 'settle') {
+      const over = (grabR - minR) / Math.max(1e-6, cfg.arrivalTightSpan);
+      return { before, after: state.fuel, tight: over < 0 ? 1 : over > 1 ? 0 : 1 - over };
+    }
+  }
+  return null;
+}
+
+describe('the arrival award', () => {
+  it('pays at the periapsis freeze, scaled by how tight the grab was', () => {
+    // Asked for as "they do a big burn, get a tight capture, and then receive a
+    // fuel award for the tight capture" — an AWARD rather than the brake's refund,
+    // so it is not bounded by anything spent and a dive that never braked gets it.
+    const f = freeze(DEFAULT_CONFIG)!;
+    expect(f).not.toBeNull();
+    expect(f.tight).toBeGreaterThan(0);
+    expect(f.after - f.before).toBeCloseTo(DEFAULT_CONFIG.arrivalFuelReward * f.tight, 6);
+  });
+
+  it('pays nothing at the freeze when the reward is off', () => {
+    // The control. Without it this whole file would pass on a fixture that simply
+    // regenerated, which is the trap `AGENTS.md` names for the render knobs.
+    const f = freeze({ ...DEFAULT_CONFIG, arrivalFuelReward: 0 })!;
+    expect(f.after - f.before).toBeCloseTo(0, 6);
+  });
+
+  it('grades it: a looser arrival is worth less', () => {
+    // Shrinking the span makes every arrival read as loose, which is the only lever
+    // the fixture has over its own geometry.
+    const tightSpan = freeze(DEFAULT_CONFIG)!;
+    const looseSpan = freeze({ ...DEFAULT_CONFIG, arrivalTightSpan: 1e-9 })!;
+    expect(looseSpan.after - looseSpan.before).toBeCloseTo(0, 6);
+    expect(tightSpan.after - tightSpan.before).toBeGreaterThan(0);
+  });
+
+  it('is off in the prototype config, which is what keeps the gate at zero', () => {
+    expect(PROTOTYPE_CONFIG.arrivalFuelReward).toBe(0);
+    expect(DEFAULT_CONFIG.arrivalFuelReward).toBeGreaterThan(0);
+  });
+
+  it('does not count as a refund, because it may exceed what was spent', () => {
+    // `Capture.fuelBack` is refunds only and `test/escape.test.ts` pins it at no
+    // more than `fuelSpent`. The award is exactly the thing allowed to break that
+    // bound — at the freeze a direct dive has spent nothing on braking at all — so
+    // it must not be routed through that counter.
+    const state = createInitialState(DEFAULT_CONFIG);
+    state.fuel = DEFAULT_CONFIG.fuelMax * 0.5;
+    for (let i = 0; i < 400; i++) {
+      stepSim(
+        state,
+        DEFAULT_CONFIG,
+        { held: i >= 18, pressed: i === 18, released: false },
+        FIXED_DT,
+      );
+      const cap = state.capture;
+      if (cap && cap.phase === 'settle') {
+        expect(cap.fuelBack).toBeLessThanOrEqual(cap.fuelSpent + 1e-9);
+        return;
+      }
+    }
+    throw new Error('never froze');
+  });
+});
+
 describe('the link fuel refund', () => {
   it('pays a release that earned its boost, scaled by the boost envelope', () => {
     const r = capture(DEFAULT_CONFIG, 18, 150);
