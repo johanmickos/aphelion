@@ -236,29 +236,44 @@ Landed:
   stays the score, and at 0.25 a good session's displayed best is 77k against a
   stated 100k ceiling.
 
-#### What stage (c) still wants, and it is a phone
+#### What stage (c) still wants — and it is now three values, not a programme
 
-**Everything below needs a session flown on the current build**, and the two
-values landed this session are the reason it is worth flying rather than reasoning
-about:
+Most of what this section used to list is closed. PORT_NOTES 78 is the anchor:
+`diagnostics/2026-08-28T18-16-34-168Z.json` is a 105s run scoring **105,364 on its
+best life**, which is the ceiling the author named, and `tools/score-profile.ts`
+prints its shape so a change can be measured against it.
 
-- **`boostPeakAt` is a fit, not a percentile**, and `boostT` now makes the real
-  measurement available. This is the one to do first: it is the only threshold in
-  the game that was calibrated by extrapolating a density.
-- **Whether the jackpot is lucrative enough.** The survival rates behind
-  `bandStep` are from drags that were ACCIDENTS, so they are floors. A session
-  flown going FOR the top rung is what prices it.
-- **`flybyTurnSpan` on more than 42 passes**, whose error surface is flat from 81
-  to 91.
-- **`tightMax` and `chainStep`.** 2 and 0.1, both legible rather than measured.
-  The pair currently multiplies the carry by a median 2.7x over `climbPerPx`.
-- **Whether a rescue at ~7x is too generous**, which needs a rescue flown under
-  the new economy — neither session so far had one.
-- **The tier's zone fractions.** Direction 06's 0.40 / 0.70 / 0.92 are design
-  intent and a measurement cannot refute them; where they LAND is still 84 / 60 /
-  27% of swings against an intent of 60 / 30 / +-8%. Fixing the two saturating
-  inputs was the agreed first move and it is done; whether anything is left to fix
-  is the next session's question, not this one's.
+Settled, with the evidence:
+
+- ~~**`boostPeakAt` is a fit, not a percentile**~~ — VALIDATED. `boostT` measured
+  the in-plateau releases at a median 0.88s against the 0.90s the density
+  extrapolation predicted. A 2% error on the weakest number in the game.
+- ~~**Whether the jackpot is lucrative enough**~~ — RETIRED WITH THE BAND. The
+  three-rung ladder is deleted; the fire is a per-metre rate (`fireBoost`). And a
+  100k run touches the fire **zero** times, so it was never load-bearing.
+- ~~**`flybyTurnSpan` on more than 42 passes**~~ — re-measured on 85 and moved
+  81 -> 105. PORT_NOTES 76 has the method, and expect it to move again.
+- ~~**The tier's zone fractions**~~ — they land at x1 20% / TRUE 33% / SHARP 35% /
+  PERFECT 11% on the anchor run, which is Direction 06's intent. Nothing to fix.
+- ~~**`climbPerPx`**~~ — 0.25 confirmed by a run that hit the stated ceiling.
+
+Still open, and all three are ordinary tuning rather than a stage:
+
+- **`fireBoost` 1.5.** Placed to match the deleted ladder's top-end ratio applied
+  to the right metres. The number that would calibrate it — how many metres a real
+  wall-ride climbs while hot — is in no recording, because the carry's factors are
+  applied tick by tick and only their product reaches the tuple. `ScoreAward.band`
+  reports what the fire was worth per swing, so a session with deliberate wall
+  work measures it.
+- **`tightMax` and `chainStep`**, 2 and 0.1, both legible rather than measured —
+  and PORT_NOTES 78 is why `tightMax` has never shown up in a session's numbers:
+  it spreads 1.32x against climb's 4.6x. **Do not raise it to fix the
+  capture-versus-pass complaint**; that is measured to make it worse.
+- **Whether a rescue at ~7x is too generous**, which still needs one flown.
+
+**This file can be deleted the moment those three stop being interesting.**
+Everything in it that survives is already at a declaration or in PORT_NOTES 73,
+74, 76, 77 and 78.
 
 #### The reading from the first session, corrected
 
