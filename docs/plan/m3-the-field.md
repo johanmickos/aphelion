@@ -35,6 +35,11 @@ opinions:
 - **The cap**: how much extra a taller device may see, so that what a player can see is bounded
   above as well as below.
 
+**And the view this costs is bought back with sightings**, which is [M2.2](./m2-the-instrument.md)'s
+and lands before this step — a body the picture cannot show, marked on the edge of it in its own
+hue. It is the other half of the ruling rather than a separate feature, and the ordering matters:
+narrowing the view before there is anything to replace it with is a step that only takes.
+
 The evidence they are sized against is [M1.5's](./m1-the-swing.md), measured over 877 releases:
 unguarded, devices see **496 – 846** prototype units of height, and the body a craft next grabs is
 on screen at the moment of release **45 – 89%** of the time. Fitting whole gives a flat 88% and a

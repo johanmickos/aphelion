@@ -45,12 +45,17 @@ neighbours, excluding the violet–pink band and the quality bands.
 body's own hue, ahead of the climb only, never for a body already on screen. It belongs here rather
 than with the compass because it is the same hue machinery answering the same question one state
 further out, and because it is **always on**: the compass needs an orbit, and a sighting is the
-whole of what a coasting craft has to read. Two things in §6 are open and are the author's — how a
-sighting says how far, and whether the body a press would take is marked differently.
+whole of what a coasting craft has to read. Direction 03's dot in identity hue is the whole of what
+is built; the prototype's distance labels and its ring on the offered body are recorded in §6 with
+their evidence and are not.
 
-It is also the mitigation for what [M3.1](./m3-the-field.md) is about to do: with the width fixed
-and the height flexing, the body a craft next grabs is off the picture at the moment of release
-**32%** of the time on a phone in a browser, against 12% today.
+**It is the other half of spec [00 · §7](../spec/00-tokens.md)'s ruling and not a decoration on
+it** — *"markers to objects off-screen is the way we deal with the information loss of fixing the
+width"* (author, 2026-08-28). With the width fixed and the height flexing, the body a craft next
+grabs is off the picture at the moment of release **32%** of the time on a phone in a browser,
+against 12% today, and a sighting is what that 32% reads instead. **So this lands before
+[M3.1](./m3-the-field.md) changes the fit**, which the milestone order already gives — it is
+written down because an ordering nobody wrote down is an ordering that gets swapped.
 
 **Acceptance**: the four states are visually distinct and assertable in presentation state;
 the tide tracks with lag; hue generation obeys the exclusion rule; a body on screen has no sighting

@@ -105,12 +105,17 @@ No collision resolution between them; they may overlap.
 | Form | A dot on the edge of the picture, in the body's **identity hue** | Direction 03 |
 | Which bodies | Off the picture, ahead of the climb, and within reach | Direction 03 |
 | Direction | The mark's position on the edge, never a drawn vector | Direction 03 |
-| Distance | **Open** — see below | — |
+| Distance | **Not carried.** Direction 03 rules no labels, and nothing replaces them | Direction 03 |
 | Behind the climb | **Never drawn.** A mark below the craft points at somewhere it has already been, which is clutter and a suggestion to turn around | Carried |
 | Already on screen | **Never drawn.** A mark pointing at a thing the player can see is clutter over the exact thing it was pointing at | Carried |
 | When | **Always**, whether or not a body is held | Carried |
 
-**They exist for the moments the compass cannot reach.** The compass needs an orbit, so it exists
+**They are how the game pays for a fixed width** (author, 2026-08-28). Spec
+[00 · §7](./00-tokens.md) fixes the design *width* and lets the visible height flex, which buys a
+full-size picture and costs field of view; sightings are what the lost view is replaced with, so
+this section is not a decoration on §7's ruling but the other half of it.
+
+**And they exist for the moments the compass cannot reach.** The compass needs an orbit, so it exists
 only inside a swing; a sighting is the whole of what a coasting craft has to go on, and that is
 exactly the long drift and the fast flyby — the moments when knowing where anything is matters most
 (carried from the prototype, [ADR-0013](../adr/0013-carry-the-behaviour-re-derive-the-mechanism.md)).
@@ -119,23 +124,26 @@ reached another body, the body the craft next grabs is **outside the picture 12%
 the design space is fitted today, and **32%** under §7's ruled fit. A sighting is what that 32% has
 to read instead.
 
-> **Open — how a sighting says how far.** Direction 03 rules *"no labels"*, and this spec drew the
-> conclusion that a sighting therefore carries no distance at all, at a flat E1. Both cannot be
-> what is wanted: the author asks for *"how far away they are"* (2026-08-28) and the board refuses
-> the number. **Brightness is the game's only ordinal channel** (spec [00 · §3](./00-tokens.md)) and
-> hue is already spent on identity, so distance as brightness is the one answer that needs no
-> label and breaks no rule. The prototype ramps it continuously — full strength at 200 units,
-> floor at 1 600 — where this palette has four steps. What is open is only whether a sighting
-> steps E0 – E2 with distance or stays flat at E1 and says nothing about it.
+**Two things the prototype has and this does not**, recorded with their evidence rather than left
+to be re-derived — because the author's ask was *the role* and not the prototype's form: *"I don't
+necessarily need the arrows and distances from the original; I was asserting that markers to
+objects off-screen is the way we deal with the information loss of fixing the width"*
+(2026-08-28). Direction 03's dot in identity hue is a complete answer to that, and it is what is
+built.
 
-> **Open — whether the body a press would take is marked differently.** The prototype rings that
-> one at full strength whatever the distance says, and **keeps the ring when the body comes into
-> view**, moving it from the edge onto the body — *"the cue must not blink out at the moment the
-> thing it points at comes into view, because that is exactly when the player is deciding."* Its
-> evidence is a measured session: the craft was inside the grab window for **1.03s** and could see
-> the body itself for **0.23s** of that. It is a fact about what the button would do rather than an
-> instruction, so nothing refuses it — but it is a second cue in the same place as the compass's
-> job, and whether this game wants it is the author's.
+- **Distance.** The prototype fades a marker with range — full strength at 200 units, a floor at
+  1 600 — and prints the number beside it. Direction 03 refuses the label, and the fade has no
+  replacement here: **brightness is the game's only ordinal channel** (spec
+  [00 · §3](./00-tokens.md)) and hue is already spent on identity, so if a sighting ever needs to
+  say how far, stepping its energy is the one answer that needs no label and breaks no rule. It
+  says nothing about distance today, at a flat E1.
+- **The body a press would take.** The prototype rings that one at full strength and **keeps the
+  ring when the body comes into view**, moving it from the edge onto the body — *"the cue must not
+  blink out at the moment the thing it points at comes into view, because that is exactly when the
+  player is deciding."* Its evidence is a measured session: the craft was inside the grab window
+  for **1.03s** and could see the body itself for **0.23s** of that. It is a fact about what the
+  button would do rather than an instruction, so nothing refuses it — but the compass is about to
+  be built over the same question, and this is worth revisiting once it exists rather than before.
 
 **Reach is not yet a number.** *"Within reach"* is Direction 03's phrase and the prototype carries
 an explicit range beyond which nothing is marked. What it should be here is spec

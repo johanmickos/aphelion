@@ -224,6 +224,13 @@ anywhere from **45% to 89%** of the time.
 - **A cap on the extra.** A device tall enough to show more than the band does not get unbounded
   extra field, so what a player can see is bounded above as well as below.
 
+**And the field of view this costs is bought back with sightings** (author, 2026-08-28) — spec
+[03 · §6](./03-hud.md), a body the picture cannot show marked on the edge of it in its own hue.
+That is the other half of this ruling rather than a separate feature: fixing the width takes the
+body a craft next grabs off the picture at the moment of release **32%** of the time against 12%
+when the rectangle is fitted whole, and a sighting is what that 32% reads instead. They arrive in
+[M2.2](../plan/m2-the-instrument.md), before [M3.1](../plan/m3-the-field.md) changes the fit.
+
 Both numbers are [M3.1](../plan/m3-the-field.md)'s to measure, along with the fit itself; what is
 built today still fits the design space whole, and says so. The thumb line below was already
 written against the *screen* rather than the design space, and this is the reading it always
