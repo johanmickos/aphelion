@@ -237,19 +237,31 @@ export interface ScoreConfig {
    * top rung automatically. A 64-degree pass and a 156-degree pass graded
    * identically, and half of every pass in the game was a PERFECT.
    *
-   * 81 IS WHERE THE TWO MANOEUVRES GRADE ALIKE, which is the only reading of "one
+   * 105 IS WHERE THE TWO MANOEUVRES GRADE ALIKE, which is the only reading of "one
    * ladder" that survives the two distributions being different shapes. Sweeping
-   * the span and comparing the rung mix against the 47 recorded releases:
+   * the span and comparing the rung mix against the recorded releases, pooled over
+   * the seven sessions flown on this envelope — 153 releases and 85 passes:
    *
-   *   releases                   19% none  23% TRUE  38% SHARP  19% PERFECT
-   *   passes at span 60          12%       24%       12%        52%
-   *   passes at span 81          21%       26%       26%        26%
-   *   passes at span 120         43%       33%       12%        12%
+   *   releases                   25% none  36% TRUE  29% SHARP  10% PERFECT
+   *   passes at span  81         27%       27%       11%        35%
+   *   passes at span 105         40%       24%       19%        18%
+   *   passes at span 130         51%       28%       15%         6%
    *
-   * The error surface is flat from 81 to 91 on n=42, so this is a range and not a
-   * point; 81 is its minimum rather than a number chosen for looking like one.
-   * The rungs land at 32 / 57 / 75 degrees, which is p21 / p48 / p74 of recorded
-   * passes.
+   * The error surface is flat from 105 to 110 and shallow either side of it, so
+   * this is a range whose minimum is 105 rather than a number chosen for looking
+   * like one.
+   *
+   * IT HAS NOW BEEN RE-MEASURED TWICE AND MOVED BOTH TIMES, 60 -> 81 -> 105, and
+   * the sample doubled at each step: 249 reconstructed passes, then 42 recorded
+   * ones, then 85. Expect it to move again, and note what the defect looks like
+   * each time — the span sits under the top of real play, so passes clamp
+   * `turnFrac` to 1 and take the top rung automatically. At 81 that was 26 of 85,
+   * which is an 82-degree pass and a 142-degree pass grading identically; at 105
+   * it is 10.
+   *
+   * A HIGH "no tier at all" SHARE IS NOT THE DEFECT and should not be tuned away.
+   * 40% of passes scoring nothing is this key working: a pass that barely bends
+   * the ship was never meant to be paid for arriving next to a planet.
    *
    * A SPAN AND NOT A FLOOR, which is the half a gate cannot do. The passes that
    * pay wrongly are not the near-zero ones but the mid band riding a ladder built
@@ -502,7 +514,7 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   tierTrue: 1.25,
   tierSharp: 1.5,
   tierPerfect: 2,
-  flybyTurnSpan: 81,
+  flybyTurnSpan: 105,
 
   burnEdgeSpan: 60,
   burnRate: 555,

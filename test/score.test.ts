@@ -1793,15 +1793,18 @@ describe('a flyby that stays a flyby', () => {
     // what keeps one ladder in the game instead of two.
     //
     // THIS PIN USED TO SAY THE LONGEST HOLD TOPS THE LADDER OUT, and it did while
-    // `flybyTurnSpan` was 60. It is 81 now, re-measured off the 42 passes a phone
-    // actually recorded under the award — 60 had ended up below the median real
-    // pass — and this fixture's geometry caps at 68.4 degrees however long the
-    // button is held, so it lands on SHARP. That is the assertion's new truth and
-    // it is a better one: the pass is still graded, still monotone in the turn,
-    // and no longer automatically the best pass in the game for having happened.
+    // `flybyTurnSpan` was 60. The span has been re-measured twice since — 81, then
+    // 105 — and each time the sample doubled, so it is written as a PROPERTY
+    // rather than as a rung: pinning the exact tier meant editing this line every
+    // time a threshold was measured, which is how a pin stops meaning anything.
+    //
+    // What must stay true is that the fixture's pass is GRADED and does not top
+    // the ladder for merely having happened. Its geometry caps at 68.4 degrees
+    // however long the button is held, which is TRUE at the span of the day.
     expect(held[2]!.turn).toBeLessThan(DEFAULT_SCORE_CONFIG.flybyTurnSpan);
-    expect(held[2]!.tier).toBe(DEFAULT_SCORE_CONFIG.tierSharp);
-    // ...and the shortest swings a fraction of it and cannot.
+    expect(held[2]!.tier).toBeLessThan(DEFAULT_SCORE_CONFIG.tierPerfect);
+    expect(held[2]!.tier).toBeGreaterThan(1);
+    // ...and the shortest swings a fraction of it and cannot do as well.
     expect(held[0]!.tier).toBeLessThan(held[2]!.tier);
   });
 
