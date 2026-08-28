@@ -4802,6 +4802,114 @@ being spent by it. Nothing under `src/sim/` moved — the equality gate read
 
 ---
 
+### 74 — The economy stopped minting, and four of its own numbers did not survive the swap
+
+F04 stage (b): eleven `ScoreConfig` keys deleted, the formula replaced with
+`carry x tier x band x streak`, both required pixels drawn, and 47% of the game's
+popups removed as a consequence rather than as a policy. What this note records is
+the part that was not in the plan — the four things that had to change once the
+formula was real, and one defect the old economy was hiding.
+
+**The economy, for the record.** Metres climbed while engaged accrue into a carry,
+priced as they are climbed by the chain rate and multiplied whole by the tightness
+of every arrival; a release cashes the carry at tier x band x streak. One source,
+four multipliers, and a carpet dot is the only flat award left in the game.
+
+**Two counters where the plan implied one.** Direction 08 has chain (+10%/link,
+inside the carry) AND streak (in the cash step), and says they are two systems with
+two pixels — but the code had exactly one counter, which the board's own definition
+would call a chain. Reading them as one quantity used twice is the "combos of
+combos" axiom 1 refuses, so they are two with different break rules: **chain** steps
+on every capture BEGUN, zips and passes included, and breaks when the gap gate
+expires; **streak** steps only on a swing that cashed, and breaks on a putter-out.
+That also makes `hopBonus`'s re-home real — a zip is an engagement, so a charged
+window drives the chain instead of paying a flat 500 a body. The chain is uncapped,
+which is the one deliberate departure from the board: VISION's standing open call is
+that the ceiling binds 22 seconds in and the most prominent number on screen then
+never moves again, and a second ceiling would rebuild exactly that.
+
+**The tier is a discrete ladder and both sharpness keys survive it.** Direction 06
+rev 2 specifies TRUE / SHARP / PERFECT at the inner 60% / 30% / +-8% of the window,
+priced x1.25 / x1.5 / x2, and F04's ruling is that the tier grades the CONJUNCTION
+rather than the angle. So the quality is `aim^aimSharpness * timing^timingSharpness`
+and each rung threshold is that expression evaluated at the board's zone fraction:
+0.0102, 0.1681, 0.6591. A pass grades on the same three rungs by passing its swept
+turn as both axes, which lands `turnFrac^(aimSharpness + timingSharpness)` exactly
+on the same lines — one ladder for both manoeuvres rather than two sets of numbers
+free to drift.
+
+**The band's steps are drawn, but they are not the thresholds.** `bandTwoAt` and
+`bandThreeAt` are integrals in heat-seconds, so no fixed x on the hazard gradient
+corresponds to either — how long the ship stays is half of the quantity. What the
+three drawn steps mark is where the heat that fills them changes rate, which is the
+part the geometry can honestly say. That distinction is written at
+`drawHazardZones`, because the obvious "fix" is to move the steps to the thresholds
+and it would be drawing a ladder the score does not use.
+
+**A DEFECT THE OLD ECONOMY HID: a whole capture's climb was being gated as a
+coast.** `SimConfig.holdClimbInCapture` freezes `highWaterY` for the duration of a
+capture — deliberately, because an orbit is a round trip and counting the near
+side's height puts the trailing floor at the apex the far side then flies into — so
+the mark does not move at all while attached and jumps by the entire climb on the
+tick the ship lets go. The old `awardLink` differenced `climbFromY` at the release
+and never noticed. Stage (a)'s per-tick accrual reads `state.capture` to decide
+whether metres are engaged, and on that one tick the capture is already gone, so
+the lump was being clipped to whatever the gate had left: **an 880px pass banked
+560 of it.** The fix is one clause — `state.capture || sc.wasCaptured`, since
+`scoreTick` updates `wasCaptured` at the bottom — and it also settles where the
+orbiting faucet is closed, which is in the simulation rather than in any scoring
+rule. Direction 08 lists "orbiting earns nothing per lap" under what deliberately
+earns nothing and says "altitude while orbiting is approximately 0, so the formula
+already says so". It is the held mark that makes that true.
+
+**`burnMinHeat` stopped being a weight, and it had been shaped by its own test.**
+Its declaration said so: "the honest value for that is zero... it is 0.01 rather
+than 0 for a mechanical reason worth writing down: `test/score.test.ts` proves a
+weight is live by trying it at 0, half and double, and every one of those is 0 when
+the value is 0". It was a weight because it BRACKETED the flare, deciding what
+counted as one drag rather than two and therefore how many burn awards a capture
+paid. There are no burn awards now — the heat integrates across the whole swing and
+is spent once, by the release — so it cannot change what a session scores. It is
+`BURN_MIN_HEAT = 0` next to `edgeHeat`, which is `AGENTS.md`'s rule for a value that
+only says when something is judged, and it takes the honest number with it.
+
+**Two fixture holes, and both are the `fuelRegen` failure arriving from a new
+direction.** The dead-zone drag session never released, which was fine while the
+burn paid when the fire went out and is fatal now that the release is what cashes a
+band — all four `burn*` keys measured as dead because the fixture stopped reaching
+a mechanism that had moved. And the battery only ever landed on two rungs of the
+tier ladder: the pilot releases at the turnover of its own quality, at SHARP or at
+nothing, and the flyby fixture sweeps past the top and lands PERFECT, so `tierTrue`
+had nothing to move. A session releasing at tick 330 sits at q 0.026, between the
+TRUE line and SHARP, and twenty ticks later it is 0.72 and PERFECT — which is how
+narrow that window is and why the fixture is written down rather than reasoned. The
+sweep now collects every dead key instead of throwing on the first, because the
+useful failure message is the whole list.
+
+**What a diagnostics report from before this looks like.** Every recording in
+`diagnostics/` predates the constitution, so most of their awards carry codes there
+is no longer a kind for. `recordedAwards` drops those and counts them, and the
+replay prints a line saying the session was flown under the additive economy and
+its prices no longer exist — because the old wording ("the replay parted company at
+tick N") reads as a divergence, which is the one conclusion a reader must not draw
+here. The FRAMES are still phone truth: positions, velocity and fuel every 60 ticks
+off a fixed seed. It is the prices that are gone.
+
+**Scale, and why it is not calibrated.** A 4000-tick pilot session now peaks at 285
+against thousands under the additive economy, because the score is literally
+proportional to ground covered and `climbPerPx` is still 0.25 — Direction 08's own
+worked example prices a metre at 1 point. Every magnitude in the new formula is
+provisional and says so at its declaration. Calibrating them is stage (c) and it
+cannot start against this corpus: all 67 recordings are 20-25 August and predate the
+release kick, the flyby retune and the ending, and VISION is explicit that a
+threshold measured under tuning that has since moved is worse than an unmeasured
+one, because it looks defensible.
+
+Nothing under `src/sim/` changed. The equality gate read `0.000e+0` across all ten
+scenarios, the golden did not move, and `SIM_VERSION` did not need a bump.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -4824,12 +4932,12 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    render 203 · score 99 · camera 55 · invariants 32 · charged 26
-         diagnostics 25 · world 23 · carpet 22 · anomaly 19 · cleared 16
+tests    render 205 · score 98 · camera 55 · invariants 32 · diagnostics 25
+         charged 25 · world 23 · carpet 22 · anomaly 20 · cleared 16
          backtrack 15 · palette 15 · rescue 15 · clearance 14 · flyby-fuel 14
          attract 13 · kick 13 · tune 13 · input 12 · port-equality 11
          run-stats 10 · course 9 · grab-target 8 · boost-envelope 6
-         escape 6 · link-fuel 6 · outbound-grab 6 · 706 total
+         escape 6 · link-fuel 6 · outbound-grab 6 · 707 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

@@ -6,49 +6,65 @@ import type { DeadlineWall } from '../sim/rescue.ts';
 export interface ScoreAward {
   tick: number;
   /**
-   * `grab` and `link` are two separate scoring events on one capture.
+   * THREE KINDS, WHERE THERE WERE SEVEN. F04 stage (b) deleted `grab`, `hop`,
+   * `rescue` and `burn` — not by a popup policy but by the economy: none of them
+   * mints any more, so none of them is a payment, so none of them is an award.
    *
-   * A grab is judged on how you arrived — how close you let the body get, and
-   * whether you were already boring in. Those facts are settled the instant you
-   * press, and holding them back until the release put the feedback two seconds
-   * after the act it described. A link is judged on how you left: where in the
-   * boost window, and how near the compass marker.
+   * That is 47% of every popup in the game removed structurally. PORT_NOTES 59
+   * measured the reported defect — "so many at so many different points that the
+   * user doesn't know what they're being rewarded for" — at 31.7 things a minute,
+   * with 74% of awards carrying nothing but a number, composed link 36% / grab
+   * 32% / rescue 11% / flyby 10% / shouts 7% / burn 4%.
    *
-   * The grab pays when the dive SWINGS THROUGH PERIAPSIS, not when the button
-   * goes down. A tap that never reaches the bottom earns nothing, which is what
-   * stops a stationary tap-tap-tap next to a planet from being a points faucet —
-   * and it means holding on into a full orbit still collects, because periapsis
-   * is already behind you.
+   * Every one of the deleted axes still scores; it scores as a multiplier on the
+   * swing that follows, which is announced by a pixel instead of by a number
+   * floating off the ship. A tight arrival multiplies the carry, a hot pass sets
+   * the band, a zip steps the chain, and a rescue is worth about 7x an ordinary
+   * swing without anything anywhere naming it a rescue.
    *
-   * `flyby` is the one that is not part of a capture at all.
-   * A grab too fast to be held becomes a flyby; hold it through its closest
-   * approach without letting gravity catch you and it pays, and it steps the
-   * streak. It exists because the ladder used to be a count of LINKS, so a run
-   * that crossed the field fast could never climb it — measured over one session,
-   * a chained life ran at x5-x7 while a life covering 3.1x the ground per second
-   * topped out at x2 and earned a fifteenth as much per pixel climbed. Speed is
-   * skill and had no way to be paid for it.
+   * `link` and `flyby` are the two ways a swing cashes, and they are the same
+   * event wearing different clothes: `carry * tier * band * streak`, settled at
+   * the moment the ship stops being able to change what it did. They are mutually
+   * exclusive by construction — a flyby that converts does so BEFORE its
+   * periapsis, since conversion needs bound and inbound, so a pass that becomes a
+   * capture is paid once, as a link.
    *
-   * Mutually exclusive with `grab` by construction: a flyby that converts into a
-   * capture does so BEFORE its periapsis (conversion needs bound and inbound), so
-   * by the time the radius bottoms out the phase is `clear` and the grab award is
-   * the one that fires. Nothing is paid twice.
-   *
-   * `burn` is the odd one out of all of them: the only award that ACCRUES rather
-   * than being read off an instant. It integrates how deep into the edge dead zone
-   * a captured ship is and pays when the fire goes out, one capture can raise two
-   * of them, and a DEATH cancels one outright — see `endLife`.
-   */
-  /**
-   * `mote` is a dot flown through in the run-in carpet — the one award that is not
-   * about a body at all. It pays flat and steps nothing; see
+   * `mote` is a dot flown through in the run-in carpet: the one award that is not
+   * about a body, the one that still mints, and the one that steps nothing. See
    * `ScoreConfig.moteBonus`.
    */
-  kind: 'grab' | 'link' | 'hop' | 'flyby' | 'burn' | 'rescue' | 'mote';
+  kind: 'link' | 'flyby' | 'mote';
   /** Points actually applied. Never negative — nothing takes points away. */
   points: number;
-  /** The multiplier in force. */
+  /**
+   * Everything the carry was multiplied by: `tier * band * streak`.
+   *
+   * The whole product rather than the streak alone, because the popup prints it
+   * and the receipt has to explain its own number. A player who reads `x6.00`
+   * beside a total that is six times the carry can check the arithmetic; one who
+   * reads the streak alone cannot.
+   */
   multiplier: number;
+  /**
+   * The rung this release earned, as its multiplier. 1 for a release inside the
+   * window that cleared no rung.
+   *
+   * Carried as the number rather than as a name because F04 owns the price and
+   * F09 owns the vocabulary — TRUE / SHARP / PERFECT are Direction 06's words and
+   * naming them here would be pre-empting a plan that is still open.
+   */
+  tier: number;
+  /** Which of the three fire bands the swing cashed in: 1, 2 or 3. */
+  band: number;
+  /**
+   * The priced carry this swing cashed, before `multiplier`.
+   *
+   * Points rather than pixels: the chain rate and every arrival's tightness are
+   * already in it, which is what "the carry" means. `climb` is the same swing in
+   * raw pixels, and the two are deliberately both here — a receipt that reported
+   * only the priced figure could not show what the pricing did.
+   */
+  carry: number;
   /** The body this is about. */
   body: string;
   /**
@@ -101,15 +117,21 @@ export interface ScoreAward {
   timing: number;
   /** Best compass alignment at release. 0..1. Link only. */
   aim: number;
-  /** World pixels of climb banked into this link. */
+  /**
+   * World pixels of climb that fed this swing's carry, gate included.
+   *
+   * The RAW ground covered, so `carry / climb` is exactly what the chain and the
+   * arrivals were worth per pixel. Metres lost to the coast gap are not in it:
+   * they never became carry, and reporting them would make the ratio a lie.
+   */
   climb: number;
   /**
-   * Deepest the drag got into the dead zone, 0..1. Burn only.
+   * Deepest this swing got into the dead zone, 0..1. 0 for one that never burned.
    *
-   * The PEAK rather than the integral, because it is what the word is chosen on
-   * and a word describes the moment, not the invoice. Two drags worth the same
-   * points can be a long shallow graze and a brief plunge at the line; only the
-   * second deserves to be called an inferno.
+   * The PEAK rather than the integral, and the integral is what selected `band` —
+   * so the two together say how the band was earned: a long shallow graze and a
+   * brief plunge at the line can cash in the same band, and only the second one
+   * reads as a plunge. It is the number the debrief and the replay quote.
    */
   heat: number;
   /**
@@ -179,19 +201,46 @@ export interface ScoreState {
    */
   bank: number;
   /**
-   * Metres climbed and not yet cashed, priced but unpaid. Direction 08's "at
-   * stake, glowing".
+   * Points climbed and not yet cashed — Direction 08's "at stake, glowing".
    *
-   * NOT YET SPENT, AND THAT IS STAGE (a)'S WHOLE POINT. `awardLink` still prices
-   * its own climb from `climbFromY`, exactly as it always has, so no number this
-   * accrual produces reaches a score. It is built and pinned here so the risky
-   * half of F04 — the gap gate below — exists in a stage where it cannot change an
-   * outcome. Stage (b) makes the link spend this instead.
+   * THE ONLY POT IN THE GAME. Metres accrue into it at `climbPerPx`, priced as
+   * they are climbed by the chain rate, and multiplied whole by the tightness of
+   * every arrival. A release empties it into `bank` at `tier * band * streak`;
+   * a death takes it.
    *
-   * The chain and tightness multipliers the settled formula puts INSIDE the carry
-   * are also stage (b): this is the raw accrual they will price.
+   * It is deliberately a number the player can see without reading one: the
+   * craft's trail carries it, because axiom 4 says points exist in two states and
+   * the player should always be able to see what death would cost.
    */
   carry: number;
+  /**
+   * The same swing in raw world pixels, un-priced.
+   *
+   * Kept beside `carry` rather than derived from it, because deriving it would
+   * need the chain rate and every arrival's tightness back out of a product that
+   * has already collapsed them. It exists so a receipt can say what the pricing
+   * was worth — see `ScoreAward.climb` — and for nothing else: no score reads it.
+   */
+  carryPx: number;
+  /**
+   * Consecutive engagements, unbroken by a long coast or a death.
+   *
+   * NOT THE STREAK, and the difference is the reason both exist. This steps on
+   * every capture BEGUN — a grab, a zip, a pass that never converts — and breaks
+   * when `coastClimb` runs past the gate, so it asks whether the ship is still
+   * using the field. `streak` steps only on a swing that CASHED and breaks on a
+   * putter-out, so it asks whether the swings being finished are landing. One
+   * counter serving both would be paying a single quantity twice, which is the
+   * "combos of combos" axiom 1 refuses.
+   *
+   * It prices metres as they are climbed rather than the swing as it cashes —
+   * see `ScoreConfig.chainStep` — which is what puts it inside the carry and the
+   * streak in the cash step, two systems with two pixels and no overlap.
+   *
+   * A zip steps it, which is where `hopBonus` went: a hop is an engagement, so a
+   * charged window drives the chain instead of paying a flat 500 a body.
+   */
+  chain: number;
   /**
    * Climb accrued in the current coast, in world px. Reset by any engagement.
    *
@@ -211,13 +260,19 @@ export interface ScoreState {
    * patient the economy is with drifting would change according to which planet
    * happened to be nearby. Same shape as `traits.charges` and `traits.claimable`,
    * both of which are booleans so the config can keep the magnitude.
+   *
+   * IT BREAKS THE CHAIN TOO, on the same edge. One definition of "the ship has
+   * stopped using the field", so the metres stop counting and the chain resets at
+   * the same instant rather than at two thresholds that would need keeping in
+   * step.
    */
   coastClimb: number;
   /**
    * `highWaterY` as of the end of last tick, so the carry can accrue per tick.
    *
-   * `climbFromY` cannot serve: it is the anchor for a whole inter-link stretch and
-   * is only read when a link cashes, so it cannot say which metres were coasted.
+   * It replaced `climbFromY`, which anchored a whole inter-link stretch and was
+   * only read when a link cashed — so it could never say which metres were
+   * coasted, which is the question the gate turns on.
    */
   lastHighY: number;
   /** The highest any life reached this session. Never reset by a death. */
@@ -235,8 +290,23 @@ export interface ScoreState {
    * happens to be able to see.
    */
   streak: number;
-  /** Live multiplier: the streak ladder, plus any anomaly bonus on top. */
+  /**
+   * Live cash multiplier: the streak ladder, and nothing else.
+   *
+   * The tier and the band are properties of a swing that has not happened yet, so
+   * they cannot be live; the chain is inside the carry rather than beside it. What
+   * the HUD shows as `xN` is this.
+   */
   multiplier: number;
+  /**
+   * Which fire band the carry would cash in right now: 1, 2 or 3.
+   *
+   * Published for the same reason `burnHeat` is — the drawing and the points must
+   * not be able to disagree about how hot it is — and read off `burnBank` rather
+   * than off the instantaneous heat, because the band is what the swing has DONE
+   * at the edge and not where it happens to be this tick.
+   */
+  band: number;
   /** Session totals, across every life. Diagnostics, not the score. */
   grabs: number;
   links: number;
@@ -256,8 +326,6 @@ export interface ScoreState {
   // --------------------------------------------------- observer bookkeeping
   /** The capture as of last tick. See `PendingLink`. */
   pending: PendingLink | null;
-  /** `highWaterY` the current climb banks from. Null between lives. */
-  climbFromY: number | null;
   /** Edge-detects the start of an ending hold. */
   endingSeen: boolean;
   /**
@@ -297,7 +365,10 @@ export interface ScoreState {
   capTurn: number;
   /** Grab clearance of the current capture, in px above the minimum orbit. */
   grabClearance: number;
-  /** The dive has passed periapsis; the grab award is owed. */
+  /**
+   * The dive has swung through periapsis, so the arrival has already priced the
+   * carry. Edge-detected because it may only price it once per capture.
+   */
   periSeen: boolean;
   /**
    * The current flyby's radius as of last tick, and whether it is still falling.
@@ -338,27 +409,26 @@ export interface ScoreState {
    */
   pendingFlyby: PendingFlyby | null;
   /**
-   * Points banked by the flare currently burning, before the multiplier.
+   * Heat integrated over the current SWING, in band units.
+   *
+   * It used to be points and used to be paid and reset when the fire went out.
+   * Both were wrong under the constitution: minting per second near the wall is
+   * what axiom 1 bans by name, and a flare that ended before the release would
+   * have taken its evidence with it. It now survives the fire dying and is
+   * emptied by the cash, so a swing that rode the edge early still cashes in the
+   * band it earned.
    *
    * Fractional and un-rounded: heat is integrated a tick at a time and rounding
-   * each slice would lose most of a short flare. It is committed to the score in
-   * one award when the fire goes out, so the invariant that awards sum to the
-   * score inside a life still holds.
+   * each slice would lose most of a short flare.
+   *
+   * A DEATH DROPS IT, which is the whole stake. 78% of edge-drags end in the wall
+   * and pay nothing at all — the drama is free and only the save is paid.
    */
   burnBank: number;
-  /** Hottest instant of the flare currently burning. 0 when nothing is. */
+  /** Hottest instant of the current swing. 0 for one that has not burned. */
   burnPeak: number;
-  /** Ticks left before the grab award lands. -1 once it has. */
-  grabDue: number;
   /** Names of anomalies already claimed this life. Cleared by `endLife`. */
   claimed: string[];
-  /**
-   * A rescue armed at a press and waiting on its outcome, or null.
-   *
-   * Read once, on the first tick of a capture, from the drift state the press was
-   * made in — and never again, because the answer is a property of that instant.
-   */
-  rescue: { wall: DeadlineWall; quality: number; body: string } | null;
   /**
    * A press made AFTER the last one that could still have turned the ship away,
    * or null. Set at the press, cleared if the ship turns away regardless.
@@ -375,21 +445,6 @@ export interface ScoreState {
    * clears on the turn-away rather than persisting to the end of the capture.
    */
   doomed: { wall: DeadlineWall; tick: number } | null;
-  /**
-   * Bodies a rescue has already been paid against this life. Cleared by `endLife`.
-   *
-   * The same shape as `claimed`, for the same reason it exists there. A drag along
-   * the wall is spent hanging off ONE distant planet, and the author's own
-   * playtest found the behaviour it guards against — "I can tap a bunch to extend
-   * my burn through the red zone". Every one of those taps is a press with almost
-   * no window left that does turn the ship away, so without this the tightest
-   * possible rescue would also be the most repeatable one, several times a second.
-   *
-   * Per body rather than per press, so rescuing yourself onto a DIFFERENT planet
-   * still pays: that is a new decision about a new body, not the same one
-   * collected twice.
-   */
-  rescued: string[];
   /**
    * Bodies already hopped to in the CURRENT charged window.
    *
@@ -413,14 +468,19 @@ export interface ScoreState {
   /** Last observed `chargedT`, to edge-detect a window opening and closing. */
   wasCharged: boolean;
   /**
-   * Hop points banked in the current charged window, for the closing tally.
+   * Carry accrued while the current charged window was open.
    *
-   * A running sum of points ALREADY PAID, never a pot waiting to be paid. Hops
-   * bank as they land, so a death mid-window keeps every one the player actually
-   * landed; the tally at the end is a receipt, not a payment. Cleared with the
-   * window and by `endLife`.
+   * It was `hopTotal` — a running sum of the flat 500 each hop paid — and the
+   * flat award is gone, so what a frenzy is worth is no longer a sum of receipts.
+   * It is four planets of altitude taken at a chain that stepped on every one of
+   * them, which is exactly this.
+   *
+   * STILL A RESTATEMENT AND STILL NOT A PAYMENT. Nothing is banked here; the
+   * metres were already in `carry` as they were climbed, and they cash at the next
+   * release like any others. The closing tally exists so the window has a receipt
+   * at all — see `Tally`.
    */
-  hopTotal: number;
+  hopCarry: number;
   /**
    * Consecutive captures that were flown recklessly. See `src/score/reckless.ts`.
    *

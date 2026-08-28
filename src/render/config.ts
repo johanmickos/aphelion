@@ -202,6 +202,22 @@ export interface RenderConfig {
    * dense stretch.
    */
   bodyEmitAt: number;
+  /**
+   * Peak alpha of the grip gradient above a body's minimum-orbit ring.
+   *
+   * THE PIXEL FOR THE TIGHTNESS MULTIPLIER, and it is required rather than
+   * decorative. Direction 08's axiom 5: "if a scoring rule can't point at the
+   * pixel that announced it, the rule is wrong", and the pixel has to be drawn
+   * BEFORE the score touches it, so a word afterwards does not qualify. The ring
+   * announces the FLOOR; the multiplier is graded over `ScoreConfig.closeSpan`
+   * above it, and until this landed nothing drew that at all.
+   *
+   * It is a knob because how strongly it should read is exactly the judgement a
+   * still frame cannot make: too faint and it is decoration, too strong and every
+   * body in a dense stretch wears a halo. 0 turns it off, which is the comparison
+   * worth making before defending the number.
+   */
+  bodyGripAlpha: number;
 
   // --- the deadline: the point of no return ---
   /**
@@ -451,6 +467,7 @@ export const DEFAULT_RENDER_CONFIG: Readonly<RenderConfig> = Object.freeze({
   bodySpentRecover: 3,
   bodyRimRest: 0.4,
   bodyEmitAt: 0.3,
+  bodyGripAlpha: 0.16,
 
   deadlineFadeInSecs: 2.63,
   deadlineFullSecs: 1.35,

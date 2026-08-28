@@ -30,6 +30,7 @@
 import type { SimConfig } from '../sim/config.ts';
 import type { Body } from '../sim/types.ts';
 import type { FieldBounds } from '../sim/world.ts';
+import type { ScoreConfig } from '../score/config.ts';
 import type { ScoreState } from '../score/types.ts';
 import type { Camera } from './camera.ts';
 import type { RenderConfig } from './config.ts';
@@ -53,6 +54,20 @@ export interface Frame {
    * score deliberately is not part of it — see `src/score/score.ts`.
    */
   score: ScoreState;
+  /**
+   * The weights that scored it.
+   *
+   * Here for one reason and it is a rule rather than a convenience: axiom 5 says
+   * every multiplier has to be drawn before it scores, so a layer that announces
+   * one has to read the same number the scorer read. `closeSpan` is the live
+   * case — the grip gradient on a body's minimum-orbit ring IS the tightness
+   * multiplier's span — and a second copy of it in `RenderConfig` is exactly the
+   * two-definitions defect `finishLineY` and `runInBand` are in `AGENTS.md` for.
+   *
+   * It is not part of the run: score weights are code, not run parameters, so
+   * this is always `DEFAULT_SCORE_CONFIG` in the game and a fixture in a test.
+   */
+  scoreCfg: ScoreConfig;
 
   /** Null unless the field has just been cleared. Asked once per frame. */
   cer: Ceremony | null;

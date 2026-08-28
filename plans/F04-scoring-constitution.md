@@ -1,7 +1,14 @@
 # F04 · Scoring constitution
 
-**Severity** BLOCKS · **Blocks** Direction 06, Direction 08, F05 · **State** decided
-2026-08-27, stage (a) in progress
+**Severity** BLOCKS · **Blocks** Direction 06, Direction 08, F05 · **State** stages
+(a) and (b) LANDED 2026-08-27 — PORT_NOTES 73, 74. **Only (c) is left, and it is
+blocked on flying.** F05 is unblocked: it wanted the formula to exist, not to be
+calibrated.
+
+> **DO NOT RE-DERIVE ANY OF THIS.** The formula, the deletions and the two pixels
+> are in the code with their reasoning at each site. What is below is kept only
+> until (c) lands: read it for what is still OPEN, and read the code for what is
+> true.
 
 > **THE CALL IS MADE.** Direction 08 supersedes the current economy, on this
 > ruling: **the axioms rule and the numbers get measured.** The five axioms are
@@ -175,24 +182,19 @@ re-measurement at coarser granularity, not a re-pick".
 
 Each holds `pnpm check` on its own.
 
-### (a) Split the live score into `carry` and `bank` — IN PROGRESS
+### (a) Split the live score — LANDED
 
-Behaviour-preserving. `ScoreState.score` becomes `bank`: points cashed in the
-current life, which is exactly what `score` meant. `carry` is added alongside as
-the accrued, gap-gated, **not yet spent** climb, so the risky accrual is built and
-pinned in a stage where it cannot change a number.
+`score` became `bank`; `carry` accrues gap-gated beside the old economy without
+being spent by it. Changed no number. PORT_NOTES 73.
 
-**Verify** every existing pin holds, and `best` / `sessionMax` are untouched.
+### (b) Swap the formula — LANDED
 
-### (b) Swap the formula
-
-Eleven keys deleted, tightness and chain into the carry, tier and band into the
-cash step, the ring gradient added, popups for grab/rescue/burn removed.
-
-`test/score.test.ts` asserts every `ScoreConfig` key changes some session's
-outcome, so it **fails loudly here — which is the point.** `AGENTS.md`: update the
-pin to assert the new truth rather than deleting it. The new truth is that every
-_multiplier_ changes an outcome.
+Eleven keys deleted, a twelfth (`burnMinHeat`) demoted to a constant, tightness
+and chain inside the carry, tier and band in the cash step, both required pixels
+drawn, four award kinds removed. PORT_NOTES 74 has the four things that had to
+change once the formula was real — two counters rather than one, the tier's rung
+derivation, why the band's drawn steps are not its thresholds, and the capture's
+climb being gated as a coast.
 
 ### (c) Calibrate
 
@@ -239,6 +241,12 @@ generous.
 
 ## Done when
 
-`awardLink` is one `priceSwing` call, `ScoreConfig` holds no key that mints, both
+~~`awardLink` is one `priceSwing` call, `ScoreConfig` holds no key that mints, both
 required pixels are drawn, and `test/score.test.ts` pins the multiplicative truth
-rather than the additive one.
+rather than the additive one.~~ All four hold as of 2026-08-27.
+
+**This file is deleted when (c) lands.** What survives goes where it cannot go
+stale: the measurements into PORT_NOTES, the rules someone will be tempted to break
+into `AGENTS.md` (they are there — one source and four multipliers, never add a key
+that mints, every multiplier has a pixel) and into comments at the sites that tempt
+them.

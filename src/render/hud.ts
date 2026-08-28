@@ -13,7 +13,7 @@ import type { ScoreAward, ScoreState } from '../score/types.ts';
 import type { Praise } from '../score/index.ts';
 import { praiseFor } from '../score/index.ts';
 import type { AccoladeStyle } from './accolade.ts';
-import { BURN_WORD, DOT, HOP, LEVEL, ROUTINE } from './accolade.ts';
+import { DOT, LEVEL, ROUTINE } from './accolade.ts';
 import type { Camera } from './camera.ts';
 import type { RenderSnapshot } from './snapshot.ts';
 import {
@@ -170,62 +170,27 @@ interface BandLine {
  * they had just made. Adding a kind now fails to compile until it has an entry.
  */
 const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => BandLine> = {
-  grab: (a, p) => ({
-    style: p ? LEVEL[p.level] : ROUTINE,
-    // Arrival qualities only. The release has not happened yet, and reporting its
-    // fields as zeroes would read as a bad release rather than an absent one.
-    detail: `${a.body}  GRAB · CLOSE ${pct(a.close)}`,
-    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
-  }),
   link: (a, p) => ({
     style: p ? LEVEL[p.level] : ROUTINE,
-    detail: `${a.body}  PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
+    // The three multipliers that priced the swing, in the order the constitution
+    // applies them, and the carry they were applied TO. A receipt that printed
+    // only the total could not be checked against the screen; this one can —
+    // every number in it was drawn somewhere before it scored.
+    detail: `${a.body}  ${formatScore(a.carry)} x${a.tier.toFixed(2)} · FIRE x${a.band} · PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
   }),
-  // Never carries a praise word: a hop pays flat, so there is no quality to
-  // praise, and no multiplier either — every one is worth the same.
-  hop: (a) => ({
-    style: HOP,
-    detail: `${a.body}  ZIP`,
-    mult: '',
-  }),
-  // No praise word either, and for a different reason: `praiseFor` returns null
-  // for this kind because a fast life makes upward of 38 of these a minute where
-  // a chained one makes 2.7. A word on each would be the loudest thing on screen
-  // for the player it is meant to reward, and the vocabulary in `praise.ts` is
-  // calibrated on rarity. The multiplier climbing IS the feedback.
+  // Never carries a praise word, and that is calibration rather than an omission:
+  // a fast life makes upward of 38 of these a minute where a chained one makes
+  // 2.7, so a word on each would be the loudest thing on screen for the player it
+  // is meant to reward. The multiplier climbing IS the feedback.
   flyby: (a) => ({
     style: ROUTINE,
     // TURN is reported in degrees rather than as a percentage of
     // `flybyTurnSpan`, unlike every other quality on this line, and the reason is
     // that it is the one the player can check against the screen: the ship
-    // visibly swings that far around the planet. A normalised figure would be a
-    // score the readout is asking to be trusted on. It is also now the term that
-    // decides the award — closeness is multiplied BY it — so leaving it out left
-    // the line reporting the smaller half of what was paid.
-    detail: `${a.body}  FLYBY · CLOSE ${pct(a.close)} · TURN ${Math.round(a.turn)}°`,
-    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
-  }),
-  burn: (a) => ({
-    // Always the default, word or not — the same rule the popup follows. A burn's
-    // colour lives entirely in its word; the number is deliberately quiet.
-    style: ROUTINE,
-    // The peak, which is what the word was chosen on — reporting the integral
-    // here would caption a word the number does not explain.
-    detail: `${a.body}  BURN · HEAT ${pct(a.heat)}`,
-    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
-  }),
-  // No praise word yet, and deliberately: every threshold in `praise.ts` is a
-  // measured percentile of real play, and the only sessions that have ever been
-  // flown with the cross visible amount to one recording. The points ship first;
-  // the word is measured once there is play to measure it on.
-  //
-  // LATE is the quality on the axis the award is about — how little of the rescue
-  // window was left — and reads as praise the moment it is high, which is what a
-  // caption should do without needing a vocabulary behind it.
-  rescue: (a) => ({
-    style: ROUTINE,
-    detail: `${a.body}  RESCUE · LATE ${pct(a.timing)}`,
+    // visibly swings that far around the planet. It is also the term that sets
+    // the tier here, a pass having neither a compass marker nor a boost envelope.
+    detail: `${a.body}  ${formatScore(a.carry)} x${a.tier.toFixed(2)} · FIRE x${a.band} · TURN ${Math.round(a.turn)}°`,
     mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
   }),
   // No word and no multiplier, because a dot has neither: it pays flat and every
@@ -573,7 +538,7 @@ export function drawScore(
   //
   // Uncaptioned on purpose: the ship is arcing and the popups are this same
   // purple, so a word here would be a fourth cue saying what three already say.
-  // See the note on `HOP` in `accolade.ts`.
+  // See the note on `HOP_TALLY` in `accolade.ts`.
   if (snap.chargedFrac > 0) {
     const w = 64 * s;
     const h = 3 * s;
@@ -607,26 +572,8 @@ export function drawScore(
   const named = praise ? `  ${praise.word}` : '';
   const awardY = cam.offsetY + SCORE.awardY * s;
   const head = `+${formatScore(a.points)}${band.mult}`;
-  if (praise?.category === 'burn') {
-    // Two runs, because a burn's word is ember and its number is not — and the
-    // popup does exactly the same split. One centred string in one colour would
-    // put the band and the popup on different rules again, which is the drift
-    // `accolade.ts` exists to prevent.
-    //
-    // Laid out from the left edge of the whole line so the pair stays centred as
-    // a unit; centring each run separately would slide them apart.
-    const prevAlign = ctx.textAlign;
-    ctx.textAlign = 'left';
-    const x0 = cx - ctx.measureText(head + named).width / 2;
-    ctx.fillStyle = band.style.color;
-    ctx.fillText(head, x0, awardY);
-    ctx.fillStyle = BURN_WORD.color;
-    ctx.fillText(named, x0 + ctx.measureText(head).width, awardY);
-    ctx.textAlign = prevAlign;
-  } else {
-    ctx.fillStyle = band.style.color;
-    ctx.fillText(head + named, cx, awardY);
-  }
+  ctx.fillStyle = band.style.color;
+  ctx.fillText(head + named, cx, awardY);
 
   ctx.font = `${9 * s}px ui-monospace, monospace`;
   ctx.fillStyle = band.style.labelColor;

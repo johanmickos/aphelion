@@ -44,6 +44,7 @@ import type { RenderSnapshot } from './snapshot.ts';
 import type { Frame } from './frame.ts';
 import { DEFAULT_THEME } from './theme.ts';
 import type { Theme } from './theme.ts';
+import { DEFAULT_SCORE_CONFIG } from '../score/config.ts';
 import type { ScoreState } from '../score/types.ts';
 import { VOID, solid } from './palette.ts';
 import { mix } from './theme.ts';
@@ -384,6 +385,7 @@ export class Scene {
       bodies,
       field,
       score: opts.score,
+      scoreCfg: DEFAULT_SCORE_CONFIG,
       cer: ceremonyPhase(snap, cam, finishY, this.entrySpeed),
       finishY,
       timeMs: opts.timeMs,

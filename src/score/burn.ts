@@ -61,6 +61,33 @@ function clamp01(v: number): number {
  * `test/score.test.ts` does to every key — degrades to "nothing burns" instead of
  * producing a NaN that would propagate silently into the score.
  */
+/**
+ * Heat below which the ship is not burning: no flame, and nothing accrues.
+ *
+ * A CONSTANT, AND IT WAS A WEIGHT UNTIL F04 STAGE (b). `ScoreConfig.burnMinHeat`
+ * sat at 0.01 and said so at its declaration: "the honest value for that is zero
+ * — heat is exactly 0 outside the band or while drifting, so `heat > 0` already
+ * brackets a drag perfectly and needs no threshold at all. It is 0.01 rather than
+ * 0 for a mechanical reason worth writing down: `test/score.test.ts` proves a
+ * weight is live by trying it at 0, half and double, and every one of those is 0
+ * when the value is 0."
+ *
+ * That was a value shaped by its test, which is the thing this repo is otherwise
+ * careful not to do — and the reason it was a weight at all has expired. It used
+ * to BRACKET the flare, deciding what counted as one drag rather than two and
+ * therefore how many burn awards a capture paid. There are no burn awards now:
+ * the heat integrates across the whole swing and is spent once, by the release,
+ * so nothing is bracketed and the threshold cannot change what a session scores.
+ *
+ * So it goes where `AGENTS.md` says a value like this belongs — "a value that only
+ * defines WHEN something is judged, never what it costs, is a constant next to its
+ * code" — and it takes the honest number with it. At the old 0.10 the fire kindled
+ * 54px out and 7% of band entries grazed the outer strip and left without ever
+ * lighting, which is exactly what "the second they enter the dangerous red zone"
+ * was reported against. At 0 there is no strip at all.
+ */
+export const BURN_MIN_HEAT = 0;
+
 export function edgeHeat(
   x: number,
   y: number,
@@ -122,7 +149,7 @@ export function previewBurn(
   let bank = 0;
   for (const p of flight) {
     const heat = edgeHeat(p.x, p.y, field, bodies, true, scfg);
-    if (heat > scfg.burnMinHeat) bank += heat * dt * scfg.burnRate;
+    if (heat > BURN_MIN_HEAT) bank += heat * dt * scfg.burnRate;
   }
   return bank;
 }

@@ -23,26 +23,13 @@ const LIFE = 1.15;
 const LIFE_SUPER = 1.6;
 const LIFE_SHOUT = 1.4;
 /**
- * A burn lives longer than the others, because its number has to count.
+ * Seconds a merged receipt's number spends counting up to its new total.
  *
- * Long enough that the roll below finishes well before the fade starts: the fade
- * takes the last 45% of the life, so at 1.7s it begins at 0.94s and the roll lands
- * at 0.8s.
- */
-const LIFE_BURN = 1.7;
-
-/**
- * Seconds a burn's number spends counting up to its total.
- *
- * The count happens AFTER the drag, not during it. A live tally beside the ship
- * was built and taken out again — see PORT_NOTES 51 — and the reason it lost is
- * that a number climbing next to a ship that is inches from a wall competes with
- * the decision the player is actually making. Afterwards there is nothing left to
- * decide and the number has the moment to itself.
- *
- * 0.8s against a drag that runs 0.45s at the median: the tally deliberately takes
- * longer than the thing it is counting, so it reads as a total being tallied up
- * rather than as a replay of the drag in real time.
+ * It was the burn's, and the burn award is gone; what is left with the same shape
+ * is a receipt collecting several awards that landed close together. The count
+ * happens after the last of them, not during, and PORT_NOTES 51 is why a live
+ * tally beside the ship lost: a number climbing next to a ship that is inches
+ * from a wall competes with the decision the player is actually making.
  */
 const ROLL = 0.8;
 
@@ -117,7 +104,7 @@ const STACK_X = 80;
  */
 const RECEIPT_TAIL = 1.8;
 
-import { BURN_WORD, DOT, HOP, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
+import { DOT, HOP_TALLY, LEVEL, ROUTINE, SHOUT } from './accolade.ts';
 import { VOID, withAlpha } from './palette.ts';
 
 /**
@@ -155,8 +142,6 @@ interface Popup {
   shout: string | null;
   /** Seconds the number spends counting up to `points`. 0 shows it at once. */
   roll: number;
-  /** A hop inside a charged window: off the rarity ladder, purple. */
-  hop: boolean;
   /** A dot in the carpet: off the rarity ladder, the finish green. */
   dot: boolean;
   /** The closing tally of a window. Drawn large, and without a `+`. */
@@ -209,7 +194,6 @@ export class Popups {
    */
   spawn(award: ScoreAward, x: number, y: number): void {
     const praise = praiseFor(award);
-    const burning = award.kind === 'burn';
 
     // Into the open receipt, if there is one still on screen AND this award has
     // nothing of its own to say.
@@ -230,11 +214,9 @@ export class Popups {
     const open = this.receipt;
     if (!praise && open && open.t < open.life && this.live.includes(open)) {
       open.points = (open.points ?? 0) + award.points;
-      // The number counts up to the new total rather than jumping to it, which is
-      // the treatment `awardBurn` already chose for a figure that arrives all at
-      // once: it reads as a tally rather than as a replay.
+      // The number counts up to the new total rather than jumping to it: a merged
+      // receipt reads as a tally rather than as a replay.
       open.roll = ROLL;
-      open.hop = open.hop || award.kind === 'hop';
       open.dot = open.dot || award.kind === 'mote';
       // The clock restarts, so the receipt lives its tail past its LAST entry
       // rather than past its first.
@@ -250,12 +232,11 @@ export class Popups {
       // happened at the planet the first award names.
       y: this.freeY(x, y),
       t: 0,
-      life: burning ? LIFE_BURN : praise?.category === 'super' ? LIFE_SUPER : LIFE,
+      life: praise?.category === 'super' ? LIFE_SUPER : LIFE,
       points: award.points,
       praise,
       shout: null,
-      roll: burning ? ROLL : 0,
-      hop: award.kind === 'hop',
+      roll: 0,
       dot: award.kind === 'mote',
       tally: false,
     };
@@ -295,7 +276,6 @@ export class Popups {
       life: LIFE_SHOUT,
       points: null,
       praise: null,
-      hop: false,
       dot: false,
       tally: false,
       shout: shout.word,
@@ -308,9 +288,9 @@ export class Popups {
    * Raise the closing tally of a charged window.
    *
    * Not routed through `spawn`, for the reason `shout` is not: there is no award
-   * behind it. Every point in it was banked as its hop landed, and inventing an
-   * award to carry it would put a number into the score band that the score has
-   * already counted once.
+   * behind it and there never was. It restates the carry a frenzy built — which
+   * is still at stake and cashes at the next release — and inventing an award to
+   * carry it would put a number into the score band that nothing has paid.
    *
    * Lives longer than a popup and rises from higher up, because nothing else is
    * arriving by then — the window is over — so it has the screen to itself.
@@ -323,7 +303,6 @@ export class Popups {
       life: LIFE_TALLY,
       points,
       praise: null,
-      hop: false,
       dot: false,
       tally: true,
       shout: null,
@@ -372,25 +351,13 @@ export class Popups {
         continue;
       }
 
-      // A hop is off the ladder: it pays flat, so there is no quality for a
-      // rarity colour to report. See `HOP` in `accolade.ts`.
-      const style = p.tally
-        ? HOP_TALLY
-        : p.hop
-          ? HOP
-          : p.dot
-            ? DOT
-            : p.praise
-              ? LEVEL[p.praise.level]
-              : ROUTINE;
-      const burning = p.praise?.category === 'burn';
-      // The ember is the WORD's, never the number's.
-      const wordColor = burning ? BURN_WORD.color : style.color;
-      // And a burn's number is always the default grey, whether or not it earned a
-      // word. Letting it take a ladder colour meant a drag that scored well turned
-      // BLUE next to an orange word — two hues on one two-line popup, neither of
-      // them fire. Size still climbs with the rung, so how good it was is not lost.
-      const numberColor = burning ? ROUTINE.color : style.color;
+      // The window tally and the carpet dot are both off the rarity ladder: one
+      // restates what a frenzy carried and the other pays flat, so neither has a
+      // quality for a rung colour to report. See `HOP_TALLY` and `DOT` in
+      // `accolade.ts`.
+      const style = p.tally ? HOP_TALLY : p.dot ? DOT : p.praise ? LEVEL[p.praise.level] : ROUTINE;
+      const wordColor = style.color;
+      const numberColor = style.color;
 
       if (p.praise) {
         // A brief overshoot on the way in. Only the top of the ladder gets it —

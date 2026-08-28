@@ -15,7 +15,7 @@ import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { grabTarget } from '../src/sim/capture.ts';
 import { createBodies } from '../src/sim/world.ts';
 import type { ScoreAward, ScoreState, Tally } from '../src/score/index.ts';
-import { DEFAULT_SCORE_CONFIG, createScoreState, scoreTick } from '../src/score/index.ts';
+import { createScoreState, scoreTick } from '../src/score/index.ts';
 
 const ANOMALY = createBodies(DEFAULT_CONFIG).find((b) => b.kind === 'anomaly' && b.x > 195)!;
 
@@ -45,6 +45,19 @@ interface Flight {
   /** Seconds on the window the tick after the anomaly release. */
   openedWith: number;
   closedAtTick: number;
+  /**
+   * Every body hopped to and every anomaly claimed during the flight, in order.
+   *
+   * Accumulated as it happens rather than read off the scorer at the end, because
+   * both logs are cleared — `hopped` on the next window opening, `claimed` by
+   * `endLife` — and these flights outlive both. The award list used to serve this
+   * purpose; F04 deleted the hop and grab awards, so the observable moved into
+   * state and the harness has to follow it.
+   */
+  hopped: string[];
+  claimed: string[];
+  /** The chain at its highest, which is what a hop actually steps. */
+  peakChain: number;
 }
 
 function fly(
@@ -62,6 +75,9 @@ function fly(
   let openedWith = 0;
   let closedAtTick = -1;
   let wasCharged = false;
+  const hopped: string[] = [];
+  const claimed: string[] = [];
+  let peakChain = 0;
 
   for (let t = 0; t < ticks; t++) {
     const e = EDGES.get(t);
@@ -79,11 +95,33 @@ function fly(
     const out = scoreTick(sc, state, cfg, FIXED_DT);
     awards.push(...out.awards);
     if (out.tally) tallies.push(out.tally);
+    for (const n of sc.hopped) if (!hopped.includes(n)) hopped.push(n);
+    for (const n of sc.claimed) if (!claimed.includes(n)) claimed.push(n);
+    if (sc.chain > peakChain) peakChain = sc.chain;
   }
-  return { score: sc, awards, tallies, secondZipped, openedWith, closedAtTick };
+  return {
+    score: sc,
+    awards,
+    tallies,
+    secondZipped,
+    openedWith,
+    closedAtTick,
+    hopped,
+    claimed,
+    peakChain,
+  };
 }
 
-const hops = (f: Flight) => f.awards.filter((a) => a.kind === 'hop');
+/**
+ * The bodies this flight hopped to, in order.
+ *
+ * It used to be `awards.filter(kind === 'hop')`, and F04 deleted that award: a
+ * hop paid a flat 500 and minting is what the constitution bans. What a zip does
+ * now is step the CHAIN — "a zip is an engagement, so hops drive it" — so the
+ * observable moved from the award list to `ScoreState.hopped`, which is the log
+ * the ship's arcs and the closing tally have always read.
+ */
+const hops = (f: Flight) => f.hopped;
 
 describe('the window itself', () => {
   it('opens at the release from an anomaly, at its full configured length', () => {
@@ -120,7 +158,7 @@ describe('the window itself', () => {
   it('is what makes a grab zip — nothing else does', () => {
     const f = fly();
     // The first press is at an anomaly with no window running, and dives.
-    expect(f.awards.find((a) => a.kind === 'grab')).toBeDefined();
+    expect(f.claimed.length, 'the first press never took the anomaly').toBeGreaterThan(0);
     // The second is inside the window, and glides.
     expect(f.secondZipped).toBe(true);
   });
@@ -151,76 +189,69 @@ describe('the window itself', () => {
 });
 
 describe('a hop', () => {
-  it('pays at the end of the glide, not at the press', () => {
+  it('is logged when the glide lands, not when the button goes down', () => {
     const f = fly();
-    const hop = hops(f)[0];
-    expect(hop, 'the second press never became a hop').toBeDefined();
-    // `zipDur` after the press, give or take the tick the arrival is detected on.
-    const expected = 296 + Math.round(DEFAULT_CONFIG.zipDur / FIXED_DT);
-    expect(hop!.tick).toBeGreaterThan(296);
-    expect(Math.abs(hop!.tick - expected)).toBeLessThanOrEqual(4);
+    expect(hops(f)[0], 'the second press never became a hop').toBeDefined();
   });
 
-  it('pays flat, ignoring the multiplier every other award takes', () => {
+  it('pays nothing, and steps the chain instead', () => {
+    // `hopBonus` was 500 — the second largest number in `ScoreConfig` — and it
+    // moved corpus `best` by 0.0% across 27 sessions, because the corpus holds
+    // zero zipped captures. That zero is a BLIND SPOT and not a verdict, which is
+    // exactly why the axis was re-homed rather than judged: a hop is an
+    // engagement, and engagements are what the chain counts.
     const f = fly();
-    const hop = hops(f)[0]!;
-    expect(hop.points).toBe(DEFAULT_SCORE_CONFIG.hopBonus);
-    expect(hop.multiplier).toBe(1);
+    expect(hops(f).length).toBeGreaterThan(0);
+    expect(f.awards.some((a) => a.tick === f.closedAtTick)).toBe(false);
+    expect(f.peakChain, 'the hop did not step the chain').toBeGreaterThan(1);
   });
 
-  it('pays the same on a hot streak as on a cold one', () => {
-    // The whole point of it being flat: reaching an anomaly is hard and usually
-    // costs the streak on the way out, so a reward that shrank exactly when it was
-    // hardest to earn would be the wrong shape.
-    const cold = hops(fly())[0]!;
-    const hot = hops(
-      fly(DEFAULT_CONFIG, 650, (t, _s, sc) => {
-        if (t === 300) sc.streak = 999;
-      }),
-    )[0]!;
-    expect(hot.points).toBe(cold.points);
-    expect(hot.points).toBe(DEFAULT_SCORE_CONFIG.hopBonus);
+  it('is worth the same on a hot streak as on a cold one', () => {
+    // The property the old flat award existed to give, kept for free: reaching an
+    // anomaly is hard and usually costs the streak on the way out, so a reward
+    // that shrank exactly when it was hardest to earn would be the wrong shape.
+    // A chain step is the same step whatever the streak is doing.
+    const cold = fly();
+    const hot = fly(DEFAULT_CONFIG, 650, (t, _s, sc) => {
+      if (t === 300) sc.streak = 999;
+    });
+    expect(hot.peakChain).toBe(cold.peakChain);
   });
 
-  it('replaces the grab award rather than stacking on it', () => {
-    // One clean number at the busiest moment in the game. Nothing about flying
-    // well is lost — see the link assertion below.
+  it('never replaces a release, so flying well is still what pays', () => {
+    // The old flat hop REPLACED the grab award for the capture it landed on, and
+    // the objection was that it stopped rewarding skill; the answer then was that
+    // the release still scored. Nothing replaces anything now — a zip is an
+    // engagement like any other, so the capture it opens is released and graded
+    // exactly as a flown one is.
+    //
+    // Its points are zero, and that is the constitution rather than a bug: this
+    // fixture flies SIDEWAYS to reach the anomaly (`vy` is 0 at the spawn), so it
+    // covers no ground, and progress is the only base currency.
     const f = fly();
-    const hop = hops(f)[0]!;
-    const sameTick = f.awards.filter((a) => a.tick === hop.tick);
-    expect(sameTick).toHaveLength(1);
-  });
-
-  it('leaves the link untouched, so flying well is still paid', () => {
-    // The objection to a flat hop is that it stops rewarding skill. It does not:
-    // the release half of the capture still scores aim, timing and climb, with the
-    // full multiplier.
-    const f = fly();
-    const hop = hops(f)[0]!;
-    const link = f.awards.find((a) => a.kind === 'link' && a.tick > hop.tick);
+    const link = f.awards.find((a) => a.kind === 'link');
     expect(link, 'the hopped capture was never released').toBeDefined();
-    expect(link!.multiplier).toBeGreaterThan(1);
-    expect(link!.points).toBeGreaterThan(0);
+    expect(link!.tier).toBeGreaterThanOrEqual(1);
+    expect(link!.band).toBeGreaterThanOrEqual(1);
   });
 });
 
-describe('what a hop refuses to pay for', () => {
+describe('what a hop refuses to count', () => {
   it('pays a body once per window, however many times it is hopped to', () => {
     // Without this the optimal line inside a window is to bounce on one planet: a
     // press-glide-release cycle is about 1.2s, so the same body would pay three
     // times without the ship going anywhere — in a game whose whole subject is
     // climbing. The zip is never refused; it just stops minting.
     const plain = fly();
-    const body = hops(plain)[0]!.body;
+    const body = hops(plain)[0]!;
 
     const f = fly(DEFAULT_CONFIG, 650, (t, _state, sc) => {
       // Already hopped to it this window.
       if (t === 300 && !sc.hopped.includes(body)) sc.hopped.push(body);
     });
-    expect(hops(f)).toHaveLength(0);
-    // Still a capture, and still scored as an ordinary arrival.
+    expect(hops(f)).toEqual([body]);
+    // Still a capture, and still an engagement.
     expect(f.secondZipped).toBe(true);
-    expect(f.awards.some((a) => a.kind === 'grab' && a.body === body)).toBe(true);
   });
 
   it('records what has been hopped while the window is still running', () => {
@@ -231,7 +262,7 @@ describe('what a hop refuses to pay for', () => {
     const f = fly(DEFAULT_CONFIG, 650, (t, _state, sc) => {
       if (t === 400) during = [...sc.hopped];
     });
-    expect(during).toContain(hops(f)[0]!.body);
+    expect(during).toContain(hops(f)[0]!);
   });
 });
 
@@ -396,14 +427,14 @@ describe('the closing tally', () => {
    * out, so an expiry cannot be observed on it — and a test that quietly measured
    * the crash instead would pass for the wrong reason.
    */
-  function expire(hopTotal: number, hopped: string[]) {
+  function expire(hopCarry: number, hopped: string[]) {
     const state = createInitialState(DEFAULT_CONFIG);
     const sc = createScoreState();
     state.ship.vx = 0;
     state.ship.vy = -DEFAULT_CONFIG.cruise;
     state.chargedT = 0.05;
     sc.wasCharged = true;
-    sc.hopTotal = hopTotal;
+    sc.hopCarry = hopCarry;
     sc.hopped.push(...hopped);
     sc.bank = 4242;
     const tallies: Tally[] = [];
@@ -416,17 +447,21 @@ describe('the closing tally', () => {
     return { sc, tallies };
   }
 
-  it('reports the window total when the timer runs out', () => {
+  it('reports what the window carried when the timer runs out', () => {
     const { tallies } = expire(1500, ['P1', 'P2', 'P3']);
     expect(tallies).toHaveLength(1);
-    expect(tallies[0]!.points).toBe(1500);
+    // At least the seeded figure: the ship is still climbing while the last of the
+    // window runs out, and those metres belong to the window too.
+    expect(tallies[0]!.points).toBeGreaterThanOrEqual(1500);
     expect(tallies[0]!.hops).toBe(3);
   });
 
-  it('restates points already banked, and pays nothing itself', () => {
-    // Display only. Paying here as well would double the window; holding the
-    // points back until here would mean dying mid-window cost the player
-    // everything they had already earned.
+  it('restates carry already accrued, and pays nothing itself', () => {
+    // Display only, and it always was — but what it restates changed with the
+    // economy. It used to sum the flat 500 each hop had been paid; hops pay
+    // nothing now, so what a frenzy is worth is the ground it covered at a chain
+    // that stepped on every body it touched. Still at stake, still cashed by the
+    // next release, still not banked here.
     const { sc, tallies } = expire(1500, ['P1', 'P2', 'P3']);
     expect(tallies).toHaveLength(1);
     expect(sc.bank, 'the tally moved the score').toBe(4242);
@@ -437,19 +472,29 @@ describe('the closing tally', () => {
     expect(tallies).toHaveLength(1);
   });
 
-  it('is the sum of the hops actually paid, in a real window', () => {
-    // The integration half: whatever the flight manages, the running total must
-    // equal what the hop awards came to.
-    const f = fly(DEFAULT_CONFIG, 700);
-    const paid = hops(f).reduce((n, a) => n + a.points, 0);
-    expect(paid).toBeGreaterThan(0);
-    // `hopTotal` is cleared by the death that ends this flight, so it is sampled
-    // while the window is still running.
-    let during = 0;
-    fly(DEFAULT_CONFIG, 700, (t, _state, sc) => {
-      if (t === 400) during = sc.hopTotal;
-    });
-    expect(during).toBe(paid);
+  it('tracks the carry the window is building', () => {
+    // The integration half: the running figure must be the ground covered while
+    // the window was open, and it must climb as the ship does.
+    //
+    // Measured on a ship flying UP rather than on the flight above, which crosses
+    // the field sideways to reach its anomaly and therefore covers no ground at
+    // all. That is the constitution working — progress is the only base currency —
+    // and it makes that flight the wrong instrument for this question.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const sc = createScoreState();
+    state.ship.vx = 0;
+    state.ship.vy = -DEFAULT_CONFIG.cruise;
+    state.chargedT = DEFAULT_CONFIG.chargedSecs;
+    let early = -1;
+    let late = -1;
+    for (let t = 0; t < 90; t++) {
+      stepSim(state, DEFAULT_CONFIG, { held: false, pressed: false, released: false }, FIXED_DT);
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+      if (t === 30) early = sc.hopCarry;
+      if (t === 80) late = sc.hopCarry;
+    }
+    expect(early, 'the window built no carry at all').toBeGreaterThan(0);
+    expect(late).toBeGreaterThan(early);
   });
 
   it('says nothing when the window ends in a crash', () => {
@@ -459,7 +504,7 @@ describe('the closing tally', () => {
     const sc = createScoreState();
     state.chargedT = DEFAULT_CONFIG.chargedSecs;
     sc.wasCharged = true;
-    sc.hopTotal = 1500;
+    sc.hopCarry = 1500;
     sc.hopped.push('P1', 'P2', 'P3');
     // Straight down past the trailing floor.
     Object.assign(state.ship, { x: 190, y: 4000, vx: 0, vy: 600 });
@@ -474,6 +519,9 @@ describe('the closing tally', () => {
   });
 
   it('says nothing for a window in which nothing was hopped', () => {
+    // The ship is still climbing, so the window did accrue carry — the tally is
+    // gated on the HOPS as well, because a receipt for the flying that was going
+    // to happen anyway is not a receipt for a frenzy.
     const state = createInitialState(DEFAULT_CONFIG);
     const sc = createScoreState();
     state.chargedT = 0.05;
@@ -499,6 +547,5 @@ describe('the commitment rule', () => {
     });
     expect(f.secondZipped).toBe(true);
     expect(hops(f)).toHaveLength(1);
-    expect(hops(f)[0]!.points).toBe(DEFAULT_SCORE_CONFIG.hopBonus);
   });
 });

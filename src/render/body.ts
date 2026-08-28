@@ -381,6 +381,39 @@ export class BodyRenderer {
     // from one they have not reached.
     const hue = v.spent > 0 ? mix(v.hue, DUSK, v.spent) : v.hue;
 
+    // ---- the grip: the band the arrival multiplier is graded over
+    //
+    // REQUIRED, NOT DECORATIVE. Direction 08's axiom 5 is that a multiplier the
+    // player did not see drawn BEFORE it scored is invisible math, and until this
+    // landed the tightness multiplier had no pixel at all: the ring below
+    // announces the FLOOR, and how tight an arrival is gets graded over the
+    // `closeSpan` above it, which nothing drew.
+    //
+    // It reads `ScoreConfig.closeSpan` off the frame rather than carrying a copy,
+    // so the gradient and the grade cannot drift apart — the defect `finishLineY`
+    // and `runInBand` are in `AGENTS.md` for.
+    //
+    // Brightest AT the ring and gone by the top of the span, which is the shape of
+    // the multiplier itself. In the body's own hue rather than on the accolade
+    // ladder: this is an instrument drawn on the thing it describes, and the
+    // ladder is for awards — the same boundary the edge markers and the finish
+    // line sit on the other side of.
+    //
+    // Faded by `pull`, so a field of distant bodies is not sixty haloes. A body
+    // you are nowhere near is not one whose grip you are about to be graded on.
+    const grip = rc.bodyGripAlpha * v.pull;
+    if (grip > 0.002) {
+      const r0 = (b.R + sim.minOrbitGap) * s;
+      const r1 = r0 + f.scoreCfg.closeSpan * s;
+      const g = ctx.createRadialGradient(x, y, r0, x, y, r1);
+      g.addColorStop(0, withAlpha(hue, grip));
+      g.addColorStop(1, withAlpha(hue, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Minimum-orbit ring. Solid: it is a hard limit the simulation clamps to, not
     // a suggestion, and dashing made it read as advisory.
     ctx.beginPath();

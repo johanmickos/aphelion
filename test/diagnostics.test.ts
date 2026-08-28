@@ -563,11 +563,18 @@ describe('a report that survives its own replay diverging', () => {
   it('names the award where a recomputed run parts company, not merely that it did', () => {
     // The point of comparing award lists at all: an award lands at every grab and
     // release, so it localises a divergence far better than a fixed interval can.
+    //
+    // Indexed off the END of the list rather than at a fixed 2, because how many
+    // awards this fixture pays is not the property under test and F04 changed it:
+    // the grab, hop, burn and rescue awards are gone, so a session that used to
+    // record six events records two.
     const recorded = recordedAwards(parseReport(report()))!;
-    const nudged = recorded.map((w, i) => (i < 2 ? w : { ...w, points: w.points + 1 }));
+    expect(recorded.length, 'the fixture no longer pays enough to localise').toBeGreaterThan(1);
+    const at = recorded.length - 1;
+    const nudged = recorded.map((w, i) => (i < at ? w : { ...w, points: w.points + 1 }));
     const agree = awardAgreement(recorded, nudged);
-    expect(agree.matched).toBe(2);
-    expect(agree.firstDisagreement).toBe(recorded[2]!.tick);
+    expect(agree.matched).toBe(at);
+    expect(agree.firstDisagreement).toBe(recorded[at]!.tick);
   });
 
   it('still reads a report written before awards were recorded', () => {

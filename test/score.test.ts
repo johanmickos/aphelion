@@ -32,6 +32,7 @@ import {
   bonkWord,
   shoutWord,
   CLOSE_PX,
+  BURN_MIN_HEAT,
   DEFAULT_SCORE_CONFIG,
   FLYBY_TURN_MIN,
   edgeHeat,
@@ -40,6 +41,7 @@ import {
   PEAK,
   WORDS,
   createScoreState,
+  isNerveGrab,
   praiseFor,
   readAim,
   scoreTick,
@@ -289,11 +291,47 @@ const SESSIONS: ReadonlyArray<{ name: string; edges: Edges; ticks: number; ship?
    *
    * Starts 20px inside the right wall (which is at x=565.5) falling at 120px/s,
    * and grabs once the swing has begun. Worth 152 ticks inside the band.
+   *
+   * IT HAS TO LET GO, and that is F04's addition rather than tidiness. The burn
+   * used to pay when the fire went out, so a session that never released still
+   * banked one; the fire now selects the band the RELEASE cashes in, so a drag
+   * that is never let go of scores nothing at all and every `burn*` key measures
+   * as dead. Exactly the blind spot `fuelRegen` fell into twice, arriving from a
+   * new direction: the fixture stopped reaching the mechanism because the
+   * mechanism moved.
    */
   {
     name: 'dragged along the dead zone',
     ship: { x: 545.5, y: 200, vx: 0, vy: -120 },
-    edges: [[90, 1]],
+    edges: [
+      [90, 1],
+      [500, 0],
+    ],
+    ticks: 900,
+  },
+  /**
+   * A release good enough to earn the bottom rung and no better.
+   *
+   * Here for the reason the nerve grab, the anomaly, the flyby and the carpet are:
+   * without it `tierTrue` measures as inert, and that would be a hole in the
+   * fixture rather than a dead weight. The tier is a LADDER, so a battery that
+   * only ever lands on one rung cannot see the others — and the rest of it lands
+   * on two: the pilot releases at the turnover of its own quality every time, at
+   * SHARP or at nothing, and the flyby fixture sweeps past the top of the ladder
+   * and lands PERFECT.
+   *
+   * Tick 330 rather than a round number, and found by walking the release: this
+   * capture's quality passes through aim 0.35 / peak 0.78 at that moment, which is
+   * `q` 0.026 — above the TRUE line at 0.0102 and well below SHARP at 0.168. Twenty
+   * ticks later it is 0.72 and PERFECT, which is how narrow the window is and why
+   * the fixture is written down rather than reasoned.
+   */
+  {
+    name: 'released on the bottom rung',
+    edges: [
+      [240, 1],
+      [330, 0],
+    ],
     ticks: 900,
   },
   /**
@@ -500,7 +538,6 @@ describe('a score is a pure function of (config, seed, inputLog)', () => {
     expect(awards.length).toBeGreaterThan(0);
     expect(awards.reduce((n, a) => n + a.points, 0)).toBe(score.bank);
     expect(awards.filter((a) => a.kind === 'link')).toHaveLength(score.links);
-    expect(awards.filter((a) => a.kind === 'grab')).toHaveLength(score.grabs);
   });
 
   it('cannot influence the simulation, at any tick', () => {
@@ -536,6 +573,11 @@ describe('scoring weights', () => {
     // `test/tune.test.ts` measures a knob by how far it moves the ship, and a
     // score weight moves no pixel — so the same promise is kept here instead.
     const base = battery(DEFAULT_SCORE_CONFIG).map((f) => f());
+    // Collected rather than asserted key by key. A dead key is nearly always a
+    // FIXTURE hole — `fuelRegen` was pinned as inert twice on scenarios that never
+    // reached the mechanism — so the useful failure message is the whole list, not
+    // whichever key the loop happened to reach first.
+    const dead: string[] = [];
     for (const key of Object.keys(DEFAULT_SCORE_CONFIG) as Array<keyof ScoreConfig>) {
       const v = DEFAULT_SCORE_CONFIG[key];
       let moved = false;
@@ -546,8 +588,9 @@ describe('scoring weights', () => {
           break;
         }
       }
-      expect(moved, `${key} cannot change any session's outcome`).toBe(true);
+      if (!moved) dead.push(key);
     }
+    expect(dead, "these weights cannot change any session's outcome").toEqual([]);
   });
 });
 
@@ -594,10 +637,17 @@ describe('the fire a cross is offering', () => {
     );
     expect(twice / base).toBeCloseTo(2, 6);
 
-    // And it obeys the same ignition floor, so a graze that would not light a
-    // fire does not promise one either.
+    // And it obeys the same ignition floor, so a flight that never enters the
+    // band does not promise a fire. THE FLOOR IS NOW 0 and this pin moved with it:
+    // `burnMinHeat` was 0.01 only because a zero weight reads as a dead one to the
+    // sweep above, and F04 made it a constant — so the band's outer edge is the
+    // floor exactly, and a graze 0.2px inside it lights the faintest possible fire
+    // rather than none. That is the reported brief: "the second they enter the
+    // dangerous red zone". See `BURN_MIN_HEAT`.
+    const outside = hold(DEFAULT_SCORE_CONFIG.burnEdgeSpan + 0.2, 90);
+    expect(previewBurn(outside, field, bodies, DEFAULT_SCORE_CONFIG, DT)).toBe(0);
     const graze = hold(DEFAULT_SCORE_CONFIG.burnEdgeSpan - 0.2, 90);
-    expect(previewBurn(graze, field, bodies, DEFAULT_SCORE_CONFIG, DT)).toBe(0);
+    expect(previewBurn(graze, field, bodies, DEFAULT_SCORE_CONFIG, DT)).toBeGreaterThan(0);
   });
 
   it('promises nothing inside an anomaly bubble, where there is no wall', () => {
@@ -612,48 +662,82 @@ describe('what a rescue is worth', () => {
   /** A drift at the right wall, pressed `at` ticks in. */
   const WALL_DRIFT = { x: 165.5, y: 150, vx: 150, vy: -60 };
   const rescueRun = (at: number, scfg: ScoreConfig = DEFAULT_SCORE_CONFIG) =>
-    play([[at, 1]], 600, DEFAULT_CONFIG, scfg, true, WALL_DRIFT);
-
-  it('pays for turning away from the wall, and pays more the later you press', () => {
-    const early = rescueRun(20).awards.filter((a) => a.kind === 'rescue');
-    const late = rescueRun(100).awards.filter((a) => a.kind === 'rescue');
-    expect(early.length, 'an early press still rescues').toBe(1);
-    expect(late.length, 'so does a late one').toBe(1);
-    expect(late[0]!.timing, 'the later press spent more of its window').toBeGreaterThan(
-      early[0]!.timing,
+    play(
+      [
+        [at, 1],
+        [at + 200, 0],
+      ],
+      600,
+      DEFAULT_CONFIG,
+      scfg,
+      true,
+      WALL_DRIFT,
     );
-    expect(late[0]!.points, 'and is paid more for it').toBeGreaterThan(early[0]!.points);
-  });
 
-  it('pays nothing when the weight is zero, and more when the span shrinks', () => {
-    const full = rescueRun(60).awards.filter((a) => a.kind === 'rescue');
-    expect(full.length).toBe(1);
-
-    const off = rescueRun(60, { ...DEFAULT_SCORE_CONFIG, rescueBonus: 0 });
+  /**
+   * THIS BLOCK USED TO PIN `rescueBonus`, AND THE PIN FAILING IS THE POINT.
+   *
+   * F04 deleted the award. The prediction, written down before it was measured,
+   * was that a rescue would be structurally unpayable under a climb-only
+   * currency: a rescue is a lateral save, the constitution pays only for climb,
+   * so carry is about zero and `0 x band = 0`.
+   *
+   * The corpus reversed it. The link after a rescue banks a median carry of
+   * 1352px against 554px for an ordinary one — 2.44x, because a rescue means the
+   * ship drifted a long way and saved it — and the swing cashes in the fire band
+   * it was flying through. So the axis survives at about 7x an ordinary swing
+   * with no weight, no exception, and nothing anywhere naming it a rescue.
+   *
+   * What these assert is that property, which is the thing that would break
+   * silently: nothing pays a rescue, and a rescue is still worth flying for.
+   */
+  it('is not an award any more, and nothing on screen calls it one', () => {
+    const r = rescueRun(60);
     expect(
-      off.awards.some((a) => a.kind === 'rescue'),
-      'rescueBonus pays nothing at 0',
-    ).toBe(false);
-
-    // A shorter span is a harsher scale: the same press keeps less of the bonus.
-    const tight = rescueRun(60, { ...DEFAULT_SCORE_CONFIG, rescueSpan: 1.2 }).awards.filter(
-      (a) => a.kind === 'rescue',
-    );
-    expect(tight[0]!.points).toBeLessThan(full[0]!.points);
+      r.awards.every((a) => a.kind === 'link' || a.kind === 'flyby' || a.kind === 'mote'),
+    ).toBe(true);
   });
 
-  it('pays once per body per life, so tapping at the wall cannot farm it', () => {
-    // Press, release, press again on the same planet — the shape the author
-    // reported as "I can tap a bunch to extend my burn through the red zone".
-    // Every one of those taps turns the ship away, so only the once-per-body rule
-    // stops the tightest rescue also being the most repeatable one.
+  it('cashes the fire it was flying through, which is half of where the multiple comes from', () => {
+    // The band is the half of the ~7x a fixture can show. A drag along the wall is
+    // by construction inside the red, so the swing it ends on cashes above the
+    // first band — and it is the only session in the suite that does.
+    //
+    // The other half is the CARRY, and it is a corpus measurement rather than
+    // something a synthetic drift reproduces: over the reports that replay
+    // faithfully, the link after a rescue banks a median 1352px against 554px for
+    // an ordinary one. The fixtures here drift 400px sideways in a straight line;
+    // a real rescue is a long loose flight that saved itself. PORT_NOTES 73.
+    const dragged = play(
+      [
+        [90, 1],
+        [500, 0],
+      ],
+      900,
+      DEFAULT_CONFIG,
+      DEFAULT_SCORE_CONFIG,
+      true,
+      { x: 545.5, y: 200, vx: 0, vy: -120 },
+    );
+    const swing = dragged.awards.find((a) => a.kind === 'link');
+    expect(swing, 'the drag never reached a release').toBeDefined();
+    expect(swing!.band, 'the drag cashed in the cold band').toBeGreaterThan(1);
+    expect(swing!.heat, 'the swing reports the fire it flew through').toBeGreaterThan(0);
+  });
+
+  it('cannot be farmed, because a tap in place has climbed nothing to cash', () => {
+    // The reported shape: "I can tap a bunch to extend my burn through the red
+    // zone". It used to need a once-per-body rule, because every one of those taps
+    // does turn the ship away and the tightest rescue was therefore the most
+    // repeatable one. The rule is gone and the faucet is closed structurally: a
+    // press in place cashes whatever ground has been covered since the last one,
+    // and pressing again immediately has covered none.
     const tapped = play(
       [
         [60, 1],
         [130, 0],
         [136, 1],
         [190, 0],
-        [196, 1],
       ],
       600,
       DEFAULT_CONFIG,
@@ -661,37 +745,17 @@ describe('what a rescue is worth', () => {
       true,
       WALL_DRIFT,
     );
-    const paid = tapped.awards.filter((a) => a.kind === 'rescue');
-    const bodies = new Set(paid.map((a) => a.body));
-    expect(paid.length, 'one rescue per body, however many presses').toBe(bodies.size);
-  });
-
-  it('pays nothing for a press that was not headed at a wall', () => {
-    // The ordinary case: 63% of real presses never reach the projection at all.
-    const ordinary = pilot(2000).awards.filter((a) => a.kind === 'rescue');
-    for (const a of ordinary) expect(a.timing).toBeGreaterThan(0);
-    const straight = play(
-      [
-        [18, 1],
-        [150, 0],
-      ],
-      400,
+    expect(tapped.score.bank, 'tapping at the wall minted points').toBe(
+      tapped.awards.reduce((n, a) => n + a.points, 0),
     );
-    expect(
-      straight.awards.some((a) => a.kind === 'rescue'),
-      'a mid-field grab is not a rescue',
-    ).toBe(false);
+    for (const a of tapped.awards) expect(a.carry).toBeLessThanOrEqual(a.climb + 1e-6);
   });
 
-  it('reports no arrival or release quality of its own', () => {
-    // Those belong to the grab and the link. Reported as absent so nothing
-    // downstream can pay or praise them a second time.
-    const a = rescueRun(60).awards.find((w) => w.kind === 'rescue')!;
-    expect(a.close).toBe(0);
-    expect(a.aim).toBe(0);
-    expect(a.climb).toBe(0);
-    expect(a.heat).toBe(0);
-    expect(a.clearance).toBe(Infinity);
+  it('still arms the skull, which is all the scorer keeps of the prediction', () => {
+    // `armDoom` runs the same forward simulation the award used to be read from,
+    // and nothing pays or withholds a point on the answer. See `ScoreState.doomed`.
+    const late = play([[150, 1]], 400, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, WALL_DRIFT);
+    expect(late.score.doomed === null || late.score.doomed.wall === 'right').toBe(true);
   });
 });
 
@@ -801,18 +865,29 @@ describe('the skull: a press made past the last chance', () => {
 describe('what the ship says about a rescue', () => {
   const WALL_DRIFT = { x: 165.5, y: 150, vx: 150, vy: -60 };
   const run = (at: number) =>
-    play([[at, 1]], 600, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG, true, WALL_DRIFT);
+    play(
+      [
+        [at, 1],
+        [at + 200, 0],
+      ],
+      600,
+      DEFAULT_CONFIG,
+      DEFAULT_SCORE_CONFIG,
+      true,
+      WALL_DRIFT,
+    );
 
-  it('says nothing in words, and that took three attempts to arrive at', () => {
+  it('says nothing in words, and now says nothing in numbers either', () => {
     // A rescue had a praise axis (DOUSED, CLEARED), then a badge for the recovery
     // (SAFE), then a badge for the press that dared it (Nice!). All three were cut
     // on sight: "we already have the point reward from going through flames",
     // "it's too crowded and the anticipation is fun", "the 'nice!' is a bit
-    // cluttered". What confirms a rescue now is the cross brightening as the ship
-    // closes on it, and then the points.
-    const a = run(60).awards.find((w) => w.kind === 'rescue');
-    expect(a, 'the fixture is meant to rescue itself').toBeTruthy();
-    expect(praiseFor(a!), 'a rescue speaks through the instrument, not the vocabulary').toBeNull();
+    // cluttered". F04 took the fourth and last thing it said — the award — so what
+    // confirms a rescue is the cross brightening as the ship closes on it, the
+    // fire it is flying through, and the swing that follows being worth about 7x.
+    const r = run(60);
+    expect(r.awards.some((a) => a.kind === 'link')).toBe(true);
+    for (const a of r.awards) expect(praiseFor(a)?.category).not.toBe('burn');
   });
 
   it('still marks a press that was already too late', () => {
@@ -859,12 +934,24 @@ describe('what a link is worth', () => {
       expect(a.points).toBeGreaterThan(0);
     }
 
-    // Same session, weights zeroed one at a time: each component is really paid.
+    // Same session, one term at a time. THIS USED TO ZERO FOUR WEIGHTS —
+    // `closeBonus`, `timingBonus`, `aimBonus`, `climbPerPx` — and three of them
+    // no longer exist: a swing is `carry x tier x band x streak`, so there is one
+    // SOURCE and everything else is a factor on it. Zeroing a factor is the wrong
+    // instrument for a multiplier (a tier of 0 pays nothing at all), so each is
+    // flattened to 1 instead, which is the multiplicative version of the same
+    // question: does the term change what the session was worth?
     const full = pilot(4000).score.best;
-    for (const key of ['closeBonus', 'timingBonus', 'aimBonus', 'climbPerPx'] as const) {
-      const without = pilot(4000, DEFAULT_CONFIG, { ...DEFAULT_SCORE_CONFIG, [key]: 0 }).score.best;
-      expect(without, `${key} pays nothing`).toBeLessThan(full);
-    }
+    const without = (over: Partial<ScoreConfig>): number =>
+      pilot(4000, DEFAULT_CONFIG, { ...DEFAULT_SCORE_CONFIG, ...over }).score.best;
+    expect(without({ climbPerPx: 0 }), 'the carry is the only source').toBe(0);
+    expect(
+      without({ tierTrue: 1, tierSharp: 1, tierPerfect: 1 }),
+      'the tier prices nothing',
+    ).toBeLessThan(full);
+    expect(without({ tightMax: 1 }), 'tightness prices nothing').toBeLessThan(full);
+    expect(without({ chainStep: 0 }), 'the chain prices nothing').toBeLessThan(full);
+    expect(without({ streakStep: 0 }), 'the streak prices nothing').toBeLessThan(full);
   });
 
   it('pays nothing for a release that never reached a frozen orbit', () => {
@@ -891,19 +978,30 @@ describe('what a link is worth', () => {
 });
 
 describe('the streak multiplier', () => {
+  /**
+   * The streak's own contribution to a swing, backed out of the product.
+   *
+   * `ScoreAward.multiplier` is `tier x band x streak` since F04 — the whole
+   * receipt, because a popup printing one third of its own arithmetic cannot be
+   * checked against anything. So a test about the LADDER has to divide the other
+   * two back out, and doing it here once is what stops each assertion below
+   * quietly measuring a tier instead.
+   */
+  const streakOf = (a: ScoreAward): number => a.multiplier / (a.tier * a.band);
+
   it('rises with consecutive links', () => {
     const links = pilot(4000).awards.filter((a) => a.kind === 'link');
     const first = links[0]!;
-    expect(first.multiplier).toBe(1);
-    const second = links.find((a) => a.tick > first.tick && a.multiplier > 1);
+    expect(streakOf(first)).toBeCloseTo(1, 6);
+    const second = links.find((a) => a.tick > first.tick && streakOf(a) > 1);
     expect(second, 'a second link in the same life never raised the multiplier').toBeDefined();
-    expect(second!.multiplier).toBeCloseTo(1 + DEFAULT_SCORE_CONFIG.streakStep, 6);
+    expect(streakOf(second!)).toBeCloseTo(1 + DEFAULT_SCORE_CONFIG.streakStep, 6);
   });
 
   it('never exceeds its ceiling', () => {
     const gen = { ...DEFAULT_SCORE_CONFIG, streakStep: 2 };
     for (const a of pilot(4000, DEFAULT_CONFIG, gen).awards) {
-      expect(a.multiplier).toBeLessThanOrEqual(gen.streakMax);
+      expect(streakOf(a)).toBeLessThanOrEqual(gen.streakMax + 1e-9);
     }
   });
 
@@ -914,7 +1012,9 @@ describe('the streak multiplier', () => {
 
     // A multiplier that came back down to 1 after having been above it is the
     // signature of a life ending.
-    const seq = awards.filter((a) => a.kind === 'link').map((a) => a.multiplier);
+    const seq = awards
+      .filter((a) => a.kind === 'link')
+      .map((a) => Math.round(streakOf(a) * 1e6) / 1e6);
     expect(Math.max(...seq)).toBeGreaterThan(1);
     expect(seq.lastIndexOf(1)).toBeGreaterThan(seq.indexOf(1));
 
@@ -941,7 +1041,7 @@ describe('the streak multiplier', () => {
     // now far below.
     const { awards } = pilot(4000);
     const links = awards.filter((a) => a.kind === 'link');
-    const firstOfLife = links.map((a) => a.multiplier).lastIndexOf(1);
+    const firstOfLife = links.map((a) => Math.round(streakOf(a) * 1e6) / 1e6).lastIndexOf(1);
     expect(firstOfLife).toBeGreaterThan(0);
     expect(links[firstOfLife]!.climb, 'a life after a death banked no climb').toBeGreaterThan(0);
   });
@@ -954,7 +1054,11 @@ describe('grab quality (PORT_NOTES 17)', () => {
       links.some((a) => a.aim > 0.5),
       'no release was ever scored as aimed',
     ).toBe(true);
-    const blind = pilot(4000, DEFAULT_CONFIG, { ...DEFAULT_SCORE_CONFIG, aimBonus: 0 });
+    // Aim is half the tier's conjunction now rather than a bonus of its own, so
+    // the way to prove the score reads it is to make the ladder blind to it: at a
+    // sharpness of 0 every release scores `aim^0 = 1` on that axis and the tier
+    // stops being able to tell a lined-up release from a wild one.
+    const blind = pilot(4000, DEFAULT_CONFIG, { ...DEFAULT_SCORE_CONFIG, aimSharpness: 0 });
     expect(blind.score.best).not.toBe(pilot(4000).score.best);
   });
 
@@ -966,7 +1070,7 @@ describe('grab quality (PORT_NOTES 17)', () => {
       [318, 0],
     ];
     const a = play(edges, 900, DEFAULT_CONFIG, DEFAULT_SCORE_CONFIG);
-    const b = play(edges, 900, DEFAULT_CONFIG, { ...DEFAULT_SCORE_CONFIG, aimBonus: 9999 });
+    const b = play(edges, 900, DEFAULT_CONFIG, { ...DEFAULT_SCORE_CONFIG, tierPerfect: 9999 });
     expect(b.fingerprints).toEqual(a.fingerprints);
   });
 });
@@ -998,29 +1102,14 @@ const REAL = {
   aim: { med: 0.85, p75: 0.94, p90: 0.98 },
 } as const;
 
-const grab = (over: Partial<ScoreAward> = {}): ScoreAward => ({
-  tick: 500,
-  kind: 'grab',
-  points: 180,
-  multiplier: 1,
-  body: 'P3',
-  close: 0.4,
-  clearance: REAL.clearance.med,
-  skim: 40,
-  defl: 3,
-  timing: 0,
-  heat: 0,
-  turn: 0,
-  aim: 0,
-  climb: 0,
-  ...over,
-});
-
 const link = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   tick: 500,
   kind: 'link',
   points: 240,
   multiplier: 1,
+  tier: 1,
+  band: 1,
+  carry: 240,
   body: 'P3→P4',
   close: 0,
   clearance: Infinity,
@@ -1034,66 +1123,138 @@ const link = (over: Partial<ScoreAward> = {}): ScoreAward => ({
   ...over,
 });
 
-describe('the word a grab earns', () => {
-  it('says nothing about the arrival the player usually makes', () => {
-    expect(praiseFor(grab())).toBeNull();
+describe('what an arrival is worth', () => {
+  /**
+   * THIS BLOCK USED TO PIN THE GRAB'S WORD AND THE GRAB'S POINTS, AND BOTH ARE
+   * GONE. F04 folded `closeBonus`, `nerveBonus` and `flybyCloseBonus` into one
+   * multiplier on the carry — they were three flat sums paid at three moments for
+   * one quantity, clearance above the minimum orbit — and an award that mints
+   * nothing is not an award, so the popup and its vocabulary went with it.
+   *
+   * The axis did not go. What is pinned here is what replaced it, measured the
+   * only way a multiplier inside the carry can be: run the same session with
+   * tightness switched off and see what the arrival was worth.
+   */
+  const carried = (
+    edges: Edges,
+    ticks: number,
+    ship: Ship | undefined,
+    scfg: ScoreConfig,
+  ): number =>
+    play(edges, ticks, DEFAULT_CONFIG, scfg, true, ship)
+      .awards.filter((a) => a.kind === 'link' || a.kind === 'flyby')
+      .reduce((n, a) => n + a.carry, 0);
+
+  /** How much of a session's carry came from how tightly it arrived. */
+  const tightGain = (edges: Edges, ticks: number, ship?: Ship): number => {
+    const off = carried(edges, ticks, ship, { ...DEFAULT_SCORE_CONFIG, tightMax: 1 });
+    return off === 0 ? 1 : carried(edges, ticks, ship, DEFAULT_SCORE_CONFIG) / off;
+  };
+
+  /** The nerve session: bearing straight down on P1 and pressing late. */
+  const NERVE = SESSIONS.find((x) => x.name === 'head-on, pressed late')!;
+  /** An ordinary grab from the spawn. */
+  const ORDINARY: { edges: Edges; ticks: number } = {
+    edges: [
+      [240, 1],
+      [318, 0],
+    ],
+    ticks: 900,
+  };
+
+  it('is never a penalty, however wide the arrival', () => {
+    // VISION pillar 5: nothing is taken away, rewards are withheld. The ramp
+    // bottoms out at 1 rather than going below it, so a loose grab is paid the
+    // plain rate and never less.
+    for (const sn of SESSIONS) {
+      expect(tightGain(sn.edges, sn.ticks, sn.ship), sn.name).toBeGreaterThanOrEqual(1);
+    }
   });
 
-  it('speaks up for an arrival in the tightest quarter', () => {
-    expect(praiseFor(grab({ clearance: REAL.clearance.p25 }))?.category).toBe('close');
-    expect(praiseFor(grab({ clearance: REAL.clearance.p25 }))?.level).toBe('good');
+  it('is graded over `closeSpan`, so the same arrival is worth more on a wider one', () => {
+    // The span is the axis's only calibration, and the one number the ring's
+    // gradient is drawn from. Two fixed arrivals, three spans: the wider the band
+    // the tightness is measured over, the more of it the same clearance keeps.
+    const at = (span: number): number =>
+      carried(ORDINARY.edges, ORDINARY.ticks, undefined, {
+        ...DEFAULT_SCORE_CONFIG,
+        closeSpan: span,
+      });
+    expect(at(400)).toBeGreaterThan(at(200));
+    expect(at(200)).toBeGreaterThan(at(50));
   });
 
-  it('reserves the higher rung for the tightest tenth', () => {
-    expect(praiseFor(grab({ clearance: REAL.clearance.p10 }))?.level).toBe('great');
+  it('prices a pass on the same span it prices a grab on', () => {
+    // "grabs AND passes alike" — one term, two ways of arriving. Without it the
+    // flyby's closeness would have no home at all, which is where
+    // `flybyCloseBonus` went.
+    //
+    // Pressed at 60 rather than at 1, unlike the flyby fixture in `SESSIONS`: the
+    // multiplier prices what was carried INTO the arrival, so a pass begun on the
+    // first tick has nothing for it to be a multiplier of. That is not a
+    // shortcoming of the fixture, it is the rule — see the arrival block below.
+    expect(
+      tightGain(
+        [
+          [60, 1],
+          [260, 0],
+        ],
+        500,
+        FLYBY_SHIP,
+      ),
+    ).toBeGreaterThan(1);
   });
 
-  it('stays quiet on an arrival wider than usual', () => {
-    expect(praiseFor(grab({ clearance: REAL.clearance.p75 }))).toBeNull();
+  it('multiplies what was carried in, so an arrival on the first tick is worth nothing', () => {
+    // The corollary, and it is the property that makes this a multiplier rather
+    // than a bonus: a beautiful arrival made before the ship has covered any
+    // ground prices zero ground. `0 x anything = 0` is the same arithmetic that
+    // closed the tap faucet.
+    const fb = SESSIONS.find((x) => x.name === 'straight past, too fast to hold')!;
+    expect(tightGain(fb.edges, fb.ticks, fb.ship)).toBe(1);
   });
 
-  it('fires at the threshold and not a hair beyond it', () => {
-    expect(praiseFor(grab({ clearance: CLOSE_PX.tier1 }))?.category).toBe('close');
-    expect(praiseFor(grab({ clearance: CLOSE_PX.tier1 + 1 }))).toBeNull();
+  it('says no word, because there is no award left to carry one', () => {
+    const r = play(
+      NERVE.edges,
+      NERVE.ticks,
+      DEFAULT_CONFIG,
+      DEFAULT_SCORE_CONFIG,
+      true,
+      NERVE.ship,
+    );
+    for (const a of r.awards) {
+      expect(['close', 'nerve', 'burn']).not.toContain(praiseFor(a)?.category);
+    }
   });
 
-  it('never names a release quality, however good it looks', () => {
-    // Aim and peak belong to the other event. A grab that carried them would be
-    // paying for the same thing twice.
-    expect(praiseFor(grab({ aim: 1, timing: 1 }))).toBeNull();
-  });
-
-  describe('the nerve grab', () => {
+  describe('the nerve pair, which outlived the award that paid it', () => {
     // Already boring in, and you waited. Both halves are required, and that is
-    // the whole point: neither one alone is the move.
-    const nerve = (over: Partial<ScoreAward> = {}) => grab({ skim: -27, clearance: 57, ...over });
-
+    // the whole point: neither one alone is the move. Nothing pays for it any
+    // more — a line headed inside the minimum orbit has no clearance left, so it
+    // lands at the top of the tightness ramp by construction — but this is still
+    // the only definition of the pair, and the bounds are still measured.
     it('names a late press on a line already headed inside the minimum orbit', () => {
-      const p = praiseFor(nerve());
-      expect(p?.category).toBe('nerve');
-      expect(WORDS.nerve[0]).toContain(p!.word);
+      expect(isNerveGrab(-27, 57)).toBe(true);
     });
 
     it('is not earned by a late press on a line that was going to miss', () => {
       // 50px off a planet on the way past is the same PLACE as 50px off and
       // boring in, and only the second is nerve.
-      expect(praiseFor(nerve({ skim: 26 }))?.category).not.toBe('nerve');
+      expect(isNerveGrab(26, 57)).toBe(false);
     });
 
     it('is not earned by an early press on a collision line', () => {
-      expect(praiseFor(nerve({ clearance: CLOSE_PX.tier1 + 1 }))).toBeNull();
+      expect(isNerveGrab(-27, CLOSE_PX.tier1 + 1)).toBe(false);
     });
 
     it('ignores a body that was already behind the ship', () => {
-      expect(praiseFor(nerve({ skim: Infinity }))?.category).not.toBe('nerve');
+      expect(isNerveGrab(Infinity, 57)).toBe(false);
     });
 
-    it('yields to the superlative when it was also in the tightest tenth', () => {
-      expect(praiseFor(nerve({ clearance: CLOSE_PX.tier2 }))?.category).toBe('super');
-    });
-
-    it('outranks a plain tight arrival', () => {
-      expect(praiseFor(nerve())?.category).toBe('nerve');
+    it('fires at the threshold and not a hair beyond it', () => {
+      expect(isNerveGrab(0, CLOSE_PX.tier1)).toBe(true);
+      expect(isNerveGrab(0, CLOSE_PX.tier1 + 1)).toBe(false);
     });
   });
 });
@@ -1155,7 +1316,6 @@ describe('the word a release earns', () => {
     for (const [category, make] of [
       ['aim', (t: number) => link({ tick: t, aim: AIM.tier2 })],
       ['peak', (t: number) => link({ tick: t, timing: PEAK.tier2 })],
-      ['close', (t: number) => grab({ tick: t, clearance: CLOSE_PX.tier2, skim: 99 })],
     ] as const) {
       const seen = new Set<string>();
       for (let t = 0; t < 400; t++) {
@@ -1495,19 +1655,25 @@ describe('a flyby that stays a flyby', () => {
     // closest approach like a grab: see `PendingFlyby`. Moving the release moves
     // the award and changes nothing about what it is worth.
     //
-    // The award is pinned to the FIRST release's value rather than to a literal,
-    // so a retune of the flyby weights cannot make this fail for a reason that
-    // has nothing to do with the property under test. That the value is stable
-    // across releases is the assertion; what the value is belongs to
-    // `src/score/config.ts`.
-    let expected: number | null = null;
+    // THE PIN CHANGED SHAPE AT F04 AND THE PROPERTY DID NOT. It used to assert
+    // that the value was identical whatever tick the pass was let go on, because
+    // the award was read entirely off the closest approach. Under the
+    // constitution a swing cashes the ground it covered, so holding on longer is
+    // worth more — that is the economy working, not the award drifting.
+    //
+    // What still has to be true is that the QUALITIES are settled at the bottom
+    // and never re-read: one award, landing at the release, describing the same
+    // pass however long it is held.
+    let close: number | null = null;
+    let last = 0;
     for (const rel of [120, 200, 320]) {
       const f = pass(rel, 600).awards.filter((a) => a.kind === 'flyby');
       expect(f, `released at ${rel}`).toHaveLength(1);
       expect(f[0]!.tick, `released at ${rel}`).toBe(rel + 1);
-      expected ??= f[0]!.points;
-      expect(expected, `released at ${rel}`).toBeGreaterThan(0);
-      expect(f[0]!.points, `released at ${rel}`).toBe(expected);
+      close ??= f[0]!.clearance;
+      expect(f[0]!.clearance, `released at ${rel}`).toBe(close);
+      expect(f[0]!.points, `released at ${rel}`).toBeGreaterThan(last);
+      last = f[0]!.points;
     }
   });
 
@@ -1586,22 +1752,17 @@ describe('a flyby that stays a flyby', () => {
     expect(held[0]!.points).toBeLessThan(held[1]!.points);
     expect(held[1]!.points).toBeLessThan(held[2]!.points);
 
-    // The longest hold swings past `flybyTurnSpan` and so collects the whole
-    // award — the pass flown properly is worth exactly what it was worth before
-    // any of this, which is the point: nothing was taken from a good pass.
+    // THE TURN IS THE PASS'S TIER, which is where `flybyTurnSpan` went. A pass
+    // has no frozen orbit, so it has neither a compass marker nor a boost
+    // envelope to be graded on; what it has is the one quality that says what the
+    // pass DID to the ship. Grading it on the same three rungs a release gets is
+    // what keeps one ladder in the game instead of two.
+    //
+    // The longest hold swings past `flybyTurnSpan`, so it tops the ladder out.
     expect(held[2]!.turn).toBeGreaterThan(DEFAULT_SCORE_CONFIG.flybyTurnSpan);
-    expect(held[2]!.points).toBe(
-      Math.round(
-        DEFAULT_SCORE_CONFIG.flybyBase + held[2]!.close * DEFAULT_SCORE_CONFIG.flybyCloseBonus,
-      ),
-    );
-    // ...and the shortest is scaled by exactly the fraction of the span it swung.
-    expect(held[0]!.points).toBe(
-      Math.round(
-        (DEFAULT_SCORE_CONFIG.flybyBase + held[0]!.close * DEFAULT_SCORE_CONFIG.flybyCloseBonus) *
-          (held[0]!.turn / DEFAULT_SCORE_CONFIG.flybyTurnSpan),
-      ),
-    );
+    expect(held[2]!.tier).toBe(DEFAULT_SCORE_CONFIG.tierPerfect);
+    // ...and the shortest swings a fraction of it and cannot.
+    expect(held[0]!.tier).toBeLessThan(held[2]!.tier);
   });
 
   it('pays nothing once the pass has puttered out below the floor', () => {
@@ -1617,17 +1778,8 @@ describe('a flyby that stays a flyby', () => {
     // pays nothing; the same pass at 160px/s bottoms out at 158 and pays.
     //
     // Neither earns any closeness: 400px to the side is far outside `closeSpan`,
-    // which is the point — the floor is not a closeness test. So the control pays
-    // `flybyBase` and nothing else, scaled by how far it swung the ship: it sweeps
-    // most of `flybyTurnSpan` but not all of it, and asserting the scaled value
-    // rather than the bare base is what keeps this a test of the SPEED floor. See
-    // `FLYBY_TURN_MIN`.
-    //
-    // Filtered to flyby awards, and that is not tidiness: this line starts 37.9px
-    // from the left wall, which is inside the 60px dead zone, so a captured ship
-    // on it also earns a BURN. That award is correct and has nothing to do with
-    // the floor being tested here — the assertion just has to say which kind it
-    // is talking about.
+    // which is the point — the floor is not a closeness test. So the control's
+    // carry is priced by its turn alone. See `FLYBY_TURN_MIN`.
     const paid = (speed: number): ScoreAward[] =>
       play(
         [
@@ -1652,20 +1804,24 @@ describe('a flyby that stays a flyby', () => {
     const a = fast[0]!;
     expect(a.close, 'the control pass drifted inside closeSpan').toBe(0);
     expect(a.turn).toBeGreaterThan(FLYBY_TURN_MIN);
-    expect(a.points).toBe(
-      Math.round(
-        DEFAULT_SCORE_CONFIG.flybyBase * Math.min(1, a.turn / DEFAULT_SCORE_CONFIG.flybyTurnSpan),
-      ),
-    );
+    expect(a.points).toBe(Math.round(a.carry * a.multiplier));
   });
 
-  it('pays a grab and not a flyby once the pass converts', () => {
-    // One press, one award. A flyby can bottom out unbound, arc back on the brake
-    // and become a capture, and paying at the bottom would have paid that press
-    // twice and stepped the ladder twice — for an overshoot. Braking eight times
-    // as hard makes the fixture convert, and the flyby it was owed is dropped.
+  it('cashes once when the pass converts, and prices the arrival once', () => {
+    // One press, one cash. A flyby can bottom out unbound, arc back on the brake
+    // and become a capture, and cashing at the bottom would settle that press
+    // twice and step the ladder twice — for an overshoot. Braking eight times as
+    // hard makes the fixture convert, and the flyby it was owed is dropped.
+    //
+    // THE ARRIVAL IS THE OTHER HALF, and F04 added it: both a pass's closest
+    // approach and a dive's periapsis multiply the carry, so a press that was
+    // both would tighten it twice. They are mutually exclusive by construction —
+    // conversion needs bound AND inbound, so it always happens before the radius
+    // bottoms out, and the flyby branch never sees that bottom. `grabs` counts
+    // arrivals, so counting them is how that argument gets checked rather than
+    // asserted.
     const slow = { ...DEFAULT_CONFIG, flybyBrake: DEFAULT_CONFIG.flybyBrake * 8 };
-    const { awards } = play(
+    const { awards, score } = play(
       [
         [1, 1],
         [200, 0],
@@ -1677,99 +1833,142 @@ describe('a flyby that stays a flyby', () => {
       FLYBY_SHIP,
     );
     expect(awards.filter((a) => a.kind === 'flyby')).toHaveLength(0);
-    expect(awards.length, 'the converted pass paid nothing at all').toBeGreaterThan(0);
+    expect(
+      awards.filter((a) => a.kind === 'link'),
+      'the converted pass never cashed',
+    ).toHaveLength(1);
+    expect(score.grabs, 'one press priced the arrival twice').toBe(1);
   });
 });
 
-// ---------------------------------------------------------- when a grab is paid
+// ------------------------------------------------------ when an arrival scores
 
-describe('the grab award lands at periapsis, not at the press', () => {
-  /** Ticks from the press to the grab award, or -1 if none was ever paid. */
-  function payDelay(pressAt: number, releaseAt: number, ticks: number): number {
-    const { awards } = play(
-      [
-        [pressAt, 1],
-        [releaseAt, 0],
-      ],
-      ticks,
-    );
-    const g = awards.find((a) => a.kind === 'grab');
-    return g ? g.tick - pressAt : -1;
-  }
-
-  it('pays nothing for a tap that never reaches the bottom', () => {
-    // The whole reason the award is not at the press: next to a planet you are
-    // already close to the surface, so every tap would be a tight grab and
-    // tap-tap-tap would be a points faucet.
-    expect(payDelay(240, 244, 400)).toBe(-1);
-    expect(payDelay(240, 248, 400)).toBe(-1);
-  });
-
-  it('pays a couple of ticks after periapsis, not at the press', () => {
-    // Measured from PERIAPSIS, not from the press: how long the dive itself takes
-    // is a property of the approach, and on a long shallow one it is 70+ ticks.
-    // What this pins is that the award rides the bottom of the dive.
+describe('the arrival prices the carry at periapsis, not at the press', () => {
+  /**
+   * Every tick of a session, with the two things this block is about.
+   *
+   * `grabs` steps on the arrival and nowhere else, so its rising edge IS the
+   * moment the multiplier landed — there is no award left to read it off.
+   */
+  function trace(edges: Edges, ticks: number) {
     const cfg = DEFAULT_CONFIG;
     const st = createInitialState(cfg);
     const sc = createScoreState();
-    const edges = new Map<number, 0 | 1>([
-      [240, 1],
-      [400, 0],
-    ]);
+    const map = new Map(edges);
+    const arrivals: Array<{ tick: number; before: number; after: number }> = [];
     let held = false;
-    let freeze = -1;
-    let paid = -1;
-    for (let t = 0; t < 700; t++) {
-      const e = edges.get(t);
+    let peri = -1;
+    let prevGrabs = 0;
+    let prevCarry = 0;
+    for (let t = 0; t < ticks; t++) {
+      const e = map.get(t);
       const pressed = e === 1;
       const released = e === 0;
       if (pressed) held = true;
       if (released) held = false;
       stepSim(st, cfg, { held: held || pressed, pressed, released } as Input, FIXED_DT);
-      if (freeze < 0 && st.capture?.passedPeri) freeze = t;
-      for (const a of scoreTick(sc, st, cfg, FIXED_DT).awards)
-        if (a.kind === 'grab' && paid < 0) paid = a.tick;
+      scoreTick(sc, st, cfg, FIXED_DT);
+      if (peri < 0 && st.capture?.passedPeri) peri = t;
+      if (sc.grabs > prevGrabs) arrivals.push({ tick: t, before: prevCarry, after: sc.carry });
+      prevGrabs = sc.grabs;
+      prevCarry = sc.carry;
     }
-    expect(freeze, 'the capture never reached periapsis').toBeGreaterThan(240);
-    expect(paid, 'no grab award was paid').toBeGreaterThan(0);
-    expect(paid - freeze).toBeGreaterThan(0);
-    expect(paid - freeze).toBeLessThanOrEqual(4);
+    return { sc, arrivals, peri };
+  }
+
+  it('prices nothing for a tap that never reaches the bottom', () => {
+    // The rule that survived its own reason. It used to be justified as a faucet:
+    // beside a planet you are already close to the surface, so paying at the press
+    // would make every tap a tight grab. Under a pure multiplier a tap in place
+    // has climbed zero metres, so `0 x anything = 0` and the faucet is
+    // structurally impossible — the rule now stands on the receipt instead, two
+    // acts graded at two moments.
+    expect(
+      trace(
+        [
+          [240, 1],
+          [244, 0],
+        ],
+        400,
+      ).arrivals,
+    ).toHaveLength(0);
   });
 
-  it('still pays when the hold continues into a full orbit', () => {
+  it('lands ON periapsis — the moment the swing actually happened', () => {
+    // The two-tick delay this used to carry went with the popup it existed for.
+    // A multiplier has to land when the act did, or the carry the player is
+    // watching moves two ticks after the thing that moved it.
+    const r = trace(
+      [
+        [240, 1],
+        [400, 0],
+      ],
+      700,
+    );
+    expect(r.peri, 'the capture never reached periapsis').toBeGreaterThan(240);
+    expect(r.arrivals, 'no arrival was priced').toHaveLength(1);
+    expect(r.arrivals[0]!.tick).toBe(r.peri);
+  });
+
+  it('multiplies what was carried into it, rather than adding to it', () => {
+    const r = trace(
+      [
+        [240, 1],
+        [400, 0],
+      ],
+      700,
+    );
+    const a = r.arrivals[0]!;
+    expect(a.before, 'the ship climbed on the way in').toBeGreaterThan(0);
+    expect(a.after / a.before, 'the arrival was tight enough to pay').toBeGreaterThan(1);
+    expect(a.after / a.before, 'and never more than the ramp allows').toBeLessThanOrEqual(
+      DEFAULT_SCORE_CONFIG.tightMax + 1e-9,
+    );
+  });
+
+  it('still prices when the hold continues into a full orbit', () => {
     // Periapsis is behind you by then, so holding on must not forfeit it.
-    const { awards } = play(
-      [
-        [240, 1],
-        [600, 0],
-      ],
-      900,
-    );
-    expect(awards.filter((a) => a.kind === 'grab')).toHaveLength(1);
+    expect(
+      trace(
+        [
+          [240, 1],
+          [600, 0],
+        ],
+        900,
+      ).arrivals,
+    ).toHaveLength(1);
   });
 
-  it('pays exactly once however long the capture runs', () => {
-    const { awards } = play(
-      [
-        [240, 1],
-        [700, 0],
-      ],
-      1000,
-    );
-    expect(awards.filter((a) => a.kind === 'grab')).toHaveLength(1);
+  it('prices exactly once however long the capture runs', () => {
+    expect(
+      trace(
+        [
+          [240, 1],
+          [700, 0],
+        ],
+        1000,
+      ).arrivals,
+    ).toHaveLength(1);
   });
 
   it('cannot be farmed by tapping in place', () => {
     // Eight quick taps beside a planet. Each one starts a capture and abandons it
-    // long before the bottom.
+    // long before the bottom — and even if one reached it, a tap has climbed
+    // nothing, so there is nothing for the multiplier to be a multiplier of.
     const edges: Edges = [];
     for (let i = 0; i < 8; i++) edges.push([240 + i * 12, 1], [244 + i * 12, 0]);
-    const { awards, score } = play(edges, 600);
-    expect(awards.filter((a) => a.kind === 'grab')).toHaveLength(0);
+    const { score } = play(edges, 600);
     expect(score.bank).toBe(0);
   });
 
-  it('is a separate award from the release, with its own points and word', () => {
+  it("is the FIRST of the capture's two scoring events, and the release is the second", () => {
+    const r = trace(
+      [
+        [240, 1],
+        [400, 0],
+      ],
+      700,
+    );
     const { awards } = play(
       [
         [240, 1],
@@ -1777,14 +1976,11 @@ describe('the grab award lands at periapsis, not at the press', () => {
       ],
       700,
     );
-    const g = awards.find((a) => a.kind === 'grab')!;
     const l = awards.find((a) => a.kind === 'link')!;
-    expect(g.tick).toBeLessThan(l.tick);
-    expect(g.points).toBeGreaterThan(0);
-    expect(l.points).toBeGreaterThan(0);
-    // neither event carries the other's qualities
-    expect(g.aim).toBe(0);
-    expect(g.timing).toBe(0);
+    expect(r.arrivals[0]!.tick, 'the arrival priced after the release').toBeLessThan(l.tick);
+    // The release carries no arrival quality: it has already been spent pricing
+    // the carry this cashes, and reporting it here would let something downstream
+    // read it twice.
     expect(l.close).toBe(0);
     expect(l.clearance).toBe(Infinity);
   });
@@ -1874,7 +2070,7 @@ describe('the burn', () => {
     // and left without ever lighting — the player visibly in the red with nothing
     // happening, which is the whole thing that was being complained about.
     const span = DEFAULT_SCORE_CONFIG.burnEdgeSpan;
-    expect(heatAt(field.left + span - 1, true)).toBeGreaterThan(DEFAULT_SCORE_CONFIG.burnMinHeat);
+    expect(heatAt(field.left + span - 1, true)).toBeGreaterThan(BURN_MIN_HEAT);
     // And nothing at all a pixel outside it.
     expect(heatAt(field.left + span + 1, true)).toBe(0);
   });
@@ -1903,16 +2099,21 @@ describe('the burn', () => {
     expect(edgeHeat(wall, anomaly.y, field, bodies, true, DEFAULT_SCORE_CONFIG)).toBe(0);
   });
 
-  it('pays for a drag that is pulled out of, and nothing for one that hits the wall', () => {
-    // The shape of the whole mechanic: the fire is free drama on the way out and
-    // an award only if the ship survives. `endLife` drops the bank, so a death
-    // cannot pay — which matters, because 78% of real edge-drags end in one.
+  it('banks a band for a drag that is pulled out of, and nothing for one that hits the wall', () => {
+    // The shape of the whole mechanic, and F04 sharpened it rather than changing
+    // it: the fire is free drama on the way out and a MULTIPLIER only if the ship
+    // survives to cash a swing. `endLife` drops the bank, so a death cannot cash
+    // — which matters, because 78% of real edge-drags end in one.
+    //
+    // What changed is that the flare going out no longer settles anything. It
+    // used to pay at that moment, which meant a swing that burned early and let
+    // go late collected its fire twice over as two separate awards; now the
+    // integral survives the fire and is spent once, by the release.
     const state = createInitialState(DEFAULT_CONFIG);
     const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
 
     /** Hold the ship in the band for `ticks`, then either let go or die. */
-    const drag = (sc: ScoreState, ticks: number, kill: boolean): ScoreAward[] => {
-      const out: ScoreAward[] = [];
+    const drag = (sc: ScoreState, ticks: number, kill: boolean): number => {
       // Positioned through the capture's body-relative offset, NOT `state.ship`:
       // during a capture the scorer reads `shipWorldPos`, and `state.ship` is
       // stale. Writing the wrong one here silently measured zero heat.
@@ -1922,26 +2123,53 @@ describe('the burn', () => {
         state.capture = fakeCapture();
         state.capture.rx = f.left + 10 - anchor.x;
         state.capture.ry = -anchor.y;
-        out.push(...scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT).awards);
+        scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
       }
+      const held = sc.burnBank;
       state.tick++;
       if (kill) state.ending.active = true;
       else state.capture = null;
-      out.push(...scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT).awards);
-      return out.filter((a) => a.kind === 'burn');
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+      return held;
     };
 
     const survived = createScoreState();
-    const paid = drag(survived, 30, false);
-    expect(paid).toHaveLength(1);
-    expect(paid[0]!.points).toBeGreaterThan(0);
-    expect(survived.burnBank).toBe(0);
+    const held = drag(survived, 30, false);
+    expect(held, 'the drag banked no heat at all').toBeGreaterThan(0);
+    expect(survived.burnBank, 'letting go must not spend the band — the release does').toBe(held);
 
     state.ending.active = false;
     state.capture = null;
     const dying = createScoreState();
-    expect(drag(dying, 30, true)).toHaveLength(0);
-    expect(dying.burnBank).toBe(0);
+    expect(drag(dying, 30, true)).toBeGreaterThan(0);
+    expect(dying.burnBank, 'a death drops the band it had earned').toBe(0);
+  });
+
+  it('selects a deeper band the longer and deeper the drag runs', () => {
+    // The band is the integral, not the instant: `bandTwoAt` and `bandThreeAt` are
+    // in heat-SECONDS, so a graze that never stays cannot buy what a drag can. It
+    // is the reason no fixed x on the hazard gradient can be either threshold —
+    // see `drawHazardZones`.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const anchor = state.bodies[0]!;
+    const bandAfter = (ticks: number, inset: number): number => {
+      const sc = createScoreState();
+      for (let i = 0; i < ticks; i++) {
+        state.tick++;
+        state.capture = fakeCapture();
+        state.capture.rx = f.left + inset - anchor.x;
+        state.capture.ry = -anchor.y;
+        scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+      }
+      return sc.band;
+    };
+    expect(bandAfter(4, 10)).toBe(1);
+    expect(bandAfter(200, 10)).toBeGreaterThan(1);
+    expect(bandAfter(200, 10), 'a deep drag outruns a shallow one').toBeGreaterThanOrEqual(
+      bandAfter(200, 50),
+    );
+    state.capture = null;
   });
 
   it('matches the red band the player can actually see', () => {

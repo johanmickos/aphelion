@@ -18,7 +18,7 @@ import { toScreenX, toScreenY, visibleWorldY } from './camera.ts';
 import type { RenderConfig } from './config.ts';
 import { FINISH, withAlpha } from './palette.ts';
 import { hypot } from '../sim/orbit.ts';
-import { HAZARD_BAND_FROM, HAZARD_BAND_TO, HAZARD_EDGE } from './palette.ts';
+import { HAZARD_BAND_FROM, HAZARD_BAND_TO, HAZARD_EDGE, hazardBandAt } from './palette.ts';
 
 /**
  * Danger gradient at the field edges.
@@ -53,6 +53,16 @@ import { HAZARD_BAND_FROM, HAZARD_BAND_TO, HAZARD_EDGE } from './palette.ts';
  * the nearer of the two. A second red line under the first would be warning about
  * the wrong one.
  */
+/**
+ * How many bands the red is drawn in. Direction 08's ladder is x1 / x2 / x3.
+ *
+ * A constant and not a `RenderConfig` key, deliberately: it is not a matter of
+ * taste, it is the number of rungs in the economy. Changing it here without
+ * changing `ScoreConfig.bandTwoAt` / `bandThreeAt` would draw a ladder the score
+ * does not use, which is the whole failure axiom 5 exists to prevent.
+ */
+const HAZARD_STEPS = 3;
+
 export function drawHazardZones(
   ctx: CanvasRenderingContext2D,
   cam: Camera,
@@ -76,9 +86,36 @@ export function drawHazardZones(
     const w = Math.abs(xEdge - xInner);
     if (w < 0.5) continue;
 
+    // THREE STEPS AND NOT A WASH, which is the second pixel F04 stage (b)
+    // requires. Direction 08 pays a swing at `carry x tier x band x streak`, and
+    // the band is the fire: how deep and how long the swing rode the edge, which
+    // `ScoreState.burnBank` integrates. Axiom 5 says a multiplier the player did
+    // not see drawn before it scored is invisible math — and a continuous
+    // gradient, which is what this was, says "it gets worse" without ever saying
+    // where the ladder changes.
+    //
+    // So the same gradient is quantised into three bands of equal depth. It is
+    // still the same red and still deepens inward, so nothing about the warning
+    // changed; what is added is that the two step edges are legible, and a player
+    // can aim at one. That is pillar 4 — the risk is a dial you aim at, not a
+    // prompt you obey — applied to the thing that prices the risk.
+    //
+    // Depth-quantised rather than placed at `bandTwoAt`/`bandThreeAt` directly,
+    // and the difference is worth stating because it looks like a gap. Those two
+    // are integrals, in heat-SECONDS: they depend on how long the ship stays, so
+    // no fixed x on the screen corresponds to either. What the steps mark is where
+    // the heat that fills them changes rate, which is the part the geometry can
+    // honestly say.
     const g = ctx.createLinearGradient(xInner, 0, xEdge, 0);
-    g.addColorStop(0, HAZARD_BAND_FROM);
-    g.addColorStop(1, HAZARD_BAND_TO);
+    for (let k = 0; k < HAZARD_STEPS; k++) {
+      const from = k / HAZARD_STEPS;
+      const to = (k + 1) / HAZARD_STEPS;
+      // The band's colour at the MIDDLE of the step, held flat across it: a step
+      // that ramped inside itself would still read as a wash with seams.
+      const shade = hazardBandAt((k + 0.5) / HAZARD_STEPS);
+      g.addColorStop(from, shade);
+      g.addColorStop(to, shade);
+    }
     ctx.fillStyle = g;
     ctx.fillRect(x0, top, w, height);
 

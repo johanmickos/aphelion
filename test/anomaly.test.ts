@@ -16,7 +16,7 @@ import { DEFAULT_SCORE_CONFIG } from '../src/score/config.ts';
 import type { SimConfig } from '../src/sim/config.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { createScoreState, scoreTick } from '../src/score/score.ts';
-import type { ScoreAward } from '../src/score/types.ts';
+import type { ScoreAward, ScoreState } from '../src/score/types.ts';
 import { DESIGN_W, createBodies, fieldBounds } from '../src/sim/world.ts';
 import { DEFAULT_RENDER_CONFIG } from '../src/render/config.ts';
 import { hypot } from '../src/sim/orbit.ts';
@@ -36,6 +36,17 @@ interface Flight {
   multAfterRelease: number;
   /** Seconds on the charged window immediately after the release. */
   chargedAfterRelease: number;
+  /** The scorer at the end of the flight. */
+  score: ScoreState;
+  /**
+   * Every body claimed during the flight, in order.
+   *
+   * Accumulated as it happens rather than read off `score.claimed` at the end,
+   * because `endLife` clears the log and these flights usually end in one. The
+   * award list used to serve this purpose; F04 deleted the award, so the
+   * observable moved and the harness has to follow it.
+   */
+  claims: string[];
 }
 
 /**
@@ -64,6 +75,8 @@ function flyAtAnomaly(cfg: SimConfig, press: number, release: number, ticks = 90
     crossedBarrier: false,
     multAfterRelease: 0,
     chargedAfterRelease: 0,
+    score: sc,
+    claims: [],
   };
   let held = false;
   for (let i = 0; i < ticks; i++) {
@@ -73,6 +86,7 @@ function flyAtAnomaly(cfg: SimConfig, press: number, release: number, ticks = 90
     if (released) held = false;
     stepSim(state, cfg, { held: held || pressed, pressed, released }, FIXED_DT);
     out.awards.push(...scoreTick(sc, state, cfg, FIXED_DT).awards);
+    for (const name of sc.claimed) if (!out.claims.includes(name)) out.claims.push(name);
     if (!state.capture && !state.ending.active && state.ship.x > fb.right) {
       out.crossedBarrier = true;
     }
@@ -96,7 +110,7 @@ describe('the barrier exemption', () => {
     const f = flyAtAnomaly(DEFAULT_CONFIG, 88, -1, 120);
     expect(f.crossedBarrier).toBe(true);
     expect(f.died, 'died before reaching the anomaly').toBe(-1);
-    expect(f.awards.map((a) => `${a.kind}:${a.body}`)).toContain('grab:A2');
+    expect(f.claims, 'never reached the anomaly').toContain('A2');
   });
 
   it('kills the same ship without it', () => {
@@ -123,16 +137,24 @@ describe('the barrier exemption', () => {
   });
 });
 
-describe('the anomaly bonus', () => {
-  it('pays its award at the capture and arms the window for the release', () => {
+describe('what an anomaly is worth', () => {
+  it('pays nothing at the capture — the window IS the reward', () => {
+    // `anomalyBonus` was 800, the largest number in `ScoreConfig`, and F04 deleted
+    // it. The measurement behind that: across the 28 diagnostics reports that
+    // replay faithfully it moved corpus `best` by 2.4%, on ONE anomaly capture in
+    // 28 sessions. That number prices the anomaly's REACHABILITY and not its
+    // award, which is an F08 course finding and is logged there.
+    //
+    // What is left is the thing the anomaly was always actually for: it opens a
+    // charged window, and a window is spent rather than received.
     const f = flyAtAnomaly(DEFAULT_CONFIG, 88, 150);
-    const grab = f.awards.find((a) => a.kind === 'grab' && a.body === 'A2');
-    expect(grab, 'no anomaly grab').toBeDefined();
-    // Worth what the config says, times the streak it arrived with, plus whatever
-    // the arrival itself was worth.
-    expect(grab!.points).toBeGreaterThanOrEqual(
-      DEFAULT_SCORE_CONFIG.anomalyBonus * grab!.multiplier,
-    );
+    expect(f.awards.some((a) => a.body === 'A2' && a.points > 0 && a.kind !== 'link')).toBe(false);
+  });
+
+  it('still logs the claim, which is what the run sheet counts', () => {
+    const f = flyAtAnomaly(DEFAULT_CONFIG, 88, 150);
+    expect(f.claims).toContain('A2');
+    expect(f.score.run.anomalies + f.score.sessionMax.anomalies).toBeGreaterThan(0);
   });
 
   it('opens the charged window at the release, for its full configured length', () => {
@@ -149,8 +171,8 @@ describe('the anomaly bonus', () => {
 
   it('no longer touches the multiplier at all', () => {
     // The old window added x2 ON TOP of `streakMax`, and this test asserted a
-    // multiplier above the ceiling. That is now the defect: the anomaly pays flat
-    // hops, and a multiplier above the cap would mean the removed mechanic is
+    // multiplier above the ceiling. That is now the defect: a window pays nothing
+    // directly, and a multiplier above the cap would mean the removed mechanic is
     // still alive somewhere.
     const sc = createScoreState();
     sc.streak = 999;
@@ -160,17 +182,12 @@ describe('the anomaly bonus', () => {
     expect(sc.multiplier).toBeCloseTo(DEFAULT_SCORE_CONFIG.streakMax, 6);
   });
 
-  it('pays an anomaly once per life, however many times it is re-grabbed', () => {
-    // Without the claim log, orbiting out and back refreshes the reward forever —
-    // the same faucet the grab award refuses to open by paying at the press.
+  it('claims an anomaly once per life, however many times it is re-grabbed', () => {
+    // Without the claim log, orbiting out and back refreshes the WINDOW forever.
+    // Nothing is paid for the claim any more, so what the log now guards is the
+    // ability rather than the points — and the log is the only thing that can.
     const f = flyAtAnomaly(DEFAULT_CONFIG, 88, 150);
-    const grabs = f.awards.filter((a) => a.kind === 'grab' && a.body === 'A2');
-    expect(grabs.length).toBeGreaterThan(0);
-    expect(grabs[0]!.points).toBeGreaterThan(0);
-
-    const sc = createScoreState();
-    sc.claimed.push('A2');
-    expect(sc.claimed).toContain('A2');
+    expect(f.claims.filter((n) => n === 'A2')).toHaveLength(1);
   });
 });
 

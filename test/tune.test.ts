@@ -16,7 +16,7 @@ import { BodyRenderer } from '../src/render/body.ts';
 import { createBodies, fieldBounds } from '../src/sim/world.ts';
 import { captureSnapshot } from '../src/render/snapshot.ts';
 import { recordingContext } from './canvas-stub.ts';
-import { createScoreState } from '../src/score/index.ts';
+import { DEFAULT_SCORE_CONFIG, createScoreState } from '../src/score/index.ts';
 import type { Frame } from '../src/render/frame.ts';
 
 describe('tunable parameters', () => {
@@ -355,6 +355,7 @@ describe('render-only tunable parameters', () => {
           bodies,
           field,
           score: createScoreState(),
+          scoreCfg: DEFAULT_SCORE_CONFIG,
           cer: null,
           finishY: null,
           timeMs: 0,

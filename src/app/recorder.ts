@@ -77,12 +77,8 @@ export type AwardRecord = [
  * session leaves behind. This fails to compile until a new kind has a letter.
  */
 const AWARD_CODE: Record<ScoreAward['kind'], AwardRecord[1]> = {
-  grab: 'g',
   link: 'l',
-  hop: 'h',
   flyby: 'f',
-  burn: 'b',
-  rescue: 'r',
   mote: 'd',
 };
 

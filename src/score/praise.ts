@@ -161,6 +161,21 @@ export const NERVE_SKIM_PX = 0;
  * Single words, still: they are read in peripheral vision while deciding when to
  * let go of the next planet. The reckless shout in `reckless.ts` is the one
  * deliberate exception.
+ *
+ * THREE FAMILIES CANNOT FIRE ANY MORE, and they are kept deliberately rather than
+ * deleted. `close`, `nerve` and `burn` rode on the grab and burn AWARDS, and F04
+ * deleted both — nothing mints for an arrival or a flare, so there is no award for
+ * a word to be attached to, and `super[0]` (the arrival superlative) is unreachable
+ * with them. `test/render.test.ts` pins that it stays unreachable, because the
+ * ambiguity the disjoint lists exist to prevent comes back the moment anything
+ * reuses that list.
+ *
+ * They stay because F09 owns what the survivors say and is still open, and because
+ * VISION is explicit that cutting the vocabulary is "a re-measurement at coarser
+ * granularity, not a re-pick" — which needs the measured thresholds these were cut
+ * from still standing. Do not re-point one of them at a new event to give it a
+ * word: an axis that scores as a multiplier is announced by its pixel, before the
+ * score, which is what a word arriving afterwards can never do.
  */
 export const WORDS: Readonly<
   Record<PraiseCategory, readonly [readonly string[], readonly string[]]>
@@ -251,11 +266,23 @@ function tierOf(value: number, tier1: number, tier2: number): 0 | 1 | 2 {
 /**
  * Was this a late press on a line already headed inside the minimum orbit?
  *
- * Exported because the scorer pays for it as well as naming it: a word promising
- * a boost the points do not reflect is worse than no word.
+ * KEPT AS A MEASUREMENT AFTER ITS AWARD WAS DELETED, and deliberately. F04 folded
+ * `nerveBonus` into the tightness multiplier — a line already headed inside the
+ * minimum orbit has no clearance left, so a nerve grab lands at the top of that
+ * ramp by construction rather than by a flat sum bolted onto it. Nothing pays for
+ * this any more.
+ *
+ * What it still is, is the only definition in the codebase of the pair that
+ * distinguishes a ship 50px off a planet on its way past from one 50px off and
+ * boring straight in. `clearance` alone cannot tell them apart, and the two
+ * bounds below are the measured answer. Read `NERVE_SKIM_PX` for why one of them
+ * is a real boundary in the simulation rather than a percentile.
+ *
+ * It takes the two numbers rather than an award because the award it used to read
+ * no longer exists.
  */
-export function isNerveGrab(award: ScoreAward): boolean {
-  return award.kind === 'grab' && award.skim <= NERVE_SKIM_PX && award.clearance <= CLOSE_PX.tier1;
+export function isNerveGrab(skim: number, clearance: number): boolean {
+  return skim <= NERVE_SKIM_PX && clearance <= CLOSE_PX.tier1;
 }
 
 /**
@@ -265,69 +292,24 @@ export function isNerveGrab(award: ScoreAward): boolean {
  * already says what went wrong.
  */
 export function praiseFor(award: ScoreAward): Praise | null {
-  if (award.kind === 'grab') return praiseGrab(award);
   if (award.kind === 'link') return praiseRelease(award);
-  if (award.kind === 'burn') return praiseBurn(award);
-  // A hop earns no word, and that is not an omission. Every hop inside a charged
-  // window pays the same flat `hopBonus`, so there is no quality for a word to
-  // name — and the popup already says what it is by being purple.
+  // A FLYBY earns no word, and that is calibration rather than an omission: a
+  // fast life makes upward of 38 of these a minute where a chained one makes 2.7,
+  // so a word on each would be the loudest thing on screen for the player it is
+  // meant to reward. Nor does a MOTE — every dot is the same dot.
   //
-  // Nor does a RESCUE, and that is a decision rather than an omission. It had an
-  // `escape` axis for one session — DOUSED, CLEARED, in the burn's ember — and it
-  // was withdrawn: "we already have the point reward from going through flames".
-  // The burn pays for the fire and says so in its own word; a second word on the
-  // same second, about the same fire, was the vocabulary competing with itself.
-  // What a rescue says now it says beside the ship, in `src/render/verdict.ts`.
-  return null;
-}
-
-/**
- * How hot the pass got.
- *
- * No `super` rung, unlike the grab and the release. Those two each judge a pair
- * of independent qualities and reserve gold for landing both at once; a burn has
- * one quality, so a gold word here would mean nothing more than "even hotter" —
- * which is what the ladder's colour already says.
- */
-function praiseBurn(award: ScoreAward): Praise | null {
-  const heat = tierOf(award.heat, BURN.tier1, BURN.tier2);
-  // Nothing to guard against a dying drag reaching here: `endLife` drops the bank
-  // before the award is ever built, so every burn that gets a word was survived.
-  if (heat === 0) return null;
-  return {
-    category: 'burn',
-    level: heat === 2 ? 'great' : 'good',
-    word: pick(WORDS.burn[heat - 1]!, award.tick, 'burn'),
-  };
-}
-
-/**
- * How the ship arrived: how close it let the body get, and whether it was
- * already boring in when it committed.
- */
-function praiseGrab(award: ScoreAward): Praise | null {
-  const close = tierOf(award.clearance, CLOSE_PX.tier1, CLOSE_PX.tier2);
-  const nerve = isNerveGrab(award);
-
-  // The rare one on this side: a late press on a collision line that was ALSO in
-  // the tightest tenth. Nerve alone only needs `CLOSE_PX.tier1`.
-  if (nerve && close === 2) {
-    return {
-      category: 'super',
-      level: 'exceptional',
-      word: pick(WORDS.super[0], award.tick, 'super'),
-    };
-  }
-  if (nerve) {
-    return { category: 'nerve', level: 'great', word: pick(WORDS.nerve[0], award.tick, 'nerve') };
-  }
-  if (close === 1 || close === 2) {
-    return {
-      category: 'close',
-      level: close === 2 ? 'great' : 'good',
-      word: pick(WORDS.close[close - 1]!, award.tick, 'close'),
-    };
-  }
+  // THE ARRIVAL AND THE FIRE LOST THEIR WORDS WITH THEIR AWARDS, at F04 stage
+  // (b), and it is worth being clear that it was not a vocabulary decision. A
+  // word rides on an award; `grab`, `rescue` and `burn` stopped being awards
+  // because none of them mints, so there was nothing left for a word to be
+  // attached to. Both axes still score — a tight arrival multiplies the carry and
+  // a hot swing sets the band — and both are now announced by a pixel drawn
+  // BEFORE the score touches them, which is what axiom 5 asks for and what a word
+  // arriving afterwards could never do.
+  //
+  // What the release says is F09's question, not this file's. Do not add a tier
+  // word here ahead of it: VISION is explicit that cutting the vocabulary is "a
+  // re-measurement at coarser granularity, not a re-pick".
   return null;
 }
 

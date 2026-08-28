@@ -307,4 +307,18 @@ export const RENDER_KNOBS: readonly RenderKnob[] = [
     // field with no memory at all, which is what the mark has to beat.
     hint: 'seconds a body you just let go of stays dark · 0 removes the mark, long enough and it lies about a body you are flying back to',
   },
+  {
+    group: 'THE LAMP',
+    key: 'bodyGripAlpha',
+    label: 'GRIP',
+    min: 0,
+    max: 0.6,
+    step: 0.02,
+    dp: 2,
+    // The one render knob that is answerable to a scoring rule rather than only
+    // to taste: it draws the band the tightness multiplier is graded over, and
+    // axiom 5 says a multiplier nothing announced is invisible math. 0 is
+    // therefore a comparison and not a setting to leave it on.
+    hint: 'how strongly a body shows the band its grip is graded over · 0 makes the tightness multiplier invisible math',
+  },
 ];

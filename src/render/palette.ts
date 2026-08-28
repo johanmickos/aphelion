@@ -83,6 +83,19 @@ export const HAZARD_FUEL = T.ion;
 export const HAZARD_EDGE = withAlpha(T.ion, 0.5);
 export const HAZARD_BAND_FROM = withAlpha(T.ion, 0);
 export const HAZARD_BAND_TO = withAlpha(T.ion, 0.22);
+/**
+ * The side band's colour `t` of the way from its inner edge to the lethal line.
+ *
+ * THE RAMP, not the steps. `drawHazardZones` samples this at three depths because
+ * three is the number of rungs in the fire multiplier, and the rung count belongs
+ * to the economy — this file only says what the red IS at a given depth. The same
+ * boundary `accolade.ts` and `palette.ts` sit either side of: one defines a hue,
+ * the other decides which one a thing wears.
+ */
+export function hazardBandAt(t: number): string {
+  const k = t < 0 ? 0 : t > 1 ? 1 : t;
+  return withAlpha(T.ion, 0.22 * k);
+}
 export const HAZARD_NOTICE_FILL = withAlpha(T.ion, 0.14);
 export const HAZARD_NOTICE_BORDER = withAlpha(T.ion, 0.9);
 

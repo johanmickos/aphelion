@@ -44,9 +44,11 @@ equivalent promise for score weights: every key in `ScoreConfig` must change som
 session's outcome. A value that only defines _when_ something is judged, never
 what it costs, is a constant next to its code, not a weight.
 
-Measure a session by `score.best`, not `score.score`. The score is the current
+Measure a session by `score.best`, not `score.bank`. The bank is the current
 _life's_ and a death zeroes it, so at the last tick of a recording it is usually
-zero — which will make any weight you are testing look dead.
+zero — which will make any weight you are testing look dead. `score.carry` is
+smaller than either and zeroes at every release: it is what is at stake, not what
+has been paid.
 
 **Anything drawn after a run ends must read `score.lastRun`**, the copy sealed on
 the ending tick, and never the live fields. `endLife` runs on the FIRST tick of
@@ -63,12 +65,45 @@ line at 15 degrees praised 42% of captures. Re-measure under the CURRENT config 
 recordings predate whatever was tuned last, and a threshold calibrated on a stale
 feel is worse than an unmeasured one, because it looks defensible.
 
-**A capture is two scoring events.** A `grab` is judged on how the ship arrived
-and pays when the dive swings through periapsis; a `link` is judged on how it left
-and pays at the release. Neither carries the other's qualities. The grab does not
-pay at the press, and must not be "simplified" to: beside a planet you are already
-close to the surface, so every tap would be a tight grab and tapping in place
-would be a points faucet.
+## The economy
+
+**One source, four multipliers.** A swing earns
+`carry × tier × band × streak`, and the carry is metres climbed while engaged,
+priced as they are climbed by the chain and multiplied whole by the tightness of
+every arrival. Nothing else in the game mints a point except a carpet dot. That is
+Direction 08's constitution, it landed as F04 stage (b), and the reasoning is in
+`src/score/config.ts` at each key with the measurements in PORT_NOTES 73-74.
+
+**Never add a key that mints.** Eleven were deleted for it — `linkBase`,
+`closeBonus`, `timingBonus`, `aimBonus`, `nerveBonus`, `flybyBase`,
+`flybyCloseBonus`, `rescueBonus`, `rescueSpan`, `anomalyBonus`, `hopBonus` — and a
+twelfth, `burnRate`, stopped minting per second near the wall and became the scale
+that turns edge depth into a band. A new axis is priced as a multiplier on the
+carry or it is not priced. Axiom 2: skill only multiplies.
+
+**Every multiplier has a pixel, drawn before it scores.** Tightness is the grip
+gradient above a body's minimum-orbit ring; the band is the three steps in the
+hazard gradient; the tier is the boost halo and the compass markers; the chain is
+the craft's bloom; the streak is the ×N. A praise word after the fact does not
+count — it arrives after the score. If a rule cannot point at its pixel, the rule
+is wrong.
+
+**A capture is two scoring events.** The arrival is judged on how the ship arrived
+and prices the carry when the dive swings through periapsis; the release is judged
+on how it left and cashes at the release. Neither carries the other's qualities.
+
+The arrival does not price at the press, and must not be "simplified" to — but the
+reason has changed and the old one is dead. It used to be a faucet argument: beside
+a planet you are already close to the surface, so every tap would be a tight grab.
+Under a pure multiplier a tap in place has climbed zero metres, so `0 × anything
+= 0` and the faucet is structurally impossible. What the rule survives on is the
+receipt: two acts, graded at two moments, each with its own pixel.
+
+**There are three award kinds and there used to be seven.** `link`, `flyby` and
+`mote`. `grab`, `hop`, `burn` and `rescue` went with F04 — not by a popup policy
+but because none of them mints, so none of them is a payment. That removed 47% of
+every popup in the game, and each axis still scores as a multiplier announced by a
+pixel. Do not re-add one to give an act a receipt: the receipt is the carry moving.
 
 **Colour means how good, the word means what — on an AWARD.** Colour is the
 rarity ladder in `src/render/accolade.ts` and encodes nothing else there; the

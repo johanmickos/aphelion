@@ -19,155 +19,219 @@
  * every key here must change the score of some session, or it is not a weight,
  * it is decoration.
  *
- * MOST OF THESE NUMBERS ARE STILL A FIRST CUT. They were chosen for legible
- * relative size — a perfect link is worth about eight ordinary drift seconds and
- * about five times a sloppy one — not by playing. Capture feel moved with the
- * clearance fix (PORT_NOTES 18); calibrate against how the game plays now, not
- * against the numbers here.
+ * NOTHING HERE MINTS ANY MORE, and that is the whole of F04 stage (b). Eleven
+ * keys were deleted because each one made points out of an act rather than out of
+ * ground covered — `linkBase`, `closeBonus`, `timingBonus`, `aimBonus`,
+ * `nerveBonus`, `flybyBase`, `flybyCloseBonus`, `rescueBonus`, `rescueSpan`,
+ * `anomalyBonus`, `hopBonus` — and `burnRate` stopped minting and became the
+ * scale that turns edge depth into a band. What is left is one source
+ * (`climbPerPx`, metres climbed while engaged) and a chain of multipliers on it.
+ *
+ * Every axis those keys carried survives; PORT_NOTES 74 has the table of where
+ * each one went. The two that are worth repeating here because they look like
+ * losses and are not: a rescue is now paid STRUCTURALLY, at about 7x an ordinary
+ * swing, because the link after one banks 2.44x the carry and cashes it in the
+ * fire band — measured, and the opposite of what was predicted. And the anomaly
+ * pays nothing directly because its reward is the charged window it opens, which
+ * is spent rather than received.
+ *
+ * MOST OF THE MAGNITUDES BELOW ARE PROVISIONAL AND SAY SO AT THEIR DECLARATION.
+ * F04's ruling is that the axioms rule and the numbers get measured, and every
+ * magnitude in the new formula is a threshold — which `AGENTS.md` says is a
+ * percentile of real play. That is stage (c), and it cannot start until there are
+ * recordings from the CURRENT build: the whole existing corpus is 20-25 August and
+ * predates the release kick, the flyby retune and the ending. Calibrating on it
+ * would produce numbers that look measured, which VISION names as worse than not
+ * measuring at all.
  *
  * The exceptions, which carry their own measured rationale and should not be
- * moved on feel: `closeSpan`, `flybyCloseBonus` (why closeness and not speed),
- * `flybyTurnSpan` (a percentile of how far real passes actually bend the ship),
- * `flybyBase` and `streakStep` (both retuned against a recorded speed run),
- * `streakMax` (which has already been mis-tuned once on too small a sample), and
- * all three `burn*` keys — calibrated on the 159 dead-zone drags in the corpus,
- * with `burnEdgeSpan` pinned by a test to the hazard band's own width rather than
- * chosen at all.
+ * moved on feel: `closeSpan`, `flybyTurnSpan` (a percentile of how far real
+ * passes actually bend the ship), `streakStep` and `streakMax` (both retuned
+ * against recorded sessions, and the second already mis-tuned once on too small a
+ * sample), and all three `burn*` keys — calibrated on the 159 dead-zone drags in
+ * the corpus, with `burnEdgeSpan` pinned by a test to the hazard band's own width
+ * rather than chosen at all.
  */
 export interface ScoreConfig {
-  // --- what one capture-and-release is worth ---
-  /** Paid for any release that earned its boost, before bonuses. */
-  linkBase: number;
-  /** Points per world pixel climbed since the previous link. */
+  // --- the carry: the one place points are made ---
+  /**
+   * Points per world pixel climbed while engaged. THE ONLY SOURCE OF POINTS.
+   *
+   * Axiom 1: progress is the only base currency. Everything else in this file is
+   * a multiplier on what this produced, so a session's score is entirely a
+   * question of how much ground it covered and how well it covered it.
+   *
+   * PROVISIONAL. Direction 08's worked example prices a metre at 1 point against
+   * the 0.25 here, and which of those is right is a stage (c) question — it is
+   * the scale of every number the player ever sees, and it cannot be settled
+   * against a corpus flown under a different release.
+   */
   climbPerPx: number;
   /**
-   * Full bonus for grabbing from right on top of a body.
+   * Each consecutive engagement adds this much to the rate the carry accrues at.
    *
-   * Paid by the GRAB award at periapsis, not by the release — how close you let
-   * the body get is settled the instant you press, and reporting it two seconds
-   * later attached it to the wrong act.
+   * CHAIN IS ENGAGEMENT, NOT ACCURACY, and it is a different counter from the
+   * streak below with a different way of breaking — see `ScoreState.chain`. It
+   * steps on every capture begun, zips and passes included, and it breaks when
+   * the ship has climbed a full `grabRange` without engaging anything. So it
+   * measures whether you are still using the field, and the streak measures
+   * whether the swings you finish are any good.
+   *
+   * Direction 08 puts it inside the carry accrual rather than in the cash step,
+   * which is what stops it being a second copy of the streak: metres climbed
+   * under a long chain are worth more AS THEY ARE CLIMBED, and the carry the
+   * player can see glowing already has it priced in.
+   *
+   * UNCAPPED, deliberately, and that is the one place this departs from the
+   * board's own +10%/link. VISION's standing open call is that the multiplier
+   * ceiling binds about 22 seconds in and the most prominent progression number
+   * on screen then never moves again — pinned for 74% of an 85-second session. A
+   * second ceiling would reproduce exactly that, on the number that is meant to
+   * reward flying the field rather than stopping in it. The streak keeps its
+   * ceiling because a ceiling there is what makes a great chain distinguishable
+   * from a merely long one.
+   *
+   * PROVISIONAL: +10% is Direction 08's figure and no session has been flown
+   * under it.
    */
-  closeBonus: number;
+  chainStep: number;
   /**
-   * Grab clearance, in px above the minimum orbit radius, at which `close` has
-   * decayed to zero. 200 spans real play: the closest grab on record cleared the
-   * floor by 25px and the furthest by 268.
+   * What an arrival right on top of a body multiplies the carry by.
+   *
+   * TIGHTNESS, and it is one term where there used to be three: `closeBonus` paid
+   * a tight grab, `flybyCloseBonus` paid a tight pass and `nerveBonus` paid a
+   * grab so tight it was already inside the minimum orbit. All three were reading
+   * the same quantity — clearance above the minimum orbit — and paying it three
+   * different flat sums at three different moments.
+   *
+   * It scales from 1 at `closeSpan` of clearance to this at zero, so a loose
+   * arrival is never a penalty: nothing is taken away, rewards are withheld
+   * (VISION pillar 5). A nerve grab lands at the top of it by construction,
+   * because a line already headed inside the minimum orbit has no clearance left.
+   *
+   * PAID AT THE ARRIVAL, on everything carried into it — periapsis for a grab,
+   * closest approach for a pass. That is what makes a capture two scoring events
+   * still: the arrival prices the carry, the departure sets the tier. It is also
+   * why the carry visibly jumps at the bottom of a dive, which is the receipt the
+   * deleted grab popup used to be.
+   *
+   * PROVISIONAL. It replaces 23.6% of corpus `best` (closeBonus 12.8, flybyClose
+   * 6.3, nerve 4.5) and 2 is a doubling for a perfect arrival, which is legible
+   * rather than measured.
+   */
+  tightMax: number;
+  /**
+   * Clearance above the minimum orbit, in px, at which tightness has decayed to
+   * nothing. 200 spans real play: the closest grab on record cleared the floor by
+   * 25px and the furthest by 268.
+   *
+   * ONE SPAN FOR ARRIVALS OF BOTH KINDS. A pass measures it at the closest
+   * approach and a grab at the press, which is the same choice read at the moment
+   * each one is actually made.
+   *
+   * NOT `cap.tightness`, which reads as the same idea and is useless as one:
+   * measured over 112 real releases it sits at 0.99 or above for three quarters
+   * of them, because the dive almost always reaches the minimum-orbit floor. Grab
+   * clearance is the quantity with actual spread.
+   *
+   * IT IS ALSO THE PIXEL. Axiom 5 says a multiplier the player did not see drawn
+   * before it scored is invisible math, so the minimum-orbit ring draws this span
+   * as a gradient above itself — see `drawTightGradient` in `src/render/body.ts`.
+   * Change this and that gradient changes with it; they read the same number.
    */
   closeSpan: number;
-  /** Full bonus for releasing at the peak of the boost envelope. */
-  timingBonus: number;
-  /** Full bonus for releasing exactly on a compass marker. */
-  aimBonus: number;
+
+  // --- the tier: how the swing was released ---
   /**
-   * Flat bonus for a nerve grab: a late press on a line that was already headed
-   * inside the minimum orbit. See `src/score/praise.ts`. Paid by the GRAB award.
+   * Shaping exponents on the two release qualities, before they are graded.
    *
-   * Flat rather than proportional, because the thing being rewarded is a
-   * threshold being crossed — you either held your nerve or you did not — and
-   * because a word that promises a boost the points do not reflect is worse than
-   * no word. Set it to 0 to keep the word and drop the points.
-   */
-  nerveBonus: number;
-  /**
-   * Paid for any flyby held through its closest approach, before closeness.
+   * The underlying measures are generous ramps — alignment is linear over a full
+   * 90 degrees, the boost envelope over ~1.8 seconds — which is right for a gauge
+   * you read at a glance and far too soft for a grade. Raising them pushes the
+   * rungs toward the tip, so "close enough" reads on the compass and only precise
+   * clears a rung.
    *
-   * A flat floor rather than the whole award, because the act being paid for is
-   * committing to the pass at all: pressing on a body you are already too fast to
-   * hold, and staying on it while the brake burns fuel and gravity decides
-   * whether it catches you. What you do with the pass is `flybyCloseBonus`.
-   *
-   * SIZED AGAINST THE STREAK, not against a link. The points are the smaller half
-   * of what a flyby is worth — the larger half is that it steps the ladder, which
-   * is what a fast run could not previously do at all. Measured over the sessions
-   * in `diagnostics/`, an ordinary chained life makes 2.7 unconverted flybys a
-   * minute and a fast one makes upward of 38, so this is paid ~14x more often to
-   * the style it is meant to reward without needing to know which style it is
-   * looking at. Make it much larger and the density stops being a multiplier
-   * story and starts being a faucet.
-   *
-   * Raised 60 -> 80 while `flybyCloseBonus` went 120 -> 300, which is deliberately
-   * NOT a proportional bump: this half is paid for showing up and that half is
-   * paid for the line. At 60/120 a mean pass in the first session flown under the
-   * flyby award was 45% flat base; at 80/300 it is 31%, so the volume floor stayed
-   * roughly where it was in absolute terms and the skill half grew. See
-   * `streakStep` for the session and what the pair was calibrated against.
-   */
-  flybyBase: number;
-  /**
-   * Full bonus for a flyby that shaves the minimum orbit, decaying to zero over
-   * `closeSpan` exactly as a grab's closeness does.
-   *
-   * Closeness and not speed, and that is a measurement rather than a preference.
-   * Speed at closest approach was the obvious axis and discriminates nothing: an
-   * unconverted flyby is unbound BY DEFINITION, so its speed is pinned near
-   * escape velocity — p50 314px/s, p10 149, and 90% of every flyby ever recorded
-   * sits in a band 250px/s wide. Clearance over the same 167 passages runs 0px to
-   * 318px with a median of 60, which is real spread and is a choice the player
-   * makes on the way past. Same reasoning that put grab clearance ahead of
-   * `cap.tightness`.
-   *
-   * 120 -> 300, and this is the half of the flyby award that was raised, because
-   * it is the half that discriminates. The first fast session flown under the
-   * award shaved p10 0px / p50 67px / p90 189px across 43 passes — the same median
-   * as its own grabs — so the closeness term was already separating good passes
-   * from lazy ones and was simply priced too low to matter. It is now the largest
-   * closeness bonus in the file, above `closeBonus`, which is correct: a grab that
-   * comes in tight also gets to bank a link, and a flyby gets one number and is
-   * gone.
-   */
-  flybyCloseBonus: number;
-  /**
-   * Degrees of course change at which a flyby collects its whole award. Below it
-   * the award scales down linearly; below `FLYBY_TURN_MIN` there is no award.
-   *
-   * This is the term that decides what a flyby is FOR. Base and closeness both
-   * describe where the ship was; only this describes what the pass did to it, and
-   * without it the award pays for arriving next to a planet rather than for using
-   * one. Reported from play as: fly past at speed, tap beside each planet, collect
-   * 1000+ a time. That is exactly what the other two terms pay for — `close` is
-   * read off geometry the ship already had, and `FLYBY_SPEED_MIN` cannot help
-   * because an unconverted flyby is fast by definition.
-   *
-   * Sixty degrees is p73 of the 249 paid flybys in `diagnostics/`, whose swept
-   * turn runs p10 9.6, p25 17.8, p50 34.3, p75 63.5, p90 90.4. So the median real
-   * pass collects about half and a strong one collects all of it.
-   *
-   * A SPAN AND NOT A FLOOR, which is the half a gate cannot do. The passes that
-   * pay wrongly are not the near-zero ones — those already pay 112-176 — but the
-   * mid band riding a ladder built out of them. No floor low enough to spare real
-   * play reaches those; a span does.
-   *
-   * CALIBRATE THIS AGAINST THE ONE SESSION PLAYED UNDER THE AWARD, not against
-   * the corpus average, and the difference is large enough to matter. Most reports
-   * in `diagnostics/` predate the flyby award — their passes are reconstructions
-   * of what presses made for other reasons WOULD have scored — and rescoring those
-   * takes flyby income to 65-69%. The one session flown with the award on screen
-   * (2026-08-23T22-43, 4 minutes, 48 recorded flybys, 19% of its total score) is
-   * the only one where the presses were made to collect this, and it sweeps far
-   * harder: p50 58.9 degrees against 34.3. It loses 19%, not 35%.
-   *
-   * That session is also the evidence this span is aimed correctly. Every pass in
-   * it that had been paid 1400+ swept 36-197 degrees on a 19-63 tick hold, and all
-   * but one still collect in full — those are hard, close passes swung right
-   * around a planet, and nothing should be taken from them. What falls is exactly
-   * the short stuff: 7 ticks and 8.7 degrees goes 442 -> 64, 13 ticks and 10.1
-   * degrees goes 977 -> 165, 22 ticks and 11.9 degrees goes 574 -> 114.
-   *
-   * The weights above were NOT raised to compensate, so a great pass still tops
-   * out where it always did.
-   */
-  flybyTurnSpan: number;
-  /**
-   * Shaping exponents. The underlying measures are generous ramps — alignment is
-   * linear over a full 90 degrees, the boost envelope over ~1.8 seconds — which
-   * is right for a gauge you read at a glance and far too soft for a reward.
-   * Raising them concentrates the points near the tip, so "close enough" reads on
-   * the compass but only precise pays.
+   * THE THREE THRESHOLDS BELOW ARE DERIVED FROM THESE. Each is
+   * `zone^aimSharpness * zone^timingSharpness` for Direction 06's zone fractions,
+   * so moving a sharpness here silently moves what "inner 30%" means. If either
+   * changes, re-derive all three rather than leaving them where they are.
    */
   aimSharpness: number;
   timingSharpness: number;
+  /**
+   * The conjunction quality at which a release earns each rung.
+   *
+   * Direction 06 rev 2 names three: TRUE at the inner 60% of the window, SHARP at
+   * the inner 30%, PERFECT within +/-8% of the centre. F04's ruling is that the
+   * tier grades the CONJUNCTION of the release marker and the boost envelope
+   * rather than the angle alone — VISION pillar 2 is that those two fight, and an
+   * angle-only tier would grade a perfectly-aimed release at a dead envelope as
+   * PERFECT.
+   *
+   * So the quality is `aim^aimSharpness * timing^timingSharpness` and a rung
+   * means BOTH axes are inside that zone:
+   *
+   *   TRUE     0.40^3 * 0.40^2 = 0.0102
+   *   SHARP    0.70^3 * 0.70^2 = 0.1681
+   *   PERFECT  0.92^3 * 0.92^2 = 0.6591
+   *
+   * A pass grades the same way on one axis instead of two, by passing its swept
+   * turn as both — `turnFrac^(aimSharpness + timingSharpness)`, which lands a
+   * pass that sweeps 40% of `flybyTurnSpan` on exactly the TRUE line. One ladder,
+   * both manoeuvres, no second set of thresholds to drift.
+   *
+   * PROVISIONAL IN A SPECIFIC WAY: the zone FRACTIONS are Direction 06's design
+   * intent, which a measurement cannot refute. Whether the resulting rungs land
+   * where percentiles of real play say they should is stage (c).
+   */
+  tierTrueAt: number;
+  tierSharpAt: number;
+  tierPerfectAt: number;
+  /**
+   * What each rung multiplies the carry by. Direction 06 rev 2's ladder.
+   *
+   * A release inside the window but under TRUE pays x1 and says nothing: "the
+   * make speaks in numbers; no word spent". A miss pays nothing at all, because
+   * there is no release and therefore no cash.
+   *
+   * THE GRADE PRICES THE WHOLE CARRY, not the moment. A PERFECT does not award a
+   * flat bonus, it doubles everything carried through that orbit — which is what
+   * makes a high carry into a hard window the game's core bet, and the compass
+   * arc's width the posted odds.
+   *
+   * PROVISIONAL: 1.25 / 1.5 / 2 are the board's ratios and stage (c) owns them.
+   */
+  tierTrue: number;
+  tierSharp: number;
+  tierPerfect: number;
+  /**
+   * Degrees of course change at which a flyby reaches the top of the tier ladder.
+   *
+   * This is the term that decides what a flyby is FOR. Where the ship was is
+   * already priced by tightness; only this describes what the pass DID to it, and
+   * without it a pass would be paid for arriving next to a planet rather than for
+   * using one. Reported from play as: fly past at speed, tap beside each planet,
+   * collect 1000+ a time.
+   *
+   * Sixty degrees is p73 of the 249 paid flybys in `diagnostics/`, whose swept
+   * turn runs p10 9.6, p25 17.8, p50 34.3, p75 63.5, p90 90.4 — so the median
+   * real pass reaches about 57% of the span, which is between the TRUE and SHARP
+   * rungs, and a strong one clears the top.
+   *
+   * A SPAN AND NOT A FLOOR, which is the half a gate cannot do. The passes that
+   * pay wrongly are not the near-zero ones but the mid band riding a ladder built
+   * out of them; no floor low enough to spare real play reaches those. The floor
+   * that does exist, `FLYBY_TURN_MIN`, decides only whether the pass is a scoring
+   * event at all.
+   *
+   * CALIBRATE AGAINST SESSIONS FLOWN UNDER THE AWARD, not against the corpus
+   * average: most reports predate the flyby award and their passes are
+   * reconstructions. The one session played with it on screen sweeps far harder
+   * — p50 58.9 degrees against 34.3.
+   */
+  flybyTurnSpan: number;
 
-  // --- the burn ---
+  // --- the band: how deep the swing rode the edge ---
   /**
    * Distance from the lethal side line, in px, at which dead-zone heat reaches
    * zero. The inner edge of the red band.
@@ -178,138 +242,82 @@ export interface ScoreConfig {
    * does would be teaching a line that is not the line.
    */
   burnEdgeSpan: number;
-
-  // --- the rescue: pressing at the last moment that still works ---
   /**
-   * Full bonus for a press made with no rescue window left at all.
+   * Scale from heat-seconds to band units. NO LONGER MINTS ANYTHING.
    *
-   * Paid when the rescue COMPLETES — the instant the ship's velocity toward the
-   * wall reaches zero, which is the exact promise `src/render/deadline.ts` draws. A
-   * press that never turns pays nothing, so a doomed one cannot collect, and the
-   * award describes the outcome rather than the intention.
+   * This used to be points per heat-second of dragging the dead zone, and it was
+   * the eleventh minting key — the one the plan's own table had filed under
+   * "shapes a curve". Direction 08 bans exactly it, twice: axiom 1 pays for
+   * "metres climbed while engaged. Not time", and under what deliberately earns
+   * nothing, "survival time — never... not from a per-second trickle".
    *
-   * WHY TIMING AND NOT MARGIN. How CLOSE to the wall the rescue came is already
-   * paid, continuously and precisely, by the burn: `burnBank` integrates depth
-   * into the band over time, so a later press is already worth more because it
-   * starts deeper and burns longer. Paying again for the same closeness would be
-   * note 29 in points form. What the score does not otherwise know is how much of
-   * the available window the player CHOSE to spend, and that is the quantity the
-   * cross makes visible and therefore aimable.
+   * What it does now is set how fast `ScoreState.burnBank` fills, and `burnBank`
+   * selects the band. So it is still the depth-to-reward scale it always was;
+   * raising it reaches the x3 band sooner rather than paying more per second.
    *
-   * Sized against `nerveBonus` (200), which pays for the planet-side version of
-   * the same nerve: a late press on a line already boring in. The wall version
-   * asks for more — a nerve grab is judged against a surface you can see, this
-   * against a deadline you have to read.
-   */
-  rescueBonus: number;
-  /**
-   * Seconds of window left at which the rescue bonus has decayed to zero.
-   *
-   * Measured over the 507 presses in `diagnostics/` that were made while
-   * committed to a wall: the window left at the press runs p10 0.28s, median
-   * 1.30s, p75 2.37s, p90 3.90s. 2.4 is that p75 — chosen the way `closeSpan`
-   * was, to span real play rather than to be a round number. Across the measured
-   * distribution it puts a tight press at 0.88, the median press at 0.46 and a
-   * lazy one at nearly nothing, which is spread rather than a cliff.
-   *
-   * MEASURED AGAINST SIGHTED PLAY, and the prediction that used to stand here was
-   * wrong. It said presses would move later once the cross was drawable, the
-   * median quality would rise, and the span would want shrinking. A 237s session
-   * flown with the deadline says otherwise: quality came out p25 0.42, median 0.59,
-   * p75 0.74, p90 0.78 against the blind p25 0.30, median 0.56, p75 0.78, p90
-   * 0.86. The centre did not move. The TAILS tightened — fewer very early presses
-   * and fewer very late ones — which is the more sensible reading: a visible
-   * deadline says how much room there is as clearly as how little.
-   *
-   * So 2.4 stands. It is still only one sighted session against sixty-two blind
-   * ones, and the two populations are not strictly comparable — recorded quality
-   * exists only for rescues that PAID — so this wants confirming rather than
-   * re-deriving. What moved instead was behaviour: presses already past the cross
-   * fell from 23% of wall-committed presses to 7%.
-   */
-  rescueSpan: number;
-  /**
-   * Points per heat-second of dragging the dead zone.
-   *
-   * Derived from the drags that SURVIVE, because those are the only ones that
-   * ever pay — a death drops the banked flare entire. Their median integrates
-   * 0.153 heat-seconds, so 555 puts it at ~85 points, the band `closeBonus` 150
-   * and `nerveBonus` 200 already occupy. The best on record lands at ~510.
-   *
-   * Re-derived when `burnMinHeat` dropped to the band's edge: lighting on the
-   * shallow grazes too pulled the median integral down, so the same points band
-   * needs more rate behind it.
-   *
-   * Worth noticing that this is a THIRD of the rate the reentry burn used, for
-   * the same points: an edge-drag lasts four to ten times longer than a periapsis
-   * flare, so the same payout needs far less rate behind it.
+   * The measurement behind 555 still holds and is what the thresholds below are
+   * placed against: over the drags that SURVIVE — the only ones that ever pay,
+   * since a death drops the banked flare entire — the median integrates 0.153
+   * heat-seconds and the best on record 0.92.
    */
   burnRate: number;
   /**
-   * Heat below which the ship is not burning: no flame, and no points.
+   * `burnBank` at which the swing cashes in the second and third bands.
    *
-   * It brackets the flare — a burn award is owed when heat falls back under this
-   * — so it decides what counts as one drag rather than two, and it withholds the
-   * points from a smoulder too faint to draw. A weight, not a constant, because
-   * it changes what a session scores.
+   * Three steps, and they are what Direction 08 means by riding the fire: a swing
+   * that never went near the edge cashes at x1, one that dragged it cashes at x2,
+   * one that lived in it cashes at x3. The band applies to the whole carry, which
+   * is why a rescue is structurally worth about 7x an ordinary swing with no
+   * rescue award at all — the ship that drifted a long way banks 2.44x the carry
+   * AND cashes it at the top of this ladder.
    *
-   * As close to the band's outer edge as a weight is allowed to sit. "The second
-   * they enter the dangerous red zone" is the brief, and the honest value for that
-   * is zero — heat is exactly 0 outside the band or while drifting, so `heat > 0`
-   * already brackets a drag perfectly and needs no threshold at all.
+   * PLACED AGAINST `burnRate`'S OWN MEASUREMENT, provisionally: 85 is the median
+   * surviving drag (0.153 heat-seconds x 555) and 333 is two thirds of the
+   * hottest on record (0.6 x 555). So about half the drags that are survived
+   * reach x2 and only a deliberate one reaches x3. Both are stage (c).
    *
-   * It is 0.01 rather than 0 for a mechanical reason worth writing down:
-   * `test/score.test.ts` proves a weight is live by trying it at 0, half and
-   * double, and every one of those is 0 when the value is 0 — so a zero weight
-   * reads as a dead one and fails a test that is right to exist. 0.01 is 0.6px
-   * inside a 60px band: the same instant, and still a number.
-   *
-   * At the old 0.10 the fire kindled 54px out, and 7% of band entries grazed the
-   * outer strip and left without ever lighting — visibly in the red with nothing
-   * happening, which is precisely what the brief was about.
+   * THE STEPS ARE THE PIXEL. `drawHazardZones` paints the band in three steps
+   * rather than as one continuous wash, so the player can see where the ladder
+   * changes before flying into it — axiom 5. `burnEdgeSpan` is already pinned to
+   * that band's own width, so there is one definition of where the edge is.
    */
-  burnMinHeat: number;
-
-  // --- the streak ---
+  bandTwoAt: number;
+  bandThreeAt: number;
   /**
-   * Each link after the first adds this much to the multiplier.
+   * What each band step adds to the multiplier. 1 gives the board's x1/x2/x3.
    *
-   * This — not `streakMax` — is the lever that decides what a chain is worth. The
-   * ceiling only ever bites at the very top; the step is what every link past the
-   * first is paid. Measured over one recorded 10-link session, raising it from
-   * 0.25 to 0.4 is a 23% larger session score and a 60% larger marginal reward
-   * for one more link.
+   * A step rather than three separate multipliers, because unlike the tier the
+   * board's band ratios ARE uniform, and three keys where one will do is three
+   * things to keep in step at stage (c).
+   */
+  bandStep: number;
+
+  // --- the streak: how many swings in a row landed ---
+  /**
+   * Each scoring passage after the first adds this much to the cash multiplier.
    *
-   * 0.25 -> 0.4, which unblocks the note this used to carry. It was parked at 0.25
-   * pending the boost-timing axis, on the grounds that `timing` paid ~6% of link
-   * points and raising the step would deepen the arbitrage against waiting for the
-   * peak. That axis has since been fixed — its window used to close inside the
-   * settle — and in the session this was retuned against `timing` paid 20% of link
-   * points, alongside `aim` at 22% and `climb` at 39%. The premise for parking it
-   * is gone, so it moved.
+   * This — not `streakMax` — is the lever that decides what a run of good swings
+   * is worth. The ceiling only ever bites at the very top; the step is what every
+   * passage past the first is paid.
    *
-   * WHAT IT WAS RETUNED FOR: the ladder's climb is a tax that a short life pays in
-   * full and a long one amortises. Over one 133s speed-run session — six lives,
-   * 8001 ticks, 97 awards — only two lives lived long enough to reach the ceiling,
-   * and both took ~25s to get there; the other four burned 48s of flying, 36% of
-   * the session, and never got past x2.25. At 0.25 the ceiling binds on the 17th
-   * scoring event, at 0.4 on the 11th, which is inside a fast life instead of at
-   * the end of one.
+   * IT IS NOT THE CHAIN. `chainStep` prices metres as they are climbed and breaks
+   * on a long coast; this prices the swing at the moment it cashes and breaks on
+   * a putter-out or a death. Two counters because they answer different questions
+   * — are you still using the field, and are the swings you finish landing.
+   *
+   * 0.25 -> 0.4, measured over one recorded 10-link session: a 23% larger session
+   * score and a 60% larger marginal reward for one more link. WHAT IT WAS RETUNED
+   * FOR: the ladder's climb is a tax that a short life pays in full and a long one
+   * amortises. Over one 133s speed-run session — six lives, 8001 ticks, 97 awards
+   * — only two lives lived long enough to reach the ceiling, and both took ~25s to
+   * get there; the other four burned 48s of flying, 36% of the session, and never
+   * got past x2.25. At 0.25 the ceiling binds on the 17th scoring event, at 0.4 on
+   * the 11th, which is inside a fast life instead of at the end of one.
    *
    * It is NOT the lever that rebalances speed against chaining, and should not be
    * reached for as though it were. Rescored across that session and four
-   * chain-heavy ones in `diagnostics/`, this step pays the speed run 1.18x and the
-   * chain runs 1.07-1.13x — near-uniform inflation. The flyby weights are the only
-   * measured lever that is style-specific (1.30x against 1.00x), which is why both
-   * moved together and why they moved for different stated reasons.
-   *
-   * And neither closes the headline gap the author noticed, because that gap is
-   * not in the weights: the displayed score is `best`, the best SINGLE LIFE, and
-   * that session summed 87,866 across six lives while showing 33,860. Per second
-   * inside a life it was the highest earner on record (1168 pts/s against 967 for
-   * the best chained life in `diagnostics/`). Speed was already paid at parity per
-   * second; it just gets a third as many seconds. If the gap still reads wrong
-   * after this, the thing to reconsider is the aggregation rule, not this number.
+   * chain-heavy ones, this step pays the speed run 1.18x and the chain runs
+   * 1.07-1.13x — near-uniform inflation.
    */
   streakStep: number;
   /**
@@ -333,57 +341,25 @@ export interface ScoreConfig {
    * construction.
    */
   streakMax: number;
-  /**
-   * Raw points for capturing an anomaly, before the multiplier.
-   *
-   * Sized against a link's ~300-400 raw so the capture lands as two or three
-   * links' worth: at a maxed streak that is around 4000, a visible number at the
-   * moment of greatest tension. Deliberately not larger. The ten-second window is
-   * meant to be the prize, and a flat award big enough to dominate would turn a
-   * run's score into a count of anomalies found rather than a measure of how well
-   * it was flown.
-   */
-  anomalyBonus: number;
-  /**
-   * What one hop inside a charged window pays. See `SimConfig.chargedSecs`.
-   *
-   * FLAT, and the only award in the game that is. Every other one ends in
-   * `raw * multiplier`; this one does not, so an anomaly found on a cold run pays
-   * exactly what one found at x5 pays. That is deliberate: reaching an anomaly is
-   * hard and usually costs the streak on the way out to it, and a reward that
-   * shrank precisely when it was hardest to earn would be the wrong shape.
-   *
-   * It also REPLACES the grab award for the capture it lands on, rather than
-   * adding to it — a hop is one clean number. Nothing about flying well is lost:
-   * the link at the release is untouched and still scores aim, timing and climb
-   * with the full multiplier, so the skill is still paid, just at the other end of
-   * the capture.
-   *
-   * 500 against three hops in a five-second window is ~1500 a frenzy. Sized
-   * against the x2 window this replaced, which was reckoned at 2500-3000 — so an
-   * anomaly is worth somewhat less than it was, and the difference is made up by
-   * where the hops leave you: four planets of altitude is ~280 raw climb banked
-   * into the next link, and climb is paid by the mechanism that already exists.
-   */
-  hopBonus: number;
+
+  // --- the one flat award left ---
   /**
    * What one dot in the run-in carpet pays. See `SimConfig.carpetMoteCount`.
    *
-   * FLAT, like `hopBonus`, and for a related reason: every dot is the same dot, so
-   * there is no quality here for a multiplier to be a multiplier OF. It is also
-   * the only scoring event in the game that can happen after the last planet is
-   * behind you, and paying it on the streak would mean the carpet was worth five
-   * times as much to a run that had chained well — which is a run that has already
-   * been paid for chaining well, everywhere else.
+   * THE ONLY THING IN THE GAME THAT STILL MINTS, and it survives the constitution
+   * for the reason Direction 12 gives: it is found money on a victory lap, after
+   * the last planet is behind you. Every dot is the same dot, so there is no
+   * quality here for a multiplier to be a multiplier OF, and there is nothing left
+   * above the carpet to spend one on.
    *
-   * A DOT DOES NOT STEP THE STREAK EITHER. Ten free rungs at the end of every
-   * cleared run would make the ladder a fact about the carpet rather than about
-   * the flying, and there is nothing left above the carpet to spend a multiplier
-   * on.
+   * A DOT DOES NOT STEP THE STREAK OR THE CHAIN EITHER. Ten free rungs at the end
+   * of every cleared run would make both ladders a fact about the carpet rather
+   * than about the flying.
    *
-   * 150, against a link at maxed streak worth several thousand: the full set is
-   * about half of one good release. The carpet is a victory lap and the points are
-   * a receipt for having flown it well, not a second course.
+   * 150, against a swing at a good chain and a maxed streak worth several
+   * thousand: the full set is about half of one good release. The carpet is a
+   * victory lap and the points are a receipt for having flown it well, not a
+   * second course.
    */
   moteBonus: number;
 }
@@ -393,80 +369,82 @@ export interface ScoreConfig {
  *
  * The shape of the model, which is the part worth arguing about:
  *
- *   grab  = (close + nerve)                      x multiplier   at periapsis
- *   link  = (base + climb + timing + aim)        x multiplier   at the release
- *   flyby = (base + close) x turn                x multiplier   at the release
- *   burn  = (dead-zone depth, integrated)        x multiplier   when the fire dies
+ *   carry  =  SUM over ticks of  climb * climbPerPx * (1 + chainStep * chain)
+ *               gap-gated: metres stop counting once the ship has climbed a full
+ *               `grabRange` without engaging anything
+ *             * tightness   applied at each arrival, to everything carried in
  *
- * Four events, because they are settled at different moments and describe
- * different acts. The grab is judged on how the ship arrived and pays when the
- * dive swings through the bottom — not at the press, so a tap that never gets
- * there earns nothing and tapping beside a planet is not a faucet. The link is
- * judged on how it left. The flyby is judged on a pass that was never a capture
- * at all: its qualities are read at the bottom, for the same reason the grab's
- * are, but it is settled at the release because the one thing it is really paid
- * for — how far the pass bent the ship — is not finished until the ship lets go.
+ *   cash   =  carry * tier * band * streak                     at the release
  *
- * The flyby's real payload is not in the line above: it steps the streak. Before
- * it, the ladder counted links, so the only way to reach a large multiplier was to
- * stop at bodies — and a life measured covering 3.1x the ground per second earned
- * a fifteenth as much per pixel as a chained one, capped at x2 while the chained
- * life ran at x5-x7. Speed was already the harder thing to do and was the thing
- * the score could not see.
+ * ONE SOURCE AND FOUR MULTIPLIERS. That is Direction 08's constitution, and the
+ * five axioms it rests on are values rather than findings: progress is the only
+ * base currency; skill only multiplies; coasting is unpaid but never punished;
+ * points exist as carried or banked; and every multiplier has a pixel that was
+ * drawn before it scored.
  *
- * The burn is judged on a stretch of the ride: how long the ship spent inside the
- * dead zone at the field's edge while hanging off a planet, and how deep it went.
- * It is the only one that accrues rather than being read off an instant, the only
- * one that can pay twice in one capture, and the only one a DEATH can cancel —
- * `endLife` drops the banked flare, so the 78% of edge-drags that end in the wall
- * pay nothing at all. The fire on those is a warning, not an award. Only pulling
- * out alive collects: the drama is free and the rescue is what scores.
+ * THE UNIT OF SCORING IS THE SWING, because the unit of play is the swing. A
+ * release is not a bonus moment, it is payday, and the compass spent the whole
+ * orbit setting the wage.
  *
- * `close` is how near you let the body get before committing to the grab.
- * `cap.tightness` was the obvious candidate and is the wrong one — it saturates
- * at 0.99+ across three quarters of real releases, so it paid every capture the
- * same and discriminated nothing. Grab clearance has real spread and is a choice
- * the player makes. `timing` is the boost window, which is the skill mechanic the
- * player is already playing. `aim` is the compass, which until now was advice
- * with nothing behind it.
+ * A CAPTURE IS STILL TWO SCORING EVENTS, which is the rule `AGENTS.md` states and
+ * which survives the rewrite: the arrival prices the carry and the departure sets
+ * the tier. The REASON it used to give has expired and should not be quoted any
+ * more. It said that paying a grab at the press would make tapping beside a
+ * planet a points faucet, because you are already close to the surface — and that
+ * is entirely an argument about an additive economy. Under a pure multiplier a
+ * tap in place has climbed zero metres, so `0 * anything = 0` and the faucet is
+ * structurally impossible. What the rule survives on now is the receipt: two acts
+ * graded at two moments, each with its own pixel.
  *
- * Timing and aim are the interesting pair because they FIGHT. The boost peaks a
- * fixed 0.45s after the orbit freezes, and the ship is wherever its sweep has
- * carried it by then; the marker is at a fixed angle. Getting both means shaping
- * the dive so the peak lands on the marker, and that is a real skill with a real
- * ceiling — built entirely out of physics that already exists.
+ * `climb` is banked rather than paid continuously, which is VISION pillar 5:
+ * altitude is withheld until you engage again, and withholding a reward is a
+ * different thing in the hand from confiscating one. The gap gate is where that
+ * stops being free — see `ScoreState.coastClimb`, and note that 63.7% of all
+ * climb in the corpus is coasted, so where the gate falls decides most of the
+ * economy.
  *
- * `climb` is banked rather than paid continuously: altitude gained since the last
- * link is only cashed at the next one. Coasting therefore earns nothing until you
- * engage again — which is now the ONLY pressure to keep engaging. There was a
- * penalty for rising past a body you could have taken, and it was removed for
- * being too punitive: banking the climb withholds a reward, which is a different
- * thing from taking points off someone who was already having a bad run.
+ * `tier` is the pair that FIGHT. The boost peaks a fixed 0.45s after the orbit
+ * freezes and the ship is wherever its sweep has carried it by then; the marker
+ * is at a fixed angle. Getting both means shaping the dive so the peak lands on
+ * the marker, and that is a real skill with a real ceiling — built entirely out of
+ * physics that already exists, which is what VISION means by looking for the
+ * mechanic the simulation is already performing and has no word for.
+ *
+ * `band` is the fire, and it is the only multiplier that accrues over a stretch of
+ * the ride rather than being read off an instant. A death drops it with everything
+ * else, so the 78% of edge-drags that end in the wall cash nothing: the drama is
+ * free and only the save is paid.
+ *
+ * `streak` is the ladder, and the flyby is on it. Before that the ladder counted
+ * links, so the only way to climb it was to stop at bodies — a life measured
+ * covering 3.1x the ground per second earned a fifteenth as much per pixel as a
+ * chained one, capped at x2 while the chained life ran at x5-x7. Speed was already
+ * the harder thing to do and was the thing the score could not see.
  */
 export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
-  linkBase: 100,
   climbPerPx: 0.25,
-  closeBonus: 150,
+  chainStep: 0.1,
+  tightMax: 2,
   closeSpan: 200,
-  timingBonus: 250,
-  aimBonus: 200,
-  nerveBonus: 200,
-  flybyBase: 80,
-  flybyCloseBonus: 300,
-  flybyTurnSpan: 60,
+
   aimSharpness: 3,
   timingSharpness: 2,
+  tierTrueAt: 0.0102,
+  tierSharpAt: 0.1681,
+  tierPerfectAt: 0.6591,
+  tierTrue: 1.25,
+  tierSharp: 1.5,
+  tierPerfect: 2,
+  flybyTurnSpan: 60,
 
   burnEdgeSpan: 60,
   burnRate: 555,
-  burnMinHeat: 0.01,
-
-  rescueBonus: 320,
-  rescueSpan: 2.4,
+  bandTwoAt: 85,
+  bandThreeAt: 333,
+  bandStep: 1,
 
   streakStep: 0.4,
   streakMax: 5,
-  anomalyBonus: 800,
-  hopBonus: 500,
+
   moteBonus: 150,
 } satisfies ScoreConfig);

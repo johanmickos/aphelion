@@ -146,42 +146,22 @@ export const BURN_WORD: AccoladeStyle = {
 };
 
 /**
- * A hop inside a charged window — see `SimConfig.chargedSecs`.
- *
- * Off the ladder, like `SHOUT`, and for the same structural reason: it is not an
- * answer to "how good was that?". Every hop pays the same flat `hopBonus`, so
- * there is no quality for a rarity colour to report, and putting one on it would
- * be inventing a distinction the award does not have.
- *
- * What the colour says instead is WHICH MODE the game is in, which is legitimate
- * where a category colour was not: a category has to be learned before it means
- * anything, whereas the player is already looking at an electrified ship and a
- * draining purple bar. The hue is the anomaly's own — `rgba(168,92,255)`, the
- * centre of the bubble it projects — so the popup is visibly the same substance
- * that infected the ship.
- *
- * Measured, as the ladder was: dE 45.8 to its nearest neighbour (`SHOUT`), which
- * clears this set's closest pair — `ROUTINE` vs `good` at dE 36.6.
- */
-export const HOP: AccoladeStyle = {
-  // AURORA. A hop only exists inside a charged window, which is the anomaly's
-  // reward — and violet is what the anomaly means: the rules are different here.
-  color: solid(AURORA),
-  labelColor: withAlpha(AURORA, 0.85),
-  // Small on purpose, and smaller than anything else that floats. Three or four
-  // of these arrive inside seven seconds, on top of whatever else is in the air:
-  // at a praise word's size they were the loudest thing on screen during the
-  // busiest moment in the game, for the least interesting reason — every one is
-  // the same number. They are receipts. `HOP_TALLY` is the headline.
-  size: 11,
-};
-
-/**
  * The closing tally of a charged window — see `Tally` in `src/score/score.ts`.
  *
- * The same purple, deliberately: it is the same channel, summing the same events,
- * and a second hue would imply a second kind of thing happened. What separates it
- * is size, which is the one dimension the small per-hop numbers left free.
+ * AURORA, and off the ladder, which is legitimate where a category colour would
+ * not be: it is not an answer to "how good was that?". What the colour says is
+ * WHICH MODE the game is in, and the player is already looking at an electrified
+ * ship and a draining purple bar. The hue is the anomaly's own — the centre of the
+ * bubble it projects — so the popup is visibly the same substance that infected
+ * the ship. Measured, as the ladder was: dE 45.8 to its nearest neighbour
+ * (`SHOUT`), which clears this set's closest pair, `ROUTINE` vs `good` at dE 36.6.
+ *
+ * IT USED TO HAVE A SMALLER SIBLING, `HOP`, for the per-hop receipts, and F04
+ * deleted the award those carried: a hop paid a flat 500 and minting is what the
+ * constitution bans. So this is the only purple left, and it is a headline with
+ * nothing beneath it to be the headline OF — which is the right shape anyway. The
+ * receipts were the loudest thing on screen during the busiest moment in the game,
+ * for the least interesting reason: every one of them was the same number.
  */
 export const HOP_TALLY: AccoladeStyle = {
   color: solid(mix(AURORA, CORE, 0.3)),
@@ -192,9 +172,10 @@ export const HOP_TALLY: AccoladeStyle = {
 /**
  * A dot flown through in the run-in carpet — see `SimConfig.carpetMoteCount`.
  *
- * OFF THE LADDER, like `HOP`, and for the same structural reason: every dot pays
+ * OFF THE LADDER, like `HOP_TALLY`, and for a structural reason: every dot pays
  * the same flat `moteBonus`, so there is no quality for a rarity colour to report
- * and inventing one would be inventing a distinction the award does not have.
+ * and inventing one would be inventing a distinction the award does not have. It
+ * is also the last flat award in the game — see `ScoreConfig.moteBonus`.
  *
  * THE FINISH GREEN, which is the deliberate reuse this file's header would
  * otherwise forbid. The rule there is about the LADDER: colour on an award means
@@ -205,7 +186,7 @@ export const HOP_TALLY: AccoladeStyle = {
  * on the way to the same line. Giving it a fourth hue would say it belonged to
  * something else.
  *
- * Small, like `HOP`, and for the identical reason: a full carpet raises ten of
+ * Small, and for the reason the deleted `HOP` was: a full carpet raises ten of
  * these in a couple of seconds and every one of them is the same number. They are
  * receipts.
  */

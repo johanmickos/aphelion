@@ -98,6 +98,8 @@ export interface Frame {
    * however hot its peak, and the peak alone cannot say so.
    */
   burnHeat: number;
+  /** Fraction of the charged window still running, 0 when none is. */
+  chargedFrac: number;
   /** Floor clamps accumulated so far this session. */
   floorTotal: number;
   fp: string;
@@ -243,6 +245,7 @@ export function replayReport(report: DiagReport): Analysis {
       firstOfCapture: isFirst,
       clearance: cap ? Math.hypot(cap.rx, cap.ry) - cap.minR : null,
       burnHeat: score.burnHeat,
+      chargedFrac: state.chargedT > 0 ? state.chargedT / cfg.chargedSecs : 0,
       floorTotal: state.telemetry.floorSubstepsTotal,
       fp: fingerprintHex(state),
     });
@@ -335,47 +338,30 @@ export function replayReport(report: DiagReport): Analysis {
   // nothing about how the session went.
   findings.push(
     `best life scored ${score.best} (${score.bank} standing at the end) — ` +
-      `${score.grabs} grab(s), ${score.links} link(s), ` +
+      `${score.grabs} arrival(s), ${score.links} link(s), ` +
       `${score.flybys} flyby(s), ${score.burns} burn(s), ` +
       `best multiplier x${Math.max(1, ...awards.map((a) => a.multiplier)).toFixed(2)}`,
   );
-  {
-    // How late the presses were is the whole point of the award, so the finding
-    // reports the quality rather than only the money: a run can be paid well for
-    // rescues and still be leaving most of every window on the table.
-    const rescues = awards.filter((a) => a.kind === 'rescue');
-    if (rescues.length > 0) {
-      const paid = rescues.reduce((n, a) => n + a.points, 0);
-      const late = rescues.reduce((n, a) => n + a.timing, 0) / rescues.length;
-      findings.push(
-        `${rescues.length} rescue(s) worth ${paid} — ` +
-          `window spent, on average ${(100 * late).toFixed(0)}% (1.00 is a press at the cross)`,
-      );
-    }
-  }
   if (score.burns > 0) {
-    const burns = awards.filter((a) => a.kind === 'burn');
-    const paid = burns.reduce((n, a) => n + a.points, 0);
-    const hottest = Math.max(...burns.map((a) => a.heat));
-    // Captures counted from the frames, NOT from `score.grabs` — that is the
-    // number of grab AWARDS, and a grab from far out pays nothing and is not
-    // counted. A session of nine captures was reporting "over 0 capture(s)".
+    // The fire pays nothing directly any more — it selects the band the whole
+    // carry cashes in — so what a finding can honestly report is how much of the
+    // session was spent earning one, and how deep it got. Which band the swings
+    // actually cashed at is on the award lines below.
     const captures = frames.filter((f, i) => f.r !== null && frames[i - 1]?.r == null).length;
     // How long the fire was actually lit is the number that matters and the one
     // that was missing: a flare has to survive long enough to be SEEN, and heat
     // just over the ignition floor clears it for only a frame or two.
     const hotTicks = frames.filter((f) => f.burnHeat > 0).length;
+    const hottest = Math.max(0, ...frames.map((f) => f.burnHeat));
     findings.push(
-      `${score.burns} burn(s) over ${captures} capture(s) — worth ${paid}, ` +
+      `${score.burns} burn(s) over ${captures} capture(s) — ` +
         `hottest ${hottest.toFixed(2)}, alight for ${hotTicks} tick(s) ` +
         `(${(hotTicks * report.dt).toFixed(2)}s of the session)`,
     );
-    // Deliberately NOT an inference about visibility. It says how long the burn
-    // was PAYING, which is what these ticks are. The flame outlives them by a wide
+    // Deliberately NOT an inference about visibility. It says how long the ship
+    // was alight, which is what these ticks are. The flame outlives them by a wide
     // margin — the renderer's ember decay stretched a 7-tick pass to 77 frames on
-    // a real session — so reading "3 ticks" as "you cannot have seen it" is wrong,
-    // and was briefly asserted here. What a report can honestly say is how much of
-    // the session earned burn points.
+    // a real session.
   }
   if (score.links > 0) {
     const links = awards.filter((a) => a.kind === 'link');
@@ -383,26 +369,24 @@ export function replayReport(report: DiagReport): Analysis {
       (links.reduce((n, a) => n + pick(a), 0) / links.length).toFixed(2);
     findings.push(
       `release quality, averaged over ${links.length} link(s): ` +
-        `boost peak ${mean((a) => a.timing)} · aim ${mean((a) => a.aim)}  (0-1 each)`,
+        `boost peak ${mean((a) => a.timing)} · aim ${mean((a) => a.aim)}  (0-1 each) — ` +
+        `tier x${mean((a) => a.tier)}, fire band x${mean((a) => a.band)}`,
     );
   }
-  const hopAwards = awards.filter((a) => a.kind === 'hop');
-  if (hopAwards.length > 0) {
-    // Windows are counted by gaps between hops: two hops more than `chargedSecs`
-    // apart cannot have come from one window. Approximate on purpose — the exact
-    // count would mean recording window openings, and this is a finding, not a
-    // fingerprint.
-    const gap = Math.round(cfg.chargedSecs / report.dt);
-    let windows = hopAwards.length > 0 ? 1 : 0;
-    for (let i = 1; i < hopAwards.length; i++) {
-      if (hopAwards[i]!.tick - hopAwards[i - 1]!.tick > gap) windows++;
+  {
+    // A charged window pays nothing directly — its hops step the chain instead —
+    // so what there is to report is how much CARRY the frenzies built. Counted
+    // off the state rather than off awards, since there are no hop awards to
+    // count any more.
+    const chargedTicks = frames.filter((f) => f.chargedFrac > 0).length;
+    if (chargedTicks > 0) {
+      findings.push(
+        `${(chargedTicks * report.dt).toFixed(1)}s spent inside a charged window ` +
+          `(${((100 * chargedTicks) / Math.max(1, frames.length)).toFixed(0)}% of the session)`,
+      );
     }
-    findings.push(
-      `${hopAwards.length} hop(s) across ~${windows} charged window(s), ` +
-        `${(hopAwards.length / windows).toFixed(1)} per window on average — ` +
-        `worth ${hopAwards.reduce((n, a) => n + a.points, 0)} flat`,
-    );
   }
+
   if (shouts.length > 0) {
     const deepest = Math.max(...shouts.map((x) => x.streak));
     findings.push(`${shouts.length} reckless shout(s); longest run of rough captures: ${deepest}`);
@@ -455,39 +439,67 @@ export function replayReport(report: DiagReport): Analysis {
  * evidence a phone session leaves, and silently relabelling one of its awards is
  * the kind of error that reads as a scoring bug for an afternoon.
  */
-const AWARD_KIND: Record<AwardRecord[1], ScoreAward['kind']> = {
-  g: 'grab',
+const AWARD_KIND: Partial<Record<AwardRecord[1], ScoreAward['kind']>> = {
   l: 'link',
-  h: 'hop',
   f: 'flyby',
-  b: 'burn',
-  r: 'rescue',
   d: 'mote',
 };
 
+/**
+ * Codes that belonged to awards F04 deleted: grab, hop, burn, rescue.
+ *
+ * A report is the only evidence a phone session leaves behind, and every
+ * recording in `diagnostics/` predates the constitution — so most of them carry
+ * awards there is no longer a kind for. They are dropped rather than mapped onto
+ * something else, and counted, so a reader is told the report is from the old
+ * economy instead of quietly shown a shorter list.
+ *
+ * The right way to read one of those now: the FRAMES are still phone truth —
+ * positions, velocity and fuel every 60 ticks off a fixed seed — and it is the
+ * PRICES that no longer exist. See `AGENTS.md` on reading a diagnostics report.
+ */
+const RETIRED_CODES: ReadonlySet<string> = new Set(['g', 'h', 'b', 'r']);
+
+/** How many recorded awards the last `recordedAwards` call dropped as retired. */
+export let retiredAwardCount = 0;
+
 export function recordedAwards(report: DiagReport): ScoreAward[] | null {
   if (!report.awards?.length) return null;
-  return report.awards.map(
-    ([
+  retiredAwardCount = 0;
+  const out: ScoreAward[] = [];
+  for (const [
+    tick,
+    code,
+    points,
+    multiplier,
+    close,
+    clearance,
+    skim,
+    defl,
+    timing,
+    aim,
+    climb,
+    body,
+    heat,
+    turn,
+  ] of report.awards) {
+    const kind = AWARD_KIND[code];
+    if (!kind) {
+      if (RETIRED_CODES.has(code)) retiredAwardCount++;
+      continue;
+    }
+    out.push({
       tick,
       kind,
       points,
       multiplier,
-      close,
-      clearance,
-      skim,
-      defl,
-      timing,
-      aim,
-      climb,
-      body,
-      heat,
-      turn,
-    ]) => ({
-      tick,
-      kind: AWARD_KIND[kind],
-      points,
-      multiplier,
+      // Neither existed when any of these were recorded, and there is no honest
+      // way to recover them: `multiplier` was the streak alone, so it cannot be
+      // divided back into a tier and a band that were not being computed. 1 and 1
+      // read as "unpriced", which is what an award from the additive economy is.
+      tier: 1,
+      band: 1,
+      carry: 0,
       body,
       close,
       clearance,
@@ -505,8 +517,9 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       // those sessions but is the only honest thing a missing field can say — and
       // nothing recomputes an award from it.
       turn: turn ?? 0,
-    }),
-  );
+    });
+  }
+  return out.length > 0 ? out : null;
 }
 
 /**
@@ -717,8 +730,27 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
       out.push(
         `  score — AS THE PHONE PAID IT (${recorded.length} events, recorded not recomputed)`,
       );
+      if (retiredAwardCount > 0) {
+        // Not a fidelity problem and must not be read as one: the trajectory is
+        // fine, the ECONOMY changed underneath the recording. F04 deleted the
+        // grab, hop, burn and rescue awards, so a session flown before it carries
+        // events this build has no kind for.
+        out.push(
+          `    ${retiredAwardCount} more were grab/hop/burn/rescue awards, deleted by F04 — ` +
+            `this session was flown under the additive economy and its PRICES no longer exist`,
+        );
+      }
       if (agree.matched === recorded.length && agree.firstDisagreement === null) {
         out.push('    the replay recomputed every one of these identically');
+      } else if (retiredAwardCount > 0) {
+        // NOT A FIDELITY SIGNAL when the report predates the constitution, and
+        // saying so matters: the old line read as "the replay diverged", which is
+        // the one conclusion a reader must not draw here. The trajectory can be
+        // bit-exact and every price still differ, because the prices changed.
+        out.push(
+          '    the replay prices them differently, which is expected and is not a divergence —' +
+            ' check the fidelity line above for whether the FLIGHT was reproduced',
+        );
       } else {
         out.push(
           `    the replay agreed on the first ${agree.matched} and then parted company` +
@@ -730,18 +762,17 @@ export function formatAnalysis(report: DiagReport, a: Analysis): string[] {
       out.push('  score — RECOMPUTED (this report predates recorded awards)');
     }
     out.push(
-      '    tick  ev      what      points   mult   close   heat   peak    aim   defl   climb  earned',
+      '    tick  ev      what       points   carry   tier   band   mult   peak    aim   climb  earned',
     );
     for (const w of shown.slice(0, 24)) {
       out.push(
         `    ${String(w.tick).padStart(5)}  ${w.kind.padEnd(6)}  ` +
           `${w.body.padEnd(10)}` +
-          `${String(w.points).padStart(7)}  ${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
-          `${(w.kind === 'link' || w.kind === 'burn' || w.kind === 'rescue' ? '  · ' : w.close.toFixed(2)).padStart(5)}  ` +
-          `${(w.kind === 'burn' ? w.heat.toFixed(2) : '  · ').padStart(5)}  ` +
-          `${(w.kind === 'link' || w.kind === 'rescue' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +
+          `${String(w.points).padStart(7)}  ${w.carry.toFixed(0).padStart(6)}  ` +
+          `${('x' + w.tier.toFixed(2)).padStart(5)}  ${('x' + String(w.band)).padStart(4)}  ` +
+          `${('x' + w.multiplier.toFixed(2)).padStart(5)}  ` +
+          `${(w.kind === 'link' ? w.timing.toFixed(2) : '  · ').padStart(5)}  ` +
           `${(w.kind === 'link' ? w.aim.toFixed(2) : '  · ').padStart(5)}  ` +
-          `${w.defl.toFixed(0).padStart(4)}  ` +
           `${w.climb.toFixed(0).padStart(5)}  ` +
           // The word choice is seeded from the tick, so this is the word the
           // player actually saw, not a fresh roll of the same table.

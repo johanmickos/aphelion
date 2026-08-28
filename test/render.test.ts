@@ -63,7 +63,7 @@ import { drawCompass } from '../src/render/compass.ts';
 import { Popups } from '../src/render/popups.ts';
 import { BURN_WORD, LEVEL, ROUTINE, SHOUT } from '../src/render/accolade.ts';
 import { FUEL_RAMP } from '../src/render/hud.ts';
-import { AIM, CLOSE_PX, PEAK, WORDS } from '../src/score/index.ts';
+import { AIM, CLOSE_PX, DEFAULT_SCORE_CONFIG, PEAK, WORDS } from '../src/score/index.ts';
 import {
   AIM_MAX_TARGETS,
   AIM_RANGE,
@@ -186,6 +186,31 @@ describe('hazard zones', () => {
     drawHazardZones(r.ctx, c, rcfg, field);
     const xs = (r.calls('lineTo') as Array<[string, number, number]>).map((o) => o[1]);
     expect(xs.some((x) => Math.abs(x - toScreenX(c, field.left)) < 1e-6)).toBe(true);
+  });
+
+  it('draws the fire ladder in three readable steps, not as one wash', () => {
+    // ONE OF F04'S TWO REQUIRED PIXELS. A swing cashes at `carry x tier x band x
+    // streak`, and the band is the fire: how deep and how long the swing rode the
+    // edge. Axiom 5 says a multiplier the player did not see drawn BEFORE it
+    // scored is invisible math, and a continuous gradient — which is what this
+    // was — says "it gets worse" without ever saying where the ladder changes.
+    //
+    // Three steps means each colour is held flat across its band, so every shade
+    // appears at two stops: the start of its step and the end of it. A ramp would
+    // show every stop at a different colour.
+    const r = recordingContext();
+    drawHazardZones(r.ctx, cam(), rcfg, field);
+    const stops = r.calls('addColorStop') as Array<[string, number, string]>;
+    // Two walls, three steps, two stops each.
+    expect(stops).toHaveLength(2 * 3 * 2);
+    const oneWall = stops.slice(0, 6);
+    const shades = [...new Set(oneWall.map((o) => o[2]))];
+    expect(shades, 'the band is not three distinct steps').toHaveLength(3);
+    for (let i = 0; i < 3; i++) {
+      expect(oneWall[i * 2]![2], 'a step ramps inside itself').toBe(oneWall[i * 2 + 1]![2]);
+      expect(oneWall[i * 2]![1]).toBeCloseTo(i / 3, 9);
+      expect(oneWall[i * 2 + 1]![1]).toBeCloseTo((i + 1) / 3, 9);
+    }
   });
 
   it('draws no band at the ceiling, which is a finish line and not a wall', () => {
@@ -2732,14 +2757,19 @@ describe('floating score popups', () => {
     expect(WORDS.aim[1]).toContain(words[0]);
   });
 
-  it("rolls a burn's number up after the drag, not during it", () => {
+  it('rolls a merged receipt up after the fact, not during it', () => {
     // A live tally beside the ship was built and taken back out — see PORT_NOTES
-    // 51. The count belongs after the act: while the drag is happening the player
-    // is inches from a wall and deciding whether to hold on, and a number climbing
-    // in their peripheral vision competes with that. Afterwards it has the moment
-    // to itself.
+    // 51. The count belongs after the act: while it is happening the player is
+    // deciding what to do next, and a number climbing in their peripheral vision
+    // competes with that. Afterwards it has the moment to itself.
+    //
+    // This used to be the burn's roll-up, and F04 deleted that award. The roll is
+    // still here because the receipt still needs it: several awards landing close
+    // together merge into one number, and it counts up to the new total rather
+    // than jumping to it.
     const p = new Popups();
-    p.spawn(award({ kind: 'burn' as const, points: 200, heat: 0.9 }), 195, 0);
+    p.spawn(award({ points: 200 }), 195, 0);
+    p.spawn(award({ points: 400, tick: 4 }), 195, 0);
     const shown = (): number => {
       const r = recordingContext();
       p.draw(r.ctx, cam());
@@ -2751,53 +2781,29 @@ describe('floating score popups', () => {
     p.update(0.2);
     const mid = shown();
     expect(mid).toBeGreaterThan(0);
-    expect(mid).toBeLessThan(200);
+    expect(mid).toBeLessThan(600);
     p.update(0.3);
     expect(shown()).toBeGreaterThan(mid);
     p.update(0.4); // past the 0.8s roll
-    expect(shown()).toBe(200);
+    expect(shown()).toBe(600);
   });
 
-  it('burns the WORD in ember and leaves the number the default grey', () => {
-    // The narrow exception in `accolade.ts`: SINGED / SCORCHED / INFERNO name a
-    // thing that has a colour, and ladder blue is the one case where the ladder
-    // fights the word it is colouring.
+  it('no longer has a burn to colour, and the exception went with it', () => {
+    // THE PIN THAT SURVIVES A DELETED FEATURE. `accolade.ts` carried one narrow
+    // exception to "colour means how good": a burn's WORD was ember, because
+    // SINGED / SCORCHED / INFERNO name a thing that has a colour and ladder blue
+    // fought it. F04 deleted the burn award — the fire selects a multiplier now
+    // rather than minting — so the word went, and with it the only exception.
     //
-    // The number does NOT follow it, and does not follow the ladder either. This
-    // assertion wanted `LEVEL.great` for one build, and the ladder is exactly what
-    // went wrong: a drag that scored well turned the number BLUE beside an orange
-    // word — two hues on one two-line popup, neither of them fire. Grey always,
-    // with size still climbing the rung, so how good it was is not lost.
+    // What this asserts is that the exception did not survive its reason: no
+    // popup the game can raise draws in the ember, because no popup can carry a
+    // burn word any more.
     const p = new Popups();
-    // heat 0.8 clears BURN.tier2, so this one earns a word.
-    p.spawn(award({ kind: 'burn' as const, points: 180, heat: 0.8 }), 195, 0);
+    p.spawn(award({ points: 180, aim: AIM.tier2 }), 195, 0);
+    p.spawn(award({ kind: 'mote' as const, points: 150, tick: 30 }), 240, 0);
     const r = recordingContext();
     p.draw(r.ctx, cam());
-    const fills = r.calls('=fillStyle').map((o) => String(o[1]));
-    expect(fills).toContain(BURN_WORD.color);
-    expect(fills).toContain(ROUTINE.color);
-    expect(fills).not.toContain(LEVEL.great.color);
-    expect(fills).not.toContain(LEVEL.good.color);
-
-    const words = texts(r).filter((t) => !t.startsWith('+'));
-    expect(WORDS.burn.flat()).toContain(words[0]);
-  });
-
-  it('draws a burn on the rarity ladder, like every other award', () => {
-    // This pinned the opposite for one build. A red channel for the burn — its own
-    // colour whether or not it earned a word — was asked for, built, and taken back
-    // out: "I even preferred your original gray plus points."
-    //
-    // So the rule in `accolade.ts` stands unbroken after all: colour means HOW GOOD,
-    // the word says WHAT, and the only thing red in this feature is the fire itself.
-    // A burn under the word threshold is grey, exactly like any other routine award,
-    // and that is the commonest thing a burn is.
-    const p = new Popups();
-    // heat 0.2 is well under BURN.tier1, so this one earns no word.
-    p.spawn(award({ kind: 'burn' as const, points: 40, heat: 0.2 }), 195, 0);
-    const r = recordingContext();
-    p.draw(r.ctx, cam());
-    expect(r.calls('=fillStyle').map((o) => String(o[1]))).toContain(ROUTINE.color);
+    expect(r.calls('=fillStyle').map((o) => String(o[1]))).not.toContain(BURN_WORD.color);
   });
 
   it('rises and then expires', () => {
@@ -2856,11 +2862,14 @@ describe('floating score popups', () => {
     };
 
     // Same rung, different quality -> same colour, and the WORD carries which.
+    // The pair used to be an aim word and a CLOSE word, and F04 deleted the grab
+    // award the close word rode on. Aim and peak are the pair that remains, and
+    // they are the two that must never blur: they can fire on the same event.
     const aimGreat = shot({ aim: AIM.tier2, kind: 'link' });
-    const closeGreat = shot({ kind: 'grab', clearance: CLOSE_PX.tier2, skim: 999 });
-    expect(aimGreat.color).toBe(closeGreat.color);
+    const peakGreat = shot({ timing: PEAK.tier2, kind: 'link' });
+    expect(aimGreat.color).toBe(peakGreat.color);
     expect(aimGreat.texts.some((t) => WORDS.aim[1].includes(t))).toBe(true);
-    expect(closeGreat.texts.some((t) => WORDS.close[1].includes(t))).toBe(true);
+    expect(peakGreat.texts.some((t) => WORDS.peak[1].includes(t))).toBe(true);
 
     // different level -> different colour
     const aimGood = shot({ aim: AIM.tier1, kind: 'link' });
@@ -2888,16 +2897,20 @@ describe('floating score popups', () => {
     expect(exceptional).toBeGreaterThan(great);
   });
 
-  it('names which event a superlative was for', () => {
-    // The one case that could not be read before: one gold word for both a
-    // superlative arrival and a superlative departure.
+  it('keeps the release superlative, and has nothing left to confuse it with', () => {
+    // This pinned the one case that could not be read: one gold word served both
+    // a superlative ARRIVAL and a superlative departure, so the rarest thing in
+    // the game was the only one that could not say what it was for. The fix was
+    // two disjoint lists.
+    //
+    // F04 deleted the arrival award, so only the departure half can fire — and
+    // the pin is updated rather than dropped, because the ambiguity comes back
+    // the moment anything reuses the arrival list. `WORDS.super[0]` is now
+    // unreachable from play, and this asserts it.
     const p = new Popups();
     p.spawn(award({ kind: 'link', aim: AIM.tier2, timing: PEAK.tier2 }), 195, 0);
-    p.spawn(award({ kind: 'grab', clearance: CLOSE_PX.tier2, skim: -30, tick: 101 }), 195, 0);
     const r = recordingContext();
     p.draw(r.ctx, cam());
-    // No label says which event it was; the two word lists are disjoint, and the
-    // moment each fires is the other half of the answer.
     const t = texts(r);
     expect(
       t.some((x) => WORDS.super[1].includes(x)),
@@ -2905,8 +2918,8 @@ describe('floating score popups', () => {
     ).toBe(true);
     expect(
       t.some((x) => WORDS.super[0].includes(x)),
-      'no grab superlative',
-    ).toBe(true);
+      'the arrival superlative is reachable again',
+    ).toBe(false);
   });
 
   it('draws a shout no louder than a praised release', () => {
@@ -2932,7 +2945,7 @@ describe('floating score popups', () => {
     // Everything rises the same distance, so landing them on one spot means they
     // stay on it for the whole of both lives.
     const p = new Popups();
-    p.spawn(award({ kind: 'grab', clearance: CLOSE_PX.tier2, skim: 999 }), 195, 0);
+    p.spawn(award({ kind: 'link', aim: AIM.tier2 }), 195, 0);
     p.shout({ tick: 100, word: 'RECKLESS!', kind: 'reckless', streak: 3 }, 195, 0);
     const r = recordingContext();
     p.draw(r.ctx, cam());
@@ -2985,6 +2998,9 @@ describe('the score band', () => {
     kind: 'link' as const,
     points: 1240,
     multiplier: 2.25,
+    tier: 1.5,
+    band: 1,
+    carry: 551,
     body: 'P3→P4',
     close: 0.84,
     clearance: 32,
@@ -3025,65 +3041,80 @@ describe('the score band', () => {
     drawScore(r.ctx, cam(), sc, snapAt(110));
     const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
     expect(texts.some((t) => t.includes('+1,240'))).toBe(true);
-    // A link reports how the ship LEFT. How it arrived was reported, and paid,
-    // at the grab award — see the two tests below.
+    // A link reports how the ship LEFT, and — since F04 — the three multipliers
+    // that priced it and the carry they were applied to. A receipt that printed
+    // only the total could not be checked against anything on screen.
     const detail = texts.find((t) => t.includes('PEAK'))!;
     expect(detail).toContain('P3→P4');
     expect(detail).toContain('91');
     expect(detail).toContain('96');
+    expect(detail).toContain('551');
+    expect(detail).toContain('x1.50');
+    expect(detail).toContain('FIRE x1');
+    // Arrival qualities are absent: they were spent pricing the carry this
+    // cashed, and reporting them here would let them be read twice.
     expect(detail).not.toContain('CLOSE');
   });
 
-  it("splits a burn's band line so the word is ember and the number is not", () => {
-    // The band draws points, multiplier and word as ONE centred string, so a burn
-    // needs two runs to colour only the word. Easy to get wrong in a way nothing
-    // else notices — and if it drifts, the band and the popup are back to
-    // answering the same question in two different colours, which is the whole
-    // reason `accolade.ts` is one table.
-    const r = recordingContext();
-    const burn = award({ kind: 'burn' as const, points: 180, heat: 0.8, multiplier: 2 });
-    drawScore(r.ctx, cam(), scoreWith({ bank: 900, lastAward: burn }), snapAt(110));
-
-    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
-    const fills = r.calls('=fillStyle').map((o) => String(o[1]));
-    expect(fills).toContain(BURN_WORD.color);
-
-    // The number and the word are drawn separately, not as one string.
-    const head = texts.find((t) => t.startsWith('+180'))!;
-    expect(head).not.toContain('SCORCHED');
-    expect(texts.some((t) => WORDS.burn.flat().some((w) => t.includes(w)))).toBe(true);
-  });
-
-  it('never announces a grab as a coasting penalty', () => {
-    // This is the regression: `kind` grew a third value and the band still asked
-    // `=== 'link'`, so every grab fell through to the deduction arm — the player
-    // told off for the capture they had just made. The penalty itself is gone
-    // now; what this still pins is that a grab reads as a gain.
-    const r = recordingContext();
-    const sc = scoreWith({
-      bank: 200,
-      lastAward: award({ kind: 'grab', points: 34, body: 'P1', multiplier: 1 }),
-    });
-    drawScore(r.ctx, cam(), sc, snapAt(110));
-    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
-    expect(texts.some((t) => t.includes('+34'))).toBe(true);
-    expect(texts.some((t) => t.includes('GRAB'))).toBe(true);
-    expect(texts.every((t) => !t.includes('-'))).toBe(true);
-  });
-
-  it('reports only the qualities the event actually has', () => {
-    // A grab has no aim or peak yet; showing them as zeroes would read as a bad
-    // release rather than one that has not happened.
+  it('has no ember left in the band, because there is no burn award to colour', () => {
+    // THE PIN SURVIVES THE FEATURE. The band draws points, multiplier and word as
+    // ONE centred string, and a burn needed two runs to colour only the word —
+    // easy to get wrong in a way nothing else notices, and if it drifted the band
+    // and the popup were back to answering the same question in two colours.
+    //
+    // F04 deleted the burn award, so the two-run split went with it. What is
+    // pinned now is the property that made the split necessary in the first
+    // place: one string, one colour, no exception anywhere in the band.
     const r = recordingContext();
     drawScore(
       r.ctx,
       cam(),
-      scoreWith({ lastAward: award({ kind: 'grab', aim: 0, timing: 0 }) }),
+      scoreWith({ bank: 900, lastAward: award({ heat: 0.8, multiplier: 2 }) }),
+      snapAt(110),
+    );
+    expect(r.calls('=fillStyle').map((o) => String(o[1]))).not.toContain(BURN_WORD.color);
+  });
+
+  it('never announces an award as a coasting penalty', () => {
+    // This is the regression: `kind` grew a third value and the band still asked
+    // `=== 'link'`, so every grab fell through to the deduction arm — the player
+    // told off for the capture they had just made. Both the penalty and the grab
+    // award are gone now; what this still pins is that the table is EXHAUSTIVE,
+    // which is the property that made the bug impossible rather than unlikely.
+    for (const kind of ['link', 'flyby', 'mote'] as const) {
+      const r = recordingContext();
+      drawScore(
+        r.ctx,
+        cam(),
+        scoreWith({ bank: 200, lastAward: award({ kind, points: 34, body: 'P1' }) }),
+        snapAt(110),
+      );
+      const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+      expect(
+        texts.some((t) => t.includes('+34')),
+        kind,
+      ).toBe(true);
+      expect(
+        texts.every((t) => !t.includes('-')),
+        kind,
+      ).toBe(true);
+    }
+  });
+
+  it('reports only the qualities the event actually has', () => {
+    // A flyby has no aim or peak: it never froze an orbit, so it had neither a
+    // compass marker nor a boost envelope. Showing them as zeroes would read as a
+    // bad release rather than as one that never happened.
+    const r = recordingContext();
+    drawScore(
+      r.ctx,
+      cam(),
+      scoreWith({ lastAward: award({ kind: 'flyby' as const, aim: 0, timing: 0, turn: 42 }) }),
       snapAt(110),
     );
     const detail = (r.calls('fillText') as Array<[string, string]>)
       .map((o) => o[1])
-      .find((t) => t.includes('CLOSE'))!;
+      .find((t) => t.includes('TURN'))!;
     expect(detail).not.toContain('AIM');
     expect(detail).not.toContain('PEAK');
   });
@@ -3616,6 +3647,7 @@ function bodyFrame(
     snap,
     sim: DEFAULT_CONFIG,
     render: rcfg,
+    scoreCfg: DEFAULT_SCORE_CONFIG,
     theme: DEFAULT_THEME,
     bodies,
     field,
@@ -3671,6 +3703,49 @@ describe('a body says what it is doing for you', () => {
     centerCamera(c, bodies[0]!.x, bodies[0]!.y, field, null);
     return c;
   }
+
+  it('draws the grip band the tightness multiplier is graded over', () => {
+    // THE OTHER OF F04'S TWO REQUIRED PIXELS. An arrival multiplies the whole
+    // carry by how far above the minimum orbit it committed, graded over
+    // `ScoreConfig.closeSpan` — and until this landed nothing drew that band at
+    // all. The ring announces the FLOOR; the grade happens in the 200px above it.
+    //
+    // Pinned to the SCORE's own number rather than to a literal, because the two
+    // being one number is the whole point. A second copy in `RenderConfig` is the
+    // defect `finishLineY` and `runInBand` are in `AGENTS.md` for: both agreed
+    // right up until they did not.
+    const b0 = bodies[0]!;
+    const c = bodyCam();
+    const r = recordingContext();
+    const snap = { ...base, x: b0.x + 90, y: b0.y, capture: null, grabOffer: -1 };
+    new BodyRenderer().draw(bodyFrame(r.ctx, c, bodies, snap));
+
+    const grads = r.calls('=createRadialGradient') as Array<
+      [string, number, number, number, number, number, number]
+    >;
+    const floor = (b0.R + sim.minOrbitGap) * c.scale;
+    const grip = grads.find((g) => Math.abs(g[3] - floor) < 1e-6);
+    expect(grip, 'no gradient starts at the minimum-orbit ring').toBeDefined();
+    expect(grip![6] - grip![3]).toBeCloseTo(DEFAULT_SCORE_CONFIG.closeSpan * c.scale, 6);
+  });
+
+  it('draws no grip band when the knob turns it off', () => {
+    // 0 is the honest comparison, and it is also what makes the tightness
+    // multiplier invisible math — see `RenderConfig.bodyGripAlpha`. The control
+    // matters because a whole-frame difference would pass any knob given it.
+    const b0 = bodies[0]!;
+    const c = bodyCam();
+    const r = recordingContext();
+    const snap = { ...base, x: b0.x + 90, y: b0.y, capture: null, grabOffer: -1 };
+    new BodyRenderer().draw(
+      bodyFrame(r.ctx, c, bodies, snap, { render: { ...rcfg, bodyGripAlpha: 0 } }),
+    );
+    const floor = (b0.R + sim.minOrbitGap) * c.scale;
+    const grads = r.calls('=createRadialGradient') as Array<
+      [string, number, number, number, number, number, number]
+    >;
+    expect(grads.some((g) => Math.abs(g[3] - floor) < 1e-6)).toBe(false);
+  });
 
   it('lights the rim harder the harder it is pulling you', () => {
     // The AHEAD -> IN REACH ramp, and it is a ramp rather than a threshold: the

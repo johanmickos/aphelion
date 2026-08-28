@@ -38,10 +38,9 @@ import { hypot } from '../sim/orbit.ts';
 import { fieldBounds } from '../sim/world.ts';
 import { shipWorldPos } from '../sim/step.ts';
 import { readAim } from './aim.ts';
-import { edgeHeat } from './burn.ts';
+import { BURN_MIN_HEAT, edgeHeat } from './burn.ts';
 import { rescueDeadline, turnedAway, wallAt } from '../sim/rescue.ts';
 
-import { isNerveGrab } from './praise.ts';
 import {
   BONK_SPEED,
   RECKLESS_DEG,
@@ -54,15 +53,6 @@ import type { Shout } from './reckless.ts';
 import type { ScoreConfig } from './config.ts';
 import { DEFAULT_SCORE_CONFIG } from './config.ts';
 import type { PendingFlyby, PendingLink, RunStats, ScoreAward, ScoreState } from './types.ts';
-
-/**
- * Ticks between periapsis and the grab award landing.
- *
- * Long enough that it reads as "you swung through and came out", short enough to
- * still be the same moment. At the bottom of a dive the ship is moving fastest,
- * so two ticks is a visible distance travelled rather than a pause.
- */
-const GRAB_AWARD_DELAY = 2;
 
 /**
  * Speed at closest approach below which a flyby pays nothing, in px/s.
@@ -119,6 +109,8 @@ export function createScoreState(): ScoreState {
   return {
     bank: 0,
     carry: 0,
+    carryPx: 0,
+    chain: 0,
     coastClimb: 0,
     lastHighY: 0,
     best: 0,
@@ -131,9 +123,9 @@ export function createScoreState(): ScoreState {
     burnHeat: 0,
     burnBank: 0,
     burnPeak: 0,
+    band: 1,
     lastAward: null,
     pending: null,
-    climbFromY: null,
     endingSeen: false,
     lastDrift: null,
     wasCaptured: false,
@@ -142,7 +134,6 @@ export function createScoreState(): ScoreState {
     maxDefl: 0,
     capTurn: 0,
     periSeen: false,
-    grabDue: -1,
     flybyR: Infinity,
     flybyFalling: false,
     pendingFlyby: null,
@@ -152,13 +143,11 @@ export function createScoreState(): ScoreState {
     inHardKink: false,
     putterOuts: 0,
     claimed: [],
-    rescue: null,
-    rescued: [],
     doomed: null,
     hopped: [],
     motes: 0,
     wasCharged: false,
-    hopTotal: 0,
+    hopCarry: 0,
     run: emptyRun(),
     lastRun: null,
     driftTicks: 0,
@@ -212,22 +201,28 @@ function clamp01(v: number): number {
 /**
  * Metres, priced but unpaid — Direction 08's carry, accrued a tick at a time.
  *
- * NOTHING HERE REACHES A SCORE YET. `awardLink` still prices its own climb off
- * `climbFromY`, so this runs alongside the existing economy and changes no number.
- * That is deliberate: the gap gate below is the single decision that moves most of
- * F04's economy, and building it in a stage where it cannot break an outcome is
- * what makes stage (b) a swap rather than a leap.
+ * THE ONLY PLACE POINTS ARE MADE. Everything else in this file multiplies what
+ * this produced. Axiom 1: progress is the only base currency, metres climbed
+ * while engaged — not time, not kills, not combos of combos.
  *
  * THE GATE. `highWaterY` only ratchets, so a dip inside an orbit cannot accrue
- * negative ground and the measure is the same one `awardLink` has always used.
- * While captured, every metre counts and the coast resets. While drifting, metres
- * count until the ship has climbed `cfg.grabRange` without engaging anything —
- * after that it is out of reach of everything it left, which is aimless drift by
- * the game's own definition rather than by a number chosen for the economy.
+ * negative ground. While captured, every metre counts and the coast resets. While
+ * drifting, metres count until the ship has climbed `cfg.grabRange` without
+ * engaging anything — after that it is out of reach of everything it left, which
+ * is aimless drift by the game's own definition rather than by a number chosen
+ * for the economy. It is measured rather than argued: at the board's own rung
+ * (25px) the gate leaves 58.6% of all corpus climb unpaid, which is 93% of the
+ * way to paying only for captured metres and re-decides by the back door a
+ * question that was answered the other way; at `grabRange` it leaves 7.3%.
  *
- * See `ScoreState.coastClimb` for why the cut is there and not at the board's own
- * rung, and for the rule that a per-body reach must multiply `cfg.grabRange`
- * rather than replace it.
+ * The gate is also what breaks the chain, on the same edge and for the same
+ * reason. See `ScoreState.coastClimb` for the per-body-reach rule that comes with
+ * reading the global.
+ *
+ * THE CHAIN PRICES THE METRES AS THEY ARE CLIMBED, which is what puts it inside
+ * the carry rather than beside the streak in the cash step. A long chain is
+ * therefore worth more for the ground it is covering NOW, and the carry the
+ * player can see glowing already has it in.
  */
 function accrueCarry(sc: ScoreState, state: SimState, cfg: SimConfig, scfg: ScoreConfig): void {
   const high = state.highWaterY;
@@ -238,14 +233,112 @@ function accrueCarry(sc: ScoreState, state: SimState, cfg: SimConfig, scfg: Scor
   }
   const gained = Math.max(0, sc.lastHighY - high);
   sc.lastHighY = high;
-  if (state.capture) {
+  const rate = scfg.climbPerPx * (1 + scfg.chainStep * sc.chain);
+  // `sc.wasCaptured` and not only `state.capture`, and the difference is a whole
+  // capture's ground. `SimConfig.holdClimbInCapture` freezes `highWaterY` for the
+  // duration of a capture — deliberately, because an orbit is a round trip and
+  // counting the near side's height would put the trailing floor at the apex the
+  // far side then flies into — so the mark does not move at all while the ship is
+  // attached and then jumps by the whole climb on the tick it lets go.
+  //
+  // That lump is engaged ground arriving one tick late, not a coast. Read through
+  // `state.capture` alone it was being clipped to whatever the gate had left, and
+  // a 880px swing banked 560 of it. `wasCaptured` is still last tick's value here,
+  // because `scoreTick` updates it at the bottom, so the release tick sees the
+  // capture it just ended.
+  //
+  // It also settles where the orbiting faucet is closed: it is closed in the
+  // SIMULATION, by the held mark, which is why nothing here needs a rule about
+  // laps. Altitude while orbiting is zero because the mark says so.
+  if (state.capture || sc.wasCaptured) {
     sc.coastClimb = 0;
-    sc.carry += gained * scfg.climbPerPx;
+    sc.carryPx += gained;
+    sc.carry += gained * rate;
     return;
   }
   const allowed = Math.max(0, cfg.grabRange - sc.coastClimb);
-  sc.carry += Math.min(gained, allowed) * scfg.climbPerPx;
+  const paid = Math.min(gained, allowed);
+  sc.carryPx += paid;
+  sc.carry += paid * rate;
   sc.coastClimb += gained;
+  // Out of reach of everything it left. The metres stopped counting on the tick
+  // above; the chain stops here, so there is one edge and not two thresholds to
+  // keep in step.
+  if (sc.coastClimb >= cfg.grabRange) sc.chain = 0;
+}
+
+/**
+ * An arrival prices everything carried into it.
+ *
+ * TIGHTNESS, and it is the whole of what used to be `closeBonus`, `nerveBonus`
+ * and `flybyCloseBonus` — three flat sums paid at three moments for one quantity,
+ * clearance above the minimum orbit. It scales from 1 at `closeSpan` to
+ * `tightMax` at the surface, so a loose arrival is never a penalty: rewards are
+ * withheld, nothing is taken away.
+ *
+ * WHY THE WHOLE CARRY AND NOT THE MOMENT. Direction 08's grade prices everything
+ * carried through the orbit rather than awarding a flat bonus, and the arrival is
+ * the half of that a capture settles first — `AGENTS.md`'s rule that a capture is
+ * two scoring events, with the reason updated: a tap in place has climbed zero
+ * metres, so `0 * anything = 0` and the faucet the old reason feared is now
+ * structurally impossible. What the rule survives on is the receipt.
+ *
+ * The receipt is the carry visibly jumping at the bottom of the dive, and the
+ * pixel that announced it beforehand is the `closeSpan` gradient the minimum-orbit
+ * ring draws above itself.
+ *
+ * A NERVE GRAB LANDS AT THE TOP OF IT BY CONSTRUCTION. A line already headed
+ * inside the minimum orbit has no clearance left, so the axis `nerveBonus` used
+ * to pay flat is now the extreme of the one this reads — which is what makes it
+ * one term instead of a threshold bolted onto a ramp.
+ */
+function priceArrival(sc: ScoreState, scfg: ScoreConfig, clearance: number): void {
+  const close = clamp01(1 - clearance / scfg.closeSpan);
+  sc.carry *= 1 + (scfg.tightMax - 1) * close;
+}
+
+/**
+ * How well the swing was released, on Direction 06's ladder.
+ *
+ * THE CONJUNCTION, not the angle. VISION pillar 2 is that the boost envelope and
+ * the release marker FIGHT — the boost peaks a fixed interval after the orbit
+ * freezes and the marker sits at a fixed angle, so hitting both means shaping the
+ * dive to bring them together, and "the scoring layer only gives it a name". An
+ * angle-only tier would grade a perfectly aimed release at a dead envelope as
+ * PERFECT, which deletes half of the pillar from scoring.
+ *
+ * A PASS GRADES ON ONE AXIS THROUGH THE SAME FUNCTION, by passing its swept turn
+ * as both. That is not a trick: the thresholds are `zone^aimSharpness *
+ * zone^timingSharpness`, so a single quality raised to the same total exponent
+ * lands on exactly the same rungs, and there is one ladder rather than two sets
+ * of thresholds free to drift apart.
+ */
+function tierQuality(scfg: ScoreConfig, aim: number, timing: number): number {
+  return Math.pow(aim, scfg.aimSharpness) * Math.pow(timing, scfg.timingSharpness);
+}
+
+/** The rung that quality earned, as its multiplier. 1 for a release under TRUE. */
+function tierFor(scfg: ScoreConfig, q: number): number {
+  if (q >= scfg.tierPerfectAt) return scfg.tierPerfect;
+  if (q >= scfg.tierSharpAt) return scfg.tierSharp;
+  if (q >= scfg.tierTrueAt) return scfg.tierTrue;
+  return 1;
+}
+
+/**
+ * Which fire band the swing has earned: 1, 2 or 3.
+ *
+ * Selected by `burnBank` — heat integrated over the swing — and not by where the
+ * ship happens to be this tick, because the band is a fact about what the swing
+ * DID at the edge. `burnRate` is the scale between the two, which is the whole of
+ * what it does now that it no longer mints.
+ *
+ * The steps are drawn: `drawHazardZones` paints the red in three, so the ladder
+ * is on screen before it is scored.
+ */
+function bandFor(sc: ScoreState, scfg: ScoreConfig): number {
+  const step = sc.burnBank >= scfg.bandThreeAt ? 2 : sc.burnBank >= scfg.bandTwoAt ? 1 : 0;
+  return 1 + scfg.bandStep * step;
 }
 
 /**
@@ -287,6 +380,8 @@ function endLife(sc: ScoreState): void {
   // means, and it is the one part of Direction 08's death rule that is universal
   // across the mode matrix. What varies by mode is the bank.
   sc.carry = 0;
+  sc.carryPx = 0;
+  sc.chain = 0;
   sc.coastClimb = 0;
   // Not reset to a value: reseeded by the next tick from the new life's own
   // `highWaterY`, so a respawn far below cannot register as a mountain of climb.
@@ -300,33 +395,31 @@ function endLife(sc: ScoreState): void {
   sc.capKinked = false;
   sc.inKink = false;
   sc.inHardKink = false;
-  sc.climbFromY = null;
   // The claim log clears, so a new life may take an anomaly it already took in
   // the last one — the once-only rule exists to stop a window being refreshed by
   // re-grabbing the same body in one flight, not to retire it from the field.
   sc.claimed.length = 0;
-  // A rescue that had not yet turned the ship away dies with the life it was
-  // meant to save, and the paid list clears with everything else: a new life may
-  // be rescued by the same planet, exactly as it may re-claim an anomaly.
-  sc.rescue = null;
-  sc.rescued.length = 0;
+  // The omen dies with the ship it was over. Nothing is paid or withheld by it —
+  // see `ScoreState.doomed` — but a fresh ship must never be born under one.
   sc.doomed = null;
   sc.hopped.length = 0;
   // A death ends the window without a tally. Left set, the falling edge would be
   // seen on the first tick after the respawn and the player would be shown a
   // total for a frenzy that ended in a crash.
   sc.wasCharged = false;
-  sc.hopTotal = 0;
+  sc.hopCarry = 0;
   // The carpet's dots come back with the ship — `respawn` un-takes them — so the
   // tally they are counted against has to come back too, or the next life's first
   // dot would look like one already collected.
   sc.motes = 0;
-  // A flare still burning at the moment of death is dropped rather than paid.
-  // Flying into the ground is how a hot pass goes wrong, and the score it would
-  // have banked is exactly what the death is taking.
+  // The band a hot swing had earned is dropped rather than cashed. Flying into
+  // the ground is how a hot pass goes wrong, and the multiplier it would have
+  // cashed at is exactly what the death is taking — 78% of edge drags end this
+  // way, which is what makes the fire a stake rather than a bonus.
   sc.burnHeat = 0;
   sc.burnBank = 0;
   sc.burnPeak = 0;
+  sc.band = 1;
   // The new life starts where the old one did, not adrift for as long as the
   // last one was. `lastEnding` has already been sealed off this by the time this
   // runs — the same ordering `lastRun` depends on.
@@ -341,17 +434,20 @@ function endLife(sc: ScoreState): void {
  * are not the same thing.
  */
 /**
- * A charged window closing, and what its hops came to.
+ * A charged window closing, and what it was worth.
  *
- * Display only. Every point in it was banked as its hop landed — this restates
- * the window's total so the small per-hop numbers can be receipts and the finale
- * can be the headline. It is emphatically NOT a fourth award: paying here as well
- * would double the window, and holding the points back until here would mean
- * dying mid-window cost you everything you had already earned.
+ * Display only, and it always was — but what it restates has changed. It used to
+ * sum the flat `hopBonus` each hop had already been paid; hops pay nothing now,
+ * so what a frenzy is worth is the ground it covered at a chain that stepped on
+ * every body it touched. That is `ScoreState.hopCarry`, and it is CARRIED rather
+ * than banked: it cashes at the next release like any other metre, and a death
+ * inside the window takes it like any other carry.
+ *
+ * It is emphatically NOT an award. Nothing is paid here, then or now.
  */
 export interface Tally {
   tick: number;
-  /** Points already paid across this window's hops. */
+  /** Carry accrued while the window was open. Already in `ScoreState.carry`. */
   points: number;
   /** How many bodies were hopped to. */
   hops: number;
@@ -439,7 +535,7 @@ export function scoreTick(
     return { awards, shouts, tally };
   }
   sc.endingSeen = false;
-  if (sc.climbFromY === null) sc.climbFromY = state.highWaterY;
+  const carryBefore = sc.carry;
   accrueCarry(sc, state, cfg, scfg);
 
   // ---- what this life is measuring about itself
@@ -475,21 +571,22 @@ export function scoreTick(
     sc.motes = taken;
   }
 
-  // ---- the burn: heat integrated over a hot pass, paid when the fire dies
+  // ---- the burn: heat integrated over the swing, cashed as the band
   //
-  // Ahead of the release below, and deliberately: a hot pass happens during the
-  // ride, so when a release ends a flare the two awards land on the same tick and
-  // the one that describes the earlier moment should be the earlier of the pair.
+  // Ahead of the release below, so a swing that is still alight when it is let go
+  // of has this tick's heat in the band it cashes at.
   //
-  // Both ends of a flare are edges on the same quantity, so a flare is exactly
-  // one continuous stretch above the ignition heat — no separate latch to get out
-  // of step with the fire the player is watching. A settle that dips through the
-  // hot zone on two passes pays twice, which is right: it burned twice.
+  // IT NO LONGER PAYS ANYTHING AND NO LONGER RESETS WITH THE FIRE. `burnRate` was
+  // the eleventh minting key — points per second spent near the wall, which is
+  // exactly what axiom 1 bans ("metres climbed while engaged. Not time") and what
+  // Direction 08 lists under what deliberately earns nothing ("survival time —
+  // never… not from a per-second trickle"). What the integral does now is select
+  // the band the whole carry cashes in, so a settle that dips through the hot zone
+  // twice earns one deeper band rather than two payments.
   //
-  // Placed outside the capture branch so a release mid-burn settles here too.
-  // Otherwise letting go at the hottest instant — which is a thing a player will
-  // do on purpose, because it is also the best boost — would silently forfeit the
-  // whole flare.
+  // Placed outside the capture branch so a release mid-burn is still counted. A
+  // player will let go at the hottest instant on purpose — it is also the best
+  // boost — and that release should cash the fire it was flying through.
   {
     // Position from `shipWorldPos`, which resolves a capture's body-relative
     // coordinates — `state.ship` is stale during one, and a burn is by definition
@@ -503,16 +600,19 @@ export function scoreTick(
       state.capture !== null,
       scfg,
     );
-    if (heat > scfg.burnMinHeat) {
+    if (heat > BURN_MIN_HEAT) {
+      // A flare beginning. Counted here rather than at the award that no longer
+      // exists, so `burns` still means what the replay prints it as: how many
+      // separate times this session went into the red and came out.
+      if (sc.burnHeat <= 0) sc.burns++;
       sc.burnHeat = heat;
       sc.run.fireSecs += dt;
       sc.burnBank += heat * dt * scfg.burnRate;
       if (heat > sc.burnPeak) sc.burnPeak = heat;
     } else {
       sc.burnHeat = 0;
-      const burn = awardBurn(sc, state, scfg);
-      if (burn) awards.push(burn);
     }
+    sc.band = bandFor(sc, scfg);
   }
 
   // ---- a charged window opened: the hop log describes the window in progress
@@ -523,12 +623,22 @@ export function scoreTick(
   const charged = state.chargedT > 0;
   if (charged && !sc.wasCharged) {
     sc.hopped.length = 0;
-    sc.hopTotal = 0;
+    sc.hopCarry = 0;
   }
+  // What the window built, measured as the carry it added rather than as points
+  // it paid — nothing inside a window is paid any more. Taken from the delta
+  // across `accrueCarry` above, so a hop's own tightness multiply is in it: a
+  // frenzy flown tight is worth visibly more than one flown wide, which is the
+  // whole reason to zip to the body rather than past it.
+  if (charged) sc.hopCarry += Math.max(0, sc.carry - carryBefore);
   // The window ran out. Not a death — `endLife` clears `wasCharged`, so a crash
   // mid-frenzy never reaches here.
-  if (!charged && sc.wasCharged && sc.hopTotal > 0) {
-    tally = { tick: state.tick, points: sc.hopTotal, hops: sc.hopped.length };
+  // Gated on the HOPS and not only on the carry. A window that opened over a ship
+  // that never zipped anywhere still accrues ground, because the ship is still
+  // climbing — and a tally for that would be a receipt for the ordinary flying
+  // that was going to happen anyway. The frenzy is the subject.
+  if (!charged && sc.wasCharged && sc.hopped.length > 0 && sc.hopCarry > 0) {
+    tally = { tick: state.tick, points: Math.round(sc.hopCarry), hops: sc.hopped.length };
   }
   sc.wasCharged = charged;
 
@@ -568,10 +678,9 @@ export function scoreTick(
   // A capture that ended without ever being thrown around breaks the run. Checked
   // before the branch below so it sees the capture that just went away.
   if (sc.wasCaptured && !cap) {
-    // Let go of before it ever turned away: the press was not a rescue after all.
-    // Cleared here rather than left to expire, so a later capture cannot inherit
-    // a quality that was read at a different press against a different wall.
-    sc.rescue = null;
+    // Let go of before the ship ever turned away. Cleared here rather than left
+    // to expire, so a later capture cannot inherit an omen that was read at a
+    // different press against a different wall.
     sc.doomed = null;
     if (!sc.capKinked) sc.recklessStreak = 0;
     sc.capKinked = false;
@@ -585,9 +694,12 @@ export function scoreTick(
     // never again — the capture's own rx/ry/vx/vy start moving immediately.
     if (!sc.wasCaptured) {
       sc.grabSkim = skimClearance(sc, state, cap);
-      const armed = armRescue(sc, state, cfg, scfg, dt);
-      sc.rescue = armed.rescue;
-      sc.doomed = armed.doomed;
+      sc.doomed = armDoom(sc, state, cfg, dt);
+      // Every capture begun is an engagement, whether it converts, putters out or
+      // sails past as a pass — so the chain steps here and not at any award. That
+      // is where `hopBonus` went: a zip is an engagement, so a charged window
+      // drives the chain rather than paying a flat sum a body.
+      sc.chain++;
       // The press distance, for a zipped capture exactly as for a flown one, and
       // that is a correction to what this was nearly changed to.
       //
@@ -606,7 +718,6 @@ export function scoreTick(
       sc.maxDefl = 0;
       sc.capTurn = 0;
       sc.periSeen = false;
-      sc.grabDue = -1;
       sc.flybyR = Infinity;
       sc.flybyFalling = false;
       sc.pendingFlyby = null;
@@ -629,39 +740,64 @@ export function scoreTick(
         // Cleared on the edge whether or not anything was owed, or the test stays
         // true for every remaining tick of the outbound leg and fires once a tick.
         sc.flybyFalling = false;
-        sc.pendingFlyby ??= readPendingFlyby(sc, state, scfg, cap, r);
+        const pass = readPendingFlyby(sc, state, scfg, cap, r);
+        if (pass && !sc.pendingFlyby) {
+          sc.pendingFlyby = pass;
+          // A pass is an arrival too, and it prices the carry at the same moment
+          // and on the same span a grab does — "grabs AND passes alike". This is
+          // where `flybyCloseBonus` went, and it is the same term as
+          // `closeBonus`: one quantity, one multiplier, two ways of arriving.
+          priceArrival(sc, scfg, pass.clearance);
+        }
       } else if (dR < 0) sc.flybyFalling = true;
       sc.flybyR = r;
     } else {
-      // It converted. The pass became a capture, so the grab award is the one
-      // that describes it and the flyby is owed nothing — that is what stops one
-      // press paying twice, and what keeps a zip from being a discount.
+      // It converted. The pass became a capture, so its periapsis is the arrival
+      // that prices the carry and its release is the cash — the flyby is owed
+      // nothing. That is what stops one press being settled twice, and what keeps
+      // a zip from being a discount.
       sc.flybyR = Infinity;
       sc.flybyFalling = false;
       sc.pendingFlyby = null;
     }
 
-    // ---- the grab award: owed once the dive swings through periapsis
+    // ---- the arrival: it prices the carry, once, when the swing has happened
     //
-    // Not at the press. A light tap should earn nothing, and paying at the press
-    // would make one next to a planet a points faucet — you are already close to
-    // the surface, so every tap would be a tight grab. Periapsis is the moment
-    // the swing actually happened; a couple of ticks past it is when it reads as
-    // having happened, on the way back out.
-    // The arrival has happened. For a dive that is periapsis — the moment the
-    // swing actually occurred. For a zip it is the end of the glide, which is the
-    // same moment wearing different clothes: the point at which the ship is where
-    // it was going. Paying either at the press would be paying for the intention.
+    // NOT AT THE PRESS, and that rule outlived the reason it was written with.
+    // The old reason was a faucet: beside a planet you are already close to the
+    // surface, so paying tightness at the press would make every tap a tight grab.
+    // Under a pure multiplier a tap in place has climbed zero metres, so
+    // `0 * anything = 0` and the faucet cannot exist. What survives is the
+    // receipt — a capture is two scoring events, and this is the first of them.
+    //
+    // For a dive the arrival is periapsis, the moment the swing actually
+    // occurred. For a zip it is the end of the glide, which is the same moment
+    // wearing different clothes: the point at which the ship is where it was
+    // going. Pricing either at the press would be pricing the intention.
+    //
+    // The two-tick delay this used to carry is gone with the popup it existed
+    // for. A multiplier has to land when the act did, or the carry the player is
+    // watching jumps two ticks after the thing that moved it.
     const arrived = cap.zipped ? cap.phase === 'orbit' : cap.passedPeri;
     if (!sc.periSeen && arrived) {
       sc.periSeen = true;
-      sc.grabDue = GRAB_AWARD_DELAY;
-    }
-    if (sc.grabDue > 0) sc.grabDue--;
-    else if (sc.grabDue === 0) {
-      sc.grabDue = -1;
-      const grab = awardGrab(sc, state, scfg, cap);
-      if (grab) awards.push(grab);
+      sc.grabs++;
+      priceArrival(sc, scfg, sc.grabClearance);
+      // A claimable body is logged once per life, and pays nothing for it. The
+      // anomaly's reward is the charged window it opens, which is spent rather
+      // than received — `anomalyBonus` was 2.4% of corpus best across ONE capture
+      // in 28 faithful sessions, and that number prices the anomaly's
+      // reachability rather than its award. See F08.
+      const body = state.bodies[cap.planet];
+      if (body?.traits.claimable && !sc.claimed.includes(body.name)) {
+        sc.claimed.push(body.name);
+        sc.run.anomalies++;
+      }
+      // The hop log still tracks bodies, because the ship's arcs read it and the
+      // window's tally counts them. Nothing is paid for being on it.
+      if (cap.zipped && body && !body.traits.claimable && !sc.hopped.includes(body.name)) {
+        sc.hopped.push(body.name);
+      }
     }
     // Accumulated rather than sampled at release: recklessness is a property of
     // the whole ride, and the roughest moment of it is usually the brake biting
@@ -708,24 +844,25 @@ export function scoreTick(
       });
     }
 
-    // ---- the rescue: paid the instant the ship stops closing on the wall
+    // ---- the omen: a press made past the last one that could have worked
     //
-    // The award describes the press, but it waits on the outcome, because the
-    // press alone cannot tell a rescue from a death: a press past the cross looks
-    // identical until the ship fails to come back. Turning away is what the cross
-    // promises, so it is what the points are settled against.
-    if (sc.rescue) {
-      const r = sc.rescue;
-      if (turnedAway(cap, r.wall)) {
-        sc.rescue = null;
-        const award = awardRescue(sc, state, scfg, r);
-        if (award) awards.push(award);
-      }
-    }
-
-    // A press past the cross that turned away anyway. Rare — 6% of them — and the
-    // prediction was wrong about that one, so the omen is withdrawn rather than
-    // left standing over a ship that is plainly fine.
+    // NOTHING IS PAID OR WITHHELD HERE, and that is the interesting part of F04.
+    // A rescue used to be an award — `rescueBonus` scaled by how little of the
+    // window was left — and it was expected to be structurally unpayable under a
+    // climb-only currency, since a rescue is a lateral save and the constitution
+    // pays only for climb.
+    //
+    // The measurement reversed the prediction. The link after a rescue banks a
+    // median carry of 1352px against 554px for an ordinary one — 2.44x, because a
+    // rescue means the ship drifted a long way and saved it — the coast gate
+    // costs it nothing, since a drift toward a SIDE wall accrues little vertical
+    // climb per coast, and the swing cashes in the x3 fire band it was flying
+    // through. About 7x an ordinary swing, with no weight and no exception, and
+    // VISION pillar 4 gets stronger by deleting the key that was serving it.
+    //
+    // So all that is left of the rescue in the scorer is the skull the renderer
+    // draws, withdrawn if the ship turns away regardless — which it does 6% of
+    // the time, because the prediction is deliberately conservative.
     if (sc.doomed && turnedAway(cap, sc.doomed.wall)) sc.doomed = null;
 
     sc.pending = readPending(state, cfg, scfg, cap, sc.grabSkim, sc.maxDefl);
@@ -814,98 +951,11 @@ function readPending(
 }
 
 /**
- * Pay for how the ship arrived.
+ * Was this press already past the last one that could have turned the ship away?
  *
- * Returns null when the arrival was worth nothing — a grab from beyond
- * `closeSpan` earns no closeness and was no kind of nerve, and a `+0` floating
- * off the ship is worse than silence.
- */
-function awardGrab(
-  sc: ScoreState,
-  state: SimState,
-  scfg: ScoreConfig,
-  cap: Capture,
-): ScoreAward | null {
-  const close = clamp01(1 - sc.grabClearance / scfg.closeSpan);
-  const multiplier = multiplierFor(sc, scfg);
-  const award: ScoreAward = {
-    tick: state.tick,
-    kind: 'grab',
-    points: 0,
-    multiplier,
-    body: state.bodies[cap.planet]?.name ?? '?',
-    close,
-    clearance: sc.grabClearance,
-    skim: sc.grabSkim,
-    defl: sc.maxDefl,
-    // Release qualities are not this event's business and must read as absent
-    // rather than as zero-scoring. The burn is not this event's business either:
-    // the arrival is one instant, and heat is a stretch of the ride after it.
-    // Nor is the turn: a capture is judged on the orbit it reached, and the arc
-    // it took to get there is the flyby award's question.
-    timing: 0,
-    aim: 0,
-    climb: 0,
-    heat: 0,
-    turn: 0,
-  };
-  const body = state.bodies[cap.planet];
-
-  // ---- a hop: a zipped arrival at a planet, inside a charged window
-  //
-  // Read off `cap.zipped` and NOT off the live window, and that difference is the
-  // rule: a zip is committed at the press, and the 0.45s glide it buys can easily
-  // outlast the countdown. Re-checking here would mean a hop begun legally inside
-  // the window silently paid nothing because it landed a tick late — punishing the
-  // player for the one thing the window is asking them to do, which is hurry.
-  //
-  // A body that pays its own way is never a hop, even when zipped to. Arriving at
-  // one is the thing `anomalyBonus` exists to pay for, and it opens the next
-  // window; calling that a hop would replace the largest award in the game with a
-  // flat 500 and quietly make chaining anomalies worth less than chaining planets.
-  if (cap.zipped && body && !body.traits.claimable && !sc.hopped.includes(body.name)) {
-    sc.hopped.push(body.name);
-    award.kind = 'hop';
-    // Flat. The only award in the game that does not take the multiplier — see
-    // `ScoreConfig.hopBonus` — so it carries the multiplier it was actually paid
-    // at rather than the one in force, which the popup would otherwise print.
-    award.multiplier = 1;
-    award.points = scfg.hopBonus;
-    sc.bank += award.points;
-    sc.hopTotal += award.points;
-    sc.grabs++;
-    return award;
-  }
-
-  // A claimable body pays a flat award on top of whatever the arrival was worth.
-  // Once per life: without the claim log a player could orbit out and back to
-  // refresh the window indefinitely, which is the same faucet the grab award
-  // already refuses to open by paying at the press.
-  //
-  // The body says it is claimable; `ScoreConfig` says what a claim is worth. Score
-  // weights do not belong in the simulation, so the amount cannot travel on the
-  // trait — see `BodyTraits.claimable`.
-  let anomaly = 0;
-  if (body?.traits.claimable && !sc.claimed.includes(body.name)) {
-    sc.claimed.push(body.name);
-    sc.run.anomalies++;
-    anomaly = scfg.anomalyBonus;
-  }
-
-  const raw = close * scfg.closeBonus + (isNerveGrab(award) ? scfg.nerveBonus : 0) + anomaly;
-  if (raw <= 0) return null;
-  award.points = Math.round(raw * multiplier);
-  sc.bank += award.points;
-  sc.grabs++;
-  return award;
-}
-
-/**
- * Read the rescue this press was, or null if it was not one.
- *
- * Called on the FIRST tick of a capture and never again. The quality is a
- * property of the instant the button went down, and one tick later the drift it
- * was measured against no longer exists.
+ * Called on the FIRST tick of a capture and never again. The question is about
+ * the instant the button went down, and one tick later the drift it is asked
+ * against no longer exists.
  *
  * `sc.lastDrift` is the state `beginCapture` actually read — held for exactly
  * this kind of question, and not interchangeable with the capture's own
@@ -913,24 +963,27 @@ function awardGrab(
  * tick. Everything else is taken from the live state: `clear` is the free phase,
  * so the fuel a rescue would have to brake with has not moved yet.
  *
- * COST. This runs `rescueDeadline`, which forward-simulates. It is affordable because
- * it happens once per capture and because the great majority of presses take its
- * cheap refusal — measured over the corpus, 37% of presses are made while
- * committed to a wall and the other 63% never reach the projection at all.
+ * OBSERVABILITY, NOT SCORING. Nothing here pays or withholds a point — it did
+ * once, and F04 deleted the award; see the omen block in `scoreTick` for why the
+ * rescue is worth more without it. It stays in the scorer because the answer is
+ * a forward simulation and the renderer must not run a second one, which is the
+ * same reason `burnHeat` is published here.
+ *
+ * COST. `rescueDeadline` forward-simulates. It is affordable because it happens
+ * once per capture and because the great majority of presses take its cheap
+ * refusal — measured over the corpus, 37% of presses are made while committed to
+ * a wall and the other 63% never reach the projection at all.
  */
-function armRescue(
+function armDoom(
   sc: ScoreState,
   state: SimState,
   cfg: SimConfig,
-  scfg: ScoreConfig,
   dt: number,
-): { rescue: ScoreState['rescue']; doomed: ScoreState['doomed'] } {
-  const none = { rescue: null, doomed: null };
+): ScoreState['doomed'] {
   const cap = state.capture;
   const drift = sc.lastDrift;
-  if (!cap || !drift) return none;
-  const body = state.bodies[cap.planet];
-  if (!body) return none;
+  if (!cap || !drift) return null;
+  if (!state.bodies[cap.planet]) return null;
 
   const pre: SimState = {
     ...state,
@@ -941,82 +994,8 @@ function armRescue(
     bodies: state.bodies.slice(),
   };
   const deadline = rescueDeadline(pre, cfg, dt);
-  if (!deadline) return none;
-
-  // Past the last press that could have worked. Asked before the once-per-body
-  // rule below, deliberately: whether the run is lost is not a question about
-  // whether it has already been paid.
-  //
-  // It is still armed at the top of the scale. The only way such a press can ever
-  // collect is by turning the ship away regardless — which happens 6% of the time,
-  // because the prediction is conservative — and a press that beats a prediction
-  // pinned to the tick has earned the top of the scale. The omen is withdrawn on
-  // the same event that pays it.
-  if (!deadline.cross) {
-    const doomed = { wall: deadline.wall, tick: state.tick };
-    if (sc.rescued.includes(body.name)) return { rescue: null, doomed };
-    return { rescue: { wall: deadline.wall, quality: 1, body: body.name }, doomed };
-  }
-
-  // Once per body per life. A drag along the wall hangs off one distant planet,
-  // so without this the tightest rescue would also be the most repeatable one.
-  if (sc.rescued.includes(body.name)) return none;
-
-  const quality = clamp01(1 - deadline.cross.t / Math.max(1e-6, scfg.rescueSpan));
-  return { rescue: { wall: deadline.wall, quality, body: body.name }, doomed: null };
-}
-
-/**
- * Pay a rescue that turned the ship away from the wall.
- *
- * Nothing here reads how deep it went, deliberately. That is the burn's
- * quantity, integrated over the fire and already paid; this pays for the decision
- * that set the fire up. See `ScoreConfig.rescueBonus`.
- */
-function awardRescue(
-  sc: ScoreState,
-  state: SimState,
-  scfg: ScoreConfig,
-  r: NonNullable<ScoreState['rescue']>,
-): ScoreAward | null {
-  const multiplier = multiplierFor(sc, scfg);
-  const points = Math.round(scfg.rescueBonus * r.quality * multiplier);
-  // A rescue so loose it rounds to nothing pays nothing and says nothing, the
-  // same rule `awardGrab` and `awardBurn` both keep.
-  if (points <= 0) return null;
-  sc.rescued.push(r.body);
-  const award: ScoreAward = {
-    tick: state.tick,
-    kind: 'rescue',
-    points,
-    multiplier,
-    body: r.body,
-    // Arrival and release qualities belong to the grab and the link. Reported as
-    // absent so nothing downstream can pay or praise them a second time.
-    close: 0,
-    clearance: Infinity,
-    skim: Infinity,
-    defl: 0,
-    // The one quality this award carries, on the axis it is about: how much of
-    // the rescue window was spent. Carried in `timing` rather than in a field of
-    // its own because it IS a timing, and `tools/replay.ts` already prints that
-    // column.
-    timing: r.quality,
-    aim: 0,
-    climb: 0,
-    // The heat the ship was at when it turned away, which is the whole of what
-    // makes a rescue a TIGHT one — "the player would've been in the flames
-    // section of the side". `praiseEscape` reads it and nothing else, so the word
-    // needs no threshold. The burn block above has already updated `burnHeat` for
-    // this tick, so this is the same heat the flame beside the ship is drawing at.
-    heat: sc.burnHeat,
-    // A rescue is paid for one decision at one instant. How far the ride swung
-    // the ship is the flyby's quantity, and the capture this happened inside is
-    // still running — there is no finished pass here to report.
-    turn: 0,
-  };
-  sc.bank += points;
-  return award;
+  if (!deadline || deadline.cross) return null;
+  return { wall: deadline.wall, tick: state.tick };
 }
 
 /**
@@ -1041,6 +1020,9 @@ function awardMote(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
     // and the replay's body column print, which is the true answer to "what was
     // that award about".
     body: 'DOT',
+    tier: 1,
+    band: 1,
+    carry: 0,
     close: 0,
     clearance: Infinity,
     skim: Infinity,
@@ -1052,59 +1034,6 @@ function awardMote(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAwa
     turn: 0,
   };
   sc.bank += points;
-  return award;
-}
-
-/**
- * Pay for a hot pass, once the fire is out.
- *
- * Returns null when nothing was burning, which is the common case — this is
- * called on every tick the ship is not alight, purely to catch the falling edge.
- *
- * The bank is committed in ONE award rather than a slice a tick, even though it
- * was accumulated a slice a tick. Paying continuously would break the promise
- * `test/score.test.ts` pins — that awards inside a life sum to the score — and
- * with it `tools/replay.ts`, which reconstructs a session from its award list and
- * would come up short by every burn. The player sees the number climb afterwards
- * instead: the popup rolls it up over 0.8s, deliberately longer than the 0.45s
- * drag it is summing, so it reads as a tally rather than a replay.
- */
-function awardBurn(sc: ScoreState, state: SimState, scfg: ScoreConfig): ScoreAward | null {
-  if (sc.burnBank <= 0) return null;
-  const raw = sc.burnBank;
-  const peak = sc.burnPeak;
-  sc.burnBank = 0;
-  sc.burnPeak = 0;
-
-  const multiplier = multiplierFor(sc, scfg);
-  const points = Math.round(raw * multiplier);
-  // A flare so faint it rounds to nothing pays nothing and says nothing: a `+0`
-  // floating off the ship is worse than silence, the same rule `awardGrab` keeps.
-  if (points <= 0) return null;
-
-  const cap = state.capture;
-  const award: ScoreAward = {
-    tick: state.tick,
-    kind: 'burn',
-    points,
-    multiplier,
-    // The body it burned against, or the one it just left — a release can end a
-    // flare, and by then the capture is already gone.
-    body: (cap ? state.bodies[cap.planet]?.name : sc.pending?.body) ?? '?',
-    // Arrival and release qualities both belong to other events. Reported as
-    // absent so nothing downstream can pay or praise them a second time.
-    close: 0,
-    clearance: Infinity,
-    skim: Infinity,
-    defl: 0,
-    timing: 0,
-    aim: 0,
-    climb: 0,
-    heat: peak,
-    turn: 0,
-  };
-  sc.bank += points;
-  sc.burns++;
   return award;
 }
 
@@ -1162,7 +1091,7 @@ function awardFlyby(
   p: PendingFlyby,
 ): ScoreAward | null {
   // How far the pass actually swung the ship, which is the whole of what a flyby
-  // is paid for. Read HERE and not in `readPendingFlyby` with the other
+  // is graded on. Read HERE and not in `readPendingFlyby` with the other
   // qualities, because unlike them it is not finished at the bottom: the outbound
   // half of a pass steers as much as the inbound half, and a player who holds
   // through the swing has earned all of it.
@@ -1175,14 +1104,23 @@ function awardFlyby(
   const turn = sc.capTurn;
   if (turn < FLYBY_TURN_MIN) return null;
 
-  const raw =
-    (scfg.flybyBase + p.close * scfg.flybyCloseBonus) * clamp01(turn / scfg.flybyTurnSpan);
-  const multiplier = multiplierFor(sc, scfg);
+  // The same ladder a release is graded on, with the turn standing in for both
+  // axes — see `tierQuality`. A pass has no frozen orbit, so it has neither a
+  // compass marker nor a boost envelope; what it has instead is the one quality
+  // that says what the pass DID, and `flybyTurnSpan` is where its rungs sit.
+  const tier = tierFor(
+    scfg,
+    tierQuality(scfg, clamp01(turn / scfg.flybyTurnSpan), clamp01(turn / scfg.flybyTurnSpan)),
+  );
+  const cash = priceSwing(sc, scfg, tier);
   const award: ScoreAward = {
     tick: state.tick,
     kind: 'flyby',
-    points: Math.round(raw * multiplier),
-    multiplier,
+    points: cash.points,
+    multiplier: cash.multiplier,
+    tier,
+    band: cash.band,
+    carry: cash.carry,
     body: p.body,
     close: p.close,
     clearance: p.clearance,
@@ -1192,73 +1130,97 @@ function awardFlyby(
     // Release qualities. There is no release: the ship never stopped.
     timing: 0,
     aim: 0,
-    climb: 0,
-    // Nor is it a burn: a flyby is not captured, and only a captured ship can be
-    // dragged along the dead zone.
-    heat: 0,
+    climb: cash.climb,
+    heat: cash.heat,
   };
   sc.bank += award.points;
   sc.flybys++;
   sc.streak++;
-  cashCarry(sc);
   return award;
 }
 
 /**
- * A cash empties the carry.
+ * THE CASH STEP. One call, and every swing in the game goes through it.
  *
- * Called where Direction 08 says payday is — the release, on a link and on a
- * paid flyby, which are the two manoeuvres that end in one. It returns the amount
- * so stage (b) has something to spend; at stage (a) every caller drops it, because
- * `awardLink` is still pricing its own climb off `climbFromY`.
+ *   carry x tier x band x streak  ->  bank
  *
- * The coast is NOT reset here. A cash is not an engagement — the ship has just let
- * go — so the drift that follows a release starts counting immediately, which is
- * the whole point of gating on reach rather than on time since a payment.
+ * Direction 08 puts payday at the release, because the unit of scoring is the
+ * swing and the unit of play is the swing: "a release isn't a bonus moment — it
+ * is payday, and the compass spent the whole orbit setting the wage".
+ *
+ * The three multipliers are settled at three different moments and are read here
+ * together, which is what stops any of them being a second source of points. The
+ * tier is a property of THIS instant and is passed in. The band is what the swing
+ * did at the field's edge, integrated across the ride. The streak is the ladder,
+ * and it is read BEFORE the caller steps it, so the Nth swing is paid at the
+ * multiplier the N-1 before it earned.
+ *
+ * MULTIPLIERS MULTIPLY, never add. That is what makes the ceiling legible rather
+ * than emergent, and it is why nothing in this file needs a cap beyond the
+ * streak's own.
+ *
+ * The coast is NOT reset here, and that is deliberate: a cash is not an
+ * engagement — the ship has just let go — so the drift that follows a release
+ * starts counting immediately, which is the whole point of gating on reach rather
+ * than on time since a payment.
  */
-function cashCarry(sc: ScoreState): number {
-  const cashed = sc.carry;
+function priceSwing(
+  sc: ScoreState,
+  scfg: ScoreConfig,
+  tier: number,
+): {
+  points: number;
+  multiplier: number;
+  carry: number;
+  climb: number;
+  band: number;
+  heat: number;
+} {
+  const carry = sc.carry;
+  const climb = sc.carryPx;
+  const band = bandFor(sc, scfg);
+  const heat = sc.burnPeak;
+  const streak = multiplierFor(sc, scfg);
+  const multiplier = tier * band * streak;
+
   sc.carry = 0;
-  return cashed;
+  sc.carryPx = 0;
+  // The fire is spent with the carry it multiplied. A swing that rode the edge
+  // cashes that band once; the next swing starts cold, however hot the ship still
+  // is, because the band describes what a swing DID and not where it is.
+  sc.burnBank = 0;
+  sc.burnPeak = 0;
+  sc.band = 1;
+
+  return { points: Math.round(carry * multiplier), multiplier, carry, climb, band, heat };
 }
 
 function awardLink(sc: ScoreState, state: SimState, scfg: ScoreConfig, p: PendingLink): ScoreAward {
-  // Climb is measured on `highWaterY` rather than on release positions: it only
-  // ratchets, so a dip inside an orbit cannot bank negative ground, and the
-  // baseline survives the whole flight between two links.
-  const climb = sc.climbFromY === null ? 0 : Math.max(0, sc.climbFromY - state.highWaterY);
-  sc.climbFromY = state.highWaterY;
-  cashCarry(sc);
-
-  const timing = Math.pow(p.timing, scfg.timingSharpness);
-  const aim = Math.pow(p.aim, scfg.aimSharpness);
-  // Closeness and nerve were paid at periapsis, by `awardGrab`. What is left here
-  // is what the release itself was worth.
-  const raw =
-    scfg.linkBase + climb * scfg.climbPerPx + timing * scfg.timingBonus + aim * scfg.aimBonus;
-
-  const multiplier = multiplierFor(sc, scfg);
-  // Built once so the nerve test sees the finished award rather than a copy of
-  // its own inputs — one definition of what a nerve grab is, in praise.ts.
+  const tier = tierFor(scfg, tierQuality(scfg, p.aim, p.timing));
+  const cash = priceSwing(sc, scfg, tier);
+  // Built once so nothing downstream sees a copy of its own inputs — one
+  // definition of what this award was, and `praiseFor` reads the finished thing.
   const award: ScoreAward = {
     tick: state.tick,
     kind: 'link',
-    points: 0,
-    multiplier,
-    body: p.target ? `${p.body}→${p.target.name}` : p.body,
-    // Arrival qualities belong to the grab award and are reported as absent here,
-    // so nothing downstream can pay or praise them twice.
+    points: cash.points,
+    multiplier: cash.multiplier,
+    tier,
+    band: cash.band,
+    carry: cash.carry,
+    body: p.target ? `${p.body}\u2192${p.target.name}` : p.body,
+    // Arrival qualities belong to the arrival, which has already priced the carry
+    // this is cashing. Reported as absent so nothing downstream reads them twice.
     close: 0,
     clearance: Infinity,
     skim: Infinity,
     defl: p.defl,
     timing: p.timing,
     aim: p.aim,
-    climb,
-    heat: 0,
+    climb: cash.climb,
+    heat: cash.heat,
     turn: 0,
   };
-  award.points = Math.round(raw * multiplier);
   sc.bank += award.points;
   sc.links++;
   sc.streak++;
