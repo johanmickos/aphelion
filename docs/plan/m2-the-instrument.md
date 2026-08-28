@@ -40,9 +40,21 @@ thing that owns it. Four states: ahead, in reach, held, spent.
 Identity hues are generated, not listed: `oklch(0.72 0.13 H)`, H stepped ≥50° between
 neighbours, excluding the violet–pink band and the quality bands.
 
+**And the fifth state is off the picture entirely: the sighting.** Spec
+[03 · §6](../spec/03-hud.md) — a body the picture cannot show, marked on the edge of it in that
+body's own hue, ahead of the climb only, never for a body already on screen. It belongs here rather
+than with the compass because it is the same hue machinery answering the same question one state
+further out, and because it is **always on**: the compass needs an orbit, and a sighting is the
+whole of what a coasting craft has to read. Two things in §6 are open and are the author's — how a
+sighting says how far, and whether the body a press would take is marked differently.
+
+It is also the mitigation for what [M3.1](./m3-the-field.md) is about to do: with the width fixed
+and the height flexing, the body a craft next grabs is off the picture at the moment of release
+**32%** of the time on a phone in a browser, against 12% today.
+
 **Acceptance**: the four states are visually distinct and assertable in presentation state;
-the tide tracks with lag; hue generation obeys the exclusion rule. **Verify**: `pnpm test`
-plus eyes.
+the tide tracks with lag; hue generation obeys the exclusion rule; a body on screen has no sighting
+and one behind the climb has none. **Verify**: `pnpm test` plus eyes.
 
 ---
 

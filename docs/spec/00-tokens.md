@@ -206,6 +206,29 @@ The design space is **1170 × 2532** — a phone held in portrait (ADR-0010). Ev
 reads is drawn in world space in design coordinates, and **nothing the player reads is drawn
 outside it, ever**, so the composition is identical on every device. DOM is developer chrome only.
 
+**The width is the contract and the height flexes** (author, 2026-08-28). The design space was
+authored at the size of a whole phone screen and a browser never gives a page a whole phone screen,
+so fitting the rectangle *whole* meant drawing everything at **77%** of the size the prototype
+draws it at on the same phone. The scale therefore comes from the **width** — 1170 design units
+across, always — and how much height a device shows follows from its own shape.
+
+Two guardrails, because a flexing height is otherwise a game whose visible field is a property of
+the hardware. Measured across plausible devices, the unguarded version shows between **496 and 846**
+prototype units of height, and the body a craft next grabs is on screen at the moment of release
+anywhere from **45% to 89%** of the time.
+
+- **A guaranteed band.** A height, measured from the shortest viewport the game supports, that
+  every device shows in full. **Everything the player reads is composed inside it**, and the rule
+  above is unchanged in force — only the rectangle it names is now the band rather than the whole
+  design space.
+- **A cap on the extra.** A device tall enough to show more than the band does not get unbounded
+  extra field, so what a player can see is bounded above as well as below.
+
+Both numbers are [M3.1](../plan/m3-the-field.md)'s to measure, along with the fit itself; what is
+built today still fits the design space whole, and says so. The thumb line below was already
+written against the *screen* rather than the design space, and this is the reading it always
+implied.
+
 **Outside it is bleed, not black.** The design space is fitted whole and centred; whatever the fit
 leaves over is filled with world — 179 design units either side on ADR-0011's measured phone,
 which is world the device could always draw and was painting over ([M1.4](../plan/m1-the-swing.md)).

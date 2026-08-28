@@ -90,11 +90,57 @@ that the press is steering, before the first orbit ever forms.
 Nothing on the track tells the player what to do. It states four facts and lets the player price
 the trade.
 
-## 6 · Off-screen bodies
+## 6 · Sightings — the bodies the picture cannot show
 
-A body outside the viewport that is within the run's reach is drawn as a **dot on the screen
-screen edge in its identity hue**, at E1. No label, no arrow, no distance number, and no
-collision resolution between them — they may overlap.
+A body outside the picture and within reach is drawn as a **mark on the edge of the picture in
+its identity hue** — `CONTEXT.md`'s **sighting**. Direction 03 is canonical for the form and it is
+a **dot, not an arrow**: the mark's *position* on the edge is the direction, so nothing has to
+point. That is not a stylistic preference — an arrow is the instruction this spec's own acceptance
+refuses, and a dot states the same fact without one.
+
+No collision resolution between them; they may overlap.
+
+| Property | Value | Kind |
+|---|---|---|
+| Form | A dot on the edge of the picture, in the body's **identity hue** | Direction 03 |
+| Which bodies | Off the picture, ahead of the climb, and within reach | Direction 03 |
+| Direction | The mark's position on the edge, never a drawn vector | Direction 03 |
+| Distance | **Open** — see below | — |
+| Behind the climb | **Never drawn.** A mark below the craft points at somewhere it has already been, which is clutter and a suggestion to turn around | Carried |
+| Already on screen | **Never drawn.** A mark pointing at a thing the player can see is clutter over the exact thing it was pointing at | Carried |
+| When | **Always**, whether or not a body is held | Carried |
+
+**They exist for the moments the compass cannot reach.** The compass needs an orbit, so it exists
+only inside a swing; a sighting is the whole of what a coasting craft has to go on, and that is
+exactly the long drift and the fast flyby — the moments when knowing where anything is matters most
+(carried from the prototype, [ADR-0013](../adr/0013-carry-the-behaviour-re-derive-the-mechanism.md)).
+The [M1 gate measured the cost of not having them](../plan/m1-the-swing.md): over 877 releases that
+reached another body, the body the craft next grabs is **outside the picture 12% of the time** as
+the design space is fitted today, and **32%** under §7's ruled fit. A sighting is what that 32% has
+to read instead.
+
+> **Open — how a sighting says how far.** Direction 03 rules *"no labels"*, and this spec drew the
+> conclusion that a sighting therefore carries no distance at all, at a flat E1. Both cannot be
+> what is wanted: the author asks for *"how far away they are"* (2026-08-28) and the board refuses
+> the number. **Brightness is the game's only ordinal channel** (spec [00 · §3](./00-tokens.md)) and
+> hue is already spent on identity, so distance as brightness is the one answer that needs no
+> label and breaks no rule. The prototype ramps it continuously — full strength at 200 units,
+> floor at 1 600 — where this palette has four steps. What is open is only whether a sighting
+> steps E0 – E2 with distance or stays flat at E1 and says nothing about it.
+
+> **Open — whether the body a press would take is marked differently.** The prototype rings that
+> one at full strength whatever the distance says, and **keeps the ring when the body comes into
+> view**, moving it from the edge onto the body — *"the cue must not blink out at the moment the
+> thing it points at comes into view, because that is exactly when the player is deciding."* Its
+> evidence is a measured session: the craft was inside the grab window for **1.03s** and could see
+> the body itself for **0.23s** of that. It is a fact about what the button would do rather than an
+> instruction, so nothing refuses it — but it is a second cue in the same place as the compass's
+> job, and whether this game wants it is the author's.
+
+**Reach is not yet a number.** *"Within reach"* is Direction 03's phrase and the prototype carries
+an explicit range beyond which nothing is marked. What it should be here is spec
+[17](./17-daily-field.md)'s to fix once a day has a length, and until then a sighting is drawn for
+every body ahead.
 
 ## Acceptance
 
@@ -104,8 +150,10 @@ collision resolution between them — they may overlap.
 - The BANK chip's opacity is a pure function of engagement; toggling coasting toggles it and
   nothing else.
 - Each boundary band in frame shows exactly one multiplier label, captioning a mote.
-- No **instruction** text — arrows, `RISK ZONE`, `TURN` — is drawn anywhere in the world. A label that states what a band pays is a fact; a label that tells the player what to do is not.
+- No **instruction** text — arrows, `RISK ZONE`, `TURN` — is drawn anywhere in the world. A label that states what a band pays is a fact; a label that tells the player what to do is not. **A sighting is held to the same line**: its position carries the direction and no vector is drawn, and none is drawn below the craft.
 - The deadline window's drawn length is independent of fuel; only its lit fraction depends on
   fuel. A test at 0%, 50% and 100% fuel finds three identical geometries and three different lit
   fractions.
 - Entering an anomaly changes zero HUD properties other than chip background colour.
+- A body on screen has no sighting, and one behind the climb has none; the count of sightings is a
+  pure function of the bodies, the camera and what the picture can show.

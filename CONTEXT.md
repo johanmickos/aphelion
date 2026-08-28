@@ -197,6 +197,17 @@ The single point on the compass marking a perfect release.
 **Hand**:
 The moving indicator on the compass showing where a release would land right now.
 
+**Sighting**:
+A body the picture cannot show, marked at the edge of it in that body's own hue. Where
+the **compass** is drawn on the thing it describes and needs a **grab** to exist at all, a
+sighting is about something out of sight and is always there — which is the whole of what a
+craft has to go on while **coasting**. It says three facts and gives no instruction: which
+body, which way, and how far. Never drawn for a body already on screen, and never for one
+behind the climb.
+_Avoid_: pointer and arrow (a sighting does not point — its **position** on the edge is the
+direction, and an arrow is the instruction `VISION.md`'s fourth pillar refuses), waypoint,
+marker, blip, radar, edge dot (**dot** is the compass's, and **carpet dot** is the carpet's)
+
 **Farewell ring**:
 The orbit detaching from the body and expanding away at release, in AURORA.
 

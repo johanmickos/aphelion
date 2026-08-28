@@ -23,8 +23,28 @@ numbers and what they were measured over are under
 [M1.4 · The camera decision has expired](./m1-the-swing.md#m14--death-and-the-shape-of-a-run);
 they are not restated here, because two copies of a measurement are two copies that drift.
 
-**Acceptance**: identical composition across aspect ratios; nothing readable in the bottom
-third, ever. **Verify**: `pnpm test` on the projection, plus screenshots at three aspects.
+**And the fit itself changed under it** (author, 2026-08-28, closing spec
+[00 · §7](../spec/00-tokens.md)). The design space is no longer fitted *whole*: **the width is the
+contract** — 1170 design units across, always — and the visible height follows from the device's own
+shape. This step owes the two guardrails that make that safe, and both are numbers rather than
+opinions:
+
+- **The guaranteed band**: a height, taken from the shortest viewport the game supports, that every
+  device shows in full and inside which everything readable is composed. Spec 00 §7's rule is
+  unchanged in force; the rectangle it names becomes this band.
+- **The cap**: how much extra a taller device may see, so that what a player can see is bounded
+  above as well as below.
+
+The evidence they are sized against is [M1.5's](./m1-the-swing.md), measured over 877 releases:
+unguarded, devices see **496 – 846** prototype units of height, and the body a craft next grabs is
+on screen at the moment of release **45 – 89%** of the time. Fitting whole gives a flat 88% and a
+77%-sized picture; the ruled fit gives a full-sized picture and 68% on a phone in a browser. The
+band and the cap are what stop the second number being the device's to decide.
+
+**Acceptance**: identical composition across aspect ratios *within the guaranteed band*, and the
+band is shown whole on every supported viewport; nothing readable in the bottom third, ever; the
+extra a tall device sees is capped. **Verify**: `pnpm test` on the projection, plus screenshots at
+three aspects.
 
 ---
 
