@@ -5143,6 +5143,71 @@ equality gate read `0.000e+0` across all ten scenarios throughout.
 
 ---
 
+### 77 — The tank empties while you play, and three of the four obvious fixes were wrong
+
+Reported three times across one evening — "I did feel like I was running out of fuel a bit too often", then "fuel was a bit scarce" — and each report moved the diagnosis somewhere else. What this note keeps is the budget that finally explained it, and the four approaches that were measured and rejected on the way, because every one of them is the first thing the next person will reach for.
+
+**THE BUDGET, AND IT IS THE WHOLE FINDING.** Per-phase, off the checkpoint trace of a 47-second session that hit EMPTY and spent 18% of itself under a quarter tank:
+
+```
+phase      time     net fuel   rate/s
+settle      7.3s     -132      -18.0
+flyby       6.7s     -216      -32.4
+clear       5.7s        0        0.0
+orbit       3.7s        0        0.0     parked
+drift       2.7s      +40      +15.0    the only income
+```
+
+**44.7 of the 47 seconds were captured, so the tank took on fuel for 2.7 of them.** `fuelRegen` runs only while not captured, which means income is 6% of the session and playing well is what starves it. That is `linkFuelReward`'s own founding argument arriving at a level of engagement it was not sized for: it was added because "a fast chain starves and a pause refuels", and at 94% captured one refund at the release does not cover it. An 88-second session says the same thing at 8% drifting and 24 tanks of regen forgone.
+
+Two rates in that table matter beyond their own row. **The brake is 2.2x the circularization** — `flybyFuelPerSec` 40 against `fuelPerSec` 18 — so the money goes on COMMITTING to a capture, before any refund has been earned at all; 88% of the low-fuel samples sit inside a capture against a 75% baseline. And **a parked orbit is exactly 0.0/s**: it does not burn, and it does not fill either. `refuel` exists at 30/s but lives inside `traits.authored`, and only the three anomalies have one.
+
+**WHAT LANDED.** Three changes, and the split between them is the part worth keeping:
+
+- **`linkFuelReward` 20 -> 22.** Half the deficit was self-inflicted: `boostPeakAt` (note 76) narrowed the envelope's flat top, and this refund reads the same fraction the tier grades, so it was halved for every release before the new peak. Netting each link against `fuelPerSec x min(boostT, settleDur)` puts the session at **-55 fuel where the old envelope put it at -2**. 22 is the largest value the headroom pin allows and the two standards in that declaration now conflict; the conflict is written down there rather than resolved.
+- **`flybyConvertRefund` became a floor, graded up to a full return by arrival tightness.** A REFUND, bounded by `brakeSpent`.
+- **`SimConfig.arrivalFuelReward` 10, paid at the periapsis freeze.** An AWARD, bounded by nothing.
+
+**THE REFUND / AWARD DISTINCTION IS STRUCTURAL AND THE TEST SUITE ALREADY KNEW IT.** `Capture.fuelBack` counts refunds and `test/escape.test.ts` pins it at no more than `fuelSpent` — you never get back more than you spent. An award is exactly the thing allowed to break that bound, so it is credited to `state.fuel` directly and never through that counter. It is also why grading the brake refund could not be the answer on its own, which is what was asked for: "they do a big burn, get a tight capture, and then receive a fuel award for the tight capture". A refund of a big burn returns the burn and never a penny more, and a direct dive that never braked collects nothing.
+
+**WHY THE FREEZE, of the three moments that were open** — the press, the circularization, the release. The freeze is the first at which the capture is provably real: a tap never reaches periapsis and neither does a pass that sails by, so it needs no gate of its own and nothing is ever clawed back. It is also ahead of the settle burn. And it is explicitly NOT paid on an authored arrival, because `freezeOrbit` hands those `tightness = 1` by fiat — "a rest stop does not grade the approach" — so an anomaly arrival or a zip charge would collect in full.
+
+---
+
+**THE FOUR THAT WERE MEASURED AND REJECTED.** Each was the obvious move at the time.
+
+**1. Pay the existing refund earlier. Buys nothing.** The intuition was exact — "it was concerning to see such low fuel when I KNEW that my good capture would reward me" — and the arithmetic refuted it. `boostT` counts from the freeze, so the freeze tick is recoverable from the tuple and the payment can be laid back onto the real trace: moving 25%, 50% or **100%** of the refund to the freeze leaves the session's minimum tank **identical at 3**, and the time under a quarter tank goes 9% -> 7%. The median wait was already 0.40s. The feel was real; the wait was not the cause.
+
+**2. Pay at the PRESS instead. A faucet.** Arrival tightness is knowable at the press, so it is implementable — but a pass that never converts arrives tight too, at a `close` of p50 0.83 and 0.93 across the corpus, so tapping beside planets would farm fuel. The freeze is 0.4-1.1s later and costs nothing to wait for.
+
+**3. Let a settled orbit at a planet refuel. Rejected by the author** — the rest stop stays the anomaly's. Worth recording that it was the measurement's own recommendation and that it lost to a design call, because the budget above will suggest it again to whoever reads it next.
+
+**4. Re-grade `timing` in the scorer without touching the sim. Breaks the pixel rule.** The boost halo draws `cap.boost / cap.boostFull`, the exact quantity the tier grades — one definition, two consumers, which is the law `src/score/burn.ts` states in its header. A halo showing full while the score said 0.6 is the defect the accolade table was built to end.
+
+---
+
+**THE NUMBER THAT COULD NOT BE PREDICTED, MEASURED.** Grading the brake refund was shipped without a curve, because nothing had recorded an arrival's tightness since F04 removed the grab award: a link sets `close: 0` deliberately, since the arrival priced the carry and reading it again at the cash would pay for it twice. `ScoreAward.arrival` was added for it, and the first session carrying it says converting arrivals run **p10 0.27, p50 0.56, p90 0.76, max 0.78** — nowhere near the 0.83-0.93 of passes that never convert. So the graded refund pays a median 0.78 of the brake against the flat 0.5 it replaced, 56% more rather than the near-doubling that was flagged as the risk. n=15.
+
+**A SIZING ERROR CAUGHT BY CHECKING RATHER THAN BY FAILING.** `arrivalFuelReward` was sized against the 15 LINKS in a session, and it fires at every periapsis freeze — which is not the same event, since presses run 1.5-1.8 per link. Checked before trusting: settle-entries in the checkpoint trace run 13 and 25 against 15 and 29 links, so the award fires about once per capture and the sizing held. It would not have failed loudly if it had not.
+
+**A FIXTURE THAT WOULD HAVE HIDDEN THE WHOLE FEATURE.** The default spawn's dive arrives **228-291px above the minimum orbit at every press tick from 10 to 50** — always outside `arrivalTightSpan` 200, so the award is always exactly 0. Every assertion about it would have passed green against a scenario structurally incapable of earning one. The tests fly `test/score.test.ts`'s nerve-grab line instead, which arrives at 52px. That is the fourth instance of this failure recorded in this file and the second this week; the discipline that catches it is asking what the fixture REACHES, not whether the test passes.
+
+**TWO SPANS, ONE QUESTION, PINNED TOGETHER.** `SimConfig.arrivalTightSpan` and `ScoreConfig.closeSpan` both grade `grabR - minR` and both are 200, and `test/score.test.ts` pins them equal the way it already pins `burnEdgeSpan` to `RenderConfig.hazardZoneWidth`. The sim owns its own copy because `src/sim/` may not import from `src/score/`; the pin is what stops that being a second opinion.
+
+---
+
+**AND THE GAUGE, WHICH IS WHERE "HUGE" ACTUALLY WAS.** The aggregate was never large — 5.6 fuel at the median arrival, which is what takes a session that hit empty back to a minimum of 40. What read as huge was a bar that moved in one frame. So the bar changed and the tank did not: making the fuel itself trickle would put a window in the game where a grab is refused for a tank that has already been paid, and would drag a render concern into a simulation that must stay a pure function of `(config, seed, inputLog)`.
+
+**A GAUGE MAY LAG GOOD NEWS AND MUST NEVER LAG BAD NEWS.** The ease runs upward only; a fall snaps. A readout above the real tank would promise a grab the simulation refuses at `fuel <= 0.5`, so the clamp lives inside `drawFuelGauge` rather than being trusted to callers, and `LOW` lights a fraction early rather than a fraction late.
+
+**And it is exponential because a fixed rate was tried first and was wrong in a way that only measurement showed.** A rate in fuel-per-second makes the fill's duration proportional to the lump, and the lump this exists for is small: at a full tank in 0.45s, the 7.4 an arrival award actually pays landed in **two frames** — the teleport it was meant to replace. Closing a fraction of the gap each frame instead takes about the same time whatever the size, 0.58s for an award and 0.90s for a respawn.
+
+The knob is deliberately not on the tune panel. `RENDER_KNOBS` is proved live by a fixture that holds fuel constant for all 24 of its frames, so `fuelGaugeFillSecs` would have measured as dead there for exactly the reason `AGENTS.md` names — and the honest fix is to teach that fixture to vary fuel, not to pin a knob against a measurement it was never going to pass.
+
+Nothing under `src/score/` changed. `SIM_VERSION` went 30 -> 32 across the two simulation changes, the golden was recaptured twice and moved no number either time — both keys are inert under `PROTOTYPE_CONFIG`, which is what the recapture proves — and the equality gate read `0.000e+0` across all ten scenarios throughout.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -5165,12 +5230,12 @@ phases exercised              drift, clear, flyby, settle, orbit, crash
 scenario boundary guard       all 10 stay inside the playfield
 golden baseline               golden/physics-v1.json
 
-tests    render 205 · score 98 · camera 55 · invariants 32 · diagnostics 25
+tests    render 212 · score 98 · camera 55 · invariants 32 · diagnostics 28
          charged 25 · world 23 · carpet 22 · anomaly 20 · cleared 16
-         backtrack 15 · palette 15 · rescue 15 · clearance 14 · flyby-fuel 14
-         attract 13 · kick 13 · tune 13 · input 12 · port-equality 11
-         run-stats 10 · course 9 · grab-target 8 · boost-envelope 6
-         escape 6 · link-fuel 6 · outbound-grab 6 · 708 total
+         backtrack 15 · flyby-fuel 15 · palette 15 · rescue 15 · clearance 14
+         attract 13 · kick 13 · tune 13 · input 12 · link-fuel 11
+         port-equality 11 · run-stats 10 · course 9 · boost-envelope 8
+         grab-target 8 · escape 6 · outbound-grab 6 · 725 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under
