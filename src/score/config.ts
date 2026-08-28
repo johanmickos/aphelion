@@ -343,31 +343,40 @@ export interface ScoreConfig {
    * The ruling: leave it rare, and price it high enough that going for it is a
    * strategy rather than an accident.
    *
-   * 2 IS WHERE THE BET TURNS OVER. A drag risks the whole carry, because a death
+   * THE BET IS WHERE IT TURNS OVER. A drag risks the whole carry, because a death
    * zeroes it — so the swing is `p(survive) x band` against `1` for not going,
-   * and the band has to beat `1 / p(survive)` to be worth flying. Measured over
-   * the 60 drags in the faithful corpus, by the rung each one reached:
+   * and the band has to beat `1 / p(survive)` to be worth flying.
    *
-   *   x1  bank < 85        n=20   survive 75%   break-even x1.33
-   *   x3  85 <= bank < 333  n=35   survive 23%   break-even x4.38
-   *   x5  bank >= 333       n= 5   survive 40%   break-even x2.50
+   * IT SHIPPED AT 2 AND THAT WAS TOO HIGH, FOR THE REASON ITS OWN CAVEAT GAVE.
+   * The first pricing used the 60 drags in the faithful corpus — 23% survival at
+   * the middle rung, 40% at the top, so break-evens of x4.38 and x2.50 — and said
+   * in this paragraph that those drags were ACCIDENTS rather than players farming
+   * the rung, so the rates were floors and the break-evens ceilings. Flown for
+   * deliberately, they are: across 524s on this economy, six heated swings cashed
+   * against six deaths from ALL causes, so drag survival is at least 50% and
+   * plausibly far above it. Break-even at 50% is x2 and at 80% it is x1.25, which
+   * put the x5 top rung two to four times over its own price.
    *
-   * So x1/x3/x5 prices the half-committed drag BELOW its cost and the committed
-   * one at 2x it. That is the shape the call asks for: the graze the player did
-   * not mean to take still pays nothing worth having, and the ride they chose is
-   * lucrative. Survival against depth is a U — 92% at the shallowest bucket, 17%
-   * through the middle, 42% at the deepest — which is what makes the top rung
-   * both the jackpot and the one you have to commit to.
+   * Reported from play before the arithmetic caught up: "the point bonus for
+   * skimming the fire zone is very large at times. 4000+ points in one turn feels
+   * ripe for exploitation." Measured, one session's two banded swings were **60%
+   * of its entire score** — 17,510 of 29,364, the larger of them 12,929 — against
+   * 0-11% in every other session.
    *
-   * TWO THINGS TO RE-MEASURE BEFORE TRUSTING THIS. The 60 drags are ACCIDENTS:
-   * ships in trouble, not players farming the rung, so 23-40% is a floor on the
-   * survival a deliberate skim would see and the break-evens are ceilings. And
-   * n=5 on the top rung is not a distribution. Re-measure once the jackpot has
-   * been flown for.
+   * SO 0.5, WHICH IS x1 / x1.5 / x2. The top rung pays its risk at the survival
+   * that can actually be measured rather than four times it, and an ordinary good
+   * swing on this economy pays 1,500-2,200, so a jackpot lands in family with one
+   * rather than with three of them. The shape the call asked for survives: the
+   * graze nobody meant to take is still not worth having, and the committed ride
+   * is still the best thing on the board.
    *
-   * It costs ordinary play nothing, which is the point of a jackpot: applied to
-   * the one session flown under the constitution it moves 1 swing of 63 and the
-   * session total by 117 points in 100,045.
+   * SIX HEATED SWINGS IS NOT A DISTRIBUTION EITHER, and this has now been priced
+   * twice off samples too small to settle it. The direction of the error is the
+   * thing to carry forward: a rate measured on drags that went wrong understates
+   * how well a deliberate one survives, and every such measurement will.
+   *
+   * It costs ordinary play nothing, which is the point of a jackpot: 5 of 254
+   * recorded swings cash a band above x1 at all.
    */
   bandStep: number;
 
@@ -520,7 +529,7 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   burnRate: 555,
   bandTwoAt: 85,
   bandThreeAt: 333,
-  bandStep: 2,
+  bandStep: 0.5,
 
   streakStep: 0.4,
   streakMax: 5,
