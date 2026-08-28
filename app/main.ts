@@ -27,7 +27,7 @@ import { derive } from '../src/state/derive.ts';
 import { attachCanvas, sizeToDisplay } from '../src/render/canvas.ts';
 import { interpolate } from '../src/render/interpolate.ts';
 import { draw } from '../src/render/index.ts';
-import { bindPress } from './input.ts';
+import { bindPress, suppressBrowserGestures } from './input.ts';
 
 /** Replaced at build time by Vite's `define`; `dev` when the dev server serves it. */
 declare const __BUILD_STAMP__: string;
@@ -40,6 +40,7 @@ if (target) {
   const context = attachCanvas(target);
   const press = createPress();
   bindPress(press, target);
+  suppressBrowserGestures(target);
 
   // The seed is fixed rather than drawn from anything: a run is described by its
   // seed and its input log (ADR-0004), and until M1.5 records one, the seed that

@@ -14,7 +14,7 @@ enforced by machine, and the author as the judge of feel.
 The numbers below are identifiers rather than a sequence, and two steps have moved. Read them
 in this order:
 
-**M1.1 → M1.2 → M1.3 → M1.6 → M1.5 → gate → M1.4.**
+**M1.1 → M1.2 → M1.3 → M1.6 → M1.4 → M1.5 → gate.**
 
 **M1.6 came early** because the milestone ends in the author flying the build and the first
 playable moment was three steps away; everything built on top of an unjudged swing is built on
@@ -28,8 +28,11 @@ costs a whole cycle to reproduce, and may not be reproducible at all. With a rec
 the same sentence is a tick number, and a disagreement about the swing becomes a disagreement
 about a specific dive that both sides can replay.
 
-**M1.4 is after the gate**, and that is a deliberate cost rather than an oversight — see its
-own section.
+**M1.4 moved back in front of the gate** (author, 2026-08-27, after flying M1.6). It was
+briefly scheduled after it, on the argument that none of spec 01's characteristics are about
+dying. Flying the build answered that: *"planets are obstacles — I should crash and die."* A
+field you can pass straight through is not the field spec 01 was measured in, and a swing with
+nothing to lose is not the swing being judged.
 
 ---
 
@@ -260,17 +263,28 @@ and bank (ADR-0007). No lives.
 
 **Acceptance**: a run ends for each distinct reason and reports which. **Verify**: `pnpm test`.
 
-**After the gate, and the cost is stated rather than hidden.** The gate's question is whether a
-*swing* feels right, and none of spec 01's characteristics are about dying. But the build the
-author flies will have no stakes in it: nothing kills, so nothing is risked, and spec
-[01 · §10](../spec/01-swing.md) measures that **83% of real endings are out of bounds** — the
-prototype's recorded sessions, which every number in spec 01 came from, were all flown under
-that pressure. A swing flown with nothing to lose is not the same swing.
+**Before the gate, and the demo is why.** M1.6 flown reported *"planets are obstacles! I should
+crash and die, and the game ends, if I hit one before rescuing myself into an orbit."* That is
+spec [01 · §10](../spec/01-swing.md) exactly, already written and not yet built, and the
+argument for it is stronger than a missing feature: **83% of real endings are out of bounds**,
+and every number in spec 01 came from sessions flown under that pressure. A field you can pass
+straight through is not that field.
 
-So the gate is asked for a judgement about the swing itself and **not** about how a run reads,
-and if the answer turns on stakes rather than on physics, this step comes first and the gate is
-re-flown. Pulling it forward is one instruction; it was left here because the alternative delays
-the diagnostic trail by a step, and the trail is what the author asked for.
+Three things §10 already settles, so this step implements rather than designs:
+
+- **Impact is `R + 5` and is not a bare distance.** It is lethal only when the approach is not a
+  graze — `−(v · n̂) / |v| > 0.18` — because flinging tangentially past a body you have just left
+  is legitimate flying and must not read as a crash. Per body, because it is written on `R`.
+- **The too-late refusal already exists** and is the other half of what the demo described as
+  *"a minimum distance, perhaps combined with velocity, where if I'm heading straight for the
+  planet it's too late to be saved."* [`grab.ts`](../../src/sim/grab.ts) refuses a press when the
+  heading ray strikes the body **and** the craft is inside ≈32.5 units of its surface, measured at
+  0.4% of real presses. Today that refusal costs nothing, because nothing happens next. After this
+  step it is the moment the run was lost.
+- **Contact while a body is held never kills.** It bounces at the floor with zero restitution, and
+  that asymmetry is the rule rather than an oversight: a grab is a promise that you will not be
+  killed by the thing you grabbed. The floor is already `dive.ts`'s; what is new here is contact
+  with a body the craft is **not** holding.
 
 ---
 
@@ -460,6 +474,82 @@ the gate is flying it repeatedly.
 
 ---
 
+## Flown, 2026-08-27 — what the demo said
+
+M1.6 was put in the author's hand before the gate proper. Five things came back. Two are
+routed and one is fixed; two need a ruling and are stated rather than answered.
+
+**1 · The camera bounces through an orbit, and is generally too sensitive vertically.**
+Confirmed — M1.6 predicted this in the same words and said what the recorded answer is. Two
+halves, and they want different fixes:
+
+- *Through a settled orbit*, the craft goes round a still point and a camera holding it pinned
+  slides the world instead. The prototype's answer is to ease the camera's **subject** from the
+  craft onto the body it is orbiting. **It must not do that during the settle**, and this is the
+  one place the prototype's own measurement is emphatic: riding settle progress flattened the
+  oval's 59 → 107 → 59px swing to under 2px, *"of 83px of total swing only 41 survived"*, and
+  the oval is exactly what item 5 below says feels great. Lock the **orbit**; fly the dive and
+  the settle.
+- *Generally*, doing a 180 twice in a row bounces the view. That is not the same fault and the
+  prototype does not have a fix for it to carry — it eased the camera and had **no vertical
+  deadzone**, and recorded that as the reason it *"could only smear"*. A deadzone is new work,
+  not carried behaviour, and wants a number measured against real play rather than chosen.
+
+**Both are blocked on the same thing, and it is bigger than the camera.** An eased camera has
+to remember where it was, and a lock that survives a release has to remember the body after it
+is let go — and `derive` deliberately has no memory between ticks, which is
+`test/state/derive.test.ts`'s boundary criterion. That criterion was written for M1.2 and it is
+stricter than ADR-0006 requires: the promise is that a frame is a pure function of
+`(recipe, tick)`, and a per-tick recurrence replayed from tick zero satisfies it exactly. It
+was always going to have to give: spec [02 · §5](../spec/02-release.md)'s kick homes over 180ms
+with one overshoot, spec [00 · §3](../spec/00-tokens.md)'s E3 decays over 400ms, and spec
+[05 · §3](../spec/05-field.md)'s wake relaxes over ~400ms. **Presentation state carrying what
+decays is an ADR**, and the camera is simply where it bit first.
+
+**2 · A double tap raises Firefox for iOS's callout menu and the selection loupe.** Fixed in
+`app/input.ts`: the callout and the loupe are the *selection's* UI, and `user-select: none`
+only stops selection by drag — refusing `selectstart` is what refuses the menu. `contextmenu`
+and `gesturestart` go with it. `touchstart` is deliberately left alone: cancelling it is the
+one hammer that can take the press with it, since the pointer events the game is bound to are
+synthesised from touches. **Not reproduced here** — there is no Firefox for iOS on this
+machine — so it wants a second look on the phone.
+
+**3 · Planets should be obstacles.** Already specified, not yet built: it is spec 01 §10, and
+[M1.4](#m14--death-and-the-shape-of-a-run) is now back in front of the gate because of it.
+
+**4 · See 1.**
+
+**5 · The craft should look like it is drifting through the oval.** *"When coming at a planet
+fast, the capture has a nice slingshotty oval to it before we settle into an orbit. This feels
+great, but the ship continues to point along the curve's tangent. I'd like to have the tail whip
+out during the oval — and really, any time there's a strain on the ship's velocity or trajectory,
+like when drifting through the fiery edge."*
+
+The quantity underneath is one thing and it wants a name — **strain**, how hard the path is
+being bent right now — and it is deliberately **not** quality. [ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)
+rules there is only one definition of quality and this must not become a second one wearing
+different clothes: quality on a frozen orbit is a *position on the envelope*, which is a clock,
+while the oval's strain is a bend, and through the settle those two say different things about
+the same instant. One reading, one meaning, two quantities.
+
+**And it runs into a rule that is load-bearing.** `CONTEXT.md` fixes that the craft's *"nose
+points along the exit tangent for the whole of an orbit"*, and spec 00 §6 says why in five
+words: **"the nose says where; the hand says when."** The nose is the release-direction readout
+the whole compass grammar is built on. So:
+
+> **Open — how far the drift is allowed to go.** **(a)** *Deformation only*: the silhouette's
+> axis stays on the tangent and the tail stretches and bends laterally with strain. The nose
+> invariant is untouched, the machinery is the one spec 02 already uses to deform the craft
+> 1.5 / 0.7 at release, and the drift reads as a smear rather than as a yaw. **(b)** *A bounded
+> yaw*: the craft rotates off the tangent with strain, like a car with its tail out, and
+> something else has to take over saying where the exit goes — which changes spec 00 §6's
+> grammar and lands on M2's instrument rather than on the craft. (b) is what "drifting" actually
+> looks like; (a) is what does not cost the compass. **This needs the author.**
+
+Either way it is [M2](./m2-the-instrument.md) — craft deformation is already in its
+presentation-state list — with the boundary half of *"any time there's a strain"* following in
+M3, off the same number.
+
 ## Gate
 
 **The author flies this build and the prototype back to back and says yes or no.** Nothing
@@ -478,12 +568,11 @@ The build is M1.6's — `pnpm dev` prints a QR for the LAN address, and the phon
 judgement is made (ADR-0010). What the gate is asked to decide is listed under
 [M1.6](#m16--input-and-a-crude-renderer), and there are four things.
 
-**What the gate is not asked.** M1.4 is deliberately still outstanding, so nothing kills and
-nothing is at stake; the punch is spec [02](../spec/02-release.md)'s and is not in the build,
-so a release pays its lasting 22% and none of its kick; there is no compass, so aim has no
-instrument; and there is no audio. Each of those changes how a swing *reads* without changing
-what it *is*, and the gate is about the second. A verdict that turns on one of them is a
-verdict about a missing step rather than about the physics, and the loop for it is that step
-and not spec 01.
+**What the gate is still not asked.** The punch is spec [02](../spec/02-release.md)'s and is not
+in the build, so a release pays its lasting 22% and none of its kick; there is no compass, so aim
+has no instrument; and there is no audio. Each changes how a swing *reads* without changing what
+it *is*, and the gate is about the second. A verdict that turns on one of them is a verdict about
+a missing step rather than about the physics, and the loop for it is that step and not spec 01.
+Stakes were on this list until the demo took them off it — see M1.4.
 
 Next: [M2](./m2-the-instrument.md).
