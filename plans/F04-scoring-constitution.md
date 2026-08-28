@@ -222,8 +222,9 @@ multiplier             p50 x6.25 · p90 x10.00 · max x11.50
 
 **The band is very nearly inert, and the cause looks structural rather than a
 threshold set too high.** `burnBank` is emptied by every cash, and this session
-cashed a swing every 2.6 seconds — so a threshold denominated in heat-seconds has
-2.6 seconds to fill rather than a capture. Lowering `bandTwoAt` is the obvious move
+cashed a swing every 2.03 seconds — 63 of them, 47 links and 16 flybys — so a
+threshold denominated in heat-seconds has two seconds to fill rather than a
+capture. Lowering `bandTwoAt` is the obvious move
 and probably the wrong one: it would pay a graze at the rate of a drag. The
 question to answer first is whether the band should survive a cash the way the
 chain survives one, and **that is a rule rather than a magnitude**, so it wants

@@ -4954,8 +4954,16 @@ Two of those are stage (c) findings and are recorded against it rather than
 decided here: SHARP is the modal rung at 48% where the board's zone says 30%, and
 PERFECT did not fire once; and the fire band is very nearly inert. The band has a
 structural cause worth writing down at the plan — it is emptied by every cash, and
-this session cashed a swing every 2.6 seconds, so a `bandTwoAt` denominated in
-heat-seconds has 2.6 seconds to fill rather than a capture.
+this session cashed a swing every 2.03 seconds (63 of them, 47 links and 16
+flybys), so a `bandTwoAt` denominated in heat-seconds has two seconds to fill
+rather than a capture.
+
+**And the counts above are from the RECORDED awards, not the replay's findings
+block, which is the discipline this report exists to teach.** That block reported
+35 links and 14 flybys — recomputed, past a divergence at tick 1280, and quoted
+once in this note's first draft before being caught. It also reported six deaths
+where the checkpoints show two respawns, and a best life of 12,924 where the
+recorded awards sum to 77,491 in a single life.
 
 ---
 
