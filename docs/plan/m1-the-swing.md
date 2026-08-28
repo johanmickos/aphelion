@@ -594,8 +594,25 @@ bounds the whole effect by the orbit's own radius.
 | | Result |
 |---|---|
 | Orbit swing reaching the view, once locked | **0.1%** (it was 100%: the view *was* the swing) |
+| Camera movement across the lock's ramp | **0** (it was 49) |
 | Largest camera step against the craft's own | **never larger**, against a jump of a whole orbit radius with no decay |
 | Craft's lowest point below centre | **182** design units, against a thumb-line budget of 422 |
+
+**The ramp took a second pass.** Flown, the first version still moved *"slightly, right at the
+moment the ship seems to settle into orbit"* — 49 design units over the ramp, against zero
+movement in the twenty ticks before it, so the deadzone had already brought the view to a stop
+and the lock was starting it up again. Two faults, one on top of the other:
+
+- **The anchor had somewhere to go.** Locking onto the *body* moves the view by however far the
+  two happen to be apart. What the lock is for is holding the view **still**, and the nearest
+  still point is the one it is already standing on — so that is what it holds, clamped to within
+  a deadzone of the body, because a shallow dive settles into a circle far above the floor and an
+  unclamped anchor would let the craft swing below the thumb line.
+- **The blend pulled from both ends.** With the target mixed toward the subject by the lock while
+  the subject was itself mixed by the lock, both ends of the ramp were right and the middle
+  pulled `(craft − camera) × lock × (1 − lock)` — a quarter of a deadzone at half lock,
+  oscillating with the orbit underneath it. The prototype centres a locked subject deliberately,
+  and it can: its anchor is the body, so it has somewhere to go. Ours does not.
 
 The deadzone's 168 is **derived rather than chosen** — it is the floor radius of the field's
 median body, so a craft going round a typical body at its floor moves the view not at all, and

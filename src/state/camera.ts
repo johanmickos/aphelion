@@ -165,45 +165,77 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   const craftY = sim.craft.y;
   const lock = lockOf(sim);
 
-  // While the lock is on, the displacement is the body's — exactly, and not
-  // eased toward it. An eased displacement would lag a target that goes round
-  // once a second, and a lagging displacement is the orbit's swing coming back
-  // at reduced amplitude, which is the whole fault this exists to remove.
+  // While the lock is on, the displacement is exact and not eased toward:
+  // an eased displacement would lag a target that goes round once a second, and
+  // a lagging displacement is the orbit's swing coming back at reduced
+  // amplitude, which is the whole fault this exists to remove.
   //
-  // While it is off, the displacement decays from wherever it was. That is the
-  // release: there is no body any more, and dropping the displacement outright
-  // would snap the view by an orbit radius on the one tick the swing is paid.
+  // **What it holds still on is where the view already is**, not the body, and
+  // that is the second correction the demo asked for. Locking onto the body
+  // moves the view by whatever the two happen to be apart when the orbit
+  // settles — measured at 49 design units over the ramp, reported as *"a slight
+  // camera up/down movement right at the moment the ship settles into orbit"*.
+  // By then the deadzone has already brought the view to a stop (measured: zero
+  // movement over the twenty ticks before the ramp), so the nearest still point
+  // is the one it is standing on, and arriving there costs nothing.
+  //
+  // Clamped to within a deadzone of the body, because "wherever it happens to
+  // be" is only good enough while it is near: a shallow dive settles into a
+  // circle far above the floor, the view has no reason to be near its centre,
+  // and an unclamped anchor would let the craft swing below the thumb line.
+  //
+  // While the lock is off, the displacement decays from wherever it was. That is
+  // the release: there is no body any more, and dropping the displacement
+  // outright would snap the view by an orbit radius on the one tick the swing is
+  // paid for.
   const offset =
     lock > 0
-      ? (sim.field.bodies[sim.heldBody!]!.y - craftY) * lock
+      ? (stillPoint(previous.y, sim.field.bodies[sim.heldBody!]!.y) - craftY) * lock
       : previous.offset * (1 - easeStep(RELEASE_RATE));
 
   const subjectY = craftY + offset;
   return {
     x: centreline(),
-    y: previous.y + (targetY(previous.y, subjectY, lock) - previous.y) * easeStep(FOLLOW_RATE),
+    y: previous.y + (targetY(previous.y, subjectY) - previous.y) * easeStep(FOLLOW_RATE),
     lock,
     offset,
   };
 }
 
 /**
- * Where the camera would like to be.
- *
- * The deadzone, and then the lock overriding it. Centring a locked subject looks
- * like a contradiction of the deadzone and is not: the deadzone exists because a
- * target that defaults to centred oscillates, and that argument is about a
- * subject that **moves**. A locked anchor does not, so centring on it converges
- * instead of cycling — and without this an orbited body would sit at the band's
- * edge rather than in the middle of the view, which is not what "the view is
- * locked to it" should look like.
+ * The point a locked view holds on: where it already is, unless that is too far
+ * from the body to keep the orbit framed.
  */
-function targetY(cameraY: number, subjectY: number, lock: number): number {
+function stillPoint(cameraY: number, bodyY: number): number {
+  return Math.min(Math.max(cameraY, bodyY - DEADZONE), bodyY + DEADZONE);
+}
+
+/**
+ * Where the camera would like to be: the deadzone, and nothing else.
+ *
+ * The camera stays exactly where it is unless the subject leaves the band, and
+ * then moves only enough to bring it back to the band's edge — never toward the
+ * centre, which is the trap. A target that defaults to centred pans the subject
+ * inside the band, which moves the target back to centre, which pans the other
+ * way; the prototype measured that limit cycle as the view wobbling while flying
+ * straight.
+ *
+ * **The lock does not appear here, and that is the point.** The prototype
+ * centres a locked subject, on the reasoning that a stationary anchor converges
+ * rather than cycling — but its anchor is the *body*, so it has somewhere to go.
+ * Ours is the point the view is already standing on, so there is nowhere to go
+ * and pulling toward it can only produce movement. Blending the two targets by
+ * the lock did exactly that: both ends of the ramp were correct and the middle
+ * pulled `(craft − camera) × lock × (1 − lock)`, which peaks a quarter of a
+ * deadzone away at half lock and oscillates with the orbit underneath it. That
+ * is the 46 design units the ramp still travelled after the anchor was fixed,
+ * and it is what this comment exists to stop being reintroduced.
+ */
+function targetY(cameraY: number, subjectY: number): number {
   const offset = subjectY - cameraY;
-  let parked = cameraY;
-  if (offset > DEADZONE) parked = subjectY - DEADZONE;
-  else if (offset < -DEADZONE) parked = subjectY + DEADZONE;
-  return parked + (subjectY - parked) * lock;
+  if (offset > DEADZONE) return subjectY - DEADZONE;
+  if (offset < -DEADZONE) return subjectY + DEADZONE;
+  return cameraY;
 }
 
 /**

@@ -159,6 +159,35 @@ describe('the camera', () => {
   });
 
   /**
+   * Reported from the phone, after the lock landed: *"there's still a slight
+   * camera up/down movement right at the moment the ship seems to settle into
+   * orbit."* Measured at **49 design units** over the ramp, and it was two
+   * faults on top of each other — an anchor that had somewhere to go, and a
+   * blend that pulled toward it from both ends. Now the ramp is a no-op: by the
+   * time it starts, the deadzone has already brought the view to a stop, and the
+   * point the lock holds on is the one it is standing on.
+   *
+   * Asserted as exactly zero rather than as a tolerance, because anything else
+   * is the thing that was reported.
+   */
+  it.each(SWINGS.slice(0, 2))(
+    'arrives at the lock without moving, in %s',
+    (_n, grabAt, letGoAt) => {
+      const { views } = fly(grabAt, letGoAt);
+      let ramp = 0;
+      let travelled = 0;
+      for (let i = 1; i < views.length; i++) {
+        const lock = views[i - 1]!.camera.lock;
+        if (lock <= 0 || lock >= 1) continue;
+        ramp += 1;
+        travelled += Math.abs(views[i]!.camera.y - views[i - 1]!.camera.y);
+      }
+      expect(ramp).toBeGreaterThan(10);
+      expect(travelled).toBe(0);
+    },
+  );
+
+  /**
    * A release must not lurch. The lock is carried *out* at the same rate it came
    * in, over the body it was held on rather than over the craft — dropping the
    * anchor at the release would snap the view by a whole orbit radius, on the one
