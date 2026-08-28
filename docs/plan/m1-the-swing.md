@@ -544,7 +544,10 @@ the whole compass grammar is built on. So:
 > yaw*: the craft rotates off the tangent with strain, like a car with its tail out, and
 > something else has to take over saying where the exit goes — which changes spec 00 §6's
 > grammar and lands on M2's instrument rather than on the craft. (b) is what "drifting" actually
-> looks like; (a) is what does not cost the compass. **This needs the author.**
+> looks like; (a) is what does not cost the compass. **Deferred by the author, 2026-08-27** —
+> raised, not urgent, and nothing before M2 depends on the answer. The reason it is written down
+> in this much detail is that the constraint is the part that gets forgotten: whoever builds it
+> will meet the nose invariant as a surprise otherwise.
 
 Either way it is [M2](./m2-the-instrument.md) — craft deformation is already in its
 presentation-state list — with the boundary half of *"any time there's a strain"* following in
