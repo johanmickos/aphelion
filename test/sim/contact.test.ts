@@ -22,6 +22,7 @@ import { createBody, floorRadius } from '../../src/sim/body.ts';
 import { createCraft } from '../../src/sim/craft.ts';
 import { distance } from '../../src/sim/math.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
+import { angleOf } from '../../src/sim/trig.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { BOUNCE_GAP, GRAZE_RATIO, IMPACT_GAP, MEDIAN_RADIUS, SCALE } from '../../src/sim/units.ts';
@@ -143,6 +144,33 @@ describe('contact while coasting', () => {
     expect(closingAt(SURFACE * lethalUpTo)).toBeLessThan(GRAZE_RATIO + 0.02);
     expect(closingAt(SURFACE * survivesFrom)).toBeLessThan(GRAZE_RATIO + 0.02);
     expect(survivesFrom).toBeLessThan(lethalUpTo + 0.01);
+  });
+  /**
+   * And what the skip costs, which spec 01 §10 does not state either.
+   *
+   * The deflection is the only visible consequence of a decision the spec left
+   * open, so it is held rather than left to be rediscovered: **up to 17° at the
+   * lethal threshold, falling to nothing as the pass becomes exactly
+   * tangential.** Whether that reads as a skip or as a snag is the gate's, and a
+   * number it can move is better than a surprise it cannot see.
+   */
+  it('costs a graze up to 17 degrees, and an exactly tangential pass nothing', () => {
+    const turnedBy = (across: number): number => {
+      const state = approach(900 * SCALE, across);
+      let before = 0;
+      for (let i = 0; i < 2000 && state.ending === null; i++) {
+        if (state.craft.x < -300) before = angleOf(state.craft.vx, state.craft.vy);
+        stepSim(state, NO_INPUT);
+        if (state.craft.x > 400) break;
+      }
+      expect(state.ending).toBe(null);
+      return (Math.abs(angleOf(state.craft.vx, state.craft.vy) - before) * 180) / Math.PI;
+    };
+
+    // Just inside the exemption, and exactly tangential.
+    expect(turnedBy(SURFACE * 0.985)).toBeGreaterThan(10);
+    expect(turnedBy(SURFACE * 0.985)).toBeLessThan(20);
+    expect(turnedBy(SURFACE)).toBeCloseTo(0, 6);
   });
 });
 

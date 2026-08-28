@@ -299,9 +299,10 @@ export const GRAZE_RATIO = 0.18;
  * it goes.
  *
  * The prototype skips it off at the same `R + 5`, and this is that behaviour
- * carried rather than a ruling invented (ADR-0013). Measured here, it costs a
- * near-parallel graze **4 – 13°** of heading. The hole spec 01 leaves is recorded
- * in the plan rather than papered over.
+ * carried rather than a ruling invented (ADR-0013). Measured across the whole
+ * graze band, it costs the craft **up to 17°** of heading at the lethal
+ * threshold, falling to nothing as the pass becomes exactly tangential. The hole
+ * spec 01 leaves is recorded in the plan rather than papered over.
  */
 export const GRAZE_RESTITUTION = 0.8;
 

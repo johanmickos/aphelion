@@ -46,8 +46,9 @@
  * speed pointed at a body only ever *falls* past the entry point, so a contact
  * that arrived as a graze stays one however deep it goes. The prototype skips it
  * off at the same surface and that is what is carried (ADR-0013), at a measured
- * cost of 4 – 13° of heading. The hole spec 01 leaves is recorded in the plan
- * rather than papered over.
+ * cost of up to 17° of heading at the lethal threshold, falling to nothing as the
+ * pass becomes exactly tangential. The hole spec 01 leaves is recorded in the
+ * plan rather than papered over.
  */
 import type { Body } from './body.ts';
 import type { Craft } from './craft.ts';

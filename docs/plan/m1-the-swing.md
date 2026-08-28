@@ -464,9 +464,10 @@ hatch. `contact.test.ts` holds it, at the body's own surface and just inside it.
 that a craft flies through a planet — the first draft of this section said the second, and it is
 not true at this scale. The lethality test will not clean it up on a later tick either: along a
 straight line the fraction of speed pointed at a body only ever *falls* past the entry point, so a
-contact that arrived as a graze stays a graze however deep it goes. Measured, the skip costs a
-near-parallel graze **4 – 13°** of heading — enough to be a real deflection rather than a nudge,
-which is worth the author's eye at the gate.
+contact that arrived as a graze stays a graze however deep it goes. Measured across the whole
+graze band, the skip costs **up to 17°** of heading at the lethal threshold, falling to nothing as
+the pass becomes exactly tangential — a real deflection on a manoeuvre the player meant to fly,
+rather than a nudge, and worth the author's eye at the gate.
 
 ### Where the endings land, and what the corpus is worth
 
