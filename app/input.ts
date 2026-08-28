@@ -72,6 +72,19 @@ export function suppressBrowserGestures(surface: HTMLElement): void {
  */
 const KEY = 'Space';
 
+/**
+ * Whether a key event belongs to something the author is typing in.
+ *
+ * The developer chrome has a text field in it — the note a **dispatch** carries
+ * — and the game's one verb is the space bar. Without this, typing a note both
+ * swallows the spaces and flies the craft, which is a bad way to lose the run
+ * you were trying to describe. Exported so the same guard covers the shell's own
+ * shortcuts, which are keys too.
+ */
+export function typing(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+}
+
 export function bindPress(press: Press, surface: HTMLElement): void {
   surface.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
@@ -86,7 +99,7 @@ export function bindPress(press: Press, surface: HTMLElement): void {
   window.addEventListener('pointercancel', lift);
 
   window.addEventListener('keydown', (event) => {
-    if (event.code !== KEY) return;
+    if (event.code !== KEY || typing(event.target)) return;
     // Space scrolls the page, and a game that scrolls out from under itself on
     // its own verb is not playable.
     event.preventDefault();

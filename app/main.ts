@@ -43,7 +43,7 @@ import { attachCanvas, sizeToDisplay } from '../src/render/canvas.ts';
 import { interpolate } from '../src/render/interpolate.ts';
 import { draw } from '../src/render/index.ts';
 import { DIAG_ENDPOINT, buildDispatch } from '../tools/dispatch.ts';
-import { bindPress, suppressBrowserGestures } from './input.ts';
+import { bindPress, suppressBrowserGestures, typing } from './input.ts';
 
 /** Replaced at build time by Vite's `define`; `dev` when the dev server serves it. */
 declare const __BUILD_STAMP__: string;
@@ -105,7 +105,9 @@ if (target) {
   };
   reset?.addEventListener('click', restart);
   window.addEventListener('keydown', (event) => {
-    if (event.code === 'KeyR') restart();
+    // Not while the author is typing a note: `R` is in most sentences, and
+    // restarting throws the run and its recipe away.
+    if (event.code === 'KeyR' && !typing(event.target)) restart();
   });
 
   const frame = (now: number): void => {
