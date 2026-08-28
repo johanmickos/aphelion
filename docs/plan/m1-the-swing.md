@@ -99,6 +99,134 @@ strikes the body.
 **Acceptance**: every characteristic from M1.1 is inside its tolerance, as an automated test.
 **Verify**: `pnpm test`.
 
+**Done.** The one verb works end to end: press to be caught, hold to dive and freeze and
+settle, let go along the tangent, coast in a straight line. `src/sim/` gained
+`grab.ts`, `clearance.ts`, `dive.ts`, `orbit.ts`, `boost.ts`, `release.ts`, `quality.ts` and
+`kepler.ts`; `stepSim` reads one button and nothing else. `pnpm check` is green at **183
+tests**, and the headless sweep harness [spec 01 · §11](../spec/01-swing.md) asks for is
+`test/sim/swing.ts` — it flies a geometry through the real verb and reports only what can be
+seen from outside, which is what every assertion in the suite is written on.
+
+### The gate holds
+
+**[Spec 01 · §11](../spec/01-swing.md)'s first criterion passes.** Over 88 geometries spanning
+its stated envelope, the arc of release headings reachable at peak boost is **at worst 61% of a
+revolution**, and it stays under a full revolution across a much wider net of 362 geometries
+too. It cannot reach one by construction either: the plateau is 0.75s, no dive can freeze inside
+the floor, and the fastest circle the floor allows takes 1.12s to go round. **Criterion 2** lands
+at **p50 46.5%** against the band of 35 – 55% (the prototype measured 43%).
+
+### What the swing measures, against what spec 01 measured
+
+| Characteristic | Spec 01 | Here |
+|---|---|---|
+| §3 · grab range, median body | 560 ±10% | 560 |
+| §4 · clearance fires | 50 – 60% of real grabs | 57% of the stand-in corpus |
+| §5a · frozen radius ÷ floor, p50 | pinned at the floor | 1.000 |
+| §5a · `v_peri / v_escape(r_peri)` | 0.72 – 1.00 | 0.737 – 0.980 |
+| §5b · dive seconds, p50 / p95 | 0.30 – 0.55 / < 2.6 | 0.47 / 1.08 |
+| §6 · settled revolution, median body | 1.12s | 1.12s |
+| §6a · four dives, one ellipse | same axis, same `e`, ridden at 400/415/435 | same floor to 0.5%, ridden at 397/410/427/433 |
+| §6a · speed at the end of the settle | circular, within 1% | exact, every geometry |
+| §6a-3 · `v_freeze / v_circ` | 1.24 – 1.40 | 1.04 – 1.39 |
+| §7 · envelope, from exit speeds alone | 0 → 0.45s → 1.2s → 2.6s | exact at all four |
+| §7 · paying threshold | `(grab + floor)/2` ±3% | 0.6% |
+| §7 · median full boost ÷ largest | ≥ 0.90 | 0.99 |
+| §8 · exit direction | within 1° of the tangent | 3 × 10⁻¹⁴ ° |
+| §8 · exit speed, corpus p50 | 280 – 350 | 293 |
+| §9 · coasting after a release | constant to 1 part in 10⁹ | bit-identical |
+| §11-1 · peak arc, worst | **strictly under a revolution** | **61%** |
+| §11-2 · peak arc, p50 | 35 – 55% | 46.5% |
+
+### Five things worth carrying forward
+
+- **The clearance predicts in the softened law and the freeze authors in Kepler**, and getting
+  that backwards is a real failure with a measured size. Aiming the clearance with the
+  unsoftened relations left the periapsis at 61.9 against a floor of 56 — the 9.4% departure
+  spec 01 §2 measures, arriving as a 10% miss. `kepler.ts` and `gravity.ts` split along exactly
+  that line and each says so.
+- **The clearance asks again every tick rather than paying out a plan.** Deciding the whole
+  impulse at the press and applying a fifth of it five times lands 13% wide on a close fast
+  approach, because the craft falls a long way in 83ms and a fixed rotation is worth a different
+  amount of angular momentum at every radius. Paying a fifth, a quarter, a third, a half, the
+  rest is the *same* even ease whenever nothing disturbs it — gravity is central, so it changes
+  neither the momentum the craft has nor the momentum the floor asks for — and it lands on the
+  floor when something has.
+- **The freeze holds the craft below escape speed at its own periapsis, and this was inferred
+  rather than read.** Spec 01 §6a's table shows approaches of 200 and 260 freezing at *the same*
+  435 units/s, which two different dives only do if something clamped them; §5a's measured
+  `v_peri / v_escape` never exceeds 0.99; and `0.98 × √2` is **1.386**, which is §6a's measured
+  ceiling of 1.40 to three figures. Three observations, one mechanism. It is **not** the
+  eccentricity cap and does not do its job — §6a's *"the dive sets the speed, and the cap does
+  not apply to it"* is about the shape clamp leaking into the rate, which it still must not.
+- **The eccentricity cap binds because most grabs are unbound.** A craft arriving with more
+  than escape energy has no ellipse to be handed; the freeze captures it and clamps a path that
+  was open. That is why spec 01 §6 measures the cap binding at p25 0.58, p50 0.60, p75 0.60.
+- **Quality is one function.** `quality.ts` is the whole of ADR-0012's definition — the envelope
+  for a swing that froze, the bend for one that did not — so there is nowhere a second could be
+  added without deleting a test. A tap pays nothing because a straight line at a body has no
+  angular momentum, and the numerator is zero; nothing checks anything.
+
+### Where the line was drawn
+
+- **The floor is M1.3's; the deaths are M1.4's.** Spec 01 §10's *"contact while a body is held
+  never kills — it bounces off the held body at the floor with zero restitution"* lives in
+  `dive.ts`, because it is the promise the press made and §4 leans on it (*"the floor catches the
+  remainder"*). Contact with a body the craft is **not** holding is M1.4's: it is one predicate
+  with two outcomes and the other outcome is a death.
+- **Quality is M1.3's; the punch is M2's.** ADR-0012 splits it exactly there. What the punch
+  does with quality — its size, its decay, the ×1.5 at full quality — is spec 02's timeline and
+  is rebased in M2.4.
+- **A release during the dive changes nothing about the craft.** It has no frozen orbit to be
+  paid on, and turning it onto a tangent would hand the player a way to steer, which
+  `VISION.md`'s first pillar calls a repeal rather than a feature. Spec 01 §8's *"exactly along
+  the tangent on 100% of releases"* is held for releases from the orbit, where it is exact by
+  construction.
+- **A grab is answered on the press, not on every tick the button is held.** Spec 01 §3 counts
+  278 presses against 270 grabs and 8 refusals, which is only a meaningful count if a refused
+  press stays refused. The release is the other way round — a level, not an edge — so the button
+  coming up always lets go.
+
+### Three things for the author, with evidence
+
+1. **[Spec 01 · §11](../spec/01-swing.md)'s third criterion does not hold everywhere, and cannot.**
+   *"The 0.50-of-peak arc exceeds 360° at every sampled geometry."* It holds at **every one of the
+   78 geometries that froze on the floor** (worst 394°) and fails at the 11 that froze well
+   outside it (worst 236°). The reason is arithmetic rather than a choice: the half-quality
+   stretch is a fixed 1.675s, an orbit's period grows as the periapsis to the power of one and a
+   half, and a swing frozen a third above the floor barely gets round once. §13.2 already records
+   the same mechanism running the peak arc from 56% to 35% purely because a bigger body's floor
+   is further out. **Either the criterion wants "every swing that reached the floor", or the
+   shallow swings want something else.** The test asserts what holds and names what does not.
+2. **The stand-in corpus is not a corpus of real play, and one number shows it.** `corpus()` in
+   `test/sim/swing.ts` draws grab distances and approach speeds from the two distributions spec
+   01 measured, and aims uniformly because spec 01 measures no aim distribution. It reproduces
+   the clearance rate (57% against 54%), the boost shape (0.99 against ≥0.90) and the exit speed
+   (293 against 314) — but **72% of its presses are unbound flybys against §13.2's measured
+   52%**, because it draws distance and speed independently and a real player's are correlated.
+   The visible cost is §5a's speed-normalisation ratio, p50 **1.27** here against a measured
+   1.51: a gain of 4.18 needs an approach around 100 units/s, and the corpus's speeds come from
+   §8's *exit* distribution whose p05 is 195, so it contains none. What the mechanism itself does
+   with a seven-fold spread of approaches is asserted in `freeze.test.ts`, where it depends on no
+   distribution at all. **Spec 01 §13.7's instruction applies: replace these with percentiles of
+   this game's own play as soon as M1.5 and M1.6 make one.**
+3. **Grab range scaling with mass is ruled; its shape is not, and the shape here is a
+   derivation.** §13.2 rules that *"grab range scales with mass ... it is what keeps a small body
+   grabbable at a distance where the grab is still a bound grab rather than a braked one."*
+   `grab.ts` makes it **linear in mass**, because a grab is bound when `v²/2 < μ/r`, so the
+   distance inside which a given approach speed is still bound is itself linear in μ — and
+   scaling the reach the same way makes *the fraction of a body's range within which a grab is
+   bound* identical for every body in the field, which is exactly what the ruling asks the
+   scaling to pay for. At `MASS_EXPONENT = 0` it is flat 560 for every body, the prototype
+   exactly. If the gate wants a different law, it is one line.
+
+`CONTEXT.md` gained **lead**, **orbit**, **boost** and **quality** — four words the code needed
+type and function names for. §6a's first test is restated: it words the claim as *"semi-major
+axis and eccentricity within 1%"*, and neither is observable from outside because the settle
+begins deforming the shape in the same tick the freeze hands it out. What is asserted instead is
+§6a's own prose — *"the same orbit, flown faster"* — as two craft tracing the same path on
+different clocks (ADR-0013).
+
 ---
 
 ## M1.4 · Death, and the shape of a run

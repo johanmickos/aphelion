@@ -90,10 +90,23 @@ _Avoid_: capture, catch, hook
 Letting go, along the exit tangent. Payday: the moment a swing is graded and priced.
 _Avoid_: launch, slingshot, fling
 
+**Lead**:
+Where the grab looks instead of where the craft is — the craft's position displaced by two
+tenths of a second of its own velocity. The body taken is the one nearest to it, so the
+question a press asks is *which body am I arriving at* rather than *which body am I beside*.
+Not a cone and not a threshold.
+_Avoid_: aim cone, capture cone, lookahead
+
 **Dive**:
 The part of a swing between the grab and the craft's closest approach. Real gravity and
 nothing else: the dive is simulated, and no part of it is authored.
 _Avoid_: approach (that is the whole run-up, before the grab), capture arc
+
+**Orbit**:
+The path the craft rides between the freeze and the release. Authored rather than
+simulated — a shape and a phase clock, not an integration — which is what lets a swing be
+held indefinitely without drifting. One per swing, around one body.
+_Avoid_: trajectory (that is any path, including a coast), path, ellipse
 
 **Floor**:
 The closest a craft may orbit — a fixed clearance above a body's surface. A hard limit
@@ -120,11 +133,28 @@ How far a dive committed, as a fraction of the distance from the grab to the flo
 the boost is paid on. Depth is not aim: it says how hard you dived, never where you pointed.
 _Avoid_: tightness, closeness, commitment
 
+**Boost**:
+The lasting speed a release is paid, on top of the orbit it left. Paid on **depth**, and
+only for a stretch that begins a fixed time after the freeze and runs out again — the
+**envelope** is the shape of what it pays across that stretch, and it is a shape in time,
+not one of the compass's **windows**. The boost is what a swing is worth; the **punch** is
+how it feels.
+_Avoid_: bonus, reward, punch (the punch is the transient, and they are different things)
+
 **Punch**:
 The kick a release lands, scaled by the quality of the swing and gone within a second or so.
 Bought with speed rather than with stopped time (ADR-0012), and carried entirely by the
 transient, so it never changes what a run is worth.
 _Avoid_: kick, impulse, boost (the boost is the lasting part, and they are different things)
+
+**Quality**:
+How good a release is, as one number. **There is deliberately only one definition of it**
+(ADR-0012): a swing that froze an orbit is graded on where on the envelope it let go, and
+one that never froze is graded on how hard the body is bending its heading at the instant
+the button comes up. The same skill wearing different clothes, and a second definition is a
+pair that agrees until it quietly does not.
+_Avoid_: grade (that is the **tier**, which prices a release rather than describing it),
+accuracy, rating
 
 **Compass**:
 The signature instrument — the coloured windows drawn on the orbit path around a body,

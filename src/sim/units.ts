@@ -105,3 +105,156 @@ export const FLOOR_GAP = 12 * SCALE;
  * When the gate closes, this becomes a number and the parameter goes away.
  */
 export const MASS_EXPONENT = 2;
+
+/**
+ * How far a body of median mass is on offer from — spec 01 §3's 560, converted.
+ *
+ * Spec [01 · §13.2](../../docs/spec/01-swing.md) rules that **grab range scales
+ * with mass**, so this is the median body's reach and [`grab.ts`](./grab.ts)
+ * derives the rest; at `MASS_EXPONENT = 0` every body is the median one and the
+ * range is flat 560, which is the prototype exactly.
+ *
+ * Measured, and generous relative to what is used: over 270 real grabs the
+ * distance to the grabbed body was p95 351, so the reach is about 1.6× the p95
+ * actually taken. A rewrite whose refusal rate is materially higher has made the
+ * grab a skill it is not.
+ */
+export const MEDIAN_GRAB_RANGE = 560 * SCALE;
+
+/**
+ * How far ahead of itself the grab looks, in seconds — spec 01 §3.
+ *
+ * The question asked is *"which body am I arriving at"* rather than *"which body
+ * am I beside"*. A time and not a length, so it is unchanged by the conversion,
+ * and continuous in both position and velocity — a heading test, a closing-speed
+ * rule or a cone would each need a threshold, and a threshold is a cliff the
+ * player falls off as a body drifts across an arbitrary line.
+ */
+export const LEAD_SECONDS = 0.2;
+
+/**
+ * How close to a body's surface is too close to be caught by it — spec 01 §3's
+ * ≈ 32.5, converted.
+ *
+ * The other half of the too-late refusal is that the heading ray strikes the
+ * body: inside this gap there is no longer room for the clearance in §4 to lift
+ * the path, so the grab declines rather than promising a floor it cannot hold.
+ * Measured at 0.4% of 278 real presses.
+ */
+export const TOO_LATE_GAP = 32.5 * SCALE;
+
+/**
+ * How many ticks the clearance impulse is spread over — spec 01 §4's 5 frames.
+ *
+ * A tick count, so it is unchanged by the conversion. 83ms at 60Hz, inside the
+ * spec's 80 – 90ms band. *"A single-tick application is a failure however
+ * correct the endpoint"*: what the player feels is a grab that gathers the craft
+ * up, and a snap reads as the world moving rather than the craft turning.
+ */
+export const CLEARANCE_TICKS = 5;
+
+/**
+ * The most of local escape speed a clearance may leave the craft at — spec 01 §4.
+ *
+ * Below one by construction, so a grab **cannot eject the craft it caught**. The
+ * prototype measured the alternative: adding tangential speed to raise a
+ * periapsis handed a craft at half escape speed up to 277 units/s and put it
+ * above escape, and its author reported *"I kind of shot off the planet at super
+ * speed"*.
+ */
+export const CLEARANCE_ESCAPE_FRACTION = 0.98;
+
+/**
+ * The most of escape speed a freeze will hand a craft at its periapsis — spec
+ * 01 §5a's measured `v_peri / v_escape(r_peri)` of **0.77 – 0.99**.
+ *
+ * A separate decision from [`CLEARANCE_ESCAPE_FRACTION`](#) that happens to
+ * share its value, and it exists for a different reason: the clearance's cap
+ * keeps a *grab* from ejecting the craft, and this one keeps the **freeze from
+ * handing out an orbit that is not one.** A craft that arrives unbound is above
+ * escape at its own closest approach by definition, and the freeze captures it
+ * anyway (spec 01 §4 — *"a grab converts a lethal line into an orbit"*); without
+ * this it would then ride a bound ellipse at a speed that ellipse cannot hold.
+ *
+ * It is not the eccentricity cap and it does not do the eccentricity cap's job.
+ * §6a's *"the dive sets the speed, and the cap does not apply to it"* is about
+ * the **shape** clamp leaking into the rate, which it still must not.
+ *
+ * The prototype's own table is the evidence it is here: approach speeds of 200
+ * and 260 from the same distance freeze at **the same 435 units/s**, which two
+ * different dives only do if something clamped them, and `0.98 × √2` — this
+ * against the circular speed — is **1.386**, which is §6a's measured ceiling of
+ * 1.40 to three figures.
+ */
+export const FREEZE_ESCAPE_FRACTION = 0.98;
+
+/**
+ * The most eccentric shape a freeze will hand out — spec 01 §6.
+ *
+ * **A feel call and the author's** (spec 01 §13.5): measured, it binds on all but
+ * the slowest dives — real play is p25 0.58, p50 0.60, p75 0.60 — which is more
+ * work than a safety limit should be doing, and whether the rewrite keeps it,
+ * moves it, or shapes the approach so it stops binding is decided at the M1 gate.
+ * It is what makes four dives differing only in approach speed ride the *same*
+ * ellipse; the speed they ride it at is deliberately not capped with it.
+ */
+export const ECCENTRICITY_CAP = 0.6;
+
+/** Ticks in a duration spec 01 states in seconds. Times transfer unscaled (§0). */
+function ticksFor(seconds: number): number {
+  return Math.round(seconds / SECONDS_PER_TICK);
+}
+
+/**
+ * How long the settle lasts — spec 01 §6's 1.2s.
+ *
+ * The stretch in which the orbit rounds toward a circle and the speed the dive
+ * earned is spent. *"The reward for a good dive is a speed advantage with a
+ * 1.2-second shelf life, and cashing it before it expires is the whole of §11's
+ * timing problem."*
+ */
+export const SETTLE_TICKS = ticksFor(1.2);
+
+/** Where the boost envelope reaches full — spec 01 §7's 0.45s after the freeze. */
+export const BOOST_ARM_TICKS = ticksFor(0.45);
+
+/**
+ * Where the boost envelope leaves its plateau — spec 01 §7's 1.2s.
+ *
+ * The same instant the settle ends, and that is not a coincidence: the plateau
+ * exists because completing a circularisation used to guarantee missing the
+ * window it was meant to reward.
+ */
+export const BOOST_PLATEAU_TICKS = SETTLE_TICKS;
+
+/** Where the boost envelope reaches nothing again — spec 01 §7's 2.6s. */
+export const BOOST_ZERO_TICKS = ticksFor(2.6);
+
+/**
+ * The boost a dive of full depth is worth, in design units per second — spec
+ * 01 §7's 60, converted.
+ *
+ * **Tuning, and M4's** (spec 01 §13.4): the envelope's shape and timing are M1's
+ * and are fixed, its magnitude is an economy number spec 08 will move, and every
+ * tolerance in §7 is written on the shape so that moving it does not invalidate
+ * them. It is not a physics constant.
+ */
+export const PEAK_BOOST = 60 * SCALE;
+
+/**
+ * The depth a dive must reach before it is paid anything — spec 01 §7.
+ *
+ * Exactly: `periapsis < (grab radius + floor) / 2`. Committing halfway to the
+ * floor is the price of admission.
+ */
+export const PAYING_DEPTH = 0.5;
+
+/**
+ * How much of the boost a release keeps — spec 01 §8's 22%.
+ *
+ * The rest is the punch, and it is spent rather than kept (ADR-0012). *"A
+ * release that put all of its boost into permanent velocity would compound up
+ * the field forever; 22% keeps the escalation bounded"*, and spec 01 §5a's flat
+ * median speed across eight altitude bands is the evidence it works.
+ */
+export const PERMANENT_SHARE = 0.22;

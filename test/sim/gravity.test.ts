@@ -8,10 +8,11 @@
 import { describe, expect, it } from 'vitest';
 import { createBody, floorRadius, massForRadius } from '../../src/sim/body.ts';
 import { createCraft, speedOf } from '../../src/sim/craft.ts';
+import { distance } from '../../src/sim/math.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS, SECONDS_PER_TICK, SOFTENING } from '../../src/sim/units.ts';
-import { MEDIAN_BODY } from './fixtures.ts';
+import { HELD, MEDIAN_BODY, holdWithoutGrabbing } from './fixtures.ts';
 
 /** Spec 01 §3's grab range of 560 prototype units, in design units. */
 const GRAB_RANGE = 560 * 3;
@@ -19,8 +20,8 @@ const GRAB_RANGE = 560 * 3;
 /** The acceleration a craft at rest at distance `r` actually receives, per second². */
 function measuredAccelerationAt(r: number): number {
   const state = createInitialState({ bodies: [MEDIAN_BODY] }, createCraft(-r, 0, 0, 0), 1);
-  state.heldBody = 0;
-  stepSim(state, NO_INPUT);
+  holdWithoutGrabbing(state);
+  stepSim(state, HELD);
   return speedOf(state.craft) / SECONDS_PER_TICK;
 }
 
@@ -28,12 +29,29 @@ describe('the force law', () => {
   const expected = (r: number): number => MEDIAN_BODY.mass / (r * r + SOFTENING * SOFTENING);
 
   it('is μ / (r² + ε²) within 2%, from the floor to the grab range', () => {
-    const floor = floorRadius(MEDIAN_BODY);
+    // From just above the floor, because *at* the floor a craft released from
+    // rest cannot fall: the floor holds it, which is the next test. One design
+    // unit is well clear of the 0.7 a tick of falling covers at this depth.
+    const floor = floorRadius(MEDIAN_BODY) + 1;
     for (let r = floor; r <= GRAB_RANGE; r += 20) {
       const ratio = measuredAccelerationAt(r) / expected(r);
       expect(ratio, `at r = ${r}`).toBeGreaterThan(0.98);
       expect(ratio, `at r = ${r}`).toBeLessThan(1.02);
     }
+  });
+
+  /**
+   * And at the floor itself the craft does not fall at all. Spec
+   * [01 · §6a](../../docs/spec/01-swing.md): *"the floor is a floor, not a
+   * suggestion"*, and `CONTEXT.md` calls it *"a hard limit that is never
+   * crossed, and the one guarantee a grab makes."*
+   */
+  it('cannot pull a held craft through the floor', () => {
+    const floor = floorRadius(MEDIAN_BODY);
+    const state = createInitialState({ bodies: [MEDIAN_BODY] }, createCraft(-floor, 0, 0, 0), 1);
+    holdWithoutGrabbing(state);
+    for (let tick = 0; tick < 120; tick++) stepSim(state, HELD);
+    expect(distance(0, 0, state.craft.x, state.craft.y)).toBeGreaterThanOrEqual(floor - 1e-9);
   });
 
   /**
@@ -79,12 +97,12 @@ describe('gravity is not ambient', () => {
 
     const alone = createInitialState({ bodies: [MEDIAN_BODY] }, createCraft(-900, 600, 360, 0), 1);
     const crowded = createInitialState(crowd, createCraft(-900, 600, 360, 0), 1);
-    alone.heldBody = 0;
-    crowded.heldBody = 0;
+    holdWithoutGrabbing(alone);
+    holdWithoutGrabbing(crowded);
 
     for (let i = 0; i < 240; i++) {
-      stepSim(alone, NO_INPUT);
-      stepSim(crowded, NO_INPUT);
+      stepSim(alone, HELD);
+      stepSim(crowded, HELD);
     }
 
     // Bit-identical, not close: the other three bodies contribute exactly

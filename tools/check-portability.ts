@@ -364,11 +364,12 @@ if (!isRealSrc) {
 // clean: a static rule can only catch what it was told to look for, and actually
 // executing the simulation with no bundler and no DOM is what catches the rest.
 //
-// It flies something rather than counting ticks. The two behaviours below are
-// the ones spec 01 says a rewrite gets wrong by default — a held craft is pulled
-// by exactly one body, and a coasting craft is pulled by nothing at all — and
-// the second is asserted as bit-identity, because §9 measures it as bit-identity
-// rather than as "nearly constant".
+// It flies a whole swing rather than counting ticks, through the one verb: press
+// to be caught, hold, let go. The behaviours below are the ones spec 01 says a
+// rewrite gets wrong by default — a press takes exactly one body, a held craft is
+// pulled by that body and no other, and a coasting craft is pulled by nothing at
+// all — and the last is asserted as bit-identity, because §9 measures it as
+// bit-identity rather than as "nearly constant".
 const { createInitialState, stepSim } = await import('../src/sim/step.ts');
 const { NO_INPUT } = await import('../src/sim/types.ts');
 const { createBody } = await import('../src/sim/body.ts');
@@ -378,7 +379,7 @@ const { derive } = await import('../src/state/derive.ts');
 const field = { bodies: [createBody(0, 0, 132)] };
 const sim = createInitialState(field, createCraft(-900, -420, 260, 0), 1);
 
-const HELD_TICKS = 120;
+const HELD_TICKS = 240;
 const COAST_TICKS = 300;
 
 let failed = false;
@@ -387,14 +388,21 @@ const fail = (message: string): void => {
   failed = true;
 };
 
-sim.heldBody = 0;
+const PRESSED = { pressed: true };
 const speedAtGrab = speedOf(sim.craft);
-for (let i = 0; i < HELD_TICKS; i++) stepSim(sim, NO_INPUT);
+let froze = false;
+for (let i = 0; i < HELD_TICKS; i++) {
+  stepSim(sim, PRESSED);
+  if (sim.orbit) froze = true;
+}
 if (sim.tick !== HELD_TICKS) fail(`expected tick ${HELD_TICKS}, got ${sim.tick}`);
+if (sim.heldBody === null) fail('a press beside a body did not take it');
 if (speedOf(sim.craft) === speedAtGrab) fail('a held craft was not accelerated by its body');
+if (!froze) fail('a dive never reached its closest approach');
 
-sim.heldBody = null;
+stepSim(sim, NO_INPUT);
 const speedAtRelease = speedOf(sim.craft);
+if (sim.heldBody !== null) fail('a craft did not let go when the button came up');
 const headingAtRelease = derive(sim).craft.heading;
 for (let i = 0; i < COAST_TICKS; i++) stepSim(sim, NO_INPUT);
 if (speedOf(sim.craft) !== speedAtRelease)
@@ -407,6 +415,6 @@ if (derive(sim).tick !== sim.tick) {
 if (failed) process.exit(1);
 
 console.log(
-  `src/sim and src/state are portable — ${HELD_TICKS} ticks held and ${COAST_TICKS} coasting ` +
-    'under plain node, no bundler, no DOM',
+  `src/sim and src/state are portable — a whole swing, ${HELD_TICKS} ticks held and ` +
+    `${COAST_TICKS} coasting, under plain node, no bundler, no DOM`,
 );

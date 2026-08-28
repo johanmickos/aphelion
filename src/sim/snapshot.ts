@@ -28,9 +28,13 @@ import type { SimState } from './types.ts';
  * generator for the same reason — so a stored one has to be able to say it was
  * written by a different game.
  */
-export const SNAPSHOT_VERSION = 1;
+export const SNAPSHOT_VERSION = 2;
 
-const HEADER_BYTES = 4 + 4 + 4 + 4 + 4 * 8 + 4 * 4;
+const HEADER_BYTES = 4 + 4 + 4 + 4 + 4 * 8 + 4 * 4 + 1;
+/** A presence byte, then a dive's four numbers. */
+const DIVE_BYTES = 1 + 4 * 8;
+/** A presence byte, then the seven numbers of an orbit and its tick count. */
+const ORBIT_BYTES = 1 + 7 * 8 + 4;
 const BODY_BYTES = 4 * 8 + 1;
 
 /** The type ordinals, fixed by position. Appending is safe; reordering is not. */
@@ -38,7 +42,9 @@ const BODY_TYPES = ['STANDARD'] as const;
 
 export function snapshot(state: SimState): Uint8Array {
   const bodies = state.field.bodies;
-  const bytes = new Uint8Array(HEADER_BYTES + bodies.length * BODY_BYTES);
+  const bytes = new Uint8Array(
+    HEADER_BYTES + DIVE_BYTES + ORBIT_BYTES + bodies.length * BODY_BYTES,
+  );
   const view = new DataView(bytes.buffer);
   let at = 0;
 
@@ -49,6 +55,10 @@ export function snapshot(state: SimState): Uint8Array {
   const f64 = (value: number): void => {
     view.setFloat64(at, value);
     at += 8;
+  };
+  const flag = (value: boolean): void => {
+    view.setUint8(at, value ? 1 : 0);
+    at += 1;
   };
 
   u32(SNAPSHOT_VERSION);
@@ -68,6 +78,29 @@ export function snapshot(state: SimState): Uint8Array {
   u32(state.rng[1]);
   u32(state.rng[2]);
   u32(state.rng[3]);
+  flag(state.pressed);
+
+  // A fixed layout with a presence byte rather than a variable-length one: two
+  // states that differ in whether a swing has frozen then differ in the first
+  // byte of the same field, which is what makes `firstDifference` say something
+  // useful about where two runs parted.
+  const dive = state.dive;
+  flag(dive !== null);
+  f64(dive ? dive.grabRadius : 0);
+  f64(dive ? dive.smallestRadius : 0);
+  f64(dive ? dive.peakEnergy : 0);
+  f64(dive ? dive.clearanceTicks : 0);
+
+  const orbit = state.orbit;
+  flag(orbit !== null);
+  f64(orbit ? orbit.periapsis : 0);
+  f64(orbit ? orbit.eccentricity : 0);
+  f64(orbit ? orbit.momentum : 0);
+  f64(orbit ? orbit.periapsisAngle : 0);
+  f64(orbit ? orbit.direction : 0);
+  f64(orbit ? orbit.depth : 0);
+  f64(orbit ? orbit.phase : 0);
+  u32(orbit ? orbit.ticksSinceFreeze : 0);
 
   for (const body of bodies) {
     f64(body.x);

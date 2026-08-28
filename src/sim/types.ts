@@ -11,6 +11,8 @@
  */
 import type { Body } from './body.ts';
 import type { Craft } from './craft.ts';
+import type { Dive } from './dive.ts';
+import type { Orbit } from './orbit.ts';
 import type { RngState } from './rng.ts';
 
 /**
@@ -25,10 +27,9 @@ export type Tick = number;
  * What the player can do. One verb — press — because the game is one decision
  * held and let go of (`CONTEXT.md`: grab, release).
  *
- * M1.2 does not read it. Press means *be caught by that body* on the way in and
- * *let go* on the way out, and both are M1.3's; what M1.2 owns is the world they
- * act on. The shape is here because a step function that takes no input is a
- * different shape, and the recipe already depends on this one.
+ * Press means *be caught by that body* on the way in and *let go* on the way
+ * out, and there is no third thing it can mean. `CONTEXT.md` puts the whole game
+ * behind it: *"the craft has timing and shape and never a throttle."*
  */
 export interface Input {
   readonly pressed: boolean;
@@ -69,11 +70,35 @@ export interface SimState {
    * while a body is held, and only from the held body**, and a coasting craft
    * feels nothing from anything at any distance.
    *
-   * M1.2 never changes it. Being caught by a body and letting go of one are the
-   * grab and the release, and both are M1.3's; what is here is the state they
-   * move between, so that the world they act on can be built and tested first.
+   * It is moved by exactly two things: [`grab.ts`](./grab.ts) puts a body in it
+   * and [`release.ts`](./release.ts) takes it out again.
    */
   heldBody: number | null;
+  /**
+   * The part of the swing before the freeze, while it is running.
+   *
+   * Present exactly while a body is held and the craft has not yet reached its
+   * closest approach. `CONTEXT.md`'s **dive**: real gravity and nothing else.
+   */
+  dive: Dive | null;
+  /**
+   * The fixed orbit the swing froze onto, once it has.
+   *
+   * Present exactly while a body is held and the dive has ended. The two are
+   * never both present and never both absent while held — the freeze is the
+   * instant one becomes the other.
+   */
+  orbit: Orbit | null;
+  /**
+   * Whether the button was down at the end of the previous tick.
+   *
+   * A grab is attempted on the **press**, not on every tick the button is held
+   * down. Spec [01 · §3](../../docs/spec/01-swing.md) counts 278 presses against
+   * 270 grabs and 8 refusals, which is only a meaningful count if a refused
+   * press stays refused: a button that kept retrying would make the grab a sweep
+   * rather than a decision, and would turn the too-late refusal into a delay.
+   */
+  pressed: boolean;
   /** The seeded stream every draw in the run comes from (ADR-0004). */
   readonly rng: RngState;
 }

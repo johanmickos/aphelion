@@ -20,33 +20,46 @@ import { MEDIAN_RADIUS } from '../../src/sim/units.ts';
 
 const TICKS = 3600; // a minute of play
 
+/** The one verb, held down. */
+const PRESSED = { pressed: true };
+
 /**
- * A run: a field, a starting craft, a seed, and a script of when the craft is
- * held.
+ * A run: a field, a starting craft, a seed, and an input log.
  *
- * The script is a **fixture, not a mechanism.** Being caught by a body and
- * letting go of one are the grab and the release, and both are M1.3's; what this
- * needs is for both code paths in `stepSim` to be exercised by something
- * reproducible, and a list of tick numbers is the simplest thing that does it.
+ * The log is where the swing enters, and it is one button: pressed between a
+ * grab tick and its release tick, up the rest of the time. That is the whole of
+ * what a recipe carries (ADR-0004), so a run driven this way is a run the replay
+ * of [M1.5](../../docs/plan/m1-the-swing.md) will have to reproduce exactly.
+ *
+ * The bodies are placed along the craft's own path so that all five presses land
+ * on real grabs: the run flies **five complete swings** — dive, freeze, settle,
+ * release, coast — rather than pressing at empty space. A draw from the seeded
+ * stream is taken at each press so the run's determinism covers the stream as
+ * well as the physics.
  */
 function fly(seed: number, ticks: number, onSnapshot?: (bytes: Uint8Array) => void): SimState {
   const field = {
     bodies: [
       createBody(0, 0, MEDIAN_RADIUS),
-      createBody(900, 1400, MEDIAN_RADIUS * 0.8),
-      createBody(-1100, 2600, MEDIAN_RADIUS * 1.2),
+      createBody(1412, -1652, MEDIAN_RADIUS * 0.8),
+      createBody(1478, 3322, MEDIAN_RADIUS * 1.2),
+      createBody(-4850, 3036, MEDIAN_RADIUS * 0.9),
+      createBody(-9557, -472, MEDIAN_RADIUS * 1.1),
     ],
   };
   const state = createInitialState(field, createCraft(-1400, 620, 431.7, 233.11), seed);
   const grabs = [40, 640, 1300, 2100, 3000];
   const releases = [420, 1010, 1780, 2600, 3400];
 
+  let holding = false;
   for (let tick = 1; tick <= ticks; tick++) {
     if (grabs.includes(tick)) {
-      state.heldBody = Math.floor(nextFraction(state.rng) * field.bodies.length);
+      holding = true;
+      // A draw per press, so the stream is part of what has to replay.
+      nextFraction(state.rng);
     }
-    if (releases.includes(tick)) state.heldBody = null;
-    stepSim(state, NO_INPUT);
+    if (releases.includes(tick)) holding = false;
+    stepSim(state, holding ? PRESSED : NO_INPUT);
     onSnapshot?.(snapshot(state));
   }
   return state;
@@ -94,8 +107,33 @@ describe('the snapshot', () => {
    */
   it('covers every field of SimState, so nothing escapes the comparison', () => {
     const state = fly(1, 1);
-    expect(Object.keys(state).sort()).toEqual(['craft', 'field', 'heldBody', 'rng', 'tick']);
+    expect(Object.keys(state).sort()).toEqual([
+      'craft',
+      'dive',
+      'field',
+      'heldBody',
+      'orbit',
+      'pressed',
+      'rng',
+      'tick',
+    ]);
     expect(Object.keys(state.craft).sort()).toEqual(['vx', 'vy', 'x', 'y']);
+    expect(Object.keys(fly(1, 100).dive!).sort()).toEqual([
+      'clearanceTicks',
+      'grabRadius',
+      'peakEnergy',
+      'smallestRadius',
+    ]);
+    expect(Object.keys(fly(1, 300).orbit!).sort()).toEqual([
+      'depth',
+      'direction',
+      'eccentricity',
+      'momentum',
+      'periapsis',
+      'periapsisAngle',
+      'phase',
+      'ticksSinceFreeze',
+    ]);
     expect(Object.keys(state.field).sort()).toEqual(['bodies']);
     expect(Object.keys(state.field.bodies[0]!).sort()).toEqual([
       'mass',
@@ -117,6 +155,23 @@ describe('the snapshot', () => {
     const held = fly(1, 300);
     held.heldBody = held.heldBody === null ? 0 : null;
     expect(firstDifference(bytes, snapshot(held))).not.toBe(-1);
+
+    // And the two halves of a swing, which are the state M1.3 added: a run
+    // mid-dive and the same run mid-orbit are different runs, and so are two
+    // orbits a picometre of phase apart.
+    const midDive = fly(1, 100);
+    const midOrbit = fly(1, 300);
+    expect(midDive.dive).not.toBeNull();
+    expect(midOrbit.orbit).not.toBeNull();
+    expect(firstDifference(snapshot(midDive), snapshot(midOrbit))).not.toBe(-1);
+
+    const nudged = fly(1, 300);
+    nudged.orbit!.phase += 1e-12;
+    expect(firstDifference(snapshot(midOrbit), snapshot(nudged))).not.toBe(-1);
+
+    const pressed = fly(1, 300);
+    pressed.pressed = !pressed.pressed;
+    expect(firstDifference(bytes, snapshot(pressed))).not.toBe(-1);
 
     const drawn = fly(1, 300);
     nextFraction(drawn.rng);

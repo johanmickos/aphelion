@@ -7,17 +7,19 @@
  * be checked that way is specified wrong, and a test welded to a name forbids
  * the refactor it should have survived.
  *
- * There is deliberately **no grab here.** The dive is set up by placing a craft
- * and marking a body held, which is a fixture and not a mechanism: being caught
- * by a body is [M1.3](../../docs/plan/m1-the-swing.md)'s, and a core that needed
- * the swing to prove itself would be a core that had the swing in it.
+ * There is deliberately **no grab here.** The dive is set up by placing a craft,
+ * marking a body held and starting a dive with no clearance owed — a fixture and
+ * not a mechanism. What these fixtures exercise is the simulation core: gravity,
+ * the integrator, coasting. The grab, the clearance, the freeze and the release
+ * are [`swing.ts`](./swing.ts)'s, which drives them through the one verb the way
+ * a player does.
  */
 import { createBody } from '../../src/sim/body.ts';
 import { createCraft, speedOf } from '../../src/sim/craft.ts';
+import { beginDive } from '../../src/sim/dive.ts';
 import { distance } from '../../src/sim/math.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
-import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS, SECONDS_PER_TICK } from '../../src/sim/units.ts';
 
 /** The field's median body, at the origin, so radii read directly as distances. */
@@ -37,8 +39,32 @@ export function approach(distanceOut: number, speed: number, offset: number): Si
     createCraft(-distanceOut, offset, speed, 0),
     1,
   );
-  state.heldBody = 0;
+  holdWithoutGrabbing(state);
   return state;
+}
+
+/**
+ * The button held down.
+ *
+ * A release is a *level* and not an edge — the button coming up always lets go
+ * of whatever is held — so a test that puts a body in the craft's hands and then
+ * steps with no input has released it before the first tick. Everything holding
+ * a body steps with this.
+ */
+export const HELD = { pressed: true };
+
+/**
+ * Put a body in the craft's hands without pressing anything.
+ *
+ * The dive is started with **no clearance owed**, so what runs is gravity and
+ * the integrator and nothing else — which is what the core's own tests are
+ * about. A grab decides whether a path needs lifting; a fixture does not get to.
+ *
+ * The caller keeps [`HELD`](#) down from there, exactly as a player would.
+ */
+export function holdWithoutGrabbing(state: SimState, index = 0): void {
+  state.heldBody = index;
+  state.dive = beginDive(state.craft, state.field.bodies[index]!, 0);
 }
 
 export interface DiveTrace {
@@ -65,7 +91,7 @@ export function dive(state: SimState, ticks: number): DiveTrace {
   let turned = false;
 
   for (let tick = 1; tick <= ticks; tick++) {
-    stepSim(state, NO_INPUT);
+    stepSim(state, HELD);
     const r = distance(0, 0, state.craft.x, state.craft.y);
     if (r < closestApproach) {
       closestApproach = r;

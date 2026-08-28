@@ -21,6 +21,7 @@
  * reading rather than a simulation (spec 01 §11). Making gravity ambient — the
  * obvious "improvement" — would delete the instrument the game is named for.
  */
+import { angleOf } from './trig.ts';
 import { SOFTENING } from './units.ts';
 
 /**
@@ -48,4 +49,56 @@ export function gravityAt(mass: number, r: number): number {
 export function pullScale(mass: number, dx: number, dy: number): number {
   const r = Math.sqrt(dx * dx + dy * dy);
   return gravityAt(mass, r) / r;
+}
+
+/**
+ * The potential energy of the softened law, per unit mass: negative, and zero
+ * at infinity.
+ *
+ * `∫ μ/(s² + ε²) ds` from `r` outward is `(μ/ε)·atan(ε/r)`, so this is the exact
+ * potential of the force above rather than an approximation to it. `angleOf`
+ * carries the arctangent, from [`trig.ts`](./trig.ts) and not from `Math`
+ * ([ADR-0014](../../docs/adr/0014-the-simulation-owns-its-transcendentals.md)).
+ *
+ * The three functions below exist so that **anything predicting what the dive
+ * will do predicts it in the law the dive actually obeys.** The unsoftened
+ * relations in [`kepler.ts`](./kepler.ts) are 9.4% out at the floor, which is
+ * enough to leave a clearance aiming a tenth of the floor gap high — measured,
+ * a periapsis of 61.9 against a floor of 56 where the spec requires the floor
+ * within 8%. What the *orbit* is authored in stays Kepler, because a Kepler
+ * ellipse is what it is; the two laws meet at the freeze and the step between
+ * them is under 3% of speed.
+ */
+export function potentialAt(mass: number, r: number): number {
+  return (-mass / SOFTENING) * angleOf(r, SOFTENING);
+}
+
+/** The specific orbital energy of a craft here, under the law it is flying in. */
+export function energyAt(mass: number, r: number, speed: number): number {
+  return (speed * speed) / 2 + potentialAt(mass, r);
+}
+
+/** The speed at which a craft here is no longer bound, under the same law. */
+export function escapeSpeedAt(mass: number, r: number): number {
+  return Math.sqrt(-2 * potentialAt(mass, r));
+}
+
+/**
+ * The angular momentum a craft of this energy needs for its closest approach to
+ * land exactly on `radius`.
+ *
+ * At its own closest approach a craft has no radial speed, so everything it has
+ * there is `√(2(E − Φ(r)))` and its momentum is that times the radius.
+ * Inverting the relation this way is what lets a clearance find its target in
+ * closed form rather than searching for it, and it is why *"the periapsis is
+ * inside the floor"* and *"there is less momentum here than the floor needs"*
+ * are the same sentence.
+ *
+ * `null` when the craft has too little energy to reach `radius` at all, in which
+ * case its closest approach is already outside it.
+ */
+export function momentumToReach(mass: number, energy: number, radius: number): number | null {
+  const squared = 2 * (energy - potentialAt(mass, radius));
+  if (squared <= 0) return null;
+  return radius * Math.sqrt(squared);
 }
