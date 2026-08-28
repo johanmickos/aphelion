@@ -31,7 +31,7 @@
  */
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
 import type { BodyView, PresentationState } from '../state/types.ts';
-import { letterbox } from './letterbox.ts';
+import { letterbox, visible } from './letterbox.ts';
 import { BODY_FILL, CORE, dim, DUSK, VOID } from './palette.ts';
 
 /**
@@ -89,12 +89,14 @@ function drawBody(context: CanvasRenderingContext2D, body: BodyView): void {
 /**
  * Draw one frame of a world.
  *
- * The whole buffer is painted VOID first, bars included: the design space is
- * fitted whole ([`letterbox.ts`](./letterbox.ts)) and clipped to, so nothing can
- * spill onto a bar and the composition is the same on every device (ADR-0010).
- * Everything after the clip is in design units, and everything after the second
- * translate is in world units — which is what lets every number in this file be
- * one the design set states.
+ * The whole buffer is painted VOID first, and then clipped to what this device
+ * can actually show — the design space, plus whatever the fit left over, bounded
+ * by the corridor's own line ([`visible`](./letterbox.ts)). The composition is
+ * the same on every device because the design space's scale and offsets are the
+ * same on every device (ADR-0010); what differs is only how much world is
+ * visible beside it. Everything after the clip is in design units, and
+ * everything after the second translate is in world units — which is what lets
+ * every number in this file be one the design set states.
  */
 export function draw(view: PresentationState, context: CanvasRenderingContext2D): void {
   const { canvas } = context;
@@ -106,16 +108,18 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
 
   context.save();
   context.setTransform(fit.scale, 0, 0, fit.scale, fit.offsetX, fit.offsetY);
+  const seen = visible(canvas.width, canvas.height, view.corridor, view.camera.x);
   context.beginPath();
-  context.rect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+  context.rect(seen.left, seen.top, seen.right - seen.left, seen.bottom - seen.top);
   context.clip();
 
   context.translate(DESIGN_WIDTH / 2 - view.camera.x, DESIGN_HEIGHT / 2 - view.camera.y);
 
   // A body is drawn if any of it can be seen. There is no horizontal test: the
   // field is no wider than the design space, which is the same fact the camera
-  // is built on (`derive.ts`).
-  const half = DESIGN_HEIGHT / 2;
+  // is built on (`derive.ts`) — the corridor is wider, but nothing is placed out
+  // there.
+  const half = (seen.bottom - seen.top) / 2;
   for (const body of view.bodies) {
     const distance = Math.abs(body.y - view.camera.y);
     if (distance <= half + body.radius + FLOOR_GAP) drawBody(context, body);

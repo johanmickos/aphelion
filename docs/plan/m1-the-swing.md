@@ -370,6 +370,50 @@ wall visible arrives in the same step as the camera that would frame it. Buildin
 follow here would also change what the gate is judging about a camera the author has just signed
 off two corrections to. **The measurement is the handover**, and it is the first thing M3.1 owes.
 
+### The bars became world (author, 2026-08-28)
+
+Asked for on reading the above: *"could we extend the width so that the ship doesn't just
+disappear while there's still screen space?"* — with sideways camera movement explicitly left to
+a later step. There was screen space, and it was being painted black.
+
+The design space is authored at the size of a whole phone screen and a browser gives a page less,
+so the fit is bound by height and leaves a bar down each side. On ADR-0011's measured 393 × 651
+viewport that bar is 46 points, which is **179 design units of world either side** that the
+device could always draw. It is now drawn.
+
+| | Half-width visible from the centreline |
+|---|---|
+| Before | **585** design units |
+| With the bleed, on the author's phone | **764** |
+| The corridor's line, where the run ends | 1123.5 |
+
+So the stretch a craft can be alive in but invisible falls from **538 design units to 359** — a
+third of it, for no change to anything composed. **The design space is still the whole of the
+contract**: the scale, the offsets and every position spec [00 · §7](../spec/00-tokens.md) fixes
+are untouched, nothing is resized, and nothing the player has to read may live in the bleed. What
+changed is only that the leftover is world instead of black. `CONTEXT.md` gained **bleed** for it.
+
+**It is bounded by the corridor's own line**, and that bound needed the corridor on
+`PresentationState` — the renderer draws what it is handed and asks the simulation nothing, so a
+clip that stops at the line is a `CorridorView` rather than a number the renderer keeps. Spec 07
+draws the line and its bands off the same field in M3. The bound matters because a wide desktop
+window has more slack than the corridor is wide: without it, a 16:9 window would show ±1441 design
+units of a world that stops at ±1123.5, painting a place a run is already over in.
+
+**The cost, stated rather than hidden.** Two devices now see different amounts of world — a
+desktop window sees the whole corridor and a phone sees two thirds of it — where before every
+device saw exactly the design space. ADR-0010 makes the phone in portrait the target and a
+desktop window a development surface, which is what makes that acceptable; if a wider screen ever
+becomes a *playing* surface for a scored daily, it is an advantage and the bound is where to
+argue about it. It does not replace M3.1's camera: **359 units of the craft's death still happen
+off the picture**, and the measurement above is still the handover.
+
+> **One sentence in an author-owned spec is now stale, and it is not edited here.** Spec 00 §7
+> reads *"the composition is identical on every device and nothing lands on a letterbox bar."*
+> The rule it encodes survives exactly — nothing the player reads lives outside the design space
+> — but there is no bar any more. The replacement sentence is *"nothing the player reads lives
+> outside the design space; what is beyond it is bleed"*, and it is the author's to make.
+
 ### Four things worth carrying forward
 
 - **Spec 01 §10 is silent on what a graze does, and something has to happen.** It says a

@@ -351,9 +351,16 @@ Eight names, each with one meaning: VOID (the sky), DUSK (structure, unlit), AUR
 **Design space**:
 The rectangle the game is composed in — a phone held in portrait — and the coordinates
 everything the player reads is drawn in, so that the composition is identical on every
-device and nothing lands on a bar. It is fitted whole and centred, with **letterbox** bars
-filling whatever is left; DOM is developer chrome only.
+device. It is fitted whole and centred; nothing the player has to read lives outside it,
+ever. DOM is developer chrome only.
 _Avoid_: viewport, screen, canvas size, resolution
+
+**Bleed**:
+The world drawn outside the design space, filling whatever the fit left over. How much of
+it a device shows depends on the device, so nothing may live there that the player has to
+read — it is the world seen further, never part of the composition. Bounded by the
+corridor's line, because past that there is no world to show.
+_Avoid_: letterbox bar (that was what the leftover used to be), overscan, margin
 
 **Camera**:
 Where the world is being watched from — a position, and never anything else. It is never

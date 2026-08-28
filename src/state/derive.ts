@@ -49,6 +49,10 @@ function present(sim: SimState, camera: CameraView): PresentationState {
       radius: body.radius,
       held: index === sim.heldBody,
     })),
+    corridor: {
+      centreline: sim.field.corridor.centreline,
+      halfWidth: sim.field.corridor.halfWidth,
+    },
   };
 }
 

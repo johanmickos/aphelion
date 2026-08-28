@@ -72,5 +72,10 @@ export function interpolate(
       speed: between(previous.craft.speed, current.craft.speed, alpha),
     },
     bodies: current.bodies,
+    // The corridor does not move, and taking it from the later tick is the same
+    // promise `bodies` above makes: interpolating a thing that cannot change
+    // would be a promise this function should not make before spec 17's
+    // narrowing corridor exists to test it.
+    corridor: current.corridor,
   };
 }

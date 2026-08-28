@@ -86,6 +86,26 @@ export interface BodyView {
 }
 
 /**
+ * The sides of the world, as the renderer needs them.
+ *
+ * It is here for one job today — **the picture never shows more world than there
+ * is**. The design space is fitted whole and whatever the buffer has left over
+ * is filled with world rather than with black
+ * ([`letterbox.ts`](../render/letterbox.ts)), and a wide desktop window has a
+ * great deal left over, so something has to say where to stop. The corridor's
+ * own line is that something, and it is the honest bound rather than a chosen
+ * one: past it a run is already over.
+ *
+ * It is also what spec [07](../../docs/spec/07-boundary.md) draws in M3 — the
+ * line itself, and the bands measured inward from it — which is why this is a
+ * field on presentation state and not a number the renderer keeps for itself.
+ */
+export interface CorridorView {
+  readonly centreline: number;
+  readonly halfWidth: number;
+}
+
+/**
  * One tick's worth of everything the renderer is allowed to know.
  *
  * M1.6 carries the world's shape, and where it is being watched from, and
@@ -97,4 +117,5 @@ export interface PresentationState {
   readonly camera: CameraView;
   readonly craft: CraftView;
   readonly bodies: readonly BodyView[];
+  readonly corridor: CorridorView;
 }

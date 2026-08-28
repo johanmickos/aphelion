@@ -17,6 +17,7 @@ function view(x: number, y: number, heading: number): PresentationState {
     camera: { x: 585, y, lock: 0, offset: 0 },
     craft: { x, y, heading, speed: 100 },
     bodies: [{ x: 0, y: 0, radius: 132, held: false }],
+    corridor: { centreline: 585, halfWidth: 1111.5 },
   };
 }
 
