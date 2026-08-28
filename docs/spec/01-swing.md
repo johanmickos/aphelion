@@ -169,7 +169,7 @@ the easiest to get wrong.
 | Floor | `minR = R + 12`; for the field's radii, **46.3 – 67.5** | Measured |
 | What it does | Turns the velocity toward tangential **at constant speed** wherever a turn alone suffices | Measured |
 | When a turn is not enough | Adds speed, capped at **0.98 × local escape speed**, then turns for the rest | Measured |
-| How it arrives | Eased over **5 frames** (83ms at 60Hz) — never a snap | Measured |
+| How it arrives | Eased at **no more than 5.07°/tick**, over **5 – 10 frames** — never a snap | Measured |
 | How often it fires | **54%** of 270 real grabs | Measured |
 | Total Δv when it fires | p05 0.4, p25 28, p50 52, p75 124, p95 194, max 281 | Measured |
 | Turn applied | 3.6° – 62° across the sweep, largest on head-on dives | Measured |
@@ -189,11 +189,29 @@ strike the body kills a coasting craft on contact; the same approach, grabbed, r
 at 339 units/s. One second after the press, a grabbed path has separated from the line it was on by
 11 – 154 units, bending the heading by up to 122°.
 
+**The rate is the characteristic; the duration is the consequence** (author, 2026-08-28, flying
+it). This spec used to measure only the *time* — five frames, 80 – 90ms — and say nothing about how
+fast the craft turned in it. With a fixed duration and a turn that runs 3.6° to 62°, the rate
+between two grabs varied seventeenfold, and the tail is what reads wrong: **47% of grabs owe a
+clearance, the median one owes 59.5°, and five frames of that turns the craft at 11.9° a frame.**
+Measured against the thing it is handing the craft to, that is three and a half times too fast — a
+settled orbit turns the nose p50 3.50° and **p90 5.07°** per frame, over 499 settled frames.
+
+So the bound is the orbit's own rate and the ease takes as long as its turn needs. Where the time
+is not there the **ten-frame cap wins**, because the clearance re-asks each frame what it still
+owes and a turn buys less angular momentum the closer the craft gets — a clearance paid later is
+paid at a worse exchange rate, and past a point it stops turning and starts buying speed, which is
+the failure this section exists to avoid. Ten is measured: swept over 1 171 real grabs at 5, 6, 8,
+10, 12 and 16 frames, the biggest single-frame turn between the press and the freeze falls from a
+p90 of **12.5° to 6.9°**, three grabs in 1 171 come out worse, and no periapsis lands below the
+floor at any value. At twelve, §5a's periapsis speed band starts failing.
+
 > **Tolerance.** Clearance fires on **50 – 60%** of real grabs. Where it fires, the resulting
 > periapsis is **≥ the floor** on 100% of grabs — this is exact. Speed after the impulse is
 > **≤ 0.98 × local escape speed** on 100% of grabs, so no grab can eject the craft it caught. The
-> impulse spreads over **80 – 90ms** of simulated time; a single-tick application is a failure
-> however correct the endpoint.
+> impulse spreads over **at least 80 – 90ms** of simulated time and never more than 167ms; a
+> single-tick application is a failure however correct the endpoint. Over a corpus of real grabs
+> the biggest single-frame turn between the press and the freeze is **p90 ≤ 7°**.
 
 ---
 
@@ -472,9 +490,18 @@ Four ways to end a run. Three are deaths; the fourth is the win.
 | **Cleared** | Above the point where the last body has gone out of grab range | Measured |
 
 **Contact while a body is held never kills.** It bounces: against the held body at `R + 12` with
-zero restitution — the floor — and against any other body at `R + 6` with 0.6 restitution. The same
-geometry is lethal coasting and safe held, and that asymmetry is the rule, not an oversight: a grab
-is a promise that you will not be killed by the thing you grabbed.
+zero restitution — the floor — and against any other body at `R + 6` with **0.2** restitution. The
+same geometry is lethal coasting and safe held, and that asymmetry is the rule, not an oversight: a
+grab is a promise that you will not be killed by the thing you grabbed.
+
+> **0.2, and it was 0.6** (author, 2026-08-28). The prototype's 0.6 was carried unmarked, and flown
+> it is a ricochet: over 300 runs it turned the craft more than 90° in a single frame **16 times**,
+> up to 165°, on a manoeuvre the player did not make and cannot see coming. Swept at 0.6, 0.4, 0.2,
+> 0.1 and 0, the count of those flips falls 16 → 9 → 6 → 5 → 1 — but **below 0.2 the craft starts
+> skidding**, the longest unbroken contact going from one frame to 44 at 0.1 and 86 at 0. Endings
+> barely move across the whole range (out-of-bounds 218 → 205 of 300), so this changes how a contact
+> reads and not what the game is. There is a symmetry under it: the **floor** slides at 0, and a
+> body you are *not* holding should not push back harder than the one you are.
 
 **The graze exemption exists to preserve a real manoeuvre.** Flinging tangentially past a body you
 have just left is legitimate flying, and at 0.18 the exemption covers it without covering anything

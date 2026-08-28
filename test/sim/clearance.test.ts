@@ -8,7 +8,7 @@
  * [`corpus.test.ts`](./corpus.test.ts).
  */
 import { describe, expect, it } from 'vitest';
-import { easeClearance, needsClearance } from '../../src/sim/clearance.ts';
+import { clearanceTicksFor, easeClearance, needsClearance } from '../../src/sim/clearance.ts';
 import { speedOf } from '../../src/sim/craft.ts';
 import { escapeSpeedAt, momentumToReach, energyAt } from '../../src/sim/gravity.ts';
 import { angularMomentum } from '../../src/sim/kepler.ts';
@@ -17,7 +17,9 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { angleOf } from '../../src/sim/trig.ts';
 import {
   CLEARANCE_ESCAPE_FRACTION,
-  CLEARANCE_TICKS,
+  CLEARANCE_TICKS_MAX,
+  CLEARANCE_TICKS_MIN,
+  CLEARANCE_TURN_PER_TICK,
   SECONDS_PER_TICK,
 } from '../../src/sim/units.ts';
 import { openField } from './fixtures.ts';
@@ -115,7 +117,7 @@ describe('the escape cap, which is why a grab cannot eject what it caught', () =
     // that is not the clearance's doing.
     for (const g of ENVELOPE) {
       const craft = placed(g).craft;
-      for (let left = CLEARANCE_TICKS; left >= 1; left--) {
+      for (let left = CLEARANCE_TICKS_MAX; left >= 1; left--) {
         const before = speedOf(craft);
         const r = distance(0, 0, craft.x, craft.y);
         const cap = CLEARANCE_ESCAPE_FRACTION * escapeSpeedAt(BODY.mass, r);
@@ -140,7 +142,7 @@ describe('the escape cap, which is why a grab cannot eject what it caught', () =
       const r0 = distance(0, 0, state.craft.x, state.craft.y);
       if (energyAt(BODY.mass, r0, speedOf(state.craft)) >= 0) continue;
       stepSim(state, PRESS);
-      for (let tick = 0; tick < CLEARANCE_TICKS; tick++) stepSim(state, PRESS);
+      for (let tick = 0; tick < CLEARANCE_TICKS_MAX; tick++) stepSim(state, PRESS);
       const r = distance(0, 0, state.craft.x, state.craft.y);
       expect(
         energyAt(BODY.mass, r, speedOf(state.craft)),
@@ -164,40 +166,90 @@ describe('the escape cap, which is why a grab cannot eject what it caught', () =
 
 describe('how it arrives', () => {
   /**
-   * *"Eased over 5 frames (83ms at 60Hz) — never a snap"*, and spec 01 §4's
-   * tolerance is emphatic: *"a single-tick application is a failure however
-   * correct the endpoint."*
+   * **The rate is the characteristic and the duration is the consequence**
+   * (author, 2026-08-28, flying it). Spec 01 §4 used to measure the *time* — five
+   * ticks, 80 – 90ms — and said nothing about the rate, so a turn of 3.6° and a
+   * turn of 62° were both paid in 83ms and the rate between them varied
+   * seventeenfold. What that cost is measurable: nearly half of all grabs owe a
+   * clearance, the median one owes 59.5°, and five ticks of that is 11.9° a tick
+   * against a settled orbit's own p90 of 5.07°.
    *
-   * Measured on a head-on dive, where gravity pulls exactly along the velocity
-   * and therefore contributes nothing to the heading — so every degree the
-   * heading turns is the clearance's.
+   * So what is held here is the rate, over the geometries §4 is written in.
+   * Measured on head-on dives, where gravity pulls exactly along the velocity and
+   * contributes nothing to the heading — every degree the heading turns is the
+   * clearance's.
    */
-  it('spreads the turn over 80 – 90ms, in even shares', () => {
+  it('turns no faster than the orbit it is handing the craft to', () => {
+    // Three approaches owing very different turns: a distant slow one, the §4
+    // geometry, and a close fast one, which is where the old fixed duration bit.
+    for (const g of [geometry(320, 150, 0), geometry(200, 200, 0), geometry(150, 320, 0)]) {
+      const state = placed(g);
+      stepSim(state, PRESS);
+      let previous = angleOf(state.craft.vx, state.craft.vy);
+      let worst = 0;
+      for (let tick = 0; tick < CLEARANCE_TICKS_MAX; tick++) {
+        stepSim(state, PRESS);
+        const now = angleOf(state.craft.vx, state.craft.vy);
+        worst = Math.max(worst, Math.abs(now - previous));
+        previous = now;
+      }
+      // The bound is honoured where the time is there and the cap wins where it
+      // is not, so the ceiling is the turn spread over the longest ease allowed.
+      const ceiling = Math.max(CLEARANCE_TURN_PER_TICK, Math.PI / 2 / CLEARANCE_TICKS_MAX);
+      expect(worst, `${g.grabDistance} out at ${g.approachSpeed}`).toBeLessThanOrEqual(ceiling);
+    }
+  });
+
+  /**
+   * *"A single-tick application is a failure however correct the endpoint"* —
+   * still the rule, and now the floor of a band rather than the whole of it.
+   */
+  it('never lands the turn in one tick, and never runs past its cap', () => {
     const state = placed(geometry(200, 200, 0));
     stepSim(state, PRESS);
 
     const headings = [angleOf(state.craft.vx, state.craft.vy)];
-    for (let tick = 0; tick < CLEARANCE_TICKS + 3; tick++) {
+    for (let tick = 0; tick < CLEARANCE_TICKS_MAX + 3; tick++) {
       stepSim(state, PRESS);
       headings.push(angleOf(state.craft.vx, state.craft.vy));
     }
 
     const steps = headings.slice(1).map((h, i) => Math.abs(h - headings[i]!));
-    const total = headings[CLEARANCE_TICKS]! - headings[0]!;
+    const total = headings[CLEARANCE_TICKS_MAX]! - headings[0]!;
     expect(Math.abs(total)).toBeGreaterThan(0.05);
 
-    const spread = CLEARANCE_TICKS * SECONDS_PER_TICK;
-    expect(spread).toBeGreaterThanOrEqual(0.08);
-    expect(spread).toBeLessThanOrEqual(0.09);
+    const shortest = CLEARANCE_TICKS_MIN * SECONDS_PER_TICK;
+    expect(shortest).toBeGreaterThanOrEqual(0.08);
+    expect(shortest).toBeLessThanOrEqual(0.09);
 
     // No tick carries the impulse on its own.
-    for (let i = 0; i < CLEARANCE_TICKS; i++) {
+    for (let i = 0; i < CLEARANCE_TICKS_MIN; i++) {
       expect(steps[i]! / Math.abs(total), `tick ${i + 1} of the ease`).toBeLessThan(0.35);
     }
-    // And it is finished when it said it would be.
-    for (let i = CLEARANCE_TICKS; i < steps.length; i++) {
-      expect(steps[i]!, `tick ${i + 1}, after the ease`).toBeLessThan(Math.abs(total) * 0.02);
+    // And it is over by the cap, whatever it was owed.
+    for (let i = CLEARANCE_TICKS_MAX; i < steps.length; i++) {
+      expect(steps[i]!, `tick ${i + 1}, after the ease`).toBeLessThan(Math.abs(total) * 0.05);
     }
+  });
+
+  /**
+   * The band exists so that a small turn is not stretched and a large one is not
+   * snapped: the duration has to actually move with the turn, or the rate bound
+   * is decoration.
+   */
+  it('takes longer for a bigger turn, between the two ends of the band', () => {
+    const gentle = clearanceTicksFor(placed(geometry(320, 150, 60)).craft, BODY);
+    const hard = clearanceTicksFor(placed(geometry(150, 320, 0)).craft, BODY);
+    expect(gentle).toBe(CLEARANCE_TICKS_MIN);
+    expect(hard).toBeGreaterThan(gentle);
+    expect(hard).toBeLessThanOrEqual(CLEARANCE_TICKS_MAX);
+
+    // And the cap is reachable rather than theoretical: the head-on approaches
+    // §4 is written on are exactly the ones that run out of band.
+    const capped = ENVELOPE.filter(
+      (g) => clearanceTicksFor(placed(g).craft, BODY) === CLEARANCE_TICKS_MAX,
+    );
+    expect(capped.length).toBeGreaterThan(0);
   });
 
   /**

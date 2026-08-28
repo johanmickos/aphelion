@@ -50,19 +50,18 @@
  * `MASS_EXPONENT`, which is what sets every body's mass — fails there until the
  * version is bumped.
  *
- * **What that does not cover is recorded rather than papered over.** A constant
- * that shapes the *swing* rather than the field — the eccentricity cap, the
- * settle's length, the boost envelope — moves the run a recipe replays to
- * without moving the field's identity, and nothing here will say so. The
- * prototype paid for that lesson and answers it with a simulation behaviour
- * version beside the seed; this repo will need one, and the place it goes is
- * beside `field` below. It is not built now because the gate is about to close
- * the one parameter that is open (spec 01 §13.2), and a version whose first act
- * is to be bumped teaches nobody anything.
+ * **What the field's version does not cover, [`sim`](./version.ts) does.** A
+ * constant that shapes the *swing* rather than the field — the eccentricity cap,
+ * the settle's length, the boost envelope, how long the clearance takes — moves
+ * the run a recipe replays to without moving the field's identity. So a recipe
+ * carries both, and a run flown under a simulation this build no longer is gets
+ * refused with its version in the message rather than replayed into a run nobody
+ * flew.
  */
 import type { Craft } from './craft.ts';
 import { FIXTURE_FIELD_VERSION, fixtureCraft, fixtureField } from './fixture-field.ts';
 import type { Field, Tick } from './types.ts';
+import { SIM_VERSION } from './version.ts';
 
 /**
  * Bumped whenever the shape below changes.
@@ -71,7 +70,7 @@ import type { Field, Tick } from './types.ts';
  * one written by a different game has to be able to say so rather than replay
  * to a plausible-looking wrong answer.
  */
-export const RECIPE_VERSION = 1;
+export const RECIPE_VERSION = 2;
 
 /**
  * The longest run a recipe may claim, in ticks: **one hour of play**.
@@ -117,6 +116,8 @@ export interface Recipe {
   readonly version: number;
   /** The field it was flown in — named, not carried. See the header. */
   readonly field: FieldIdentity;
+  /** The build of the swing it was flown under ([`version.ts`](./version.ts)). */
+  readonly sim: number;
   /** The seed every draw in the run comes from (ADR-0004). */
   readonly seed: number;
   /** How long the run was, in ticks. Not derivable from the log. */
@@ -210,6 +211,7 @@ export function recipeOf(recorder: Recorder): Recipe {
   return {
     version: RECIPE_VERSION,
     field: { generator: recorder.field.generator, version: recorder.field.version },
+    sim: SIM_VERSION,
     seed: recorder.seed,
     ticks: recorder.ticks,
     log: [...recorder.log],
@@ -268,7 +270,14 @@ export function parseRecipe(raw: unknown): Recipe {
   // cannot make is refused here, where the message can say which field, and not
   // three layers down inside a replay that has already started.
   fieldFor(field);
+  const sim = integer(r.sim, 'simulation version', 0, 0xffff);
+  if (sim !== SIM_VERSION) {
+    throw new Error(
+      `recipe was flown under simulation ${sim} and this build is ${SIM_VERSION} — ` +
+        'the swing has changed underneath it',
+    );
+  }
   const seed = integer(r.seed, 'seed', 0, 0xffffffff);
   const ticks = integer(r.ticks, 'ticks', 0, MAX_RECIPE_TICKS);
-  return { version: RECIPE_VERSION, field, seed, ticks, log: parseLog(r.log, ticks) };
+  return { version: RECIPE_VERSION, field, sim, seed, ticks, log: parseLog(r.log, ticks) };
 }

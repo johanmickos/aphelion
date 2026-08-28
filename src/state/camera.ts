@@ -74,11 +74,21 @@ export const DEADZONE = MEDIAN_RADIUS + FLOOR_GAP;
  * that a movement instead of a step. **The rate is bounded from below by the
  * thumb line** — an ease lags a moving craft by `v × (1 − k) / k`, and at spec
  * 01 §8's p95 exit speed the lag plus [`DEADZONE`](#) has to still leave the
- * craft above [`THUMB_BUDGET`](#). The prototype's own follow rate is 3, which
- * it can afford because its view is a third the height of this one; at 8 the
- * time constant is an eighth of a second and the budget holds with room.
+ * craft above [`THUMB_BUDGET`](#).
+ *
+ * **Three, flown** (author, 2026-08-28): *"camera follow rate feels much better
+ * at a lower value to smoothen movement going back down."* It is the prototype's
+ * own rate, which this file previously assumed it could only afford because its
+ * view is a third the height of this one; the thumb line says otherwise, and the
+ * budget holds at 3 over every swing `test/state/camera.test.ts` flies.
+ *
+ * **Two is the floor and it is not a matter of taste.** At 2 presentation state
+ * stops shedding a disagreement within a bounded time, which is
+ * [ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)'s
+ * third rule and the property that makes the memory safe rather than merely
+ * convenient. Three is the slowest rate that keeps it.
  */
-export const FOLLOW_RATE = 8;
+export const FOLLOW_RATE = 3;
 
 /**
  * How long the lock takes to arrive, in ticks, once the settle is over.

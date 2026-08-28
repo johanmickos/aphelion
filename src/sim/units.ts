@@ -144,14 +144,51 @@ export const LEAD_SECONDS = 0.2;
 export const TOO_LATE_GAP = 32.5 * SCALE;
 
 /**
- * How many ticks the clearance impulse is spread over — spec 01 §4's 5 frames.
+ * The shortest the clearance may take — spec 01 §4's 5 frames, 83ms at 60Hz and
+ * inside its measured 80 – 90ms band.
  *
- * A tick count, so it is unchanged by the conversion. 83ms at 60Hz, inside the
- * spec's 80 – 90ms band. *"A single-tick application is a failure however
- * correct the endpoint"*: what the player feels is a grab that gathers the craft
- * up, and a snap reads as the world moving rather than the craft turning.
+ * It is a floor rather than the duration now, and the reason the floor exists is
+ * unchanged: *"a single-tick application is a failure however correct the
+ * endpoint"*. What the player feels is a grab that gathers the craft up, and a
+ * snap reads as the world moving rather than the craft turning. A small turn
+ * still takes exactly this long, so nothing about the median grab has moved.
  */
-export const CLEARANCE_TICKS = 5;
+export const CLEARANCE_TICKS_MIN = 5;
+
+/**
+ * The longest it may take.
+ *
+ * **A hard limit and not a preference**: the clearance asks each tick what is
+ * still owed, and as the craft closes, a turn buys less angular momentum —
+ * `r × speed` falls while the momentum the floor asks for does not. So a
+ * clearance paid later is paid at a worse exchange rate, and past a point it
+ * stops being able to turn for it and starts buying *speed* instead, which is
+ * the failure [`clearance.ts`](./clearance.ts) exists to avoid.
+ *
+ * Ten is measured. Swept over 1 171 real grabs at 5, 6, 8, 10, 12 and 16 ticks:
+ * the biggest single-tick turn between the press and the freeze falls from a p90
+ * of 12.5° to 6.9° by ten, **three grabs in 1 171 come out worse**, and no
+ * periapsis lands below the floor at any value. At twelve the count of grabs made
+ * worse quadruples and spec 01 §5a's periapsis speed band starts failing.
+ */
+export const CLEARANCE_TICKS_MAX = 10;
+
+/**
+ * How fast the clearance may turn the craft, in radians per tick.
+ *
+ * **Derived from the thing it is handing the craft to.** Measured over 499
+ * settled ticks across 200 runs, a settled orbit turns the nose p50 3.50° and
+ * p90 **5.07°** per tick; a clearance that turns faster than the orbit it is
+ * delivering the craft into is the thing that reads as a snap rather than as a
+ * grab gathering the craft up. At five fixed ticks it turned **three and a half
+ * times faster than that** — the turn owed is a median 59.5° over 554 real
+ * clearances, which is 11.9° a tick.
+ *
+ * Where the time is there, the rate is honoured. Where it is not,
+ * [`CLEARANCE_TICKS_MAX`](#) wins, because a clearance that ran out of approach
+ * is worse than one that turned briskly (author, 2026-08-28, flying it).
+ */
+export const CLEARANCE_TURN_PER_TICK = (5.07 * Math.PI) / 180;
 
 /**
  * The most of local escape speed a clearance may leave the craft at — spec 01 §4.
@@ -316,8 +353,28 @@ export const GRAZE_RESTITUTION = 0.8;
  */
 export const BOUNCE_GAP = 6 * SCALE;
 
-/** How hard that bounce pushes back — spec 01 §10's 0.6. */
-export const BOUNCE_RESTITUTION = 0.6;
+/**
+ * How hard that bounce pushes back.
+ *
+ * **0.2, and it was 0.6** (author, 2026-08-28). Spec 01 §10 states 0.6 without
+ * marking it, and it is the prototype's, carried. Flown, it is a ricochet: over
+ * 300 runs it turned the craft more than 90° in a single tick **16 times**, up
+ * to 165°, on a manoeuvre the player did not make and cannot see coming — the
+ * craft is holding one body and brushes another.
+ *
+ * Swept at 0.6, 0.4, 0.2, 0.1 and 0: the count of >90° flips falls 16 → 9 → 6 →
+ * 5 → 1, and **below 0.2 the craft starts skidding** — the longest unbroken
+ * contact goes from one tick to 44 at 0.1 and 86 at 0, which is a second and a
+ * half of the craft sliding along a planet it is not holding. The endings barely
+ * move across the whole range (out-of-bounds 218 → 205 of 300), so this changes
+ * how a contact reads and not what the game is.
+ *
+ * 0.2 is where the flips are cut by two thirds and the skid has not started.
+ * There is a symmetry argument under it too: the **floor** — the body actually
+ * held — has restitution 0 and slides, and it was odd that a body you are *not*
+ * holding pushed back harder than the one you are.
+ */
+export const BOUNCE_RESTITUTION = 0.2;
 
 /**
  * How far past the corridor's line is out — spec 01 §10's 4 units, converted.

@@ -16,7 +16,14 @@ import { speedOf } from '../src/sim/craft.ts';
 import { distance } from '../src/sim/math.ts';
 import { fixtureCraft, fixtureField } from '../src/sim/fixture-field.ts';
 import type { Recipe } from '../src/sim/recipe.ts';
-import { FIXTURE_FIELD, createRecorder, recipeOf, recordPress } from '../src/sim/recipe.ts';
+import {
+  FIXTURE_FIELD,
+  RECIPE_VERSION,
+  createRecorder,
+  recipeOf,
+  recordPress,
+} from '../src/sim/recipe.ts';
+import { SIM_VERSION } from '../src/sim/version.ts';
 import { openRun, replayRun } from '../src/sim/replay.ts';
 import { BOOST_ARM_TICKS, BOOST_PLATEAU_TICKS, BOOST_ZERO_TICKS } from '../src/sim/units.ts';
 import { createPresentation, derive } from '../src/state/derive.ts';
@@ -26,8 +33,9 @@ import { flyRun } from './sim/run.ts';
 /** One swing, by hand: the field opens with the first body already on offer. */
 const RELEASE = 200;
 const oneSwing: Recipe = {
-  version: 1,
+  version: RECIPE_VERSION,
   field: FIXTURE_FIELD,
+  sim: SIM_VERSION,
   seed: 1,
   ticks: 400,
   log: [0, RELEASE],
@@ -119,7 +127,7 @@ describe('a whole run, read from outside', () => {
     // M1.4 measured that **87% of out-of-bounds endings happen with a body still
     // held** — *you are not flying out of the corridor, you are being swung out
     // of it* — so this is the common shape of a death rather than an edge case.
-    const trail = walkRun(pilotRecipe(2472));
+    const trail = walkRun(pilotRecipe(1));
     const last = trail.swings.at(-1)!;
     expect(trail.ending).toBe('OUT_OF_BOUNDS');
     expect(last.releasedAt).toBeNull();

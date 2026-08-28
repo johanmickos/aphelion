@@ -23,11 +23,13 @@ import {
   recipeOf,
   recordPress,
 } from '../../src/sim/recipe.ts';
+import { SIM_VERSION } from '../../src/sim/version.ts';
 
 /** A recipe of the shape the validator should accept, to spoil one field at a time. */
 const sound = {
   version: RECIPE_VERSION,
   field: { generator: 'fixture', version: FIXTURE_FIELD_VERSION },
+  sim: SIM_VERSION,
   seed: 7,
   ticks: 100,
   log: [10, 40, 55],
@@ -154,6 +156,8 @@ describe('parseRecipe', () => {
       'a fixture field this build has moved past',
       { ...sound, field: { generator: 'fixture', version: FIXTURE_FIELD_VERSION + 1 } },
     ],
+    ['a run flown under a simulation this build no longer is', { ...sound, sim: SIM_VERSION + 1 }],
+    ['no simulation version at all', { ...sound, sim: undefined }],
     ['a seed that is not a whole number', { ...sound, seed: 1.5 }],
     ['a seed outside 32 bits', { ...sound, seed: 2 ** 32 }],
     ['a negative seed', { ...sound, seed: -1 }],
@@ -178,7 +182,7 @@ describe('parseRecipe', () => {
   it('builds a fresh recipe rather than blessing the one it was handed', () => {
     const raw = { ...structuredClone(sound), somethingElse: 'ignored' };
     const recipe = parseRecipe(raw);
-    expect(Object.keys(recipe).sort()).toEqual(['field', 'log', 'seed', 'ticks', 'version']);
+    expect(Object.keys(recipe).sort()).toEqual(['field', 'log', 'seed', 'sim', 'ticks', 'version']);
     raw.log.push(90);
     expect(recipe.log).toEqual([10, 40, 55]);
   });

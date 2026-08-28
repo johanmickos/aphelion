@@ -22,10 +22,12 @@ import {
 import { receive } from '../tools/vite-plugin-diag.ts';
 import { FIXTURE_FIELD_VERSION } from '../src/sim/fixture-field.ts';
 import { RECIPE_VERSION } from '../src/sim/recipe.ts';
+import { SIM_VERSION } from '../src/sim/version.ts';
 
 const recipe = {
   version: RECIPE_VERSION,
   field: { generator: 'fixture', version: FIXTURE_FIELD_VERSION },
+  sim: SIM_VERSION,
   seed: 1,
   ticks: 600,
   log: [12, 90, 240, 401],

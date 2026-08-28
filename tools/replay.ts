@@ -44,9 +44,11 @@ import { formatDispatch, formatTrail, walkRun } from './trail.ts';
  *
  * A real run in the real format, so the command has something to prove itself
  * on before the author has flown one — and it says in its own note that it was
- * flown by the headless pilot rather than by a person.
+ * flown by the headless pilot rather than by a person. It is regenerated
+ * whenever the swing changes, because a recipe flown under a different
+ * simulation is refused now rather than replayed ([`version.ts`](../src/sim/version.ts)).
  */
-const SHIPPED = fileURLToPath(new URL('../test/recipes/pilot-76s.json', import.meta.url));
+const SHIPPED = fileURLToPath(new URL('../test/recipes/pilot-60s.json', import.meta.url));
 
 /** How many times over, and how many lengths — M1.5's acceptance, as numbers. */
 const REPLAYS = 4;

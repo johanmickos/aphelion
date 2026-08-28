@@ -18,10 +18,13 @@
  * construction.** Only where turning alone falls short is speed bought, and then
  * never past 0.98 of local escape.
  *
- * **And it arrives over five ticks, never in one.** *"A single-tick application
- * is a failure however correct the endpoint"* — what the player should feel is a
- * grab gathering the craft up, and a snap reads as the world moving rather than
- * as the craft turning.
+ * **And it eases, never snapping.** *"A single-tick application is a failure
+ * however correct the endpoint"* — what the player should feel is a grab
+ * gathering the craft up, and a snap reads as the world moving rather than as the
+ * craft turning. It arrives over **five ticks at least and ten at most**, taking
+ * as long as its own turn needs at a bounded rate; see
+ * [`clearanceTicksFor`](#clearanceTicksFor) for why the rate is the
+ * characteristic and the duration is the consequence.
  *
  * ## Two things that were got wrong first, and are worth stating
  *
@@ -54,7 +57,12 @@ import { energyAt, escapeSpeedAt, momentumToReach } from './gravity.ts';
 import { angularMomentum } from './kepler.ts';
 import { magnitude } from './math.ts';
 import { angleOf, cos, sin } from './trig.ts';
-import { CLEARANCE_ESCAPE_FRACTION } from './units.ts';
+import {
+  CLEARANCE_ESCAPE_FRACTION,
+  CLEARANCE_TICKS_MAX,
+  CLEARANCE_TICKS_MIN,
+  CLEARANCE_TURN_PER_TICK,
+} from './units.ts';
 
 /** How far the velocity has to turn, and how much speed it has to gain. */
 interface Lift {
@@ -138,6 +146,36 @@ function liftFor(craft: Craft, body: Body): Lift | null {
 /** Whether a grab of `body` from here owes the path anything — spec 01 §4's 54%. */
 export function needsClearance(craft: Craft, body: Body): boolean {
   return liftFor(craft, body) !== null;
+}
+
+/**
+ * How long this clearance should take: as long as its turn needs at a bounded
+ * rate, and never outside the band.
+ *
+ * **The duration follows the turn, and it did not use to.** Spec 01 §4 measured
+ * the *time* — five ticks, 80 – 90ms — and said nothing about the *rate*, so a
+ * turn of 3.6° and a turn of 62° were both paid in 83ms and the rate between
+ * them varied seventeenfold. Flown, the tail is what reads wrong: nearly half of
+ * all grabs owe a clearance, the median one owes 59.5°, and paying that in five
+ * ticks turns the craft at 11.9° a tick — three and a half times the rate of the
+ * settled orbit it is being handed to (author, 2026-08-28).
+ *
+ * So the rate is the characteristic and the duration is the consequence. A small
+ * turn still takes [`CLEARANCE_TICKS_MIN`](./units.ts) and nothing about it has
+ * moved; a large one takes longer, up to the point where waiting costs more than
+ * turning briskly does — see [`CLEARANCE_TICKS_MAX`](./units.ts).
+ *
+ * Asked once, at the press, rather than each tick: the *share* is re-asked every
+ * tick, which is what makes the ease land on the floor rather than near it, but
+ * the length of the ease is fixed when it starts so that it eases at all. A
+ * duration that was re-derived each tick from a turn the previous tick had
+ * already shortened would never finish.
+ */
+export function clearanceTicksFor(craft: Craft, body: Body): number {
+  const lift = liftFor(craft, body);
+  if (lift === null) return 0;
+  const wanted = Math.ceil(Math.abs(lift.turn) / CLEARANCE_TURN_PER_TICK);
+  return Math.min(Math.max(wanted, CLEARANCE_TICKS_MIN), CLEARANCE_TICKS_MAX);
 }
 
 /**

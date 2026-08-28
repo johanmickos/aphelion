@@ -20,18 +20,12 @@
  * arrives over the five ticks *after* the press rather than at it.
  */
 import type { Body } from './body.ts';
-import { needsClearance } from './clearance.ts';
+import { clearanceTicksFor } from './clearance.ts';
 import type { Craft } from './craft.ts';
 import { beginDive } from './dive.ts';
 import { distance, magnitude } from './math.ts';
 import type { Field, SimState } from './types.ts';
-import {
-  CLEARANCE_TICKS,
-  LEAD_SECONDS,
-  MEDIAN_GRAB_RANGE,
-  MEDIAN_MASS,
-  TOO_LATE_GAP,
-} from './units.ts';
+import { LEAD_SECONDS, MEDIAN_GRAB_RANGE, MEDIAN_MASS, TOO_LATE_GAP } from './units.ts';
 
 /**
  * How far this body is on offer from.
@@ -125,10 +119,8 @@ export function attemptGrab(state: SimState): boolean {
   if (tooLate(state.craft, body)) return false;
 
   state.heldBody = chosen;
-  state.dive = beginDive(
-    state.craft,
-    body,
-    needsClearance(state.craft, body) ? CLEARANCE_TICKS : 0,
-  );
+  // How long the clearance takes is the turn's business, not a constant's: see
+  // [`clearanceTicksFor`](./clearance.ts).
+  state.dive = beginDive(state.craft, body, clearanceTicksFor(state.craft, body));
   return true;
 }

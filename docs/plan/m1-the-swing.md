@@ -1002,6 +1002,92 @@ prototype's loop is the same shape — an accumulator, a catch-up cap and `rende
 > release a recipe cannot reproduce, and [ADR-0004](../adr/0004-determinism-is-the-contract-the-author-is-the-feel-gate.md)
 > makes determinism the contract.
 
+## Flown at the bench, 2026-08-28 — the first two things the gate moved
+
+The gate opened on a desktop bench: the repo's own simulation with the open questions on
+sliders, so a verdict arrives with the value that produced it. Two findings, both measured
+before anything moved.
+
+### The capture snapped, and it was the clearance's rate rather than its duration
+
+*"I'm going straight toward a planet, capture, and the ship rotates pretty dramatically and
+changes its trajectory ... I'd rather have all transitions tween a bit more."*
+
+**Asked for as steering and answered as a rate.** Guiding a *coasting* craft is not available and
+was not the fix: spec 01 §2's first measured surprise is that a coasting craft feels nothing from
+anything at any distance, asserted as bit-identity in `pnpm portable`'s own proof of life, and
+`VISION.md`'s first pillar puts the whole game behind one button. But after the press, *guiding the
+craft left and right around the body* is precisely what the clearance is — it was simply doing it
+in 83ms.
+
+Measured over 1 171 grabs from 300 pilot runs, and it is a tail rather than a median: the biggest
+single-tick turn between the press and the freeze is **p50 3.4°, p90 12.5°**. Under it,
+**47% of grabs owe a clearance and the median one owes 59.5° of turn**, which five ticks pays at
+11.9° a tick. The thing it is handing the craft to turns at **p50 3.50° and p90 5.07°** per tick,
+over 499 settled ticks — so the clearance was turning three and a half times faster than the orbit
+that follows it, and the corner between them is what reads as a snap.
+
+So **the rate became the characteristic and the duration became the consequence**. Spec 01 §4
+measured only the time and was silent on the rate; a fixed duration against a turn running 3.6° to
+62° is a rate that varies seventeenfold. It now eases at the settled orbit's own p90 rate and takes
+as long as that needs, between five ticks and ten.
+
+**Ten is measured, and longer is not better.** The clearance re-asks each tick what it still owes,
+and a turn buys less angular momentum the closer the craft gets — so a clearance paid later is paid
+at a worse exchange rate, and past a point it stops turning and starts buying speed, which is the
+failure §4 exists to avoid. Swept at 5, 6, 8, 10, 12 and 16 ticks: the p90 peak falls
+**12.5° → 6.9°**, three grabs in 1 171 come out worse, and **no periapsis lands below the floor at
+any value**. At twelve, §5a's periapsis speed band starts failing. Built, the p90 is **6.9°/tick**
+and the count of grabs containing a tick over 8° falls from **400 to 57**.
+
+**What was not touched, and why.** There is a second corner and it is at the *freeze*: the turn
+rate steps by a median **×3.6** in one tick — the dive curving at 1.5°/tick, the next tick doing
+6.7 — and the speed changes by a median 27/s, p90 356/s, max 1227/s. Position is continuous
+(measured: the craft never moves further in a tick than its speed allows, ratio 1.00 on every
+freeze), so it corners rather than teleports. That is [§6a](../spec/01-swing.md), which is
+deliberately physically inconsistent and is the only channel by which a good dive's quality
+survives into the orbit. It is left alone until the clearance has been flown, so that what remains
+can be attributed.
+
+### The bounce off a neighbour was a ricochet
+
+Found while measuring the above rather than reported: over 300 runs, a craft holding one body and
+brushing **another** flipped its heading by more than 90° in a single tick **16 times**, up to
+165°. That is spec 01 §10's `R + 6` safety bounce — never lethal, by design — at the prototype's
+0.6 restitution, on a manoeuvre the player did not make and cannot see coming.
+
+Swept: the count of those flips falls 16 → 9 → 6 → 5 → 1 across restitutions 0.6, 0.4, 0.2, 0.1 and
+0, and **below 0.2 the craft starts skidding** — the longest unbroken contact goes from one tick to
+44 at 0.1 and 86 at 0, a second and a half of sliding along a planet. Endings barely move over the
+whole range (out-of-bounds 218 → 205 of 300). **0.2** is where the flips are cut by two thirds and
+the skid has not started, and there is a symmetry under it: the floor — the body actually held —
+slides at 0, and it was odd that a body you are *not* holding pushed back harder than the one you
+are.
+
+### And a recipe now says which swing it was flown under
+
+M1.5 recorded that the field's version covers the *world* and nothing covers the *swing*, and named
+`Recipe.sim` as the place that would land. Changing the clearance is what landed it: without it,
+every dispatch recorded before this change would replay under the new physics and report a
+different run as though it were the recorded one. [`version.ts`](../../src/sim/version.ts) is the
+number, `test/sim/version.test.ts` fingerprints three whole runs to keep it honest, and a recipe
+from the old swing is now refused with its version in the message. The author's own first dispatch
+is the first thing it refused, which is the correct outcome.
+
+### The camera follows at 3
+
+*"Camera follow rate feels much better at a lower value to smoothen movement going back down."*
+
+Taken. It is the prototype's own rate, which [`camera.ts`](../../src/state/camera.ts) had assumed
+it could only afford because its view is a third the height of this one; the thumb line says
+otherwise and holds at 3 over every swing the suite flies. Two costs, both stated: the lock now
+arrives with about **two design units** of camera movement instead of exactly zero — against the
+**49** that was reported as a defect, so the test became a tolerance rather than an equality — and
+**2 is the floor**, because below 3 presentation state stops shedding a disagreement within a
+bounded time, which is ADR-0015's third rule.
+
+---
+
 ## What the camera does now
 
 Built after the demo, as a correction to M1.6 rather than as a new step, on

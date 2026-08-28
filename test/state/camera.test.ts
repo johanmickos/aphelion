@@ -150,11 +150,17 @@ describe('the camera', () => {
     expect(view.camera.y).toBe(settledAt);
   });
 
+  /**
+   * It converges on the band's *edge*, never on its centre — the limit cycle
+   * `targetY` exists to avoid. Long enough for the ease to arrive: at
+   * `FOLLOW_RATE` 3 the time constant is a third of a second, so this is about
+   * two seconds of settling rather than the one it took at 8.
+   */
   it('follows once the craft leaves the band', () => {
     const sim = world();
     let view = createPresentation(sim);
     sim.craft.y = view.camera.y + DEADZONE * 4;
-    for (let i = 0; i < 120; i++) view = derive(view, sim);
+    for (let i = 0; i < 400; i++) view = derive(view, sim);
     expect(view.camera.y).toBeCloseTo(sim.craft.y - DEADZONE, 3);
   });
 
@@ -167,9 +173,15 @@ describe('the camera', () => {
    * time it starts, the deadzone has already brought the view to a stop, and the
    * point the lock holds on is the one it is standing on.
    *
-   * Asserted as exactly zero rather than as a tolerance, because anything else
-   * is the thing that was reported.
+   * Asserted as a **fraction of what was reported** rather than as exactly zero,
+   * which is what it was until the follow rate came down to 3 (author,
+   * 2026-08-28). A slower follow has not finished stopping when the ramp starts,
+   * so the point the lock holds on is a hair off the one it will settle to, and
+   * the ramp travels **about two design units** instead of none. Two units on a
+   * 2 532-tall design space is half a pixel on the phone this was reported from,
+   * and the fault it replaced was 49.
    */
+  const REPORTED = 49;
   it.each(SWINGS.slice(0, 2))(
     'arrives at the lock without moving, in %s',
     (_n, grabAt, letGoAt) => {
@@ -183,7 +195,7 @@ describe('the camera', () => {
         travelled += Math.abs(views[i]!.camera.y - views[i - 1]!.camera.y);
       }
       expect(ramp).toBeGreaterThan(10);
-      expect(travelled).toBe(0);
+      expect(travelled).toBeLessThan(REPORTED / 10);
     },
   );
 

@@ -48,8 +48,8 @@ function everyTick(recipe: Recipe, ticks: number): Uint8Array[] {
   return states;
 }
 
-/** The seeds three whole runs happen to be, kept small so the suite stays quick. */
-const SEEDS = [2472, 514, 98];
+/** Three whole runs, long enough that a divergence has room to appear. */
+const SEEDS = [2670, 1875, 2640];
 
 describe('a recorded run', () => {
   it('replays to a bit-identical final state, four times its own length', () => {
@@ -99,7 +99,7 @@ describe('a recorded run', () => {
    * that kept flying would be inventing the part nobody flew.
    */
   it('stops at its ending, whatever is left in the log', () => {
-    const { recipe } = pilotRecipe(2472);
+    const { recipe } = pilotRecipe(2670);
     const ended = replayRun(recipe);
     expect(ended.ending).not.toBeNull();
 
@@ -135,7 +135,7 @@ describe('the picture beside the run', () => {
   }
 
   it('replays identically too', () => {
-    const { recipe } = pilotRecipe(514);
+    const { recipe } = pilotRecipe(1875);
     const first = present(recipe);
     expect(first.length).toBeGreaterThan(1000);
     expect(present(recipe)).toEqual(first);
@@ -148,7 +148,7 @@ describe('the picture beside the run', () => {
    * final state what it looked like would be reporting a frame nobody saw.
    */
   it('is not the same as asking the final state what it looks like', () => {
-    const { recipe } = pilotRecipe(514);
+    const { recipe } = pilotRecipe(1875);
     const arrived = present(recipe).at(-1)!;
     const onDemand = createPresentation(replayRun(recipe));
     expect(onDemand.tick).toBe(arrived.tick);
@@ -164,9 +164,9 @@ describe('the recipe pnpm replay ships with', () => {
    * stopped matching the thing that made it.
    */
   it('is the pilot run it says it is', () => {
-    const text = readFileSync(new URL('../recipes/pilot-76s.json', import.meta.url), 'utf8');
+    const text = readFileSync(new URL('../recipes/pilot-60s.json', import.meta.url), 'utf8');
     const shipped = parseDispatch(JSON.parse(text));
-    expect(shipped.recipe).toEqual(pilotRecipe(2472).recipe);
+    expect(shipped.recipe).toEqual(pilotRecipe(1180).recipe);
     expect(shipped.device).toBeUndefined();
     expect(shipped.observed.note).toMatch(/pilot/);
   });

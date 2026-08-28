@@ -9,7 +9,7 @@
  * | Where | Surface | Restitution | Lethal |
  * |---|---|---|---|
  * | The **held** body — the floor | `R + 12` | 0 | never |
- * | Any **other** body, while one is held | `R + 6` | 0.6 | never |
+ * | Any **other** body, while one is held | `R + 6` | 0.2 | never |
  * | Any body, while **coasting** | `R + 5` | 0.8 | **unless it is a graze** |
  *
  * They live here as one function and three call sites rather than three code
