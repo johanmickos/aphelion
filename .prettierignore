@@ -13,3 +13,11 @@ pnpm-lock.yaml
 # Reports posted from a phone by the dev-only diagnostics endpoint. Machine
 # written and committed as evidence, so they are read, not restyled.
 diagnostics/
+
+# `pnpm bench`'s output: a generated page with a bundle inlined in it. Rooted, so
+# it does not also match `tools/bench/`, which is the source.
+/bench/
+
+# A handoff prompt for the next session — the author's own words, in the same
+# class as docs/ and CONTEXT.md: read, not restyled.
+/prompt.md

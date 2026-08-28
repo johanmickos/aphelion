@@ -24,5 +24,10 @@
   // Deliberate portability violations, kept as data for tools/check-portability.ts
   // to be pointed at. They are inputs to a test, not code — typechecking them
   // would report exactly the problems they exist to contain.
-  "exclude": ["test/fixtures"]
+  //
+  // tools/bench/entry.ts is excluded for the same shape of reason: it imports the
+  // *patched* copy of src/ that `pnpm bench` builds, which has setters this one
+  // does not. It is typechecked — by `pnpm bench`, against the tree it actually
+  // imports, with this same config extended.
+  "exclude": ["test/fixtures", "tools/bench/entry.ts"]
 }

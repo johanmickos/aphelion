@@ -25,3 +25,8 @@ venv/
 dist/
 .vite/
 
+# `pnpm bench`'s output and its work tree: a patched copy of src/ and one
+# self-contained HTML file, both rebuilt from source on demand. Rooted, because
+# an unrooted `bench/` also swallows `tools/bench/`, which is the source.
+/bench/
+

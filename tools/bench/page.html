@@ -1,0 +1,594 @@
+<title>Aphelion Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;800&display=swap"
+/>
+<style>
+  /* The palette is the game's own — spec 00 §1, eight names and eight meanings.
+     The page commits to VOID because the game does: the sky is the darkest thing
+     on screen, and a light version of this would be a different instrument. */
+  :root {
+    --void: #0a0814;
+    --surface: #100c20;
+    --dusk: #6c64a6;
+    --ink: #edeaf7;
+    --core: #fff4e0;
+    --ion: #ff5fa2;
+    --lumen: #7fe0a8;
+    --solar: #ffc94a;
+    --rule: color-mix(in oklab, var(--dusk) 34%, transparent);
+    --quiet: color-mix(in oklab, var(--ink) 52%, transparent);
+    --display: 'Anton', 'Archivo', system-ui, sans-serif;
+    --body: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--void);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 28px 24px 64px;
+  }
+
+  /* ---- masthead ---- */
+  header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--rule);
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: 0.03em;
+    margin: 0;
+    color: var(--core);
+    text-transform: uppercase;
+  }
+  .kicker {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--dusk);
+    font-weight: 600;
+  }
+  header p {
+    margin: 0;
+    flex: 1 1 320px;
+    max-width: 62ch;
+    color: var(--quiet);
+  }
+  header p b {
+    color: var(--dusk);
+    font-weight: 600;
+  }
+
+  /* ---- the two columns ---- */
+  .bench {
+    display: grid;
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+    gap: 28px;
+    padding-top: 24px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .bench {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* ---- the run ---- */
+  /* The width is held still and the height comes from the chosen viewport, which
+     is what a phone does: the screen is as wide as it is, and browser chrome
+     eats the height. */
+  #stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1170 / 2532;
+    margin-inline: auto;
+    background: var(--void);
+    border: 1px solid var(--rule);
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .runbar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  #hud {
+    color: var(--core);
+  }
+  .ending {
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 11px;
+    color: var(--ion);
+    white-space: nowrap;
+  }
+  .ending.over.cleared {
+    color: var(--lumen);
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  button {
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--rule);
+    padding: 8px 12px;
+    cursor: pointer;
+    transition:
+      border-color 120ms ease,
+      color 120ms ease;
+  }
+  button:hover {
+    border-color: var(--dusk);
+    color: var(--core);
+  }
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--core);
+    outline-offset: 2px;
+  }
+  input[type='text'] {
+    font: inherit;
+    font-size: 13px;
+    width: 100%;
+    margin-top: 8px;
+    color: var(--core);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 8px 10px;
+  }
+  input[type='text']::placeholder {
+    color: color-mix(in oklab, var(--dusk) 80%, transparent);
+  }
+  .fine {
+    margin: 14px 0 0;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--quiet);
+  }
+  .fine b {
+    color: var(--dusk);
+    font-weight: 600;
+  }
+
+  /* ---- panel cards ---- */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+  }
+  .card {
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .card > h2 {
+    margin: 0 0 2px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .card > .lede {
+    margin: 0 0 16px;
+    font-size: 12px;
+    color: var(--quiet);
+    max-width: 68ch;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 26px;
+  }
+
+  /* ---- knobs ---- */
+  .knob {
+    display: block;
+    padding: 10px 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--dusk) 16%, transparent);
+  }
+  .knob:last-child {
+    border-bottom: 0;
+  }
+  .knob-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .knob-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .knob output {
+    font-size: 13px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--dusk);
+  }
+  .knob output.moved {
+    color: var(--ion);
+  }
+  .knob-what {
+    display: block;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--quiet);
+  }
+  input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 22px;
+    margin: 2px 0 4px;
+    background: transparent;
+    cursor: ew-resize;
+  }
+  input[type='range']::-webkit-slider-runnable-track {
+    height: 1px;
+    background: var(--dusk);
+  }
+  input[type='range']::-moz-range-track {
+    height: 1px;
+    background: var(--dusk);
+  }
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    margin-top: -6px;
+    border-radius: 50%;
+    background: var(--core);
+    border: 0;
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--core);
+    border: 0;
+  }
+
+  .lockrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .lockrow input {
+    accent-color: var(--core);
+    width: 15px;
+    height: 15px;
+  }
+  .lockrow span {
+    color: var(--quiet);
+    font-weight: 400;
+    font-size: 11px;
+  }
+
+  .fit-cost {
+    margin-top: 10px;
+    color: var(--dusk);
+  }
+  .fit-cost b {
+    color: var(--core);
+    font-weight: 600;
+  }
+  .fit-cost b.cut {
+    color: var(--ion);
+  }
+  .pick {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0 2px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .pick select {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--core);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 6px 8px;
+  }
+
+  .state {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--dusk);
+  }
+  .state.moved {
+    color: var(--ion);
+  }
+  .statebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  /* ---- the trail ---- */
+  .scroller {
+    overflow-x: auto;
+    margin-top: 10px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  th {
+    text-align: right;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dusk);
+    padding: 0 0 8px 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+  th:first-child,
+  td:first-child {
+    padding-left: 0;
+  }
+  td {
+    text-align: right;
+    padding: 5px 0 5px 14px;
+    color: var(--ink);
+    border-bottom: 1px solid color-mix(in oklab, var(--dusk) 12%, transparent);
+  }
+  td.empty {
+    text-align: left;
+    color: var(--quiet);
+    padding: 14px 0;
+  }
+  tr.e-plateau td:nth-child(11) {
+    color: var(--solar);
+    font-weight: 600;
+  }
+  tr.e-unarmed td:nth-child(11),
+  tr.e-expired td:nth-child(11) {
+    color: var(--dusk);
+  }
+  #summary {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--dusk);
+    font-variant-numeric: tabular-nums;
+  }
+
+  ul.flags {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  ul.flags li {
+    padding-left: 12px;
+    border-left: 2px solid var(--ion);
+    color: var(--ink);
+  }
+  ul.flags li.empty {
+    border-left-color: var(--rule);
+    color: var(--quiet);
+  }
+  ul.flags b {
+    color: var(--core);
+    font-weight: 600;
+  }
+
+  textarea {
+    width: 100%;
+    height: 74px;
+    resize: vertical;
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--quiet);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 10px;
+    word-break: break-all;
+  }
+  .chip {
+    display: inline-block;
+    border: 1px solid var(--rule);
+    padding: 1px 7px;
+    color: var(--core);
+    letter-spacing: 0.04em;
+  }
+  .sendrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Aphelion</h1>
+    <span class="kicker">Bench</span>
+    <p>
+      The M1 gate's open questions, on sliders, flying the repo's own simulation —
+      <b>src/sim</b>, <b>src/state</b> and <b>src/render</b> exactly as they are on <b>main</b>,
+      with twelve constants made settable and nothing else changed.
+    </p>
+  </header>
+
+  <div class="bench">
+    <section class="run">
+      <div id="stage"></div>
+      <div class="runbar"><span id="hud"></span><span id="ending" class="ending"></span></div>
+      <p id="fit-cost" class="fine fit-cost"></p>
+      <div class="controls">
+        <button id="reset" type="button">Reset</button>
+        <button id="flag" type="button">Flag</button>
+      </div>
+      <input id="note" type="text" autocomplete="off" placeholder="what happened" />
+      <p class="fine">
+        <b>Click the field or hold the space bar</b> to be caught by the body you are arriving at;
+        let go to release. <b>Flag</b> stamps the tick something felt wrong; <b>R</b> restarts. The
+        field is the fixture the gate flies, drawn in the 1170 × 2532 design space, fitted whole.
+      </p>
+    </section>
+
+    <div class="panel">
+      <div class="cards">
+        <section class="card">
+          <h2>Physics</h2>
+          <p class="lede">
+            These change what a run <em>is</em>, so moving one starts the run again — otherwise the
+            recipe underneath would describe a run nobody flew.
+          </p>
+          <div id="knobs-physics"></div>
+        </section>
+
+        <section class="card">
+          <h2>The picture</h2>
+          <p class="lede">
+            These change only what is drawn, and presentation state converges (ADR-0015), so they
+            land live on the run you are already flying.
+          </p>
+          <div id="knobs-camera"></div>
+          <label class="lockrow"
+            ><input id="lock" type="checkbox" checked /> Lock on a settled orbit
+            <span>— off, the view follows the craft round the body</span></label
+          >
+
+          <div class="pick">
+            <label for="viewport">Fit it into</label>
+            <select id="viewport"></select>
+          </div>
+          <label class="lockrow"
+            ><input id="fitwidth" type="checkbox" /> Fit the width, not the whole
+            <span
+              >— spec 00 §7's open question, and the readout under the field is the cost</span
+            ></label
+          >
+        </section>
+      </div>
+
+      <div class="statebar">
+        <span id="defaults-state" class="state"></span>
+        <button id="defaults" type="button">Back to defaults</button>
+      </div>
+
+      <section class="card">
+        <h2>The trail</h2>
+        <p class="lede" id="summary"></p>
+        <div class="scroller">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Press</th>
+                <th>Body</th>
+                <th>Grab</th>
+                <th>Approach</th>
+                <th>Froze</th>
+                <th>Periapsis</th>
+                <th>Depth</th>
+                <th>Let go</th>
+                <th>Since</th>
+                <th>Envelope</th>
+                <th>Exit</th>
+              </tr>
+            </thead>
+            <tbody id="swings"></tbody>
+          </table>
+        </div>
+        <p class="fine">
+          Read from outside the simulation, exactly as <b>pnpm replay</b> reads it. Lengths and
+          speeds are design units; <b>since</b> is ticks after the freeze, which is the clock the
+          boost envelope is dated from — under 27 it has not armed, 27 to 72 is the plateau, and it
+          is gone by 156.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Flagged</h2>
+        <ul id="flags" class="flags"></ul>
+      </section>
+
+      <section class="card">
+        <h2>The dispatch</h2>
+        <p class="lede">
+          The run and what you made of it, in the format the phone sends. Copy it and run
+          <span class="chip">pbpaste | pnpm replay -</span> to fly it again on the laptop.
+        </p>
+        <textarea id="dispatch" readonly></textarea>
+        <div class="sendrow">
+          <button id="copy" type="button">Copy</button>
+          <span class="state"
+            >a run flown off the defaults says so in its note — replay will fly it at main's
+            values</span
+          >
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+  __BENCH_JS__;
+</script>

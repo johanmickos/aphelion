@@ -134,6 +134,14 @@ The stated deliverable is **a technical architecture that is easy to maintain an
   tick a grab happened on, what the geometry was, where on the envelope a release fell. With
   no argument it flies the one this repo ships. It is how a sentence about the feel of a
   swing gets a run underneath it.
+- **`pnpm bench`** builds the desktop bench: this game, bundled for the browser, with the open
+  questions on sliders — one self-contained page in `bench/`. It runs **the repo's own
+  simulation**, which is what makes a verdict reached on it a verdict about the game. The
+  constants it makes settable are listed in `tools/bench/patches.ts` and **stay `const` in
+  `src/`**: §6 asks a knob for an argument about why the decision cannot be made once inside,
+  and _"so it can be flown"_ is an argument for a bench. Move one of those constants and
+  `test/bench.test.ts` fails, because a bench whose sliders are wired to nothing answers
+  questions confidently and wrongly.
 - **A recipe names the field it was flown in, so the field carries a version**
   (`src/sim/fixture-field.ts`, following spec 17 §2). Change anything that field builds —
   a placement, the corridor, the spawn, or `MASS_EXPONENT` — and bump the version with it.

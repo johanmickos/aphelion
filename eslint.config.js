@@ -22,7 +22,19 @@ export default tseslint.config(
     // `test/fixtures/**` holds deliberate portability violations, kept as data
     // for the checker to be pointed at. Linting them reports the problems they
     // exist to contain.
-    ignores: ['**/dist/**', '**/node_modules/**', '.claude/**', 'docs/**', 'test/fixtures/**'],
+    // `bench/` is `pnpm bench`'s output and its work tree — a copy of src/ with
+    // the bench's patches applied, so linting it reports the patches.
+    // `tools/bench/entry.ts` is written against that copy and is typechecked by
+    // `pnpm bench` rather than from here; see tsconfig.json.
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '.claude/**',
+      'docs/**',
+      'test/fixtures/**',
+      'bench/**',
+      'tools/bench/entry.ts',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
