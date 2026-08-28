@@ -364,6 +364,35 @@ E3. Brightness is the game's only ordinal channel: nothing ever changes hue to m
 "better".
 _Avoid_: glow level, intensity
 
+**Bloom**:
+The light leaving a thing, as a radius. The one measurement **energy** is expressed in, and
+therefore the only thing in the game that means *more*: a step of energy is a radius and a
+link of chain is a radius, and neither is ever a hue or an opacity. It is drawn outward from
+the edge of whatever emits it, never as a disc over it.
+_Avoid_: glow, halo, aura, emission
+
+**Flash**:
+The E3 — the brightest step, additive, and **the only one of its kind alive at any moment**.
+A release strikes one, a grab strikes one, an award strikes one; a new one replaces the one
+before rather than stacking with it, so two can never fight over the same instant. It stays
+where it was struck, because what it marks is the place the thing happened and not the thing.
+_Avoid_: burst, pop, blast, spark (a spark is the bank's, in the economy)
+
+**Decay**:
+A value in the picture on its way back to nothing, or back to rest. Everything the design
+puts between the physics and the pixels has one — the **flash**, the **deformation**, the
+camera's kick, the rungs' wake, a callout — and they are one shape with different lengths.
+A decay **ends** rather than becoming very small, so a thing that is over is absent.
+Never the **settle**, which is the orbit rounding toward a circle and is a whole layer down.
+_Avoid_: fade, timer, animation, easing
+
+**Deformation**:
+The craft's shape under a release: drawn out along its own velocity and narrowed across it,
+returning past rest once before it settles. Along the velocity vector always, never along a
+screen axis and never around a centre — the game is side-on and nothing in it radiates from
+a point.
+_Avoid_: squash and stretch, squish, wobble, scale
+
 **Identity**:
 What something is, expressed as hue. A body keeps its hue forever.
 

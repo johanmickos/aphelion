@@ -15,7 +15,10 @@ import { createCraft, speedOf } from '../../src/sim/craft.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS } from '../../src/sim/units.ts';
+import { stretch } from '../../src/state/deformation.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
+import { E3_TICKS } from '../../src/state/energy.ts';
+import type { PresentationState } from '../../src/state/types.ts';
 import { openField } from '../sim/fixtures.ts';
 
 function world(): ReturnType<typeof createInitialState> {
@@ -66,6 +69,44 @@ describe('presentation state', () => {
     expect(derive(otherView, other)).toEqual(derive(view, state));
   });
 
+  /**
+   * ADR-0015's **third** rule, for the memory M2.1 added. The camera's version
+   * of this is in [`camera.test.ts`](./camera.test.ts); a flash and a stretch
+   * shed a disagreement in a stronger way than an ease does — they *end* — so
+   * the bound is a stated number of ticks rather than a tolerance.
+   */
+  it('sheds a flash and a stretch it should never have had', () => {
+    const state = world();
+    const honest = createPresentation(state);
+    const haunted: PresentationState = {
+      ...honest,
+      craft: { ...honest.craft, deformation: stretch() },
+      flash: { x: 9e4, y: -9e4, radius: 9e4, decay: { age: 0, span: E3_TICKS } },
+    };
+
+    let a = honest;
+    let b = haunted;
+    for (let i = 0; i < E3_TICKS; i++) {
+      stepSim(state, NO_INPUT);
+      a = derive(a, state);
+      b = derive(b, state);
+    }
+    expect(b).toEqual(a);
+    expect(b.flash).toBeNull();
+    expect(b.craft.deformation.recovery).toBeNull();
+  });
+
+  /**
+   * ADR-0015's **second** rule. A run opens placed, and nothing in it is
+   * mid-decay: a picture that opened with a flash already fading would be
+   * showing the player an event that never happened.
+   */
+  it('opens with nothing already decaying', () => {
+    const opened = createPresentation(world());
+    expect(opened.flash).toBeNull();
+    expect(opened.craft.deformation).toEqual({ along: 1, across: 1, recovery: null });
+  });
+
   it('reports the tick it was derived from', () => {
     const state = world();
     const opened = createPresentation(state);
@@ -82,7 +123,15 @@ describe('presentation state', () => {
     const state = world();
     const view = createPresentation(state);
     expect(view.craft.speed).toBe(speedOf(state.craft));
-    expect(Object.keys(view.craft).sort()).toEqual(['heading', 'speed', 'x', 'y']);
+    expect(Object.keys(view.craft).sort()).toEqual([
+      'bloom',
+      'deformation',
+      'energy',
+      'heading',
+      'speed',
+      'x',
+      'y',
+    ]);
   });
 
   it('says which body is held, so the renderer never has to work it out', () => {
@@ -101,6 +150,13 @@ describe('presentation state', () => {
    */
   it('hands the renderer geometry and not physics', () => {
     const view = createPresentation(world());
-    expect(Object.keys(view.bodies[0]!).sort()).toEqual(['held', 'radius', 'x', 'y']);
+    expect(Object.keys(view.bodies[0]!).sort()).toEqual([
+      'bloom',
+      'energy',
+      'held',
+      'radius',
+      'x',
+      'y',
+    ]);
   });
 });

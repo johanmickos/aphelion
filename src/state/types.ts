@@ -7,6 +7,7 @@
  * boundary heat — precisely so that a frame can be asserted without a canvas.
  */
 import type { Tick } from '../sim/types.ts';
+import type { Decay } from './decay.ts';
 
 /**
  * How committed or imminent something is, in four steps (`CONTEXT.md`: energy).
@@ -14,6 +15,29 @@ import type { Tick } from '../sim/types.ts';
  * "better".
  */
 export type Energy = 0 | 1 | 2 | 3;
+
+/**
+ * How the craft is stretched, as two scales on its own silhouette
+ * (`CONTEXT.md`: deformation).
+ *
+ * **Along its velocity and across it**, never along a screen axis — spec
+ * [02 · §4](../../docs/spec/02-release.md), and spec 00 §5's rule that nothing
+ * in this game radiates from a point. Both are 1 at rest.
+ *
+ * `recovery` is the memory and the other two are the answer. They cannot
+ * disagree because [`deformation.ts`](./deformation.ts) computes all three in
+ * one place from one clock; carrying the clock as well as the shape is what lets
+ * a test say *the craft is four ticks into its recovery* rather than inferring
+ * it from a scale factor.
+ */
+export interface DeformationView {
+  /** Scale along the velocity vector. */
+  readonly along: number;
+  /** Scale across it. */
+  readonly across: number;
+  /** The return in progress, or `null` when the craft is at rest. */
+  readonly recovery: Decay | null;
+}
 
 /**
  * Where the craft is and what it is doing, in design coordinates.
@@ -28,6 +52,47 @@ export interface CraftView {
   readonly y: number;
   readonly heading: number;
   readonly speed: number;
+  /**
+   * **E2, always** — spec [00 · §3](../../docs/spec/00-tokens.md) makes the
+   * craft the game's baseline for hot, and Direction 01 the reason: *"the craft
+   * is the brightest object on screen, always."*
+   */
+  readonly energy: Energy;
+  /**
+   * How wide its bloom is, in design units.
+   *
+   * A field rather than a lookup because it is the one energy in the game that
+   * is not a function of its step alone: spec 00 §3 gives each chain link +4px,
+   * so a hot run is visibly hotter. The chain arrives with the economy in M4;
+   * until then this is E2's radius exactly.
+   */
+  readonly bloom: number;
+  readonly deformation: DeformationView;
+}
+
+/**
+ * The one E3 (`CONTEXT.md`: flash).
+ *
+ * Spec [00 · §3](../../docs/spec/00-tokens.md): *"only one E3 may be alive at a
+ * time. A new E3 replaces the old one; it does not stack"* — and spec 00's
+ * acceptance, *"at most one E3 is alive on any tick."* It is **one nullable
+ * field on the whole presentation** rather than a flag on each thing that can
+ * flash, so the rule is not a check that can be forgotten but a shape the layer
+ * cannot express a violation of. That matters more than it looks: the release,
+ * the grab, the award and the checkered line all want an E3, they are built in
+ * four different milestones, and a per-thing energy would have let the fourth
+ * one quietly stack on the first.
+ *
+ * It does not move. Spec 02 puts it *at the release point*, and the craft has
+ * already left.
+ */
+export interface FlashView {
+  readonly x: number;
+  readonly y: number;
+  /** Its bloom radius now, in design units, on its way to nothing. */
+  readonly radius: number;
+  /** How far through its 400ms it is. */
+  readonly decay: Decay;
 }
 
 /**
@@ -83,6 +148,22 @@ export interface BodyView {
   readonly y: number;
   readonly radius: number;
   readonly held: boolean;
+  /**
+   * How brightly it burns — **E2 while it is held, E1 otherwise** (spec
+   * [00 · §3](../../docs/spec/00-tokens.md)).
+   *
+   * Beside `held` rather than instead of it, and they are not the same fact:
+   * `held` is what the body *is* and this is how loud it is about it. Spec
+   * [04 · §3](../../docs/spec/04-bodies.md) gives a body four states —
+   * ahead, in reach, held, spent — and only one of the four is `held`, so the
+   * two stop being interchangeable in [M2.2](../../docs/plan/m2-the-instrument.md)
+   * when the other three arrive. The E0 a body goes to after release is one of
+   * them, and is deliberately not derived yet: it needs a memory of what has
+   * been released, which is M2.2's to hold rather than this step's to guess.
+   */
+  readonly energy: Energy;
+  /** Its bloom radius, in design units, measured outward from its surface. */
+  readonly bloom: number;
 }
 
 /**
@@ -108,9 +189,11 @@ export interface CorridorView {
 /**
  * One tick's worth of everything the renderer is allowed to know.
  *
- * M1.6 carries the world's shape, and where it is being watched from, and
- * nothing about how either looks. Energies, bloom radii, the compass, the trail
- * and the boundary heat arrive with the things they describe.
+ * M1.6 carried the world's shape and where it is being watched from, and nothing
+ * about how either looks. M2.1 adds the ordinal channel — every energy, every
+ * bloom radius, the craft's stretch and the one E3 — so that the renderer is
+ * told how bright a thing is rather than asked to work it out. The compass, the
+ * tide, the trail and the boundary heat arrive with the things they describe.
  */
 export interface PresentationState {
   readonly tick: Tick;
@@ -118,4 +201,9 @@ export interface PresentationState {
   readonly craft: CraftView;
   readonly bodies: readonly BodyView[];
   readonly corridor: CorridorView;
+  /**
+   * The E3 alive right now, or `null`. **There is one, or there is none** — see
+   * [`FlashView`](#flashview).
+   */
+  readonly flash: FlashView | null;
 }

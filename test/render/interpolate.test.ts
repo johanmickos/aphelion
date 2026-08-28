@@ -8,6 +8,8 @@
  * states, so it is tested without a canvas.
  */
 import { describe, expect, it } from 'vitest';
+import { UNDEFORMED } from '../../src/state/deformation.ts';
+import { bloomOf, E3_BLOOM, E3_TICKS } from '../../src/state/energy.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import { interpolate } from '../../src/render/interpolate.ts';
 
@@ -15,9 +17,26 @@ function view(x: number, y: number, heading: number): PresentationState {
   return {
     tick: x,
     camera: { x: 585, y, lock: 0, offset: 0 },
-    craft: { x, y, heading, speed: 100 },
-    bodies: [{ x: 0, y: 0, radius: 132, held: false }],
+    craft: {
+      x,
+      y,
+      heading,
+      speed: 100,
+      energy: 2,
+      bloom: bloomOf(2),
+      deformation: UNDEFORMED,
+    },
+    bodies: [{ x: 0, y: 0, radius: 132, held: false, energy: 1, bloom: bloomOf(1) }],
     corridor: { centreline: 585, halfWidth: 1111.5 },
+    flash: null,
+  };
+}
+
+/** The same view with an E3 `age` ticks into its span, at the origin. */
+function flashing(age: number, radius: number): PresentationState {
+  return {
+    ...view(0, 0, 0),
+    flash: { x: 0, y: 0, radius, decay: { age, span: E3_TICKS } },
   };
 }
 
@@ -73,5 +92,32 @@ describe('a frame between two ticks', () => {
     const frame = interpolate(from, to, 0.5);
     expect(frame.tick).toBe(to.tick);
     expect(frame.bodies).toBe(to.bodies);
+  });
+
+  /**
+   * Spec [00 · §5](../../docs/spec/00-tokens.md)'s first motion rule: **things
+   * arrive; they do not fade in.** An E3 struck on the later tick is at full
+   * radius on the first frame that shows it, however far into the gap that frame
+   * falls — interpolating it up from nothing would be a 16ms fade-in, which is
+   * exactly what the rule forbids and what the eye reads as softness.
+   */
+  it('does not fade an E3 in', () => {
+    const struck = flashing(0, E3_BLOOM);
+    for (const alpha of [0, 0.25, 0.5, 0.9]) {
+      expect(interpolate(view(0, 0, 0), struck, alpha).flash?.radius).toBe(E3_BLOOM);
+    }
+  });
+
+  /** And once it is alive, it is crossed like any other length. */
+  it('crosses an E3 already alive', () => {
+    const frame = interpolate(flashing(3, 100), flashing(4, 80), 0.5);
+    expect(frame.flash?.radius).toBe(90);
+    // The clock itself is the later tick's: it is the input to the next
+    // derivation, and a frame is not a tick (ADR-0015).
+    expect(frame.flash?.decay).toEqual({ age: 4, span: E3_TICKS });
+  });
+
+  it('lets an E3 that has ended stay ended', () => {
+    expect(interpolate(flashing(23, 1), view(0, 0, 0), 0.5).flash).toBeNull();
   });
 });

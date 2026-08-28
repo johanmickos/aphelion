@@ -56,6 +56,22 @@ export const PATCHES: readonly Patch[] = [
   settable('src/state/camera.ts', 'LOCK_TICKS', 'the prototype’s third of a second, carried'),
   settable('src/state/camera.ts', 'RELEASE_RATE', 'what decays after a release'),
 
+  // Spec 00 §3's ordinal channel, read into design units. The radii are the
+  // board's own numbers times three (ADR-0010) and the reading is the thing to
+  // fly: a bloom the author cannot see moving is a bloom nobody can rule on.
+  settable('src/state/energy.ts', 'E1_BLOOM', 'spec 00 §3 · body rims, labels, a window at rest'),
+  settable('src/state/energy.ts', 'E2_BLOOM', 'spec 00 §3 · the craft, and a held body'),
+  settable('src/state/energy.ts', 'E3_BLOOM', 'spec 00 §3 · the release and the grab'),
+  settable('src/state/energy.ts', 'E3_TICKS', 'spec 00 §3’s 400ms, and the only one it states'),
+  settable(
+    'src/state/decay.ts',
+    'OVERSHOOT_FROM',
+    'the rebound shape everything that homes shares',
+  ),
+  settable('src/state/deformation.ts', 'STRETCH_ALONG', 'spec 02 §4, still to be flown'),
+  settable('src/state/deformation.ts', 'STRETCH_ACROSS', 'the other half of the same stretch'),
+  settable('src/state/deformation.ts', 'DEFORM_TICKS', 'spec 02 §4’s 180ms, dated from T0'),
+
   {
     // The lock is the one camera mechanism with no number that turns it off:
     // `LOCK_TICKS` of 0 makes it arrive instantly rather than not at all, and

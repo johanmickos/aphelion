@@ -45,7 +45,8 @@
  * watched.
  */
 import type { SimState } from '../sim/types.ts';
-import { FLOOR_GAP, MEDIAN_RADIUS, SECONDS_PER_TICK, SETTLE_TICKS } from '../sim/units.ts';
+import { FLOOR_GAP, MEDIAN_RADIUS, SETTLE_TICKS } from '../sim/units.ts';
+import { easeStep } from './decay.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from './design.ts';
 import type { CameraView } from './types.ts';
 
@@ -122,11 +123,6 @@ export const LOCK_TICKS = 20;
  * movement can never exceed `radius × rate`, whatever the craft does next.
  */
 export const RELEASE_RATE = 3;
-
-/** An exponential ease's per-tick coefficient, from a rate in 1/seconds. */
-function easeStep(rate: number): number {
-  return Math.min(1, rate * SECONDS_PER_TICK);
-}
 
 /** Where the camera sits sideways: the corridor's centreline, always. */
 function centreline(): number {

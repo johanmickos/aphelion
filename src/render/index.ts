@@ -13,14 +13,21 @@
  * or the orbit's phase would have broken ADR-0006's promise with nothing
  * failing. `test/render/boundary.test.ts` is what fails instead.
  *
- * ## What M1.6 draws, and what it deliberately does not
+ * ## What it draws, and what it deliberately does not
  *
  * Circles and lines: the sky, a disc and a rim for every body, a ring at the
- * floor of the one being held, and a dart for the craft. **No glow, no compass,
- * no HUD** — [M1.6](../../docs/plan/m1-the-swing.md) exists to make the swing
+ * floor of the one being held, and a dart for the craft. **No compass and no
+ * HUD** — [M1.6](../../docs/plan/m1-the-swing.md) exists to make the swing
  * flyable so the author can judge whether it feels right, and every instrument
  * drawn before that judgement is an instrument built on an untested premise. The
- * bloom chain is M3's, the compass is [M2](../../docs/plan/m2-the-instrument.md)'s.
+ * compass is [M2.3](../../docs/plan/m2-the-instrument.md)'s; the tide, the
+ * strata and the identity hues are M2.2's.
+ *
+ * What M2.1 added is the one thing that could not wait for them: **the ordinal
+ * channel**. Every energy in spec [00 · §3](../../docs/spec/00-tokens.md) is a
+ * bloom radius on presentation state now, so this file paints a glow it is told
+ * the size of rather than deciding one — and the author can see a radius move on
+ * the bench, which is the only way a radius ever gets ruled.
  *
  * The colours are the palette's even though the shapes are crude, because spec
  * [00](../../docs/spec/00-tokens.md)'s acceptance is a lint and a lint does not
@@ -30,7 +37,7 @@
  * the game.
  */
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
-import type { BodyView, PresentationState } from '../state/types.ts';
+import type { BodyView, Energy, FlashView, PresentationState } from '../state/types.ts';
 import { letterbox, visible } from './letterbox.ts';
 import { BODY_FILL, CORE, dim, DUSK, VOID } from './palette.ts';
 
@@ -52,6 +59,67 @@ const RIM_AT_REST = 0.35;
 const RIM_HELD = 1;
 
 /**
+ * How strongly each energy step is painted — spec
+ * [00 · §3](../../docs/spec/00-tokens.md)'s *"6px @ 35%"*, *"18px @ 60%"* and
+ * the E3's additive flash.
+ *
+ * The radii live in [`energy.ts`](../state/energy.ts) and these do not, and the
+ * seam is ADR-0006's: a radius is a length in design units that a test asserts
+ * without a canvas, and an alpha is paint. Spec 00 §1 makes the alpha rule
+ * explicitly this layer's — *"the only way this renderer is allowed to make one
+ * colour out of another"* — so it is spent here, through `dim`, and never by
+ * reaching for a second token.
+ *
+ * E3 is 1 because it is drawn additively: what falls over its 400ms is the
+ * radius, because brightness in this game **is** radius (§3), and an alpha
+ * fading in parallel would be a second ordinal channel saying the same thing.
+ */
+const STRENGTH: Readonly<Record<Energy, number>> = { 0: 0, 1: 0.35, 2: 0.6, 3: 1 };
+
+/**
+ * A glow of `radius` design units around a point, in one palette token.
+ *
+ * `from` is where it starts — zero for the craft, a body's own surface for a
+ * body — so a bloom is always the light *leaving* a thing rather than a disc
+ * drawn over it. Spec 00 §1 permits exactly this: the token is unchanged and
+ * only its strength moves, so the frame still resolves to eight names and
+ * greyscale still ranks it.
+ */
+function bloom(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  from: number,
+  radius: number,
+  token: string,
+  strength: number,
+): void {
+  if (radius <= 0 || strength <= 0) return;
+  const gradient = context.createRadialGradient(x, y, from, x, y, from + radius);
+  gradient.addColorStop(0, dim(token, strength));
+  gradient.addColorStop(1, dim(token, 0));
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.arc(x, y, from + radius, 0, Math.PI * 2);
+  context.fill();
+}
+
+/**
+ * The one E3 — spec 00 §3's *"48px, additive, 400ms decay"*.
+ *
+ * Additive is the whole of what separates it from every other bloom in the game:
+ * an E3 over a body reads as light rather than as paint, and `lighter` is
+ * Canvas2D's word for it. It is drawn under the craft so that the craft stays
+ * the brightest object on screen, which Direction 01 rules it always is.
+ */
+function drawFlash(context: CanvasRenderingContext2D, flash: FlashView): void {
+  context.save();
+  context.globalCompositeOperation = 'lighter';
+  bloom(context, flash.x, flash.y, 0, flash.radius, CORE, STRENGTH[3]);
+  context.restore();
+}
+
+/**
  * The craft's silhouette: a dart, nose along +x, in design units.
  *
  * The prototype's outline at this repo's scale, and it is **a stand-in** — spec
@@ -70,6 +138,8 @@ function craftPath(context: CanvasRenderingContext2D): void {
 }
 
 function drawBody(context: CanvasRenderingContext2D, body: BodyView): void {
+  bloom(context, body.x, body.y, body.radius, body.bloom, DUSK, STRENGTH[body.energy]);
+
   context.beginPath();
   context.arc(body.x, body.y, body.radius, 0, Math.PI * 2);
   context.fillStyle = BODY_FILL;
@@ -122,11 +192,33 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   const half = (seen.bottom - seen.top) / 2;
   for (const body of view.bodies) {
     const distance = Math.abs(body.y - view.camera.y);
-    if (distance <= half + body.radius + FLOOR_GAP) drawBody(context, body);
+    // The reach includes the bloom, because a glow whose source is just off the
+    // top of the picture still lights the top of the picture.
+    const reach = body.radius + Math.max(FLOOR_GAP, body.bloom);
+    if (distance <= half + reach) drawBody(context, body);
   }
+
+  if (view.flash !== null) drawFlash(context, view.flash);
+
+  // The craft's own bloom is drawn round, and the dart inside it is what
+  // stretches: spec 00 §5 puts every streak parallel to velocity, and a glow
+  // pulled along the same axis would be a second streak saying the same thing at
+  // a fifth of the contrast.
+  bloom(
+    context,
+    view.craft.x,
+    view.craft.y,
+    0,
+    view.craft.bloom,
+    CORE,
+    STRENGTH[view.craft.energy],
+  );
 
   context.translate(view.craft.x, view.craft.y);
   context.rotate(view.craft.heading);
+  // Along the velocity vector and across it — spec 02 §4 — which after the
+  // rotate above are exactly the two axes of this transform.
+  context.scale(view.craft.deformation.along, view.craft.deformation.across);
   craftPath(context);
   context.fillStyle = CORE;
   context.fill();

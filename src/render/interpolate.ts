@@ -14,7 +14,7 @@
  * the gap between two ticks that have both already happened, so no frame ever
  * shows a position the simulation did not reach.
  */
-import type { PresentationState } from '../state/types.ts';
+import type { DeformationView, FlashView, PresentationState } from '../state/types.ts';
 
 const TWO_PI = Math.PI * 2;
 
@@ -35,6 +35,43 @@ function betweenAngles(from: number, to: number, alpha: number): number {
   if (delta > Math.PI) delta -= TWO_PI;
   if (delta < -Math.PI) delta += TWO_PI;
   return from + delta * alpha;
+}
+
+/**
+ * Whether something was placed on the later of the two ticks.
+ *
+ * Spec [00 · §5](../../docs/spec/00-tokens.md)'s first motion rule is that
+ * **things arrive; they do not fade in** — so a flash that did not exist a tick
+ * ago, or a stretch that was just struck, is drawn at full size on the first
+ * frame that shows it rather than eased up from whatever was there before. An
+ * interpolated arrival is a 16ms fade-in, which is exactly what the rule forbids
+ * and exactly what the eye reads as softness.
+ */
+function arriving(decay: { readonly age: number } | null): boolean {
+  return decay !== null && decay.age === 0;
+}
+
+function flashBetween(
+  previous: FlashView | null,
+  current: FlashView | null,
+  alpha: number,
+): FlashView | null {
+  if (current === null) return null;
+  if (previous === null || arriving(current.decay)) return current;
+  return { ...current, radius: between(previous.radius, current.radius, alpha) };
+}
+
+function deformationBetween(
+  previous: DeformationView,
+  current: DeformationView,
+  alpha: number,
+): DeformationView {
+  if (arriving(current.recovery)) return current;
+  return {
+    along: between(previous.along, current.along, alpha),
+    across: between(previous.across, current.across, alpha),
+    recovery: current.recovery,
+  };
 }
 
 /**
@@ -70,8 +107,14 @@ export function interpolate(
       y: between(previous.craft.y, current.craft.y, alpha),
       heading: betweenAngles(previous.craft.heading, current.craft.heading, alpha),
       speed: between(previous.craft.speed, current.craft.speed, alpha),
+      // The step never moves and the radius is a length, so one is taken and the
+      // other is crossed — the same split the rest of this function makes.
+      energy: current.craft.energy,
+      bloom: between(previous.craft.bloom, current.craft.bloom, alpha),
+      deformation: deformationBetween(previous.craft.deformation, current.craft.deformation, alpha),
     },
     bodies: current.bodies,
+    flash: flashBetween(previous.flash, current.flash, alpha),
     // The corridor does not move, and taking it from the later tick is the same
     // promise `bodies` above makes: interpolating a thing that cannot change
     // would be a promise this function should not make before spec 17's

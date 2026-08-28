@@ -1,12 +1,21 @@
 /**
- * The gate's desktop bench: the repo's own simulation, with the five open
- * questions on sliders.
+ * The gate's desktop bench: the repo's own simulation, with the open questions
+ * on sliders.
  *
  * Everything below the controls is the real thing — `src/sim/`, `src/state/`
- * and `src/render/` exactly as they are on `main`, bundled for the browser.
- * Four physics constants and five camera constants have been made settable and
+ * and `src/render/` exactly as they are on `main`, bundled for the browser. The
+ * constants listed in [`patches.ts`](./patches.ts) have been made settable and
  * nothing else has been touched, so what this page answers is a question about
  * the game rather than about a model of it.
+ *
+ * ## Three cards, and the middle one is a layer boundary
+ *
+ * **Physics** changes what a run *is*, so moving one starts the run again:
+ * otherwise the recipe underneath would describe a run nobody flew. **The
+ * picture** and **light** change only what is drawn, and presentation state is a
+ * convergent recurrence ([ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)),
+ * so they land live on the swing already in the air. The split is ADR-0006's
+ * wall as something the author can feel with a mouse.
  */
 import { bindPress, suppressBrowserGestures } from './app/input.ts';
 import { createPress, isPressed } from './src/input/press.ts';
@@ -19,6 +28,9 @@ import type { SimState } from './src/sim/types.ts';
 import * as units from './src/sim/units.ts';
 import { SECONDS_PER_TICK } from './src/sim/units.ts';
 import * as cameraKnobs from './src/state/camera.ts';
+import * as curve from './src/state/decay.ts';
+import * as shape from './src/state/deformation.ts';
+import * as light from './src/state/energy.ts';
 import * as view from './src/render/index.ts';
 import * as fit from './src/render/letterbox.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from './src/state/design.ts';
@@ -45,6 +57,8 @@ interface Knob {
   readonly apply: (value: number) => void;
   /** Physics knobs change what a run *is*, so the run starts again. */
   readonly restarts: boolean;
+  /** Which card it sits under. Only the first of the three restarts a run. */
+  readonly group: 'physics' | 'camera' | 'light';
   readonly places: number;
 }
 
@@ -59,6 +73,7 @@ const KNOBS: Knob[] = [
     base: units.MASS_EXPONENT,
     apply: units.set_MASS_EXPONENT,
     restarts: true,
+    group: 'physics',
     places: 2,
   },
   {
@@ -71,6 +86,7 @@ const KNOBS: Knob[] = [
     base: units.ECCENTRICITY_CAP,
     apply: units.set_ECCENTRICITY_CAP,
     restarts: true,
+    group: 'physics',
     places: 2,
   },
   {
@@ -83,6 +99,7 @@ const KNOBS: Knob[] = [
     base: units.GRAZE_RATIO,
     apply: units.set_GRAZE_RATIO,
     restarts: true,
+    group: 'physics',
     places: 2,
   },
   {
@@ -95,6 +112,7 @@ const KNOBS: Knob[] = [
     base: units.GRAZE_RESTITUTION,
     apply: units.set_GRAZE_RESTITUTION,
     restarts: true,
+    group: 'physics',
     places: 2,
   },
   {
@@ -107,6 +125,7 @@ const KNOBS: Knob[] = [
     base: units.BOUNCE_RESTITUTION,
     apply: units.set_BOUNCE_RESTITUTION,
     restarts: true,
+    group: 'physics',
     places: 2,
   },
   {
@@ -119,6 +138,7 @@ const KNOBS: Knob[] = [
     base: view.RIM_AT_REST,
     apply: view.set_RIM_AT_REST,
     restarts: false,
+    group: 'camera',
     places: 2,
   },
   {
@@ -131,6 +151,7 @@ const KNOBS: Knob[] = [
     base: view.RIM_WIDTH,
     apply: view.set_RIM_WIDTH,
     restarts: false,
+    group: 'camera',
     places: 1,
   },
   {
@@ -143,6 +164,7 @@ const KNOBS: Knob[] = [
     base: cameraKnobs.DEADZONE,
     apply: cameraKnobs.set_DEADZONE,
     restarts: false,
+    group: 'camera',
     places: 0,
   },
   {
@@ -155,6 +177,7 @@ const KNOBS: Knob[] = [
     base: cameraKnobs.FOLLOW_RATE,
     apply: cameraKnobs.set_FOLLOW_RATE,
     restarts: false,
+    group: 'camera',
     places: 1,
   },
   {
@@ -167,6 +190,7 @@ const KNOBS: Knob[] = [
     base: cameraKnobs.LOCK_TICKS,
     apply: cameraKnobs.set_LOCK_TICKS,
     restarts: false,
+    group: 'camera',
     places: 0,
   },
   {
@@ -179,7 +203,113 @@ const KNOBS: Knob[] = [
     base: cameraKnobs.RELEASE_RATE,
     apply: cameraKnobs.set_RELEASE_RATE,
     restarts: false,
+    group: 'camera',
     places: 1,
+  },
+
+  {
+    id: 'e1',
+    label: 'E1 · lit',
+    what: 'spec 00 §3’s 6px, read into design units. Body rims, labels, a compass window at rest',
+    min: 0,
+    max: 120,
+    step: 3,
+    base: light.E1_BLOOM,
+    apply: light.set_E1_BLOOM,
+    restarts: false,
+    group: 'light',
+    places: 0,
+  },
+  {
+    id: 'e2',
+    label: 'E2 · hot',
+    what: 'spec 00 §3’s 18px. The craft’s baseline and a held body — the craft is the brightest thing on screen, always',
+    min: 0,
+    max: 240,
+    step: 3,
+    base: light.E2_BLOOM,
+    apply: light.set_E2_BLOOM,
+    restarts: false,
+    group: 'light',
+    places: 0,
+  },
+  {
+    id: 'e3',
+    label: 'E3 · flash',
+    what: 'spec 00 §3’s 48px, additive, and only ever one alive. Struck at every grab and every release',
+    min: 0,
+    max: 480,
+    step: 6,
+    base: light.E3_BLOOM,
+    apply: light.set_E3_BLOOM,
+    restarts: false,
+    group: 'light',
+    places: 0,
+  },
+  {
+    id: 'e3ticks',
+    label: 'E3 · how long',
+    what: 'ticks. Spec 00 §3’s 400ms is 24 of them, and it is the only decay length the design states outright',
+    min: 1,
+    max: 90,
+    step: 1,
+    base: light.E3_TICKS,
+    apply: light.set_E3_TICKS,
+    restarts: false,
+    group: 'light',
+    places: 0,
+  },
+  {
+    id: 'stretch',
+    label: 'Release stretch',
+    what: 'spec 02 §4 · how far the craft draws out along its velocity as it lets go. 1 is no stretch at all',
+    min: 1,
+    max: 3,
+    step: 0.05,
+    base: shape.STRETCH_ALONG,
+    apply: shape.set_STRETCH_ALONG,
+    restarts: false,
+    group: 'light',
+    places: 2,
+  },
+  {
+    id: 'squash',
+    label: 'Release squash',
+    what: 'and how far it narrows across it, the same instant. 1 is none',
+    min: 0.3,
+    max: 1,
+    step: 0.05,
+    base: shape.STRETCH_ACROSS,
+    apply: shape.set_STRETCH_ACROSS,
+    restarts: false,
+    group: 'light',
+    places: 2,
+  },
+  {
+    id: 'deformticks',
+    label: 'Recovery',
+    what: 'ticks the stretch takes to come home. Spec 02 §4’s 180ms is 11, dated from the release itself now that the hitstop is gone (ADR-0012)',
+    min: 1,
+    max: 60,
+    step: 1,
+    base: shape.DEFORM_TICKS,
+    apply: shape.set_DEFORM_TICKS,
+    restarts: false,
+    group: 'light',
+    places: 0,
+  },
+  {
+    id: 'overshoot',
+    label: 'Overshoot',
+    what: 'how far through the return the value passes rest — 0.37 rebounds a tenth of the way past it, which is spec 02 §4’s own 0.95 against a 1.5 stretch. At 1 there is no overshoot at all',
+    min: 0.05,
+    max: 1,
+    step: 0.01,
+    base: curve.OVERSHOOT_FROM,
+    apply: curve.set_OVERSHOOT_FROM,
+    restarts: false,
+    group: 'light',
+    places: 2,
   },
 ];
 
@@ -424,10 +554,12 @@ function renderKnobs(): void {
 
   // Grouped by what a change costs, which is ADR-0006's layer boundary made
   // visible: a physics constant changes what a run *is*, so the run starts
-  // again and the recipe still describes it; a camera constant changes only the
-  // picture, and presentation state converges (ADR-0015), so it lands live.
-  byId('knobs-physics').innerHTML = markup(KNOBS.filter((knob) => knob.restarts));
-  byId('knobs-camera').innerHTML = markup(KNOBS.filter((knob) => !knob.restarts));
+  // again and the recipe still describes it; everything below it changes only
+  // the picture, and presentation state converges (ADR-0015), so it lands live
+  // on the swing already in the air.
+  for (const group of ['physics', 'camera', 'light'] as const) {
+    byId(`knobs-${group}`).innerHTML = markup(KNOBS.filter((knob) => knob.group === group));
+  }
 
   for (const knob of KNOBS) {
     const input = byId<HTMLInputElement>(`k-${knob.id}`);
