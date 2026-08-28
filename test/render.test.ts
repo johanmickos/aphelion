@@ -3026,6 +3026,45 @@ describe('the score band', () => {
     expect(formatScore(-150)).toBe('-150');
   });
 
+  it('prints no multiplier on a swing that paid nothing', () => {
+    // `0 x anything = 0`: a swing that climbed nothing while engaged cashes
+    // nothing however well it was flown, and 14 of 254 recorded swings did — all
+    // of them with a multiplier above x1 and eleven with a graded tier, so the
+    // screen said `+0  x10.00` after calling the release PERFECT. Reported as a
+    // mismatch between long captures paying 1000+ and short ones paying 0.
+    const r = recordingContext();
+    // The LIVE multiplier prints in the same format, so it is set to something
+    // else here — otherwise this passes or fails on the wrong number.
+    const sc = scoreWith({
+      bank: 1240,
+      multiplier: 3,
+      lastAward: award({ points: 0, multiplier: 10, tier: 2, carry: 0, climb: 0 }),
+    });
+    drawScore(r.ctx, cam(), sc, snapAt(110));
+    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(
+      texts.some((t) => t.includes('x10.00')),
+      'printed a multiplication that did not happen',
+    ).toBe(false);
+    // ...and the receipt still explains WHY, which is the carry rather than the
+    // release: the detail line leads with it.
+    expect(texts.some((t) => t.includes('0 x2.00'))).toBe(true);
+  });
+
+  it('still prints it on a swing that paid', () => {
+    // The control. Without it the assertion above passes on a band that stopped
+    // printing multipliers at all.
+    const r = recordingContext();
+    const sc = scoreWith({
+      bank: 1240,
+      multiplier: 3,
+      lastAward: award({ points: 900, multiplier: 10, tier: 2, carry: 90 }),
+    });
+    drawScore(r.ctx, cam(), sc, snapAt(110));
+    const texts = (r.calls('fillText') as Array<[string, string]>).map((o) => o[1]);
+    expect(texts.some((t) => t.includes('x10.00'))).toBe(true);
+  });
+
   it('always shows the total, and the multiplier only once it is above 1', () => {
     const r = recordingContext();
     drawScore(r.ctx, cam(), scoreWith({ bank: 1240 }), snapAt(0));

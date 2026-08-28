@@ -169,6 +169,23 @@ interface BandLine {
  * deduction colour, captioned as a penalty — the player told off for the capture
  * they had just made. Adding a kind now fails to compile until it has an entry.
  */
+/**
+ * The multiplier, when there is one and it multiplied something.
+ *
+ * `points > 0` IS THE LOAD-BEARING HALF, and `awardMote` already carries the rule
+ * it comes from: "printing x5 beside a number that was not multiplied by five is
+ * the readout lying about its own arithmetic". A swing that climbed nothing while
+ * engaged cashes `0 x anything = 0`, and 14 of 254 recorded swings did — every one
+ * of them with a multiplier above x1 and eleven with a graded tier, so the screen
+ * was printing `+0  x10.00` after grading the release PERFECT.
+ *
+ * The detail line still says `carry 0` beside it, which is the honest answer to
+ * why. What goes is the headline claiming a multiplication that did not happen.
+ */
+function multOf(a: ScoreAward): string {
+  return a.multiplier > 1 && a.points > 0 ? `  x${a.multiplier.toFixed(2)}` : '';
+}
+
 const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => BandLine> = {
   link: (a, p) => ({
     style: p ? LEVEL[p.level] : ROUTINE,
@@ -177,7 +194,7 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     // only the total could not be checked against the screen; this one can —
     // every number in it was drawn somewhere before it scored.
     detail: `${a.body}  ${formatScore(a.carry)} x${a.tier.toFixed(2)} · FIRE x${a.band} · PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
-    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
+    mult: multOf(a),
   }),
   // Never carries a praise word, and that is calibration rather than an omission:
   // a fast life makes upward of 38 of these a minute where a chained one makes
@@ -191,7 +208,7 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     // visibly swings that far around the planet. It is also the term that sets
     // the tier here, a pass having neither a compass marker nor a boost envelope.
     detail: `${a.body}  ${formatScore(a.carry)} x${a.tier.toFixed(2)} · FIRE x${a.band} · TURN ${Math.round(a.turn)}°`,
-    mult: a.multiplier > 1 ? `  x${a.multiplier.toFixed(2)}` : '',
+    mult: multOf(a),
   }),
   // No word and no multiplier, because a dot has neither: it pays flat and every
   // one is identical. The line says which of them this was, so ten of them read as
