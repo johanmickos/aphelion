@@ -541,6 +541,28 @@ describe('a report that survives its own replay diverging', () => {
     );
   }
 
+  it('carries what each swing was priced at, not only what it paid', () => {
+    // THE GAP THE FIRST CURRENT-BUILD SESSION FOUND. F04 added `tier`, `band` and
+    // `carry` to an award and did not add them to this tuple, so the one recording
+    // flown under the constitution reported every swing as unpriced — and those
+    // three ARE the calibration stage (c) exists to do. `points` is the product
+    // and `multiplier` is the whole of `tier x band x streak`, so without them the
+    // factors are recoverable only by reconstructing the streak and guessing which
+    // factorisation of the remainder was real.
+    const parsed = parseReport(report());
+    const awards = recordedAwards(parsed)!;
+    const live = replayReport(parsed).awards;
+    expect(awards.map((w) => w.tier)).toEqual(live.map((w) => w.tier));
+    expect(awards.map((w) => w.band)).toEqual(live.map((w) => w.band));
+    expect(awards.map((w) => w.carry)).toEqual(live.map((w) => Math.round(w.carry)));
+    // And the receipt has to add up, or the three are decoration rather than the
+    // factors: every swing's points are its carry times its whole multiplier.
+    for (const w of awards) {
+      if (w.kind === 'mote') continue;
+      expect(Math.abs(w.points - w.carry * w.multiplier), `${w.tick}`).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('carries every award the session paid, through a round trip', () => {
     const parsed = parseReport(report());
     const awards = recordedAwards(parsed);

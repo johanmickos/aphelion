@@ -482,6 +482,9 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
     body,
     heat,
     turn,
+    tier,
+    band,
+    carry,
   ] of report.awards) {
     const kind = AWARD_KIND[code];
     if (!kind) {
@@ -493,13 +496,16 @@ export function recordedAwards(report: DiagReport): ScoreAward[] | null {
       kind,
       points,
       multiplier,
-      // Neither existed when any of these were recorded, and there is no honest
-      // way to recover them: `multiplier` was the streak alone, so it cannot be
-      // divided back into a tier and a band that were not being computed. 1 and 1
-      // read as "unpriced", which is what an award from the additive economy is.
-      tier: 1,
-      band: 1,
-      carry: 0,
+      // Absent from every report written before F04 stage (b), and from the first
+      // session flown under it — the tuple was extended one build late. There is
+      // no honest way to recover them from an ADDITIVE report: `multiplier` was
+      // the streak alone, so it cannot be divided back into a tier and a band that
+      // were never computed. 1 / 1 / 0 read as "unpriced", which is what an award
+      // from that economy is; `scratch/f04c-recover.ts` is what to reach for on a
+      // multiplicative report that predates the fields.
+      tier: tier ?? 1,
+      band: band ?? 1,
+      carry: carry ?? 0,
       body,
       close,
       clearance,

@@ -4910,6 +4910,55 @@ scenarios, the golden did not move, and `SIM_VERSION` did not need a bump.
 
 ---
 
+### 75 — The first session under the constitution could not say what it had been priced at
+
+F04 added `tier`, `band` and `carry` to a `ScoreAward` and did not add them to
+`AwardRecord`. The tuple is what a phone session leaves behind, and it is the only
+part of a report that survives a replay diverging — so the one recording flown
+under the new economy reported every swing as unpriced, and those three fields ARE
+the calibration stage (c) exists to do.
+
+**It is invisible from the inside**, which is why it is worth a note. The report
+decoded cleanly, no retired codes, `config matches current defaults`, every award
+in the table carrying a plausible `points` and `multiplier`. What gave it away was
+`tier x1.00` and `band x1` on all 67 events, which is the placeholder
+`recordedAwards` writes for a field that is absent — the same three columns an
+ADDITIVE report shows, so a report from the current build and one from before the
+constitution were rendering identically.
+
+The fields are appended and optional, which is the rule this tuple has always
+followed: `heat` and `turn` were added the same way, and `recordedAwards` reads a
+missing field as absent rather than as a zero someone might calibrate on.
+`test/diagnostics.test.ts` now pins that a round trip preserves all three AND that
+the receipt adds up — `points = carry x multiplier` on every swing — because three
+fields that survive the trip without agreeing with the number beside them would be
+decoration rather than the factors.
+
+**What the lost session still yielded.** `multiplier` is the whole product and
+`points / multiplier` is the carry, so reconstructing the streak from the award
+sequence leaves `tier x band`, and the two ladders are coarse enough that 46 of 63
+swings factorise uniquely. `scratch/f04c-recover.ts` does it. First reading, one
+128s session, six lives, stated with its sample size because two sessions cannot
+establish a distribution whose interesting end is rare by construction:
+
+```
+tier   x1 10 · TRUE 14 · SHARP 22 · PERFECT 0
+band   x1 45 · x2 1 · x3 0
+carry  p10 52 · p50 187 · p90 481 · max 1462
+carry per px climbed   p10 0.43 · p50 0.67 · p90 1.18   (climbPerPx is 0.25)
+multiplier             p50 x6.25 · p90 x10.00 · max x11.50
+6% of swings cashed nothing
+```
+
+Two of those are stage (c) findings and are recorded against it rather than
+decided here: SHARP is the modal rung at 48% where the board's zone says 30%, and
+PERFECT did not fire once; and the fire band is very nearly inert. The band has a
+structural cause worth writing down at the plan — it is emptied by every cash, and
+this session cashed a swing every 2.6 seconds, so a `bandTwoAt` denominated in
+heat-seconds has 2.6 seconds to fill rather than a capture.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
@@ -4937,7 +4986,7 @@ tests    render 205 · score 98 · camera 55 · invariants 32 · diagnostics 25
          backtrack 15 · palette 15 · rescue 15 · clearance 14 · flyby-fuel 14
          attract 13 · kick 13 · tune 13 · input 12 · port-equality 11
          run-stats 10 · course 9 · grab-target 8 · boost-envelope 6
-         escape 6 · link-fuel 6 · outbound-grab 6 · 707 total
+         escape 6 · link-fuel 6 · outbound-grab 6 · 708 total
 ```
 
 What the gate proves, precisely: `src/sim` reproduces `index.html` under

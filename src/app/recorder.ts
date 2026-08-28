@@ -51,6 +51,14 @@ export type InputRecord = [number, 0 | 1];
  * every grab and every release rather than on a fixed interval, so comparing the
  * two lists localises a divergence to the capture that caused it.
  */
+/**
+ * APPEND ONLY, AND EVERY ADDITION IS OPTIONAL. A report written by an older build
+ * is shorter, and `recordedAwards` in `tools/replay-core.ts` reads a missing field
+ * as its honest absence rather than as a zero someone might calibrate on. The
+ * retired codes are kept in the union for the same reason: `g`/`h`/`b`/`r` no
+ * longer exist as awards, but every recording in `diagnostics/` still carries
+ * them and a decoder that could not name them could not say so.
+ */
 export type AwardRecord = [
   number,
   'g' | 'l' | 'h' | 'f' | 'b' | 'r' | 'd',
@@ -64,6 +72,19 @@ export type AwardRecord = [
   number,
   number,
   string,
+  number?,
+  number?,
+  /**
+   * `tier`, `band`, `carry` — the three fields F04 added and this tuple did not.
+   *
+   * Without them a report from the constitution's own build cannot say what a
+   * swing was PRICED at: `points` is the product and `multiplier` is the whole of
+   * `tier x band x streak`, so the three factors are recoverable only by
+   * reconstructing the streak from the award sequence and then guessing which
+   * factorisation of the remainder was real. That is exactly the calibration
+   * stage (c) has to do, on exactly these numbers.
+   */
+  number?,
   number?,
   number?,
 ];
@@ -177,6 +198,9 @@ export class RunRecorder {
         a.body,
         q(a.heat),
         Math.round(a.turn),
+        q(a.tier),
+        a.band,
+        Math.round(a.carry),
       ]);
       if (this.awards.length > this.opts.maxAwards) {
         this.awards.shift();

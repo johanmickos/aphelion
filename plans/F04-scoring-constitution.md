@@ -196,17 +196,76 @@ change once the formula was real — two counters rather than one, the tier's ru
 derivation, why the band's drawn steps are not its thresholds, and the capture's
 climb being gated as a coast.
 
-### (c) Calibrate
+### (c) Calibrate — ALL THAT IS LEFT, AND IT IS UNDER WAY
 
-**Only after fresh recordings from the current build.** Every magnitude is a
-threshold under the ruling, and the existing corpus predates the release kick, the
-flyby retune and the ending — VISION's standing hazard is staleness, not error:
-"a threshold measured under tuning that has since moved is worse than an unmeasured
+**Only against recordings from the current build.** Every magnitude is a threshold
+under the ruling, and the 67-recording corpus predates the release kick, the flyby
+retune and the ending — VISION's standing hazard is staleness, not error: "a
+threshold measured under tuning that has since moved is worse than an unmeasured
 one, because it looks defensible."
 
-Open at (c): points per metre (the board's worked example is 1 pt/m against
-`climbPerPx` 0.25); the tier and band ratios; whether a rescue at ~7× is too
-generous.
+#### The first session flown under it — 2026-08-28, 128s, 67 swings
+
+One session, stated with its sample size because the interesting end of every
+distribution here is rare by construction. It predates the recorder carrying
+`tier`/`band`/`carry`, so the split is reconstructed: PORT_NOTES 75 has the method
+and `scratch/f04c-recover.ts` does it. **Re-measure on the next session, which
+carries the fields directly.**
+
+```
+tier   x1 10 · TRUE 14 · SHARP 22 · PERFECT 0     (46 of 63 factorise uniquely)
+band   x1 45 · x2 1 · x3 0
+carry  p10 52 · p50 187 · p90 481 · max 1462
+carry per px climbed   p10 0.43 · p50 0.67 · p90 1.18   (climbPerPx is 0.25)
+multiplier             p50 x6.25 · p90 x10.00 · max x11.50
+```
+
+**The band is very nearly inert, and the cause looks structural rather than a
+threshold set too high.** `burnBank` is emptied by every cash, and this session
+cashed a swing every 2.6 seconds — so a threshold denominated in heat-seconds has
+2.6 seconds to fill rather than a capture. Lowering `bandTwoAt` is the obvious move
+and probably the wrong one: it would pay a graze at the rate of a drag. The
+question to answer first is whether the band should survive a cash the way the
+chain survives one, and **that is a rule rather than a magnitude**, so it wants
+deciding before (c) tunes anything.
+
+It has a reported feel attached: "I find myself being more careful and conservative
+with my burns." That is the opposite of what Direction 08 asks the fire band for —
+"the fire band gets scarier the richer you are" is a temptation, and VISION pillar
+4 says the whole point of the marker is to be able to aim at it. A multiplier that
+fires once in 46 swings is not a dial.
+
+**SHARP is the modal rung and PERFECT never fired.** 22 of 46 at SHARP, where the
+board's zone says the inner 30% — and a CONJUNCTION of two axes should be rarer
+than either zone alone, not commoner. The rungs are too loose. Re-derive rather
+than nudge: each threshold is `zone^aimSharpness * zone^timingSharpness`, so they
+move with the sharpnesses and all three have to move together.
+
+**The displayed number and the played number are different numbers.** That session
+totalled 100,045 across its lives; the game shows the best SINGLE life. The
+author's reading of it — "I struggle to reach 100k points, which is a good thing, I
+want that to be a tough ceiling" — is calibrated on the total. This is VISION's
+standing open call on aggregation arriving with fresh evidence, and it is upstream
+of the scale question below: decide what a RUN is worth before tuning what a swing
+is worth.
+
+#### The open magnitudes
+
+Every provisional number says so at its declaration in `src/score/config.ts`.
+
+- **Points per metre.** `climbPerPx` is still 0.25 and Direction 08's worked
+  example is 1 pt/m. This is the scale of every number the player sees, and it is
+  downstream of the aggregation call above.
+- **The tier rungs.** The zone FRACTIONS are Direction 06's design intent and a
+  measurement cannot refute them; where the resulting thresholds land is the
+  question, and the first session says too loose.
+- **The band**, once its reset rule is settled. `bandTwoAt` 85 is the median
+  surviving drag and `bandThreeAt` 333 is two thirds of the hottest on record,
+  both from `burnRate`'s own measurement.
+- **`tightMax` and `chainStep`.** 2 and 0.1, both legible rather than measured. The
+  pair currently multiplies the carry by a median 2.7x over `climbPerPx`.
+- **Whether a rescue at ~7x is too generous**, which needs a rescue flown under the
+  new economy — the first session had none.
 
 ## Gates
 
