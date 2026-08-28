@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { createBody } from '../../src/sim/body.ts';
 import { createCraft, headingOf, speedOf } from '../../src/sim/craft.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
+import { openField } from './fixtures.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS } from '../../src/sim/units.ts';
 
@@ -20,13 +21,11 @@ const TICKS = 600;
 
 function coastingRun(): ReturnType<typeof createInitialState> {
   // A crowd of bodies, none of them held. If any of them pulls, this fails.
-  const field = {
-    bodies: [
-      createBody(0, 0, MEDIAN_RADIUS),
-      createBody(400, 900, MEDIAN_RADIUS),
-      createBody(-700, 300, MEDIAN_RADIUS * 1.25),
-    ],
-  };
+  const field = openField([
+    createBody(0, 0, MEDIAN_RADIUS),
+    createBody(400, 900, MEDIAN_RADIUS),
+    createBody(-700, 300, MEDIAN_RADIUS * 1.25),
+  ]);
   return createInitialState(field, createCraft(-2000, -80, 431.7, 233.11), 1);
 }
 

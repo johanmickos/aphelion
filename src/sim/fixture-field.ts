@@ -63,6 +63,51 @@ import { SCALE } from './units.ts';
 const CENTRELINE = 195;
 
 /**
+ * How far either side of the centreline the corridor reaches, in prototype
+ * units.
+ *
+ * **The prototype's own, and it is a tuned number rather than an incidental
+ * one.** Its field is `1.9 ×` the width it is drawn in — 390 — and its tuning
+ * log records both halves of the move from 1.2: *"the corridor felt
+ * constrictive, and a wider field gives more room to find a planet to curve away
+ * from before reaching a boundary"*, and then 1.90 specifically so that a run
+ * does not open on the boundary's own gradient. Spec
+ * [01 · §10](../../docs/spec/01-swing.md)'s 24 recorded endings — 83% of them
+ * out of bounds — were all flown at this width, and its tolerance that
+ * out-of-bounds stays the plurality is written on that number.
+ *
+ * **It is also the narrowest that this field can be flown in.** Three of the
+ * bodies below sit 150 units off the centreline, so a *settled circle* at one of
+ * their floors reaches 202 — and an oval at the eccentricity cap reaches 400.
+ * A corridor at the design space's own edges (half-width 195) would kill a craft
+ * on the far side of a legitimate orbit around a body the field itself placed,
+ * which is exactly the defect §10 records the fell-behind line having had.
+ *
+ * **Expires with M3's corridor.** Spec [17 · §4](../../docs/spec/17-daily-field.md)
+ * narrows the half-width with altitude, in metres this repo has not reconciled
+ * with design units, and M3 re-measures the curve. Until then the corridor is
+ * one number and it is this one.
+ */
+const CORRIDOR_HALF_WIDTH = (390 * 1.9) / 2;
+
+/**
+ * How far below the craft's own spawn the field's foot sits, in prototype units.
+ *
+ * The prototype's, and the two numbers it is made of are visible in it: one
+ * screen height (844) plus 400. **It is a backstop rather than a line anyone
+ * meets** — the fell-behind line trails the high-water mark by 700 and the mark
+ * opens at the spawn, so the fell-behind line is always the higher of the two and
+ * always fires first. That is true of the prototype at this tuning too. It is
+ * built because spec 01 §10's out-of-bounds ending is *"leaving the corridor
+ * sideways ... **or** falling out of the bottom"*, and a field with no foot is a
+ * field a run could fall through if the trailing line ever moved.
+ */
+const FOOT_BELOW_SPAWN = 844 + 400;
+
+/** Where the craft stands at the first tick, in prototype units of altitude. */
+const SPAWN_BELOW_FIRST_BODY = 354.48;
+
+/**
  * The field, foot to top, in the prototype's units.
  *
  * `up` is altitude and increases with the climb; `dx` is signed from the
@@ -113,7 +158,14 @@ export function fixtureField(): Field {
   const bodies: Body[] = PLACEMENTS.map((at) =>
     createBody((CENTRELINE + at.dx) * SCALE, -at.up * SCALE, at.radius * SCALE),
   );
-  return { bodies };
+  return {
+    bodies,
+    corridor: {
+      centreline: CENTRELINE * SCALE,
+      halfWidth: CORRIDOR_HALF_WIDTH * SCALE,
+      foot: (SPAWN_BELOW_FIRST_BODY + FOOT_BELOW_SPAWN) * SCALE,
+    },
+  };
 }
 
 /**
@@ -126,5 +178,10 @@ export function fixtureField(): Field {
  */
 export function fixtureCraft(): Craft {
   const first = PLACEMENTS[0]!;
-  return createCraft((CENTRELINE + first.dx - 84) * SCALE, 354.48 * SCALE, 0, -97 * SCALE);
+  return createCraft(
+    (CENTRELINE + first.dx - 84) * SCALE,
+    SPAWN_BELOW_FIRST_BODY * SCALE,
+    0,
+    -97 * SCALE,
+  );
 }

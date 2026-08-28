@@ -68,6 +68,24 @@ _Avoid_: wall, edge, barrier
 **Fire band**:
 The hottest, best-paid, most dangerous band of the boundary.
 
+**Corridor**:
+The field's sides and its foot — the region a run is flown inside. Today it is a constant
+half-width about a centreline; spec 17 narrows it with altitude. It has no top, because
+leaving through the top is the win rather than the loss.
+_Avoid_: playfield, bounds, walls
+
+**Line**:
+The edge of the corridor itself, and the only absolute in it. The **boundary** is the graded
+region inside the line; the line is where it stops being negotiable and the run is over.
+_Avoid_: wall, barrier, edge
+
+**Fell-behind line**:
+The line that trails the climb, a fixed distance below the highest the craft has been. Falling
+through it ends the run. It **does not follow a craft that is holding a body**: an orbit is a
+round trip and the height gained going round its near side is not ground kept. Never called a
+floor — the **floor** is the orbit's, and the two are a whole run apart.
+_Avoid_: backtrack floor, trailing floor, death floor
+
 **Carpet**:
 The sanctuary at the top of the field. Crossing into it ends the run as a win: gravity
 lets go and the craft is thrown past the top of the screen. The boundary's mirror,
@@ -192,6 +210,13 @@ document knows it was decided against rather than forgotten.
 Flying without being engaged with a body. Earns nothing and costs nothing.
 _Avoid_: drifting, idling
 
+**Contact**:
+The craft meeting a body. One event with two outcomes, and which one it is depends on nothing
+about the geometry: while a body is held the craft bounces off whatever it meets and lives,
+and while coasting the same meeting ends the run unless it is a near-parallel graze. A grab is
+a promise that you will not be killed by the thing you grabbed.
+_Avoid_: collision, crash (a crash is the **impact** ending, which is one outcome of a contact)
+
 ## The economy
 
 **Carry**:
@@ -265,6 +290,19 @@ Something the field gives the craft, paying fuel or time. Never points and never
 multipliers — the economy pays for skill, and a powerup is not skill.
 
 ## The run and its modes
+
+**Run**:
+One craft, one field, one climb, from the spawn to whatever ends it. The unit a recipe
+describes and a score belongs to.
+_Avoid_: game, session (a session is a sitting and may hold many runs), life, attempt
+
+**Ending**:
+How a run stopped, and there are four. Three are deaths — **impact** (a contact while
+coasting), **out of bounds** (leaving the corridor sideways, or falling out of its foot) and
+**fell behind** (through the fell-behind line) — and the fourth, **cleared**, is the win: above
+the point where the last body has gone out of grab range. A run is over exactly when it has an
+ending, and the ending says which.
+_Avoid_: game over, death (death is the three; the win is an ending too), reason, cause
 
 **Day**:
 One seeded field, shared by every player on a given date, with a name and a fixed number

@@ -15,23 +15,26 @@
  * rules that contact while a body is held never kills — it bounces off the held
  * body at the floor with zero restitution — and §4 rules that where the
  * clearance's turn falls short *"the floor catches the remainder"*. Those are the
- * same mechanism seen from two ends, and it lives here rather than with the
- * deaths of M1.4, because what it protects is the promise the press made. Contact
- * with any body the craft is *not* holding is M1.4's: it is one predicate with
- * two outcomes, and the other outcome is a death.
+ * same mechanism seen from two ends, and it lives here rather than in
+ * [`run.ts`](./run.ts) with the endings, because what it protects is the promise
+ * the press made. The rest of the field bounces here too, at `R + 6` and never
+ * lethally, because spec 01 §10 extends that promise to everything for as long
+ * as a body is held: **the same geometry is lethal coasting and safe held**, and
+ * the coasting half is [`contact.ts`](./contact.ts)'s `strikeField`.
  *
  * The dive also carries the two numbers the freeze reads out of it — how far out
  * the press happened, and the **peak** energy it reached.
  */
 import type { Body } from './body.ts';
-import { floorRadius } from './body.ts';
 import type { Craft } from './craft.ts';
 import { speedOf } from './craft.ts';
 import { easeClearance } from './clearance.ts';
+import { bounce, bounceOffOthers, inContact } from './contact.ts';
 import { integrate } from './integrate.ts';
 import { specificEnergy } from './kepler.ts';
-import { distance, magnitude } from './math.ts';
-import { SECONDS_PER_TICK, SUBSTEPS } from './units.ts';
+import { distance } from './math.ts';
+import type { Field } from './types.ts';
+import { FLOOR_GAP, SECONDS_PER_TICK, SUBSTEPS } from './units.ts';
 
 export interface Dive {
   /**
@@ -84,23 +87,13 @@ export function beginDive(craft: Craft, body: Body, clearanceTicks: number): Div
  * it. *"A hard limit that is never crossed"*: this is the sentence, and
  * everything downstream — the frozen periapsis, the settled circle, the depth
  * the boost is paid on — is measured against a radius this function guarantees.
+ *
+ * It is [`bounce`](./contact.ts) at zero restitution and not a second copy of
+ * it. Spec 01 §10's three contacts are one operation at three sets of constants,
+ * and the prototype's own experience is that written out three times they drift.
  */
-function holdAboveFloor(craft: Craft, body: Body, floor: number): void {
-  const dx = craft.x - body.x;
-  const dy = craft.y - body.y;
-  const r = magnitude(dx, dy);
-  if (r >= floor || r === 0) return;
-
-  const outX = dx / r;
-  const outY = dy / r;
-  craft.x = body.x + outX * floor;
-  craft.y = body.y + outY * floor;
-
-  const inward = craft.vx * outX + craft.vy * outY;
-  if (inward < 0) {
-    craft.vx -= inward * outX;
-    craft.vy -= inward * outY;
-  }
+function holdAboveFloor(craft: Craft, body: Body): void {
+  if (inContact(craft, body, FLOOR_GAP)) bounce(craft, body, FLOOR_GAP, 0);
 }
 
 /**
@@ -119,18 +112,23 @@ function holdAboveFloor(craft: Craft, body: Body, floor: number): void {
  * never freezes at all, which is the release ADR-0012 grades on how hard the
  * body is bending it instead.
  */
-export function flyDive(craft: Craft, body: Body, dive: Dive): boolean {
+export function flyDive(craft: Craft, field: Field, body: Body, dive: Dive): boolean {
   if (dive.clearanceTicks > 0) {
     easeClearance(craft, body, dive.clearanceTicks);
     dive.clearanceTicks -= 1;
   }
 
-  const floor = floorRadius(body);
   const dt = SECONDS_PER_TICK / SUBSTEPS;
   for (let i = 0; i < SUBSTEPS; i++) {
     integrate(craft, body, dt, 1);
-    holdAboveFloor(craft, body, floor);
+    holdAboveFloor(craft, body);
   }
+
+  // The rest of the field, at spec 01 §10's `R + 6` and never lethally. Once per
+  // tick rather than per substep, which is where the prototype puts it too: a
+  // tick moves the craft a handful of units against a body of a hundred, so
+  // there is nothing to tunnel through.
+  bounceOffOthers(craft, field, body);
 
   const radius = distance(craft.x, craft.y, body.x, body.y);
   const energy = specificEnergy(body.mass, radius, speedOf(craft));

@@ -393,7 +393,12 @@ const { createCraft, speedOf } = await import('../src/sim/craft.ts');
 const { createPresentation, derive } = await import('../src/state/derive.ts');
 const { createPress, pressDown, pressUp, isPressed } = await import('../src/input/press.ts');
 
-const field = { bodies: [createBody(0, 0, 132)] };
+// No sides and no foot: this is a proof that the layer runs under plain node,
+// not a run, and a corridor here would be geometry the proof has to dodge.
+const field = {
+  bodies: [createBody(0, 0, 132)],
+  corridor: { centreline: 0, halfWidth: Infinity, foot: Infinity },
+};
 const sim = createInitialState(field, createCraft(-900, -420, 260, 0), 1);
 
 const HELD_TICKS = 240;

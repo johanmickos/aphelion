@@ -16,11 +16,13 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS } from '../../src/sim/units.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
+import { openField } from '../sim/fixtures.ts';
 
 function world(): ReturnType<typeof createInitialState> {
-  const field = {
-    bodies: [createBody(0, 0, MEDIAN_RADIUS), createBody(700, 900, MEDIAN_RADIUS * 0.8)],
-  };
+  const field = openField([
+    createBody(0, 0, MEDIAN_RADIUS),
+    createBody(700, 900, MEDIAN_RADIUS * 0.8),
+  ]);
   return createInitialState(field, createCraft(-900, 600, 360, -120), 1);
 }
 

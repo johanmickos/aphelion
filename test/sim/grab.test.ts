@@ -15,13 +15,14 @@ import { attemptGrab, bodyOnOffer, grabRange } from '../../src/sim/grab.ts';
 import { distance } from '../../src/sim/math.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { MEDIAN_RADIUS, LEAD_SECONDS, SCALE } from '../../src/sim/units.ts';
+import { openField } from './fixtures.ts';
 import { BODY, LET_GO, PRESS, placed, geometry, scaled } from './swing.ts';
 
 /** Spec 01 §3's grab range of 560 prototype units. */
 const RANGE = scaled(560);
 
 function world(bodies: ReturnType<typeof createBody>[], craft: ReturnType<typeof createCraft>) {
-  return createInitialState({ bodies }, craft, 1);
+  return createInitialState(openField(bodies), craft, 1);
 }
 
 describe('the range', () => {
@@ -88,7 +89,7 @@ describe('which body a press takes', () => {
           (a, b) =>
             distance(leadX, leadY, a.body.x, a.body.y) - distance(leadX, leadY, b.body.x, b.body.y),
         )[0];
-        const chosen = bodyOnOffer({ bodies }, craft);
+        const chosen = bodyOnOffer(openField(bodies), craft);
         expect(chosen, `at velocity ${vx},${vy}`).toBe(nearest ? nearest.index : null);
       }
     }
@@ -102,7 +103,7 @@ describe('which body a press takes', () => {
    */
   it('is the nearest body when the craft is not moving', () => {
     const bodies = [createBody(700, 0, MEDIAN_RADIUS), createBody(-400, 0, MEDIAN_RADIUS)];
-    expect(bodyOnOffer({ bodies }, createCraft(0, 0, 0, 0))).toBe(1);
+    expect(bodyOnOffer(openField(bodies), createCraft(0, 0, 0, 0))).toBe(1);
   });
 
   /**
@@ -113,9 +114,9 @@ describe('which body a press takes', () => {
   it('changes only where two bodies are equally near the lead point', () => {
     const bodies = [createBody(900, 600, MEDIAN_RADIUS), createBody(900, -600, MEDIAN_RADIUS)];
     let flips = 0;
-    let previous = bodyOnOffer({ bodies }, createCraft(0, 0, 1200, -1200));
+    let previous = bodyOnOffer(openField(bodies), createCraft(0, 0, 1200, -1200));
     for (let vy = -1200; vy <= 1200; vy += 1) {
-      const chosen = bodyOnOffer({ bodies }, createCraft(0, 0, 1200, vy));
+      const chosen = bodyOnOffer(openField(bodies), createCraft(0, 0, 1200, vy));
       if (chosen !== previous) flips += 1;
       previous = chosen;
     }
@@ -209,7 +210,7 @@ describe('the world beyond the swing', () => {
       createBody(600, 400, MEDIAN_RADIUS),
       createBody(-500, 700, MEDIAN_RADIUS),
     ];
-    const state = createInitialState({ bodies }, createCraft(-600, 0, 300 * SCALE, 0), 1);
+    const state = createInitialState(openField(bodies), createCraft(-600, 0, 300 * SCALE, 0), 1);
     stepSim(state, PRESS);
     expect(state.heldBody).not.toBeNull();
     stepSim(state, PRESS);

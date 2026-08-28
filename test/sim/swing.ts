@@ -34,6 +34,7 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { angleOf } from '../../src/sim/trig.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS, SCALE, SECONDS_PER_TICK } from '../../src/sim/units.ts';
+import { openField } from './fixtures.ts';
 
 /** The field's median body, at the origin, so a radius reads as a distance. */
 export const BODY = createBody(0, 0, MEDIAN_RADIUS);
@@ -119,7 +120,7 @@ export function placed(g: Geometry): SimState {
   const across = scaled(g.aim);
   const along = -Math.sqrt(Math.max(0, out * out - across * across));
   return createInitialState(
-    { bodies: [BODY] },
+    openField([BODY]),
     createCraft(along, across, scaled(g.approachSpeed), 0),
     1,
   );

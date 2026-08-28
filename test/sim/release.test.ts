@@ -19,7 +19,7 @@ import {
   PERMANENT_SHARE,
   SECONDS_PER_TICK,
 } from '../../src/sim/units.ts';
-import { holdWithoutGrabbing } from './fixtures.ts';
+import { holdWithoutGrabbing, openField } from './fixtures.ts';
 import { BODY, ENVELOPE, LET_GO, PRESS, fly, geometry, placed, scaled } from './swing.ts';
 
 describe('the direction', () => {
@@ -126,7 +126,7 @@ describe('what the craft does next', () => {
   });
 
   it('feels nothing from the body it just let go of, however close it passes', () => {
-    const state = createInitialState({ bodies: [BODY] }, placed(geometry(200, 150, 20)).craft, 1);
+    const state = createInitialState(openField([BODY]), placed(geometry(200, 150, 20)).craft, 1);
     for (let tick = 0; tick < 90; tick++) stepSim(state, PRESS);
     stepSim(state, LET_GO);
     const { vx, vy } = state.craft;
@@ -200,20 +200,20 @@ describe('quality, which the punch is scaled by', () => {
     // is no bend at all, and a release here is worth exactly nothing. This is
     // the tap paying nothing structurally — the arithmetic has a zero in it, and
     // no guard is checking anything.
-    const straightIn = createInitialState({ bodies: [BODY] }, createCraft(-radius, 0, 900, 0), 1);
+    const straightIn = createInitialState(openField([BODY]), createCraft(-radius, 0, 900, 0), 1);
     holdWithoutGrabbing(straightIn);
     expect(qualityOf(straightIn)).toBe(0);
 
     // Broadside at the same distance and speed: the same body is now bending it
     // as hard as it can, and the reading follows.
-    const broadside = createInitialState({ bodies: [BODY] }, createCraft(-radius, 0, 0, 900), 1);
+    const broadside = createInitialState(openField([BODY]), createCraft(-radius, 0, 0, 900), 1);
     holdWithoutGrabbing(broadside);
     expect(qualityOf(broadside)).toBeGreaterThan(qualityOf(straightIn));
 
     // At exactly the speed of a circle here, the body is bending the craft
     // exactly as much as a circle would, which is what a reading of one means.
     const circular = createInitialState(
-      { bodies: [BODY] },
+      openField([BODY]),
       createCraft(-radius, 0, 0, circularSpeed(BODY.mass, radius)),
       1,
     );

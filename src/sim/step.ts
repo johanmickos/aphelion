@@ -12,6 +12,7 @@
  * the decision behind it, so this file can be read for the order of events and
  * nothing else.
  */
+import { strikeField } from './contact.ts';
 import type { Craft } from './craft.ts';
 import { flyDive } from './dive.ts';
 import { attemptGrab } from './grab.ts';
@@ -19,7 +20,8 @@ import { coast } from './integrate.ts';
 import { freeze, rideOrbit } from './orbit.ts';
 import { release } from './release.ts';
 import { seedRng } from './rng.ts';
-import type { Field, Input, SimState } from './types.ts';
+import { endingFor, markHighWater } from './run.ts';
+import type { Ending, Field, Input, SimState } from './types.ts';
 import { SECONDS_PER_TICK } from './units.ts';
 
 /**
@@ -39,6 +41,12 @@ export function createInitialState(field: Field, craft: Craft, seed: number): Si
     dive: null,
     orbit: null,
     pressed: false,
+    // A run opens alive, with its high-water mark where the craft is standing.
+    // Not at the field's foot and not at zero: the mark is what the fell-behind
+    // line trails, and a run that opened with a mark below itself would be given
+    // free ground it had not climbed.
+    ending: null,
+    highWater: craft.y,
     rng: seedRng(seed),
   };
 }
@@ -59,6 +67,13 @@ export function createInitialState(field: Field, craft: Craft, seed: number): Si
  * pure function does not threaten.
  */
 export function stepSim(state: SimState, input: Input): void {
+  // **A run that has ended does not tick.** DAILY is one run, no retry and no
+  // lives (ADR-0007), so there is nothing after the ending for the simulation to
+  // have an opinion about — the field behind a debrief card stays alive in spec
+  // 09's picture, and a picture is presentation state's business rather than
+  // this one's.
+  if (state.ending !== null) return;
+
   // The press is an edge and the release is a level: a button that goes down
   // while nothing is on offer has spent its press, and a button that comes up
   // always lets go of whatever is held.
@@ -70,10 +85,14 @@ export function stepSim(state: SimState, input: Input): void {
   // whether there is a force at all. A held craft is then in exactly one of the
   // swing's two halves: diving, or riding the orbit the freeze handed it.
   const held = state.heldBody === null ? null : state.field.bodies[state.heldBody]!;
+  let struck: Ending | null = null;
   if (held === null) {
     coast(state.craft, SECONDS_PER_TICK);
+    // Planets are obstacles, and only to a craft that is holding nothing (spec
+    // 01 §10). A held craft's contacts are the dive's, where they bounce.
+    struck = strikeField(state.craft, state.field);
   } else if (state.dive) {
-    if (flyDive(state.craft, held, state.dive)) {
+    if (flyDive(state.craft, state.field, held, state.dive)) {
       state.orbit = freeze(state.craft, held, state.dive);
       state.dive = null;
     }
@@ -81,5 +100,13 @@ export function stepSim(state: SimState, input: Input): void {
     rideOrbit(state.craft, held, state.orbit);
   }
 
+  // The mark before the endings, so a tick that climbs and then falls behind is
+  // judged against the height it actually kept — and it does not move at all
+  // while a body is held, which is spec 01 §10's measured rule.
+  markHighWater(state);
+  state.ending = struck ?? endingFor(state);
+
+  // The tick that ends a run still completes, so the ending has a tick number
+  // and the state it is read from is the state the craft died in.
   state.tick += 1;
 }

@@ -17,6 +17,7 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS } from '../../src/sim/units.ts';
+import { openField } from './fixtures.ts';
 
 const TICKS = 3600; // a minute of play
 
@@ -38,15 +39,13 @@ const PRESSED = { pressed: true };
  * well as the physics.
  */
 function fly(seed: number, ticks: number, onSnapshot?: (bytes: Uint8Array) => void): SimState {
-  const field = {
-    bodies: [
-      createBody(0, 0, MEDIAN_RADIUS),
-      createBody(1412, -1652, MEDIAN_RADIUS * 0.8),
-      createBody(1478, 3322, MEDIAN_RADIUS * 1.2),
-      createBody(-4850, 3036, MEDIAN_RADIUS * 0.9),
-      createBody(-9557, -472, MEDIAN_RADIUS * 1.1),
-    ],
-  };
+  const field = openField([
+    createBody(0, 0, MEDIAN_RADIUS),
+    createBody(1412, -1652, MEDIAN_RADIUS * 0.8),
+    createBody(1478, 3322, MEDIAN_RADIUS * 1.2),
+    createBody(-4850, 3036, MEDIAN_RADIUS * 0.9),
+    createBody(-9557, -472, MEDIAN_RADIUS * 1.1),
+  ]);
   const state = createInitialState(field, createCraft(-1400, 620, 431.7, 233.11), seed);
   const grabs = [40, 640, 1300, 2100, 3000];
   const releases = [420, 1010, 1780, 2600, 3400];
@@ -110,8 +109,10 @@ describe('the snapshot', () => {
     expect(Object.keys(state).sort()).toEqual([
       'craft',
       'dive',
+      'ending',
       'field',
       'heldBody',
+      'highWater',
       'orbit',
       'pressed',
       'rng',
@@ -134,7 +135,8 @@ describe('the snapshot', () => {
       'phase',
       'ticksSinceFreeze',
     ]);
-    expect(Object.keys(state.field).sort()).toEqual(['bodies']);
+    expect(Object.keys(state.field).sort()).toEqual(['bodies', 'corridor']);
+    expect(Object.keys(state.field.corridor).sort()).toEqual(['centreline', 'foot', 'halfWidth']);
     expect(Object.keys(state.field.bodies[0]!).sort()).toEqual([
       'mass',
       'radius',

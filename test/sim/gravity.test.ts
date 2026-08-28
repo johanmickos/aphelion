@@ -12,14 +12,14 @@ import { distance } from '../../src/sim/math.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS, SECONDS_PER_TICK, SOFTENING } from '../../src/sim/units.ts';
-import { HELD, MEDIAN_BODY, holdWithoutGrabbing } from './fixtures.ts';
+import { HELD, MEDIAN_BODY, holdWithoutGrabbing, openField } from './fixtures.ts';
 
 /** Spec 01 §3's grab range of 560 prototype units, in design units. */
 const GRAB_RANGE = 560 * 3;
 
 /** The acceleration a craft at rest at distance `r` actually receives, per second². */
 function measuredAccelerationAt(r: number): number {
-  const state = createInitialState({ bodies: [MEDIAN_BODY] }, createCraft(-r, 0, 0, 0), 1);
+  const state = createInitialState(openField([MEDIAN_BODY]), createCraft(-r, 0, 0, 0), 1);
   holdWithoutGrabbing(state);
   stepSim(state, HELD);
   return speedOf(state.craft) / SECONDS_PER_TICK;
@@ -48,7 +48,7 @@ describe('the force law', () => {
    */
   it('cannot pull a held craft through the floor', () => {
     const floor = floorRadius(MEDIAN_BODY);
-    const state = createInitialState({ bodies: [MEDIAN_BODY] }, createCraft(-floor, 0, 0, 0), 1);
+    const state = createInitialState(openField([MEDIAN_BODY]), createCraft(-floor, 0, 0, 0), 1);
     holdWithoutGrabbing(state);
     for (let tick = 0; tick < 120; tick++) stepSim(state, HELD);
     expect(distance(0, 0, state.craft.x, state.craft.y)).toBeGreaterThanOrEqual(floor - 1e-9);
@@ -72,7 +72,7 @@ describe('the force law', () => {
 describe('gravity is not ambient', () => {
   it('gives a coasting craft no measurable acceleration, at any distance', () => {
     for (const r of [floorRadius(MEDIAN_BODY), 200, 500, 1000, GRAB_RANGE, 10_000]) {
-      const state = createInitialState({ bodies: [MEDIAN_BODY] }, createCraft(-r, 0, 0, 0), 1);
+      const state = createInitialState(openField([MEDIAN_BODY]), createCraft(-r, 0, 0, 0), 1);
       // heldBody stays null: this craft is coasting.
       stepSim(state, NO_INPUT);
       expect(speedOf(state.craft), `at r = ${r}`).toBe(0);
@@ -86,16 +86,20 @@ describe('gravity is not ambient', () => {
    * *"where do I let go to reach that body"* a solved reading.
    */
   it('gives a held craft nothing from any body but the one holding it', () => {
-    const crowd = {
-      bodies: [
-        MEDIAN_BODY,
-        createBody(0, 400, MEDIAN_RADIUS),
-        createBody(300, -250, MEDIAN_RADIUS),
-        createBody(-900, 0, MEDIAN_RADIUS * 1.2),
-      ],
-    };
+    // The crowd stands well clear of the swing's own reach, and it has to: a
+    // held craft that *touches* another body bounces off it (spec 01 §10), which
+    // is a different rule with its own test in `contact.test.ts`. Distance costs
+    // this claim nothing, because the claim is **exactly zero** rather than
+    // negligible — a body at four thousand units and one at four hundred
+    // contribute the same nothing.
+    const crowd = openField([
+      MEDIAN_BODY,
+      createBody(0, 2400, MEDIAN_RADIUS),
+      createBody(1800, -1500, MEDIAN_RADIUS),
+      createBody(-5400, 0, MEDIAN_RADIUS * 1.2),
+    ]);
 
-    const alone = createInitialState({ bodies: [MEDIAN_BODY] }, createCraft(-900, 600, 360, 0), 1);
+    const alone = createInitialState(openField([MEDIAN_BODY]), createCraft(-900, 600, 360, 0), 1);
     const crowded = createInitialState(crowd, createCraft(-900, 600, 360, 0), 1);
     holdWithoutGrabbing(alone);
     holdWithoutGrabbing(crowded);

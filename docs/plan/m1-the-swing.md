@@ -270,21 +270,184 @@ argument for it is stronger than a missing feature: **83% of real endings are ou
 and every number in spec 01 came from sessions flown under that pressure. A field you can pass
 straight through is not that field.
 
-Three things §10 already settles, so this step implements rather than designs:
+**Done.** `pnpm check` is green at **280 tests**, 30 files, up from 255. Four endings, one
+contact rule, and a run that knows whether it is over:
 
-- **Impact is `R + 5` and is not a bare distance.** It is lethal only when the approach is not a
-  graze — `−(v · n̂) / |v| > 0.18` — because flinging tangentially past a body you have just left
-  is legitimate flying and must not read as a crash. Per body, because it is written on `R`.
-- **The too-late refusal already exists** and is the other half of what the demo described as
-  *"a minimum distance, perhaps combined with velocity, where if I'm heading straight for the
-  planet it's too late to be saved."* [`grab.ts`](../../src/sim/grab.ts) refuses a press when the
-  heading ray strikes the body **and** the craft is inside ≈32.5 units of its surface, measured at
-  0.4% of real presses. Today that refusal costs nothing, because nothing happens next. After this
-  step it is the moment the run was lost.
-- **Contact while a body is held never kills.** It bounces at the floor with zero restitution, and
-  that asymmetry is the rule rather than an oversight: a grab is a promise that you will not be
-  killed by the thing you grabbed. The floor is already `dive.ts`'s; what is new here is contact
-  with a body the craft is **not** holding.
+- **[`contact.ts`](../../src/sim/contact.ts)** — spec 01 §10's three contacts as *one*
+  operation at three sets of constants: put the craft on the surface, reflect whatever part of
+  its velocity pointed into it. The held body's floor at `R + 12` and zero restitution is the
+  same call, so [`dive.ts`](../../src/sim/dive.ts)'s floor is no longer a second copy of it —
+  the prototype resolved contacts in three hand-written places and recorded that they drifted.
+- **[`run.ts`](../../src/sim/run.ts)** — the three endings that are about *where the craft is*,
+  and the high-water mark. Impact is contact's, because it is a consequence of touching
+  something rather than of being somewhere.
+- **`Field` gained a corridor**; `SimState` gained an **ending** and a **high-water mark**. Both
+  are in the snapshot, which is now version 3, so a run that ends is a run a recipe reproduces
+  — including *how* it ended.
+- **[`test/sim/run.ts`](../../test/sim/run.ts)** — the headless pilot, the other scale from
+  `swing.ts`: a craft let loose in the real field until something stops it, which is the only
+  scale spec 01 §10's statistical tolerance can be read at.
+
+`CONTEXT.md` gained six words the code needed names for: **run**, **ending**, **contact**,
+**corridor**, **line** and **fell-behind line** — the last because spec 01 §10 and the glossary
+both already insist it is not the floor, and it now has a function named after it.
+
+### The one decision: where the corridor's line went
+
+**It is the prototype's own, at 1.9 × the design width** — half-width 370.5 prototype units,
+1111.5 in design units, centred on the same centreline the fixture field is built around. It is
+carried rather than chosen, and it **expires with M3's corridor** (spec [17 · §4](../spec/17-daily-field.md)
+narrows the half-width with altitude, in metres this repo has not reconciled with design units,
+and M3 re-measures the curve).
+
+Three things decided it, and the first is the one that ruled out the obvious candidate.
+
+**1 · The design space's own edges are too narrow for this field, and it is not close.** A
+settled swing is a circle at the body's floor, so the furthest sideways a *legitimate* orbit
+ever reaches is a body's offset plus its floor. Measured over the fixture field:
+
+| | Furthest from the centreline | Against a half-width of |
+|---|---|---|
+| Widest body's own edge | 190 prototype units | — |
+| **Widest settled circle at a floor** | **202** | the design space's 195 — **outside** |
+| Widest oval at the eccentricity cap | 400 | the prototype's 370.5 |
+
+Three of the twenty-four bodies cannot be orbited at all inside a corridor at the design
+space's edges. That is not a hard boundary; it is a craft killed on the far side of a swing
+around a body the field itself placed — **exactly the defect spec 01 §10 records the
+fell-behind line having had**, *"killing a craft that had not lost a unit of altitude"*.
+`test/sim/fixture-field.test.ts` holds the corridor to it.
+
+**2 · 1.9 is a tuned number with a recorded reason, not an incidental one.** The prototype's
+own tuning log moves it from 1.2: *"the corridor felt constrictive, and a wider field gives more
+room to find a planet to curve away from before reaching a boundary"*, and then 1.90 specifically
+so a run does not open on the boundary's own gradient. **Every one of spec 01 §10's 24 recorded
+endings was flown at this width**, including the 83% that were out of bounds, and its tolerance
+that out-of-bounds stays the plurality is written on that number.
+
+**3 · The fixture field's bodies are the prototype's own placement bounds**, so the same
+corridor is the right corridor for it. The prototype places single rows within ±72 of the
+centreline and forks within ±96 – 160; ours are within ±70 and ±96 – 150. That is not a
+coincidence — M1.6 read the field out of the prototype — but it had not been checked against the
+corridor before, and it is what makes the carried width fit rather than merely available.
+
+**And the foot.** One design-space height plus 400 below the spawn, which is the prototype's
+own margin. **It cannot be reached**: the fell-behind line trails the mark by 700 and the mark
+opens at the spawn, so at 1054 it is always above the foot at 1598 and always fires first. That
+is true of the prototype at this tuning too, which is why its note calls the foot a death *"in
+every config"* rather than a death anyone sees — it is there for the configs with no trailing
+line at all. It is built because spec 01 §10 names it, and it is tested on a field of its own.
+
+### The camera decision has expired, and here is the number under it
+
+[`camera.ts`](../../src/state/camera.ts) does not pan sideways and says in its own header that
+the decision *"expires when the field outgrows the design space, which is M1.4's boundary and
+M3's corridor"*. **It has, and this step is not the one that fixes it.**
+
+| | |
+|---|---|
+| Corridor line, from the centreline | **1123.5** design units (half-width plus the four units of grace) |
+| Edge of the picture, from the centreline | **585** |
+| So a craft may be alive, and may die, this far outside the frame | **538.5** — nearly half a screen |
+
+Measured over 400 pilot runs through the fixture field: **85.5%** of runs leave the picture
+sideways at some point, **87%** of out-of-bounds endings happen with a body still held, and they
+land a median of **541** design units past the frame's edge. The shape of it is the surprise and
+it is worth stating plainly: **you are not usually flying out of the corridor, you are being
+swung out of it** — on the wide part of an oval, which every one of the twenty-four bodies can
+produce, because an oval at the eccentricity cap reaches four floors from its centre and the
+picture is only 585 wide.
+
+**Leaving the picture is not new** — the fixture field has been able to do it since M1.6, and
+the author flew it twice without raising it. What M1.4 adds is that the craft can now *end the
+run* out there, with nothing on screen to say why.
+
+It is **not fixed here** deliberately. The horizontal camera is four mechanisms the prototype
+needs and this repo has none of — a deadzone, a look-ahead, a clamp to the field and a backstop
+— [M3.1](./m3-the-field.md) is where the camera and the design space are built properly, and
+spec [07](../spec/07-boundary.md)'s line and bands are M3's too, so the thing that would make a
+wall visible arrives in the same step as the camera that would frame it. Building a sideways
+follow here would also change what the gate is judging about a camera the author has just signed
+off two corrections to. **The measurement is the handover**, and it is the first thing M3.1 owes.
+
+### Four things worth carrying forward
+
+- **Spec 01 §10 is silent on what a graze does, and something has to happen.** It says a
+  near-parallel contact is not lethal and stops there. A craft left inside the disc travels the
+  chord and comes out of the far side — and the fraction of speed pointed at a body only ever
+  *falls* as a straight line goes deeper, so a graze can never become lethal on the way through.
+  The prototype bounces it at the same `R + 5`, at restitution 0.8, and that is what is carried
+  (ADR-0013). Recorded here rather than papered over: it is a hole in the spec, not a ruling.
+- **Contacts are not resolved on a frozen orbit**, and the prototype draws the same line in the
+  same place. After the freeze the craft's position is authored by the phase clock, so a bounce
+  would be rewritten on the next tick; the prototype resolves these contacts only in its
+  integrated phases. So the `R + 6` bounce is the dive's, and a settled orbit whose oval reaches
+  a neighbour passes through it. Nothing in the fixture field does this today.
+- **The held mark protects a case this field cannot produce.** An orbit has to be taller than
+  the 700 the line trails by before holding the mark saves anything, and a settled circle is
+  twice the floor — so with radii of 34 – 56 the tallest orbit in the game is about 400 units.
+  The rule is carried because spec 01 §10 measured it, not because the fixture needs it, and
+  `run.test.ts` exercises it at the size it starts to bite at. It will bite the moment a body
+  gets large, which spec 17's black holes and pulsars will do.
+- **A run that ends stays exactly as it ended.** `stepSim` returns immediately, so the tick
+  number, the craft and the held body are all still there to be read — which is what spec
+  [09](../spec/09-debrief.md)'s debrief card needs, and what a recipe reproduces. Nothing lets
+  go for the player: the prototype does, at its finish line, and that is not carried because
+  `clearedAbove` sits a whole grab range above the last body while an orbit reaches a quarter of
+  that. [`run.ts`](../../src/sim/run.ts) records where the answer is if a field ever closes the
+  gap.
+
+### Where the endings land, and what the corpus is worth
+
+`test/sim/run.ts` is a **pilot, not a player**, and it says so in as much detail as it deserves.
+It drives the one verb from the two distributions spec 01 actually measured — §3's grab
+distances over 270 real grabs, and §11's 53 / 12 / 36 split of where a release falls on the boost
+envelope — and it aims, because §11's own explanation of that split is that *"the aim arrived
+first and they took it"*, and a pilot that ignored aim died on its first release.
+
+Over 400 runs, against spec 01 §10's 24 recorded endings:
+
+| Ending | The pilot | Measured, real play |
+|---|---|---|
+| **Out of bounds** | **71.8%** | 83% |
+| Fell behind | 24.3% | 8% |
+| Impact | 3.8% | 8% |
+| Cleared | 0.3% | 0% (no session in the cohort reached the top) |
+
+Spec 01 §10's tolerance is that out-of-bounds stays **the plurality at 60% or more**, and it
+does. Where the pilot differs is where it is weakest and the difference says so: it falls behind
+three times as often as a player because it has no judgement about *which* release keeps a
+climb, which is the one thing spec 01 measures no distribution for. It has two invented numbers
+— an aim tolerance and how often an approach is flown past — and both are named in the file.
+**Spec 01 §13.7's instruction applies here as it does to `swing.ts`'s corpus: replace it with
+percentiles of this game's own play as soon as [M1.5](#m15--recipes-replay-and-the-trail-a-session-leaves)
+can record some.**
+
+### What was deliberately not built
+
+- **The death sequence.** Spec [07 · §6](../spec/07-boundary.md) describes an unravelling craft,
+  an `SOS` strobe, a BANK that snaps to DUSK and a debrief card. Those are M3's and M6's, and
+  M1.4 builds the predicate, the ending and the reason — nothing that is drawn. Presentation
+  state is therefore untouched, and `run.test.ts`'s layer criterion is exactly that: derive from
+  an ended run and an alive one and get the same picture. When death does reach the picture the
+  fix is a field on `PresentationState`, deliberately, and that test is where it becomes visible.
+- **The bands.** Spec 07's outer band and fire band, their motes, their labels and the closing-
+  speed gradient are M3's. Spec 01 §10 says it: *"M1 needs the line only."*
+- **A tidy-up of spec 07.** Its §6 still specifies a **70ms hitstop** at the line, which
+  [ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md) withdrew;
+  spec 02 carries the notice and spec 07 does not. It is not implemented and it is not edited
+  here — `docs/` is the author's, and rebasing a board spec is M3's work rather than a passing
+  correction.
+
+### What the RESET control means now
+
+It stays, and it stays obviously chrome. **It is a restart and never a retry**: ADR-0007 rules
+DAILY as one run with no retry and no lives, and now that a run can end, the distinction is real
+rather than academic. What the button does is throw the run away and open a new one from tick
+zero, which is what an author or an agent needs in order to fly the same field again — and it is
+a DOM button outside the design space precisely so that it never reads as part of the game. The
+readout beside it now says which ending the run reached, read off the simulation rather than off
+presentation state, and that line goes away when the debrief card arrives.
 
 ---
 

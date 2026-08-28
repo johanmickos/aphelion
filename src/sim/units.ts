@@ -258,3 +258,69 @@ export const PAYING_DEPTH = 0.5;
  * median speed across eight altitude bands is the evidence it works.
  */
 export const PERMANENT_SHARE = 0.22;
+
+/**
+ * How close to a body's surface counts as contact for a coasting craft — spec
+ * 01 §10's `R + 5`, converted.
+ *
+ * A different number from [`BOUNCE_GAP`](#) by one unit, and that difference is
+ * not worth tidying away: the two are measured separately and the asymmetry
+ * they carry is that the same geometry is lethal coasting and safe held.
+ */
+export const IMPACT_GAP = 5 * SCALE;
+
+/**
+ * How head-on an approach has to be before contact kills — spec 01 §10's 0.18.
+ *
+ * `−(v · n̂) / |v|`, so it is a **ratio and does not scale**. Below it the
+ * contact is a graze and the craft lives: *"flinging tangentially past a body
+ * you have just left is legitimate flying"*, and a bare distance test would kill
+ * the manoeuvre the game is about.
+ */
+export const GRAZE_RATIO = 0.18;
+
+/**
+ * How hard a graze pushes back — the prototype's 0.8, and **spec 01 §10 does not
+ * state it**.
+ *
+ * §10 says what a graze is not (lethal) and stops. Something still has to happen,
+ * because a craft left inside the disc travels the chord and comes out the far
+ * side — and a straight line's approach fraction only ever falls after entry, so
+ * it can never become lethal on the way through. The prototype resolves it as a
+ * bounce at the same `R + 5`, and this is that behaviour carried rather than a
+ * ruling invented (ADR-0013). It is recorded in the plan as a hole spec 01 left.
+ */
+export const GRAZE_RESTITUTION = 0.8;
+
+/**
+ * How close to a body the craft may come while holding a *different* one — spec
+ * 01 §10's `R + 6`, converted.
+ *
+ * Never lethal. A grab is a promise that you will not be killed by the thing you
+ * grabbed, and spec 01 §10 extends the safety to the whole field for as long as
+ * one is held.
+ */
+export const BOUNCE_GAP = 6 * SCALE;
+
+/** How hard that bounce pushes back — spec 01 §10's 0.6. */
+export const BOUNCE_RESTITUTION = 0.6;
+
+/**
+ * How far past the corridor's line is out — spec 01 §10's 4 units, converted.
+ *
+ * A grace rather than a second line: the line is where the corridor stops and
+ * this is the slack the predicate is measured with, which is the form the
+ * prototype states it in.
+ */
+export const CORRIDOR_GRACE = 4 * SCALE;
+
+/**
+ * How far the fell-behind line trails the high-water mark — spec 01 §10's 700,
+ * converted.
+ *
+ * `CONTEXT.md` is emphatic that this is **not** the floor: the floor is the
+ * orbit's and is 12 units above a body's surface, and these two were confused
+ * once. The line trails the climb, so it is pressure to keep going rather than a
+ * wall met once.
+ */
+export const FELL_BEHIND_GAP = 700 * SCALE;

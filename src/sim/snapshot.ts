@@ -28,9 +28,11 @@ import type { SimState } from './types.ts';
  * generator for the same reason — so a stored one has to be able to say it was
  * written by a different game.
  */
-export const SNAPSHOT_VERSION = 2;
+export const SNAPSHOT_VERSION = 3;
 
-const HEADER_BYTES = 4 + 4 + 4 + 4 + 4 * 8 + 4 * 4 + 1;
+const HEADER_BYTES = 4 + 4 + 4 + 4 + 4 * 8 + 4 * 4 + 1 + 1 + 8;
+/** The corridor's centreline, half-width and foot. */
+const CORRIDOR_BYTES = 3 * 8;
 /** A presence byte, then a dive's four numbers. */
 const DIVE_BYTES = 1 + 4 * 8;
 /** A presence byte, then the seven numbers of an orbit and its tick count. */
@@ -40,10 +42,20 @@ const BODY_BYTES = 4 * 8 + 1;
 /** The type ordinals, fixed by position. Appending is safe; reordering is not. */
 const BODY_TYPES = ['STANDARD'] as const;
 
+/**
+ * The ending ordinals, fixed by position, with **zero reserved for a run that is
+ * still alive**.
+ *
+ * So the byte says both things at once — whether the run is over and how — which
+ * is the same one-value rule `SimState` holds: two values that must agree are two
+ * values that will eventually disagree.
+ */
+const ENDINGS = ['IMPACT', 'OUT_OF_BOUNDS', 'FELL_BEHIND', 'CLEARED'] as const;
+
 export function snapshot(state: SimState): Uint8Array {
   const bodies = state.field.bodies;
   const bytes = new Uint8Array(
-    HEADER_BYTES + DIVE_BYTES + ORBIT_BYTES + bodies.length * BODY_BYTES,
+    HEADER_BYTES + CORRIDOR_BYTES + DIVE_BYTES + ORBIT_BYTES + bodies.length * BODY_BYTES,
   );
   const view = new DataView(bytes.buffer);
   let at = 0;
@@ -79,6 +91,16 @@ export function snapshot(state: SimState): Uint8Array {
   u32(state.rng[2]);
   u32(state.rng[3]);
   flag(state.pressed);
+  view.setUint8(at, state.ending === null ? 0 : ENDINGS.indexOf(state.ending) + 1);
+  at += 1;
+  f64(state.highWater);
+
+  // The corridor, because two runs flown in fields with different sides are two
+  // different runs even when the craft is in the same place — and a recipe is
+  // the whole description of one (ADR-0004).
+  f64(state.field.corridor.centreline);
+  f64(state.field.corridor.halfWidth);
+  f64(state.field.corridor.foot);
 
   // A fixed layout with a presence byte rather than a variable-length one: two
   // states that differ in whether a swing has frozen then differ in the first

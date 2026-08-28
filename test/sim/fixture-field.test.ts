@@ -14,7 +14,7 @@ import { floorRadius } from '../../src/sim/body.ts';
 import { grabRange } from '../../src/sim/grab.ts';
 import { distance } from '../../src/sim/math.ts';
 import { createInitialState } from '../../src/sim/step.ts';
-import { MASS_EXPONENT, SCALE } from '../../src/sim/units.ts';
+import { CORRIDOR_GRACE, FELL_BEHIND_GAP, MASS_EXPONENT, SCALE } from '../../src/sim/units.ts';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { createPresentation } from '../../src/state/derive.ts';
 import { DESIGN_WIDTH } from '../../src/state/design.ts';
@@ -24,18 +24,72 @@ const bodies = field.bodies;
 
 describe('the fixture field', () => {
   /**
-   * The camera's whole simplification rests on this: the field is no wider than
-   * the design space, so there is nothing to pan toward
-   * ([`derive.ts`](../../src/state/derive.ts)). The two live in different layers
-   * and cannot import each other, so this is where they are held in agreement.
+   * The **bodies** are no wider than the design space, so the camera has nothing
+   * to pan toward to keep them framed. The two live in different layers and
+   * cannot import each other, so this is where they are held in agreement.
+   *
+   * **The corridor is not**, and that is M1.4's, below.
    */
-  it('fits inside the design space, where the camera is looking', () => {
+  it('puts its bodies inside the design space, where the camera is looking', () => {
     const camera = createPresentation(createInitialState(field, fixtureCraft(), 1)).camera;
     expect(camera.x).toBe(DESIGN_WIDTH / 2);
     for (const body of bodies) {
       expect(body.x - body.radius).toBeGreaterThanOrEqual(0);
       expect(body.x + body.radius).toBeLessThanOrEqual(DESIGN_WIDTH);
     }
+  });
+
+  /**
+   * **The corridor has to hold the orbits of its own bodies**, and this is the
+   * criterion that decided where its line went.
+   *
+   * A settled swing is a circle at the body's floor, so the furthest sideways a
+   * legitimate orbit ever reaches is a body's own offset plus its floor. A
+   * corridor narrower than that kills a craft on the far side of a swing around
+   * a body the field itself placed — which is exactly the defect spec
+   * [01 · §10](../../docs/spec/01-swing.md) records the fell-behind line having
+   * had, *"killing a craft that had not lost a unit of altitude"*.
+   *
+   * Measured here: the widest settled circle reaches **202** prototype units
+   * from the centreline, so a corridor at the design space's own edges — half
+   * width 195 — is not one this field can be flown in.
+   */
+  it('holds every settled orbit its own bodies can hand out', () => {
+    const { centreline, halfWidth } = field.corridor;
+    for (const body of bodies) {
+      const reach = Math.abs(body.x - centreline) + floorRadius(body);
+      expect(reach).toBeLessThan(halfWidth);
+    }
+  });
+
+  /**
+   * **The foot cannot be reached**, and it is a backstop rather than a line
+   * anyone meets. The fell-behind line trails the high-water mark by 700 and the
+   * mark opens at the spawn, so it is always the higher of the two and always
+   * fires first. The prototype is the same at this tuning, which is why its own
+   * note calls the foot a death *"in every config"* rather than a death anyone
+   * sees: it is there for the configs that have no trailing line at all.
+   */
+  it('puts its foot below the line that trails the climb', () => {
+    expect(field.corridor.foot).toBeGreaterThan(fixtureCraft().y + FELL_BEHIND_GAP);
+  });
+
+  /**
+   * **And the corridor outgrows the design space, which retires a decision.**
+   * [`camera.ts`](../../src/state/camera.ts) does not pan sideways and says in
+   * its own header that the decision *"expires when the field outgrows the
+   * design space"*. It has: the corridor is 1.9× the design width, carried from
+   * the prototype's own tuned field, so the craft can be more than half a screen
+   * outside the picture and still alive — and, now, still able to die out there.
+   *
+   * This test is not a complaint; it is the number under the clause, held so
+   * that whoever builds M3.1's camera can see what it has to cover.
+   */
+  it('is wider than the picture, which is what retires the fixed camera', () => {
+    const visible = DESIGN_WIDTH / 2;
+    const line = field.corridor.halfWidth + CORRIDOR_GRACE;
+    expect(line).toBeGreaterThan(visible);
+    expect(line - visible).toBeCloseTo(538.5, 6);
   });
 
   /**

@@ -55,9 +55,14 @@ if (target) {
   let observed = performance.now();
 
   // Developer chrome, and the only thing in the build that is not the one verb.
-  // A run that has flown off the top of a fixture field with no boundary and no
-  // death in it — both are M1.4's — has nowhere to come back from, and the gate
-  // is flying this repeatedly.
+  //
+  // **It is a restart and never a retry.** ADR-0007 rules DAILY as one run, no
+  // retry and no lives, and now that a run can end that distinction is real
+  // rather than academic: what this does is throw the run away and open a new
+  // one from tick zero, which is what an author or an agent needs in order to
+  // fly the same field again. It stays obviously chrome — a DOM button beside
+  // the readout, outside the design space — because the moment it looks like
+  // part of the game it is a retry, and the run is meant to be the wager.
   const restart = (): void => {
     sim = start();
     current = createPresentation(sim);
@@ -90,9 +95,16 @@ if (target) {
     draw(interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK), context);
 
     if (readout) {
+      // The ending is read off the simulation rather than off presentation
+      // state, because M1.4 puts nothing about death into the picture — spec
+      // 07 §6's unravelling craft and debrief card are M3's and M6's. This is
+      // the shell saying what the run did, beside the tick counter; when the
+      // death sequence is built it becomes a field on `PresentationState` and
+      // this line goes away.
       readout.textContent =
         `APHELION · ${__BUILD_STAMP__} · tick ${current.tick} · ` +
-        `${current.craft.speed.toFixed(0)}/s`;
+        `${current.craft.speed.toFixed(0)}/s` +
+        (sim.ending === null ? '' : ` · ${sim.ending.replace(/_/g, ' ')}`);
     }
     requestAnimationFrame(frame);
   };

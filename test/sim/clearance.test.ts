@@ -20,6 +20,7 @@ import {
   CLEARANCE_TICKS,
   SECONDS_PER_TICK,
 } from '../../src/sim/units.ts';
+import { openField } from './fixtures.ts';
 import { BODY, ENVELOPE, FLOOR, PRESS, fly, geometry, placed } from './swing.ts';
 
 describe('when it fires', () => {
@@ -80,7 +81,7 @@ describe('the floor, which is the one guarantee a grab makes', () => {
    * craft driven straight into it slides along it, and nothing is returned.
    */
   it('takes the whole of the radial speed of a craft driven into it', () => {
-    const state = createInitialState({ bodies: [BODY] }, placed(geometry(120, 60, 0)).craft, 1);
+    const state = createInitialState(openField([BODY]), placed(geometry(120, 60, 0)).craft, 1);
     stepSim(state, PRESS);
     let touched = false;
     let worstOutward = 0;

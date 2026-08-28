@@ -14,16 +14,38 @@
  * are [`swing.ts`](./swing.ts)'s, which drives them through the one verb the way
  * a player does.
  */
+import type { Body } from '../../src/sim/body.ts';
 import { createBody } from '../../src/sim/body.ts';
 import { createCraft, speedOf } from '../../src/sim/craft.ts';
 import { beginDive } from '../../src/sim/dive.ts';
 import { distance } from '../../src/sim/math.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
-import type { SimState } from '../../src/sim/types.ts';
+import type { Field, SimState } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS, SECONDS_PER_TICK } from '../../src/sim/units.ts';
 
 /** The field's median body, at the origin, so radii read directly as distances. */
 export const MEDIAN_BODY = createBody(0, 0, MEDIAN_RADIUS);
+
+/**
+ * A field with no sides and no foot.
+ *
+ * Almost every test in this directory is about **the swing** and not about the
+ * run, and it flies a geometry chosen to make one characteristic legible rather
+ * than to sit inside a corridor — a body at the origin, a craft two thousand
+ * units to its left. A corridor around those would end runs for reasons the test
+ * is not about, and moving every geometry inside one would make each of spec
+ * 01's tolerances a coordinate transform away from the sentence it came from.
+ *
+ * So the sides are opened rather than the geometry moved. The endings that *are*
+ * about the run have their own field, in `test/sim/run.test.ts`, and the one the
+ * gate flies is [`fixtureField`](../../src/sim/fixture-field.ts)'s.
+ */
+export function openField(bodies: readonly Body[]): Field {
+  return {
+    bodies,
+    corridor: { centreline: 0, halfWidth: Infinity, foot: Infinity },
+  };
+}
 
 /**
  * A craft approaching `MEDIAN_BODY` from the left, already held.
@@ -35,7 +57,7 @@ export const MEDIAN_BODY = createBody(0, 0, MEDIAN_RADIUS);
  */
 export function approach(distanceOut: number, speed: number, offset: number): SimState {
   const state = createInitialState(
-    { bodies: [MEDIAN_BODY] },
+    openField([MEDIAN_BODY]),
     createCraft(-distanceOut, offset, speed, 0),
     1,
   );
