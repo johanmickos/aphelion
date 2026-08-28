@@ -32,13 +32,22 @@
  * a ratio and therefore unscaled. Flinging tangentially past a body just left is
  * legitimate flying, and a bare distance test would kill it.
  *
+ * **`R + 5` is the craft's own hull**, not a shell around the body — the dart is
+ * five prototype units half-width, this number exactly — so a graze is the hull
+ * *touching* the surface rather than passing near it. It is also why the two
+ * thresholds never disagree: any straight line that would put the craft's centre
+ * inside the disc arrives at more than 0.18 and is lethal, for every body under
+ * 301 prototype units of radius, against a field whose largest is 56.
+ *
  * **A graze still bounces, and spec 01 §10 does not say so.** It says what a
- * graze is not and stops, and something has to happen: a craft left inside the
- * disc travels the chord and comes out of the far side, and the approach
- * fraction on a straight line only ever falls after entry, so it can never
- * become lethal on the way through. The prototype bounces it at the same
- * surface, so that is what is carried here (ADR-0013), and the hole spec 01
- * leaves is recorded in the plan rather than papered over.
+ * graze is not and stops, and something has to happen: a craft left alone with
+ * its hull on the surface sinks into the disc it is touching. The lethality test
+ * will not clean that up later either — along a straight line the fraction of
+ * speed pointed at a body only ever *falls* past the entry point, so a contact
+ * that arrived as a graze stays one however deep it goes. The prototype skips it
+ * off at the same surface and that is what is carried (ADR-0013), at a measured
+ * cost of 4 – 13° of heading. The hole spec 01 leaves is recorded in the plan
+ * rather than papered over.
  */
 import type { Body } from './body.ts';
 import type { Craft } from './craft.ts';

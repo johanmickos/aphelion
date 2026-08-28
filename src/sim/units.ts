@@ -263,6 +263,13 @@ export const PERMANENT_SHARE = 0.22;
  * How close to a body's surface counts as contact for a coasting craft — spec
  * 01 §10's `R + 5`, converted.
  *
+ * **It is the craft's own hull.** The dart the renderer draws is 15 design units
+ * half-width — five prototype units, this number exactly — so `R + 5` is not a
+ * shell around the body but the radius at which the craft, which the simulation
+ * carries as a point, actually touches it. Everything §10 says about contact
+ * reads differently once that is seen: a *graze* is the hull brushing the
+ * surface, not a near miss.
+ *
  * A different number from [`BOUNCE_GAP`](#) by one unit, and that difference is
  * not worth tidying away: the two are measured separately and the asymmetry
  * they carry is that the same geometry is lethal coasting and safe held.
@@ -283,12 +290,18 @@ export const GRAZE_RATIO = 0.18;
  * How hard a graze pushes back — the prototype's 0.8, and **spec 01 §10 does not
  * state it**.
  *
- * §10 says what a graze is not (lethal) and stops. Something still has to happen,
- * because a craft left inside the disc travels the chord and comes out the far
- * side — and a straight line's approach fraction only ever falls after entry, so
- * it can never become lethal on the way through. The prototype resolves it as a
- * bounce at the same `R + 5`, and this is that behaviour carried rather than a
- * ruling invented (ADR-0013). It is recorded in the plan as a hole spec 01 left.
+ * §10 says what a graze is not — lethal — and stops. Something still has to
+ * happen, because a graze is the craft's hull *on* the surface (see
+ * [`IMPACT_GAP`](#)) and a craft left alone there sinks into the disc it is
+ * touching. And the lethality test cannot clean that up on a later tick: along a
+ * straight line the fraction of speed pointed at a body only ever **falls** past
+ * the entry point, so a contact that arrived as a graze stays one however deep
+ * it goes.
+ *
+ * The prototype skips it off at the same `R + 5`, and this is that behaviour
+ * carried rather than a ruling invented (ADR-0013). Measured here, it costs a
+ * near-parallel graze **4 – 13°** of heading. The hole spec 01 leaves is recorded
+ * in the plan rather than papered over.
  */
 export const GRAZE_RESTITUTION = 0.8;
 

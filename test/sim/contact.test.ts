@@ -79,13 +79,15 @@ describe('contact while coasting', () => {
   });
 
   /**
-   * And it is turned away rather than let through. Spec 01 §10 says what a graze
-   * is *not* and stops there; something still has to happen, because a straight
-   * line inside the disc only ever gets less head-on as it goes, so a craft left
-   * alone would come out of the far side having flown through a planet. The
-   * prototype bounces it, and that is what is carried (ADR-0013).
+   * And the hull is turned away rather than let sink in. `R + 5` is the craft's
+   * own half-width, so a graze is the hull *on* the surface; spec 01 §10 says
+   * that is not lethal and stops there, and something still has to happen or the
+   * craft settles into the disc it is touching. The lethality test will not
+   * catch it later either — a straight line only ever gets *less* head-on as it
+   * goes deeper, so a contact that arrived as a graze stays one. The prototype
+   * skips it off, and that is what is carried (ADR-0013).
    */
-  it('turns a graze away instead of letting it through the body', () => {
+  it('skips a grazing hull off the surface instead of letting it sink in', () => {
     const state = approach(900 * SCALE, SURFACE * 0.995);
     let deepest = Infinity;
     for (let i = 0; i < 2000 && state.ending === null; i++) {
@@ -94,6 +96,26 @@ describe('contact while coasting', () => {
     }
     expect(state.ending).toBe(null);
     expect(deepest).toBeGreaterThanOrEqual(SURFACE - 1e-9);
+  });
+
+  /**
+   * **The two thresholds never disagree, and that is arithmetic rather than
+   * luck.** Any straight line that would put the craft's *centre* inside the
+   * body arrives at more than 0.18 and is lethal, so no graze is ever a line
+   * that was going to hit the planet — it is always the hull brushing past. That
+   * holds for every body under 301 prototype units of radius, against a field
+   * whose largest is 56, and it is why the graze exemption cannot be used to fly
+   * through anything.
+   */
+  it('never spares a line that was going to strike the body itself', () => {
+    // The largest impact parameter that is still lethal, from spec 01 §10's own
+    // ratio: `√(1 − 0.18²)` of the contact radius.
+    const largestLethal = SURFACE * Math.sqrt(1 - GRAZE_RATIO * GRAZE_RATIO);
+    expect(largestLethal).toBeGreaterThan(BODY.radius);
+
+    // And flown, either side of the body's own surface.
+    expect(flyUntilEnded(approach(900 * SCALE, BODY.radius)).ending).toBe('IMPACT');
+    expect(flyUntilEnded(approach(900 * SCALE, BODY.radius * 0.999)).ending).toBe('IMPACT');
   });
 
   /**

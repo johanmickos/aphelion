@@ -417,11 +417,11 @@ off the picture**, and the measurement above is still the handover.
 ### Four things worth carrying forward
 
 - **Spec 01 §10 is silent on what a graze does, and something has to happen.** It says a
-  near-parallel contact is not lethal and stops there. A craft left inside the disc travels the
-  chord and comes out of the far side — and the fraction of speed pointed at a body only ever
-  *falls* as a straight line goes deeper, so a graze can never become lethal on the way through.
-  The prototype bounces it at the same `R + 5`, at restitution 0.8, and that is what is carried
-  (ADR-0013). Recorded here rather than papered over: it is a hole in the spec, not a ruling.
+  near-parallel contact is not lethal and stops there. The prototype skips it off the same
+  `R + 5` at restitution 0.8, and that is what is carried (ADR-0013) — recorded here rather than
+  papered over, because it is a hole in the spec and not a ruling. **The reason is not the one
+  first written here**, and building the demo below is what found that: see *What `R + 5`
+  actually is*.
 - **Contacts are not resolved on a frozen orbit**, and the prototype draws the same line in the
   same place. After the freeze the craft's position is authored by the phase clock, so a bounce
   would be rewritten on the next tick; the prototype resolves these contacts only in its
@@ -440,6 +440,33 @@ off the picture**, and the measurement above is still the handover.
   `clearedAbove` sits a whole grab range above the last body while an orbit reaches a quarter of
   that. [`run.ts`](../../src/sim/run.ts) records where the answer is if a field ever closes the
   gap.
+
+### What `R + 5` actually is, and what a graze therefore is
+
+Found while building a demo of the graze rule, and it corrects a reason rather than a
+behaviour — the code is unchanged, the argument under it was wrong.
+
+**`R + 5` is the craft's own hull.** The dart the renderer draws is 15 design units half-width,
+which is five prototype units — this number exactly. The simulation carries the craft as a
+point, so spec 01 §10's contact radius is not a shell around the body: it is the radius at which
+the craft *touches* it. Two things follow, and both are arithmetic.
+
+**A graze is the hull brushing the surface, never a line that was going to hit the planet.** For
+the contact to be a graze the craft's centre has to pass more than `√(1 − 0.18²)` of the contact
+radius from the body's centre, which for the field's median body is **144.6 design units against
+a body radius of 132** — so the centre always clears the disc, and the hull overlaps it by at
+most 1.5 units. The two thresholds cannot cross for any body under **301 prototype units of
+radius**, and the field's largest is 56. **The graze exemption can therefore never be used to fly
+through a planet**, which is worth knowing because it is the obvious worry about a 0.18 escape
+hatch. `contact.test.ts` holds it, at the body's own surface and just inside it.
+
+**So the reason for the bounce is that a hull left alone sinks into the disc it is touching**, not
+that a craft flies through a planet — the first draft of this section said the second, and it is
+not true at this scale. The lethality test will not clean it up on a later tick either: along a
+straight line the fraction of speed pointed at a body only ever *falls* past the entry point, so a
+contact that arrived as a graze stays a graze however deep it goes. Measured, the skip costs a
+near-parallel graze **4 – 13°** of heading — enough to be a real deflection rather than a nudge,
+which is worth the author's eye at the gate.
 
 ### Where the endings land, and what the corpus is worth
 
