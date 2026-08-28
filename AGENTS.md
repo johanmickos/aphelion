@@ -130,6 +130,16 @@ The stated deliverable is **a technical architecture that is easy to maintain an
   allowed a browser, and what constrains it is the other direction — **the renderer draws
   presentation state and asks the simulation nothing**, which is `test/render/boundary.test.ts`.
 - **`pnpm dev`** prints a QR for the LAN address; `s` reprints it, `S` prints it larger.
-- **`tools/vite-plugin-diag.ts`** receives a JSON report from the author's phone and writes
-  it to `diagnostics/`. Read its header before extending it — it writes files on a server
-  bound to all interfaces and it is narrow on purpose.
+- **`pnpm replay`** takes a recipe or a **dispatch** and flies it, printing the trail — which
+  tick a grab happened on, what the geometry was, where on the envelope a release fell. With
+  no argument it flies the one this repo ships. It is how a sentence about the feel of a
+  swing gets a run underneath it.
+- **A recipe names the field it was flown in, so the field carries a version**
+  (`src/sim/fixture-field.ts`, following spec 17 §2). Change anything that field builds —
+  a placement, the corridor, the spawn, or `MASS_EXPONENT` — and bump the version with it.
+  `test/sim/fixture-field.test.ts` fails until you do, and the cost of not doing it is old
+  recipes replaying against a field nobody flew, in numbers that all look reasonable.
+- **`tools/vite-plugin-diag.ts`** receives what the author's phone has to say — a timing
+  report or a dispatch — and writes it to `diagnostics/`. Read its header before extending
+  it: it writes files on a server bound to all interfaces and it is narrow on purpose.
+  **Extending its validator is the change; loosening it is not.**

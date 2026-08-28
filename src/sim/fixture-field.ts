@@ -51,6 +51,26 @@ import type { Field } from './types.ts';
 import { SCALE } from './units.ts';
 
 /**
+ * The version of this fixture, and it is part of the field's identity.
+ *
+ * Spec [17 · §2](../../docs/spec/17-daily-field.md) versions the day generator
+ * so that *"old runs replay against the generator version they were flown on"*,
+ * and a recipe names this ([`recipe.ts`](./recipe.ts)) for exactly that reason:
+ * a run flown in one field and replayed in another is a different run, and the
+ * numbers do not say so.
+ *
+ * **Bump it whenever anything below changes what this function builds** — a
+ * placement, a radius, the corridor, the spawn, or `MASS_EXPONENT`, which sets
+ * every body's mass. Remembering to is not a mechanism, so
+ * `test/sim/fixture-field.test.ts` holds this number against a fingerprint of
+ * the field it produces and fails until the two agree again. Old recipes are
+ * then refused rather than replayed against a field they were not flown in;
+ * keeping them replayable is M3's problem, when there is a generator whose old
+ * versions are worth keeping.
+ */
+export const FIXTURE_FIELD_VERSION = 1;
+
+/**
  * Where the corridor's centreline stands, from the left of the field.
  *
  * Half the prototype's 390-unit framing, which is half this repo's design space

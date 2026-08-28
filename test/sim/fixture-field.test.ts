@@ -9,13 +9,14 @@
  * allows them: spec 01 §13.2's mass-to-radius exponent, and §13.5's eccentricity
  * cap.
  */
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { floorRadius } from '../../src/sim/body.ts';
 import { grabRange } from '../../src/sim/grab.ts';
 import { distance } from '../../src/sim/math.ts';
 import { createInitialState } from '../../src/sim/step.ts';
 import { CORRIDOR_GRACE, FELL_BEHIND_GAP, MASS_EXPONENT, SCALE } from '../../src/sim/units.ts';
-import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
+import { FIXTURE_FIELD_VERSION, fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { createPresentation } from '../../src/state/derive.ts';
 import { DESIGN_WIDTH } from '../../src/state/design.ts';
 
@@ -109,6 +110,43 @@ describe('the fixture field', () => {
     const spread = Math.max(...reaches) / Math.min(...reaches);
     expect(spread).toBeCloseTo(Math.pow(56 / 34, MASS_EXPONENT), 6);
     expect(spread).toBeGreaterThan(1.5);
+  });
+
+  /**
+   * **The version has to move whenever the field does, and remembering to is not
+   * a mechanism.**
+   *
+   * A recipe names the field it was flown in ([`recipe.ts`](../../src/sim/recipe.ts))
+   * because spec [17 · §2](../../docs/spec/17-daily-field.md) rules that a
+   * generator's version is part of its fields' identity — *"old runs replay
+   * against the generator version they were flown on"* — and a fixture that
+   * changed under a version that did not would replay old runs against a field
+   * nobody flew, silently, in numbers that all look reasonable.
+   *
+   * So this fingerprints what `fixtureField` actually builds. Anything that
+   * moves it fails here: a placement, a radius, the corridor, the spawn, and
+   * **`MASS_EXPONENT`**, which is the one parameter the M1 gate is still holding
+   * open (spec 01 §13.2) and which sets every body's mass. When it fails, bump
+   * [`FIXTURE_FIELD_VERSION`](../../src/sim/fixture-field.ts) and this
+   * fingerprint together, and know that every recipe recorded before that stops
+   * replaying — which is the honest outcome, and the whole reason the number is
+   * there.
+   */
+  it('has a version that moves whenever the field it names does', () => {
+    const craft = fixtureCraft();
+    const written = [
+      `corridor ${field.corridor.centreline} ${field.corridor.halfWidth} ${field.corridor.foot}`,
+      `craft ${craft.x} ${craft.y} ${craft.vx} ${craft.vy}`,
+      ...bodies.map((body) => `${body.x} ${body.y} ${body.radius} ${body.mass} ${body.type}`),
+    ].join('\n');
+    const fingerprint = createHash('sha256').update(written).digest('hex').slice(0, 16);
+
+    expect(FIXTURE_FIELD_VERSION).toBe(1);
+    expect(
+      fingerprint,
+      'the fixture field changed: bump FIXTURE_FIELD_VERSION and this fingerprint together, ' +
+        'and every recipe recorded before now stops replaying',
+    ).toBe('f612536c7d348a13');
   });
 
   /** Spec 17 §5's third invariant. A field that overlaps itself is not a field. */

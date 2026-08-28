@@ -256,7 +256,20 @@ Gates the craft's bloom.
 **Recipe**:
 The complete description of a run — its seed and its input log — from which the run can
 be replayed and its score independently recomputed. What makes a claimed score a fact.
+It names the **field** it was flown in rather than carrying it, because a run flown in one
+field and replayed in another is a different run and the numbers do not say so.
 _Avoid_: replay file, demo, ghost data
+
+**Dispatch**:
+What a session sends back: a **recipe**, the ticks the author flagged while flying it, and
+what they wrote afterwards. The evidence and the testimony in one envelope, so that *"the
+grab feels late"* has the run that produced it underneath and a disagreement about the
+swing becomes a disagreement about a tick number. It is **not** a second name for a
+recipe — a recipe is the run, a dispatch is the run and what somebody made of it — and it
+belongs to development rather than to the game: it goes from the phone to the machine that
+keeps it, and nowhere else (ADR-0003).
+_Avoid_: report, diagnostics, telemetry (Direction 04 retires the telemetry voice), bug
+report
 
 **Ghost**:
 A recipe played back alongside a live run.

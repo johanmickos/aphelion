@@ -1,0 +1,24 @@
+{
+  "kind": "run-dispatch",
+  "at": "2026-08-28T00:00:00.000Z",
+  "recipe": {
+    "version": 1,
+    "field": {
+      "generator": "fixture",
+      "version": 1
+    },
+    "seed": 2472,
+    "ticks": 4570,
+    "log": [
+      137, 242, 259, 560, 617, 740, 758, 1059, 1060, 1144, 1165, 1205, 1216, 1259, 1276, 1577, 1578,
+      1647, 1660, 1761, 1780, 1819, 1831, 1858, 1867, 1926, 1949, 2250, 2251, 2298, 2313, 2417,
+      2440, 2475, 2488, 2511, 2526, 2553, 2565, 2597, 2609, 2626, 2627, 2928, 2929, 2969, 2984,
+      3076, 3098, 3170, 3177, 3341, 3354, 3566, 3575, 3726, 3741, 4042, 4043, 4060, 4091, 4295,
+      4314, 4342, 4360, 4393, 4394
+    ]
+  },
+  "observed": {
+    "ticks": [],
+    "note": "Flown by the headless pilot in test/sim/run.ts at seed 2472 — not by a person. It is here so pnpm replay has a real run in the real format to prove itself on, and it is replaced the first time the author sends one from the phone."
+  }
+}

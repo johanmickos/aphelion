@@ -1,11 +1,17 @@
 /**
- * DEV-ONLY endpoint that receives a measurement report from a phone and writes
- * it to `diagnostics/`.
+ * DEV-ONLY endpoint that receives what a phone has to say and writes it to
+ * `diagnostics/`.
  *
  * The author's judgement is made on a phone (ADR-0010) and so is the only
  * measurement that counts (M0.5). A number read off a phone screen and typed
  * back into a laptop is a number nobody can check later, so the phone posts its
  * samples here and the machine keeps the file.
+ *
+ * **Two things arrive here, and they are told apart by `kind`.** M0.5's timing
+ * report is the first. The second is [M1.5](../docs/plan/m1-the-swing.md)'s
+ * **dispatch** (`CONTEXT.md`) — a recipe with what the author saw beside it —
+ * and it is the same argument one milestone on: a sentence about how a swing
+ * felt, typed back into a laptop, is a sentence nobody can replay.
  *
  * The prototype has a plugin with the same job. Its decisions are taken; its
  * code is not copied (ADR-0001). What is taken:
@@ -25,11 +31,20 @@
  *
  *   - POST only.
  *   - A hard body cap, enforced while reading rather than after.
- *   - The body must parse as a report of the expected shape, or it is refused
+ *   - The body must parse as one of the two known shapes, or it is refused
  *     before anything touches the disk.
- *   - **The filename is generated here**, from a timestamp, and never taken from
- *     the request. A caller cannot choose a path.
+ *   - **The filename is generated here**, from a timestamp and from a suffix
+ *     fixed per kind, and never taken from the request. A caller cannot choose a
+ *     path, and cannot choose part of one either.
  *   - It writes into one fixed directory, resolved from this file's own URL.
+ *
+ * **The second kind arrived by extending the validator, never by loosening it**,
+ * and the cap moved the other way: 512 KB was an assumption, and
+ * [`MAX_DISPATCH_BYTES`](./dispatch.ts) is now a measurement — 64 KB, about
+ * twice the largest legitimate thing anyone can post. A dispatch is also written
+ * back out from what the validator built rather than echoed from the bytes that
+ * arrived, so a key nobody checked cannot reach the disk inside an object that
+ * looks checked.
  *
  * Do not carry this pattern into anything user-facing.
  */
@@ -37,10 +52,20 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Connect, Plugin, ViteDevServer } from 'vite';
+import { DIAG_ENDPOINT, DISPATCH_KIND, MAX_DISPATCH_BYTES, parseDispatch } from './dispatch.ts';
+import { formatDispatch } from './trail.ts';
 
 const OUT_DIR = fileURLToPath(new URL('../diagnostics', import.meta.url));
-const MAX_BYTES = 512 * 1024;
-export const DIAG_ENDPOINT = '/__diag';
+const MAX_BYTES = MAX_DISPATCH_BYTES;
+
+/**
+ * The end of the filename, per kind, and it is a literal in this file.
+ *
+ * The whole name is generated here — a timestamp and one of these — so that
+ * nothing a caller sends reaches a path, not even the part of it that says what
+ * the file is.
+ */
+const SUFFIX = { spike: 'renderer-spike', dispatch: 'run-dispatch' } as const;
 
 /** The timing summary for one candidate, in milliseconds. */
 export interface DiagStats {
@@ -125,7 +150,7 @@ function readBody(req: Connect.IncomingMessage): Promise<string> {
     req.on('data', (c: Buffer) => {
       size += c.length;
       if (size > MAX_BYTES) {
-        reject(new Error(`report exceeds ${MAX_BYTES} bytes`));
+        reject(new Error(`body exceeds ${MAX_BYTES} bytes`));
         req.destroy();
         return;
       }
@@ -182,6 +207,41 @@ export function formatDiagReport(report: DiagReport): string[] {
   return out;
 }
 
+/** One accepted body: what to call the file, what to write, and what to print. */
+export interface Accepted {
+  readonly suffix: string;
+  readonly body: string;
+  /**
+   * The lines to print, produced **after** the file is written and separately
+   * from validating it. A dispatch is read by replaying it, and a bug in the
+   * reader must never be a reason the evidence was not kept.
+   */
+  readonly describe: () => string[];
+}
+
+/**
+ * Decide which of the two things this is, and refuse it if it is neither.
+ *
+ * `kind` is asked first and matched against a literal, so a body that does not
+ * claim to be a dispatch is held to the timing report's own validator exactly as
+ * it was before this file learned a second shape.
+ */
+export function receive(body: string): Accepted {
+  const raw: unknown = JSON.parse(body);
+  const kind =
+    typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>).kind : undefined;
+  if (kind === DISPATCH_KIND) {
+    const dispatch = parseDispatch(raw);
+    return {
+      suffix: SUFFIX.dispatch,
+      body: JSON.stringify(dispatch),
+      describe: () => formatDispatch(dispatch),
+    };
+  }
+  const report = parseDiagReport(body);
+  return { suffix: SUFFIX.spike, body, describe: () => formatDiagReport(report) };
+}
+
 export function diagPlugin(): Plugin {
   return {
     name: 'aphelion:diag',
@@ -196,23 +256,31 @@ export function diagPlugin(): Plugin {
             return;
           }
           try {
-            const body = await readBody(req);
-            const report = parseDiagReport(body);
+            const accepted = receive(await readBody(req));
 
             mkdirSync(OUT_DIR, { recursive: true });
             // Generated here, never taken from the request.
-            const name = `${new Date().toISOString().replace(/[:.]/g, '-')}-renderer-spike.json`;
-            writeFileSync(join(OUT_DIR, name), body);
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const name = `${stamp}-${accepted.suffix}.json`;
+            writeFileSync(join(OUT_DIR, name), accepted.body);
 
             const log = server.config.logger;
-            for (const line of formatDiagReport(report)) log.info(line);
+            // The file exists by now, so reading it is allowed to fail without
+            // costing the thing that was sent. A dispatch is a run somebody flew
+            // once, on a phone, and it does not come back.
+            try {
+              for (const line of accepted.describe()) log.info(line);
+            } catch (err) {
+              const why = err instanceof Error ? err.message : String(err);
+              log.warn(`  saved, but could not be read back: ${why}`);
+            }
             log.info(`  saved to diagnostics/${name}\n`);
 
             res.setHeader('content-type', 'application/json');
             res.end(JSON.stringify({ ok: true, saved: name }));
           } catch (err) {
             const why = err instanceof Error ? err.message : String(err);
-            server.config.logger.warn(`  diagnostics report rejected: ${why}`);
+            server.config.logger.warn(`  refused: ${why}`);
             res.statusCode = 400;
             res.end(JSON.stringify({ ok: false, error: why }));
           }

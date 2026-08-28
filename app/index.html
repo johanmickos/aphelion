@@ -57,10 +57,6 @@
         top: max(8px, env(safe-area-inset-top));
         left: max(8px, env(safe-area-inset-left));
         right: max(8px, env(safe-area-inset-right));
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        justify-content: space-between;
         color: #46516b;
         font:
           10px/1.6 ui-monospace,
@@ -70,12 +66,19 @@
         letter-spacing: 0.14em;
         pointer-events: none;
       }
+      #top {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+      }
       #readout {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      #reset {
+      #chrome button,
+      #chrome input {
         pointer-events: auto;
         flex: none;
         background: transparent;
@@ -87,11 +90,33 @@
         padding: 6px 10px;
         touch-action: manipulation;
       }
+      /* The dev row: the recorder's controls. Hidden unless `main.ts` un-hides
+         it, which it does only under `import.meta.env.DEV` — a production build
+         has no endpoint to send to (ADR-0003) and drops the code that would. */
+      #dev {
+        display: flex;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      #dev[hidden] {
+        display: none;
+      }
+      #note {
+        flex: 1;
+        min-width: 0;
+      }
     </style>
   </head>
   <body>
     <div id="app"></div>
-    <div id="chrome"><span id="readout"></span><button id="reset" type="button">RESET</button></div>
+    <div id="chrome">
+      <div id="top"><span id="readout"></span><button id="reset" type="button">RESET</button></div>
+      <div id="dev" hidden>
+        <button id="flag" type="button">FLAG</button>
+        <input id="note" type="text" autocomplete="off" placeholder="what happened" />
+        <button id="send" type="button">SEND</button>
+      </div>
+    </div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

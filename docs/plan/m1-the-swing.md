@@ -525,7 +525,7 @@ presentation state, and that line goes away when the debrief card arrives.
 
 ## M1.5 · Recipes, replay, and the trail a session leaves
 
-**Next, and it is what the gate is flown with.**
+**Done, and it is what the gate is flown with.**
 
 Define the recipe — seed plus input log — and a CLI that takes one and produces a final
 state. This is the instrument the physics gate uses, the thing that makes a bug report a
@@ -575,6 +575,151 @@ recipe.
 **Not in this step**: no upload to anywhere but the dev server (ADR-0003 — there is no backend,
 and this endpoint is not one), no ghosts (that is a recipe played back alongside a live run, and
 it needs M2), and no scoring in the trail, because there is no economy until M4.
+
+**Done.** `src/sim/recipe.ts` is what a run is written down as and the one door one comes in
+through; `src/sim/replay.ts` is the loop that flies it, pure and portable, and is the seam
+ADR-0003 describes; `pnpm replay` is the command; `tools/trail.ts` is the reader; `tools/dispatch.ts`
+is the envelope both ends of the wire share; `app/main.ts` writes every tick's press down and can
+send the run with what the author saw beside it. `pnpm check` is green at **364 tests**, up from
+298. `CONTEXT.md` gained **dispatch**.
+
+### How the acceptance was read, since it has two readings
+
+*"A recorded run replays to a bit-identical final state, four times its own length"* can mean four
+replays or four lengths. **Both are checked**, because neither costs anything and one of them is
+nearly vacuous alone: four independent replays compared at **every tick** rather than only at the
+end — a divergence that appears at tick 400 and is gone by 4000 is still a divergence — and each
+carried to four times the run's recorded length. The second is the weaker half and it is worth
+saying why: a run that has ended does not tick, so its further ticks are provably nothing, and the
+reading only bites on a run still flying when its log ran out. `pnpm replay` prints both lines and
+says which case it was in.
+
+### What the log is, and the three things that follow from it
+
+The **ticks the press changed on**, in order, alternating from a button that starts up.
+
+- **Ticks, never milliseconds.** The same session on a stuttering phone and a smooth one produces
+  the same ticks and different milliseconds, because `ticksDue` is what turns observed time into
+  ticks and its catch-up is capped at three. A log stamped in milliseconds is a log that does not
+  replay.
+- **What the button did, not what the simulation answered.** A refused press is in the log exactly
+  as a grabbed one is, which is what lets a replay under a changed constant *answer it differently* —
+  and answering it differently is the whole reason to prefer a recipe to a recording.
+- **Every array the validator accepts is replayable.** Strictly increasing whole numbers inside the
+  run's own length is the entire validity rule, so there is no log that parses and then means
+  something impossible. That matters because a recipe arrives over the LAN and is therefore
+  attacker-shaped data.
+
+The recorder is fed the same boolean handed to `stepSim`, before it is handed over, so the
+reconstruction is identical **by construction** rather than by agreement. That is also how the
+up-edge nobody made survives: **focus loss lets go of everything** (`src/input/press.ts`), and a log
+written from the boolean records the dropped grab exactly as it records a lifted thumb. A log
+written from the *events* would not have recorded it at all, and the replay would have kept holding.
+
+### The field is named, and the name is held to the field by a test
+
+Spec [17 · §2](../spec/17-daily-field.md)'s mechanism, borrowed early: the fixture carries a version
+and a recipe names it, so a run flown in one field and replayed in another is refused rather than
+replayed into numbers that all look reasonable. Remembering to bump it is not a mechanism, so
+`test/sim/fixture-field.test.ts` fingerprints what `fixtureField()` actually builds and fails until
+the version moves with it.
+
+**That covers `MASS_EXPONENT`, which is the parameter the gate is about to decide** (spec 01 §13.2):
+it sets every body's mass, the fingerprint is taken over the built bodies, and moving it fails the
+test — which is the right failure, because every recipe recorded before the move replays to a
+different run. Verified by moving it to 0 and watching the guard fire.
+
+**What it does not cover is recorded rather than papered over.** A constant that shapes the *swing*
+rather than the field — the eccentricity cap, the settle's length, the boost envelope — moves the
+run a recipe replays to without moving the field's identity, and nothing will say so. The prototype
+answers this with a simulation behaviour version stored beside the seed, and it earned that the hard
+way: version skew it could not see *"made it look like the simulation had become non-deterministic"*.
+This repo will need one and the place it goes is beside `field` in `Recipe`. It is not built now
+because the gate is about to close the one parameter that is open, and a version whose first act is
+to be bumped teaches nobody anything.
+
+### The size the plan asked for, measured rather than assumed
+
+The endpoint's 512KB cap wanted a number. At spec [01 · §3](../spec/01-swing.md)'s recorded press
+rate — **278 presses in 474 seconds** — an **85-second run is 50 presses, 100 edges and 564 bytes**.
+The plan's estimate of *"a hundred edges and a couple of kilobytes"* had the edges right and the
+bytes four times too high. Three more, for scale: the whole 474-second cohort as one recipe is
+**3.2KB**, an unbroken hour of play at the same rate is **27KB**, and the timing reports already in
+`diagnostics/` are **1.7 – 1.9KB**.
+
+So the cap is **64KB** — about twice the largest legitimate thing anyone can post, and eight times
+narrower than what it replaced. It is the first line of defence and not the last: an input log's
+length is bounded only by the run's own length, so a pathological log inside a legal tick count
+would be megabytes, and the byte cap refuses it before the validator ever sees it. The recipe's own
+tick count is capped at an hour for the same reason — the verification flies four times the length,
+and an unvalidated one is a way to make the dev server work forever from the LAN.
+
+**Everything else about the endpoint got narrower, not looser.** The second kind arrived as a second
+validator rather than as a relaxed one; the filename's suffix is a literal chosen per kind, so a
+caller cannot choose a path *or part of one*; and a dispatch is written to disk as the object the
+validator built rather than as the bytes that arrived, so a key nobody checked cannot ride along
+inside one that looks checked. The trail is printed **after** the file is written and inside its own
+`try`, because a bug in the reader must never be the reason a run somebody flew once was not kept.
+
+### What the reader reports, and the promise it spends
+
+For every press: the tick, the body's **address**, how far out and how fast the press was, the tick
+it froze on, the periapsis it reached and the depth that makes, the tick it let go on, how long after
+the freeze that was, and **where on the boost envelope it fell** — unarmed, plateau, decaying,
+expired, which is spec 01 §7's shape in words. Then the ending, where, and how much altitude the run
+kept. For any tick worth a sentence — one the author flagged, or one an agent asks about with
+`--at` — what the craft was doing, and **where the camera was looking**.
+
+All of it measured from outside. The geometry is recomputed from positions the reader kept, the
+freeze's clock is counted rather than read off the orbit, and the only questions asked of the
+simulation are the two `swing.ts` and `run.ts` already allow themselves — *is a body held*, *has it
+frozen* — which are questions about which phase a swing is in ([ADR-0013](../adr/0013-carry-the-behaviour-re-derive-the-mechanism.md)).
+
+**The camera is there because ADR-0006's promise is the reason any of this exists**: a frame is a
+pure function of `(recipe, tick)`. Since [ADR-0015](../adr/0015-presentation-state-carries-what-decays.md)
+presentation state is a recurrence, so the promise only survives if the picture is derived *beside*
+the simulation, once per tick, from tick zero — and the replay loop cannot do it itself, because
+`src/sim/` may not reach `src/state/`. So the loop offers the hook and the reader spends it. Two
+tests hold the distinction: replaying the picture twice gives the same picture at every tick, and
+**asking the final state what it looks like gives a different answer than arriving there**, which is
+what "a recurrence" means and what a reader that took the shortcut would have got wrong.
+
+### The word that landed
+
+**Dispatch**: a recipe, the ticks the author flagged while flying it, and what they wrote afterwards.
+The evidence and the testimony in one envelope. Explicitly not a second name for a recipe — a recipe
+is the run, a dispatch is the run and what somebody made of it — and it is development's rather than
+the game's, which is why it lives in `tools/` beside the endpoint that receives it and not in `src/`,
+where every module belongs to one of ADR-0006's three layers. _Avoid_: report, diagnostics,
+telemetry (Direction 04 retires that voice), bug report.
+
+The two halves are two shapes because a phone can only produce one of them mid-flight. **FLAG** is a
+tap: no keyboard, no attention, and it lands on the tick the feeling did. The note is typed
+afterwards, when there is a hand free. The prototype arrived at the same split.
+
+### What `pnpm replay` ships with, and why it is a stand-in
+
+A real 76-second run in the real format — 34 swings across 22 bodies, climbing 16 080 design units
+before going out of bounds — **flown by the headless pilot, not by a person**, and its own note says
+so. It is there so the command can prove itself before the author has flown one, and
+`test/sim/replay.test.ts` holds the committed file to being exactly what the pilot produces, so it
+cannot quietly stop matching the thing that made it. It is replaced by the first dispatch that
+arrives from the phone.
+
+It does **not** close spec 01 §13.7, which wants the pilot's two invented numbers replaced by
+percentiles of this game's own *recorded play*. That is what the gate's own dispatches are for, and
+this step is what makes them exist.
+
+### How the gate is flown with it
+
+`pnpm dev`, scan the QR, fly. **FLAG** whenever something feels wrong — it costs nothing and the tick
+is the half of the observation that cannot be reconstructed later. Type a sentence, **SEND**, and the
+trail prints in the terminal on the laptop a second later, with the note above it. Then
+`pnpm replay diagnostics/<file>.json --at <tick>` re-flies exactly that run, and an agent can change
+a constant and fly it again.
+
+**RESET is a restart and never a retry** (ADR-0007), and it throws the recipe away with the run: a
+recorder that survived a restart would describe a run nobody flew.
 
 ---
 
@@ -942,6 +1087,12 @@ disagreement about the swing stops being a disagreement about two memories of it
 The build is M1.6's — `pnpm dev` prints a QR for the LAN address, and the phone is where the
 judgement is made (ADR-0010). What the gate is asked to decide is listed under
 [M1.6](#m16--input-and-a-crude-renderer), and there are four things.
+
+**The recorder is now in the build**, and [M1.5](#m15--recipes-replay-and-the-trail-a-session-leaves)
+says how it is flown: **FLAG** stamps the tick something felt wrong, the note is typed afterwards,
+**SEND** posts the run and its testimony to the laptop, and the trail prints there a second later.
+Nothing about it is required — a verdict with no dispatch behind it is still a verdict — but a
+sentence with a tick number under it costs the next session a day less than one without.
 
 **What the gate is still not asked.** The punch is spec [02](../spec/02-release.md)'s and is not
 in the build, so a release pays its lasting 22% and none of its kick; there is no compass, so aim

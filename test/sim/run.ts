@@ -199,8 +199,17 @@ function aimed(state: SimState): boolean {
  * `ticks` is a ceiling and not a schedule: a run still flying when it runs out
  * returns a `null` ending, which is itself worth counting — a corpus where most
  * runs time out is a corpus measuring the ceiling rather than the game.
+ *
+ * `onInput` is handed the press each tick is flown with, before it is flown, so
+ * a caller can write a recipe of the run the pilot is flying.
  */
-export function flyRun(field: Field, craft: Craft, seed: number, ticks = 20_000): Flown {
+export function flyRun(
+  field: Field,
+  craft: Craft,
+  seed: number,
+  ticks = 20_000,
+  onInput?: (tick: number, pressed: boolean) => void,
+): Flown {
   const state: SimState = createInitialState(field, craft, seed);
   const next = stream(seed);
   const { centreline } = field.corridor;
@@ -270,6 +279,12 @@ export function flyRun(field: Field, craft: Craft, seed: number, ticks = 20_000)
     }
 
     const holdingBefore = state.heldBody;
+    // Handed out before the step and not after, so what a caller writes down is
+    // the press the run was actually flown with rather than a reconstruction of
+    // it. This is the cheapest source of realistic input logs there is until the
+    // author's own arrive — [M1.5](../../docs/plan/m1-the-swing.md) records one
+    // as the recipe `pnpm replay` ships with.
+    onInput?.(tick, pressed);
     stepSim(state, { pressed });
     if (state.heldBody !== null && !holding) grabs += 1;
     if (holdingBefore !== null && state.heldBody === null) {

@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "portable": "node tools/check-portability.ts",
+    "replay": "node tools/replay.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm portable && pnpm test"
   },
   "devDependencies": {
