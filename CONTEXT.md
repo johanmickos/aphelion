@@ -86,6 +86,13 @@ only condition under which gravity acts at all — a coasting craft feels nothin
 anything, at any distance.
 _Avoid_: capture, catch, hook
 
+**Press**:
+The one input the game has. Touch, mouse and keyboard all mean it and there is nothing
+else to mean: it says *be caught by that body* on the way in and *let go* on the way out.
+Held while any device is holding it, so a second finger is not a second press and lifting
+one does not let go.
+_Avoid_: tap (a press has a length and that length is the swing), button, hold, input
+
 **Release**:
 Letting go, along the exit tangent. Payday: the moment a swing is graded and priced.
 _Avoid_: launch, slingshot, fling
@@ -302,3 +309,16 @@ What something is, expressed as hue. A body keeps its hue forever.
 Eight names, each with one meaning: VOID (the sky), DUSK (structure, unlit), AURORA
 (strange), ION (risk), CORE (the player), LUMEN (mid quality, and sanctuary), SOLAR
 (top quality), INK (utility text).
+
+**Design space**:
+The rectangle the game is composed in — a phone held in portrait — and the coordinates
+everything the player reads is drawn in, so that the composition is identical on every
+device and nothing lands on a bar. It is fitted whole and centred, with **letterbox** bars
+filling whatever is left; DOM is developer chrome only.
+_Avoid_: viewport, screen, canvas size, resolution
+
+**Camera**:
+Where the world is being watched from — a position, and never anything else. It is never
+rotated, never shaken and never randomised, and it is part of what a tick presents rather
+than something the renderer decides, so a frame can be asserted without a canvas.
+_Avoid_: view, viewport, scroll position

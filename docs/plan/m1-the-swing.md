@@ -260,6 +260,127 @@ on desktop (ADR-0010).
 
 **Acceptance**: it is flyable on a phone and on a desktop browser. **Verify**: fly it.
 
+**Pulled ahead of M1.4 and M1.5 deliberately.** M1 ends in a gate that is the author flying
+the build (ADR-0004), the swing is proved correct headlessly and cannot be proved to feel
+right by anything but a phone, and every step built on top of it before that judgement is a
+step built on an untested premise. So: make it flyable, then stop.
+
+**Done.** `src/input/press.ts` combines devices into the one boolean and `app/input.ts` binds
+them; `src/render/` is a Canvas2D renderer of circles and lines; `src/sim/fixture-field.ts` is
+a field to fly in; presentation state gained a **camera**. `pnpm check` is green at **240
+tests**, up from 183.
+
+### Where the lines were drawn
+
+Three things the specs do not answer, decided here rather than invented in passing:
+
+1. **The camera** ([`src/state/derive.ts`](../../src/state/derive.ts)). Spec 05 says nothing
+   about scrolling; spec 00 §5 rules only that it is never rotated, shaken or randomised;
+   spec 02's kick and spec 12's held finish are later milestones'. It is **centred on the
+   craft, fixed sideways, and does not lag**, and it lives in presentation state so that spec
+   02 §5 can assert its offset in M2 — *a camera that lives in the renderer is a camera no
+   test can see*.
+
+   *Fixed sideways* is the load-bearing half. The prototype pans horizontally and needs four
+   mechanisms to do it safely — a deadzone, a velocity look-ahead, a clamp to the field and a
+   backstop for the frames the ease has not caught — and every one of them answers a question
+   that only exists because its playfield is wider than its window. Ours is not: the fixture
+   field's bodies fit inside the design space, which `test/sim/fixture-field.test.ts` holds
+   them to. **The decision expires when the field outgrows the design space**, which is
+   M1.4's boundary and M3's corridor.
+
+   *No lag* is a refusal rather than an omission. An eased camera has to remember where it
+   was, and presentation state deliberately has none — deriving the same simulation twice
+   must give the same answer, which is what makes a frame a pure function of `(recipe, tick)`.
+   The prototype's evidence says the lag is also what costs: following a craft round a
+   *settled* orbit through a 0.33s ease put a vertical oscillation over half the orbit's own
+   period into the view, *"too slow to track ... all it could do was smear"*, and the fix it
+   needed was a second mechanism easing the camera's subject onto the body. Rigid, none of
+   that arises. What is left is **the world sliding with the orbit, and that is a thing to
+   watch for at the gate** — if it reads badly, the prototype's anchor is the recorded answer
+   and it belongs in M2 beside the release kick, which needs a decaying transient anyway.
+
+2. **The field** ([`src/sim/fixture-field.ts`](../../src/sim/fixture-field.ts)). Spec 17 §3
+   rules that a day is generated once as data before the first tick and the generator is
+   M3's, so this is a hand-authored table that satisfies the same contract and says it is a
+   fixture. Its geometry is the prototype's own field at the tuning spec 01 measured — bodies
+   inside the design width, gaps of 280 units jittered, radii 34 – 56, a fork at about two
+   altitudes in five, and the prototype's tuned opening kept exactly. **Nothing here rules on
+   spec 17 §4's curve**, whose metres this repo has not reconciled with its design units.
+
+3. **The input rule** ([`src/input/press.ts`](../../src/input/press.ts)). The button is down
+   while any device is holding it, so a second finger is not a second press and lifting one
+   does not let go — a release is the one moment in this game that must never be an accident.
+   Every keyboard press shares one identity, so a second key means nothing. Focus loss lets go
+   of everything, because a button whose up event is never coming would hold a grab open for
+   the rest of the run. The rule is pure and `pnpm portable` now scans `src/input/` too; the
+   listeners live in `app/`, beside the wall clock, for the reason `clock.ts` is pure and
+   `performance.now()` is not.
+
+### What is tested without a canvas
+
+M1.6's acceptance is *"fly it"*, which is not an excuse for an untested step. The camera is
+asserted over a whole flown swing — centred every tick, never below spec 00 §7's thumb line,
+never moving sideways however far the craft does, and identical however the simulation
+arrived. The projection M3.1 will want *"identical composition across aspect ratios"* of is
+pure arithmetic and is checked at four aspects. The interpolation between ticks is checked at
+both ends of the gap and across the heading wrap that happens once a revolution on every
+orbit in the game. Spec 00 §1's acceptance — *"a lint over the render layer finds no other
+literal"* — is `test/render/palette.test.ts`, written now while the renderer draws three
+colours, because a palette is a thing a codebase either has from the first colour or spends a
+milestone recovering.
+
+And **the layer criterion is written in the direction `pnpm portable` cannot look**
+(AGENTS.md §6). The checker skips `src/render/` because the renderer is the one layer allowed
+a browser; what it therefore cannot catch is a renderer reaching into `SimState` for the held
+body or the orbit's phase, which would draw a correct-looking frame while ADR-0006's promise
+quietly stopped being true. `test/render/boundary.test.ts` fails instead, and the fix when it
+does is never to relax it: what the renderer needs is a field on `PresentationState`.
+
+### For the author, at the gate
+
+Four things, none of them decided here.
+
+- **The mass-to-radius exponent** (spec 01 §13.2, `MASS_EXPONENT`, an opening position at 2)
+  is now flyable: the field's radii run 34 – 56, so at `n = 0` every body pulls and reaches
+  alike — the prototype exactly — and at `n = 2` the largest body reaches **2.7× as far** as
+  the smallest. A field of identically-sized bodies would have made the question unaskable,
+  which is why the fixture spreads them.
+- **The eccentricity cap at 0.6** (spec 01 §13.5), which binds on all but the slowest dives
+  and is doing more work than a safety limit should.
+- **Spec 01 §11's third criterion** — half-quality available at every heading — holds for
+  every swing that froze on the floor and cannot hold for shallow ones, because the
+  half-quality stretch is a fixed 1.675s against a period that grows as the periapsis to the
+  power of one and a half. M1.3 recorded it; reading it in the hand is worth more than
+  re-deriving it.
+- **The camera's rigid vertical follow**, above.
+
+> **And one measurement the gate should have before it starts.** ADR-0010 makes the design
+> space the whole of a phone screen, and a browser does not give a page the whole of a phone
+> screen. On the 393 × 651 CSS viewport ADR-0011 measured on, the design space fits **bound by
+> height**: the game occupies **301 of 393 points of width, with a 46-point bar down each
+> side**, and everything is drawn at **77%** of the size the prototype draws it at on the same
+> phone — 0.77 CSS points per world unit against 1.01 — so the player sees 844 world units of
+> height where the prototype shows 646.
+>
+> This is spec [00 · §7](../spec/00-tokens.md) and ADR-0010 applied exactly as written, and it
+> is not a bug. But the M1 gate is *this build against the prototype, back to back, in the same
+> hand*, and a swing drawn at three quarters of the size against a third more visible world is
+> not the same thing in the hand even when it is the same thing in the numbers. Two readings
+> survive and this step does not choose between them: **(a)** the design space is 1170 × 2532
+> and letterboxes wherever it must, which is what is built, and the size difference is
+> something the gate should knowingly discount; or **(b)** the design *width* is the contract
+> and the visible height flexes with the viewport, which is what the prototype does and which
+> spec 00 §7's own wording — *"the thumb line sits at 2/3 of the screen height"* — leaves room
+> for. It needs the author.
+
+### What was deliberately not built
+
+No compass, no trail, no glow, no HUD, no boundary and no death — M2's, M3's and M1.4's. The
+one thing here that is not the game is a **RESET** control, DOM developer chrome and marked as
+such: a fixture field with no boundary and no death in it has nowhere to come back from, and
+the gate is flying it repeatedly.
+
 ---
 
 ## Gate
@@ -267,5 +388,12 @@ on desktop (ADR-0010).
 **The author flies this build and the prototype back to back and says yes or no.** Nothing
 in M2 starts before that. If the answer is no, the loop is M1.1's characteristics — find the
 one that is wrong, not the tuning value that is closest to hand.
+
+**The build to fly is M1.6's**, which is why it was pulled ahead: `pnpm dev` prints a QR for
+the LAN address, and the phone is where the judgement is made (ADR-0004). M1.4 and M1.5 are
+still outstanding and neither is a precondition — death and the run lifecycle change what
+happens when a swing goes wrong, and recipes change how a bug is reported, and the gate is
+about how a swing that goes right feels. What the gate is asked to decide is listed under
+[M1.6](#m16--input-and-a-crude-renderer).
 
 Next: [M2](./m2-the-instrument.md).

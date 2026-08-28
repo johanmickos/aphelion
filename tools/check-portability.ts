@@ -27,7 +27,7 @@
  * A `srcRoot` other than the real `src/` scans only; the proof of life needs the
  * real simulation. Test fixtures use that path.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
@@ -43,6 +43,12 @@ const isRealSrc = root === REAL_SRC;
  * allowed a browser — scanning it would ban the only thing it is for. What
  * constrains the renderer is that nothing else may import it.
  *
+ * `src/input/` is not a layer. It is held here anyway because what it contains
+ * is the rule for combining devices into the simulation's one boolean, and a
+ * rule that can only be exercised through a browser is a rule nothing tests.
+ * The listeners that feed it live in `app/`, beside the wall clock, for the same
+ * reason `clock.ts` is pure and `performance.now()` is not.
+ *
  * Two of these rules go slightly beyond the letter of M0.3, which asks only that
  * `src/state/` not import `src/render/`. `src/sim/` reaching outside itself at
  * all, and `src/state/` reaching anywhere but `src/sim/`, are the same rule
@@ -53,6 +59,7 @@ const isRealSrc = root === REAL_SRC;
 const LAYERS: ReadonlyArray<{ dir: string; mayImport: readonly string[] }> = [
   { dir: 'sim', mayImport: [] },
   { dir: 'state', mayImport: ['sim'] },
+  { dir: 'input', mayImport: [] },
 ];
 
 /**
@@ -153,6 +160,11 @@ const violations: Violation[] = [];
 
 function walk(dir: string): string[] {
   let out: string[] = [];
+  // A layer that is not there is not a violation. The fixtures under
+  // `test/fixtures/portability/` are shaped like `src/` but hold only the one
+  // directory each case needs, and a checker that insisted on the full set would
+  // fail on the shape of its own test data rather than on its contents.
+  if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) out = out.concat(walk(full));
@@ -370,11 +382,16 @@ if (!isRealSrc) {
 // pulled by that body and no other, and a coasting craft is pulled by nothing at
 // all — and the last is asserted as bit-identity, because §9 measures it as
 // bit-identity rather than as "nearly constant".
+//
+// The button is pressed through `src/input/` rather than by a literal, so the
+// thing the phone will actually hold the verb down with is proved to run here
+// too. Two devices hold it, because that is the case the module exists to answer.
 const { createInitialState, stepSim } = await import('../src/sim/step.ts');
 const { NO_INPUT } = await import('../src/sim/types.ts');
 const { createBody } = await import('../src/sim/body.ts');
 const { createCraft, speedOf } = await import('../src/sim/craft.ts');
 const { derive } = await import('../src/state/derive.ts');
+const { createPress, pressDown, pressUp, isPressed } = await import('../src/input/press.ts');
 
 const field = { bodies: [createBody(0, 0, 132)] };
 const sim = createInitialState(field, createCraft(-900, -420, 260, 0), 1);
@@ -388,11 +405,13 @@ const fail = (message: string): void => {
   failed = true;
 };
 
-const PRESSED = { pressed: true };
+const press = createPress();
+pressDown(press, 'pointer:1');
+pressDown(press, 'key');
 const speedAtGrab = speedOf(sim.craft);
 let froze = false;
 for (let i = 0; i < HELD_TICKS; i++) {
-  stepSim(sim, PRESSED);
+  stepSim(sim, { pressed: isPressed(press) });
   if (sim.orbit) froze = true;
 }
 if (sim.tick !== HELD_TICKS) fail(`expected tick ${HELD_TICKS}, got ${sim.tick}`);
@@ -400,7 +419,11 @@ if (sim.heldBody === null) fail('a press beside a body did not take it');
 if (speedOf(sim.craft) === speedAtGrab) fail('a held craft was not accelerated by its body');
 if (!froze) fail('a dive never reached its closest approach');
 
-stepSim(sim, NO_INPUT);
+pressUp(press, 'key');
+stepSim(sim, { pressed: isPressed(press) });
+if (sim.heldBody === null) fail('one device letting go let go of the body');
+pressUp(press, 'pointer:1');
+stepSim(sim, { pressed: isPressed(press) });
 const speedAtRelease = speedOf(sim.craft);
 if (sim.heldBody !== null) fail('a craft did not let go when the button came up');
 const headingAtRelease = derive(sim).craft.heading;
@@ -415,6 +438,6 @@ if (derive(sim).tick !== sim.tick) {
 if (failed) process.exit(1);
 
 console.log(
-  `src/sim and src/state are portable — a whole swing, ${HELD_TICKS} ticks held and ` +
-    `${COAST_TICKS} coasting, under plain node, no bundler, no DOM`,
+  `src/sim, src/state and src/input are portable — a whole swing, ${HELD_TICKS} ticks held ` +
+    `and ${COAST_TICKS} coasting, under plain node, no bundler, no DOM`,
 );

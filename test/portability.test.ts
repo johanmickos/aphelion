@@ -50,6 +50,19 @@ describe('the checker fails loudly when', () => {
     expect(output).toContain('not attempting to load the simulation');
   });
 
+  /**
+   * `src/input/` is not a layer, and is held to the same bans anyway: what it
+   * contains is the rule for combining devices into the simulation's one
+   * boolean, and a rule that can only be exercised through a browser is a rule
+   * nothing tests. The listeners themselves live in `app/`.
+   */
+  it('the DOM reaches into the input rule instead of staying in the shell', () => {
+    const { code, output } = check('dom-in-input');
+    expect(code).toBe(1);
+    expect(output).toContain('input/press.ts');
+    expect(output).toContain('window — DOM global');
+  });
+
   it('presentation state imports the renderer', () => {
     const { code, output } = check('state-imports-render');
     expect(code).toBe(1);

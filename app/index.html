@@ -43,25 +43,55 @@
         touch-action: none;
         -webkit-tap-highlight-color: transparent;
       }
+      /* The game. Everything the player reads is drawn inside it, in world space
+         in design coordinates (spec 00 §7). */
       #app {
         position: absolute;
         inset: 0;
+      }
+      /* Developer chrome, and spec 00 §7 rules that DOM is nothing else. It sits
+         at the top because the bottom third of the screen is the thumb's, and a
+         button there would eat presses meant for the game. */
+      #chrome {
+        position: absolute;
+        top: max(8px, env(safe-area-inset-top));
+        left: max(8px, env(safe-area-inset-left));
+        right: max(8px, env(safe-area-inset-right));
         display: flex;
+        gap: 12px;
         align-items: center;
-        justify-content: center;
+        justify-content: space-between;
         color: #46516b;
         font:
           10px/1.6 ui-monospace,
           'SFMono-Regular',
           Menlo,
           monospace;
-        letter-spacing: 0.18em;
-        text-align: center;
+        letter-spacing: 0.14em;
+        pointer-events: none;
+      }
+      #readout {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #reset {
+        pointer-events: auto;
+        flex: none;
+        background: transparent;
+        border: 1px solid #2a2740;
+        border-radius: 3px;
+        color: #46516b;
+        font: inherit;
+        letter-spacing: inherit;
+        padding: 6px 10px;
+        touch-action: manipulation;
       }
     </style>
   </head>
   <body>
     <div id="app"></div>
+    <div id="chrome"><span id="readout"></span><button id="reset" type="button">RESET</button></div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
