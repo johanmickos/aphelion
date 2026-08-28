@@ -9,6 +9,28 @@ exactly zero divergence. This rewrite discards that protection deliberately (ADR
 this milestone rebuilds it in a different shape: characteristics named up front, determinism
 enforced by machine, and the author as the judge of feel.
 
+## The order, which is not the numbering
+
+The numbers below are identifiers rather than a sequence, and two steps have moved. Read them
+in this order:
+
+**M1.1 → M1.2 → M1.3 → M1.6 → M1.5 → gate → M1.4.**
+
+**M1.6 came early** because the milestone ends in the author flying the build and the first
+playable moment was three steps away; everything built on top of an unjudged swing is built on
+an untested premise.
+
+**M1.5 now comes before the gate** (author, 2026-08-27). It was always described here as *the
+instrument the physics gate uses*, and it was still scheduled after the gate that uses it. The
+author's judgement of feel is the scarcest thing in this project, and a session flown without a
+recorder produces one sentence and no evidence: *"the grab feels late"* with nothing behind it
+costs a whole cycle to reproduce, and may not be reproducible at all. With a recipe under it,
+the same sentence is a tick number, and a disagreement about the swing becomes a disagreement
+about a specific dive that both sides can replay.
+
+**M1.4 is after the gate**, and that is a deliberate cost rather than an oversight — see its
+own section.
+
 ---
 
 ## M1.1 · The characteristics document
@@ -209,7 +231,8 @@ at **p50 46.5%** against the band of 35 – 55% (the prototype measured 43%).
    §8's *exit* distribution whose p05 is 195, so it contains none. What the mechanism itself does
    with a seven-fold spread of approaches is asserted in `freeze.test.ts`, where it depends on no
    distribution at all. **Spec 01 §13.7's instruction applies: replace these with percentiles of
-   this game's own play as soon as M1.5 and M1.6 make one.**
+   this game's own play as soon as there is some.** M1.6 made the play; M1.5 makes it
+   countable, and this is a second reason it now comes before the gate.
 3. **Grab range scaling with mass is ruled; its shape is not, and the shape here is a
    derivation.** §13.2 rules that *"grab range scales with mass ... it is what keeps a small body
    grabbable at a distance where the grab is still a bound grab rather than a braked one."*
@@ -237,9 +260,23 @@ and bank (ADR-0007). No lives.
 
 **Acceptance**: a run ends for each distinct reason and reports which. **Verify**: `pnpm test`.
 
+**After the gate, and the cost is stated rather than hidden.** The gate's question is whether a
+*swing* feels right, and none of spec 01's characteristics are about dying. But the build the
+author flies will have no stakes in it: nothing kills, so nothing is risked, and spec
+[01 · §10](../spec/01-swing.md) measures that **83% of real endings are out of bounds** — the
+prototype's recorded sessions, which every number in spec 01 came from, were all flown under
+that pressure. A swing flown with nothing to lose is not the same swing.
+
+So the gate is asked for a judgement about the swing itself and **not** about how a run reads,
+and if the answer turns on stakes rather than on physics, this step comes first and the gate is
+re-flown. Pulling it forward is one instruction; it was left here because the alternative delays
+the diagnostic trail by a step, and the trail is what the author asked for.
+
 ---
 
-## M1.5 · Recipes and headless replay
+## M1.5 · Recipes, replay, and the trail a session leaves
+
+**Next, and it is what the gate is flown with.**
 
 Define the recipe — seed plus input log — and a CLI that takes one and produces a final
 state. This is the instrument the physics gate uses, the thing that makes a bug report a
@@ -249,6 +286,46 @@ compressed input log, so Direction 10's `APH-214-KX7Q` can only ever be a server
 
 **Acceptance**: a recorded run replays to a bit-identical final state, four times its own
 length. **Verify**: `pnpm replay`.
+
+### What the gate needs on top of the recipe
+
+A recipe replays a run. What the author needs is a session on a phone turning into something
+two people can point at, which is three more things and no more:
+
+1. **A recorder in the shell.** `app/main.ts` reads the press and steps; nothing writes it
+   down. The log is what the button did and when, and nothing else — a log of positions would
+   be a recording, and a recording cannot be re-flown under a changed constant, which is the
+   whole reason to prefer the recipe.
+2. **The phone-to-laptop seam, which already exists and is the wrong shape.**
+   `tools/vite-plugin-diag.ts` is the dev-only endpoint the phone posts to and it validates one
+   schema — M0.5's timing report. Its header says to read it before extending it, because it
+   writes files on a server bound to every interface on the LAN, and every narrowing in it is
+   load-bearing. **Extending its validator is the change; loosening it is not.** Its 512KB body
+   cap wants a measurement rather than an assumption: a press log is small, and *how* small
+   over an 85-second run is a number this step should record.
+3. **A reader.** The point of the trail is that an agent can walk it — which tick a grab
+   happened on, what the geometry was, where on the envelope a release fell — and compare it
+   against what the author says happened. `test/sim/swing.ts` already flies a geometry and
+   reports only what can be seen from outside; the same discipline applies here, and
+   [ADR-0013](../adr/0013-carry-the-behaviour-re-derive-the-mechanism.md) still rules that a
+   reading which requires reaching inside the simulation is the wrong reading.
+
+**A recipe must name the field it was flown in.** Today the field is a hand-authored fixture in
+code ([`fixture-field.ts`](../../src/sim/fixture-field.ts)) and a recipe that did not name it
+would replay against whatever the file says this week. Spec [17 · §2](../spec/17-daily-field.md)
+already versions the day generator for exactly this reason and rules that *"old runs replay
+against the generator version they were flown on"*; the fixture borrows that mechanism now
+rather than having it retrofitted when M3's generator arrives.
+
+**One word is missing and lands with this step.** `CONTEXT.md` has **recipe** — a run's seed and
+its input log — and has no word for the envelope that carries one *plus* what the author
+observed. The prototype called those diagnostics reports. Whatever it is called, it goes in the
+glossary in the same change ([AGENTS.md](../../AGENTS.md) §2), and it is not a second name for a
+recipe.
+
+**Not in this step**: no upload to anywhere but the dev server (ADR-0003 — there is no backend,
+and this endpoint is not one), no ghosts (that is a recipe played back alongside a live run, and
+it needs M2), and no scoring in the trail, because there is no economy until M4.
 
 ---
 
@@ -389,11 +466,24 @@ the gate is flying it repeatedly.
 in M2 starts before that. If the answer is no, the loop is M1.1's characteristics — find the
 one that is wrong, not the tuning value that is closest to hand.
 
-**The build to fly is M1.6's**, which is why it was pulled ahead: `pnpm dev` prints a QR for
-the LAN address, and the phone is where the judgement is made (ADR-0004). M1.4 and M1.5 are
-still outstanding and neither is a precondition — death and the run lifecycle change what
-happens when a swing goes wrong, and recipes change how a bug is reported, and the gate is
-about how a swing that goes right feels. What the gate is asked to decide is listed under
-[M1.6](#m16--input-and-a-crude-renderer).
+**It is flown after M1.5, with a recorder running** (author, 2026-08-27). The gate was
+originally last in the milestone and the instrument it uses was scheduled after it, which is
+the wrong way round: ADR-0004 makes the author's judgement of feel the scarcest input this
+project has, and a session flown without a recorder spends it on a sentence nobody can
+reproduce. Flown with one, *"the grab feels late"* arrives with a recipe and a tick number
+under it, the same dive can be re-flown by an agent under a changed constant, and a
+disagreement about the swing stops being a disagreement about two memories of it.
+
+The build is M1.6's — `pnpm dev` prints a QR for the LAN address, and the phone is where the
+judgement is made (ADR-0010). What the gate is asked to decide is listed under
+[M1.6](#m16--input-and-a-crude-renderer), and there are four things.
+
+**What the gate is not asked.** M1.4 is deliberately still outstanding, so nothing kills and
+nothing is at stake; the punch is spec [02](../spec/02-release.md)'s and is not in the build,
+so a release pays its lasting 22% and none of its kick; there is no compass, so aim has no
+instrument; and there is no audio. Each of those changes how a swing *reads* without changing
+what it *is*, and the gate is about the second. A verdict that turns on one of them is a
+verdict about a missing step rather than about the physics, and the loop for it is that step
+and not spec 01.
 
 Next: [M2](./m2-the-instrument.md).
