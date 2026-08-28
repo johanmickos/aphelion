@@ -1074,6 +1074,23 @@ number, `test/sim/version.test.ts` fingerprints three whole runs to keep it hone
 from the old swing is now refused with its version in the message. The author's own first dispatch
 is the first thing it refused, which is the correct outcome.
 
+### And the first evidence that §11's tension cannot be judged in this build
+
+Not a defect, and it is a measurement of a clause the **Gate** section below already carries: *"there
+is no compass, so aim has no instrument."*
+
+Over a 31-second flown run, 13 swings converted, the releases fall **23% before the boost armed,
+54% inside the plateau, 15% decaying, 8% expired**. Spec [01 · §11](../spec/01-swing.md) measured
+the prototype's own cohort at **53 / 12 / 36**, and its reason for the 53 is explicit: *"the aim
+arrived first and they took it."*
+
+**The split inverted because half of the decision is missing.** The prototype's cohort was flown
+with a compass; this build has none, so there is nothing to read the aim off and the clock is the
+only thing left to play. That makes this build's release distribution evidence about M2's absence
+rather than about the physics — and it means **§11's tension is not one of the things this gate can
+close**. `test/sim/run.ts`'s pilot draws from the prototype's 53 / 12 / 36 and is unaffected; what
+is affected is any verdict on whether the two goals actually compete in the hand.
+
 ### The camera follows at 3
 
 *"Camera follow rate feels much better at a lower value to smoothen movement going back down."*
