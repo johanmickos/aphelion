@@ -260,6 +260,18 @@ export interface ScoreState {
    */
   carryPx: number;
   /**
+   * The same swing priced WITHOUT the fire, and for one purpose.
+   *
+   * `carry / carryCold` is what the fire was worth on this swing, which is the
+   * number the receipt has always printed as `FIRE`. It takes every multiply the
+   * real carry takes — the chain rate, every arrival's tightness — and only skips
+   * the dead-zone rate, so the ratio isolates the fire and nothing else.
+   *
+   * Kept rather than derived for the reason `carryPx` is: there is no way back
+   * from a product that has already collapsed its factors.
+   */
+  carryCold: number;
+  /**
    * Consecutive engagements, unbroken by a long coast or a death.
    *
    * NOT THE STREAK, and the difference is the reason both exist. This steps on
@@ -339,9 +351,13 @@ export interface ScoreState {
    * Which fire band the carry would cash in right now: 1, 2 or 3.
    *
    * Published for the same reason `burnHeat` is — the drawing and the points must
-   * not be able to disagree about how hot it is — and read off `burnBank` rather
-   * than off the instantaneous heat, because the band is what the swing has DONE
-   * at the edge and not where it happens to be this tick.
+   * not be able to disagree about how hot it is.
+   *
+   * MEASURED NOW, NOT SELECTED. It was a three-rung ladder chosen by an integral;
+   * it is `carry / carryCold`, what the fire has actually been worth to this swing
+   * so far. Continuous, so it reads 1.02 for a graze instead of rounding to
+   * nothing, and it cannot be earned by a swing that climbed no metres in the
+   * fire — which is what a threshold on heat-seconds could do and did.
    */
   band: number;
   /** Session totals, across every life. Diagnostics, not the score. */
@@ -445,25 +461,21 @@ export interface ScoreState {
    * as one rule: pay at the moment the act finished being reversible.
    */
   pendingFlyby: PendingFlyby | null;
-  /**
-   * Heat integrated over the current SWING, in band units.
-   *
-   * It used to be points and used to be paid and reset when the fire went out.
-   * Both were wrong under the constitution: minting per second near the wall is
-   * what axiom 1 bans by name, and a flare that ended before the release would
-   * have taken its evidence with it. It now survives the fire dying and is
-   * emptied by the cash, so a swing that rode the edge early still cashes in the
-   * band it earned.
-   *
-   * Fractional and un-rounded: heat is integrated a tick at a time and rounding
-   * each slice would lose most of a short flare.
-   *
-   * A DEATH DROPS IT, which is the whole stake. 78% of edge-drags end in the wall
-   * and pay nothing at all — the drama is free and only the save is paid.
-   */
-  burnBank: number;
   /** Hottest instant of the current swing. 0 for one that has not burned. */
   burnPeak: number;
+  /**
+   * Heat integrated over the stretch since metres were last priced, and how long
+   * that stretch is. Their ratio is the mean heat the next lump is priced at.
+   *
+   * A PAIR, AND THE DENOMINATOR IS THE POINT. `holdClimbInCapture` freezes the
+   * climb for the whole of a capture, so metres arrive as one lump at the release
+   * rather than a tick at a time — pricing that lump at the release tick's heat
+   * would pay an entire swing at whatever the ship was doing in its final frame.
+   * The span makes it an average instead, so a graze inside a long capture is
+   * worth the fraction of it that was hot.
+   */
+  fireHeatSecs: number;
+  fireSpan: number;
   /** Names of anomalies already claimed this life. Cleared by `endLife`. */
   claimed: string[];
   /**

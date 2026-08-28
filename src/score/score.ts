@@ -109,6 +109,7 @@ export function createScoreState(): ScoreState {
   return {
     bank: 0,
     carry: 0,
+    carryCold: 0,
     carryPx: 0,
     chain: 0,
     coastClimb: 0,
@@ -121,8 +122,9 @@ export function createScoreState(): ScoreState {
     flybys: 0,
     burns: 0,
     burnHeat: 0,
-    burnBank: 0,
     burnPeak: 0,
+    fireHeatSecs: 0,
+    fireSpan: 0,
     band: 1,
     lastAward: null,
     pending: null,
@@ -233,7 +235,33 @@ function accrueCarry(sc: ScoreState, state: SimState, cfg: SimConfig, scfg: Scor
   }
   const gained = Math.max(0, sc.lastHighY - high);
   sc.lastHighY = high;
-  const rate = scfg.climbPerPx * (1 + scfg.chainStep * sc.chain);
+  const cold = scfg.climbPerPx * (1 + scfg.chainStep * sc.chain);
+  // THE FIRE IS A RATE, NOT A BAND. Metres climbed inside the dead zone are worth
+  // more per metre, in proportion to how deep they were climbed — which is what
+  // the hazard gradient has always drawn and what the old ladder could not say.
+  //
+  // It sits here, beside the chain, because this is where an axis that describes
+  // how the swing was FLOWN belongs: F04's own ruling re-homed grab quality the
+  // same way ("Grab quality prices the carry instead, which is where the board
+  // already puts chain"). The band lived at the cash step only because it was
+  // integrated as a bank, and that placement is what let a two-tenths-of-a-second
+  // graze double 813px of climb earned nowhere near the wall.
+  //
+  // MEAN HEAT ACROSS THE STRETCH THE METRES WERE EARNED OVER, NOT THIS TICK'S.
+  // The first version of this read `sc.burnHeat` directly and was wrong in exactly
+  // the way it was written to fix. `SimConfig.holdClimbInCapture` freezes
+  // `highWaterY` for the whole of a capture, so a swing's metres do not arrive a
+  // tick at a time — they arrive as ONE LUMP on the release tick. Sampling the
+  // heat there prices an entire capture's climb at whatever the ship happened to
+  // be doing in its final frame, which is the same defect relocated: a graze at
+  // the instant of release would have paid the whole swing at full rate.
+  //
+  // So the heat is integrated between one arrival of metres and the next, and the
+  // lump is priced at the average over that stretch. A two-tenths-of-a-second
+  // graze inside a three-second capture is worth two tenths of three seconds of
+  // fire; a ride that spends the whole capture at the wall is worth all of it.
+  const mean = sc.fireSpan > 0 ? sc.fireHeatSecs / sc.fireSpan : sc.burnHeat;
+  const rate = cold * (1 + scfg.fireBoost * mean);
   // `sc.wasCaptured` and not only `state.capture`, and the difference is a whole
   // capture's ground. `SimConfig.holdClimbInCapture` freezes `highWaterY` for the
   // duration of a capture — deliberately, because an orbit is a round trip and
@@ -254,12 +282,22 @@ function accrueCarry(sc: ScoreState, state: SimState, cfg: SimConfig, scfg: Scor
     sc.coastClimb = 0;
     sc.carryPx += gained;
     sc.carry += gained * rate;
+    sc.carryCold += gained * cold;
+    if (gained > 0) {
+      sc.fireHeatSecs = 0;
+      sc.fireSpan = 0;
+    }
     return;
   }
   const allowed = Math.max(0, cfg.grabRange - sc.coastClimb);
   const paid = Math.min(gained, allowed);
   sc.carryPx += paid;
   sc.carry += paid * rate;
+  sc.carryCold += paid * cold;
+  if (gained > 0) {
+    sc.fireHeatSecs = 0;
+    sc.fireSpan = 0;
+  }
   sc.coastClimb += gained;
   // Out of reach of everything it left. The metres stopped counting on the tick
   // above; the chain stops here, so there is one edge and not two thresholds to
@@ -294,7 +332,12 @@ function accrueCarry(sc: ScoreState, state: SimState, cfg: SimConfig, scfg: Scor
  */
 function priceArrival(sc: ScoreState, scfg: ScoreConfig, clearance: number): void {
   const close = clamp01(1 - clearance / scfg.closeSpan);
-  sc.carry *= 1 + (scfg.tightMax - 1) * close;
+  const tight = 1 + (scfg.tightMax - 1) * close;
+  sc.carry *= tight;
+  // The cold twin takes every multiply the real carry takes except the fire, so
+  // `carry / carryCold` isolates the fire and nothing else. Miss this and the
+  // receipt's FIRE figure quietly becomes "fire times tightness".
+  sc.carryCold *= tight;
 }
 
 /**
@@ -330,22 +373,6 @@ function tierFor(scfg: ScoreConfig, q: number): number {
   if (q >= scfg.tierSharpAt) return scfg.tierSharp;
   if (q >= scfg.tierTrueAt) return scfg.tierTrue;
   return 1;
-}
-
-/**
- * Which fire band the swing has earned: 1, 2 or 3.
- *
- * Selected by `burnBank` — heat integrated over the swing — and not by where the
- * ship happens to be this tick, because the band is a fact about what the swing
- * DID at the edge. `burnRate` is the scale between the two, which is the whole of
- * what it does now that it no longer mints.
- *
- * The steps are drawn: `drawHazardZones` paints the red in three, so the ladder
- * is on screen before it is scored.
- */
-function bandFor(sc: ScoreState, scfg: ScoreConfig): number {
-  const step = sc.burnBank >= scfg.bandThreeAt ? 2 : sc.burnBank >= scfg.bandTwoAt ? 1 : 0;
-  return 1 + scfg.bandStep * step;
 }
 
 /**
@@ -387,6 +414,7 @@ function endLife(sc: ScoreState): void {
   // means, and it is the one part of Direction 08's death rule that is universal
   // across the mode matrix. What varies by mode is the bank.
   sc.carry = 0;
+  sc.carryCold = 0;
   sc.carryPx = 0;
   sc.chain = 0;
   sc.coastClimb = 0;
@@ -424,9 +452,7 @@ function endLife(sc: ScoreState): void {
   // cashed at is exactly what the death is taking — 78% of edge drags end this
   // way, which is what makes the fire a stake rather than a bonus.
   sc.burnHeat = 0;
-  sc.burnBank = 0;
   sc.burnPeak = 0;
-  sc.band = 1;
   // The new life starts where the old one did, not adrift for as long as the
   // last one was. `lastEnding` has already been sealed off this by the time this
   // runs — the same ordering `lastRun` depends on.
@@ -542,6 +568,47 @@ export function scoreTick(
     return { awards, shouts, tally };
   }
   sc.endingSeen = false;
+
+  // ---- the fire, BEFORE the carry, because it prices it
+  //
+  // This block used to sit below the awards and integrate `burnBank`, which chose
+  // a band the whole swing then cashed in. That is gone: the fire is a RATE on the
+  // metres climbed inside it, so it has to be known before `accrueCarry` runs.
+  //
+  // Placed outside the capture branch so a release mid-burn still counts the tick
+  // it let go on. A player will let go at the hottest instant on purpose — it is
+  // also the best boost — and those metres are the ones worth the most.
+  {
+    // Position from `shipWorldPos`, which resolves a capture's body-relative
+    // coordinates — `state.ship` is stale during one, and a burn is by definition
+    // something that only happens during one.
+    const p = shipWorldPos(state);
+    const heat = edgeHeat(
+      p.x,
+      p.y,
+      fieldBounds(cfg, state.bodies),
+      state.bodies,
+      state.capture !== null,
+      scfg,
+    );
+    if (heat > BURN_MIN_HEAT) {
+      // A flare beginning. Counted here rather than at an award, so `burns` still
+      // means what the replay prints it as: how many separate times this session
+      // went into the red and came out.
+      if (sc.burnHeat <= 0) sc.burns++;
+      sc.burnHeat = heat;
+      sc.run.fireSecs += dt;
+      if (heat > sc.burnPeak) sc.burnPeak = heat;
+    } else {
+      sc.burnHeat = 0;
+    }
+    // The integral the next lump of metres will be priced at. Runs every tick,
+    // hot or not, because the average has to be over the whole stretch — counting
+    // only the hot ticks would price a graze as a wall-ride.
+    sc.fireHeatSecs += sc.burnHeat * dt;
+    sc.fireSpan += dt;
+  }
+
   const carryBefore = sc.carry;
   accrueCarry(sc, state, cfg, scfg);
 
@@ -576,50 +643,6 @@ export function scoreTick(
     for (const m of state.motes) if (m.taken) taken++;
     for (let i = sc.motes; i < taken; i++) awards.push(awardMote(sc, state, scfg));
     sc.motes = taken;
-  }
-
-  // ---- the burn: heat integrated over the swing, cashed as the band
-  //
-  // Ahead of the release below, so a swing that is still alight when it is let go
-  // of has this tick's heat in the band it cashes at.
-  //
-  // IT NO LONGER PAYS ANYTHING AND NO LONGER RESETS WITH THE FIRE. `burnRate` was
-  // the eleventh minting key — points per second spent near the wall, which is
-  // exactly what axiom 1 bans ("metres climbed while engaged. Not time") and what
-  // Direction 08 lists under what deliberately earns nothing ("survival time —
-  // never… not from a per-second trickle"). What the integral does now is select
-  // the band the whole carry cashes in, so a settle that dips through the hot zone
-  // twice earns one deeper band rather than two payments.
-  //
-  // Placed outside the capture branch so a release mid-burn is still counted. A
-  // player will let go at the hottest instant on purpose — it is also the best
-  // boost — and that release should cash the fire it was flying through.
-  {
-    // Position from `shipWorldPos`, which resolves a capture's body-relative
-    // coordinates — `state.ship` is stale during one, and a burn is by definition
-    // something that only happens during one.
-    const p = shipWorldPos(state);
-    const heat = edgeHeat(
-      p.x,
-      p.y,
-      fieldBounds(cfg, state.bodies),
-      state.bodies,
-      state.capture !== null,
-      scfg,
-    );
-    if (heat > BURN_MIN_HEAT) {
-      // A flare beginning. Counted here rather than at the award that no longer
-      // exists, so `burns` still means what the replay prints it as: how many
-      // separate times this session went into the red and came out.
-      if (sc.burnHeat <= 0) sc.burns++;
-      sc.burnHeat = heat;
-      sc.run.fireSecs += dt;
-      sc.burnBank += heat * dt * scfg.burnRate;
-      if (heat > sc.burnPeak) sc.burnPeak = heat;
-    } else {
-      sc.burnHeat = 0;
-    }
-    sc.band = bandFor(sc, scfg);
   }
 
   // ---- a charged window opened: the hop log describes the window in progress
@@ -881,6 +904,10 @@ export function scoreTick(
   }
   sc.wasCaptured = cap !== null;
 
+  // What the fire has been worth to this swing so far, for the drawing. Published
+  // every tick because the band it replaced was, and because the score band reads
+  // it live rather than only at a cash.
+  sc.band = sc.carryCold > 0 ? sc.carry / sc.carryCold : 1;
   sc.multiplier = multiplierFor(sc, scfg);
   if (sc.bank > sc.best) sc.best = sc.bank;
   if (awards.length > 0) sc.lastAward = awards[awards.length - 1]!;
@@ -1193,17 +1220,23 @@ function priceSwing(
 } {
   const carry = sc.carry;
   const climb = sc.carryPx;
-  const band = bandFor(sc, scfg);
+  // WHAT THE FIRE WAS WORTH ON THIS SWING, as a multiplier, which is what `band`
+  // has always meant on the receipt — only now it is measured rather than
+  // selected. `carryCold` took every multiply this carry took except the fire, so
+  // the ratio is the fire alone. It is continuous where the ladder was three
+  // rungs, so a graze reads 1.02 instead of rounding down to nothing or up to a
+  // doubling, and an old report's 1 / 1.5 / 2 still means the same thing.
+  const band = sc.carryCold > 0 ? carry / sc.carryCold : 1;
   const heat = sc.burnPeak;
   const streak = multiplierFor(sc, scfg);
   const multiplier = tier * band * streak;
 
   sc.carry = 0;
+  sc.carryCold = 0;
   sc.carryPx = 0;
-  // The fire is spent with the carry it multiplied. A swing that rode the edge
-  // cashes that band once; the next swing starts cold, however hot the ship still
-  // is, because the band describes what a swing DID and not where it is.
-  sc.burnBank = 0;
+  // The fire is spent with the metres it priced. The next swing starts cold
+  // however hot the ship still is: what the fire was worth is a property of the
+  // climb it paid for, not of where the ship happens to be.
   sc.burnPeak = 0;
   sc.band = 1;
 

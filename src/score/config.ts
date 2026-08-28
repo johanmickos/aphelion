@@ -288,97 +288,46 @@ export interface ScoreConfig {
    */
   burnEdgeSpan: number;
   /**
-   * Scale from heat-seconds to band units. NO LONGER MINTS ANYTHING.
+   * How much more a metre is worth when it is climbed at the lethal line.
    *
-   * This used to be points per heat-second of dragging the dead zone, and it was
-   * the eleventh minting key — the one the plan's own table had filed under
-   * "shapes a curve". Direction 08 bans exactly it, twice: axiom 1 pays for
-   * "metres climbed while engaged. Not time", and under what deliberately earns
-   * nothing, "survival time — never... not from a per-second trickle".
+   * The carry's rate becomes `climbPerPx x chain x (1 + fireBoost x heat)`, so at
+   * full heat a metre is worth `1 + fireBoost` of an ordinary one and at the band's
+   * inner edge it is worth exactly an ordinary one. Nothing is minted: a swing
+   * that climbs nothing in the fire is paid nothing for the fire, which is the
+   * whole point of moving it here.
    *
-   * What it does now is set how fast `ScoreState.burnBank` fills, and `burnBank`
-   * selects the band. So it is still the depth-to-reward scale it always was;
-   * raising it reaches the x3 band sooner rather than paying more per second.
+   * IT REPLACED A THREE-RUNG LADDER — `bandTwoAt`, `bandThreeAt`, `bandStep` — AND
+   * THE LADDER FAILED IN THREE DIRECTIONS AT ONCE. Reported from play, all in one
+   * session: a two-tenths-of-a-second graze that doubled 813px of climb earned
+   * nowhere near the wall, and paid 6,860 against a p90 swing of 1,496; the
+   * deepest burn of the same run, at 0.94 heat, paying ZERO because that swing
+   * climbed nothing; and a pass visibly inside the red scoring nothing at all,
+   * because at 0.20 heat the integral needed 0.77s to cross a threshold with no
+   * pixel. One decoupling, pointing three ways: the payout was chosen by a
+   * threshold on an integral and then applied to a carry earned somewhere else.
    *
-   * The measurement behind 555 still holds and is what the thresholds below are
-   * placed against: over the drags that SURVIVE — the only ones that ever pay,
-   * since a death drops the banked flare entire — the median integrates 0.153
-   * heat-seconds and the best on record 0.92.
+   * A RATE FIXES THE PIXEL, WHICH WAS DOCUMENTED AS BROKEN. PORT_NOTES 74 records
+   * that the hazard gradient's three drawn steps are NOT the thresholds — they
+   * mark where the heat that fills them changes rate — so a player could cross a
+   * visible step and earn nothing. Under a rate the continuous gradient is
+   * literally the payout: deeper red, more per metre, drawn before it scores.
+   *
+   * AND IT BELONGS HERE BY F04'S OWN RULING. An axis describing how the swing was
+   * FLOWN prices the carry; an axis describing the RELEASE grades the cash. That
+   * is why grab quality was re-homed into the carry rather than added to
+   * `priceSwing`. The fire is a during-the-swing axis that sat at the cash only
+   * because it was banked as an integral.
+   *
+   * PROVISIONAL, AND THE MEASUREMENT IT WANTS IS ONE NOBODY CAN TAKE YET. What
+   * decides this number is how many metres a real wall-ride actually climbs while
+   * hot, and no recording can say: every replay on this build diverges within a
+   * few hundred ticks, and `fireSecs` is a duration rather than a distance. 1.5 is
+   * placed so that a metre at the lethal line is worth two and a half ordinary
+   * ones — the same top-end ratio the deleted ladder had, applied to the right
+   * metres. `ScoreAward.band` now reports what it was worth per swing, so the next
+   * session measures it directly.
    */
-  burnRate: number;
-  /**
-   * `burnBank` at which the swing cashes in the second and third bands.
-   *
-   * Three steps, and they are what Direction 08 means by riding the fire: a swing
-   * that never went near the edge cashes at x1, one that dragged it cashes at x2,
-   * one that lived in it cashes at x3. The band applies to the whole carry, which
-   * is why a rescue is structurally worth about 7x an ordinary swing with no
-   * rescue award at all — the ship that drifted a long way banks 2.44x the carry
-   * AND cashes it at the top of this ladder.
-   *
-   * PLACED AGAINST `burnRate`'S OWN MEASUREMENT, provisionally: 85 is the median
-   * surviving drag (0.153 heat-seconds x 555) and 333 is two thirds of the
-   * hottest on record (0.6 x 555). So about half the drags that are survived
-   * reach x2 and only a deliberate one reaches x3. Both are stage (c).
-   *
-   * THE STEPS ARE THE PIXEL. `drawHazardZones` paints the band in three steps
-   * rather than as one continuous wash, so the player can see where the ladder
-   * changes before flying into it — axiom 5. `burnEdgeSpan` is already pinned to
-   * that band's own width, so there is one definition of where the edge is.
-   */
-  bandTwoAt: number;
-  bandThreeAt: number;
-  /**
-   * What each band step adds to the multiplier. 2 gives x1 / x3 / x5.
-   *
-   * A step rather than three separate multipliers, because unlike the tier the
-   * board's band ratios ARE uniform, and three keys where one will do is three
-   * things to keep in step.
-   *
-   * THE BAND IS A JACKPOT, NOT A DIAL, AND THAT IS THE AUTHOR'S CALL. Direction
-   * 08 wants the fire to be a temptation aimed at every swing; the measurement
-   * says it cannot be one. Across the 28 faithful reports the ship is inside the
-   * red band for 6% of its captured time and drags it 2.1 times a session, and
-   * the one session flown under the constitution recorded heat on 1 of 63 swings.
-   * The ruling: leave it rare, and price it high enough that going for it is a
-   * strategy rather than an accident.
-   *
-   * THE BET IS WHERE IT TURNS OVER. A drag risks the whole carry, because a death
-   * zeroes it — so the swing is `p(survive) x band` against `1` for not going,
-   * and the band has to beat `1 / p(survive)` to be worth flying.
-   *
-   * IT SHIPPED AT 2 AND THAT WAS TOO HIGH, FOR THE REASON ITS OWN CAVEAT GAVE.
-   * The first pricing used the 60 drags in the faithful corpus — 23% survival at
-   * the middle rung, 40% at the top, so break-evens of x4.38 and x2.50 — and said
-   * in this paragraph that those drags were ACCIDENTS rather than players farming
-   * the rung, so the rates were floors and the break-evens ceilings. Flown for
-   * deliberately, they are: across 524s on this economy, six heated swings cashed
-   * against six deaths from ALL causes, so drag survival is at least 50% and
-   * plausibly far above it. Break-even at 50% is x2 and at 80% it is x1.25, which
-   * put the x5 top rung two to four times over its own price.
-   *
-   * Reported from play before the arithmetic caught up: "the point bonus for
-   * skimming the fire zone is very large at times. 4000+ points in one turn feels
-   * ripe for exploitation." Measured, one session's two banded swings were **60%
-   * of its entire score** — 17,510 of 29,364, the larger of them 12,929 — against
-   * 0-11% in every other session.
-   *
-   * SO 0.5, WHICH IS x1 / x1.5 / x2. The top rung pays its risk at the survival
-   * that can actually be measured rather than four times it, and an ordinary good
-   * swing on this economy pays 1,500-2,200, so a jackpot lands in family with one
-   * rather than with three of them. The shape the call asked for survives: the
-   * graze nobody meant to take is still not worth having, and the committed ride
-   * is still the best thing on the board.
-   *
-   * SIX HEATED SWINGS IS NOT A DISTRIBUTION EITHER, and this has now been priced
-   * twice off samples too small to settle it. The direction of the error is the
-   * thing to carry forward: a rate measured on drags that went wrong understates
-   * how well a deliberate one survives, and every such measurement will.
-   *
-   * It costs ordinary play nothing, which is the point of a jackpot: 5 of 254
-   * recorded swings cash a band above x1 at all.
-   */
-  bandStep: number;
+  fireBoost: number;
 
   // --- the streak: how many swings in a row landed ---
   /**
@@ -526,10 +475,7 @@ export const DEFAULT_SCORE_CONFIG: Readonly<ScoreConfig> = Object.freeze({
   flybyTurnSpan: 105,
 
   burnEdgeSpan: 60,
-  burnRate: 555,
-  bandTwoAt: 85,
-  bandThreeAt: 333,
-  bandStep: 0.5,
+  fireBoost: 1.5,
 
   streakStep: 0.4,
   streakMax: 5,

@@ -190,28 +190,33 @@ describe('hazard zones', () => {
     expect(xs.some((x) => Math.abs(x - toScreenX(c, field.left)) < 1e-6)).toBe(true);
   });
 
-  it('draws the fire ladder in three readable steps, not as one wash', () => {
-    // ONE OF F04'S TWO REQUIRED PIXELS. A swing cashes at `carry x tier x band x
-    // streak`, and the band is the fire: how deep and how long the swing rode the
-    // edge. Axiom 5 says a multiplier the player did not see drawn BEFORE it
-    // scored is invisible math, and a continuous gradient — which is what this
-    // was — says "it gets worse" without ever saying where the ladder changes.
+  it('draws the red as a slope, because depth IS the payout now', () => {
+    // THIS PIN USED TO ASSERT THREE STEPS, and it was right to: the fire was a
+    // three-rung band chosen by an integral, axiom 5 says a multiplier the player
+    // did not see drawn cannot be scored, and a smooth gradient says "it gets
+    // worse" without saying where a rung changes.
     //
-    // Three steps means each colour is held flat across its band, so every shade
-    // appears at two stops: the start of its step and the end of it. A ramp would
-    // show every stop at a different colour.
+    // The rungs are gone — `ScoreConfig.fireBoost` prices a metre by how deep it
+    // was climbed — so there are no edges to mark and a slope is the honest
+    // picture. It also closes a gap the old version had to admit in its own
+    // comment: the steps were quantised by DEPTH while the thresholds were
+    // integrals in heat-seconds, so no x on the screen corresponded to either and
+    // a player could cross a visible step and earn nothing. Reported exactly that
+    // way before this changed.
     const r = recordingContext();
     drawHazardZones(r.ctx, cam(), rcfg, field);
     const stops = r.calls('addColorStop') as Array<[string, number, string]>;
-    // Two walls, three steps, two stops each.
-    expect(stops).toHaveLength(2 * 3 * 2);
-    const oneWall = stops.slice(0, 6);
-    const shades = [...new Set(oneWall.map((o) => o[2]))];
-    expect(shades, 'the band is not three distinct steps').toHaveLength(3);
-    for (let i = 0; i < 3; i++) {
-      expect(oneWall[i * 2]![2], 'a step ramps inside itself').toBe(oneWall[i * 2 + 1]![2]);
-      expect(oneWall[i * 2]![1]).toBeCloseTo(i / 3, 9);
-      expect(oneWall[i * 2 + 1]![1]).toBeCloseTo((i + 1) / 3, 9);
+    const perWall = stops.length / 2;
+    expect(perWall, 'a slope needs more than a handful of samples').toBeGreaterThan(6);
+    const oneWall = stops.slice(0, perWall);
+    // Every stop a different colour, which is what tells a ramp from steps: a
+    // stepped gradient repeats each shade at both ends of its band.
+    expect(new Set(oneWall.map((o) => o[2])).size).toBe(perWall);
+    // Monotone from the inner edge to the wall, and spanning the whole width.
+    expect(oneWall[0]![1]).toBeCloseTo(0, 9);
+    expect(oneWall.at(-1)![1]).toBeCloseTo(1, 9);
+    for (let i = 1; i < oneWall.length; i++) {
+      expect(oneWall[i]![1]).toBeGreaterThan(oneWall[i - 1]![1]);
     }
   });
 
@@ -1885,7 +1890,7 @@ describe('scene', () => {
     // `deadlinePrizeMin` and `deadlinePrizeMax` with the burn waiting at the
     // cross, so a fat mark meant a big fire. The channel was cut: at the marker
     // size the author settled on it swung under 3px, and the reward it previewed
-    // is both paid and shown by something far louder — `burnBank` pays for real
+    // is both paid and shown by something far louder — the fire pays for real
     // time spent captured in the band, and the ship is visibly on fire while it
     // does. A preview that is systematically 2.21x low cannot compete with flames.
     //

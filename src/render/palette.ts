@@ -86,8 +86,9 @@ export const HAZARD_BAND_TO = withAlpha(T.ion, 0.22);
 /**
  * The side band's colour `t` of the way from its inner edge to the lethal line.
  *
- * THE RAMP, not the steps. `drawHazardZones` samples this at three depths because
- * three is the number of rungs in the fire multiplier, and the rung count belongs
+ * THE RAMP, not the steps. `drawHazardZones` samples this continuously now — the
+ * fire is a per-metre rate rather than a three-rung band, so depth IS the payout
+ * and the slope is the honest picture. The sampling resolution belongs
  * to the economy — this file only says what the red IS at a given depth. The same
  * boundary `accolade.ts` and `palette.ts` sit either side of: one defines a hue,
  * the other decides which one a thing wears.

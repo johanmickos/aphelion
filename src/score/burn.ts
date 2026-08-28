@@ -106,10 +106,9 @@ export function edgeHeat(
  * How much fire the ship would fly INTO, for a rescue that has not happened yet.
  *
  * `rescueDeadline` hands over the flight it simulated for the press at the cross —
- * one world position a tick — and this runs the same integral `scoreTick` runs on
- * the real thing: the same `edgeHeat`, the same `burnRate`, the same ignition
- * floor. One definition, now three consumers, which is the rule the header of
- * this file exists for.
+ * one world position a tick — and this runs the same `edgeHeat` over it that
+ * `scoreTick` runs on the real thing, against the same ignition floor. One
+ * definition, which is the rule the header of this file exists for.
  *
  * IT IS NOT THE PAYOUT, AND MUST NOT BE PRESENTED AS ONE. The flight ends where
  * `rescueDeadline`'s promise ends — at the turn-away — but the fire does not: the ship
@@ -118,10 +117,18 @@ export function edgeHeat(
  * 2.21x this number (p10 1.94, p90 3.01), and only 5 of the 513 landed within 25%.
  * So this is the fire on the way IN, and the bias is systematic rather than noisy.
  *
- * That is good enough for the one thing it is used for — sizing the mark in
- * `src/render/deadline.ts`, where what matters is that a bigger fire draws a bigger
- * mark, and where `RenderConfig.deadlinePrizeFull` is calibrated in these same units.
- * It is NOT good enough to show the player a number, or to pay one. Anything that
+ * IT HAS NO CONSUMER TODAY, and this note used to claim one: it said it sized the
+ * mark in `src/render/deadline.ts` against `RenderConfig.deadlinePrizeFull`, and
+ * that key does not exist. Nothing outside `test/score.test.ts` calls this. It is
+ * kept rather than deleted because the prediction is the expensive half and it is
+ * correct — see the bias measured above — and because the deadline mark is the
+ * obvious thing to want it for again.
+ *
+ * IT RETURNS HEAT-SECONDS NOW. It used to return `burnBank` units, scaled by a
+ * `burnRate` that existed to feed a three-rung band; the band is a per-metre rate
+ * now and that scale is gone. Heat-seconds is what the integral physically is, so
+ * a future consumer calibrates against a quantity rather than against a deleted
+ * key. It is NOT a payout and must not be presented as one. Anything that
  * needs the real total has to keep flying past the turn-away until the heat drops
  * below the floor, which is a longer flight than `rescueDeadline` has any reason to
  * simulate for its own purposes.
@@ -131,9 +138,9 @@ export function edgeHeat(
  * outside itself — `pnpm portable` proves it — so the predictor returns a
  * trajectory and pricing it is somebody else's word.
  *
- * Returns the RAW bank, before any multiplier: the multiplier is a property of
- * the streak at the moment of payment, and this is a promise about a press that
- * has not been made.
+ * Returns heat-seconds, not points. What a fire is WORTH now depends on how far
+ * the ship climbs inside it, which a flight that ends at the turn-away cannot
+ * know.
  *
  * Every sample is captured by construction — the flight begins at a press — so
  * `captured` is true throughout. A flight that never enters the band scores zero,
@@ -146,12 +153,12 @@ export function previewBurn(
   scfg: ScoreConfig,
   dt: number,
 ): number {
-  let bank = 0;
+  let secs = 0;
   for (const p of flight) {
     const heat = edgeHeat(p.x, p.y, field, bodies, true, scfg);
-    if (heat > BURN_MIN_HEAT) bank += heat * dt * scfg.burnRate;
+    if (heat > BURN_MIN_HEAT) secs += heat * dt;
   }
-  return bank;
+  return secs;
 }
 
 /**

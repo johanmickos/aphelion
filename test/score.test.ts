@@ -654,20 +654,18 @@ describe('the fire a cross is offering', () => {
     expect(longer / deep).toBeCloseTo(2, 6);
   });
 
-  it('is the same integral the burn is paid on, weight for weight', () => {
-    // The promise that matters: if these two ever stop agreeing, the mark is
-    // sizing itself off a fire the scorer would not pay for. Doubling the rate
-    // doubles the preview, and the span it is compared against is in these units.
-    const flight = hold(20, 90);
-    const base = previewBurn(flight, field, bodies, DEFAULT_SCORE_CONFIG, DT);
-    const twice = previewBurn(
-      flight,
-      field,
-      bodies,
-      { ...DEFAULT_SCORE_CONFIG, burnRate: DEFAULT_SCORE_CONFIG.burnRate * 2 },
-      DT,
-    );
+  it('is heat-seconds, and the same integral the scorer runs', () => {
+    // IT USED TO ASSERT A SCALE, doubling `burnRate` and expecting twice the
+    // preview. That key existed to turn heat-seconds into `burnBank` units for a
+    // three-rung band, and both are gone — the fire is a per-metre rate now. What
+    // is left is the physical quantity, so the proportionality that means anything
+    // is in TIME: twice as long in the same place is twice the integral.
+    const base = previewBurn(hold(20, 90), field, bodies, DEFAULT_SCORE_CONFIG, DT);
+    const twice = previewBurn(hold(20, 180), field, bodies, DEFAULT_SCORE_CONFIG, DT);
     expect(twice / base).toBeCloseTo(2, 6);
+    // And it is seconds rather than an arbitrary unit: 90 ticks at heat h is
+    // `90 * DT * h`, and the inset is two thirds of the way in.
+    expect(base).toBeCloseTo(90 * DT * (1 - 20 / DEFAULT_SCORE_CONFIG.burnEdgeSpan), 6);
 
     // And it obeys the same ignition floor, so a flight that never enters the
     // band does not promise a fire. THE FLOOR IS NOW 0 and this pin moved with it:
@@ -2142,76 +2140,89 @@ describe('the burn', () => {
     expect(edgeHeat(wall, anomaly.y, field, bodies, true, DEFAULT_SCORE_CONFIG)).toBe(0);
   });
 
-  it('banks a band for a drag that is pulled out of, and nothing for one that hits the wall', () => {
-    // The shape of the whole mechanic, and F04 sharpened it rather than changing
-    // it: the fire is free drama on the way out and a MULTIPLIER only if the ship
-    // survives to cash a swing. `endLife` drops the bank, so a death cannot cash
-    // — which matters, because 78% of real edge-drags end in one.
-    //
-    // What changed is that the flare going out no longer settles anything. It
-    // used to pay at that moment, which meant a swing that burned early and let
-    // go late collected its fire twice over as two separate awards; now the
-    // integral survives the fire and is spent once, by the release.
-    const state = createInitialState(DEFAULT_CONFIG);
-    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
-
-    /** Hold the ship in the band for `ticks`, then either let go or die. */
-    const drag = (sc: ScoreState, ticks: number, kill: boolean): number => {
+  it('prices a metre climbed in the fire above the same metre climbed cold', () => {
+    // THE WHOLE MECHANIC, and it replaced a three-rung ladder that failed in three
+    // directions at once — see `ScoreConfig.fireBoost`. What the ladder could not
+    // say is this: the fire pays for the climb made INSIDE it, so a graze is worth
+    // a graze and a wall-ride is worth a wall-ride.
+    const climbInBand = (inset: number, ticks: number): number => {
+      const state = createInitialState(DEFAULT_CONFIG);
+      const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+      const anchor = state.bodies[0]!;
+      const sc = createScoreState();
       // Positioned through the capture's body-relative offset, NOT `state.ship`:
       // during a capture the scorer reads `shipWorldPos`, and `state.ship` is
-      // stale. Writing the wrong one here silently measured zero heat.
-      const anchor = state.bodies[0]!;
-      for (let i = 0; i < ticks; i++) {
-        state.tick++;
-        state.capture = fakeCapture();
-        state.capture.rx = f.left + 10 - anchor.x;
-        state.capture.ry = -anchor.y;
-        scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
-      }
-      const held = sc.burnBank;
-      state.tick++;
-      if (kill) state.ending.active = true;
-      else state.capture = null;
-      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
-      return held;
-    };
-
-    const survived = createScoreState();
-    const held = drag(survived, 30, false);
-    expect(held, 'the drag banked no heat at all').toBeGreaterThan(0);
-    expect(survived.burnBank, 'letting go must not spend the band — the release does').toBe(held);
-
-    state.ending.active = false;
-    state.capture = null;
-    const dying = createScoreState();
-    expect(drag(dying, 30, true)).toBeGreaterThan(0);
-    expect(dying.burnBank, 'a death drops the band it had earned').toBe(0);
-  });
-
-  it('selects a deeper band the longer and deeper the drag runs', () => {
-    // The band is the integral, not the instant: `bandTwoAt` and `bandThreeAt` are
-    // in heat-SECONDS, so a graze that never stays cannot buy what a drag can. It
-    // is the reason no fixed x on the hazard gradient can be either threshold —
-    // see `drawHazardZones`.
-    const state = createInitialState(DEFAULT_CONFIG);
-    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
-    const anchor = state.bodies[0]!;
-    const bandAfter = (ticks: number, inset: number): number => {
-      const sc = createScoreState();
+      // stale. Writing the wrong one here silently measures zero heat.
       for (let i = 0; i < ticks; i++) {
         state.tick++;
         state.capture = fakeCapture();
         state.capture.rx = f.left + inset - anchor.x;
         state.capture.ry = -anchor.y;
+        // ...and it has to CLIMB, or there are no metres for the fire to price and
+        // every arm of this test reads zero. That is the fixture trap this whole
+        // change is about: the old ladder paid on time in the band, so a test that
+        // never moved could still measure it.
+        state.highWaterY -= 10;
         scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
       }
-      return sc.band;
+      return sc.carry;
     };
-    expect(bandAfter(4, 10)).toBe(1);
-    expect(bandAfter(200, 10)).toBeGreaterThan(1);
-    expect(bandAfter(200, 10), 'a deep drag outruns a shallow one').toBeGreaterThanOrEqual(
-      bandAfter(200, 50),
-    );
+
+    const cold = climbInBand(400, 60);
+    const graze = climbInBand(DEFAULT_SCORE_CONFIG.burnEdgeSpan - 5, 60);
+    const deep = climbInBand(2, 60);
+    expect(cold, 'the fixture never climbed').toBeGreaterThan(0);
+    expect(graze).toBeGreaterThan(cold);
+    expect(deep).toBeGreaterThan(graze);
+    // At the lethal line a metre is worth `1 + fireBoost` of an ordinary one, and
+    // at the band's inner edge exactly an ordinary one — which is what makes the
+    // hazard gradient the honest pixel for it.
+    const heat = 1 - 2 / DEFAULT_SCORE_CONFIG.burnEdgeSpan;
+    expect(deep / cold).toBeCloseTo(1 + DEFAULT_SCORE_CONFIG.fireBoost * heat, 4);
+  });
+
+  it('pays nothing for a fire the ship climbed nothing in', () => {
+    // The half a threshold could never get right. A swing that rides deep and
+    // gains no altitude is worth what every other zero-climb swing is worth, and
+    // it is no longer ANNOUNCED as a band either: the reported case was a 0.94
+    // heat burn carrying `FIRE x1.5` and paying 0.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const anchor = state.bodies[0]!;
+    const sc = createScoreState();
+    for (let i = 0; i < 60; i++) {
+      state.tick++;
+      state.capture = fakeCapture();
+      state.capture.rx = f.left + 2 - anchor.x;
+      state.capture.ry = -anchor.y;
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+    }
+    expect(sc.burnPeak, 'the fixture never reached the fire').toBeGreaterThan(0.9);
+    expect(sc.carry).toBe(0);
+    expect(sc.band, 'a fire that priced no metres reports no multiplier').toBe(1);
+    state.capture = null;
+  });
+
+  it('reports what the fire was worth, rather than which rung it reached', () => {
+    // `ScoreState.band` is `carry / carryCold` now: measured, continuous, and
+    // isolated to the fire because the cold twin takes every other multiply.
+    const state = createInitialState(DEFAULT_CONFIG);
+    const f = fieldBounds(DEFAULT_CONFIG, state.bodies);
+    const anchor = state.bodies[0]!;
+    const sc = createScoreState();
+    for (let i = 0; i < 60; i++) {
+      state.tick++;
+      state.capture = fakeCapture();
+      state.capture.rx = f.left + 30 - anchor.x;
+      state.capture.ry = -anchor.y;
+      state.highWaterY -= 10;
+      scoreTick(sc, state, DEFAULT_CONFIG, FIXED_DT);
+    }
+    const heat = 1 - 30 / DEFAULT_SCORE_CONFIG.burnEdgeSpan;
+    expect(sc.band).toBeCloseTo(1 + DEFAULT_SCORE_CONFIG.fireBoost * heat, 4);
+    // Not a rung: the old ladder could only ever report 1, 1.5 or 2.
+    expect(sc.band).not.toBe(1);
+    expect(sc.band).not.toBe(1.5);
     state.capture = null;
   });
 

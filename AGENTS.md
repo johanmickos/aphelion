@@ -78,7 +78,10 @@ Direction 08's constitution, it landed as F04 stage (b), and the reasoning is in
 `closeBonus`, `timingBonus`, `aimBonus`, `nerveBonus`, `flybyBase`,
 `flybyCloseBonus`, `rescueBonus`, `rescueSpan`, `anomalyBonus`, `hopBonus` — and a
 twelfth, `burnRate`, stopped minting per second near the wall and became the scale
-that turns edge depth into a band. A new axis is priced as a multiplier on the
+that turned edge depth into a band — and then the band itself was deleted, because
+a ladder chosen by an integral and applied to a whole swing paid a two-tenths-of-a-
+second graze for 813px of climb earned nowhere near the wall. `fireBoost` prices
+the metres climbed IN the fire instead. Same axiom, right metres. A new axis is priced as a multiplier on the
 carry or it is not priced. Axiom 2: skill only multiplies.
 
 **Every multiplier has a pixel, drawn before it scores.** Tightness is the grip
@@ -88,15 +91,27 @@ the craft's bloom; the streak is the ×N. A praise word after the fact does not
 count — it arrives after the score. If a rule cannot point at its pixel, the rule
 is wrong.
 
-**The fire band is a jackpot and not a dial, and that is a ruling rather than a
-tuning.** Direction 08 asks for a temptation aimed at on every swing; the field
-cannot supply one, because `bodySpread` keeps every planet's centre at least 210px
-from a wall and a captured ship reaches the red only on a wide tether. Measured:
-2.1 drags a session, 6% of captured time, and 62 of 63 swings in the one session
-flown under the constitution recorded no heat at all. So it is priced against the
-BET instead — `bandStep` is set so the committed ride beats `1 / p(survive)` and
-the half-committed one does not. Do not lower `bandTwoAt` to make it fire more
-often: that pays a graze at the rate of a drag, and the rarity is the point.
+**The fire prices metres, not swings, and that is a ruling rather than a tuning.**
+It was a three-rung band at the cash step and it failed in three directions at
+once, all reported from one session: a graze that doubled a whole swing and paid
+4.6x the p90; the deepest burn of the same run paying ZERO because that swing
+climbed nothing; and a pass visibly inside the red earning nothing because the
+integral had not crossed a threshold with no pixel. One decoupling — the payout was
+chosen by a threshold and then applied to a carry earned somewhere else — pointing
+three ways.
+
+`ScoreConfig.fireBoost` makes it a rate on the accrual, beside the chain, which is
+where F04 already put every axis that describes how a swing was FLOWN rather than
+how it was released. Do not move it back to the cash step, and do not add a rung:
+the continuous hazard gradient is the pixel precisely because depth IS the price,
+and a rung would need an edge the geometry cannot honestly draw.
+
+**Mean heat over the stretch, never this tick's.** `holdClimbInCapture` freezes
+`highWaterY` for a whole capture, so a swing's metres arrive as ONE LUMP at the
+release. Pricing that lump at the release tick's heat prices an entire capture by
+its final frame — the first version of `fireBoost` did exactly that and was the
+old defect relocated. The integral and its span are both in `ScoreState`, and the
+span is the half that is easy to drop.
 
 **A capture is two scoring events.** The arrival is judged on how the ship arrived
 and prices the carry when the dive swings through periapsis; the release is judged

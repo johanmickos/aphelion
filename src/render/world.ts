@@ -54,14 +54,18 @@ import { HAZARD_BAND_FROM, HAZARD_BAND_TO, HAZARD_EDGE, hazardBandAt } from './p
  * the wrong one.
  */
 /**
- * How many bands the red is drawn in. Direction 08's ladder is x1 / x2 / x3.
+ * How finely the red is sampled across its width.
  *
- * A constant and not a `RenderConfig` key, deliberately: it is not a matter of
- * taste, it is the number of rungs in the economy. Changing it here without
- * changing `ScoreConfig.bandTwoAt` / `bandThreeAt` would draw a ladder the score
- * does not use, which is the whole failure axiom 5 exists to prevent.
+ * A RESOLUTION, NOT A RUNG COUNT, and it replaced one. This was `HAZARD_STEPS = 3`
+ * — "not a matter of taste, it is the number of rungs in the economy" — back when
+ * the fire was a three-rung band. `ScoreConfig.fireBoost` made it a per-metre rate,
+ * so there are no rungs to draw and the honest picture is the slope itself.
+ *
+ * Still a constant rather than a `RenderConfig` key for the same reason the count
+ * was: nothing about it is a preference. It only has to be fine enough that the
+ * gradient follows `hazardBandAt` rather than a chord across it.
  */
-const HAZARD_STEPS = 3;
+const HAZARD_SAMPLES = 12;
 
 export function drawHazardZones(
   ctx: CanvasRenderingContext2D,
@@ -86,35 +90,30 @@ export function drawHazardZones(
     const w = Math.abs(xEdge - xInner);
     if (w < 0.5) continue;
 
-    // THREE STEPS AND NOT A WASH, which is the second pixel F04 stage (b)
-    // requires. Direction 08 pays a swing at `carry x tier x band x streak`, and
-    // the band is the fire: how deep and how long the swing rode the edge, which
-    // `ScoreState.burnBank` integrates. Axiom 5 says a multiplier the player did
-    // not see drawn before it scored is invisible math — and a continuous
-    // gradient, which is what this was, says "it gets worse" without ever saying
-    // where the ladder changes.
+    // A CONTINUOUS WASH, AND IT WAS THREE STEPS UNTIL THE FIRE BECAME A RATE.
+    // The steps were F04 stage (b)'s second required pixel: the band was a
+    // three-rung ladder chosen by an integral, axiom 5 says a multiplier the
+    // player did not see drawn cannot be scored, and a smooth gradient says "it
+    // gets worse" without saying where a rung changes. So the gradient was
+    // quantised to match the rung count.
     //
-    // So the same gradient is quantised into three bands of equal depth. It is
-    // still the same red and still deepens inward, so nothing about the warning
-    // changed; what is added is that the two step edges are legible, and a player
-    // can aim at one. That is pillar 4 — the risk is a dial you aim at, not a
-    // prompt you obey — applied to the thing that prices the risk.
+    // The rungs are gone. The fire is a per-metre rate now — `ScoreConfig.fireBoost`
+    // has the three ways the ladder failed — and a rate has no edges to draw. What
+    // it has is exactly this: depth IS the payout, continuously, and the wash that
+    // could not honestly mark a threshold can honestly mark a slope.
     //
-    // Depth-quantised rather than placed at `bandTwoAt`/`bandThreeAt` directly,
-    // and the difference is worth stating because it looks like a gap. Those two
-    // are integrals, in heat-SECONDS: they depend on how long the ship stays, so
-    // no fixed x on the screen corresponds to either. What the steps mark is where
-    // the heat that fills them changes rate, which is the part the geometry can
-    // honestly say.
+    // That also closes the gap the old note here had to admit. The steps were
+    // depth-quantised while the thresholds were integrals in heat-SECONDS, so no
+    // fixed x on the screen corresponded to either and a player could cross a
+    // visible step and earn nothing — which is exactly what was reported. Now the
+    // pixel and the price are the same function of the same x.
     const g = ctx.createLinearGradient(xInner, 0, xEdge, 0);
-    for (let k = 0; k < HAZARD_STEPS; k++) {
-      const from = k / HAZARD_STEPS;
-      const to = (k + 1) / HAZARD_STEPS;
-      // The band's colour at the MIDDLE of the step, held flat across it: a step
-      // that ramped inside itself would still read as a wash with seams.
-      const shade = hazardBandAt((k + 0.5) / HAZARD_STEPS);
-      g.addColorStop(from, shade);
-      g.addColorStop(to, shade);
+    // Sampled finely rather than as two endpoints, because `hazardBandAt` is not
+    // linear in either channel or alpha and a two-stop gradient would draw a
+    // different curve from the one the payout follows.
+    for (let k = 0; k <= HAZARD_SAMPLES; k++) {
+      const at = k / HAZARD_SAMPLES;
+      g.addColorStop(at, hazardBandAt(at));
     }
     ctx.fillStyle = g;
     ctx.fillRect(x0, top, w, height);

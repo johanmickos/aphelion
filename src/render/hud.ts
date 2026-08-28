@@ -193,7 +193,7 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     // applies them, and the carry they were applied TO. A receipt that printed
     // only the total could not be checked against the screen; this one can —
     // every number in it was drawn somewhere before it scored.
-    detail: `${a.body}  ${formatScore(a.carry)} x${a.tier.toFixed(2)} · FIRE x${a.band} · PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
+    detail: `${a.body}  ${formatScore(a.carry)} x${a.tier.toFixed(2)} · FIRE x${a.band.toFixed(2)} · PEAK ${pct(a.timing)} · AIM ${pct(a.aim)}`,
     mult: multOf(a),
   }),
   // Never carries a praise word, and that is calibration rather than an omission:
@@ -207,7 +207,7 @@ const BAND: Record<ScoreAward['kind'], (a: ScoreAward, p: Praise | null) => Band
     // that it is the one the player can check against the screen: the ship
     // visibly swings that far around the planet. It is also the term that sets
     // the tier here, a pass having neither a compass marker nor a boost envelope.
-    detail: `${a.body}  ${formatScore(a.carry)} x${a.tier.toFixed(2)} · FIRE x${a.band} · TURN ${Math.round(a.turn)}°`,
+    detail: `${a.body}  ${formatScore(a.carry)} x${a.tier.toFixed(2)} · FIRE x${a.band.toFixed(2)} · TURN ${Math.round(a.turn)}°`,
     mult: multOf(a),
   }),
   // No word and no multiplier, because a dot has neither: it pays flat and every
