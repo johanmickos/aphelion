@@ -14,7 +14,7 @@ import { interpolate } from '../../src/render/interpolate.ts';
 function view(x: number, y: number, heading: number): PresentationState {
   return {
     tick: x,
-    camera: { x: 585, y },
+    camera: { x: 585, y, lock: 0, offset: 0 },
     craft: { x, y, heading, speed: 100 },
     bodies: [{ x: 0, y: 0, radius: 132, held: false }],
   };

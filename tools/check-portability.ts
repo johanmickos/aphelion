@@ -390,7 +390,7 @@ const { createInitialState, stepSim } = await import('../src/sim/step.ts');
 const { NO_INPUT } = await import('../src/sim/types.ts');
 const { createBody } = await import('../src/sim/body.ts');
 const { createCraft, speedOf } = await import('../src/sim/craft.ts');
-const { derive } = await import('../src/state/derive.ts');
+const { createPresentation, derive } = await import('../src/state/derive.ts');
 const { createPress, pressDown, pressUp, isPressed } = await import('../src/input/press.ts');
 
 const field = { bodies: [createBody(0, 0, 132)] };
@@ -426,12 +426,20 @@ pressUp(press, 'pointer:1');
 stepSim(sim, { pressed: isPressed(press) });
 const speedAtRelease = speedOf(sim.craft);
 if (sim.heldBody !== null) fail('a craft did not let go when the button came up');
-const headingAtRelease = derive(sim).craft.heading;
-for (let i = 0; i < COAST_TICKS; i++) stepSim(sim, NO_INPUT);
+// Presentation state is a recurrence now (ADR-0015), so it is stepped beside the
+// simulation rather than asked after the fact. Doing it here is not incidental:
+// it is what proves the layer runs under plain node too, and that a run can be
+// presented without a browser having existed at any point.
+let view = createPresentation(sim);
+const headingAtRelease = view.craft.heading;
+for (let i = 0; i < COAST_TICKS; i++) {
+  stepSim(sim, NO_INPUT);
+  view = derive(view, sim);
+}
 if (speedOf(sim.craft) !== speedAtRelease)
   fail('a coasting craft changed speed — gravity is ambient');
-if (derive(sim).craft.heading !== headingAtRelease) fail('a coasting craft turned');
-if (derive(sim).tick !== sim.tick) {
+if (view.craft.heading !== headingAtRelease) fail('a coasting craft turned');
+if (view.tick !== sim.tick) {
   fail('presentation state does not agree with the simulation it came from');
 }
 

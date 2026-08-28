@@ -1,0 +1,219 @@
+/**
+ * Where the world is watched from, and the two things that decide it.
+ *
+ * **Unspecified, and decided here.** Spec 05 says nothing about scrolling; spec
+ * [00 · §5](../../docs/spec/00-tokens.md) rules only that the camera is never
+ * rotated, never shaken and never randomised; spec 02's kick and spec 12's held
+ * finish are later milestones'. [M3.1](../../docs/plan/m3-the-field.md) builds
+ * the camera and the design space properly. This is the smallest one that can be
+ * flown, and the plan records where the lines were drawn.
+ *
+ * ## It does not move sideways
+ *
+ * The field is a corridor whose bodies fit inside the design space's width, so
+ * the whole corridor is on screen at all times and there is nothing to pan
+ * toward. That is not a small saving: the prototype's playfield is wider than
+ * its window, and the four mechanisms it needs as a consequence — a horizontal
+ * deadzone, a velocity look-ahead, a clamp to the field, and a backstop for the
+ * frames the ease has not caught up on — all answer a question this field does
+ * not ask. **The decision expires when the field outgrows the design space**,
+ * which is M1.4's boundary and M3's corridor (spec 17 §4).
+ *
+ * Everything below is therefore vertical, and the lock in particular is a
+ * vertical lock. In a field that panned, the same blend would carry x too.
+ *
+ * ## The two mechanisms, and why they are two
+ *
+ * **The deadzone** answers *the view is too sensitive to small movement*. The
+ * camera holds still until the craft leaves a band, and then moves only enough
+ * to bring it back to the band's edge — never toward the centre, which is the
+ * trap: a target that defaults to centred pans the craft inside the band, which
+ * moves the target back to centre, which pans the other way. The prototype
+ * measured that limit cycle as the view wobbling while flying straight.
+ *
+ * **The lock** answers *the world slides while I orbit*. Through a settled orbit
+ * the craft goes round a still point, and a view holding the craft still moves
+ * the world instead. So the camera's **subject** eases from the craft onto the
+ * body it is orbiting, which is a thing no deadzone can do, because the craft's
+ * excursion there is the orbit's whole diameter.
+ *
+ * **The lock must not run during the settle**, and this is the one place the
+ * prototype's own measurement is emphatic. Easing it in on the settle's progress
+ * flattened the oval's 59 → 107 → 59px swing to under 2px — *"of 83px of total
+ * swing only 41 survived"* — and the oval is the most dramatic part of a capture.
+ * The dive and the settle are flown; only the round orbit at the end of them is
+ * watched.
+ */
+import type { SimState } from '../sim/types.ts';
+import { FLOOR_GAP, MEDIAN_RADIUS, SECONDS_PER_TICK, SETTLE_TICKS } from '../sim/units.ts';
+import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from './design.ts';
+import type { CameraView } from './types.ts';
+
+/**
+ * How far the craft may drift from the camera before the camera follows, in
+ * design units either side.
+ *
+ * **Derived rather than chosen**: it is the floor radius of the field's median
+ * body, so a craft going round a typical body at its floor moves the view not at
+ * all — the same job the lock does, done by geometry, and available before the
+ * lock arrives and to flybys that never freeze at all. An oval reaches several
+ * times this and still moves the view, which is the half of the behaviour that
+ * must survive.
+ *
+ * It is an opening position in the sense the spec README means: the derivation
+ * says what magnitude it should be, and only the gate can say whether it reads
+ * right.
+ */
+export const DEADZONE = MEDIAN_RADIUS + FLOOR_GAP;
+
+/**
+ * How fast the camera closes on its target, in units of 1/second.
+ *
+ * Its job is to round the deadzone's edges rather than to trail the craft: a
+ * band alone starts and stops the view abruptly at its own edge, and this makes
+ * that a movement instead of a step. **The rate is bounded from below by the
+ * thumb line** — an ease lags a moving craft by `v × (1 − k) / k`, and at spec
+ * 01 §8's p95 exit speed the lag plus [`DEADZONE`](#) has to still leave the
+ * craft above [`THUMB_BUDGET`](#). The prototype's own follow rate is 3, which
+ * it can afford because its view is a third the height of this one; at 8 the
+ * time constant is an eighth of a second and the budget holds with room.
+ */
+export const FOLLOW_RATE = 8;
+
+/**
+ * How long the lock takes to arrive, in ticks, once the settle is over.
+ *
+ * The prototype's third of a second, carried with its reason: the lock **steps**
+ * rather than ramps — the settle keeps its whole oval and the lock arrives when
+ * the orbit becomes round — so this stretch *is* the blend. *"Slow enough to
+ * read as the view settling with the orbit and fast enough not to trail it."*
+ *
+ * It is a stretch on the swing's own clock rather than a filter, which is what
+ * lets the weight be a **pure function of the simulation**: the only thing this
+ * camera has to remember is the displacement it is currently applying, and one
+ * remembered number is a smaller promise than two.
+ */
+export const LOCK_TICKS = 20;
+
+/**
+ * How fast the displacement decays once there is no orbit to hold it, in units
+ * of 1/second.
+ *
+ * The prototype's rate again — *"the same rate carries the lock back out at the
+ * release, which is the other discontinuity."*
+ *
+ * **What decays is the displacement and not the weight**, and that is a
+ * departure from the prototype worth stating. Decaying the weight means
+ * recomputing `body − craft` every tick against a body the craft is now flying
+ * away from, so the displacement is a shrinking fraction of a growing distance
+ * and the view can briefly move faster than the craft it is following —
+ * measured here at 1.25× before this was changed. Decaying the displacement
+ * itself bounds the whole effect by the orbit's own radius: the camera's extra
+ * movement can never exceed `radius × rate`, whatever the craft does next.
+ */
+export const RELEASE_RATE = 3;
+
+/** An exponential ease's per-tick coefficient, from a rate in 1/seconds. */
+function easeStep(rate: number): number {
+  return Math.min(1, rate * SECONDS_PER_TICK);
+}
+
+/** Where the camera sits sideways: the corridor's centreline, always. */
+function centreline(): number {
+  return DESIGN_WIDTH / 2;
+}
+
+/**
+ * The camera at the first tick of a run.
+ *
+ * Placed, not eased into place. A run that opened by gliding from wherever the
+ * last one ended would begin with a lurch, and the prototype records exactly
+ * that as the reason its own reset is a placement.
+ */
+export function openCamera(sim: SimState): CameraView {
+  return { x: centreline(), y: sim.craft.y, lock: 0, offset: 0 };
+}
+
+/**
+ * How much the view is held on the body rather than on the craft, from 0 to 1.
+ *
+ * **A pure function of the simulation**, on the swing's own clock: zero unless a
+ * body is held *and* the dive has frozen *and* the settle is over, then eased in
+ * over [`LOCK_TICKS`](#). Smootherstep rather than a line because both ends have
+ * to be seamless — the same reason the settle itself uses one.
+ */
+export function lockOf(sim: SimState): number {
+  const orbit = sim.orbit;
+  if (sim.heldBody === null || orbit === null) return 0;
+  const since = orbit.ticksSinceFreeze - SETTLE_TICKS;
+  if (since <= 0) return 0;
+  if (since >= LOCK_TICKS) return 1;
+  const x = since / LOCK_TICKS;
+  return x * x * x * (x * (x * 6 - 15) + 10);
+}
+
+/**
+ * The camera one tick on.
+ *
+ * A pure function of the previous camera and the current simulation, evaluated
+ * exactly once per tick ([ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)).
+ * Every carried value eases toward something this tick determines, so two
+ * cameras that disagree agree again within a bounded time — which is what makes
+ * the memory safe rather than merely convenient.
+ */
+export function followCamera(previous: CameraView, sim: SimState): CameraView {
+  const craftY = sim.craft.y;
+  const lock = lockOf(sim);
+
+  // While the lock is on, the displacement is the body's — exactly, and not
+  // eased toward it. An eased displacement would lag a target that goes round
+  // once a second, and a lagging displacement is the orbit's swing coming back
+  // at reduced amplitude, which is the whole fault this exists to remove.
+  //
+  // While it is off, the displacement decays from wherever it was. That is the
+  // release: there is no body any more, and dropping the displacement outright
+  // would snap the view by an orbit radius on the one tick the swing is paid.
+  const offset =
+    lock > 0
+      ? (sim.field.bodies[sim.heldBody!]!.y - craftY) * lock
+      : previous.offset * (1 - easeStep(RELEASE_RATE));
+
+  const subjectY = craftY + offset;
+  return {
+    x: centreline(),
+    y: previous.y + (targetY(previous.y, subjectY, lock) - previous.y) * easeStep(FOLLOW_RATE),
+    lock,
+    offset,
+  };
+}
+
+/**
+ * Where the camera would like to be.
+ *
+ * The deadzone, and then the lock overriding it. Centring a locked subject looks
+ * like a contradiction of the deadzone and is not: the deadzone exists because a
+ * target that defaults to centred oscillates, and that argument is about a
+ * subject that **moves**. A locked anchor does not, so centring on it converges
+ * instead of cycling — and without this an orbited body would sit at the band's
+ * edge rather than in the middle of the view, which is not what "the view is
+ * locked to it" should look like.
+ */
+function targetY(cameraY: number, subjectY: number, lock: number): number {
+  const offset = subjectY - cameraY;
+  let parked = cameraY;
+  if (offset > DEADZONE) parked = subjectY - DEADZONE;
+  else if (offset < -DEADZONE) parked = subjectY + DEADZONE;
+  return parked + (subjectY - parked) * lock;
+}
+
+/**
+ * How far below the middle of the design space the craft may sit before it is
+ * under the player's own thumb.
+ *
+ * Spec [00 · §7](../../docs/spec/00-tokens.md) puts the thumb line at 2/3 of the
+ * height and rules that nothing readable lives below it, ever. The craft is the
+ * most readable thing on the screen, so this is the budget the deadzone and the
+ * follow lag are spending between them, and `test/state/camera.test.ts` holds
+ * them to it over real swings rather than by arithmetic.
+ */
+export const THUMB_BUDGET = THUMB_LINE - DESIGN_HEIGHT / 2;

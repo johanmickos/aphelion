@@ -45,6 +45,13 @@ function betweenAngles(from: number, to: number, alpha: number): number {
  * function should not make before spec [04](../../docs/spec/04-bodies.md)'s
  * moving bodies exist to test it. The tick number is the later one too — a frame
  * belongs to the tick it is drawn from, and half a tick is not a tick.
+ *
+ * The camera's carried state — its lock, and the body the lock is held on — is
+ * taken from the later tick for a stronger reason: it is the *input* to the next
+ * tick's derivation, and a frame is not a tick
+ * ([ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)).
+ * Only the two numbers the renderer actually draws with are interpolated, and
+ * nothing this function returns is ever fed back in.
  */
 export function interpolate(
   previous: PresentationState,
@@ -54,6 +61,7 @@ export function interpolate(
   return {
     tick: current.tick,
     camera: {
+      ...current.camera,
       x: between(previous.camera.x, current.camera.x, alpha),
       y: between(previous.camera.y, current.camera.y, alpha),
     },

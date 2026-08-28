@@ -480,8 +480,9 @@ M1.6 was put in the author's hand before the gate proper. Five things came back.
 routed and one is fixed; two need a ruling and are stated rather than answered.
 
 **1 · The camera bounces through an orbit, and is generally too sensitive vertically.**
-Confirmed — M1.6 predicted this in the same words and said what the recorded answer is. Two
-halves, and they want different fixes:
+**Fixed**, and the fix cost an ADR — see *What the camera does now*, below. M1.6 predicted this
+in the same words and said what the recorded answer was. Two halves, and they wanted different
+fixes:
 
 - *Through a settled orbit*, the craft goes round a still point and a camera holding it pinned
   slides the world instead. The prototype's answer is to ease the camera's **subject** from the
@@ -495,16 +496,18 @@ halves, and they want different fixes:
   deadzone**, and recorded that as the reason it *"could only smear"*. A deadzone is new work,
   not carried behaviour, and wants a number measured against real play rather than chosen.
 
-**Both are blocked on the same thing, and it is bigger than the camera.** An eased camera has
-to remember where it was, and a lock that survives a release has to remember the body after it
-is let go — and `derive` deliberately has no memory between ticks, which is
+**Both needed the same thing, and it is bigger than the camera.** An eased camera has to
+remember where it was, and a lock that survives a release has to remember something about the
+orbit after it is let go — and `derive` deliberately had no memory between ticks, which was
 `test/state/derive.test.ts`'s boundary criterion. That criterion was written for M1.2 and it is
 stricter than ADR-0006 requires: the promise is that a frame is a pure function of
 `(recipe, tick)`, and a per-tick recurrence replayed from tick zero satisfies it exactly. It
 was always going to have to give: spec [02 · §5](../spec/02-release.md)'s kick homes over 180ms
 with one overshoot, spec [00 · §3](../spec/00-tokens.md)'s E3 decays over 400ms, and spec
-[05 · §3](../spec/05-field.md)'s wake relaxes over ~400ms. **Presentation state carrying what
-decays is an ADR**, and the camera is simply where it bit first.
+[05 · §3](../spec/05-field.md)'s wake relaxes over ~400ms. So
+[ADR-0015](../adr/0015-presentation-state-carries-what-decays.md): **presentation state carries
+what decays**, `derive(previous, sim)` is a recurrence evaluated once per tick, and the camera
+is simply where that bit first.
 
 **2 · A double tap raises Firefox for iOS's callout menu and the selection loupe.** Fixed in
 `app/input.ts`: the callout and the loupe are the *selection's* UI, and `user-select: none`
@@ -552,6 +555,57 @@ the whole compass grammar is built on. So:
 Either way it is [M2](./m2-the-instrument.md) — craft deformation is already in its
 presentation-state list — with the boundary half of *"any time there's a strain"* following in
 M3, off the same number.
+
+## What the camera does now
+
+Built after the demo, as a correction to M1.6 rather than as a new step, on
+[ADR-0015](../adr/0015-presentation-state-carries-what-decays.md). Three mechanisms, and each
+answers a different sentence:
+
+| | What it answers | How |
+|---|---|---|
+| **The lock** | *"The camera bounces up and down when I orbit a planet"* | Through a **settled** orbit the view's subject is the body, not the craft |
+| **The deadzone** | *"A bit less sensitive to my ship's up-and-down"* | The view holds still until the craft leaves a band of **168** design units either side |
+| **The follow** | Neither — it rounds the deadzone's edges | An exponential ease at **8** per second |
+
+**The lock is a pure function of the swing's own clock**, which is worth stating because it is
+the one place this departs from the prototype's shape and it buys something. Zero until the
+settle is over, then a smootherstep over **20 ticks** — a third of a second, which is the
+prototype's own rate and its own reason: *"slow enough to read as the view settling with the
+orbit and fast enough not to trail it."* Because it is pure, the only thing the camera has to
+remember is **the displacement it is currently applying**, and one remembered number is a
+smaller promise than two.
+
+**The lock is exactly zero through the dive and the settle**, asserted as `toBe(0)` rather than
+as a tolerance. This is the prototype's most expensive camera lesson and the demo corroborated
+it from the other side: easing the lock in on the settle's progress flattened the oval's swing
+to under 2px — *"of 83px of total swing only 41 survived"* — and the demo's own next sentence
+was that the oval is the part that feels great. The dive and the oval are flown; only the round
+orbit at the end of them is watched.
+
+**What decays after a release is the displacement, not the weight**, and that *is* a departure.
+Decaying the weight means recomputing `body − craft` every tick against a body the craft is now
+flying away from — a shrinking fraction of a growing distance — and it was measured here making
+the view move **1.25× faster than the craft it was following**. Decaying the displacement itself
+bounds the whole effect by the orbit's own radius.
+
+### Measured, over four swings through the fixture field's opening
+
+| | Result |
+|---|---|
+| Orbit swing reaching the view, once locked | **0.1%** (it was 100%: the view *was* the swing) |
+| Largest camera step against the craft's own | **never larger**, against a jump of a whole orbit radius with no decay |
+| Craft's lowest point below centre | **182** design units, against a thumb-line budget of 422 |
+
+The deadzone's 168 is **derived rather than chosen** — it is the floor radius of the field's
+median body, so a craft going round a typical body at its floor moves the view not at all, and
+that holds before the lock arrives and for flybys that never freeze. The follow rate's 8 is
+bounded from below by the thumb line: an ease lags a moving craft by `v × (1 − k) / k`, and the
+lag plus the deadzone has to leave the craft above two thirds of the screen at spec 01 §8's p95
+exit speed. The prototype can afford 3 because its view is a third the height of this one.
+
+**Both numbers are opening positions and the gate may move them.** The derivations say what
+magnitude they should be; only a phone can say whether they read right.
 
 ## Gate
 

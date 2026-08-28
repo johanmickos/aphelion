@@ -16,7 +16,7 @@ import { distance } from '../../src/sim/math.ts';
 import { createInitialState } from '../../src/sim/step.ts';
 import { MASS_EXPONENT, SCALE } from '../../src/sim/units.ts';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
-import { derive } from '../../src/state/derive.ts';
+import { createPresentation } from '../../src/state/derive.ts';
 import { DESIGN_WIDTH } from '../../src/state/design.ts';
 
 const field = fixtureField();
@@ -30,7 +30,7 @@ describe('the fixture field', () => {
    * and cannot import each other, so this is where they are held in agreement.
    */
   it('fits inside the design space, where the camera is looking', () => {
-    const camera = derive(createInitialState(field, fixtureCraft(), 1)).camera;
+    const camera = createPresentation(createInitialState(field, fixtureCraft(), 1)).camera;
     expect(camera.x).toBe(DESIGN_WIDTH / 2);
     for (const body of bodies) {
       expect(body.x - body.radius).toBeGreaterThanOrEqual(0);

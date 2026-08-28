@@ -23,7 +23,7 @@ import { fixtureCraft, fixtureField } from '../src/sim/fixture-field.ts';
 import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { SECONDS_PER_TICK } from '../src/sim/units.ts';
 import { createPress, isPressed } from '../src/input/press.ts';
-import { derive } from '../src/state/derive.ts';
+import { createPresentation, derive } from '../src/state/derive.ts';
 import { attachCanvas, sizeToDisplay } from '../src/render/canvas.ts';
 import { interpolate } from '../src/render/interpolate.ts';
 import { draw } from '../src/render/index.ts';
@@ -49,7 +49,7 @@ if (target) {
     createInitialState(fixtureField(), fixtureCraft(), 1);
 
   let sim = start();
-  let current = derive(sim);
+  let current = createPresentation(sim);
   let previous = current;
   const clock = createClock();
   let observed = performance.now();
@@ -60,7 +60,7 @@ if (target) {
   // is flying this repeatedly.
   const restart = (): void => {
     sim = start();
-    current = derive(sim);
+    current = createPresentation(sim);
     previous = current;
   };
   reset?.addEventListener('click', restart);
@@ -72,11 +72,18 @@ if (target) {
     const elapsedSeconds = (now - observed) / 1000;
     observed = now;
 
+    // Presentation state is a recurrence and this loop is the whole of
+    // [ADR-0015](../docs/adr/0015-presentation-state-carries-what-decays.md)'s
+    // first rule: **once per tick, never per frame.** A frame that derived would
+    // advance every decay in the game at the display's rate, so a 120Hz phone
+    // would home the camera in half the time a 60Hz one does and no two
+    // recordings of the same recipe would agree. `interpolate` below reads the
+    // two states this produces and its result is never fed back in.
     const ticks = ticksDue(clock, elapsedSeconds);
     for (let i = 0; i < ticks; i++) {
       previous = current;
       stepSim(sim, { pressed: isPressed(press) });
-      current = derive(sim);
+      current = derive(previous, sim);
     }
 
     sizeToDisplay(context);

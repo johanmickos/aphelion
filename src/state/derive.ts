@@ -1,5 +1,5 @@
 /**
- * Simulation in, presentation state out. Once per tick, no memory of its own.
+ * Simulation in, presentation state out. Once per tick, and once only.
  *
  * This is the layer ADR-0006 warns will quietly grow a dependency on the
  * renderer. It cannot: `pnpm portable` reads this directory and fails if it
@@ -9,65 +9,34 @@
  * speed instead of a velocity, a `held` flag instead of an index. The renderer
  * never asks the simulation a question — everything it draws is already an
  * answer, which is what makes a frame a pure function of `(recipe, tick)`.
+ *
+ * ## It is a recurrence, and that is deliberate
+ *
+ * [ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md):
+ * almost everything the design puts in this layer decays — the release kick
+ * homes over 180ms, an E3 over 400ms, the rungs' wake over 400ms — and a decay
+ * is by definition a function of the current tick **and what was already on
+ * screen**. So `derive` takes the previous tick's presentation and produces the
+ * next one.
+ *
+ * **Three rules keep that honest, and each is a test rather than a convention.**
+ * It is called exactly once per tick and never per frame, because ticks are the
+ * only clock in the game and a decay advanced per frame would run at the
+ * display's rate. A run opens with [`createPresentation`](#), which places
+ * everything rather than easing toward it from wherever the last run ended.
+ * And everything carried eases toward something the current tick determines, so
+ * two presentations that disagree agree again within a bounded time — memory
+ * that cannot be shed turns one bad tick into a permanently wrong picture.
  */
 import { headingOf, speedOf } from '../sim/craft.ts';
 import type { SimState } from '../sim/types.ts';
-import { DESIGN_WIDTH } from './design.ts';
-import type { PresentationState } from './types.ts';
+import { followCamera, openCamera } from './camera.ts';
+import type { CameraView, PresentationState } from './types.ts';
 
-/**
- * Where the world is watched from. **Unspecified, and decided here** — spec 05
- * says nothing about scrolling, spec 00 §5 rules only that the camera is never
- * rotated, shaken or randomised, and spec 02's kick and spec 12's held finish
- * are both later milestones'. [M3.1](../../docs/plan/m3-the-field.md) is where
- * the camera and the design space are built properly; M1.6 needed one on its
- * first frame, so this is the smallest camera that can be flown, and the plan
- * records where the line was drawn.
- *
- * **It does not move sideways.** The field is a corridor whose bodies fit inside
- * the design space's width, so the whole corridor is on screen at all times and
- * there is nothing to pan toward. That is not a small saving: the prototype's
- * playfield is wider than its window, and the four mechanisms it needs as a
- * consequence — a horizontal deadzone, a velocity look-ahead, a clamp to the
- * field, and a backstop for the frames the ease has not caught up on — all exist
- * to answer a question this field does not ask. **The decision expires when the
- * field outgrows the design space**, which is M3's corridor (spec 17 §4) and
- * M1.4's boundary.
- *
- * **It is centred on the craft vertically, and it does not lag.** Centred is the
- * framing the prototype's feel was tuned at (ADR-0013 — carry the behaviour),
- * and the design space is taller than the prototype's own view, so this already
- * looks further ahead than the swing was measured looking. It cannot sit lower
- * than centre: spec 00 §7's thumb line is at 2/3 of the height and the craft is
- * the most readable thing on the screen, so putting it there would park it under
- * the player's own thumb.
- *
- * The lag is refused rather than omitted. A camera that eases toward a target
- * needs to remember where it was, and presentation state deliberately has no
- * memory between ticks — deriving the same simulation twice must give the same
- * answer, which is what makes a frame a pure function of `(recipe, tick)` and is
- * `test/state/derive.test.ts`'s boundary criterion. The prototype's evidence
- * says the lag is also what costs: following a craft round a *settled* orbit
- * through a 0.33s ease put a vertical oscillation over half the orbit's own
- * period into the view — too slow to track, and it could only smear — and the
- * answer it needed was a second mechanism, easing the camera's subject from the
- * craft onto the body it is orbiting. Rigid, none of that arises; what is left
- * is the world sliding with the orbit, which is **the thing to watch for at the
- * gate**. If it reads badly, the prototype's anchor is the recorded answer, and
- * it belongs with spec 02 §5's release kick in M2, where presentation state has
- * to carry a decaying transient anyway.
- */
-function cameraFor(sim: SimState): PresentationState['camera'] {
-  // The corridor's centreline, which the fixture field puts at the middle of the
-  // design space. A field with a centreline of its own — M3's, which narrows
-  // with altitude — states it in the field rather than here.
-  return { x: DESIGN_WIDTH / 2, y: sim.craft.y };
-}
-
-export function derive(sim: SimState): PresentationState {
+function present(sim: SimState, camera: CameraView): PresentationState {
   return {
     tick: sim.tick,
-    camera: cameraFor(sim),
+    camera,
     craft: {
       x: sim.craft.x,
       y: sim.craft.y,
@@ -81,4 +50,19 @@ export function derive(sim: SimState): PresentationState {
       held: index === sim.heldBody,
     })),
   };
+}
+
+/**
+ * The presentation at the first tick of a run.
+ *
+ * Everything that eases is placed here rather than eased into place, so a run
+ * never opens by gliding in from wherever the last one left off.
+ */
+export function createPresentation(sim: SimState): PresentationState {
+  return present(sim, openCamera(sim));
+}
+
+/** The presentation one tick on. Call once per tick, in the same loop as `stepSim`. */
+export function derive(previous: PresentationState, sim: SimState): PresentationState {
+  return present(sim, followCamera(previous.camera, sim));
 }

@@ -49,6 +49,26 @@ export interface CraftView {
 export interface CameraView {
   readonly x: number;
   readonly y: number;
+  /**
+   * How much the view is held on the body being orbited rather than on the
+   * craft, from 0 to 1.
+   *
+   * Vertical only, because the camera does not move sideways
+   * ([`camera.ts`](./camera.ts)). It is here rather than hidden inside the
+   * derivation because it is the quantity the behaviour is *about*: a test that
+   * asserts a settled orbit holds the view still is asserting this, and one that
+   * asserts the oval is still flown is asserting that this is zero throughout it.
+   */
+  readonly lock: number;
+  /**
+   * How far from the craft the view is currently sitting, in design units.
+   *
+   * The one thing the camera remembers ([ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)),
+   * and it is the *displacement* rather than the body that produced it — so what
+   * decays after a release is bounded by the orbit's own radius rather than by
+   * how far the craft has since travelled away from a remembered point.
+   */
+  readonly offset: number;
 }
 
 /**

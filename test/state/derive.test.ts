@@ -15,7 +15,7 @@ import { createCraft, speedOf } from '../../src/sim/craft.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS } from '../../src/sim/units.ts';
-import { derive } from '../../src/state/derive.ts';
+import { createPresentation, derive } from '../../src/state/derive.ts';
 
 function world(): ReturnType<typeof createInitialState> {
   const field = {
@@ -26,33 +26,49 @@ function world(): ReturnType<typeof createInitialState> {
 
 describe('presentation state', () => {
   /**
-   * The boundary criterion. If `derive` ever grows memory of its own — a
-   * smoothed value, a cached camera, anything carried between ticks — deriving
-   * the same simulation twice stops giving the same answer, and a frame stops
-   * being a pure function of the recipe. That is the failure ADR-0006 warns
-   * about, and it would not show up in an import scan.
+   * The boundary criterion, restated for
+   * [ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md).
+   *
+   * M1.2 wrote this as *"deriving the same simulation twice gives the same
+   * answer"*, which was the strictest reading available and is stricter than
+   * ADR-0006 asks for. What ADR-0006 promises is that a frame is a pure function
+   * of `(recipe, tick)`, and a recurrence seeded at tick zero satisfies that —
+   * so what has to hold now is that `derive` is a pure function of **its two
+   * arguments**, with nothing of its own between calls. A cache, a wall clock or
+   * a module-level accumulator would fail here exactly as before.
+   *
+   * The replay property that used to live in this test — that two runs which
+   * agree present identically — is `test/state/camera.test.ts`'s, because it is
+   * now a statement about a sequence rather than about a call.
    */
-  it('is a pure function of the simulation, with no memory between calls', () => {
+  it('is a pure function of its two arguments', () => {
     const state = world();
     state.heldBody = 0;
-    for (let i = 0; i < 120; i++) stepSim(state, NO_INPUT);
+    let view = createPresentation(state);
+    for (let i = 0; i < 120; i++) {
+      stepSim(state, NO_INPUT);
+      view = derive(view, state);
+    }
 
-    const once = derive(state);
-    const again = derive(state);
-    expect(again).toEqual(once);
+    expect(derive(view, state)).toEqual(derive(view, state));
 
-    // And two simulations that agree must present identically, whatever route
-    // they took to get there.
+    // And the same pair reached by a different route presents identically: it is
+    // the arguments that decide the answer, not the history behind them.
     const other = world();
     other.heldBody = 0;
-    for (let i = 0; i < 120; i++) stepSim(other, NO_INPUT);
-    expect(derive(other)).toEqual(once);
+    let otherView = createPresentation(other);
+    for (let i = 0; i < 120; i++) {
+      stepSim(other, NO_INPUT);
+      otherView = derive(otherView, other);
+    }
+    expect(derive(otherView, other)).toEqual(derive(view, state));
   });
 
   it('reports the tick it was derived from', () => {
     const state = world();
+    const opened = createPresentation(state);
     stepSim(state, NO_INPUT);
-    expect(derive(state).tick).toBe(state.tick);
+    expect(derive(opened, state).tick).toBe(state.tick);
   });
 
   /**
@@ -62,16 +78,16 @@ describe('presentation state', () => {
    */
   it('gives the renderer answers rather than a velocity to work from', () => {
     const state = world();
-    const view = derive(state);
+    const view = createPresentation(state);
     expect(view.craft.speed).toBe(speedOf(state.craft));
     expect(Object.keys(view.craft).sort()).toEqual(['heading', 'speed', 'x', 'y']);
   });
 
   it('says which body is held, so the renderer never has to work it out', () => {
     const state = world();
-    expect(derive(state).bodies.map((b) => b.held)).toEqual([false, false]);
+    expect(createPresentation(state).bodies.map((b) => b.held)).toEqual([false, false]);
     state.heldBody = 1;
-    expect(derive(state).bodies.map((b) => b.held)).toEqual([false, true]);
+    expect(createPresentation(state).bodies.map((b) => b.held)).toEqual([false, true]);
   });
 
   /**
@@ -82,7 +98,7 @@ describe('presentation state', () => {
    * body is.
    */
   it('hands the renderer geometry and not physics', () => {
-    const view = derive(world());
+    const view = createPresentation(world());
     expect(Object.keys(view.bodies[0]!).sort()).toEqual(['held', 'radius', 'x', 'y']);
   });
 });
