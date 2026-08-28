@@ -113,6 +113,21 @@ its final frame — the first version of `fireBoost` did exactly that and was th
 old defect relocated. The integral and its span are both in `ScoreState`, and the
 span is the half that is easy to drop.
 
+**The score says how far you got and how well you were flying while you got there,
+and a capture is how progress is BOUGHT rather than a thing paid for on its own.**
+`holdClimbInCapture` freezes the climb for a whole capture, so orbiting banks
+nothing and a close exciting capture that comes back where it started pays almost
+nothing. That is axiom 1 working, it has been reported as a defect four times in
+different words, and PORT_NOTES 78 has the measurement: arrival tightness is
+uncorrelated with what a swing pays (r 0.033), because climb spreads 4.6x across
+real swings and tightness spreads 1.32x.
+
+**Do not "fix" it by turning up a quality axis.** Both obvious ones make it worse,
+measured: sharpening tightness favours PASSES, whose arrivals run p50 0.81 against
+a release's 0.64, and the tier does too — passes reach PERFECT on 35% of swings
+against a release's 10%. The three levers that would actually work are in
+PORT_NOTES 78 and every one of them is a constitutional change.
+
 **A capture is two scoring events.** The arrival is judged on how the ship arrived
 and prices the carry when the dive swings through periapsis; the release is judged
 on how it left and cashes at the release. Neither carries the other's qualities.

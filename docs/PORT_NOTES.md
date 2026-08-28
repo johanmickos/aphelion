@@ -5208,6 +5208,59 @@ Nothing under `src/score/` changed. `SIM_VERSION` went 30 -> 32 across the two s
 
 ---
 
+### 78 — The 100k run, and why the capture-versus-pass complaint is the axiom rather than a weight
+
+`diagnostics/2026-08-28T18-16-34-168Z.json` is the calibration anchor this file has wanted since F04 stage (c) opened. It is a 105-second run scoring **105,364 on its best life** — the author's own stated ceiling, "I struggle to reach 100k points, which is a good thing, I want that to be a tough ceiling", met almost exactly — and `tools/score-profile.ts` prints its shape so a future change can be measured against it rather than against a memory of how it felt.
+
+```
+best life 105,364   total 113,349   over 2 lives
+per swing   p50 1,492   p90 4,435   max 14,980
+climb px    p10 132  p50 274  p90 440   spread 3.3x
+tier        x1 20%  TRUE 33%  SHARP 35%  PERFECT 11%
+timing      reads 1.00 on 2/41
+arrival     p10 0.47  p50 0.76  p90 0.87
+fire        0/54 swings touched it
+paid nothing 0/54
+```
+
+**Four provisional numbers are settled by that row of figures.** `climbPerPx` 0.25 is right, and this is the first evidence that is not an argument: a strong run lands on the ceiling the author named. The tier ladder is where Direction 06 asked for it. `boostPeakAt` holds — `timing` saturates on 2 of 41 releases against the 43% that prompted it. And **a 100k run touches the fire zero times**, which retires the idea that the band was ever load-bearing: the ceiling is reachable without going near a wall.
+
+---
+
+**THE COMPLAINT THAT WOULD NOT GO AWAY, AND WHAT IT ACTUALLY IS.** Across four sessions the same report kept arriving in different words — "long and slow captures rewarding 1000+ points while some closer shorter captures yield 0", then "closer more exciting captures were yielding 400-1500" against a fire swing at 5,000. It was attributed to the fire three times, and twice the fire was re-priced for it. Both times the complaint came back.
+
+It is not the fire. Measured over 313 paying swings on this economy, on a log scale because the economy is multiplicative:
+
+```
+points track   carry      r = 0.831
+               multiplier r = 0.683
+               climb      r = 0.534
+               tier       r = 0.245
+               arrival    r = 0.033      <- n=123
+```
+
+**Arrival tightness is uncorrelated with what a swing pays.** Median points by tightness bucket are flat — 832 / 632 / 846 / 692 — and the reason is arithmetic rather than a bug. Climb spreads 4.6x from p10 to p90 across real swings; the tightness multiplier spreads **1.32x**, because `closeSpan` 200 hands a p10 arrival x1.37 as a floor. The quality signal is inside the distance noise.
+
+**AND BOTH LEVERS THAT WOULD RAISE QUALITY MAKE THE COMPLAINT WORSE.** This is the part worth carrying, because both look obviously right until they are measured. Sharpening tightness favours PASSES: flyby arrivals run p50 0.81 against a release's 0.64, so at sharpness 3 / `tightMax` 4 a pass's median multiplier goes from 1.10x a release's to **1.45x**. The tier does the same — passes reach PERFECT on 35% of swings against a release's 10%. Turning up "quality" turns up the thing the complaint is against.
+
+**So the mismatch is axiom 1 working.** `SimConfig.holdClimbInCapture` freezes `highWaterY` for the whole of a capture, deliberately, so that orbiting earns nothing — Direction 08 lists "orbiting earns nothing per lap" under what deliberately earns nothing, and PORT_NOTES 74 records that it is the held mark that makes it true. A close, exciting capture that swings round a body and back banks only the net altitude it gained. A pass that sails by banks every metre of it. The tightest arrival in one session, 0.96, paid 104 points, because it moved the ship 17 pixels up the field.
+
+Nothing here is broken. What the score says is "how far did you get, and how well were you flying while you got there", and a capture is how progress is BOUGHT rather than a thing paid for on its own. That is the axiom the constitution was ratified on.
+
+**The three ways out, none of them taken, all of them real.** Recorded because this will be asked again:
+
+1. **Compress the distance.** `carry = climb^k` at k around 0.7 turns climb's 4.6x spread into 2.9x and makes every quality axis matter comparatively more. Still only metres and still mints nothing, but it bends "a metre is a metre" and is a constitutional change.
+2. **Give a capture something a pass cannot earn.** A release has aim and boost timing; a pass has neither. Pricing those into the carry the way tightness is, rather than grading them at the cash, is the only lever that favours captures specifically. It re-opens what F04 settled when it deleted `linkBase`.
+3. **Accept it**, which is what happened, on the author's call to move on and fine-tune later.
+
+**The measurement that would settle it does not exist yet.** All three need a faithful replay to price: the carry's factors — `climbPerPx`, `chainStep`, `tightMax`, `fireBoost` — are applied tick by tick and only their product reaches the award tuple, so no recording can answer "what would this session have scored at `tightMax` 4". Every replay on this build diverges within a few hundred ticks. `tools/score-profile.ts` says so at its own head rather than leaving the next person to find out.
+
+---
+
+**`tools/score-profile.ts` exists because this was re-derived four times.** Every scoring argument in these notes was settled by the same handful of distributions, each rebuilt from scratch in a throwaway harness — and the same deduplication bug was rediscovered twice, because a report can be exported more than once and nothing in the file says so. `2026-08-28T06-23-27` and `06-24-38` are byte-identical in input and awards; only the export stamp differs. `(loadedAt, ticks)` is the identity, and the tool prints a line when it drops one.
+
+---
+
 ## Tuning vs. fidelity
 
 `src/sim/config.ts` holds two parameter sets:
