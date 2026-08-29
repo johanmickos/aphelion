@@ -429,6 +429,7 @@ const BLOCKED = 0.3;
  * geometry. It is a fact, never a command."*
  */
 function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): void {
+  if (compass.alpha <= 0) return;
   // State 1 · PRESS. *"The grab filament: a line from the craft to the body
   // pulling hardest, in that body's identity hue."* There is no instrument yet,
   // which is what makes the compass arriving *be* the freeze, seen.
@@ -438,7 +439,7 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
     context.moveTo(compass.x, compass.y);
     context.lineTo(compass.craftX, compass.craftY);
     context.lineWidth = HAND_WIDTH;
-    context.strokeStyle = identity(compass.hue, STRENGTH[2]);
+    context.strokeStyle = identity(compass.hue, STRENGTH[2] * compass.alpha);
     context.stroke();
     return;
   }
@@ -454,7 +455,7 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
       const span = Math.min(compass.swept, Math.PI * 2);
       traceArc(context, compass, from, span * compass.direction);
       context.lineWidth = HAND_WIDTH;
-      context.strokeStyle = dim(CORE, STRENGTH[2]);
+      context.strokeStyle = dim(CORE, STRENGTH[2] * compass.alpha);
       context.stroke();
     }
   }
@@ -467,7 +468,10 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
     compass.y + Math.sin(compass.hand) * compass.reach * compass.scale,
   );
   context.lineWidth = HAND_WIDTH;
-  context.strokeStyle = dim(CORE, HAND_AT_REST + (1 - HAND_AT_REST) * closest(compass));
+  context.strokeStyle = dim(
+    CORE,
+    (HAND_AT_REST + (1 - HAND_AT_REST) * closest(compass)) * compass.alpha,
+  );
   context.stroke();
 
   for (const ring of compass.rings) drawRing(context, compass, ring);
@@ -501,7 +505,7 @@ function drawPath(context: CanvasRenderingContext2D, compass: CompassView): void
   context.lineWidth = PATH_WIDTH;
   context.strokeStyle = dim(
     CORE,
-    PATH_STRENGTH * compass.presence * (compass.predicted ? PREDICTED : 1),
+    PATH_STRENGTH * compass.presence * compass.alpha * (compass.predicted ? PREDICTED : 1),
   );
   context.stroke();
 }
@@ -564,7 +568,7 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
   context.beginPath();
   context.arc(compass.x, compass.y, radius, 0, Math.PI * 2);
   context.lineWidth = RING_WIDTH;
-  context.strokeStyle = dim(DUSK, STRENGTH[1]);
+  context.strokeStyle = dim(DUSK, STRENGTH[1] * compass.alpha);
   context.stroke();
 
   // The window heats **in place**: E1 at rest, E2 under live aim, and the hue
@@ -578,7 +582,7 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
   // A **blocked** window is dimmed rather than removed: a release that runs into
   // another body is worth saying, and a window that vanished would be the
   // blinking this instrument was rebuilt to stop.
-  const clear = ring.blocked ? BLOCKED : 1;
+  const clear = (ring.blocked ? BLOCKED : 1) * compass.alpha;
 
   context.save();
   context.lineCap = 'round';
@@ -613,7 +617,7 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
     0,
     Math.PI * 2,
   );
-  context.fillStyle = dim(CORE, STRENGTH[ring.energy]);
+  context.fillStyle = dim(CORE, STRENGTH[ring.energy] * clear);
   context.fill();
 }
 

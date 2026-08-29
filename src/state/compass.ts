@@ -44,7 +44,7 @@
 import { AIM_RANGE, handOf, windowsOn } from '../sim/compass.ts';
 import { pathRadiusAt, predictOrbit } from '../sim/orbit.ts';
 import type { Orbit } from '../sim/orbit.ts';
-import { advance, easeStep, home, place, ticksIn } from './decay.ts';
+import { advance, easeStep, home, leaving, place, shut, ticksIn } from './decay.ts';
 import { SCALE } from '../sim/units.ts';
 import { alignmentOf, tierFor } from '../sim/tier.ts';
 import type { Tier } from '../sim/tier.ts';
@@ -153,6 +153,32 @@ export const ENTER_TICKS = ticksIn(120);
 /** Where that pop starts from — spec 00 §5's 92%. */
 export const ENTER_FROM = 0.92;
 
+/**
+ * How long the instrument takes to click out, and how far in it collapses.
+ *
+ * *"When holding an orbit and release, the compass just disappears. Could we have
+ * it pulse out slightly and then quickly in with a fadeout? So it looks like it
+ * clicks out?"* (author, 2026-08-29).
+ *
+ * **It leaves on the curve it arrived on, reversed** — [`leaving`](./decay.ts) is
+ * [`home`](./decay.ts) read from the other end, so the swell on the way out is
+ * the same single overshoot ENTER lands on, and the instrument's two ends are one
+ * shape rather than two. Multiplied by [`EXIT_BY`](#) it swells about **3.5%**
+ * away from rest, comes back through it, and then collapses inward, accelerating,
+ * while the whole thing fades. That acceleration is the click.
+ *
+ * **This is where the farewell ring will want a word.** Spec
+ * [02 · §6](../../docs/spec/02-release.md) has the orbit detaching from the body
+ * and expanding away in AURORA, which is the same instant going the other
+ * direction — so the **path** deliberately does not scale with this, only the
+ * instrument does, leaving that expansion for [M2.4](../../docs/plan/m2-the-instrument.md)
+ * to put on it.
+ */
+export const EXIT_TICKS = ticksIn(180);
+
+/** How far in it collapses before it is gone. */
+export const EXIT_BY = 0.35;
+
 const TWO_PI = Math.PI * 2;
 
 /**
@@ -165,7 +191,7 @@ const TWO_PI = Math.PI * 2;
  */
 export function compassOf(previous: CompassView | null, sim: SimState): CompassView | null {
   const held = sim.heldBody;
-  if (held === null) return null;
+  if (held === null) return leave(previous);
   const body = sim.field.bodies[held]!;
   const hue = hueOf(held);
 
@@ -190,6 +216,8 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
       // Nothing to come online yet: the dive has no instrument.
       scale: 1,
       entrance: null,
+      alpha: 1,
+      exit: null,
       anchor: guess === null ? 0 : guess.periapsis,
       path: guess === null ? [] : sample(guess),
       presence: fadedIn(previous, guess !== null),
@@ -255,6 +283,8 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     filament: false,
     predicted: false,
     presence: fadedIn(previous, true),
+    alpha: 1,
+    exit: null,
     hand,
     anchor,
     path,
@@ -305,6 +335,27 @@ function unstack(rings: RingView[]): void {
     }
     rings[i] = { ...ring, radius };
   }
+}
+
+/**
+ * The instrument on its way out, or `null` once it is gone.
+ *
+ * Everything is the previous tick's — the body does not move, the rings do not
+ * move, and the **hand stays where the release happened**, which is the thing
+ * worth still being able to see. What changes is the scale and the fade.
+ */
+function leave(previous: CompassView | null): CompassView | null {
+  if (previous === null) return null;
+  const exit = previous.exit === null ? place(EXIT_TICKS) : advance(previous.exit);
+  if (exit === null) return null;
+  return {
+    ...previous,
+    filament: false,
+    exit,
+    entrance: null,
+    scale: 1 - EXIT_BY * leaving(exit),
+    alpha: shut(exit),
+  };
 }
 
 /** The path as radii at even angles — a shape rather than a formula to get wrong. */

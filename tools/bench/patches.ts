@@ -163,6 +163,12 @@ export function lockOf(sim: SimState): number {
   ),
   settable('src/state/compass.ts', 'ENTER_FROM', 'spec 00 §5’s ENTER: how small it starts'),
   settable('src/state/compass.ts', 'ENTER_TICKS', 'and how long it takes to come online'),
+  settable(
+    'src/state/compass.ts',
+    'EXIT_BY',
+    'how far in the instrument collapses as it clicks out',
+  ),
+  settable('src/state/compass.ts', 'EXIT_TICKS', 'and how long that click takes'),
   {
     file: 'src/render/index.ts',
     find: 'const BODY_BLOOM = 0.35;',

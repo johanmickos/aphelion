@@ -353,6 +353,16 @@ export interface CompassView {
   readonly scale: number;
   /** The entrance in progress, or `null` once it has settled. */
   readonly entrance: Decay | null;
+  /**
+   * How much of the instrument is drawn at all, from 1 to 0.
+   *
+   * One while a body is held, and falling through the **exit**: the compass
+   * clicks out at a release rather than vanishing, swelling slightly and then
+   * collapsing inward as it fades. See [`EXIT_TICKS`](./compass.ts).
+   */
+  readonly alpha: number;
+  /** The departure in progress. Present only after a release, and briefly. */
+  readonly exit: Decay | null;
   /** Where a release would land right now (`CONTEXT.md`: **hand**), or `null` while diving. */
   readonly hand: number | null;
   /**

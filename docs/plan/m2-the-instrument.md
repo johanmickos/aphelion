@@ -675,6 +675,35 @@ Measured over the run this repo ships, every ring's dot, width and radius is now
 constant for the whole swing — 0.00 at every percentile, not a tolerance — and a test asserts it
 as equality over more than a thousand ring-ticks.
 
+### And the instrument clicks out
+
+*"When holding an orbit and release, the compass just disappears. Could we have it pulse out
+slightly and then quickly in with a fadeout? So it looks like it clicks out?"* (author,
+2026-08-29).
+
+**It leaves on the curve it arrives on, reversed.** [`leaving`](../../src/state/decay.ts) is
+[`home`](../../src/state/decay.ts) read from the other end, so the swell on the way out is the
+same single overshoot ENTER lands on and the instrument's two ends are one shape rather than two
+— which is what spec [00 · §5](../spec/00-tokens.md) means by the motion tokens being one grammar.
+Measured: it swells to **1.034** by five ticks, comes back through 1.0 at seven, then collapses to
+**0.78** and is gone at **eleven — 180ms**.
+
+**One curve had to be added, and the reason is a measurement.** `fade` is the design's decay,
+fastest at the start and slowing to nothing, which is right for an E3 that is over the instant it
+has happened. Used here it had the compass at 30% opacity by the time it *began* to collapse and
+under 13% through the collapse itself — the motion asked for, happening where it could not be
+seen. `shut` is the same journey with the curvature the other way round, so the light holds while
+the shape talks: the swell now lands at **79 – 87%** and the deepest part of the collapse is still
+visible at **17%**.
+
+**The path deliberately does not scale with it.** Spec [02 · §6](../spec/02-release.md) has the
+orbit detaching from the body and expanding away in AURORA at exactly this instant — the same
+moment going the other direction — so only the instrument collapses, and the expansion is left for
+[M2.4](#m24--the-release--400ms) to put on the path rather than half-invented here.
+
+The hand stays where the release happened, which is the thing still worth seeing, and the rings do
+not move on the way out any more than they did on the way in.
+
 ### What this makes false in the specs, and is not edited here
 
 `docs/` is author-owned and these are rebases rather than tidying, so they are listed for
@@ -692,7 +721,7 @@ approval rather than written:
 | [04 · §3](../spec/04-bodies.md) | IN REACH's *"E1 + tide"* — a body glows on grip, and the tide is on the offer |
 | [00 · §6](../spec/00-tokens.md) | the **ghost** is a **crossing**; and a window heats over a quarter turn rather than over itself |
 
-**543 tests, 46 files.** Every number that moved is on the bench, which is now at `/bench` on the dev server.
+**548 tests, 46 files.** Every number that moved is on the bench, which is now at `/bench` on the dev server.
 
 ---
 

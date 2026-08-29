@@ -102,7 +102,12 @@ footer uses obsolete numbering and is void.
 > once, when the rings arrive at the freeze. It scales the rings and the hand and
 > never the orbit path, because the craft is on the path. What it is deliberately
 > **not** is the prototype's continuous pump, which that codebase measured at
-> *"85 out to 97 and back over about a second"* and removed.
+> *"85 out to 97 and back over about a second"* and removed. **And it leaves on the
+> same curve reversed** (2026-08-29): the compass clicks out at a release rather
+> than vanishing, swelling 3.4% and then collapsing inward over 180ms. §5's DECAY
+> is not the fade used for it — measured, that curve had the collapse happening
+> under 13% opacity, so the motion was where it could not be seen; the exit holds
+> its light while the shape moves and goes when it does.
 >
 > **§7 · The thumb line holds and is now load-bearing twice.** Sightings are pinned inside the
 > design space and never cross it, which falls out of the geometry rather than being clamped.

@@ -20,6 +20,8 @@ import { MIN_HALF_WIDTH } from '../../src/sim/compass.ts';
 import {
   ENTER_FROM,
   ENTER_TICKS,
+  EXIT_BY,
+  EXIT_TICKS,
   RING_INNER,
   STACK_GAP,
   takenBy,
@@ -165,11 +167,13 @@ describe('what it is allowed to say', () => {
   it('carries geometry and a grade, and no advice', () => {
     const armed = compassAt(held(), (c) => c.rings.length > 0);
     expect(Object.keys(armed).sort()).toEqual([
+      'alpha',
       'anchor',
       'craftX',
       'craftY',
       'direction',
       'entrance',
+      'exit',
       'filament',
       'hand',
       'hue',
@@ -387,6 +391,82 @@ describe('a window never moves once it exists', () => {
       const bearing = Math.atan2(body.y - y, body.x - x);
       const off = Math.abs(((heading - bearing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
       expect(off).toBeLessThan(0.02);
+    }
+  });
+});
+
+describe('the instrument clicking out', () => {
+  /** One swing, and everything after the release until the compass is gone. */
+  const exiting = (): PresentationState[] => {
+    const sim: SimState = createInitialState(fixtureField(), fixtureCraft(), 1);
+    const views = [createPresentation(sim)];
+    for (let tick = 0; tick < 420; tick++) {
+      stepSim(sim, tick >= 20 && tick < 300 ? PRESS : NO_INPUT);
+      views.push(derive(views[views.length - 1]!, sim));
+    }
+    const released = views.findIndex(
+      (view, i) => i > 0 && view.compass?.exit != null && views[i - 1]!.compass?.exit == null,
+    );
+    expect(released).toBeGreaterThan(0);
+    return views.slice(released).filter((view) => view.compass !== null);
+  };
+
+  /**
+   * *"When holding an orbit and release, the compass just disappears. Could we
+   * have it pulse out slightly and then quickly in with a fadeout? So it looks
+   * like it clicks out?"* (author, 2026-08-29). It leaves on the curve it
+   * arrived on, reversed — so the swell is the same single overshoot ENTER lands
+   * on, and the two ends of the instrument are one shape.
+   */
+  it('swells slightly, then collapses inward, and is gone', () => {
+    const out = exiting();
+    const scales = out.map((view) => view.compass!.scale);
+
+    // Out, a little.
+    const swell = Math.max(...scales);
+    expect(swell).toBeGreaterThan(1);
+    expect(swell).toBeLessThan(1.06);
+
+    // Then in, past where it started, accelerating — the click.
+    const last = scales.at(-1)!;
+    expect(last).toBeLessThan(1 - EXIT_BY / 2);
+    expect(scales.indexOf(swell)).toBeLessThan(scales.length / 2);
+
+    // And over quickly: 180ms and not a tick more.
+    expect(out.length).toBeLessThanOrEqual(EXIT_TICKS);
+  });
+
+  /**
+   * **The light holds while the shape talks.** The design's own decay is fastest
+   * at the start, which had the collapse happening under 13% opacity — the motion
+   * asked for, where it could not be seen.
+   */
+  it('fades so that the collapse is still visible', () => {
+    const out = exiting();
+    const alphas = out.map((view) => view.compass!.alpha);
+
+    for (let i = 1; i < alphas.length; i++) expect(alphas[i]!).toBeLessThan(alphas[i - 1]!);
+    expect(alphas[0]).toBe(1);
+
+    // Still well lit where the shape swells, and still visible where it shuts.
+    const swellAt = out.findIndex(
+      (view) => view.compass!.scale === Math.max(...out.map((v) => v.compass!.scale)),
+    );
+    expect(alphas[swellAt]!).toBeGreaterThan(0.6);
+    expect(alphas.at(-1)!).toBeGreaterThan(0.1);
+  });
+
+  /**
+   * The hand stays where the release happened, because that is the thing still
+   * worth seeing — and the rings do not move on the way out any more than they
+   * did on the way in.
+   */
+  it('holds still while it goes', () => {
+    const out = exiting();
+    const first = out[0]!.compass!;
+    for (const view of out) {
+      expect(view.compass!.hand).toBe(first.hand);
+      expect(view.compass!.rings.map((r) => r.dot)).toEqual(first.rings.map((r) => r.dot));
     }
   });
 });

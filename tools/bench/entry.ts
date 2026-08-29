@@ -640,6 +640,32 @@ const KNOBS: Knob[] = [
     group: 'compass',
     places: 0,
   },
+  {
+    id: 'exitby',
+    label: 'Click out',
+    what: 'how far in the instrument collapses as it leaves. It leaves on the curve it arrives on, reversed — so it swells about a tenth of this away from rest first, then comes back through and shuts. At 0 it just fades',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    base: instrument.EXIT_BY,
+    apply: instrument.set_EXIT_BY,
+    restarts: false,
+    group: 'compass',
+    places: 2,
+  },
+  {
+    id: 'exitticks',
+    label: 'Click length',
+    what: 'ticks the click takes. 11 is 180ms',
+    min: 2,
+    max: 40,
+    step: 1,
+    base: instrument.EXIT_TICKS,
+    apply: instrument.set_EXIT_TICKS,
+    restarts: false,
+    group: 'compass',
+    places: 0,
+  },
 ];
 
 /**
