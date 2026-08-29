@@ -163,6 +163,11 @@ export function lockOf(sim: SimState): number {
   ),
   settable(
     'src/state/compass.ts',
+    'FILAMENT_FLOOR',
+    'how faint the tether goes once the craft is outside the body’s hold',
+  ),
+  settable(
+    'src/state/compass.ts',
     'PATH_FADE_RATE',
     'how fast the oval fades in once it is possible',
   ),

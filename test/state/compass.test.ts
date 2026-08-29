@@ -10,7 +10,12 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { createBody } from '../../src/sim/body.ts';
+import { createCraft } from '../../src/sim/craft.ts';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
+import { grabRange } from '../../src/sim/grab.ts';
+import { MEDIAN_RADIUS } from '../../src/sim/units.ts';
+import { openField } from '../sim/fixtures.ts';
 import { SETTLE_TICKS } from '../../src/sim/units.ts';
 import { openRun, replayRun } from '../../src/sim/replay.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
@@ -20,6 +25,7 @@ import { MIN_HALF_WIDTH } from '../../src/sim/compass.ts';
 import {
   ENTER_FROM,
   ENTER_TICKS,
+  FILAMENT_FLOOR,
   EXIT_BY,
   EXIT_TICKS,
   RING_INNER,
@@ -78,7 +84,7 @@ describe('the five states of one swing', () => {
    * freeze made visible.
    */
   it('is a filament and nothing else through the dive', () => {
-    const diving = compassAt(views, (c) => c.filament);
+    const diving = compassAt(views, (c) => c.filament > 0);
     expect(diving.hand).toBeNull();
     expect(diving.rings).toEqual([]);
     expect(diving.hue).toBe(hueOf(0));
@@ -88,7 +94,7 @@ describe('the five states of one swing', () => {
   it('grows its rings at the freeze', () => {
     const armed = compassAt(views, (c) => c.hand !== null);
     expect(armed.rings.length).toBeGreaterThan(0);
-    expect(armed.filament).toBe(false);
+    expect(armed.filament).toBe(0);
   });
 
   /**
@@ -393,6 +399,91 @@ describe('a window never moves once it exists', () => {
       const off = Math.abs(((heading - bearing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
       expect(off).toBeLessThan(0.02);
     }
+  });
+});
+
+/**
+ * *"Sometimes I grab too late and float away while tethered, and the dying
+ * brightness would be diegetic"* (author, 2026-08-29).
+ *
+ * The hold ends on a release and on nothing else, so a grab that never captures
+ * keeps its filament all the way out of the field. At constant brightness that
+ * line goes on insisting the grab is going somewhere; faded, it says what
+ * actually happened.
+ */
+describe('the grab filament', () => {
+  const law = (sim: SimState): number => {
+    const body = sim.field.bodies[sim.heldBody!]!;
+    const away = Math.hypot(sim.craft.x - body.x, sim.craft.y - body.y);
+    return FILAMENT_FLOOR + (1 - FILAMENT_FLOOR) * (1 - Math.min(1, away / grabRange(body)));
+  };
+
+  it('is exactly how much of the body’s hold is left, floored', () => {
+    const sim: SimState = createInitialState(fixtureField(), fixtureCraft(), 1);
+    let view = createPresentation(sim);
+    let checked = 0;
+    for (let tick = 0; tick < 400; tick++) {
+      stepSim(sim, tick >= 20 ? PRESS : NO_INPUT);
+      view = derive(view, sim);
+      if (view.compass === null || view.compass.filament === 0) continue;
+      expect(view.compass.filament).toBeCloseTo(law(sim), 9);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(50);
+  });
+
+  it('brightens as the craft falls in, and is all but full at the freeze', () => {
+    const sim: SimState = createInitialState(fixtureField(), fixtureCraft(), 1);
+    let view = createPresentation(sim);
+    const dive: number[] = [];
+    for (let tick = 0; tick < 400; tick++) {
+      stepSim(sim, tick >= 20 ? PRESS : NO_INPUT);
+      view = derive(view, sim);
+      if (view.compass !== null && view.compass.filament > 0) dive.push(view.compass.filament);
+    }
+    expect(dive.length).toBeGreaterThan(50);
+    // The end that was already tuned stays where it was: at the freeze the craft
+    // is about a tenth of a reach out, so the filament is near enough to full
+    // that the moment looks the way it always did.
+    expect(dive.at(-1)!).toBeGreaterThan(0.9);
+    expect(dive.at(-1)!).toBeGreaterThan(dive[0]!);
+  });
+
+  /**
+   * The case the note is about: a body grabbed from behind, at speed, that never
+   * captures. The craft drifts out past 1.7 reaches still tethered.
+   */
+  it('dies to a thread when the grab misses, and never below it', () => {
+    const body = createBody(0, 0, MEDIAN_RADIUS);
+    const field = openField([body]);
+    const sim: SimState = createInitialState(
+      field,
+      createCraft(0, grabRange(body) * 0.5, 0, 1200),
+      1,
+    );
+    let view = createPresentation(sim);
+    const out: number[] = [];
+    let froze = false;
+    for (let tick = 0; tick < 600; tick++) {
+      stepSim(sim, PRESS);
+      view = derive(view, sim);
+      if (sim.orbit !== null) froze = true;
+      if (view.compass !== null && view.compass.filament > 0) out.push(view.compass.filament);
+    }
+
+    expect(froze).toBe(false); // It really is a miss.
+    expect(out.length).toBeGreaterThan(100);
+    expect(out[0]!).toBeGreaterThan(0.5);
+    expect(Math.min(...out)).toBeCloseTo(FILAMENT_FLOOR, 9);
+
+    // A thread, not nothing: the craft is still attached and still spending a
+    // grab, and the picture has to keep saying so.
+    expect(Math.min(...out)).toBeGreaterThan(0);
+
+    // And stated without reference to the constant, so that turning the fade off
+    // fails here rather than passing by agreeing with itself: the far end is
+    // less than half the near end.
+    expect(Math.min(...out)).toBeLessThan(out[0]! / 2);
   });
 });
 

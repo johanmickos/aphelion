@@ -42,6 +42,8 @@
  * reading the field.
  */
 import { AIM_RANGE, handOf, windowsOn } from '../sim/compass.ts';
+import { grabRange } from '../sim/grab.ts';
+import { distance } from '../sim/math.ts';
 import { pathRadiusAt, predictOrbit } from '../sim/orbit.ts';
 import type { Orbit } from '../sim/orbit.ts';
 import { advance, easeStep, hastened, home, leaving, place, shut, ticksIn } from './decay.ts';
@@ -124,6 +126,35 @@ export const PATH_POINTS = 64;
 export const PATH_FADE_RATE = 8;
 
 /**
+ * How faintly the grab filament burns once the craft is outside the body's hold.
+ *
+ * *"Sometimes I grab too late and float away while tethered, and the dying
+ * brightness would be diegetic"* (author, 2026-08-29). The hold ends on a
+ * release and on nothing else ([`release.ts`](../sim/release.ts)), so a craft
+ * that misses its capture keeps its filament all the way out of the field — and
+ * a line at constant brightness is the only thing on screen still insisting the
+ * grab is going somewhere.
+ *
+ * **Measured against the body's reach rather than against its grip.** Grip is the
+ * physical truth and is the wrong curve to paint with: it falls as 1/r², and a
+ * body's reach is **10.5×** its own floor, so grip at the edge of a hold is
+ * `0.009`. A filament painted with it would be invisible at the exact moment the
+ * player catches something at range. Distance over reach is linear on screen,
+ * runs 1 → 0 across precisely the span the hold covers, and is the same reading
+ * the rings already use for *how far* (`away / AIM_RANGE`).
+ *
+ * **It floors rather than dies.** At the edge of the reach there is nothing left
+ * to feel, and past it the number would only go on being nothing — but a
+ * filament at zero would take the last evidence that the craft is still attached
+ * and still spending a grab. What is left is a thread.
+ *
+ * The **near** end is untouched: at the freeze the craft is around a tenth of a
+ * reach out, so the filament burns at 0.93 of what it always did. That end was
+ * already tuned; only the far end is new.
+ */
+export const FILAMENT_FLOOR = 0.25;
+
+/**
  * How long the instrument takes to come online, and how small it starts.
  *
  * **Spec [00 · §5](../../docs/spec/00-tokens.md)'s ENTER token, applied to the
@@ -203,6 +234,10 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     // gravity has bound the craft at all, is the path it is currently on: faded
     // in, and firming up as the prediction converges.
     const guess = predictOrbit(sim.craft, body);
+    // How much of this body's hold is left — 1 against the body, 0 at the edge
+    // of its reach, and floored past it so the thread survives the miss.
+    const held =
+      1 - Math.min(1, distance(sim.craft.x, sim.craft.y, body.x, body.y) / grabRange(body));
     return {
       x: body.x,
       y: body.y,
@@ -210,7 +245,7 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
       craftX: sim.craft.x,
       craftY: sim.craft.y,
       direction: guess === null ? 1 : guess.direction,
-      filament: true,
+      filament: FILAMENT_FLOOR + (1 - FILAMENT_FLOOR) * held,
       predicted: guess !== null,
       hand: null,
       // Nothing to come online yet: the dive has no instrument.
@@ -288,7 +323,7 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     craftX: sim.craft.x,
     craftY: sim.craft.y,
     direction: sim.orbit.direction,
-    filament: false,
+    filament: 0,
     predicted: false,
     presence: fadedIn(previous, true),
     alpha: 1,
@@ -358,7 +393,7 @@ function leave(previous: CompassView | null): CompassView | null {
   if (exit === null) return null;
   return {
     ...previous,
-    filament: false,
+    filament: 0,
     exit,
     entrance: null,
     scale: 1 - EXIT_BY * leaving(hastened(exit)),

@@ -320,8 +320,16 @@ export interface CompassView {
   readonly craftY: number;
   /** Which way round the craft goes: +1 counter-clockwise, −1 clockwise. */
   readonly direction: number;
-  /** Spec 00 §6 state 1: the line from the craft to the body, drawn while diving. */
-  readonly filament: boolean;
+  /**
+   * How brightly the grab filament burns, from 0 to 1 — **0 when there is no
+   * filament**, which is every state after the freeze.
+   *
+   * It used to be a `boolean` naming the state, and nothing read it: the
+   * renderer tells the dive from the instrument by whether there is a hand. Now
+   * it carries the strength instead, which is the thing the renderer could not
+   * work out for itself — see [`FILAMENT_FLOOR`](./compass.ts).
+   */
+  readonly filament: number;
   /**
    * Whether the path is the orbit the craft is **currently on** rather than one
    * a freeze has fixed.

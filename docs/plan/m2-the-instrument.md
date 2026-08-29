@@ -780,6 +780,40 @@ below 1, so at any fixed distance the heavier body is still the brighter one —
 [04 · §2](../spec/04-bodies.md)'s *"reaches with a longer and brighter tide"* survives being made
 to depend on distance as well. It is a knob on the bench beside the width's A/B.
 
+### The tether dies as you float away from it
+
+*"Can we have the capture tether line fade with distance? Sometimes I grab too late and float away
+while tethered, and the dying brightness would be diegetic."*
+
+**The hold ends on a release and on nothing else** ([`release.ts`](../../src/sim/release.ts)), so a
+grab that never captures keeps its filament all the way out of the field. Measured: a body grabbed
+from behind at speed never freezes and the craft drifts to **1.78 × the body's reach** still
+tethered — with the line burning at exactly the brightness it had at the moment of the grab. It was
+the one element on screen still insisting the grab was going somewhere.
+
+**Measured against the reach, not against the grip**, which is the interesting part. Grip is the
+physical truth and is the wrong curve to paint with: it falls as 1/r², and a body's reach is
+**10.5 ×** its own floor, so grip at the edge of a hold is `0.009`. A filament painted with grip
+would be invisible at the exact moment the player catches something at range — the opposite of the
+note. Distance over reach is linear on screen, runs 1 → 0 across precisely the span the hold
+covers, and is the same reading the rings already use for *how far*.
+
+**It floors rather than dies.** `FILAMENT_FLOOR = 0.25`: past the reach there is nothing left to
+feel, but a filament at zero takes the last evidence that the craft is still attached and still
+spending a grab. What is left is a thread. The **near** end is untouched — at the freeze the craft
+is a tenth of a reach out, so the filament burns at **0.93** of what it always did, alpha 0.279
+against 0.300 flat. Same discipline as the tide's brightness: move the end that is wrong and leave
+the end that was already tuned.
+
+| | at the grab | at the freeze | floated away |
+|---|---|---|---|
+| before | 0.300 | 0.300 | 0.300 |
+| now | 0.178 | 0.279 | **0.075** |
+
+`CompassView.filament` **stopped being a boolean to do this**, and it lost nothing: the renderer
+tells the dive from the instrument by whether there is a hand, so the flag was write-only. It now
+carries the strength, which is the thing the renderer could not work out for itself.
+
 ### Queued, from the same sitting
 
 **A collision has no voice.** *"I want to show a quirky 'Clang!' or similar when I bounce into

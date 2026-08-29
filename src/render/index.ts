@@ -439,7 +439,12 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
     context.moveTo(compass.x, compass.y);
     context.lineTo(compass.craftX, compass.craftY);
     context.lineWidth = HAND_WIDTH;
-    context.strokeStyle = identity(compass.hue, STRENGTH[2] * compass.alpha);
+    // **It fades with distance**, which is the difference between a line that
+    // says *you have hold of this* and one that says *you had hold of this*. The
+    // strength is the state's — see
+    // [`FILAMENT_FLOOR`](../state/compass.ts) — and STRENGTH[2] stays its
+    // ceiling, so a filament at the freeze looks the way it always did.
+    context.strokeStyle = identity(compass.hue, STRENGTH[2] * compass.filament * compass.alpha);
     context.stroke();
     return;
   }

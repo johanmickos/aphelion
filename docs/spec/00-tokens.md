@@ -112,6 +112,17 @@ footer uses obsolete numbering and is void.
 > under 13% opacity, so the motion was where it could not be seen; the exit holds
 > its light while the shape moves and goes when it does.
 >
+> **§6 · The grab filament fades with distance.** State 1's row describes a line and not a
+> brightness, and it was drawn at a constant E2. The hold ends on a release and on nothing else, so
+> a grab that never captures keeps that line at full strength all the way out of the field —
+> measured, a craft can drift to 1.78 × a body's reach still tethered. *"Sometimes I grab too late
+> and float away while tethered, and the dying brightness would be diegetic"* (author,
+> 2026-08-29). It now runs from E2 against the body down to a quarter of that at the edge of the
+> body's reach, and floors there: past the reach there is nothing left to feel, but a filament at
+> zero would take the last sign that the craft is still attached and still spending a grab. It is
+> measured against the **reach** rather than against grip, which falls as 1/r² and would put the
+> line at 0.009 exactly when the player catches something at range.
+>
 > **§7 · The thumb line holds and is now load-bearing twice.** Sightings are pinned inside the
 > design space and never cross it, which falls out of the geometry rather than being clamped.
 
