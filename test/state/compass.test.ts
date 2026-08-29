@@ -11,6 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
+import { SETTLE_TICKS } from '../../src/sim/units.ts';
 import { openRun, replayRun } from '../../src/sim/replay.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
@@ -313,6 +314,80 @@ describe('the instrument coming online', () => {
     const r = Math.hypot(craft.x - early.x, craft.y - early.y);
     expect(r).toBeGreaterThanOrEqual(Math.min(...early.path) - 1);
     expect(r).toBeLessThanOrEqual(Math.max(...early.path) + 1);
+  });
+});
+
+describe('a window never moves once it exists', () => {
+  /**
+   * *"Sometimes the compass windows would move after initializing. This is not
+   * acceptable; the planets don't move. We should only show stable targets"*
+   * (author, 2026-08-29). The planets do not move, the held body does not move,
+   * and neither may anything drawn about them — so this asserts **equality**
+   * rather than a tolerance, over every ring of every tick of the run this repo
+   * ships.
+   *
+   * Three things were moving them, and they were three different bugs. The dot
+   * was chosen from two exact roots by whichever had the smaller floating-point
+   * residual, which flipped it **46.6° in one tick**. It was then computed on the
+   * momentary oval, which slid it up to **56°** across a settle. And the ring
+   * radius jumped a whole [`STACK_GAP`](../../src/state/compass.ts) whenever the
+   * sliding dots stopped overlapping.
+   */
+  it('holds its dot, its width and its radius for the whole swing', () => {
+    const run = shippedRun();
+    const first = new Map<number, { dot: number; halfWidth: number; radius: number }>();
+    let held: number | null = null;
+    let checked = 0;
+
+    for (const view of run) {
+      const compass = view.compass;
+      const holding = view.bodies.findIndex((body) => body.held);
+      if (holding !== held) {
+        first.clear();
+        held = holding;
+      }
+      if (compass === null || compass.hand === null) continue;
+
+      for (const ring of compass.rings) {
+        const was = first.get(ring.body);
+        if (was === undefined) {
+          first.set(ring.body, { dot: ring.dot, halfWidth: ring.halfWidth, radius: ring.radius });
+          continue;
+        }
+        expect(ring.dot).toBe(was.dot);
+        expect(ring.halfWidth).toBe(was.halfWidth);
+        expect(ring.radius).toBe(was.radius);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(1000);
+  });
+
+  /**
+   * And it is still an aim rather than a decoration: the dot is where the exit
+   * tangent points at the body **on the orbit the swing is becoming**, which is
+   * exactly the orbit by the time the settle is over.
+   */
+  it('is still the true tangent once the settle is done', () => {
+    const settled = held().filter(
+      (view) => view.compass?.hand != null && view.tick > 20 + SETTLE_TICKS + 40,
+    );
+    expect(settled.length).toBeGreaterThan(50);
+    const view = settled[0]!;
+    const compass = view.compass!;
+    for (const ring of compass.rings) {
+      const radius = compass.anchor;
+      const x = compass.x + Math.cos(ring.dot) * radius;
+      const y = compass.y + Math.sin(ring.dot) * radius;
+      const body = view.bodies[ring.body]!;
+      const heading = Math.atan2(
+        Math.cos(ring.dot) * compass.direction,
+        -Math.sin(ring.dot) * compass.direction,
+      );
+      const bearing = Math.atan2(body.y - y, body.x - x);
+      const off = Math.abs(((heading - bearing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      expect(off).toBeLessThan(0.02);
+    }
   });
 });
 

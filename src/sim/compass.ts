@@ -67,6 +67,7 @@
 import type { Body } from './body.ts';
 import { floorRadius } from './body.ts';
 import { magnitude } from './math.ts';
+import type { Orbit } from './orbit.ts';
 import { pathRadiusAt } from './orbit.ts';
 import { angleOf, cos, sin } from './trig.ts';
 import type { SimState } from './types.ts';
@@ -221,19 +222,49 @@ export function windowsOn(state: SimState): Window[] {
   const held = state.heldBody;
   if (held === null || state.orbit === null) return [];
   const anchor = state.field.bodies[held]!;
+  const aiming = settledLike(state.orbit);
 
   return aimTargets(state).map((index) => {
     const target = state.field.bodies[index]!;
-    const dot = releaseAngleFor(state, anchor, target);
-    const earned = band(state, anchor, target, dot, floorRadius(target) * WINDOW_REACH);
+    const dot = releaseAngleFor(aiming, anchor, target);
+    const earned = band(aiming, anchor, target, dot, floorRadius(target) * WINDOW_REACH);
     return {
       body: index,
       dot,
       halfWidth: Math.max(earned, MIN_HALF_WIDTH),
       away: magnitude(target.x - anchor.x, target.y - anchor.y),
-      blocked: blockedFrom(state, anchor, target, dot),
+      blocked: blockedFrom(state, aiming, anchor, target, dot),
     };
   });
+}
+
+/**
+ * The orbit this swing is **becoming**: same periapsis, same north, same way
+ * round, and round.
+ *
+ * **The instrument is anchored to that, and the path drawn shows the one the
+ * craft is on.** Those are different orbits for the 1.2 seconds of the settle,
+ * and the difference is the whole of *"sometimes the compass windows would move
+ * after initializing. This is not acceptable; the planets don't move"* (author,
+ * 2026-08-29): computed on the momentary oval the dots slide as it rounds —
+ * measured, p90 **36°** and up to **56°** from where a window first appeared,
+ * which is a target moving out from under the aim closing on it.
+ *
+ * It is the same anchor the rings already use, so the whole instrument now sits
+ * on one orbit rather than the rings on one and the windows on another.
+ *
+ * **What it costs is stated, and it is smaller than it sounds.** A dot fixed on
+ * the settled circle is not exactly the tangent while the orbit is still an oval.
+ * Measured against the live geometry over a real run, that error is p50 6.6° and
+ * at most 35° through the **unarmed** stretch — spec
+ * [01 · §7](../../docs/spec/01-swing.md)'s first 27 ticks, where a release is
+ * paid nothing at all — falls to **p50 0.62°, p90 7.3°** across the boost's
+ * plateau, against a window half-width of 18°, and is **exactly zero** from the
+ * end of the settle onward. The error is largest where nothing is at stake and
+ * gone where everything is.
+ */
+function settledLike(orbit: Orbit): Orbit {
+  return { ...orbit, eccentricity: 0, ticksSinceFreeze: 0 };
 }
 
 /**
@@ -244,12 +275,44 @@ export function windowsOn(state: SimState): Window[] {
  * a thousandth of a degree for a fraction of what sampling the whole circle for a
  * minimum costs. A sign change that jumps by more than π is the wrap rather than
  * a root, and is skipped.
+ *
+ * ## An eccentric orbit can have two, and picking between them is the whole job
+ *
+ * A **circle** has exactly one: of the two points whose tangent line passes
+ * through an external target, the orbit's direction sends one of them at the
+ * target and the other away. An **ellipse** can have two, and through the settle
+ * every orbit is one.
+ *
+ * Both are exact, so choosing by *"which root has the smaller residual"* is
+ * choosing on floating-point noise — and flown, that is exactly what happened:
+ * *"sometimes the compass windows would move after initializing. This is not
+ * acceptable; the planets don't move"* (author, 2026-08-29). Measured on that
+ * dispatch, the dot flipped **46.6° in a single tick, twice**, between two roots
+ * 191° and 237° apart, at one and two ticks after a freeze.
+ *
+ * So the tie-break is the **shortest flight**: of the releases that reach the
+ * body, the one that gets there soonest. It is a property of the geometry alone,
+ * so this function stays a pure question the world can be asked, and it is
+ * meaningful rather than merely stable — the other candidates measured (furthest
+ * out on the orbit, nearest the body's own bearing) were equally still, so the
+ * choice is on what it *means*.
+ *
+ * Measured over the same run: 3 496 target-ticks have one root and **7 have
+ * two**, the coarse sweep misses a root **0 times in 3 503**, and once the settle
+ * is over the dot does not move at all — 0.000° at every percentile.
  */
-export function releaseAngleFor(state: SimState, anchor: Body, target: Body): number {
-  const err = (angle: number): number => headingError(state, anchor, target, angle);
+export function releaseAngleFor(orbit: Orbit, anchor: Body, target: Body): number {
+  const err = (angle: number): number => headingError(orbit, anchor, target, angle);
 
-  let best = 0;
+  // The best sample, kept only for the case where the geometry offers no exact
+  // release at all — a body the orbit's tangents never point at.
+  let nearest = 0;
   let smallest = Infinity;
+
+  let chosen = 0;
+  let shortest = Infinity;
+  let found = false;
+
   let previousAngle = 0;
   let previous = err(0);
 
@@ -258,8 +321,9 @@ export function releaseAngleFor(state: SimState, anchor: Body, target: Body): nu
     const here = err(angle);
     if (Math.abs(here) < smallest) {
       smallest = Math.abs(here);
-      best = angle;
+      nearest = angle;
     }
+
     if (previous * here < 0 && Math.abs(previous - here) < Math.PI) {
       let lo = previousAngle;
       let hi = angle;
@@ -274,16 +338,24 @@ export function releaseAngleFor(state: SimState, anchor: Body, target: Body): nu
         }
       }
       const root = (lo + hi) / 2;
-      const there = Math.abs(err(root));
-      if (there < smallest) {
-        smallest = there;
-        best = root;
+      const flight = flightFrom(orbit, anchor, target, root);
+      if (flight < shortest) {
+        shortest = flight;
+        chosen = root;
+        found = true;
       }
     }
+
     previousAngle = angle;
     previous = here;
   }
-  return best;
+  return found ? chosen : nearest;
+}
+
+/** How far the craft would fly from a release at `angle` to reach `target`. */
+function flightFrom(orbit: Orbit, anchor: Body, target: Body, angle: number): number {
+  const at = releasePoint(orbit, anchor, angle);
+  return magnitude(target.x - at.x, target.y - at.y);
 }
 
 /**
@@ -292,18 +364,17 @@ export function releaseAngleFor(state: SimState, anchor: Body, target: Body): nu
  * Zero is a perfect aim. The sign is what makes the root findable: a minimum of
  * the *unsigned* miss has to be hunted, and a zero crossing can be bracketed.
  */
-function headingError(state: SimState, anchor: Body, target: Body, angle: number): number {
-  const at = releasePoint(state, anchor, angle);
+function headingError(orbit: Orbit, anchor: Body, target: Body, angle: number): number {
+  const at = releasePoint(orbit, anchor, angle);
   return wrap(angleOf(at.dx, at.dy) - angleOf(target.x - at.x, target.y - at.y));
 }
 
 /** Where the craft would be and which way it would leave, releasing at `angle`. */
 function releasePoint(
-  state: SimState,
+  orbit: Orbit,
   anchor: Body,
   angle: number,
 ): { x: number; y: number; dx: number; dy: number } {
-  const orbit = state.orbit!;
   const radius = pathRadiusAt(orbit, angle);
   return {
     x: anchor.x + radius * cos(angle),
@@ -321,15 +392,15 @@ function releasePoint(
  * the edge. Bounded at a quarter turn, because an arc wider than that is a body
  * every release reaches and is not being aimed at.
  */
-function band(state: SimState, anchor: Body, target: Body, dot: number, tolerance: number): number {
-  if (missFrom(state, anchor, target, dot) > tolerance) return 0;
+function band(orbit: Orbit, anchor: Body, target: Body, dot: number, tolerance: number): number {
+  if (missFrom(orbit, anchor, target, dot) > tolerance) return 0;
   let lo = 0;
   let hi = Math.PI / 2;
   for (let i = 0; i < BISECTIONS; i++) {
     const mid = (lo + hi) / 2;
     const out =
-      missFrom(state, anchor, target, dot + mid) > tolerance ||
-      missFrom(state, anchor, target, dot - mid) > tolerance;
+      missFrom(orbit, anchor, target, dot + mid) > tolerance ||
+      missFrom(orbit, anchor, target, dot - mid) > tolerance;
     if (out) hi = mid;
     else lo = mid;
   }
@@ -344,8 +415,8 @@ function band(state: SimState, anchor: Body, target: Body, dot: number, toleranc
  * is a miss of the whole distance rather than a near one — a release does not go
  * backwards.
  */
-function missFrom(state: SimState, anchor: Body, target: Body, angle: number): number {
-  const at = releasePoint(state, anchor, angle);
+function missFrom(orbit: Orbit, anchor: Body, target: Body, angle: number): number {
+  const at = releasePoint(orbit, anchor, angle);
   const wx = target.x - at.x;
   const wy = target.y - at.y;
   return wx * at.dx + wy * at.dy <= 0 ? magnitude(wx, wy) : Math.abs(wx * at.dy - wy * at.dx);
@@ -357,8 +428,14 @@ function missFrom(state: SimState, anchor: Body, target: Body, angle: number): n
  * The held body is exempt: the craft leaves along its own tangent, which grazes
  * it by construction and is the one contact spec 01 §10 promises will never kill.
  */
-function blockedFrom(state: SimState, anchor: Body, target: Body, dot: number): boolean {
-  const at = releasePoint(state, anchor, dot);
+function blockedFrom(
+  state: SimState,
+  orbit: Orbit,
+  anchor: Body,
+  target: Body,
+  dot: number,
+): boolean {
+  const at = releasePoint(orbit, anchor, dot);
   const dx = target.x - at.x;
   const dy = target.y - at.y;
   const length = magnitude(dx, dy);

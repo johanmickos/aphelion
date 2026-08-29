@@ -627,6 +627,54 @@ never the path**: the rings, their windows and the hand's reach pop, and the orb
 because the craft is on the orbit. A HUD coming online over a world that stays put is the thing
 being described.
 
+### The windows were moving, and it was three bugs wearing one coat
+
+*"Sometimes the compass windows would move after initializing. This is not acceptable; the planets
+don't move. We should only show stable targets. I think this is a bug"* (author, 2026-08-29).
+
+It was three, and only the first looked like one.
+
+**The dot was chosen from two exact answers by floating-point noise.** A **circle** has exactly
+one release whose tangent points at a given body — of the two tangent points, the orbit's
+direction sends one at the target and the other away. An **ellipse** can have two, and through the
+settle every orbit is one. Both are exact, so picking *"the root with the smaller residual"* was
+picking on noise: measured on the dispatch, the dot flipped **46.6° in a single tick, twice**,
+between roots at 191° and 237°. The tie-break is now the **shortest flight** — of the releases
+that reach the body, the one that gets there soonest. Two other candidates were measured and were
+equally still, so the choice is on what it means rather than on stability. Two roots are rare:
+**7 target-ticks in 3 503**. And the coarse sweep was exonerated — it misses a root **0 times in
+3 503**.
+
+**The dot was computed on the orbit the craft was momentarily on.** With the flip fixed the dot
+still slid, because the settle rounds the oval underneath it: measured, **p90 36° and up to 56°**
+from where a window first appeared. That is a target moving out from under the aim closing on it,
+which is the complaint exactly.
+
+So the instrument is now anchored to the orbit the swing is **becoming** — same periapsis, same
+north, same way round, and round — which is the anchor the **rings** already used. The whole
+instrument sits on one orbit now, and the **path** still draws the one the craft is on, because
+that is the line it is flying.
+
+**What that costs is measured and is smaller than it sounds.** A dot fixed on the settled circle
+is not exactly the tangent while the orbit is still an oval:
+
+| when | how far the fixed dot's aim misses |
+|---|---|
+| **unarmed**, the first 27 ticks, where a release is paid nothing | p50 6.6°, max 35° |
+| the boost's **plateau**, ticks 27 – 72 | **p50 0.62°**, p90 7.3° |
+| **settled**, 72 onward | exactly 0 |
+
+Against a window half-width of 18°. The error is largest where nothing is at stake and gone where
+everything is.
+
+**And the third bug went with the second.** The ring radius jumped a whole `STACK_GAP` — 56 design
+units in one tick — whenever the sliding dots stopped overlapping and the unstacking let go. Fixed
+dots make fixed overlap, so it fixed itself.
+
+Measured over the run this repo ships, every ring's dot, width and radius is now **exactly**
+constant for the whole swing — 0.00 at every percentile, not a tolerance — and a test asserts it
+as equality over more than a thousand ring-ticks.
+
 ### What this makes false in the specs, and is not edited here
 
 `docs/` is author-owned and these are rebases rather than tidying, so they are listed for
@@ -644,7 +692,7 @@ approval rather than written:
 | [04 · §3](../spec/04-bodies.md) | IN REACH's *"E1 + tide"* — a body glows on grip, and the tide is on the offer |
 | [00 · §6](../spec/00-tokens.md) | the **ghost** is a **crossing**; and a window heats over a quarter turn rather than over itself |
 
-**541 tests, 46 files.** Every number that moved is on the bench, which is now at `/bench` on the dev server.
+**543 tests, 46 files.** Every number that moved is on the bench, which is now at `/bench` on the dev server.
 
 ---
 
