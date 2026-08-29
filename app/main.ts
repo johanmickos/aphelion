@@ -58,6 +58,39 @@ import { bindPress, suppressBrowserGestures, typing } from './input.ts';
 /** Replaced at build time by Vite's `define`; `dev` when the dev server serves it. */
 declare const __BUILD_STAMP__: string;
 
+/**
+ * The finest interval this browser's clock will admit to, in seconds.
+ *
+ * Spun for rather than declared: read `performance.now()` until it changes, a
+ * few times over, and keep the smallest step seen. One probe can over-read — the
+ * clock may tick immediately after the first sample — so the minimum of several
+ * is the reading.
+ *
+ * Two guards, and both return **zero**, which `ticksDue` reads as *exact* and
+ * which restores the arithmetic this game had before the probe existed. A clock
+ * that will not advance inside a bounded spin is a clock this cannot measure,
+ * and a grain coarser than half a tick is not a grain — it is a clock that
+ * cannot pace this game at all, and rounding against it would round everything.
+ */
+function clockGrain(): number {
+  const PROBES = 5;
+  const PATIENCE = 2_000_000;
+  let finest = Infinity;
+  for (let probe = 0; probe < PROBES; probe++) {
+    const from = performance.now();
+    let to = from;
+    let spins = 0;
+    while (to === from && spins < PATIENCE) {
+      to = performance.now();
+      spins += 1;
+    }
+    if (to === from) return 0;
+    finest = Math.min(finest, to - from);
+  }
+  const seconds = finest / 1000;
+  return seconds > SECONDS_PER_TICK / 2 ? 0 : seconds;
+}
+
 const target = document.getElementById('app');
 const readout = document.getElementById('readout');
 const reset = document.getElementById('reset');
@@ -92,6 +125,19 @@ if (target) {
   let sent = '';
   const clock = createClock();
   let observed = performance.now();
+  // **What this clock can actually resolve**, probed rather than assumed.
+  //
+  // WebKit clamps `performance.now()` to a whole millisecond for privacy, so the
+  // phone cannot report 16.667ms and the leftover accumulates until a frame runs
+  // two ticks and the craft jumps (`clock.ts`). `ticksDue` can read past that,
+  // but only if it is told how coarse the reading is — and the shell is the only
+  // thing that can find out, because it is the only thing allowed a clock.
+  //
+  // Probed rather than hardcoded so that a machine with a fine clock gets its
+  // real jitter respected instead of a phone's fact applied to it: at a grain of
+  // a few hundred nanoseconds the rounding never fires and the arithmetic is the
+  // one this game always had.
+  const grainSeconds = clockGrain();
   // Dev-only, like the dispatch it rides in: `import.meta.env.DEV` is replaced
   // by `false` when the build is made, so the meter and its module go with it.
   let meter = import.meta.env.DEV ? createMeter() : null;
@@ -164,7 +210,7 @@ if (target) {
     // would home the camera in half the time a 60Hz one does and no two
     // recordings of the same recipe would agree. `interpolate` below reads the
     // two states this produces and its result is never fed back in.
-    const ticks = ticksDue(clock, elapsedSeconds);
+    const ticks = ticksDue(clock, elapsedSeconds, grainSeconds);
     // What the clock bought, and what the run actually spent — which are the
     // same number until the run ends and then never again. `stepSim` does
     // nothing once there is an ending, so a frame after one advances no

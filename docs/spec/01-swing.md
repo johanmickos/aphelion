@@ -614,15 +614,30 @@ Criterion 1 is the acceptance gate. The other four are the shape.
 | Substeps | **6** per tick — integration step 1/360s | Measured |
 | Method | Semi-implicit Euler: velocity from acceleration, then position from the new velocity | Measured |
 | Catch-up ceiling | 3 ticks | Measured |
+| Clock grain | The caller declares what its clock can resolve, and a reading within one grain of a whole number of ticks is read as that number — bounded so the rounding never borrows more than one tick. Probed at startup, not assumed; **1ms** on the author's phone | Ruled |
 | What is integrated | **The dive only.** After the freeze the phase clock is closed-form | Measured |
 
-**Open, and this section is silent on it: what resolution the duration handed to `ticksDue` is
-measured at.** The table above fixes the tick and the ceiling; it does not say how precisely the
-outside world is allowed to report elapsed time, and on the author's phone that is a whole
-millisecond. A 1ms clock cannot express 16.667ms, so the leftover accumulates and the craft
-double-steps in bursts — measured on three phone runs, reproduced from `ticksDue` alone, with a
-tested fix, in [the performance write-up](../plan/performance.md) §10 and the spec README's open
-questions. Nothing here is withdrawn by it; what is missing is a ruling on the input.
+**The grain is why the last row is there, and it was a bug before it was a row.** WebKit clamps
+`performance.now()` to a whole millisecond, so the phone cannot report 16.667ms — it reports 16 or
+17, the leftover accumulates, and every so often a frame runs two ticks and moves the world 33ms
+while showing one picture. Measured across four phone runs: **34 frames in 1 811 ran two ticks and
+37 ran none**, arriving in bursts rather than scattered (variance ÷ mean of **8**, where scatter
+gives 1), because a random walk lingers near the boundary it is crossing. The author reported it
+twice, as *"some lag when orbiting"* and then as *"visual stuttering"*, and both times the burst is
+in the timeline where they said to look.
+
+So the duration now arrives with the grain of the clock that measured it, and a reading within one
+grain of a whole number of ticks **is** that whole number — the difference was the instrument, not
+the world. Measured through the real `ticksDue`: every 60Hz-family display goes from 70 – 958
+double-steps per 6 000 frames to **zero**, 120Hz and 90Hz are untouched, and a frame that genuinely
+took two ticks still gets two. What stops it inventing time is a **bound and not a promise**: the
+clock remembers what the rounding has borrowed and stops rounding while that exceeds one tick, which
+never engages on a real 60Hz display and engages within a second on a 63Hz one — where rounding
+every frame would otherwise drag the simulation 2.2 seconds per minute off the wall.
+
+**Nothing about a recipe changes.** [`replayRun`](../../src/sim/replay.ts) never calls `ticksDue`,
+so a run replays identically and `SIM_VERSION` does not move. The evidence is in
+[the performance write-up](../plan/performance.md) §10.
 
 **Six substeps is converged, not chosen.** Measured against a 96-substep reference on six dives
 spanning the envelope: periapsis radius agrees to **0.03 units**, periapsis speed to **0.1 units/s**,

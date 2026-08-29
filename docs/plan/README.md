@@ -62,8 +62,11 @@ playing it, so a plan whose first playable moment is late is a plan that cannot 
   work stops fitting at roughly **1 500 bodies**, and the term that takes it there is `bodiesOf`.
   A third run isolated the one thing that *is* ours — the phone's 1ms clock cannot express a
   16.667ms tick, so `ticksDue` hands out bursts of double-steps and the craft jumps. Reproduced from
-  the real function with no game attached, and a five-line fix is measured to remove every spurious
-  jump while keeping every real one. **Unbuilt: it changes pacing, which is a gate.**
+  the real function with no game attached. **Fixed on the author's instruction**: the caller now
+  declares what its clock can resolve, a reading within one grain of a whole number of ticks is read
+  as that number, and a bound on what the rounding may borrow keeps it from dragging the simulation
+  off wall-clock time on a display it would misrepresent. 60Hz goes to zero double-steps; 120Hz and
+  90Hz are untouched; `SIM_VERSION` does not move.
 
 ## What is deliberately not here
 

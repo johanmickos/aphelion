@@ -613,15 +613,53 @@ ticks a frame, which is what 30Hz should be and is tidier than the 1 111 it does
 It only bites when a frame period lands within 1ms of a tick multiple, so 90Hz, 144Hz and 50Hz
 displays never see it.
 
-**It is not built.** Three things about it are the author's to rule on, not an agent's:
+### Built, 2026-08-29, on the author's instruction
 
-- **It changes how the game paces itself**, and pacing is feel. ADR-0004 makes that a gate.
-- **Where it lives.** `ticksDue` is pure and in `src/sim/`; the clock's *resolution* is a fact about
-  the measuring device, which is the shell's. Either the shell snaps before calling, or `clock.ts`
-  takes the resolution as an argument. The second is testable and the first keeps the simulation
-  ignorant of the outside world; they are not obviously ranked.
-- **It is not a performance change and must not be filed as one.** Nothing gets faster. What goes
-  away is a visible artefact — which is the only thing in three runs that was ever ours.
+**Landed as `ticksDue(clock, elapsedSeconds, grainSeconds)`** — the caller now hands in its error
+bar as well as its measurement, and `app/main.ts` **probes** the grain rather than declaring it, by
+reading `performance.now()` until it changes and keeping the smallest step over five tries. A
+machine with a fine clock therefore gets its real jitter respected instead of a phone's fact applied
+to it: at a few hundred nanoseconds of grain the rounding never fires and the arithmetic is the one
+this game always had.
+
+**The guard is the part that took the measuring**, and the first two designs were wrong:
+
+- *Accumulate absolute elapsed instead of per-frame deltas.* Sound-looking and **useless** — measured
+  side by side it gives 518 double-steps against 530 at 60Hz, because both compare a 1ms clock
+  against a 16.667ms grid. Discarded on the numbers.
+- *Round every reading toward the nearest whole tick.* Takes 60Hz to zero jumps and then quietly
+  drags the simulation along with any display near it: **2.2 seconds of drift per minute at 63Hz**,
+  1.0 at 61Hz, 4.0 at 24Hz.
+- *Round, while the rounding has borrowed less than one tick.* What shipped. Same zero at
+  60/60.1/59.94/59.8Hz, and the drift at 61/63/65Hz collapses to **4 – 7ms per minute**. The bound
+  never engages where the reading is honest and engages within a second where it is not.
+
+| display | double-steps before | after | drift per minute |
+|---|---|---|---|
+| 120 Hz | 0 | 0 | 0ms |
+| 90 Hz | 0 | 0 | −15ms |
+| 65 Hz | 0 | 0 | 6ms |
+| 63 Hz | 0 | 0 | 7ms |
+| 61 Hz | 76 | **0** | 4ms |
+| 60.1 Hz | 70 | **0** | 0ms |
+| 60.0 Hz | 958 | **0** | 0ms |
+| 59.94 Hz | 82 | **5** | −10ms |
+| 30 Hz | 4 084 | 6 000 | 0ms |
+
+Thirty hertz becoming *uniformly* two ticks a frame is the correct reading of a 30Hz display and is
+tidier than the mixture it produced before. Seven new cases in `test/sim/clock.test.ts`, including
+the bug itself as a test so it cannot come back unnoticed.
+
+**Three things it is careful not to be**, and they were the reasons it waited for a ruling:
+
+- **It changes how the game paces itself**, and pacing is feel — so it was the author's call to
+  make and they made it. It wants its own flight before M2.4's gate, so the choreography is judged
+  on a clean clock rather than through this.
+- **Where it lives** settled itself. The grain is a fact about the *measuring device*, so the shell
+  finds it out and hands it over — which is the rule `ticksDue` was already written under, extended
+  by one argument. The simulation still hears only numbers, and the logic stayed pure and testable.
+- **It is not a performance change and must not be filed as one.** Nothing got faster. What went
+  away is a visible artefact — the only thing in four runs that was ever ours.
 
 **Determinism is not at risk**, and that is worth stating plainly: `replayRun` never calls
 `ticksDue`, so a recipe replays identically either way and `SIM_VERSION` does not move.
