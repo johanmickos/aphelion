@@ -39,10 +39,10 @@ import type { Recipe } from '../src/sim/recipe.ts';
 import { parseRecipe } from '../src/sim/recipe.ts';
 import type { Tick } from '../src/sim/types.ts';
 import { MAX_CATCH_UP_TICKS } from '../src/sim/units.ts';
-import { MAX_WORST_FRAMES, TIMING_BUCKETS } from './meter.ts';
-import type { Bucketed, DispatchTiming, TickGroup, WorstFrame } from './meter.ts';
+import { MAX_WORST_FRAMES, TIMELINE_SEGMENTS, TIMING_BUCKETS } from './meter.ts';
+import type { Bucketed, DispatchTiming, Segment, TickGroup, WorstFrame } from './meter.ts';
 
-export type { Bucketed, DispatchTiming, TickGroup, WorstFrame };
+export type { Bucketed, DispatchTiming, Segment, TickGroup, WorstFrame };
 
 /**
  * Where the phone posts, and it is one path.
@@ -241,6 +241,51 @@ function parseBucketed(raw: unknown, what: string): { value: Bucketed; count: nu
   };
 }
 
+/**
+ * The timeline, in order and adding up to the frames the block claims.
+ *
+ * The sum is checked for the same reason the histograms' is: a meter cannot
+ * produce a timeline that disagrees with its own frame count, so one that does
+ * was not produced by a meter. What is *not* required is that the segments be
+ * equal in size — they are not, because the last one is still filling and a
+ * folded timeline carries an odd tail.
+ */
+function parseTimeline(raw: unknown, ticks: Tick, frames: number): Segment[] {
+  // **Absent is legal, and it dates the dispatch.** The two runs the author flew
+  // on 2026-08-29 carry timing and no timeline, because the timeline is what
+  // reading them asked for. Refusing them to enforce a field they could not have
+  // had would throw away the evidence that motivated it.
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) throw new Error('timeline is not an array');
+  const given = raw as unknown[];
+  if (given.length > TIMELINE_SEGMENTS) {
+    throw new Error(`more than ${TIMELINE_SEGMENTS} timeline segments`);
+  }
+  let counted = 0;
+  const out = given.map((entry) => {
+    if (typeof entry !== 'object' || entry === null) throw new Error('malformed segment');
+    const g = entry as Record<string, unknown>;
+    const tick = counting(g.tick, 'segment tick');
+    if (tick > ticks) throw new Error(`segment at tick ${tick} is outside a run of ${ticks}`);
+    const held = counting(g.frames, 'segment frames');
+    const jumps = counting(g.jumps, 'segment jumps');
+    if (jumps > held) throw new Error(`a segment of ${held} frames cannot hold ${jumps} jumps`);
+    counted += held;
+    return {
+      tick,
+      frames: held,
+      cpu: lasting(g.cpu, 'segment cpu'),
+      interval: lasting(g.interval, 'segment interval'),
+      jumps,
+      worst: lasting(g.worst, 'segment worst interval'),
+    };
+  });
+  if (counted !== frames) {
+    throw new Error(`the timeline holds ${counted} frames, not ${frames}`);
+  }
+  return out;
+}
+
 function parseWorst(raw: unknown, ticks: Tick): WorstFrame[] {
   if (!Array.isArray(raw)) throw new Error('worst frames are not an array');
   const given = raw as unknown[];
@@ -311,6 +356,7 @@ function parseTiming(raw: unknown, ticks: Tick): DispatchTiming {
     interval: interval.value,
     byTicks,
     worst: parseWorst(t.worst, ticks),
+    timeline: parseTimeline(t.timeline, ticks, frames),
   };
 }
 

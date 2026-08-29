@@ -165,6 +165,15 @@ if (target) {
     // recordings of the same recipe would agree. `interpolate` below reads the
     // two states this produces and its result is never fed back in.
     const ticks = ticksDue(clock, elapsedSeconds);
+    // What the clock bought, and what the run actually spent — which are the
+    // same number until the run ends and then never again. `stepSim` does
+    // nothing once there is an ending, so a frame after one advances no
+    // simulation however many ticks it was handed. Counting those as ticks told
+    // the meter that a tick was cheaper than it is (a run whose author kept
+    // watching after the death diluted the fit with free ones) and stamped every
+    // one of them with the tick the run stopped on. The meter is given the ticks
+    // that happened.
+    let ran = 0;
     for (let i = 0; i < ticks; i++) {
       previous = current;
       const pressed = isPressed(press);
@@ -174,7 +183,10 @@ if (target) {
       // construction. A run that has ended is not recorded past its ending: it
       // has stopped meaning anything, which is what `stepSim` returning
       // immediately already says.
-      if (sim.ending === null) recordPress(recorder, sim.tick, pressed);
+      if (sim.ending === null) {
+        recordPress(recorder, sim.tick, pressed);
+        ran += 1;
+      }
       stepSim(sim, { pressed });
       current = derive(previous, sim);
     }
@@ -197,7 +209,7 @@ if (target) {
         sent;
     }
 
-    if (meter) frameEnded(meter, performance.now(), current.tick, ticks);
+    if (meter) frameEnded(meter, performance.now(), current.tick, ran);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

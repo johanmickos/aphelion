@@ -8,9 +8,9 @@ it, and it is deliberately as careful about the answer **no** as it would be abo
 
 ---
 
-> **Answered by the phone, 2026-08-29.** §8 is the measurement and it is the last word in this
-> file. Everything before it is the laptop work that predicted it, kept as written so the
-> prediction can be checked against the result rather than quietly edited to match it.
+> **Answered by the phone, 2026-08-29.** §8 is the first run and §9 is the second — the one where
+> the lag was actually felt. Everything before §8 is the laptop work that predicted them, kept as
+> written so the predictions can be checked against the results rather than quietly edited to match.
 
 ## The result, in one paragraph
 
@@ -427,7 +427,110 @@ or they would not, and the run would be carrying something none of this has seen
 
 ---
 
-## 9 · Queued from this session
+## 9 · The second run, where the lag was felt
+
+`diagnostics/2026-08-29T21-21-51-614Z-run-dispatch.json` — same phone, six minutes after §8's run.
+**482 ticks (8.0s), 510 frames, 4 swings, ended `OUT_OF_BOUNDS`.** The author flagged **tick 462**
+and wrote: *"towards the end (last or second to last planet I touched, i think), i definitely felt
+some lag when orbiting or so."*
+
+**The instrument found it.** Three of the twelve worst frames are at **456, 461 and 462** — the
+flagged tick and the six ticks before it. Two more are at **306 and 309**, and the trail calls both
+*orbiting #3, plateau* — **#3 is the second-to-last body touched**, which is where the author said
+to look.
+
+### It is not our work, and this run proves it a second way
+
+`cpu` is p50 1ms, p99 2ms, **max 4ms** — quieter than the run that felt fine. And this run supplies
+a control the first one could not:
+
+**Ticks 442 to 461 draw the identical frame.** Twenty consecutive ticks, each asking the canvas for
+3 gradients, 24 arcs, 15 strokes, 5 pieces of text and **1.208 screens** of paint — the same
+numbers, tick after tick, because the craft is coasting and nothing on screen is changing. **Two of
+those twenty frames were long. Eighteen were not.** Identical work, different frame times. Nothing
+about what the renderer asked for can explain the difference, because there was no difference in
+what it asked for.
+
+### And it is not fill rate either, which main-thread timing could not have told us
+
+*"cpu low, interval long"* has a second reading the M0.5 report already warned about: *"main-thread
+time does not see the GPU."* A fill-rate-bound frame is cheap on the main thread and still misses
+its vsync. So overdraw was checked against the worst frames directly, in both runs:
+
+| | run mean overdraw | at the 12 worst frames |
+|---|---|---|
+| §8's run, no lag felt | 0.984 | **0.823** |
+| this run, lag felt | 0.966 | 1.152 |
+
+In the first run the worst frames paint **less** than the run's average. If the GPU were the binding
+constraint that number would sit above the mean, not below it. In this run it is above, but the
+eight non-grab frames scatter from the 41st percentile to the 100th, which is not a fill-rate
+signature either. **Overdraw does not predict a dropped frame.**
+
+### What does differ between the two runs is the rate
+
+| | frames | frames ≥ 20ms | rate |
+|---|---|---|---|
+| §8's run, *"no noticeable lag"* | 3 096 | 29 | 0.94% |
+| this run, *"definitely felt some lag"* | 510 | 9 | **1.76%** |
+
+**Twice the drop rate, in the run that felt wrong** — and where §8's long frames were *all* grabs
+(12 of 12), only 4 of this run's 12 are. There is a second population of dropped frames here that
+the quiet run did not have, running at about one every 1.6 seconds, and nothing this game does
+distinguishes those frames from their neighbours. Six minutes of continuous play on a phone is the
+obvious confound and it is not something the dispatch can see.
+
+### One thing that *is* ours, and it was hiding in plain sight
+
+**The phone's clock is quantised to 1ms, and that quantised number is what paces the simulation.**
+`app/main.ts` measures `now - observed` from the `requestAnimationFrame` timestamp, which WebKit
+clamps like every other clock, and hands the result to `ticksDue`. So the simulation is never told
+16.667ms. It is told **16 or 17**, and the leftover accumulates.
+
+The result, over this run's 484 live frames: **16 frames ran no tick at all and 14 ran two.** They
+nearly balance, which is what jitter around a matched rate looks like — but a frame that runs two
+ticks advances the world **33ms while displaying one frame**. That is a *jump* rather than a
+slowdown, which is precisely the distinction §7 was told to watch for. Both of the two-tick frames
+in the worst list are at ticks 306 and 309, orbiting the body the author named, at the plateau,
+where the craft is moving fastest.
+
+**This is raised, not fixed.** Any change to it is a ruling about how the game paces itself — it
+touches `ticksDue`, ADR-0006's *the tick is the only clock*, and determinism's relationship to wall
+time. The evidence is here so the question is worth a decision rather than a patch:
+
+- Is 1.5 to 3 two-tick frames a second, on a matched 60Hz display, an acceptable amount of jump?
+- Would smoothing the measured elapsed time before it reaches `ticksDue` — a shell-side change that
+  the simulation never sees — remove it without costing anything? The clock stays pure either way.
+- Or is the honest answer that a 1ms clock cannot pace a 16.667ms tick, and the tick rate should be
+  one the clamp can express exactly?
+
+### Two things about the instrument that this run fixed
+
+**A bug.** After a run ends, `stepSim` does nothing but the frame loop still asked `ticksDue` for
+ticks and told the meter it had run them. This run ended at tick 482 and kept drawing: **26 of its
+510 frames were post-death frames counted as live ticks**, which diluted the tick-cost fit to
+0.05ms and stamped every one of them with the tick the run stopped on. §8's run never ended, so its
+0.17ms is unaffected and remains the measurement. The meter is now given the ticks that actually
+advanced the run.
+
+**A gap.** The report was about a *stretch* — *"towards the end"* — and a histogram is the whole run
+at once. Answering it meant replaying the recipe beside the dispatch, which worked and is not the
+point: the evidence should carry its own answer. The block now carries a **timeline**: at most
+sixteen segments, each with its frames, its mean cost, its worst gap and its count of **jumps**.
+Segments *grow* rather than multiply — when a run outgrows the scale, neighbours are added together
+and the span doubles — so an hour and a minute cost the same bytes, and every segment stays a true
+sum rather than an average of averages.
+
+### Where this leaves it
+
+**The game is not slow, in either run, by any measurement taken.** What the author felt is real and
+is in the data, and it is a **dropped frame** — sometimes at a grab, sometimes not — occasionally
+compounded by the clock handing the next frame two ticks. The next dispatch will carry the timeline,
+so *"towards the end"* becomes a row rather than an investigation.
+
+---
+
+## 10 · Queued from this session
 
 **Particle effects, as a visual language** (author, 2026-08-29), in the register of
 `https://bwilliford.github.io/particleCharts/`. Recorded rather than built, and with one thing

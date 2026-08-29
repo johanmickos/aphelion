@@ -146,6 +146,10 @@ const timing = {
     { frames: 0, cpu: 0 },
   ],
   worst: [{ tick: 240, cpu: 30.4, interval: 33.4, ticks: 2 }],
+  timeline: [
+    { tick: 120, frames: 2, cpu: 8.8, interval: 32.8, jumps: 0, worst: 16.7 },
+    { tick: 240, frames: 1, cpu: 30.4, interval: 33.3, jumps: 1, worst: 33.3 },
+  ],
 };
 
 const withTiming = (change: Record<string, unknown> = {}): unknown => ({
@@ -213,6 +217,37 @@ describe('parseDispatch · the timing block', () => {
   it('refuses more named frames than the cap', () => {
     const many = Array.from({ length: MAX_WORST_FRAMES + 1 }, () => timing.worst[0]);
     expect(() => parseDispatch(withTiming({ worst: many }))).toThrow(/more than/);
+  });
+
+  it('accepts timing with no timeline, because the first two dispatches had none', () => {
+    const { timeline: _dropped, ...older } = timing;
+    const parsed = parseDispatch({ ...dispatch, timing: older });
+    expect(parsed.timing?.timeline).toEqual([]);
+    expect(parsed.timing?.frames).toBe(3);
+  });
+
+  it('refuses a timeline that does not add up to the frames counted', () => {
+    expect(() => parseDispatch(withTiming({ timeline: [timing.timeline[0]] }))).toThrow(
+      /timeline holds 2 frames, not 3/,
+    );
+  });
+
+  it('refuses a segment holding more jumps than it holds frames', () => {
+    expect(() =>
+      parseDispatch(
+        withTiming({
+          timeline: [timing.timeline[0], { ...timing.timeline[1], jumps: 4 }],
+        }),
+      ),
+    ).toThrow(/cannot hold 4 jumps/);
+  });
+
+  it('refuses a segment at a tick the run never reached', () => {
+    expect(() =>
+      parseDispatch(
+        withTiming({ timeline: [timing.timeline[0], { ...timing.timeline[1], tick: 900 }] }),
+      ),
+    ).toThrow(/outside a run of 600/);
   });
 
   it('refuses a negative duration, which no monotonic clock produces', () => {

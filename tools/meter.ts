@@ -89,6 +89,22 @@ export const TIMING_BUCKETS = 65;
 /** How many of the worst frames are named. Enough to see a pattern in. */
 export const MAX_WORST_FRAMES = 12;
 
+/**
+ * How many segments the run is cut into for the timeline.
+ *
+ * **A distribution has no *when* in it**, and that is what this is for. The
+ * first report the meter answered came back as *"towards the end … I definitely
+ * felt some lag"* — a claim about a stretch of a run — and the histogram, which
+ * is the whole run at once, could not speak to it. Answering it meant replaying
+ * the recipe beside the dispatch, which works and is not the point: the evidence
+ * should carry its own answer.
+ *
+ * Sixteen is enough to locate a stretch in a run of any length and small enough
+ * that the block stays a fixed size. The segments **grow rather than
+ * multiply** — see [`fold`](#) — so an hour and a minute cost the same bytes.
+ */
+export const TIMELINE_SEGMENTS = 16;
+
 /** One measured quantity's whole distribution, in 1ms buckets. */
 export interface Bucketed {
   /** `buckets[i]` is how many samples fell in [i, i+1) ms; the last is the overflow. */
@@ -122,6 +138,29 @@ export interface TickGroup {
   readonly cpu: number;
 }
 
+/**
+ * One stretch of the run, so *when* is a question the dispatch can answer.
+ *
+ * `jumps` is the field this exists for, and it carries no threshold: a frame
+ * that ran **two or more ticks** advanced the simulation further than it
+ * displayed, which is `ticksDue` catching up after something delayed the frame
+ * before it. That is a *jump* rather than a slowdown, and the two are different
+ * bugs with different fixes — so it is counted directly rather than inferred
+ * from a millisecond cutoff nobody can defend across display rates.
+ */
+export interface Segment {
+  /** The tick the run had reached when this segment closed. */
+  readonly tick: Tick;
+  readonly frames: number;
+  /** Summed, not averaged — the reader divides, and can also add two segments up. */
+  readonly cpu: number;
+  readonly interval: number;
+  /** Frames that ran two or more ticks. */
+  readonly jumps: number;
+  /** The longest single interval in the segment. */
+  readonly worst: number;
+}
+
 export interface DispatchTiming {
   /** Frames measured. The last frame of a run is never finished, so it is not one. */
   readonly frames: number;
@@ -131,6 +170,8 @@ export interface DispatchTiming {
   readonly byTicks: readonly TickGroup[];
   /** The worst frames by `interval`, worst first. */
   readonly worst: readonly WorstFrame[];
+  /** The run in order, oldest first — at most `TIMELINE_SEGMENTS` of them. */
+  readonly timeline: readonly Segment[];
 }
 
 interface Histogram {
@@ -155,12 +196,19 @@ export interface Meter {
   byTicks: TickGroup[];
   /** Kept sorted, worst first, and never longer than `MAX_WORST_FRAMES`. */
   worst: WorstFrame[];
+  /** Oldest first. The last one is still filling. */
+  timeline: Segment[];
+  /** How many frames each closed segment holds — doubles when the run outgrows it. */
+  span: number;
   open: Open | null;
 }
 
 function histogram(): Histogram {
   return { buckets: new Array<number>(TIMING_BUCKETS).fill(0), total: 0, max: 0 };
 }
+
+/** How many frames a timeline segment holds before the run outgrows the scale. */
+const FIRST_SPAN = 32;
 
 export function createMeter(): Meter {
   return {
@@ -169,7 +217,57 @@ export function createMeter(): Meter {
     interval: histogram(),
     byTicks: Array.from({ length: MAX_CATCH_UP_TICKS + 1 }, () => ({ frames: 0, cpu: 0 })),
     worst: [],
+    timeline: [{ tick: 0, frames: 0, cpu: 0, interval: 0, jumps: 0, worst: 0 }],
+    span: FIRST_SPAN,
     open: null,
+  };
+}
+
+/**
+ * Halve the timeline by adding neighbours together, and double the span.
+ *
+ * The reason the timeline costs the same bytes for an hour as for a minute: when
+ * the run outgrows the scale it is on, the scale coarsens rather than the array
+ * growing. Every segment stays a true sum of the frames inside it, so a
+ * timeline that has folded four times is the same measurement at lower
+ * resolution — never a sample of one, and never an average of averages.
+ */
+function fold(meter: Meter): void {
+  const folded: Segment[] = [];
+  for (let i = 0; i + 1 < meter.timeline.length; i += 2) {
+    const a = meter.timeline[i]!;
+    const b = meter.timeline[i + 1]!;
+    folded.push({
+      tick: b.tick,
+      frames: a.frames + b.frames,
+      cpu: a.cpu + b.cpu,
+      interval: a.interval + b.interval,
+      jumps: a.jumps + b.jumps,
+      worst: Math.max(a.worst, b.worst),
+    });
+  }
+  // An odd tail is the segment still filling; it keeps its own identity rather
+  // than being folded into a neighbour it does not belong with.
+  if (meter.timeline.length % 2 === 1) folded.push(meter.timeline[meter.timeline.length - 1]!);
+  meter.timeline = folded;
+  meter.span *= 2;
+}
+
+/** Put a closed frame into the timeline, coarsening the scale if the run outgrew it. */
+function place(meter: Meter, frame: WorstFrame): void {
+  let last = meter.timeline[meter.timeline.length - 1]!;
+  if (last.frames >= meter.span) {
+    if (meter.timeline.length >= TIMELINE_SEGMENTS) fold(meter);
+    last = { tick: frame.tick, frames: 0, cpu: 0, interval: 0, jumps: 0, worst: 0 };
+    meter.timeline.push(last);
+  }
+  meter.timeline[meter.timeline.length - 1] = {
+    tick: frame.tick,
+    frames: last.frames + 1,
+    cpu: last.cpu + frame.cpu,
+    interval: last.interval + frame.interval,
+    jumps: last.jumps + (frame.ticks >= 2 ? 1 : 0),
+    worst: Math.max(last.worst, frame.interval),
   };
 }
 
@@ -223,12 +321,14 @@ export function frameBegan(meter: Meter, presentedAt: number, startedAt: number)
       frames: group.frames + 1,
       cpu: group.cpu + previous.cpu,
     };
-    remember(meter, {
+    const closed: WorstFrame = {
       tick: previous.tick,
       cpu: previous.cpu,
       interval,
       ticks: previous.ticks,
-    });
+    };
+    remember(meter, closed);
+    place(meter, closed);
   }
   meter.open = { presentedAt, startedAt, cpu: 0, tick: 0, ticks: 0 };
 }
@@ -261,6 +361,7 @@ export function timingOf(meter: Meter): DispatchTiming | null {
     },
     byTicks: meter.byTicks.map((group) => ({ ...group })),
     worst: meter.worst.map((frame) => ({ ...frame })),
+    timeline: meter.timeline.filter((s) => s.frames > 0).map((s) => ({ ...s })),
   };
 }
 

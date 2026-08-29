@@ -494,6 +494,28 @@ export function formatTiming(timing: DispatchTiming, recipe: Recipe): string[] {
           `${fit.perFrame.toFixed(2)}ms\x1b[0m \x1b[2m(least squares, weighted)\x1b[0m`,
   );
 
+  if (timing.timeline.length > 1) {
+    // **Where in the run**, which a distribution cannot say and a report about
+    // *"towards the end"* needs. `jumps` is the column to read first: a frame
+    // that ran two or more ticks moved the simulation further than it showed,
+    // which is the shape a hitch takes when the clock catches up rather than
+    // when the code is slow.
+    const span = timing.timeline.reduce((most, s) => Math.max(most, s.frames), 0);
+    out.push('');
+    out.push('  \x1b[2mthe run in order — where the frames went, not just how many\x1b[0m');
+    out.push('    to tick   frames   mean cpu   mean gap   worst gap   jumps');
+    for (const segment of timing.timeline) {
+      const bar = Math.round((segment.jumps / Math.max(1, span)) * 20);
+      out.push(
+        `  ${String(segment.tick).padStart(9)}  ${String(segment.frames).padStart(6)}  ` +
+          `${(segment.cpu / segment.frames).toFixed(2).padStart(7)}ms  ` +
+          `${(segment.interval / segment.frames).toFixed(2).padStart(7)}ms  ` +
+          `${segment.worst.toFixed(0).padStart(8)}ms  ${String(segment.jumps).padStart(5)} ` +
+          '\u2588'.repeat(bar),
+      );
+    }
+  }
+
   if (timing.worst.length) {
     const walked = walkRun(
       recipe,

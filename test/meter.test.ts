@@ -20,6 +20,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_WORST_FRAMES,
+  TIMELINE_SEGMENTS,
   TIMING_BUCKETS,
   bucketAt,
   bucketCount,
@@ -213,5 +214,64 @@ describe('the meter', () => {
 
   it('has no line to fit when every frame ran the same number of ticks', () => {
     expect(frameCost(timingOf(meterOf(steady(50, 4)))!)).toBeNull();
+  });
+});
+
+/**
+ * The timeline exists because the first report the meter answered was about a
+ * *stretch* of a run — *"towards the end … I definitely felt some lag"* — and a
+ * histogram is the whole run at once. What it must never do is grow with the
+ * run: an hour of play and a minute of it cost the same bytes, which is what
+ * makes the block's size a property of its shape.
+ */
+describe('the timeline', () => {
+  it('never grows past its cap, however long the run is', () => {
+    for (const frames of [40, 400, 4000, 40000]) {
+      const timing = timingOf(meterOf(steady(frames, 4)))!;
+      expect(timing.timeline.length).toBeLessThanOrEqual(TIMELINE_SEGMENTS);
+      // And every frame is still in there somewhere: folding adds neighbours
+      // together, it does not sample one of them.
+      expect(timing.timeline.reduce((sum, s) => sum + s.frames, 0)).toBe(timing.frames);
+      expect(timing.timeline.reduce((sum, s) => sum + s.cpu, 0)).toBeCloseTo(timing.cpu.total, 6);
+    }
+  });
+
+  it('runs in order, and each segment names the tick the run had reached', () => {
+    const frames: Fabricated[] = [];
+    for (let i = 0; i < 900; i++) {
+      frames.push({ presentedAt: i * 16.67, cost: 4, tick: i, ticks: 1 });
+    }
+    const ticks = timingOf(meterOf(frames))!.timeline.map((s) => s.tick);
+    expect([...ticks].sort((a, b) => a - b)).toEqual(ticks);
+  });
+
+  /** The column this was built for: a jump is a frame that ran two or more ticks. */
+  it('counts the jumps where they happened, not where the run ended', () => {
+    let at = 0;
+    const frames: Fabricated[] = [];
+    for (let i = 0; i < 600; i++) {
+      // Every jump is in the last quarter, which is the claim being tested.
+      const ticks = i >= 450 && i % 9 === 0 ? 2 : 1;
+      frames.push({ presentedAt: at, cost: 4, tick: i, ticks });
+      at += ticks === 2 ? 33.3 : 16.67;
+    }
+    const timeline = timingOf(meterOf(frames))!.timeline;
+    const early = timeline.slice(0, Math.floor(timeline.length / 2));
+    const late = timeline.slice(Math.floor(timeline.length / 2));
+    expect(early.reduce((sum, s) => sum + s.jumps, 0)).toBe(0);
+    expect(late.reduce((sum, s) => sum + s.jumps, 0)).toBeGreaterThan(10);
+    // And a segment can never hold more jumps than it holds frames.
+    for (const s of timeline) expect(s.jumps).toBeLessThanOrEqual(s.frames);
+  });
+
+  it('keeps the worst gap in a segment rather than losing it to a fold', () => {
+    const frames: Fabricated[] = [];
+    let at = 0;
+    for (let i = 0; i < 2000; i++) {
+      frames.push({ presentedAt: at, cost: 4, tick: i, ticks: 1 });
+      at += i === 1500 ? 99 : 16.67;
+    }
+    const timeline = timingOf(meterOf(frames))!.timeline;
+    expect(Math.max(...timeline.map((s) => s.worst))).toBeCloseTo(99, 6);
   });
 });

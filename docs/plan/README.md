@@ -53,8 +53,11 @@ playing it, so a plan whose first playable moment is late is a plan that cannot 
   frame costs 0.58ms**, about 4.5% of a 16.67ms frame, and nothing was optimised to get there. What
   the run *did* find is that **every grab costs one deferred frame** — twelve of the twelve worst
   frames land on the exact tick of a press, with our own work on them at 0–1ms — so the stutter is
-  the browser's touch-begin path and not this game's. Still open: a dispatch flown on a session
-  where the lag is actually felt.
+  the browser's touch-begin path and not this game's. A second run, where the lag **was** felt,
+  found it at the flagged tick — and found twenty consecutive frames asking the canvas for identical
+  work of which two were long and eighteen were not, which is as close to a control as a phone
+  offers. It is a dropped frame, sometimes compounded by the phone's 1ms clock handing the next
+  frame two ticks, which is a **jump** and is the one part of this that is ours to rule on.
 
 ## What is deliberately not here
 
