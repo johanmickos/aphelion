@@ -8,7 +8,7 @@ it, and it is deliberately as careful about the answer **no** as it would be abo
 
 ---
 
-> **Answered by the phone, 2026-08-29.** §8 is the first run and §9 is the second — the one where
+> **Answered by the phone, 2026-08-29.** §8, §9 and §10 are three runs off the author's own phone — the one where
 > the lag was actually felt. Everything before §8 is the laptop work that predicted them, kept as
 > written so the predictions can be checked against the results rather than quietly edited to match.
 
@@ -534,7 +534,102 @@ so *"towards the end"* becomes a row rather than an investigation.
 
 ---
 
-## 10 · Queued from this session
+## 10 · The third run, and the stutter has a mechanism
+
+`diagnostics/2026-08-29T21-44-56-848Z-run-dispatch.json` — **1 809 ticks (30.1s), 1 811 frames, 16
+swings**, still flying at the end. The first run flown with the timeline. Author: *"towards the end
+when I was orbiting the last planet I thought I noticed some visual stuttering."*
+
+**The timeline answered it in one row.** Swing 16 grabs body #16 at tick 1482 and holds it until
+1791 — a 309-tick orbit, five seconds, the longest in the run.
+
+| to tick | frames | mean cpu | mean gap | worst gap | jumps |
+|---|---|---|---|---|---|
+| … | | | | | |
+| 1 534 | 128 | 0.82ms | 16.64ms | 25ms | 0 |
+| **1 661** | 128 | 0.84ms | 16.64ms | **18ms** | **7** |
+| 1 789 | 128 | 0.79ms | 16.64ms | 18ms | 2 |
+
+**Nine jumps inside that orbit, and not one dropped frame to go with them.** The worst gap in those
+two segments is 18ms — barely over the 17ms baseline — while the rest of the run has segments
+reaching 26 and 27ms. So this stretch is the cleanest evidence in the file: *the stutter happened
+where nothing was slow and nothing was dropped.* The author's word for it changed too, from *lag*
+to **visual stuttering**, which is the right word for a jump.
+
+### The mechanism, reproduced
+
+`ticksDue` is pure, so it can be driven with a fabricated clock and no game at all. Feeding it a
+60Hz display read through a **1ms clock** — which is what the phone hands it — reproduces the
+phone's numbers:
+
+| display | 0-tick frames | 2-tick frames | jumps per 128 frames | variance ÷ mean |
+|---|---|---|---|---|
+| 60.00 Hz | 341 | 340 | `28 7 31 42 27 0 0 0 0 34 43 43 42 43` | 13.2 |
+| **59.94 Hz** | **25** | **26** | `13 0 0 0 0 0 0 8 5 0 0 0 0 0` | 8.1 |
+| 60.10 Hz | 23 | 19 | `0 0 0 0 8 0 0 0 0 7 0 0 0 4` | 5.4 |
+
+**The phone measured 37 zero-tick and 34 two-tick frames in 1 811.** The 59.94Hz row is 25 and 26
+in 1 792. Same order, same near-equal split — and, the part that matters, **the same burstiness.**
+A variance-to-mean ratio of 8 where random scatter would give 1: the jumps arrive in clumps
+separated by long quiet stretches, which is exactly what the timeline shows and exactly what
+"noticed some stuttering for a moment" describes.
+
+**Why it bursts.** `clock.unspentSeconds` accumulates `measured − k × 16.667ms`. A 1ms clock can
+only ever say 16 or 17, never 16.667, so the leftover random-walks. While it happens to sit near the
+two-tick threshold, several consecutive frames cross it; then it wanders off and the run is smooth
+again. A random walk near a boundary is bursty by nature, and this one is metering the game's
+motion.
+
+**And it is ours.** Not the compositor, not the GPU, not WebKit's touch path — this is the game's
+own clock arithmetic meeting a clock that cannot express its tick.
+
+### A fix, tested, and it is five lines
+
+If a measured duration is within the clock's **own resolution** of a whole number of ticks, then it
+*is* that whole number and the difference was measurement error rather than time:
+
+```ts
+const ticks = Math.round(elapsedSeconds / SECONDS_PER_TICK);
+const exact = ticks * SECONDS_PER_TICK;
+return Math.abs(elapsedSeconds - exact) <= RESOLUTION ? exact : elapsedSeconds;
+```
+
+Driven through the real `ticksDue`:
+
+| display | jumps as-is | jumps snapped | idle frames as-is | snapped |
+|---|---|---|---|---|
+| 60.00 Hz | 340 | **0** | 341 | **0** |
+| 59.94 Hz | 26 | **0** | 25 | **0** |
+| 60.10 Hz | 19 | **0** | 23 | **0** |
+| 59.80 Hz | 25 | **0** | 20 | **0** |
+| 120 Hz | 0 | 0 | 897 | 897 |
+| 30 Hz | 1 111 | 1 792 | 0 | 0 |
+
+**Every spurious jump goes, and every real one stays.** With 17 genuinely doubled frames injected
+into a 59.94Hz run, the unsnapped clock reports **43** two-tick frames and the snapped one reports
+exactly **17** — the real drops, and nothing else. 120Hz is untouched. 30Hz becomes *uniformly* two
+ticks a frame, which is what 30Hz should be and is tidier than the 1 111 it does today.
+
+It only bites when a frame period lands within 1ms of a tick multiple, so 90Hz, 144Hz and 50Hz
+displays never see it.
+
+**It is not built.** Three things about it are the author's to rule on, not an agent's:
+
+- **It changes how the game paces itself**, and pacing is feel. ADR-0004 makes that a gate.
+- **Where it lives.** `ticksDue` is pure and in `src/sim/`; the clock's *resolution* is a fact about
+  the measuring device, which is the shell's. Either the shell snaps before calling, or `clock.ts`
+  takes the resolution as an argument. The second is testable and the first keeps the simulation
+  ignorant of the outside world; they are not obviously ranked.
+- **It is not a performance change and must not be filed as one.** Nothing gets faster. What goes
+  away is a visible artefact — which is the only thing in three runs that was ever ours.
+
+**Determinism is not at risk**, and that is worth stating plainly: `replayRun` never calls
+`ticksDue`, so a recipe replays identically either way and `SIM_VERSION` does not move.
+`test/sim/clock.test.ts` would gain cases, not lose them.
+
+---
+
+## 11 · Queued from this session
 
 **Particle effects, as a visual language** (author, 2026-08-29), in the register of
 `https://bwilliford.github.io/particleCharts/`. Recorded rather than built, and with one thing

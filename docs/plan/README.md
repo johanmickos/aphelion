@@ -60,6 +60,10 @@ playing it, so a plan whose first playable moment is late is a plan that cannot 
   frame two ticks, which is a **jump** and is the one part of this that is ours to rule on.
   **Nothing has been optimised and nothing needs to be**: the budget M3 inherits is that per-tick
   work stops fitting at roughly **1 500 bodies**, and the term that takes it there is `bodiesOf`.
+  A third run isolated the one thing that *is* ours — the phone's 1ms clock cannot express a
+  16.667ms tick, so `ticksDue` hands out bursts of double-steps and the craft jumps. Reproduced from
+  the real function with no game attached, and a five-line fix is measured to remove every spurious
+  jump while keeping every real one. **Unbuilt: it changes pacing, which is a gate.**
 
 ## What is deliberately not here
 
