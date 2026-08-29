@@ -11,7 +11,7 @@
  * dot, release, coast, and assert the craft actually arrives.
  */
 import { describe, expect, it } from 'vitest';
-import { handOf, RINGS, windowsOn } from '../../src/sim/compass.ts';
+import { AIM_RANGE, handOf, RINGS, windowsOn } from '../../src/sim/compass.ts';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { grabRange } from '../../src/sim/grab.ts';
 import { distance } from '../../src/sim/math.ts';
@@ -34,6 +34,9 @@ function orbiting(grabAt = 20, ticks = 400): SimState {
   }
   throw new Error('the fixture field did not produce an orbit');
 }
+
+const magnitude2 = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+  Math.hypot(a.x - b.x, a.y - b.y);
 
 const shortWay = (angle: number): number => {
   let d = angle % TWO_PI;
@@ -169,17 +172,34 @@ describe('the windows are true', () => {
   });
 
   /**
-   * And it offers only bodies **up the climb**, which is the prototype's rule and
-   * its reason: *"offering the planet you just came from as an equal option
-   * invites you to bounce between two bodies forever, which is a local maximum
-   * neither the compass nor the score should signpost."*
+   * And it offers what is **near**, above or below. The climb is favoured in the
+   * press rather than in the picture (author, 2026-08-29): a filter here is a
+   * preference the player cannot see or overrule, and going back down a rung —
+   * for a powerup, or for breath — has to stay available.
    */
-  it('offers only bodies above the one being held', () => {
+  it('offers bodies below the one being held as well as above', () => {
     const sim = orbiting();
     const anchor = sim.field.bodies[sim.heldBody!]!;
     const rings = windowsOn(sim);
     expect(rings.length).toBeGreaterThan(0);
-    for (const ring of rings) expect(sim.field.bodies[ring.body]!.y).toBeLessThan(anchor.y);
+    for (const ring of rings) {
+      expect(magnitude2(sim.field.bodies[ring.body]!, anchor)).toBeLessThanOrEqual(AIM_RANGE);
+    }
+    // Over a whole run the instrument offers both, because a corridor has both.
+    const below: number[] = [];
+    const world2 = world();
+    let view = 0;
+    for (let tick = 0; tick < 900; tick++) {
+      stepSim(world2, tick >= 20 && tick < 500 ? PRESS : tick >= 560 ? PRESS : NO_INPUT);
+      if (world2.orbit === null || world2.heldBody === null) continue;
+      const a = world2.field.bodies[world2.heldBody]!;
+      for (const ring of windowsOn(world2)) {
+        if (world2.field.bodies[ring.body]!.y > a.y) below.push(ring.body);
+      }
+      view++;
+    }
+    expect(view).toBeGreaterThan(100);
+    expect(below.length).toBeGreaterThan(0);
   });
 
   /**

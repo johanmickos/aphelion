@@ -78,6 +78,7 @@ import type {
   BodyState,
   BodyView,
   CameraView,
+  CompassView,
   DeformationView,
   Energy,
   FlashView,
@@ -202,6 +203,7 @@ function present(
   flash: FlashView | null,
   deformation: DeformationView,
   previousBodies: readonly BodyView[] | null,
+  previousCompass: CompassView | null,
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
@@ -226,7 +228,7 @@ function present(
     },
     flash,
     sightings: sightingsOf(sim.field.bodies, states, offered, sim.craft, camera),
-    compass: compassOf(sim),
+    compass: compassOf(previousCompass, sim),
   };
 }
 
@@ -240,7 +242,7 @@ function present(
  * run opens with its scoreboard empty, however the last one ended.
  */
 export function createPresentation(sim: SimState): PresentationState {
-  return present(sim, openCamera(sim), null, UNDEFORMED, null);
+  return present(sim, openCamera(sim), null, UNDEFORMED, null, null);
 }
 
 /** The presentation one tick on. Call once per tick, in the same loop as `stepSim`. */
@@ -252,5 +254,6 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
     flashOf(previous.flash),
     event === 'RELEASE' ? stretch() : relax(previous.craft.deformation),
     previous.bodies,
+    previous.compass,
   );
 }

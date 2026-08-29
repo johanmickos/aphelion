@@ -322,6 +322,25 @@ export interface CompassView {
   readonly direction: number;
   /** Spec 00 §6 state 1: the line from the craft to the body, drawn while diving. */
   readonly filament: boolean;
+  /**
+   * Whether the path is the orbit the craft is **currently on** rather than one
+   * a freeze has fixed.
+   *
+   * True through the dive, once gravity has bound the craft at all. It is coarser
+   * than the frozen orbit will be and converges on it, which is what
+   * [`presence`](#) is for.
+   */
+  readonly predicted: boolean;
+  /**
+   * How faded in the path is, from 0 to 1.
+   *
+   * The oval arrives *"as soon as an oval orbit is possible"* and does not snap
+   * into view (author, 2026-08-29). What this fades is a **prediction firming
+   * up** rather than an element entering, which is why it does not contradict
+   * spec [00 · §5](../../docs/spec/00-tokens.md)'s *"things arrive; they do not
+   * fade in"*.
+   */
+  readonly presence: number;
   /** Where a release would land right now (`CONTEXT.md`: **hand**), or `null` while diving. */
   readonly hand: number | null;
   /**

@@ -48,6 +48,12 @@ footer uses obsolete numbering and is void.
 > outward in the body's hue, at an alpha that grows with grip. *"The planets should have a
 > fainter, much wider glow that grows with proximity."*
 >
+> **§2 · The tide's width grows with proximity, and it is an A/B.** §2 scales the arc with
+> **mass**, which is what shipped; flown, *"the tide markers flash in at some default width. I'd
+> love if they grew into their width based on my distance"* (author, 2026-08-29). `TIDE_GROWTH`
+> mixes the two — 0 is §2 exactly as written, 1 is the prototype's reading, which lerps the span
+> by live pull. Mass still sets the ceiling and proximity decides how much of it is showing.
+>
 > **§1, §4 and §5 stand as written.** The rim and tide widths are constant in design px whatever
 > the radius, the strata sit at 0.68r and 0.39r, the core is the type slot at 0.08r, and a body is
 > named by hue in the run — which is the ruling that keeps a **sighting**'s new label a distance

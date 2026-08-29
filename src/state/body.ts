@@ -109,6 +109,31 @@ export const TIDE_HALF_WIDTH_MAX = 0.6;
 export const TIDE_LAG_RATE_MAX = 12;
 
 /**
+ * How much of the tide's width is spent on **proximity** rather than on mass.
+ *
+ * *"Right now the tide markers flash in at some default width. I'd love if they
+ * grew into their width based on my distance. I'm picturing a waterdrop effect
+ * when it first bubbles in, and then growing in width as I approach. Can we A/B
+ * test this?"* (author, 2026-08-29)
+ *
+ * **This is the A/B, and it is a dial rather than a switch.** At **0** the width
+ * is mass alone, which is spec [04 · §2](../../docs/spec/04-bodies.md) exactly as
+ * written and what shipped yesterday. At **1** it is mass × [`gripOf`](#), which
+ * is the prototype's own reading — it lerps the span by live pull, not by mass.
+ * In between, the two are mixed. Nothing is deleted at either end, so the
+ * comparison is one slider on the bench and the run does not restart.
+ *
+ * The droplet falls out rather than being drawn: an arc a few degrees wide with a
+ * round cap **is** a bead, so a body just coming into reach bubbles in and then
+ * stretches along the limb as the craft closes.
+ *
+ * Two thirds is where it starts, so mass still sets the ceiling — §2's *"a
+ * heavier body reaches with a longer tide"* survives — and proximity decides how
+ * much of that ceiling is showing.
+ */
+export const TIDE_GROWTH = 0.67;
+
+/**
  * Which of spec 04 §3's four states a body is in.
  *
  * **SPENT is a fact and not a distance**: a body that has been held and let go
@@ -149,6 +174,10 @@ export function energyOf(state: BodyState, grip: number): Energy {
  * you is the one a press would answer. It is absent on a spent body, whose lamp
  * is out.
  *
+ * **Its width grows with proximity**, so it bubbles in as a bead and stretches
+ * along the limb as the craft closes — see [`TIDE_GROWTH`](#), which is the A/B
+ * and has the old behaviour at zero.
+ *
  * A tide that has just appeared is **placed** on the true bearing rather than
  * eased onto it from wherever it was last time the body was in reach
  * ([ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)'s
@@ -166,14 +195,18 @@ export function tideOf(
   if (state !== 'HELD' && !offered) return null;
 
   const pull = pullOf(body);
+  const grip = gripOf(body, craft);
+  // Mass sets the ceiling and proximity decides how much of it is showing.
+  const open = 1 - TIDE_GROWTH * (1 - grip);
+  const halfWidth = TIDE_HALF_WIDTH_MAX * pull * open;
   const bearing = angleOf(craft.x - body.x, craft.y - body.y);
   if (previous === null) {
-    return { bearing, halfWidth: TIDE_HALF_WIDTH_MAX * pull, strength: pull };
+    return { bearing, halfWidth, strength: pull };
   }
 
   return {
     bearing: towards(previous.bearing, bearing, easeStep(TIDE_LAG_RATE_MAX * pull)),
-    halfWidth: TIDE_HALF_WIDTH_MAX * pull,
+    halfWidth,
     strength: pull,
   };
 }

@@ -48,7 +48,13 @@ import type { Body } from './body.ts';
 import { floorRadius } from './body.ts';
 import type { Craft } from './craft.ts';
 import type { Dive } from './dive.ts';
-import { angularMomentum, circularSpeed, eccentricityFor, escapeSpeed } from './kepler.ts';
+import {
+  angularMomentum,
+  circularSpeed,
+  eccentricityFor,
+  escapeSpeed,
+  specificEnergy,
+} from './kepler.ts';
 import { magnitude } from './math.ts';
 import { angleOf, cos, sin } from './trig.ts';
 import {
@@ -139,6 +145,72 @@ function phaseAt(orbit: Orbit, mass: number, ticks: number): number {
   const circular = circularSpeed(mass, orbit.periapsis) * orbit.periapsis;
   const rate = circular / (orbit.periapsis * orbit.periapsis);
   return orbit.phase + rate * (ticks - SETTLE_TICKS) * SECONDS_PER_TICK;
+}
+
+/**
+ * The orbit the craft is *currently on*, before any freeze has fixed one.
+ *
+ * The osculating ellipse of the live position and velocity: the path the craft
+ * would ride if gravity simply kept acting, which through the dive it is. It
+ * exists so the picture can show an oval **while the dive runs** rather than
+ * snapping one into view at the freeze — *"as soon as an oval orbit is possible I
+ * want it to fade in"* (author, 2026-08-29) — and the prototype's own compass
+ * carries the same finding from the other side: before periapsis it showed
+ * nothing at all, measured at *"2.0 seconds of blank sky from the grab, which is
+ * precisely when a player is deciding where this capture is taking them."*
+ *
+ * `null` while the craft is **unbound** — a hyperbolic pass has no oval to draw,
+ * and drawing one would promise a capture the geometry has not offered yet.
+ *
+ * **Two approximations, both stated.** It does not model the **clearance**'s
+ * remaining turn, so early in a dive that owes one the prediction is coarser than
+ * it will be — it converges as the dive proceeds and lands on the frozen orbit,
+ * which is what the fade is for. And where the natural periapsis would fall
+ * inside the **floor** the whole ellipse is scaled up until it sits on it, rather
+ * than drawn through the body: the floor is the one guarantee a grab makes, so an
+ * oval that dived inside it would be a prediction of something that cannot
+ * happen.
+ */
+export function predictOrbit(craft: Craft, body: Body): Orbit | null {
+  const dx = craft.x - body.x;
+  const dy = craft.y - body.y;
+  const r = magnitude(dx, dy);
+  if (r <= 0) return null;
+
+  const speed = magnitude(craft.vx, craft.vy);
+  const energy = specificEnergy(body.mass, r, speed);
+  if (energy >= 0) return null;
+
+  const momentum = angularMomentum(dx, dy, craft.vx, craft.vy);
+  const semiLatus = (momentum * momentum) / body.mass;
+  if (semiLatus <= 0) return null;
+
+  // The **eccentricity vector**, which points at periapsis and whose length is
+  // the eccentricity — so one expression answers both *what shape* and *which way
+  // round*, with no inverse cosine. That matters here rather than being tidy:
+  // `Math.acos` is one of the functions ECMA-262 leaves implementation-
+  // approximated, and `pnpm portable` bans it in this directory (ADR-0014).
+  const ex = (craft.vy * momentum) / body.mass - dx / r;
+  const ey = (-craft.vx * momentum) / body.mass - dy / r;
+  const shape = Math.min(magnitude(ex, ey), 0.999);
+
+  let periapsis = semiLatus / (1 + shape);
+  if (periapsis <= 0) return null;
+
+  // The floor is never crossed, so neither is it drawn crossed.
+  const floor = floorRadius(body);
+  if (periapsis < floor) periapsis = floor;
+
+  return {
+    periapsis,
+    eccentricity: shape,
+    momentum,
+    periapsisAngle: angleOf(ex, ey),
+    direction: momentum < 0 ? -1 : 1,
+    depth: 0,
+    phase: 0,
+    ticksSinceFreeze: 0,
+  };
 }
 
 /**

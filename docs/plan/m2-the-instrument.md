@@ -499,6 +499,94 @@ nearby planets."* Widening helps the aiming and does not touch the pull, because
 hardest. Guiding play toward near bodies means pricing distance, which is spec
 [08](../spec/08-economy.md)'s arithmetic and **M4's**. Recorded here so the step inherits it.
 
+## Flown a third time, 2026-08-29 — four notes, and one of them was not a bug
+
+**The oval fades in from the press.** *"As soon as an oval orbit is possible I want it to fade
+in, not just snap into view."* [`predictOrbit`](../../src/sim/orbit.ts) is the osculating ellipse
+of the live state — the path the craft is on right now, which through a dive it genuinely is —
+and the compass draws it from the moment gravity binds the craft at all, faded in over about a
+quarter of a second and dimmer than a frozen one. It converges on the frozen orbit, so the freeze
+is not a moment the path jumps at. The prototype found the same hole from the other side: before
+periapsis it drew nothing, *"measured on a real session, 2.0 seconds of blank sky from the grab —
+the entire dive, which is precisely when a player is deciding where this capture is taking
+them."*
+
+Two approximations are stated in the code rather than hidden: it does not model the
+**clearance**'s remaining turn, so a dive that owes one is coarser early and sharpens as it goes;
+and where the natural periapsis would fall inside the **floor** the ellipse is scaled up to sit
+on it, because the floor is the one guarantee a grab makes and an oval diving through a body
+would be a prediction of something that cannot happen.
+
+**And the fade is not spec [00 · §5](../spec/00-tokens.md) being broken.** *"Things arrive; they
+do not fade in"* governs elements *entering*, and the softness it forbids is exactly the defect.
+What fades here is a **prediction firming up** — the answer, not the element.
+
+**The compass shows bodies below again, and the climb moved into the press.** Filtering the
+instrument to bodies up the climb was the prototype's rule and it was the wrong half of the idea:
+*"show all nearby planets on compass, both ahead and below, but when I'm traveling and grabbing
+planets, somehow favor grabbing ahead planets more than lower ones. This helps the game move
+upwards, but also lets players catch a breath and go back down a rung for e.g. a powerup."* So the
+picture shows everything reachable and **the grab leans upward** — a preference the player can
+overrule by flying at something, where a filter is one they can neither see nor argue with.
+
+It had to be smooth. Spec [01 · §3](../spec/01-swing.md) is emphatic that a threshold is *"a
+cliff the player falls off as a body drifts across an arbitrary line"*, and a flat penalty on
+everything below the craft puts that cliff at the craft's own altitude. `CLIMB_BIAS` weights
+**how far** above or below, saturating on `rise / (1 + |rise|)` — the same shape grip and the tide
+already use — measured in the body's own grab range, so no new length is invented.
+
+**Swept over 200 pilot runs**, downward grabs fall 15.3% → 13.8% → 12.8% → 9.5% across 0, 0.3,
+0.5 and 0.8, with the median climb unmoved and the endings within noise. That is **weak evidence
+and says so**: the pilot presses at sampled distances rather than choosing a target, so it mostly
+measures the field's geometry. 0.5 is where it starts and the author flying it is what settles it.
+
+**`SIM_VERSION` is 3.** A press can now take a different body from the same log, which is exactly
+what that number exists for — every dispatch recorded before now is refused with its version in
+the message, and the run `pnpm replay` ships is re-recorded at the new one (2 775 ticks, from
+3 598).
+
+**The tide grows into its width, and it is an A/B.** *"Right now the tide markers flash in at some
+default width. I'd love if they grew into their width based on my distance... a waterdrop effect
+when it first bubbles in. Can we A/B test this?"* `TIDE_GROWTH` is the dial: at **0** the width is
+mass alone, which is spec [04 · §2](../spec/04-bodies.md) as written and what shipped yesterday;
+at **1** it is mass × grip, which is the prototype's own reading — it lerps the span by live pull,
+not by mass. Nothing is deleted at either end, so the comparison is one slider and the run does
+not restart. It starts at two thirds, where mass still sets the ceiling and proximity decides how
+much of it is showing. Measured, a half-width of **6.3° at grip 0.03 opening to 18°** — and the
+droplet falls out rather than being drawn, because a few degrees of round-capped arc *is* a bead.
+
+### The last grab was not a bug, and the instrument it exposes is missing
+
+*"At the last planet grab I felt that I slowed down a LOT in the orbit. Can you triple check the
+physics/math here?"*
+
+**The maths is exact.** Over the 302 ticks that swing spent settled, `v / circular = 1.000000` at
+every one of them and the radius held at 272.50 — a perfect circular orbit, no drift. The 43% net
+loss decomposes into three things, all of them specified:
+
+| | |
+|---|---|
+| The **freeze clamp** | Arrived at 1 181/s; the freeze hands out an orbit at 0.98 of escape, which is 837. Spec 01 §6a's own mechanism — *"approach speeds of 200 and 260 from the same distance freeze at the same 435"* — and it bites hardest on a fast arrival, which is what makes four dives ride one ellipse |
+| The **settle** | 837 → 604 over 72 ticks, to circular speed at the frozen periapsis. §6a: *"the reward for a good dive is a speed advantage with a 1.2-second shelf life"* |
+| The **hold** | 373 ticks after the freeze. The boost envelope is gone by **156** |
+
+Across the whole run the pattern is visible and is the system working: a fast entry is clamped
+hard and nets a loss, a slow entry is not clamped and nets a gain — swings alternate +109%, −51%,
++16%, −16%. That is spec 01 §5a's bounded escalation, and its evidence is a flat median speed
+across altitude bands.
+
+**What is actually missing is a clock.** Spec [01 · §11](../spec/01-swing.md)'s tension is the
+**envelope** (a shape in time) against the **window** (a shape in angle), and M2 has now drawn the
+window beautifully and drawn *nothing at all* for the envelope. The swing above held 2.4× longer
+than the boost lasts and there was no way to know. **The prototype says it in words** —
+`BOOST arming…`, `◀ BOOST PEAK — release!`, `BOOST fading` — at the top of the screen.
+
+It is not built here, because it is a new readable element and therefore spec
+[03](../spec/03-hud.md)'s and spec [00 · §4](../spec/00-tokens.md)'s: it needs a face, a place
+above the thumb line, and a ruling on whether the game says this in words at all. **It is the
+first thing M2.4 should be asked about**, and until it exists the gate is judging half of §11's
+tension.
+
 ### What this makes false in the specs, and is not edited here
 
 `docs/` is author-owned and these are rebases rather than tidying, so they are listed for
@@ -516,7 +604,7 @@ approval rather than written:
 | [04 · §3](../spec/04-bodies.md) | IN REACH's *"E1 + tide"* — a body glows on grip, and the tide is on the offer |
 | [00 · §6](../spec/00-tokens.md) | the **ghost** is a **crossing**; and a window heats over a quarter turn rather than over itself |
 
-**532 tests, 46 files.** Every number that moved is on the bench.
+**536 tests, 46 files.** Every number that moved is on the bench.
 
 ---
 

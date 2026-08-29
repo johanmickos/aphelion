@@ -42,7 +42,9 @@
  * reading the field.
  */
 import { AIM_RANGE, handOf, windowsOn } from '../sim/compass.ts';
-import { pathRadiusAt } from '../sim/orbit.ts';
+import { pathRadiusAt, predictOrbit } from '../sim/orbit.ts';
+import type { Orbit } from '../sim/orbit.ts';
+import { easeStep } from './decay.ts';
 import { SCALE } from '../sim/units.ts';
 import { alignmentOf, tierFor } from '../sim/tier.ts';
 import type { Tier } from '../sim/tier.ts';
@@ -104,6 +106,23 @@ export const HAND_OVERSHOOT = 12 * BOARD_PIXEL;
  */
 export const PATH_POINTS = 64;
 
+/**
+ * How fast the orbit path fades in, in 1/seconds.
+ *
+ * *"As soon as an oval orbit is possible I want it to fade in, not just snap into
+ * view"* (author, 2026-08-29). At eight it is most of the way there in a quarter
+ * of a second.
+ *
+ * **This is not spec [00 · §5](../../docs/spec/00-tokens.md)'s rule being
+ * broken.** *"Things arrive; they do not fade in"* governs elements *entering* —
+ * an award, a flash, a callout — and the fade there is the softness the rule is
+ * against. What fades here is a **prediction firming up**: the oval is the orbit
+ * the craft is currently on, it is coarse the moment gravity first binds and it
+ * converges on the frozen one, and the fade is that confidence made visible. The
+ * element does not enter softly; the *answer* does.
+ */
+export const PATH_FADE_RATE = 8;
+
 const TWO_PI = Math.PI * 2;
 
 /**
@@ -114,7 +133,7 @@ const TWO_PI = Math.PI * 2;
  * pulling hardest, in that body's identity hue."* There is no hand and there are
  * no rings until the freeze, which is what makes the freeze visible.
  */
-export function compassOf(sim: SimState): CompassView | null {
+export function compassOf(previous: CompassView | null, sim: SimState): CompassView | null {
   const held = sim.heldBody;
   if (held === null) return null;
   const body = sim.field.bodies[held]!;
@@ -122,17 +141,25 @@ export function compassOf(sim: SimState): CompassView | null {
 
   const hand = handOf(sim);
   if (hand === null || sim.orbit === null) {
+    // **The dive, with the oval it is heading for.** There is no instrument yet —
+    // no hand, no rings — because a release that never froze earns nothing, and
+    // the compass arriving is still the freeze made visible. What there is, once
+    // gravity has bound the craft at all, is the path it is currently on: faded
+    // in, and firming up as the prediction converges.
+    const guess = predictOrbit(sim.craft, body);
     return {
       x: body.x,
       y: body.y,
       hue,
       craftX: sim.craft.x,
       craftY: sim.craft.y,
-      direction: 1,
+      direction: guess === null ? 1 : guess.direction,
       filament: true,
+      predicted: guess !== null,
       hand: null,
-      anchor: 0,
-      path: [],
+      anchor: guess === null ? 0 : guess.periapsis,
+      path: guess === null ? [] : sample(guess),
+      presence: fadedIn(previous, guess !== null),
       reach: 0,
       rings: [],
       swept: 0,
@@ -152,10 +179,7 @@ export function compassOf(sim: SimState): CompassView | null {
   // from [`pathRadiusAt`](../sim/orbit.ts) — the simulation's own ellipse, at the
   // shape it has this tick — so the drawn path and the flown path cannot be two
   // different curves.
-  const path: number[] = [];
-  for (let i = 0; i < PATH_POINTS; i++) {
-    path.push(pathRadiusAt(sim.orbit, (i / PATH_POINTS) * TWO_PI));
-  }
+  const path = sample(sim.orbit);
   const rings: RingView[] = windowsOn(sim).map((arc) => {
     const offset = shortWay(hand - arc.dot);
     const tier = tierFor(offset, arc.halfWidth * 2);
@@ -189,6 +213,8 @@ export function compassOf(sim: SimState): CompassView | null {
     craftY: sim.craft.y,
     direction: sim.orbit.direction,
     filament: false,
+    predicted: false,
+    presence: fadedIn(previous, true),
     hand,
     anchor,
     path,
@@ -239,6 +265,27 @@ function unstack(rings: RingView[]): void {
     }
     rings[i] = { ...ring, radius };
   }
+}
+
+/** The path as radii at even angles — a shape rather than a formula to get wrong. */
+function sample(orbit: Orbit): number[] {
+  const path: number[] = [];
+  for (let i = 0; i < PATH_POINTS; i++) path.push(pathRadiusAt(orbit, (i / PATH_POINTS) * TWO_PI));
+  return path;
+}
+
+/**
+ * How faded in the path is, from nothing when it first becomes drawable.
+ *
+ * **Placed at zero and eased toward one** — ADR-0015's second rule and its third
+ * at once: a swing never opens with a path already half there, and the value
+ * converges on something this tick decides. It survives the freeze without a
+ * step, because a predicted path and a frozen one are the same line by then.
+ */
+function fadedIn(previous: CompassView | null, drawable: boolean): number {
+  if (!drawable) return 0;
+  const was = previous === null || previous.path.length === 0 ? 0 : previous.presence;
+  return was + (1 - was) * easeStep(PATH_FADE_RATE);
 }
 
 /** An angle folded onto (−π, π] — the short way round, which is what an aim error is. */

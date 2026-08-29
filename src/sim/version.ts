@@ -27,5 +27,10 @@
  * What it is deliberately **not**: a version of the *code*. A refactor that
  * leaves every tick bit-identical does not touch this, because nothing a recipe
  * describes has changed. The fingerprint is the arbiter, not the diff.
+ *
+ * **3, on 2026-08-29**: a press now prefers a body up the climb to one below it
+ * ([`CLIMB_BIAS`](./units.ts)), so the same log can take a different body. Every
+ * dispatch recorded before now is refused with its version in the message, which
+ * is the correct outcome and the reason this exists.
  */
-export const SIM_VERSION = 2;
+export const SIM_VERSION = 3;

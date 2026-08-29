@@ -176,10 +176,24 @@ export function handOf(state: SimState): number | null {
 /**
  * The bodies worth aiming at from the one being held, nearest first.
  *
- * **Upward, within reach, and capped** — and a pure function of the field and the
- * anchor, so it cannot change while a body is held. That is what stops a window
- * blinking: the ring set is decided by where the bodies are, never by where the
- * craft happens to be on its orbit.
+ * **Within reach and capped**, and a pure function of the field and the anchor,
+ * so it cannot change while a body is held. That is what stops a window blinking:
+ * the ring set is decided by where the bodies are, never by where the craft
+ * happens to be on its orbit.
+ *
+ * **Below as well as ahead.** This filtered to bodies up the climb for a day,
+ * carried from the prototype with its reason — *"offering the planet you just
+ * came from as an equal option invites you to bounce between two bodies
+ * forever"* — and the author put it back: *"show all nearby planets on compass,
+ * both ahead and below, but when I'm traveling and grabbing planets, somehow
+ * favor grabbing ahead planets more than lower ones. This helps the game move
+ * upwards, but also lets players catch a breath and go back down a rung for e.g.
+ * a powerup"* (2026-08-29).
+ *
+ * So the climb is favoured **in the press** rather than in the picture — see
+ * [`CLIMB_BIAS`](./units.ts). The instrument shows everything reachable and the
+ * grab leans upward, which is a preference the player can overrule by flying at
+ * something, where a filter here is one they could not see or argue with.
  */
 export function aimTargets(state: SimState): number[] {
   const held = state.heldBody;
@@ -190,7 +204,6 @@ export function aimTargets(state: SimState): number[] {
   for (let i = 0; i < state.field.bodies.length; i++) {
     if (i === held) continue;
     const body = state.field.bodies[i]!;
-    if (body.y >= anchor.y) continue;
     const away = magnitude(body.x - anchor.x, body.y - anchor.y);
     if (away <= AIM_RANGE) near.push({ index: i, away });
   }

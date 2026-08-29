@@ -60,8 +60,8 @@ const GRAB = 74;
 const RELEASE = 258;
 
 describe('the run pnpm replay ships', () => {
-  it('is the sixty seconds the trail prints', () => {
-    expect(RUN.length - 1).toBe(3598);
+  it('is the run the trail prints', () => {
+    expect(RUN.length - 1).toBe(2775);
   });
 });
 
@@ -80,7 +80,7 @@ describe('the one E3', () => {
    * and the farewell ring are M2.4's.
    */
   it('is never struck, over a whole run', () => {
-    expect(RUN.length).toBeGreaterThan(3000);
+    expect(RUN.length).toBeGreaterThan(2000);
     for (const view of RUN) expect(view.flash).toBeNull();
   });
 

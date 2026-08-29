@@ -166,6 +166,8 @@ describe('what it is allowed to say', () => {
       'hand',
       'hue',
       'path',
+      'predicted',
+      'presence',
       'reach',
       'rings',
       'swept',
@@ -340,7 +342,7 @@ describe('a recipe replays to identical tiers', () => {
 
   it('grades the shipped run the same way twice', () => {
     const first = tiersOf(shippedRun());
-    expect(first.length).toBeGreaterThan(3000);
+    expect(first.length).toBeGreaterThan(2000);
     expect(tiersOf(shippedRun())).toEqual(first);
   });
 

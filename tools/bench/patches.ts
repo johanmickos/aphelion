@@ -51,6 +51,7 @@ export const PATCHES: readonly Patch[] = [
   settable('src/sim/units.ts', 'GRAZE_RATIO', 'spec 01 §10 — how head-on a contact has to be'),
   settable('src/sim/units.ts', 'GRAZE_RESTITUTION', 'spec 01 §10 leaves it unstated'),
   settable('src/sim/units.ts', 'BOUNCE_RESTITUTION', 'moved at the M1 gate, 0.6 → 0.2'),
+  settable('src/sim/units.ts', 'CLIMB_BIAS', 'how much a press prefers a body up the climb'),
   settable('src/state/camera.ts', 'DEADZONE', 'an opening position; only the gate can judge it'),
   settable('src/state/camera.ts', 'FOLLOW_RATE', 'moved at the M1 gate, 8 → 3'),
   settable('src/state/camera.ts', 'LOCK_TICKS', 'the prototype’s third of a second, carried'),
@@ -150,6 +151,16 @@ export function lockOf(sim: SimState): number {
     'the narrowest arc worth aiming at, ruled 2026-08-29',
   ),
   settable('src/state/body.ts', 'EMIT_AT', 'how much grip it takes before a body lights up at all'),
+  settable(
+    'src/state/body.ts',
+    'TIDE_GROWTH',
+    'the A/B: 0 is width from mass alone, 1 from proximity',
+  ),
+  settable(
+    'src/state/compass.ts',
+    'PATH_FADE_RATE',
+    'how fast the oval fades in once it is possible',
+  ),
   settable('src/state/sighting.ts', 'SIGHTING_RANGE', 'spec 03 §6’s “reach is not yet a number”'),
   {
     file: 'src/render/index.ts',

@@ -416,6 +416,7 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
   // pulling hardest, in that body's identity hue."* There is no instrument yet,
   // which is what makes the compass arriving *be* the freeze, seen.
   if (compass.hand === null) {
+    drawPath(context, compass);
     context.beginPath();
     context.moveTo(compass.x, compass.y);
     context.lineTo(compass.craftX, compass.craftY);
@@ -429,12 +430,8 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
   // Drawn as a thin light line the whole way round, and then the part already
   // flown over the top of it in the craft's own light. Both walk the same sampled
   // curve, so the trail cannot come away from the path it is a piece of.
+  drawPath(context, compass);
   if (compass.path.length > 0) {
-    tracePath(context, compass, 0, compass.path.length);
-    context.lineWidth = PATH_WIDTH;
-    context.strokeStyle = dim(CORE, PATH_STRENGTH);
-    context.stroke();
-
     if (compass.swept > 0) {
       const from = compass.hand - compass.swept * compass.direction;
       const span = Math.min(compass.swept, Math.PI * 2);
@@ -462,6 +459,35 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
 /** How faint the whole orbit path is drawn, against the trail already flown. */
 const PATH_STRENGTH = 0.16;
 const PATH_WIDTH = 1 * BOARD_PIXEL;
+
+/**
+ * How much of itself a **predicted** path keeps.
+ *
+ * Drawn through the dive, before any freeze has fixed an orbit, and fainter than
+ * a real one because that is what it is — the prototype draws its own prediction
+ * at a comparable fade and reports no alignment from it, *"so the ship's release
+ * glow still means 'let go now and it counts', which before periapsis it does
+ * not."*
+ */
+const PREDICTED = 0.55;
+
+/**
+ * The orbit path: the oval the craft is on, faded in by how sure it is.
+ *
+ * One function for both the prediction and the frozen orbit, because they are the
+ * same line — the prediction converges on the frozen one and the freeze is not a
+ * moment the path should jump at.
+ */
+function drawPath(context: CanvasRenderingContext2D, compass: CompassView): void {
+  if (compass.path.length === 0 || compass.presence <= 0) return;
+  tracePath(context, compass, 0, compass.path.length);
+  context.lineWidth = PATH_WIDTH;
+  context.strokeStyle = dim(
+    CORE,
+    PATH_STRENGTH * compass.presence * (compass.predicted ? PREDICTED : 1),
+  );
+  context.stroke();
+}
 
 /** Where the sampled path is at one angle, interpolated between its samples. */
 function pathAt(compass: CompassView, angle: number): { x: number; y: number } {

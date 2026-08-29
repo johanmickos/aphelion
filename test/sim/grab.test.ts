@@ -14,7 +14,7 @@ import { createCraft } from '../../src/sim/craft.ts';
 import { attemptGrab, bodyOnOffer, grabRange } from '../../src/sim/grab.ts';
 import { distance } from '../../src/sim/math.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
-import { MEDIAN_RADIUS, LEAD_SECONDS, SCALE } from '../../src/sim/units.ts';
+import { CLIMB_BIAS, MEDIAN_RADIUS, LEAD_SECONDS, SCALE } from '../../src/sim/units.ts';
 import { openField } from './fixtures.ts';
 import { BODY, LET_GO, PRESS, placed, geometry, scaled } from './swing.ts';
 
@@ -67,9 +67,11 @@ describe('the range', () => {
 
 describe('which body a press takes', () => {
   /**
-   * *"Nearest to `position + velocity × 0.2s`, not nearest to the craft."* This
-   * is exact, not statistical: the chosen body must be the one nearest to the
-   * lead-displaced point in 100% of cases.
+   * *"Nearest to `position + velocity × 0.2s`, not nearest to the craft"* — with
+   * the climb's thumb on the scale (author, 2026-08-29;
+   * [`CLIMB_BIAS`](../../src/sim/units.ts)). This is exact rather than
+   * statistical: the chosen body is the one nearest the lead-displaced point once
+   * each distance is weighted by how far above the craft its body sits.
    */
   it('is the one nearest to where the craft will be in two tenths of a second', () => {
     const bodies = [
@@ -82,17 +84,40 @@ describe('which body a press takes', () => {
         const craft = createCraft(300, 200, vx, vy);
         const leadX = craft.x + vx * LEAD_SECONDS;
         const leadY = craft.y + vy * LEAD_SECONDS;
+        const weighted = (body: (typeof bodies)[number]): number => {
+          const rise = (craft.y - body.y) / grabRange(body);
+          return (
+            distance(leadX, leadY, body.x, body.y) *
+            (1 - CLIMB_BIAS * (rise / (1 + Math.abs(rise))))
+          );
+        };
         const reachable = bodies
           .map((body, index) => ({ body, index }))
           .filter(({ body }) => distance(craft.x, craft.y, body.x, body.y) <= grabRange(body));
-        const nearest = reachable.sort(
-          (a, b) =>
-            distance(leadX, leadY, a.body.x, a.body.y) - distance(leadX, leadY, b.body.x, b.body.y),
-        )[0];
+        const nearest = reachable.sort((a, b) => weighted(a.body) - weighted(b.body))[0];
         const chosen = bodyOnOffer(openField(bodies), craft);
         expect(chosen, `at velocity ${vx},${vy}`).toBe(nearest ? nearest.index : null);
       }
     }
+  });
+
+  /**
+   * **The climb gets the tie, and only the tie.** Two bodies the same distance
+   * from the lead point, one above and one below: the press takes the one above.
+   * Aim plainly at the lower one and the lead moves down there, and the press
+   * takes it — a preference the player can overrule, which is what separates it
+   * from a filter.
+   */
+  it('prefers a body up the climb, and still takes one below that is aimed at', () => {
+    const above = createBody(0, -700, MEDIAN_RADIUS);
+    const below = createBody(0, 700, MEDIAN_RADIUS);
+    const field = openField([above, below]);
+
+    // Dead still, exactly between them: the climb decides.
+    expect(bodyOnOffer(field, createCraft(0, 0, 0, 0))).toBe(0);
+
+    // Flying at the lower one: the lead is down there and it wins anyway.
+    expect(bodyOnOffer(field, createCraft(0, 0, 0, 1200))).toBe(1);
   });
 
   /**

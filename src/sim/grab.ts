@@ -15,6 +15,12 @@
  * threshold is a cliff the player falls off as a body drifts across an arbitrary
  * line. **Keep the displacement; do not reintroduce the line.**
  *
+ * **And the climb gets the tie**, on the same principle. A press prefers a body
+ * above the craft to one below it, weighted by how far and saturating so there is
+ * no line at the craft's own altitude to fall off (author, 2026-08-29;
+ * [`CLIMB_BIAS`](./units.ts)). It breaks a tie and never refuses: a craft plainly
+ * flying at a body below still takes it, because the lead is already down there.
+ *
  * **A grab conserves the craft exactly** — position and velocity both — and the
  * only thing that touches either is [`clearance.ts`](./clearance.ts), which
  * arrives over the five ticks *after* the press rather than at it.
@@ -25,7 +31,7 @@ import type { Craft } from './craft.ts';
 import { beginDive } from './dive.ts';
 import { distance, magnitude } from './math.ts';
 import type { Field, SimState } from './types.ts';
-import { LEAD_SECONDS, MEDIAN_GRAB_RANGE, MEDIAN_MASS, TOO_LATE_GAP } from './units.ts';
+import { CLIMB_BIAS, LEAD_SECONDS, MEDIAN_GRAB_RANGE, MEDIAN_MASS, TOO_LATE_GAP } from './units.ts';
 
 /**
  * How far this body is on offer from.
@@ -68,8 +74,17 @@ export function bodyOnOffer(field: Field, craft: Craft): number | null {
   let nearest = Infinity;
   for (let i = 0; i < field.bodies.length; i++) {
     const body = field.bodies[i]!;
-    if (distance(craft.x, craft.y, body.x, body.y) > grabRange(body)) continue;
-    const lead = distance(leadX, leadY, body.x, body.y);
+    const reach = grabRange(body);
+    if (distance(craft.x, craft.y, body.x, body.y) > reach) continue;
+
+    // **The climb gets the tie.** How far above the craft a body sits, in its own
+    // reach, saturated so there is no line to fall off — see
+    // [`CLIMB_BIAS`](./units.ts). The lead already puts the answer where the
+    // player is going; this only decides between two bodies the lead cannot.
+    const rise = (craft.y - body.y) / reach;
+    const favour = rise / (1 + Math.abs(rise));
+    const lead = distance(leadX, leadY, body.x, body.y) * (1 - CLIMB_BIAS * favour);
+
     if (lead < nearest) {
       nearest = lead;
       chosen = i;

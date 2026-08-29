@@ -133,6 +133,41 @@ export const MEDIAN_GRAB_RANGE = 560 * SCALE;
 export const LEAD_SECONDS = 0.2;
 
 /**
+ * How much a press prefers a body **up the climb** to one below.
+ *
+ * *"Show all nearby planets on compass, both ahead and below, but when I'm
+ * traveling and grabbing planets, somehow favor grabbing ahead planets more than
+ * lower ones. This helps the game move upwards, but also lets players catch a
+ * breath and go back down a rung"* (author, 2026-08-29).
+ *
+ * **A preference and not a rule**, and it had to be smooth. Spec
+ * [01 · §3](../../docs/spec/01-swing.md) is emphatic that the grab is *"a fact
+ * rather than a threshold"* and that *"a threshold is a cliff the player falls
+ * off as a body drifts across an arbitrary line"* — so a flat penalty on
+ * everything below the craft would put that exact cliff at the craft's own
+ * altitude. What is weighted instead is **how far** above or below, saturating:
+ * `rise / (1 + |rise|)` runs smoothly from −1 to 1 and is the same shape
+ * [`gripOf`](../state/body.ts) and the tide already use.
+ *
+ * The rise is measured in the body's **own grab range**, which is a length it
+ * already carries, so no new scale is invented and a big body's preference
+ * reaches as far as its reach does.
+ *
+ * At 0.5 a body directly above at one full grab range beats one below at the same
+ * distance unless the lower one is **2.3× nearer** the lead point — which is a
+ * tie-break rather than a refusal, because the lead already puts the answer where
+ * the player is going.
+ *
+ * **Swept over 200 pilot runs**, downward grabs fall 15.3% → 14.7% → 13.8% →
+ * 12.8% → 9.5% across 0, 0.15, 0.3, 0.5 and 0.8, with the median climb unmoved
+ * at 1 212 and the endings within noise. That is **weak evidence and says so**:
+ * the pilot presses at sampled distances rather than choosing a target, so it
+ * mostly measures the field's own geometry and not a preference. An opening
+ * position, on the bench, and what settles it is the author flying it.
+ */
+export const CLIMB_BIAS = 0.5;
+
+/**
  * How close to a body's surface is too close to be caught by it — spec 01 §3's
  * ≈ 32.5, converted.
  *

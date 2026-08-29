@@ -49,8 +49,8 @@ function fly(grabAt: number, letGoAt: number, ticks = 400): PresentationState[] 
 }
 
 /**
- * The sixty seconds `pnpm replay` ships, as the picture. Thirty-two swings is
- * enough real play for every transition in spec 04 §3 to happen to somebody.
+ * The run `pnpm replay` ships, as the picture. Enough real play for every
+ * transition in spec 04 §3 to happen to somebody.
  */
 function shippedRun(): PresentationState[] {
   const text = readFileSync(new URL('../recipes/pilot-60s.json', import.meta.url), 'utf8');

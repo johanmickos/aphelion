@@ -55,7 +55,11 @@ describe('a recorded run', () => {
   it('replays to a bit-identical final state, four times its own length', () => {
     for (const seed of SEEDS) {
       const { recipe } = pilotRecipe(seed);
-      expect(recipe.ticks).toBeGreaterThan(2000);
+      // Long enough to be worth replaying. It was 2 000 until the press learned to
+      // prefer the climb (2026-08-29): the pilot takes different bodies now, so the
+      // same seeds fly different routes and one of them ends sooner. What the
+      // guard is for is unchanged — a run of a handful of ticks proves nothing.
+      expect(recipe.ticks).toBeGreaterThan(1000);
 
       for (const ticks of [recipe.ticks, recipe.ticks * LENGTHS]) {
         const first = everyTick(recipe, ticks);

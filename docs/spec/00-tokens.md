@@ -85,6 +85,13 @@ footer uses obsolete numbering and is void.
 > two is stale and neither says which.** Nothing is drawn, and §6's 12° label-collision rule is
 > unbuilt with it.
 >
+> **§5 · The orbit path fades in, and that is not rule 1 being broken.** *"As soon as an oval
+> orbit is possible I want it to fade in, not just snap into view"* (author, 2026-08-29). §5's
+> *"things arrive; they do not fade in"* governs elements **entering**, and the softness it
+> forbids is exactly the defect it names. What fades here is a **prediction firming up** — the
+> compass draws the orbit the craft is currently on from the moment gravity binds it, and the fade
+> is that answer's confidence. The element does not enter softly; the answer does.
+>
 > **§7 · The thumb line holds and is now load-bearing twice.** Sightings are pinned inside the
 > design space and never cross it, which falls out of the geometry rather than being clamped.
 
