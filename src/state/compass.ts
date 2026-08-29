@@ -44,7 +44,7 @@
 import { AIM_RANGE, handOf, windowsOn } from '../sim/compass.ts';
 import { pathRadiusAt, predictOrbit } from '../sim/orbit.ts';
 import type { Orbit } from '../sim/orbit.ts';
-import { advance, easeStep, home, leaving, place, shut, ticksIn } from './decay.ts';
+import { advance, easeStep, hastened, home, leaving, place, shut, ticksIn } from './decay.ts';
 import { SCALE } from '../sim/units.ts';
 import { alignmentOf, tierFor } from '../sim/tier.ts';
 import type { Tier } from '../sim/tier.ts';
@@ -174,7 +174,7 @@ export const ENTER_FROM = 0.92;
  * instrument does, leaving that expansion for [M2.4](../../docs/plan/m2-the-instrument.md)
  * to put on it.
  */
-export const EXIT_TICKS = ticksIn(180);
+export const EXIT_TICKS = ticksIn(150);
 
 /** How far in it collapses before it is gone. */
 export const EXIT_BY = 0.35;
@@ -353,7 +353,7 @@ function leave(previous: CompassView | null): CompassView | null {
     filament: false,
     exit,
     entrance: null,
-    scale: 1 - EXIT_BY * leaving(exit),
+    scale: 1 - EXIT_BY * leaving(hastened(exit)),
     alpha: shut(exit),
   };
 }

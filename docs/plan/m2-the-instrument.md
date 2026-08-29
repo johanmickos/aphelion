@@ -685,8 +685,18 @@ slightly and then quickly in with a fadeout? So it looks like it clicks out?"* (
 [`home`](../../src/state/decay.ts) read from the other end, so the swell on the way out is the
 same single overshoot ENTER lands on and the instrument's two ends are one shape rather than two
 — which is what spec [00 · §5](../spec/00-tokens.md) means by the motion tokens being one grammar.
-Measured: it swells to **1.034** by five ticks, comes back through 1.0 at seven, then collapses to
-**0.78** and is gone at **eleven — 180ms**.
+**And it does not pause first, which took fixing the curve's handedness rather than its size.**
+*"It should pause even less and maybe disappear a touch faster"* (author, 2026-08-29). `home`
+settles into rest with no remaining speed — a double root at its far end, and exactly what makes an
+entrance land softly — so reversed, that double root becomes the **start**, and a motion that
+starts with no speed is a pause. Rather than give the exit a second curve, its clock is hurried on
+a square root: far along early, ordinary late, so the flat start is spent in a tick and the rest of
+the span belongs to the part that is moving. One shape, two handednesses, and `Math.sqrt` is
+correctly rounded so ADR-0014 has nothing to say.
+
+Measured: it swells to **1.033 by the second tick**, is back through 1.0 at the fourth, collapses
+to **0.74**, and is gone at **nine — 150ms**. The peak sits at a fifth of the span where it used to
+sit at two fifths.
 
 **One curve had to be added, and the reason is a measurement.** `fade` is the design's decay,
 fastest at the start and slowing to nothing, which is right for an E3 that is over the instant it

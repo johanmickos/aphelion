@@ -148,6 +148,25 @@ export function home(decay: Decay): number {
 }
 
 /**
+ * The same decay, **further along than it is** — its clock run on a square root.
+ *
+ * A shape read backwards keeps its ends: [`home`](#) settles into rest with no
+ * remaining speed, which is a double root at its far end and exactly what makes
+ * an entrance land softly. Reversed by [`leaving`](#) that double root becomes
+ * the *start*, and a motion that starts with no speed is a **pause** — *"it
+ * should pause even less"* (author, 2026-08-29).
+ *
+ * Rather than give the exit a second curve, its clock is hurried: `√x` is far
+ * along early and ordinary late, so the flat start is spent in a couple of ticks
+ * and the rest of the span belongs to the part that is actually moving. One
+ * shape, two handednesses, and `Math.sqrt` is correctly rounded so it costs
+ * ADR-0014 nothing.
+ */
+export function hastened(decay: Decay): Decay {
+  return { age: decay.span * Math.sqrt(progress(decay)), span: decay.span };
+}
+
+/**
  * What is left of a thing that is **closing** rather than dying: **1 → 0, holding
  * and then going**.
  *

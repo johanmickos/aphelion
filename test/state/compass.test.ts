@@ -430,9 +430,16 @@ describe('the instrument clicking out', () => {
     // Then in, past where it started, accelerating — the click.
     const last = scales.at(-1)!;
     expect(last).toBeLessThan(1 - EXIT_BY / 2);
-    expect(scales.indexOf(swell)).toBeLessThan(scales.length / 2);
 
-    // And over quickly: 180ms and not a tick more.
+    // **And it does not pause first.** The curve it borrows settles into rest at
+    // one end, so read backwards it leaves rest with no speed — which is a pause
+    // (author, 2026-08-29). Its clock is hurried to spend that in a tick: the
+    // swell is all but complete on the tick after the release, and the peak is
+    // inside the first third rather than at the halfway mark.
+    expect(scales[1]!).toBeGreaterThan(1 + (swell - 1) * 0.8);
+    expect(scales.indexOf(swell)).toBeLessThan(scales.length / 3);
+
+    // And over quickly: 150ms and not a tick more.
     expect(out.length).toBeLessThanOrEqual(EXIT_TICKS);
   });
 
