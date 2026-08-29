@@ -49,9 +49,12 @@ playing it, so a plan whose first playable moment is late is a plan that cannot 
 
 - **[Performance](./performance.md)** — where a tick's time goes, where a frame's paint goes, and
   the budget M3 inherits. Opened 2026-08-29 on a report of *"some lag during some swings"*. The
-  answer so far is that nothing measured varies enough to be an intermittent hitch: a tick is a p99
-  of 0.040ms and a frame's paint never leaves a 2% band. It ends at the author's gate, with the
-  instrument built and the prediction written down before the phone run that will test it.
+  answer, now measured on the phone over 3 096 frames: **a tick costs 0.17ms and the rest of a
+  frame costs 0.58ms**, about 4.5% of a 16.67ms frame, and nothing was optimised to get there. What
+  the run *did* find is that **every grab costs one deferred frame** — twelve of the twelve worst
+  frames land on the exact tick of a press, with our own work on them at 0–1ms — so the stutter is
+  the browser's touch-begin path and not this game's. Still open: a dispatch flown on a session
+  where the lag is actually felt.
 
 ## What is deliberately not here
 

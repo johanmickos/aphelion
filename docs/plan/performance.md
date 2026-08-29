@@ -8,6 +8,10 @@ it, and it is deliberately as careful about the answer **no** as it would be abo
 
 ---
 
+> **Answered by the phone, 2026-08-29.** §8 is the measurement and it is the last word in this
+> file. Everything before it is the laptop work that predicted it, kept as written so the
+> prediction can be checked against the result rather than quietly edited to match it.
+
 ## The result, in one paragraph
 
 **Nothing in this build's per-tick or per-frame work varies enough to produce an intermittent
@@ -323,7 +327,107 @@ so by showing nothing wrong with the frames — and that is a result, not a dead
 
 ---
 
-## 8 · Queued from this session
+## 8 · The phone answered
+
+`diagnostics/2026-08-29T21-15-55-700Z-run-dispatch.json` — iPhone, iOS 18.7, Firefox iOS 154,
+393 × 651 css at dpr 3, fixture field v1, seed 1, **3 092 ticks (51.5s), 28 swings, 0 refused**,
+still flying at the end. **3 096 frames measured.** Author's report on it: *"no noticeable lag."*
+
+**Nothing was optimised before this run and nothing has been optimised since.** The only two
+changes to what the game does at runtime are the `visibilitychange` handler, which fixes a *jump*
+on resume and not a speed, and the meter itself, which *adds* two clock reads a frame. A quiet run
+is not something this session caused, and reading it as a fix would be the exact mistake §1 is
+about.
+
+### What it cost
+
+| ms | p50 | p95 | p99 | max | mean |
+|---|---|---|---|---|---|
+| `cpu` | 1 | 1 | 2 | 11 | **0.75** |
+| `interval` | 17 | 17 | 19 | 28 | 16.64 |
+
+**The budget, measured on the device**, from the tick-group fit over 3 096 frames:
+
+> **A tick costs 0.17 ± 0.05 ms. The rest of a frame costs 0.58 ± 0.05 ms.**
+
+Both intervals are one standard error, computed from the cpu distribution's own spread against the
+121 frames that ran anything other than exactly one tick. **That is the weak term in the
+measurement and it is the one to strengthen**: 2 975 of 3 096 frames ran exactly one tick, so the
+line is pinned by 63 frames at zero ticks and 58 at two. A run flown with the display and the
+simulation further out of step would tighten it.
+
+Against 16.67ms, **the whole game is using about 4.5% of a frame.** Against the 2.8ms per-tick
+budget of §6, a tick is at **0.17ms — 16× under**, on the phone, with the budget's own second term
+now measured rather than derived: M0.5 ruled 8ms for the renderer and today's renderer spends
+**0.58** of it.
+
+### The laptop-to-phone factor, which was the missing conversion
+
+Laptop mean tick total 0.007ms; phone 0.17ms. **The phone is roughly 25× this laptop** on the tick
+side — call it 17× to 31× on the error bars. §6 extrapolated *"a phone 20× slower still leaves room
+for ~1 500 bodies"* before the phone had been measured. At the measured factor the answer is
+**about 1 500 bodies**, so the extrapolation holds and `pnpm profile`'s slopes can be trusted to
+carry across with that factor written beside them.
+
+### Which prediction came back — and it was the first one
+
+§7 wrote three outcomes down in advance. **The first one is what arrived**, and more sharply than
+it was written.
+
+**The cpu histogram is narrow.** 1 121 frames at 0ms, 1 942 at 1ms, 27 at 2ms, and a total of six
+frames above that in the whole run. **The interval histogram is not**: 29 frames at 25–28ms, and —
+the part that settles it — **30 frames at 6–8ms**. A late frame and an early one, in pairs, with
+the mean preserved at **60.10 Hz**. That is one *presented frame deferred and paid back on the
+next*, which is a compositor decision. It is not slow code, and no amount of making `derive`
+cheaper would move it.
+
+**And the third prediction is refuted too.** *Was "lag" naming a jump?* Not in this run: of 3 096
+frames, **none ran three ticks** and only 58 ran two. The catch-up clamp never fired once.
+
+### The stutter has an address, and it is the grab
+
+This is the finding worth keeping, and it was not on anybody's list.
+
+**All twelve of the worst frames land on the exact tick of a press. Not near one — on it, a gap of
+zero, twelve times out of twelve.** Presses cover 2.7% of the run, so the chance of that at random
+is **1.6 × 10⁻¹⁹**. There were 28 swings and 29 long frames.
+
+> **Every grab in the run costs one deferred frame, and our own work on that frame is 0–1ms.**
+
+Which is *"lag during some swings"* in the exact shape the original report described — during a
+swing, not all of them, at the moment you commit. Whether ~16ms of deferred present is what the
+author felt is the author's to say; it is at the edge of perceptible and this run was reported as
+clean.
+
+**Three things are already known about it, and one theory is already dead.**
+
+1. It is **not our main-thread work.** The cpu on those frames is 0–1ms, and our `pointerdown`
+   handler adds one entry to a `Set`.
+2. It is **the touch beginning, not touch handling in general.** The nearest *release* to any of
+   those twelve frames is 11 to 128 ticks away — releases do not stutter at all, or there would be
+   28 more long frames and there are 29 in total.
+3. **So it is not the non-passive listener**, which was the obvious first suspect.
+   [`app/input.ts`](../../app/input.ts) binds `touchstart` *and* `touchend` with
+   `{ passive: false }` and calls `preventDefault` in both, for iOS gesture suppression it
+   documents at length. If that were the cost, the release would pay it too. It does not.
+
+What is left is something WebKit does only at the *start* of a touch — hit-testing, gesture
+recogniser arbitration, the callout and selection machinery. **No change is proposed here**, on
+purpose: the next move is a one-line experiment on the phone, not a commit against `input.ts`,
+whose current shape is a written ruling with reasons (AGENTS.md §5.3).
+
+### What is still open
+
+**This run does not reproduce the complaint** — the author flew it and reported no lag, and the
+numbers agree with them. So it is a *negative* result: it rules three things out and names a
+fourth, and it cannot name a cause for a lag that did not happen. What would settle it is a
+dispatch flown on a session where the lag **is** felt, with FLAG tapped when it happens. The
+flagged ticks and the worst frames would then either coincide — in which case the answer is above —
+or they would not, and the run would be carrying something none of this has seen.
+
+---
+
+## 9 · Queued from this session
 
 **Particle effects, as a visual language** (author, 2026-08-29), in the register of
 `https://bwilliford.github.io/particleCharts/`. Recorded rather than built, and with one thing
