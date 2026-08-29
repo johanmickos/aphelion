@@ -30,3 +30,10 @@ dist/
 # an unrooted `bench/` also swallows `tools/bench/`, which is the source.
 /bench/
 
+
+# Reference screenshots the author drops in for a note. Kept out of history:
+# they are conversation, not source.
+ex.png
+IMG_*.jpg
+screenshot.png
+prompt*.md
