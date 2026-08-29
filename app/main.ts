@@ -26,6 +26,15 @@
  * (ADR-0004) — which is what turns *"the grab feels late"* into a tick number
  * somebody else can fly. The recorder is fed here because this is where the
  * press and the tick are both in scope, and nowhere else in the game knows both.
+ *
+ * **And it times the frames**, for exactly the same reason and in the same
+ * place. *"Some lag during some swings"* costs a cycle to reproduce and may not
+ * reproduce at all; the same sentence with a distribution and a tick number
+ * under it is a bug with an address. The clock is read here because this is the
+ * only file allowed to read one, and what it hands the meter
+ * ([`meter.ts`](../tools/meter.ts)) is three numbers a test can fabricate. The
+ * meter itself is dev-only and `null` in a built game, so nothing below the
+ * `import.meta.env.DEV` branches survives the build.
  */
 import { createClock, ticksDue } from '../src/sim/clock.ts';
 import {
@@ -43,6 +52,7 @@ import { attachCanvas, sizeToDisplay } from '../src/render/canvas.ts';
 import { interpolate } from '../src/render/interpolate.ts';
 import { draw } from '../src/render/index.ts';
 import { DIAG_ENDPOINT, buildDispatch } from '../tools/dispatch.ts';
+import { createMeter, frameBegan, frameEnded, timingOf } from '../tools/meter.ts';
 import { bindPress, suppressBrowserGestures, typing } from './input.ts';
 
 /** Replaced at build time by Vite's `define`; `dev` when the dev server serves it. */
@@ -82,6 +92,26 @@ if (target) {
   let sent = '';
   const clock = createClock();
   let observed = performance.now();
+  // Dev-only, like the dispatch it rides in: `import.meta.env.DEV` is replaced
+  // by `false` when the build is made, so the meter and its module go with it.
+  let meter = import.meta.env.DEV ? createMeter() : null;
+
+  // **Coming back from the background is not elapsed time.** A phone that slept,
+  // a tab switched away from and a screen locked all leave `observed` at the
+  // moment the page stopped being drawn, so the first frame after it hands
+  // `ticksDue` a duration worth minutes. The clamp bounds what that buys at
+  // three ticks rather than thousands (`clock.ts`), which is what stops a death
+  // spiral — but three ticks is still a visible jump, in a game whose whole
+  // input is a moment, and it lands the instant the player looks back at it.
+  //
+  // So the gap is not measured at all: the clock restarts from the moment the
+  // page becomes visible again, and the run resumes where it was. The prototype
+  // has the same handler and reached it the same way. There is nothing to save
+  // and nothing to catch up on — the simulation only advances when it is
+  // watched, which is what ADR-0006's *the tick is the only clock* already says.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') observed = performance.now();
+  });
 
   // Developer chrome, and the only thing in the build that is not the one verb.
   //
@@ -100,6 +130,12 @@ if (target) {
     // `createPresentation` places rather than eases (ADR-0015): a recorder that
     // survived a restart would describe a run nobody flew.
     recorder = createRecorder(FIXTURE_FIELD, SEED);
+    // And a new meter, for the same reason and a sharper one: every frame it
+    // names carries the tick it happened on, and a tick number from a run that
+    // has been thrown away points at a moment in a different flight. The
+    // dispatch's own validator refuses those, which is the right answer to a
+    // question that should never have been asked.
+    meter = import.meta.env.DEV ? createMeter() : null;
     flagged = [];
     sent = '';
   };
@@ -111,6 +147,13 @@ if (target) {
   });
 
   const frame = (now: number): void => {
+    // `now` is the display's timestamp for this frame — a vsync — so it is what
+    // a frame *period* is measured between. The cost of this function is
+    // measured from the clock as it is right now, which is a later moment, and
+    // keeping the two apart keeps the browser's own scheduling delay out of a
+    // number that is supposed to be ours.
+    if (meter) frameBegan(meter, now, performance.now());
+
     const elapsedSeconds = (now - observed) / 1000;
     observed = now;
 
@@ -153,6 +196,8 @@ if (target) {
         (flagged.length === 0 ? '' : ` · ${flagged.length} flagged`) +
         sent;
     }
+
+    if (meter) frameEnded(meter, performance.now(), current.tick, ticks);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
@@ -186,6 +231,7 @@ if (target) {
           dpr: window.devicePixelRatio,
           css: { w: window.innerWidth, h: window.innerHeight },
         },
+        timing: meter && timingOf(meter),
       });
       // The verdict lands in the terminal in front of the laptop, which is where
       // the person holding the phone is about to be. What comes back here is

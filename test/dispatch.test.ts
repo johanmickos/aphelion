@@ -19,6 +19,8 @@ import {
   buildDispatch,
   parseDispatch,
 } from '../tools/dispatch.ts';
+import { MAX_WORST_FRAMES, TIMING_BUCKETS } from '../tools/meter.ts';
+import { MAX_CATCH_UP_TICKS } from '../src/sim/units.ts';
 import { receive } from '../tools/vite-plugin-diag.ts';
 import { FIXTURE_FIELD_VERSION } from '../src/sim/fixture-field.ts';
 import { RECIPE_VERSION } from '../src/sim/recipe.ts';
@@ -123,6 +125,100 @@ describe('parseDispatch', () => {
   it('rebuilds rather than blessing what it was handed', () => {
     const parsed = parseDispatch({ ...structuredClone(dispatch), somethingElse: 'ignored' });
     expect(Object.keys(parsed).sort()).toEqual(['at', 'device', 'kind', 'observed', 'recipe']);
+  });
+});
+
+/**
+ * A timing block that is internally consistent — three frames, counted the same
+ * way by every part of it. Each test below breaks exactly one thing about it.
+ */
+const bucketsWith = (at: Record<number, number>): number[] =>
+  Array.from({ length: TIMING_BUCKETS }, (_, i) => at[i] ?? 0);
+
+const timing = {
+  frames: 3,
+  cpu: { buckets: bucketsWith({ 4: 2, 30: 1 }), total: 39.2, max: 30.4 },
+  interval: { buckets: bucketsWith({ 16: 2, 33: 1 }), total: 66.1, max: 33.4 },
+  byTicks: [
+    { frames: 0, cpu: 0 },
+    { frames: 2, cpu: 8.8 },
+    { frames: 1, cpu: 30.4 },
+    { frames: 0, cpu: 0 },
+  ],
+  worst: [{ tick: 240, cpu: 30.4, interval: 33.4, ticks: 2 }],
+};
+
+const withTiming = (change: Record<string, unknown> = {}): unknown => ({
+  ...dispatch,
+  timing: { ...timing, ...change },
+});
+
+/**
+ * The timing block arrived by **extending** this validator, which is the rule
+ * `vite-plugin-diag.ts` states: the endpoint writes files on a LAN interface, so
+ * a second shape is a second surface and it is held to the same line as the
+ * first. Two of these are invariants rather than range checks — a meter cannot
+ * produce a block whose parts disagree about how many frames there were, so one
+ * that does was not produced by a meter.
+ */
+describe('parseDispatch · the timing block', () => {
+  it('accepts a dispatch that carries none, because four already do not', () => {
+    expect(parseDispatch(dispatch).timing).toBeUndefined();
+  });
+
+  it('accepts a well-formed one and rebuilds it', () => {
+    const parsed = parseDispatch(withTiming());
+    expect(parsed.timing?.frames).toBe(3);
+    expect(parsed.timing?.cpu.buckets).toHaveLength(TIMING_BUCKETS);
+    expect(parsed.timing?.worst[0]?.tick).toBe(240);
+  });
+
+  it('refuses a histogram of the wrong length, which is what bounds the bytes', () => {
+    expect(() => parseDispatch(withTiming({ cpu: { ...timing.cpu, buckets: [1, 2, 3] } }))).toThrow(
+      /buckets/,
+    );
+  });
+
+  it('refuses a block whose distributions disagree about how many frames there were', () => {
+    expect(() => parseDispatch(withTiming({ frames: 4 }))).toThrow(/frames but holds/);
+  });
+
+  it('refuses tick groups that do not add up to the frames counted', () => {
+    expect(() =>
+      parseDispatch(
+        withTiming({
+          byTicks: [
+            { frames: 0, cpu: 0 },
+            { frames: 1, cpu: 4.4 },
+            { frames: 1, cpu: 30.4 },
+            { frames: 0, cpu: 0 },
+          ],
+        }),
+      ),
+    ).toThrow(/tick groups hold 2 frames, not 3/);
+  });
+
+  it('refuses a frame named at a tick the run never reached', () => {
+    expect(() => parseDispatch(withTiming({ worst: [{ ...timing.worst[0], tick: 900 }] }))).toThrow(
+      /outside a run of 600/,
+    );
+  });
+
+  it('refuses a frame claiming more ticks than the clamp allows', () => {
+    expect(() =>
+      parseDispatch(withTiming({ worst: [{ ...timing.worst[0], ticks: MAX_CATCH_UP_TICKS + 1 }] })),
+    ).toThrow(/the clamp is/);
+  });
+
+  it('refuses more named frames than the cap', () => {
+    const many = Array.from({ length: MAX_WORST_FRAMES + 1 }, () => timing.worst[0]);
+    expect(() => parseDispatch(withTiming({ worst: many }))).toThrow(/more than/);
+  });
+
+  it('refuses a negative duration, which no monotonic clock produces', () => {
+    expect(() => parseDispatch(withTiming({ cpu: { ...timing.cpu, total: -1 } }))).toThrow(
+      /negative/,
+    );
   });
 });
 

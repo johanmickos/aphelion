@@ -45,6 +45,14 @@ playing it, so a plan whose first playable moment is late is a plan that cannot 
 | [M6](./m6-the-run.md) | The run | Front door, finish, debrief, results, DRIFT | **author** | not started |
 | [M7](./m7-powerups.md) | Powerups | The field's generosity | — | not started |
 
+## Beside the milestones
+
+- **[Performance](./performance.md)** — where a tick's time goes, where a frame's paint goes, and
+  the budget M3 inherits. Opened 2026-08-29 on a report of *"some lag during some swings"*. The
+  answer so far is that nothing measured varies enough to be an intermittent hitch: a tick is a p99
+  of 0.040ms and a frame's paint never leaves a 2% band. It ends at the author's gate, with the
+  instrument built and the prediction written down before the phone run that will test it.
+
 ## What is deliberately not here
 
 - **No backend.** Offline v1, with the seams cut for a service later (ADR-0003).

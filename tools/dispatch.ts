@@ -38,6 +38,11 @@
 import type { Recipe } from '../src/sim/recipe.ts';
 import { parseRecipe } from '../src/sim/recipe.ts';
 import type { Tick } from '../src/sim/types.ts';
+import { MAX_CATCH_UP_TICKS } from '../src/sim/units.ts';
+import { MAX_WORST_FRAMES, TIMING_BUCKETS } from './meter.ts';
+import type { Bucketed, DispatchTiming, TickGroup, WorstFrame } from './meter.ts';
+
+export type { Bucketed, DispatchTiming, TickGroup, WorstFrame };
 
 /**
  * Where the phone posts, and it is one path.
@@ -67,6 +72,14 @@ export const DISPATCH_KIND = 'run-dispatch';
  * bounded only by the run's own length, so a pathological log inside a legal
  * tick count would be megabytes, and the byte cap is what refuses it before
  * `parseRecipe` ever sees it.
+ *
+ * **The timing block does not move it**, and that is a property of the shape
+ * rather than luck: two fixed-length histograms, four tick groups and at most
+ * [`MAX_WORST_FRAMES`](./meter.ts) named frames is **1.2 KB on a real run and
+ * 2.0 KB at its arithmetic widest** — every bucket occupied by a six-figure
+ * count — measured both ways, and it is the *same* size however long the run
+ * was. An hour of play carries the timing bytes a minute of it does, which is
+ * the whole reason the distribution is bucketed rather than sent as samples.
  */
 export const MAX_DISPATCH_BYTES = 64 * 1024;
 
@@ -122,6 +135,16 @@ export interface Dispatch {
    * too, and the one `pnpm replay` ships with is one of them.
    */
   readonly device?: DispatchDevice;
+  /**
+   * What the frames cost, if anything was counting — [`meter.ts`](./meter.ts).
+   *
+   * **Optional for the same reason `device` is**, and its absence says the same
+   * kind of thing: a dispatch the headless pilot produced was not drawn, and the
+   * four already in `diagnostics/` were flown before there was anything to count
+   * with. A reader that demanded it would refuse the evidence this project
+   * already has.
+   */
+  readonly timing?: DispatchTiming;
 }
 
 /** Stamp a dispatch, trimming what the author wrote to what may be sent. */
@@ -130,6 +153,7 @@ export function buildDispatch(args: {
   recipe: Recipe;
   observed: Observed;
   device?: DispatchDevice;
+  timing?: DispatchTiming | null;
 }): Dispatch {
   return {
     kind: DISPATCH_KIND,
@@ -140,6 +164,7 @@ export function buildDispatch(args: {
       note: args.observed.note.slice(0, MAX_NOTE_LENGTH),
     },
     ...(args.device ? { device: args.device } : {}),
+    ...(args.timing ? { timing: args.timing } : {}),
   };
 }
 
@@ -166,6 +191,126 @@ function parseDevice(raw: unknown): DispatchDevice {
     ua: boundedString(d.ua, 'user agent', 400),
     dpr: finite(d.dpr, 'device pixel ratio'),
     css: { w: finite(size.w, 'css width'), h: finite(size.h, 'css height') },
+  };
+}
+
+function counting(value: unknown, what: string): number {
+  const n = finite(value, what);
+  if (!Number.isInteger(n) || n < 0) throw new Error(`${what} is not a count`);
+  return n;
+}
+
+function lasting(value: unknown, what: string): number {
+  const n = finite(value, what);
+  if (n < 0) throw new Error(`${what} is negative`);
+  return n;
+}
+
+/**
+ * One histogram, rebuilt from what survived.
+ *
+ * The bucket array's **length is fixed and checked**, which is what keeps the
+ * byte cap a property of the shape: a caller cannot make this block large. The
+ * count it carries is returned so the caller can hold the whole block to one
+ * invariant — every distribution in a timing block describes the same frames,
+ * so they must all count the same number of them, and a block that disagrees
+ * with itself was not produced by a meter.
+ */
+function parseBucketed(raw: unknown, what: string): { value: Bucketed; count: number } {
+  if (typeof raw !== 'object' || raw === null) throw new Error(`${what} is not an object`);
+  const b = raw as Record<string, unknown>;
+  if (!Array.isArray(b.buckets)) throw new Error(`${what} has no buckets`);
+  const given = b.buckets as unknown[];
+  if (given.length !== TIMING_BUCKETS) {
+    throw new Error(`${what} has ${given.length} buckets, not ${TIMING_BUCKETS}`);
+  }
+  const buckets: number[] = [];
+  let count = 0;
+  for (const entry of given) {
+    const n = counting(entry, `${what} bucket`);
+    buckets.push(n);
+    count += n;
+  }
+  return {
+    value: {
+      buckets,
+      total: lasting(b.total, `${what} total`),
+      max: lasting(b.max, `${what} max`),
+    },
+    count,
+  };
+}
+
+function parseWorst(raw: unknown, ticks: Tick): WorstFrame[] {
+  if (!Array.isArray(raw)) throw new Error('worst frames are not an array');
+  const given = raw as unknown[];
+  if (given.length > MAX_WORST_FRAMES) {
+    throw new Error(`more than ${MAX_WORST_FRAMES} worst frames`);
+  }
+  return given.map((entry) => {
+    if (typeof entry !== 'object' || entry === null) throw new Error('malformed worst frame');
+    const f = entry as Record<string, unknown>;
+    const tick = counting(f.tick, 'worst frame tick');
+    // Inside the run it claims to be about — the same test a flagged tick gets,
+    // and for the same reason: a hitch on a tick the run never reached is a
+    // hitch on nothing, and the reader would go looking for it.
+    if (tick > ticks) throw new Error(`worst frame at tick ${tick} is outside a run of ${ticks}`);
+    const ran = counting(f.ticks, 'worst frame tick count');
+    if (ran > MAX_CATCH_UP_TICKS) {
+      throw new Error(`a frame cannot run ${ran} ticks; the clamp is ${MAX_CATCH_UP_TICKS}`);
+    }
+    return {
+      tick,
+      cpu: lasting(f.cpu, 'worst frame cpu'),
+      interval: lasting(f.interval, 'worst frame interval'),
+      ticks: ran,
+    };
+  });
+}
+
+/**
+ * The timing block, validated the way everything else here is: rebuilt out of
+ * what survived rather than cast.
+ *
+ * **Two invariants are checked rather than assumed**, and both are cheap:
+ * every distribution counts the same frames, and the tick groups add up to that
+ * same number. A meter cannot produce a block that fails either, so a block that
+ * does is not evidence about a run — and evidence is the only thing this
+ * endpoint exists to keep.
+ */
+function parseTiming(raw: unknown, ticks: Tick): DispatchTiming {
+  if (typeof raw !== 'object' || raw === null) throw new Error('timing is not an object');
+  const t = raw as Record<string, unknown>;
+  const frames = counting(t.frames, 'frame count');
+  const cpu = parseBucketed(t.cpu, 'cpu');
+  const interval = parseBucketed(t.interval, 'interval');
+  if (cpu.count !== frames || interval.count !== frames) {
+    throw new Error(
+      `timing counts ${frames} frames but holds ${cpu.count} cpu and ${interval.count} interval`,
+    );
+  }
+  if (!Array.isArray(t.byTicks)) throw new Error('tick groups are not an array');
+  const given = t.byTicks as unknown[];
+  if (given.length !== MAX_CATCH_UP_TICKS + 1) {
+    throw new Error(`${given.length} tick groups, not ${MAX_CATCH_UP_TICKS + 1}`);
+  }
+  let grouped = 0;
+  const byTicks: TickGroup[] = given.map((entry) => {
+    if (typeof entry !== 'object' || entry === null) throw new Error('malformed tick group');
+    const g = entry as Record<string, unknown>;
+    const count = counting(g.frames, 'tick group frames');
+    grouped += count;
+    return { frames: count, cpu: lasting(g.cpu, 'tick group cpu') };
+  });
+  if (grouped !== frames) {
+    throw new Error(`tick groups hold ${grouped} frames, not ${frames}`);
+  }
+  return {
+    frames,
+    cpu: cpu.value,
+    interval: interval.value,
+    byTicks,
+    worst: parseWorst(t.worst, ticks),
   };
 }
 
@@ -207,5 +352,6 @@ export function parseDispatch(raw: unknown): Dispatch {
     recipe,
     observed: parseObserved(d.observed, recipe.ticks),
     ...(d.device === undefined ? {} : { device: parseDevice(d.device) }),
+    ...(d.timing === undefined ? {} : { timing: parseTiming(d.timing, recipe.ticks) }),
   };
 }

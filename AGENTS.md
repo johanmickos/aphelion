@@ -134,6 +134,22 @@ The stated deliverable is **a technical architecture that is easy to maintain an
   tick a grab happened on, what the geometry was, where on the envelope a release fell. With
   no argument it flies the one this repo ships. It is how a sentence about the feel of a
   swing gets a run underneath it.
+- **`pnpm profile`** takes the same recipe or dispatch `pnpm replay` does and says where a
+  tick's time goes: `stepSim` against `derive` against the two pieces of `derive` that walk
+  the field, as a distribution and never as a mean, with the worst ticks named and lined up
+  against what the run was doing. It also runs the field-size sweep — the **same run** in a
+  field up to 64× the size, with the extra bodies parked out of every reach so the flight is
+  provably unchanged — and a **draw census**, which counts what the renderer asks the canvas
+  for rather than timing it, because a count travels to a phone and a millisecond does not.
+  **It is a laptop and it says so on every line.** What it produces are ratios and slopes;
+  the absolute numbers come from the phone, through the meter below.
+- **`tools/meter.ts`** is what counts frames on the device, and it rides in the dispatch. It
+  is handed its timestamps rather than reading a clock — the same rule `ticksDue` is written
+  under, and the only reason its arithmetic can be tested. The phone's `performance.now()` is
+  clamped to a whole millisecond, so it sends a **histogram** and not four percentiles: the
+  terminal computes the percentiles, and grouping frames by how many ticks each ran recovers
+  what a tick costs and what a frame costs to a tenth of a millisecond out of a clock that
+  cannot tell them apart. Read its header before changing what it carries.
 - **`pnpm bench`** builds the desktop bench: this game, bundled for the browser, with the open
   questions on sliders — one self-contained page in `bench/`. It runs **the repo's own
   simulation**, which is what makes a verdict reached on it a verdict about the game. The

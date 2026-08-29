@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "portable": "node tools/check-portability.ts",
     "replay": "node tools/replay.ts",
+    "profile": "node tools/profile.ts",
     "bench": "node tools/bench/build.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm portable && pnpm test"
   },

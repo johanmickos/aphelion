@@ -29,7 +29,9 @@
  * where the camera was without a canvas ever having existed.
  */
 import { createHash } from 'node:crypto';
-import type { Dispatch } from './dispatch.ts';
+import type { Dispatch, DispatchTiming } from './dispatch.ts';
+import { bucketAt, bucketCount } from './meter.ts';
+import type { Bucketed } from './meter.ts';
 import { floorRadius } from '../src/sim/body.ts';
 import { speedOf } from '../src/sim/craft.ts';
 import { distance, magnitude } from '../src/sim/math.ts';
@@ -354,6 +356,172 @@ export function formatTrail(trail: Trail): string[] {
   return out;
 }
 
+/** How many histogram rows are worth printing before the shape stops being the point. */
+const HISTOGRAM_ROWS = 24;
+
+/** The widest a bar gets, in characters. */
+const BAR = 44;
+
+/**
+ * A histogram as bars, **empty buckets left out**.
+ *
+ * The millisecond labels are what carry the gaps, so nothing about the shape is
+ * lost by not drawing sixty rows of nothing: a jump from `5ms` to `31ms` in the
+ * left column says the distribution is bimodal more plainly than twenty-five
+ * blank bars do. It is the shape that is being read here, and a screen of empty
+ * rows is the thing that hides it.
+ */
+function histogramRows(bucketed: Bucketed, label: string): string[] {
+  const counts = bucketed.buckets;
+  const busiest = counts.reduce((most, n) => Math.max(most, n), 0);
+  if (busiest === 0) return [];
+  const occupied: number[] = [];
+  for (let i = 0; i < counts.length; i++) if (counts[i]! > 0) occupied.push(i);
+  const rows: string[] = [`  \x1b[2m${label}, per 1ms — empty buckets are not drawn\x1b[0m`];
+  for (const i of occupied.slice(0, HISTOGRAM_ROWS)) {
+    const n = counts[i]!;
+    const width = Math.round((n / busiest) * BAR);
+    const edge = i === counts.length - 1 ? `${i}+` : String(i);
+    rows.push(
+      `  ${edge.padStart(5)}ms │${'█'.repeat(width)}${' '.repeat(BAR - width)}│ ` +
+        `${String(n).padStart(6)}`,
+    );
+  }
+  if (occupied.length > HISTOGRAM_ROWS) {
+    const rest = occupied.slice(HISTOGRAM_ROWS).reduce((sum, i) => sum + counts[i]!, 0);
+    rows.push(
+      `  \x1b[2m    … ${rest} more in ${occupied.length - HISTOGRAM_ROWS} further buckets, ` +
+        `out to ${occupied[occupied.length - 1]}ms\x1b[0m`,
+    );
+  }
+  return rows;
+}
+
+/**
+ * What a frame costs and what a tick costs, recovered from the frames
+ * themselves.
+ *
+ * A run produces frames that ran 0, 1, 2 or 3 ticks — `ticksDue` decides, from
+ * how the display's rate and the tick rate happen to land — and the mean cost of
+ * each group is a point on a straight line. Its **slope is one tick** and its
+ * **intercept is everything else a frame does**: the draw, the interpolation,
+ * the browser. Least squares over the four groups, weighted by how many frames
+ * are in each.
+ *
+ * **It is what makes a whole-millisecond clock usable.** No single frame's cost
+ * is known to better than the 1ms the phone's `performance.now()` is clamped to,
+ * but a mean over a thousand of them is known far more precisely than that, and
+ * two means are all a line needs. It is also the only way to get the two halves
+ * of the budget apart without a profiler on the device.
+ *
+ * `null` when the run never varied — one group of frames is a point, and a point
+ * has no slope.
+ */
+export function frameCost(timing: DispatchTiming): { perFrame: number; perTick: number } | null {
+  let n = 0;
+  let sumX = 0;
+  let sumXX = 0;
+  let sumY = 0;
+  let sumXY = 0;
+  for (let ticks = 0; ticks < timing.byTicks.length; ticks++) {
+    const group = timing.byTicks[ticks]!;
+    n += group.frames;
+    sumX += ticks * group.frames;
+    sumXX += ticks * ticks * group.frames;
+    sumY += group.cpu;
+    sumXY += ticks * group.cpu;
+  }
+  const denominator = n * sumXX - sumX * sumX;
+  if (n === 0 || denominator === 0) return null;
+  const perTick = (n * sumXY - sumX * sumY) / denominator;
+  return { perFrame: (sumY - perTick * sumX) / n, perTick };
+}
+
+/**
+ * The timing block: the distribution, the budget it implies, and the worst
+ * frames with what the run was doing on them beside each.
+ *
+ * The percentiles are computed **here** rather than read off the phone, which is
+ * the rule `vite-plugin-diag.ts` set for the first kind of report and the reason
+ * the meter sends buckets: *the report carries samples, not conclusions.* They
+ * are whole milliseconds because the samples were, and saying `11ms` where the
+ * evidence supports `11ms` is the difference between a measurement and a
+ * decoration.
+ */
+export function formatTiming(timing: DispatchTiming, recipe: Recipe): string[] {
+  const frames = timing.frames;
+  const mean = (bucketed: Bucketed): number =>
+    bucketCount(bucketed) === 0 ? 0 : bucketed.total / bucketCount(bucketed);
+  const row = (label: string, bucketed: Bucketed): string =>
+    `  ${label.padEnd(11)}` +
+    [0.5, 0.95, 0.99].map((at) => `${String(bucketAt(bucketed, at)).padStart(5)}ms`).join('  ') +
+    `  ${bucketed.max.toFixed(0).padStart(5)}ms  ${bucketed.total === 0 ? '—' : mean(bucketed).toFixed(2).padStart(6)}ms`;
+
+  const out: string[] = [
+    '',
+    `  \x1b[1m▼ frames · ${frames} measured\x1b[0m`,
+    '',
+    '  ms             p50     p95     p99      max     mean',
+    row('cpu', timing.cpu),
+    row('interval', timing.interval),
+  ];
+
+  const notUs = (timing.interval.total - timing.cpu.total) / Math.max(1, frames);
+  out.push(
+    `  \x1b[2mnot us${' '.repeat(38)}${notUs.toFixed(2).padStart(6)}ms  ` +
+      '(interval − cpu: vsync, compositor, collection, the rest of the phone)\x1b[0m',
+  );
+  out.push('');
+  out.push(...histogramRows(timing.cpu, 'cpu'));
+  out.push('');
+  out.push(...histogramRows(timing.interval, 'interval'));
+  out.push('');
+
+  out.push('  \x1b[2mwhat a frame is made of, from the frames themselves\x1b[0m');
+  out.push('    ticks run   frames    mean cpu');
+  for (let ticks = 0; ticks < timing.byTicks.length; ticks++) {
+    const group = timing.byTicks[ticks]!;
+    const each = group.frames === 0 ? '—' : `${(group.cpu / group.frames).toFixed(2)}ms`;
+    out.push(
+      `    ${String(ticks).padStart(9)}   ${String(group.frames).padStart(6)}   ${each.padStart(9)}`,
+    );
+  }
+  const fit = frameCost(timing);
+  out.push(
+    fit === null
+      ? '    \x1b[2mevery frame ran the same number of ticks, so there is no line to fit\x1b[0m'
+      : `    \x1b[1m→ a tick costs ${fit.perTick.toFixed(2)}ms; the rest of a frame costs ` +
+          `${fit.perFrame.toFixed(2)}ms\x1b[0m \x1b[2m(least squares, weighted)\x1b[0m`,
+  );
+
+  if (timing.worst.length) {
+    const walked = walkRun(
+      recipe,
+      timing.worst.map((frame) => frame.tick),
+    );
+    const byTick = new Map(walked.moments.map((moment) => [moment.tick, moment]));
+    out.push('');
+    out.push('  \x1b[2mthe worst frames, and what the run was doing on them\x1b[0m');
+    out.push('     tick     cpu  interval  ticks');
+    for (const frame of timing.worst) {
+      const moment = byTick.get(frame.tick);
+      const where =
+        moment === undefined
+          ? ''
+          : moment.phase === 'coasting'
+            ? 'coasting'
+            : moment.phase === 'diving'
+              ? `diving at #${moment.address}, ${moment.sinceGrab} ticks in`
+              : `orbiting #${moment.address}, +${moment.sinceFreeze} since the freeze (${moment.envelope})`;
+      out.push(
+        `  ${String(frame.tick).padStart(7)}  ${frame.cpu.toFixed(0).padStart(4)}ms  ` +
+          `${frame.interval.toFixed(0).padStart(6)}ms  ${String(frame.ticks).padStart(5)}  ${where}`,
+      );
+    }
+  }
+  return out;
+}
+
 /**
  * A dispatch as the terminal should read it: who flew it and what they said,
  * then the run underneath.
@@ -375,6 +543,7 @@ export function formatDispatch(dispatch: Dispatch, describe: readonly Tick[] = [
   if (dispatch.observed.note) out.push(`  \x1b[1m“${dispatch.observed.note}”\x1b[0m`);
   return [
     ...out,
+    ...(dispatch.timing ? formatTiming(dispatch.timing, dispatch.recipe) : []),
     ...formatTrail(walkRun(dispatch.recipe, [...dispatch.observed.ticks, ...describe])),
   ];
 }
