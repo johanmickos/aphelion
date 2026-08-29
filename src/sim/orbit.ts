@@ -139,12 +139,41 @@ function radiusAt(orbit: Orbit, eccentricity: number, phase: number): number {
  * Inside the settle this is the accumulated phase. Outside it the shape and the
  * momentum are both constant, so the rate is too, and the answer is one
  * multiplication — no matter how long the swing has run.
+ *
+ * **`orbit.phase` therefore stops advancing at the end of the settle**, and that
+ * is not an oversight: it is the datum this multiplication is measured from, and
+ * writing the answer back every tick is exactly the accumulation the closed form
+ * exists to avoid. Anything outside this file that wants *how far round is the
+ * craft now* has to ask [`sweptSince`](#) rather than read the field — the
+ * compass read the field, and the arc it drew stopped growing at 1.2s while the
+ * craft kept going round it.
  */
 function phaseAt(orbit: Orbit, mass: number, ticks: number): number {
   if (ticks <= SETTLE_TICKS) return orbit.phase;
   const circular = circularSpeed(mass, orbit.periapsis) * orbit.periapsis;
   const rate = circular / (orbit.periapsis * orbit.periapsis);
   return orbit.phase + rate * (ticks - SETTLE_TICKS) * SECONDS_PER_TICK;
+}
+
+/**
+ * How far round from periapsis the craft has swept `ticks` after the freeze, in
+ * radians — the flown arc's own clock, and the picture's only honest source for
+ * it.
+ *
+ * Exported because the compass draws the arc already ridden and lights it by what
+ * the boost was worth along it (spec [02](../../docs/spec/02-release.md), ruled
+ * 2026-08-29), which is a question about **where the craft was at a past tick**
+ * and cannot be answered from the current position. Past the settle it is exact
+ * and closed-form, so the envelope's decaying stretch — which begins exactly
+ * where the settle ends — needs no memory at all.
+ *
+ * Inside the settle it answers only for the tick the orbit is *on*: the phase
+ * there is accumulated at substep resolution and there is no inverse. A caller
+ * that wants a corner inside the settle latches it as it passes, which is what
+ * [`compass.ts`](../state/compass.ts) does with the one corner that falls there.
+ */
+export function sweptSince(orbit: Orbit, mass: number, ticks: number): number {
+  return phaseAt(orbit, mass, ticks);
 }
 
 /**

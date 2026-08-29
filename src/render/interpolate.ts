@@ -14,7 +14,13 @@
  * the gap between two ticks that have both already happened, so no frame ever
  * shows a position the simulation did not reach.
  */
-import type { DeformationView, FlashView, PresentationState } from '../state/types.ts';
+import type {
+  CalloutView,
+  DeformationView,
+  FarewellView,
+  FlashView,
+  PresentationState,
+} from '../state/types.ts';
 
 const TWO_PI = Math.PI * 2;
 
@@ -75,6 +81,44 @@ function deformationBetween(
 }
 
 /**
+ * The word between two ticks: its **pop** crossed, its clock taken whole.
+ *
+ * The rise is a movement over seven ticks and reads as one, so it is crossed like
+ * any other position. What is not crossed is the light: `strength` is flat
+ * through the pop and the linger and only falls at the end, so there is nothing
+ * to smooth, and its `life` is the next derivation's input rather than this
+ * frame's (ADR-0015).
+ */
+function calloutBetween(
+  previous: CalloutView | null,
+  current: CalloutView | null,
+  alpha: number,
+): CalloutView | null {
+  if (current === null) return null;
+  // A different release's word is a **new** thing rather than the same thing
+  // moved, so it is placed rather than crossed — the same reason `arriving`
+  // exists, one element further out.
+  if (previous === null || arriving(current.life) || previous.body !== current.body) return current;
+  return {
+    ...current,
+    x: between(previous.x, current.x, alpha),
+    y: between(previous.y, current.y, alpha),
+    strength: between(previous.strength, current.strength, alpha),
+  };
+}
+
+/** And the ring leaving, whose whole visible behaviour is how far out it has got. */
+function farewellBetween(
+  previous: FarewellView | null,
+  current: FarewellView | null,
+  alpha: number,
+): FarewellView | null {
+  if (current === null) return null;
+  if (previous === null || arriving(current.decay)) return current;
+  return { ...current, spread: between(previous.spread, current.spread, alpha) };
+}
+
+/**
  * A view `alpha` of the way from one tick to the next.
  *
  * Bodies are taken from the later tick whole rather than interpolated: they do
@@ -132,5 +176,7 @@ export function interpolate(
     // would be a promise this function should not make before spec 17's
     // narrowing corridor exists to test it.
     corridor: current.corridor,
+    callout: calloutBetween(previous.callout, current.callout, alpha),
+    farewell: farewellBetween(previous.farewell, current.farewell, alpha),
   };
 }

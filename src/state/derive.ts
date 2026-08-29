@@ -67,22 +67,28 @@ import { headingOf, speedOf } from '../sim/craft.ts';
 import type { SimState } from '../sim/types.ts';
 import { bodyOnOffer } from '../sim/grab.ts';
 import { closingOf, energyOf, gripOf, spendingOf, stateOf, tideOf } from './body.ts';
+import { linger, struck } from './callout.ts';
 import { followCamera, openCamera } from './camera.ts';
-import { compassOf } from './compass.ts';
-import { advance, fade } from './decay.ts';
+import { compassOf, takenRing } from './compass.ts';
+import { advance, fade, place } from './decay.ts';
 import { relax, stretch, UNDEFORMED } from './deformation.ts';
-import { bloomOf, E3_BLOOM } from './energy.ts';
+import { bloomOf, E3_BLOOM, E3_TICKS } from './energy.ts';
+import { detach, expand } from './farewell.ts';
 import { hueOf } from './identity.ts';
+import { grabPunch, relaxPunch, releasePunch } from './punch.ts';
 import { sightingsOf } from './sighting.ts';
 import type {
   BodyState,
   BodyView,
+  CalloutView,
   CameraView,
   CompassView,
   DeformationView,
   Energy,
+  FarewellView,
   FlashView,
   PresentationState,
+  PunchView,
 } from './types.ts';
 
 /**
@@ -152,7 +158,17 @@ function eventOf(previous: PresentationState, sim: SimState): Event {
  * one-alive-at-a-time rule is a shape rather than a check. The ageing below is
  * what those will decay through.
  */
-function flashOf(previous: FlashView | null): FlashView | null {
+function flashOf(previous: FlashView | null, callout: CalloutView | null): FlashView | null {
+  // **The award strikes one, and it is the only thing that does.** Spec 06 §2
+  // gives PERFECT — and PERFECT alone — energy E3, so the slot spec 00 §3 built
+  // for *"release, grab, award, the checkered line"* is finally spent on the
+  // third of those, at the dot that earned it. The release and the grab stay off
+  // it by the author's own ruling, and the one-alive-at-a-time rule is kept by
+  // the shape of the field rather than by a check.
+  if (callout !== null && callout.life.age === 0 && callout.tier === 'PERFECT') {
+    const decay = place(E3_TICKS);
+    return { x: callout.bornX, y: callout.bornY, radius: E3_BLOOM, decay };
+  }
   if (previous === null) return null;
   const decay = advance(previous.decay);
   if (decay === null) return null;
@@ -211,6 +227,8 @@ function present(
   deformation: DeformationView,
   previousBodies: readonly BodyView[] | null,
   previousCompass: CompassView | null,
+  callout: CalloutView | null,
+  farewell: FarewellView | null,
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
@@ -236,6 +254,8 @@ function present(
     flash,
     sightings: sightingsOf(sim.field.bodies, states, offered, sim.craft, camera),
     compass: compassOf(previousCompass, sim),
+    callout,
+    farewell,
   };
 }
 
@@ -249,18 +269,71 @@ function present(
  * run opens with its scoreboard empty, however the last one ended.
  */
 export function createPresentation(sim: SimState): PresentationState {
-  return present(sim, openCamera(sim), null, UNDEFORMED, null, null);
+  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null, null);
+}
+
+/**
+ * What the swing was worth on the tick the button came up.
+ *
+ * **Read off the previous picture, not off this one.** By the time `derive` runs,
+ * [`release`](../sim/release.ts) has already cleared the orbit, so
+ * [`qualityOf`](../sim/quality.ts) would answer zero for every release ever
+ * made. The number that was actually paid is the one that stood at the end of the
+ * previous tick, which is exactly what the compass carried — the same value the
+ * flown arc was lighting a moment ago, so what the player was shown and what the
+ * punch is scaled by are one number and not two.
+ */
+function qualityBehind(previous: PresentationState): number {
+  return previous.compass?.envelope ?? 0;
+}
+
+/**
+ * The punch this tick lands, or what is left of the one still coming home.
+ *
+ * A release is scaled by the quality of the swing and a grab is not — spec 06 §1
+ * rules that *"grabs are never graded"* — so the two are the same gesture with
+ * only the amplitude and the direction between them, which is spec 02 §7's
+ * *"the release's mirror, at lower amplitude"* made literal.
+ */
+function punchOf(previous: PresentationState, sim: SimState, event: Event): PunchView | null {
+  if (event === 'RELEASE') return releasePunch(sim.craft, qualityBehind(previous));
+  if (event === 'GRAB') return grabPunch(sim.craft);
+  return relaxPunch(previous.camera.punch);
+}
+
+/**
+ * The word this release earned, or the one already in the air, one tick older.
+ *
+ * **One slot, and a new word takes it.** Spec 06 §4: *"queueing is structural:
+ * one release, one word"* — so two can never fight over an instant, which is the
+ * same argument and the same shape as the single E3. Its *"a new callout snaps
+ * the previous one to its decay tail"* is the softer version of this and wants
+ * the streaks it is written beside; those are spec 08's and M4's.
+ *
+ * A **miss** does not clear the word already in the air. Spec 06 §5 gives a miss
+ * silence and ADR-0008 makes it *"a debt, not a loss"* — taking down the previous
+ * release's word would be a punishment, which silence is precisely not.
+ */
+function calloutOf(previous: PresentationState, event: Event): CalloutView | null {
+  if (event === 'RELEASE' && previous.compass !== null) {
+    const word = struck(takenRing(previous.compass.rings), previous.compass.x, previous.compass.y);
+    if (word !== null) return word;
+  }
+  return linger(previous.callout);
 }
 
 /** The presentation one tick on. Call once per tick, in the same loop as `stepSim`. */
 export function derive(previous: PresentationState, sim: SimState): PresentationState {
   const event = eventOf(previous, sim);
+  const callout = calloutOf(previous, event);
   return present(
     sim,
-    followCamera(previous.camera, sim),
-    flashOf(previous.flash),
+    followCamera(previous.camera, sim, punchOf(previous, sim, event)),
+    flashOf(previous.flash, callout),
     event === 'RELEASE' ? stretch() : relax(previous.craft.deformation),
     previous.bodies,
     previous.compass,
+    callout,
+    event === 'RELEASE' ? detach(previous.compass) : expand(previous.farewell),
   );
 }

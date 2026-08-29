@@ -42,18 +42,21 @@
  * reading the field.
  */
 import { AIM_RANGE, handOf, windowsOn } from '../sim/compass.ts';
-import { pathRadiusAt, predictOrbit } from '../sim/orbit.ts';
+import { pathRadiusAt, predictOrbit, sweptSince } from '../sim/orbit.ts';
 import type { Orbit } from '../sim/orbit.ts';
 import { advance, easeStep, fade, home, place, ticksIn } from './decay.ts';
 import type { Decay } from './decay.ts';
 import { SCALE } from '../sim/units.ts';
 import { alignmentOf, tierFor } from '../sim/tier.ts';
+import { envelopeAt } from '../sim/boost.ts';
+import { qualityOf } from '../sim/quality.ts';
+import { BOOST_ARM_TICKS, BOOST_PLATEAU_TICKS, BOOST_ZERO_TICKS } from '../sim/units.ts';
 import type { Tier } from '../sim/tier.ts';
 import type { SimState } from '../sim/types.ts';
 import { closingOf } from './body.ts';
 import { BOARD_PIXEL } from './design.ts';
 import { hueOf } from './identity.ts';
-import type { CompassView, Energy, RingView } from './types.ts';
+import type { CompassView, Energy, FlownView, RingView } from './types.ts';
 
 /**
  * How far outside the orbit the innermost ring sits, in design units.
@@ -235,6 +238,22 @@ export const EXIT_TICKS = ticksIn(100);
 /** How far in it draws before it is gone — the mirror of `ENTER_FROM`, above. */
 export const EXIT_BY = 1 - ENTER_FROM;
 
+/**
+ * How many stretches each graded run of the flown arc is drawn in.
+ *
+ * The arc's light is the envelope's own value and the envelope ramps, so a run
+ * that ramps has to be drawn in pieces — a canvas cannot put a gradient along an
+ * arc. Six is where banding stops being visible at this radius: the envelope
+ * moves at most 0.17 across one piece, against a light that runs from the
+ * renderer's own `FLOWN_FLOOR` to full.
+ *
+ * It is a count of strokes and therefore a cost. Measured on the author's phone,
+ * a whole frame costs **0.59ms of 16.67ms** and the renderer already asks for 27
+ * strokes ([performance](../../docs/plan/performance.md) §10), so fourteen more
+ * is inside the noise — and `pnpm profile` prints the census either way.
+ */
+export const FLOWN_STEPS = 6;
+
 const TWO_PI = Math.PI * 2;
 
 /**
@@ -286,6 +305,13 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
       reach: 0,
       rings: [],
       swept: 0,
+      // Through the dive there is no envelope — but there is
+      // [`qualityOf`](../sim/quality.ts)'s other half, the bend the body is
+      // putting on the heading, which is what the punch is scaled by for a
+      // release that never froze (ADR-0012). One field, both clothes.
+      envelope: qualityOf(sim),
+      flown: [],
+      arming: [],
     };
   }
 
@@ -341,6 +367,14 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
   const live = previous !== null && previous.hand !== null && previous.exit === null;
   const entrance = live ? advance(previous.entrance) : place(ENTER_TICKS);
 
+  const swept = sweptSince(sim.orbit, body.mass, sim.orbit.ticksSinceFreeze);
+  // One entry per tick of the ramp, written on the tick it happens and never
+  // again: the phase inside the settle is accumulated at substep resolution and
+  // cannot be run backwards, so the only honest way to know where the craft was
+  // is to have been there. `live` is what scopes it to this swing — a new grab
+  // starts a new clock, so it starts a new latch.
+  const arming = armingOf(live ? previous.arming : [], sim.orbit.ticksSinceFreeze, swept);
+
   return {
     scale: entrance === null ? 1 : 1 + (ENTER_FROM - 1) * home(entrance),
     entrance,
@@ -361,10 +395,113 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     path,
     reach: rings.reduce((most, ring) => Math.max(most, ring.radius), anchor) + HAND_OVERSHOOT,
     rings,
-    // How much of the orbit has been flown, capped at one turn: past a full
-    // revolution the trail would be drawing over itself and saying nothing new.
-    swept: Math.min(sim.orbit.phase, TWO_PI),
+    // How much of the orbit has been flown. **Asked rather than read**: after the
+    // settle `orbit.phase` is the datum the closed form is measured from and
+    // stops advancing, so reading it froze the arc at 1.2s and let the craft fly
+    // away from the end of its own trail. The cap it used to carry never fired,
+    // because the value it capped never got there.
+    swept,
+    envelope: qualityOf(sim),
+    flown: flownArc(arming, sim.orbit, body.mass, hand, swept),
+    arming,
   };
+}
+
+/**
+ * The ramp's latch, one tick longer — or unchanged once the ramp is over.
+ *
+ * It appends rather than rebuilding, so an entry is written once and read
+ * thereafter. The guard against a gap is not defensive tidiness: a tick that
+ * arrived out of order would leave a hole the arc would draw straight through,
+ * and the array's own length is what says how far the ramp has got.
+ */
+function armingOf(previous: readonly number[], ticks: number, swept: number): readonly number[] {
+  if (ticks > BOOST_ARM_TICKS || previous.length !== ticks) return previous;
+  return [...previous, swept];
+}
+
+/**
+ * The flown arc: the orbit already ridden, cut at the envelope's own corners and
+ * lit by what a release along it would have been worth.
+ *
+ * **Ruled 2026-08-29**, on the measurement that 34% of the author's releases
+ * landed before the boost had armed and one hold ran 303 ticks against an
+ * envelope that ended at 156: the envelope's clock is said *on the orbit path*.
+ * Nothing is invented here — spec [01 · §7](../../docs/spec/01-swing.md) fixes
+ * the shape and [`envelopeAt`](../sim/boost.ts) is the same function the
+ * simulation pays on, so the picture and the payout cannot come apart.
+ *
+ * ## Every corner is exact, and none of them is guessed
+ *
+ * The arc runs from the freeze to the craft, so time runs along it and the three
+ * stretches of the envelope are three stretches of arc. Past the settle the phase
+ * is closed-form, so **the plateau's end and the point the envelope reaches
+ * zero** both come straight out of [`sweptSince`](../sim/orbit.ts) — and the
+ * plateau ends exactly where the settle does, which spec 01 §7 says is *"not a
+ * coincidence"*. The **ramp** falls inside the settle and is therefore latched a
+ * tick at a time, so each of its stretches is bounded by a real angle paired with
+ * the envelope's own value at that tick. There is no interpolation of the clock
+ * anywhere: what varies inside a stretch is only how the light is spread across
+ * it, and a stretch is at most a sixth of a ramp wide.
+ */
+function flownArc(
+  arming: readonly number[],
+  orbit: Orbit,
+  mass: number,
+  hand: number,
+  swept: number,
+): FlownView[] {
+  // Capped at one turn: past a full revolution the arc would be drawing over
+  // itself, and the stretch underneath is the one that is still true.
+  const oldest = Math.max(0, swept - TWO_PI);
+  const peakEnded = sweptSince(orbit, mass, BOOST_PLATEAU_TICKS);
+  const zeroAt = sweptSince(orbit, mass, BOOST_ZERO_TICKS);
+
+  const flown: FlownView[] = [];
+  const place = (from: number, to: number, at: number, ends: number): void => {
+    const start = Math.max(from, oldest);
+    const stop = Math.min(to, swept);
+    if (stop <= start) return;
+    // The shading is cut off the **run**, not off what survives the one-turn
+    // clip, so a stretch scrolling off the back of the arc keeps the light it had
+    // rather than restretching its own ramp over what is left of it.
+    const along = (a: number): number => at + (ends - at) * ((a - from) / (to - from || 1));
+    flown.push({
+      from: hand - (swept - start) * orbit.direction,
+      span: (stop - start) * orbit.direction,
+      at: along(start),
+      to: along(stop),
+    });
+  };
+
+  // The ramp, a latch at a time. Every corner is an angle the craft was actually
+  // at, paired with what the envelope was actually worth at that tick.
+  const armed = arming.length > BOOST_ARM_TICKS ? arming[BOOST_ARM_TICKS]! : swept;
+  for (let k = 0; k < FLOWN_STEPS; k++) {
+    const a = Math.round((k * BOOST_ARM_TICKS) / FLOWN_STEPS);
+    const b = Math.round(((k + 1) * BOOST_ARM_TICKS) / FLOWN_STEPS);
+    const from = arming[a];
+    if (from === undefined) break;
+    const to = arming[b];
+    if (to === undefined) {
+      // The ramp is still running: the last stretch ends at the craft, at what a
+      // release right now is worth.
+      place(from, swept, envelopeAt(a), envelopeAt(orbit.ticksSinceFreeze));
+      break;
+    }
+    place(from, to, envelopeAt(a), envelopeAt(b));
+  }
+
+  place(armed, peakEnded, 1, 1);
+  // The decay is exact along the arc without any latching: past the settle the
+  // phase advances at a constant rate, so linear in time **is** linear in angle.
+  for (let k = 0; k < FLOWN_STEPS; k++) {
+    const from = peakEnded + ((zeroAt - peakEnded) * k) / FLOWN_STEPS;
+    const to = peakEnded + ((zeroAt - peakEnded) * (k + 1)) / FLOWN_STEPS;
+    place(from, to, 1 - k / FLOWN_STEPS, 1 - (k + 1) / FLOWN_STEPS);
+  }
+  place(zeroAt, swept, 0, 0);
+  return flown;
 }
 
 /**
@@ -377,12 +514,25 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
  * a tier (spec 06 §5) and gets silence rather than a word.
  */
 export function takenBy(rings: readonly RingView[]): { body: number; tier: Tier } | null {
+  const ring = takenRing(rings);
+  return ring === null ? null : { body: ring.body, tier: ring.tier! };
+}
+
+/**
+ * The same answer as a whole ring, for the callers that need its geometry.
+ *
+ * The **callout** is born at the dot that earned it (spec 06 §4) and carries the
+ * window it was taken on (spec 02 §6), so it needs the arc and not only the
+ * grade — and both readings have to be the same ring or the word lands beside the
+ * mark it is about.
+ */
+export function takenRing(rings: readonly RingView[]): RingView | null {
   let best: RingView | null = null;
   for (const ring of rings) {
     if (ring.tier === null) continue;
     if (best === null || ring.aim > best.aim) best = ring;
   }
-  return best === null ? null : { body: best.body, tier: best.tier! };
+  return best;
 }
 
 /**
@@ -438,6 +588,15 @@ function leave(previous: CompassView | null): CompassView | null {
     filament: 0,
     exit,
     entrance: null,
+    // **Unused rings die instantly** — spec 02 §6, and *"no fade"*. The one that
+    // was taken is not lost with them: it leaves on the **callout**, which
+    // outlives the instrument by design, so what goes here is every arc the
+    // release did not choose and nothing else.
+    rings: [],
+    // And the arc stops being a clock the moment there is no envelope to read.
+    // It is still drawn, because it is still the orbit that was flown — the
+    // renderer floors the light rather than letting the arc go out.
+    envelope: 0,
     // Linear, and that is the fix: every acceleration in the curve this replaced
     // was an instant that read as a snap in six ticks.
     scale: 1 - EXIT_BY * across(exit),

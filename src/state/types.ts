@@ -11,6 +11,18 @@ import type { Tier } from '../sim/tier.ts';
 import type { Decay } from './decay.ts';
 
 /**
+ * The grade of a release, re-exported because it is part of what the renderer
+ * is **told**.
+ *
+ * `test/render/boundary.test.ts` forbids `src/render/` from importing
+ * `src/sim/` at all, type-only included, and it is right to: a renderer that
+ * can name a simulation module is one import away from asking it a question.
+ * The tier is a fact the picture is handed, so it arrives through this file
+ * like every other one.
+ */
+export type { Tier };
+
+/**
  * How committed or imminent something is, in four steps (`CONTEXT.md`: energy).
  * Brightness is the game's only ordinal channel; nothing changes hue to mean
  * "better".
@@ -97,6 +109,34 @@ export interface FlashView {
 }
 
 /**
+ * The punch (`CONTEXT.md`) — the transient displacement of the view that a
+ * release lands, scaled by the quality of the swing.
+ *
+ * [ADR-0012](../../docs/adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)'s
+ * replacement for the 70ms hitstop, and spec
+ * [02 · §5](../../docs/spec/02-release.md)'s *"6px along the exit tangent, home
+ * in 180ms with one overshoot"*. It carries none of itself into velocity, which
+ * is what lets it be large: *"a player tapping beside bodies gets the punch and
+ * keeps none of it."*
+ *
+ * `x` and `y` are the displacement **now**, and the three fields under them are
+ * what it was struck with — see [`punch.ts`](./punch.ts) for why the direction
+ * is carried rather than re-read off a craft that has since turned.
+ */
+export interface PunchView {
+  /** How far the view is displaced this tick, in design units. */
+  readonly x: number;
+  readonly y: number;
+  /** The unit vector it was struck along: the exit tangent at that instant. */
+  readonly alongX: number;
+  readonly alongY: number;
+  /** How far it reached at full extension, signed — negative is a grab, reversed. */
+  readonly size: number;
+  /** The return in progress, which passes rest once. */
+  readonly decay: Decay;
+}
+
+/**
  * Where the world is being watched from — the world point the centre of the
  * design space is looking at, in design units.
  *
@@ -135,6 +175,19 @@ export interface CameraView {
    * how far the craft has since travelled away from a remembered point.
    */
   readonly offset: number;
+  /**
+   * The punch inside `x` and `y`, or `null` when the view is not carrying one.
+   *
+   * **It is a displacement from where the camera is standing, not a second
+   * opinion about where it should stand** — the distinction spec
+   * [02 · §5](../../docs/spec/02-release.md) and this file's *"it does not move
+   * sideways"* both need to be true at once. `x` and `y` above are where the
+   * world is watched from with the punch already in them, so the renderer draws
+   * an answer; what follows the craft, eases and is held to the centreline is
+   * the **subject**, which is these two minus this — see
+   * [`subjectOf`](./camera.ts).
+   */
+  readonly punch: PunchView | null;
 }
 
 /**
@@ -323,6 +376,35 @@ export interface RingView {
 }
 
 /**
+ * One stretch of the **flown arc** (`CONTEXT.md`) — the orbit already ridden
+ * since the freeze, and what the boost was worth along it.
+ *
+ * **The clock the release has no other way to see.** Spec
+ * [01 · §7](../../docs/spec/01-swing.md)'s boost envelope runs from the freeze —
+ * nothing for 0.45s, everything until 1.2s, gone by 2.6s — and it is the half of
+ * spec 01 §11's tension that had no element drawing it. Flown, 34% of releases
+ * landed before it had armed and one hold ran 303 ticks against an envelope that
+ * ended at 156, reported as *"I felt that I slowed down a LOT"* (author,
+ * 2026-08-29). Ruled the same day: it is said **on the orbit path**, by lighting
+ * the arc the craft has already flown with what a release there would have been
+ * worth.
+ *
+ * The arc is a strip chart the orbit was already drawing: time runs along it from
+ * the freeze to the craft's own nose, so the brightest part is where the boost
+ * paid and the bright end is where the eye already is.
+ */
+export interface FlownView {
+  /** Where this stretch starts, as an absolute angle about the held body. */
+  readonly from: number;
+  /** How far it runs, in radians, signed the way the craft goes. */
+  readonly span: number;
+  /** What the boost was worth at its start, from 0 to 1. */
+  readonly at: number;
+  /** And at its end. The renderer spends the pair as light. */
+  readonly to: number;
+}
+
+/**
  * The compass (`CONTEXT.md`), or `null` when no body is held.
  *
  * It exists from the **press** rather than from the freeze, because spec
@@ -429,6 +511,50 @@ export interface CompassView {
   readonly rings: readonly RingView[];
   /** How much of the orbit has been flown since the freeze, capped at one turn. */
   readonly swept: number;
+  /**
+   * What a release **right now** would be worth, from 0 to 1 — spec
+   * [01 · §7](../../docs/spec/01-swing.md)'s envelope, at this tick.
+   *
+   * It is [`qualityOf`](../sim/quality.ts)'s own answer rather than a second
+   * reading of it, so the number the picture draws and the number the punch is
+   * scaled by cannot come apart. Through the dive, where there is no envelope,
+   * it is the bend the body is putting on the heading — ADR-0012's *"the same
+   * skill wearing different clothes"*.
+   */
+  readonly envelope: number;
+  /**
+   * The flown arc, lit by what the boost was worth along it — innermost stretch
+   * first, ending at the craft.
+   *
+   * Empty through the dive, because the envelope's clock starts at the freeze and
+   * an arc drawn before then would be saying something about a boost that does
+   * not exist yet.
+   */
+  readonly flown: readonly FlownView[];
+  /**
+   * How far round the craft was at each tick of the boost's arming ramp, in
+   * radians swept from the freeze — one entry per tick, latched as it passes.
+   *
+   * **The memory, beside the answer it produced**, exactly as
+   * [`DeformationView`](#deformationview) carries its clock beside its shape. The
+   * envelope's other two corners are closed-form past the settle and need no
+   * remembering; the ramp falls **inside** it, where the phase is accumulated at
+   * substep resolution and has no inverse.
+   *
+   * **It is a tick at a time and not two corners, and that is measured.** Cutting
+   * the ramp at its ends alone and shading between them along the arc is wrong by
+   * up to **0.19** of the envelope's range — measured over 55 swings — and wrong
+   * in the direction that matters: the craft leaves periapsis at its fastest, so
+   * a light spread evenly along the arc says the boost armed **sooner** than it
+   * did, which is the exact error the element exists to remove.
+   *
+   * It is a record and not an eased value, so ADR-0015's third rule does not
+   * reach it for the reason [`derive.ts`](./derive.ts)'s header gives about
+   * SPENT: no entry is ever an input to its own next value, so there is no path
+   * by which it drifts. It is bounded by the ramp — twenty-eight numbers at most,
+   * and a new grab starts a new one.
+   */
+  readonly arming: readonly number[];
 }
 
 /**
@@ -469,6 +595,84 @@ export interface SightingView {
   readonly energy: Energy;
   readonly bloom: number;
   readonly radius: number;
+}
+
+/**
+ * The callout (`CONTEXT.md`) — the word a release earned, born at the dot that
+ * earned it, and the window it was taken on.
+ *
+ * Spec [06 · §4](../../docs/spec/06-awards.md): *"the word, its points and its
+ * colour arrive as one unit at the release point... the pop buys the glance;
+ * leaving it behind sells the speed. Score meets attention where attention
+ * already is — no band at the top of the screen."*
+ *
+ * The window travels with it rather than staying on a compass that has already
+ * gone, because spec [02 · §6](../../docs/spec/02-release.md) asks for exactly
+ * that pair — *"unused rings die instantly; the taken window stays lit and
+ * decays behind the craft"* — and they are one fact: the arc is where the word
+ * was earned, and the dot at its centre is where the word is standing.
+ */
+export interface CalloutView {
+  /**
+   * What it graded. `MAKE` is carried and **not spoken**: spec 06 §2 gives the
+   * baseline tier points alone, *"because a word for 'merely made it' devalues
+   * every word above it"*. Carrying it anyway is what lets a test assert that a
+   * make produced no word rather than that nothing happened.
+   */
+  readonly tier: Tier;
+  /** Which body's window was taken — its address, and therefore its hue. */
+  readonly body: number;
+  /** That body's hue, so the arc still knows whose it is once the compass is gone. */
+  readonly hue: number;
+  /** Where the word is standing, in world units: the dot, plus the pop. */
+  readonly x: number;
+  readonly y: number;
+  /** The dot itself, which does not move — where the word was born. */
+  readonly bornX: number;
+  readonly bornY: number;
+  /** The held body's centre, which the taken window is an arc about. */
+  readonly aboutX: number;
+  readonly aboutY: number;
+  /** How far out that arc sits, in design units. */
+  readonly radius: number;
+  /** Where its centre points, and how far it reaches either side. */
+  readonly dot: number;
+  readonly halfWidth: number;
+  /** Its bloom radius, in design units — spec 06 §4's per-tier glow. */
+  readonly bloom: number;
+  /** How tall the word is set, in design units. */
+  readonly size: number;
+  /** The pop, then the linger, then the decay: one clock, three stretches. */
+  readonly life: Decay;
+  /** How lit it is now, from 1 through the linger to 0. */
+  readonly strength: number;
+}
+
+/**
+ * The farewell ring (`CONTEXT.md`) — the orbit detaching from the body and
+ * expanding away at a release, in AURORA.
+ *
+ * Spec [02 · §6](../../docs/spec/02-release.md), and *"the only AURORA the
+ * baseline field ever wears"* — violet means the rules are different here, and
+ * for 400ms after a release they were.
+ *
+ * It carries the compass's own sampled path rather than a radius, so the ring
+ * that leaves is the ellipse the craft actually rode and not a circle standing in
+ * for it. **A stroke and never a fill**: a large expanding filled ring is the one
+ * element in this milestone that could move the renderer's overdraw off its
+ * measured 1.53 screens ([performance](../../docs/plan/performance.md) §6), and
+ * the design asks for a detaching orbit, which is a line.
+ */
+export interface FarewellView {
+  /** The body it is leaving, in world units. */
+  readonly x: number;
+  readonly y: number;
+  /** The orbit it was, as radii at `i / length` of a turn from angle zero. */
+  readonly path: readonly number[];
+  /** How far it has expanded, as a multiplier on those radii. */
+  readonly spread: number;
+  /** How far through its 400ms it is. */
+  readonly decay: Decay;
 }
 
 /**
@@ -523,4 +727,14 @@ export interface PresentationState {
    * **sighting** is what a craft without one reads.
    */
   readonly compass: CompassView | null;
+  /**
+   * The word the last release earned, or `null`.
+   *
+   * One, and never a queue. Spec 06 §4: *"queueing is structural: one release,
+   * one word"* — a new callout replaces the one before it, which is the same
+   * shape [`FlashView`](#flashview) uses for the same reason.
+   */
+  readonly callout: CalloutView | null;
+  /** The orbit expanding away from the body it was, or `null`. */
+  readonly farewell: FarewellView | null;
 }

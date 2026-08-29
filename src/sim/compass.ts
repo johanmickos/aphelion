@@ -125,10 +125,17 @@ export const AIM_RANGE = 800 * SCALE;
  *
  * Over 120 pilot runs and 342 releases that reached another body, the body the
  * craft actually grabs next is among the four nearest to the one it just left
- * **100%** of the time — 99.7% at three, 92.7% at two. Four is where the cohort
- * runs out, and it is close to what Direction 01's board draws.
+ * **100%** of the time — 99.7% at three, 92.7% at two.
+ *
+ * **Three, ruled 2026-08-29**: *"let's reduce the # of planets shown on the
+ * compass to 3. Four is a bit unwieldy and makes it hard to decide where to go
+ * next"* (author). The cohort above prices it exactly — the fourth ring is worth
+ * **0.3%** of releases, one in 342, and what it costs is a choice the player has
+ * to make on every orbit. Two is the next step down and it is a different
+ * decision: 92.7% would put the body actually taken off the instrument once every
+ * fourteen releases.
  */
-export const RINGS = 4;
+export const RINGS = 3;
 
 /**
  * How near a release has to pass to count as inside the window, in multiples of

@@ -55,7 +55,6 @@ export const PATCHES: readonly Patch[] = [
   settable('src/state/camera.ts', 'DEADZONE', 'an opening position; only the gate can judge it'),
   settable('src/state/camera.ts', 'FOLLOW_RATE', 'moved at the M1 gate, 8 → 3'),
   settable('src/state/camera.ts', 'LOCK_TICKS', 'the prototype’s third of a second, carried'),
-  settable('src/state/camera.ts', 'RELEASE_RATE', 'what decays after a release'),
 
   // Spec 00 §3's ordinal channel, read into design units. The radii are the
   // board's own numbers times three (ADR-0010) and the reading is the thing to
@@ -72,6 +71,47 @@ export const PATCHES: readonly Patch[] = [
   settable('src/state/deformation.ts', 'STRETCH_ALONG', 'spec 02 §4, still to be flown'),
   settable('src/state/deformation.ts', 'STRETCH_ACROSS', 'the other half of the same stretch'),
   settable('src/state/deformation.ts', 'DEFORM_TICKS', 'spec 02 §4’s 180ms, dated from T0'),
+
+  // Spec 02's release, rebased on ADR-0012. The punch is the whole of what
+  // replaced the hitstop, and the ADR's own words are the argument for flying
+  // it: it *"can be large without touching the economy"*, so where large stops
+  // being punch and starts being a shove is a question only the phone answers.
+  settable(
+    'src/state/punch.ts',
+    'PUNCH_RELEASE',
+    'spec 02 §5’s 6px, and ADR-0012 says it may be larger',
+  ),
+  settable('src/state/punch.ts', 'PUNCH_GRAB', 'the grab’s mirror — half, and reversed'),
+  settable('src/state/punch.ts', 'PUNCH_TICKS', 'spec 02 §5’s 180ms home, with one overshoot'),
+  settable(
+    'src/state/punch.ts',
+    'PUNCH_STRETCH',
+    'ADR-0012’s “half again as long” at full quality',
+  ),
+
+  // The farewell ring. Spec 02 §6 fixes the colour and says only "expands away",
+  // so how far is an opening position with nothing behind it.
+  settable('src/state/farewell.ts', 'FAREWELL_SPREAD', 'how far the orbit gets before it goes'),
+  settable('src/state/farewell.ts', 'FAREWELL_TICKS', 'spec 02 §2’s 400ms, dated from T0'),
+
+  // The callout. `LINGER_TICKS` is the one number in this milestone two specs
+  // disagree about — spec 02 §2 ends the word at T+510ms and spec 06 §4's own
+  // pop, linger and decay sum to 1 720ms — so it is on a slider until the author
+  // says which reading is the game's.
+  settable(
+    'src/state/callout.ts',
+    'LINGER_TICKS',
+    'spec 06 §4 says 1.2s and spec 02 §2 implies 0.4s',
+  ),
+  settable('src/state/callout.ts', 'POP_TICKS', 'spec 06 §4’s 120ms upward, one overshoot'),
+  settable('src/state/callout.ts', 'POP_RISE', 'and how far up it carries — spec 06 §4’s ~30px'),
+  {
+    file: 'src/render/index.ts',
+    find: 'const FLOWN_FLOOR = 0.22;',
+    replace: 'export let FLOWN_FLOOR = 0.22;',
+    append: '\nexport function set_FLOWN_FLOOR(value: number): void {\n  FLOWN_FLOOR = value;\n}\n',
+    why: 'how faint the flown arc goes where the boost is worth nothing',
+  },
 
   {
     // The lock is the one camera mechanism with no number that turns it off:

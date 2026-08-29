@@ -176,12 +176,19 @@ describe('what it is allowed to say', () => {
     expect(Object.keys(armed).sort()).toEqual([
       'alpha',
       'anchor',
+      // What the boost is worth now, where each tick of its ramp was flown, and
+      // what it was worth along the arc already ridden. Three facts about the
+      // swing, and the one thing on the instrument that says *when* rather than
+      // *where* — still no field that says **release**.
+      'arming',
       'craftX',
       'craftY',
       'direction',
       'entrance',
+      'envelope',
       'exit',
       'filament',
+      'flown',
       'hand',
       'hue',
       'path',
@@ -372,7 +379,9 @@ describe('a window never moves once it exists', () => {
         checked++;
       }
     }
-    expect(checked).toBeGreaterThan(1000);
+    // Three rings a swing since 2026-08-29 (`RINGS`), so the same run offers a
+    // quarter fewer samples than it did at four.
+    expect(checked).toBeGreaterThan(800);
   });
 
   /**

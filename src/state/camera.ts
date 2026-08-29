@@ -48,7 +48,7 @@ import type { SimState } from '../sim/types.ts';
 import { FLOOR_GAP, MEDIAN_RADIUS, SETTLE_TICKS } from '../sim/units.ts';
 import { easeStep } from './decay.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from './design.ts';
-import type { CameraView } from './types.ts';
+import type { CameraView, PunchView } from './types.ts';
 
 /**
  * How far the craft may drift from the camera before the camera follows, in
@@ -107,26 +107,55 @@ export const FOLLOW_RATE = 3;
 export const LOCK_TICKS = 20;
 
 /**
- * How fast the displacement decays once there is no orbit to hold it, in units
- * of 1/second.
+ * **The release lets go of the view as well as of the body**, and it used to
+ * take its time about it.
  *
- * The prototype's rate again — *"the same rate carries the lock back out at the
- * release, which is the other discontinuity."*
+ * The displacement the lock is holding used to decay after a release at the
+ * prototype's own rate — 3/s, 5% a tick — on the argument that dropping it
+ * outright *"would snap the view by an orbit radius on the one tick the swing is
+ * paid for"*. Flown, that argument was wrong twice over.
  *
- * **What decays is the displacement and not the weight**, and that is a
- * departure from the prototype worth stating. Decaying the weight means
- * recomputing `body − craft` every tick against a body the craft is now flying
- * away from, so the displacement is a shrinking fraction of a growing distance
- * and the view can briefly move faster than the craft it is following —
- * measured here at 1.25× before this was changed. Decaying the displacement
- * itself bounds the whole effect by the orbit's own radius: the camera's extra
- * movement can never exceed `radius × rate`, whatever the craft does next.
+ * **It was the delay the author reported.** *"The slight delay is making it seem
+ * jagged and jumpy. Let's remove any camera/speed delay there"* (author,
+ * 2026-08-29). Measured over the 29 releases in the recorded dispatches that were
+ * carrying a hold at all: the view spent **41 ticks at p50 and up to 104** —
+ * nearly two seconds — walking off the orbit's hold, travelling **356 design
+ * units at p50 and 553 at worst** away from a craft that was accelerating in the
+ * other direction. That is not a settle; it is the camera finishing the orbit
+ * after the player has left it.
+ *
+ * **And the snap it was guarding against is not one.** What is dropped is the
+ * camera's *subject*, not the camera: the deadzone absorbs
+ * [`DEADZONE`](#deadzone) of the change outright and the follow ease spends the
+ * rest at 5% a tick, so the largest single-tick movement the view can make is the
+ * same one it can make at any other moment. The guard was protecting a number
+ * that never reached the picture.
  */
-export const RELEASE_RATE = 3;
 
-/** Where the camera sits sideways: the corridor's centreline, always. */
+/** Where the camera sits sideways: the corridor's centreline, always. */ /** Where the camera sits sideways: the corridor's centreline, always. */
 function centreline(): number {
   return DESIGN_WIDTH / 2;
+}
+
+/**
+ * Where the camera is **following** — its position with the punch taken back out.
+ *
+ * The punch travels along the exit tangent (spec
+ * [02 · §5](../../docs/spec/02-release.md)), so it has a horizontal component,
+ * and this file does not move sideways until [M3.1](../../docs/plan/m3-the-field.md).
+ * Both are right, and this is where they meet: the punch is a **displacement
+ * from** where the camera is standing rather than a second opinion about where
+ * it should stand. What the sideways rule constrains is the subject, and this is
+ * it — `test/state/camera.test.ts` asserts the centreline on this rather than on
+ * `x`, and the recurrence eases from this rather than from a position that has a
+ * transient in it, because easing from a kicked position would feed the punch
+ * back into the follow and leave a bruise the deadzone would have to walk off.
+ */
+export function subjectOf(camera: CameraView): { x: number; y: number } {
+  const punch = camera.punch;
+  return punch === null
+    ? { x: camera.x, y: camera.y }
+    : { x: camera.x - punch.x, y: camera.y - punch.y };
 }
 
 /**
@@ -137,7 +166,7 @@ function centreline(): number {
  * that as the reason its own reset is a placement.
  */
 export function openCamera(sim: SimState): CameraView {
-  return { x: centreline(), y: sim.craft.y, lock: 0, offset: 0 };
+  return { x: centreline(), y: sim.craft.y, lock: 0, offset: 0, punch: null };
 }
 
 /**
@@ -167,9 +196,14 @@ export function lockOf(sim: SimState): number {
  * cameras that disagree agree again within a bounded time — which is what makes
  * the memory safe rather than merely convenient.
  */
-export function followCamera(previous: CameraView, sim: SimState): CameraView {
+export function followCamera(
+  previous: CameraView,
+  sim: SimState,
+  punch: PunchView | null,
+): CameraView {
   const craftY = sim.craft.y;
   const lock = lockOf(sim);
+  const was = subjectOf(previous);
 
   // While the lock is on, the displacement is exact and not eased toward:
   // an eased displacement would lag a target that goes round once a second, and
@@ -190,21 +224,23 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   // circle far above the floor, the view has no reason to be near its centre,
   // and an unclamped anchor would let the craft swing below the thumb line.
   //
-  // While the lock is off, the displacement decays from wherever it was. That is
-  // the release: there is no body any more, and dropping the displacement
-  // outright would snap the view by an orbit radius on the one tick the swing is
-  // paid for.
+  // While the lock is off there is no displacement at all — the release lets go
+  // of the view on the same tick it lets go of the body. See the note above
+  // `centreline`: what this drops is the *subject*, and the deadzone and the
+  // follow ease are what turn that into a movement.
   const offset =
-    lock > 0
-      ? (stillPoint(previous.y, sim.field.bodies[sim.heldBody!]!.y) - craftY) * lock
-      : previous.offset * (1 - easeStep(RELEASE_RATE));
+    lock > 0 ? (stillPoint(was.y, sim.field.bodies[sim.heldBody!]!.y) - craftY) * lock : 0;
 
   const subjectY = craftY + offset;
+  const followed = was.y + (targetY(was.y, subjectY) - was.y) * easeStep(FOLLOW_RATE);
   return {
-    x: centreline(),
-    y: previous.y + (targetY(previous.y, subjectY) - previous.y) * easeStep(FOLLOW_RATE),
+    // The subject is the centreline and the punch is what moves off it — the one
+    // horizontal movement in this file, and it is transient by construction.
+    x: centreline() + (punch?.x ?? 0),
+    y: followed + (punch?.y ?? 0),
     lock,
     offset,
+    punch,
   };
 }
 

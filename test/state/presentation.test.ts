@@ -67,21 +67,39 @@ describe('the run pnpm replay ships', () => {
 
 describe('the one E3', () => {
   /**
-   * **Nothing strikes one yet, and that is a ruling rather than a gap.** M2.1
-   * built spec [00 · §3](../../docs/spec/00-tokens.md)'s flash at the grab and at
-   * the release; flown, the author took both off the list (2026-08-29): *"the
-   * white dot that is emitted when I grab is too noisy and too much... let's let
-   * the PLANET speak about our grab, not some ambient glowing orbs."*
+   * **Only the award strikes one, and only its top word.** M2.1 built spec
+   * [00 · §3](../../docs/spec/00-tokens.md)'s flash at the grab and at the
+   * release; flown, the author took both off the list (2026-08-29): *"the white
+   * dot that is emitted when I grab is too noisy and too much... let's let the
+   * PLANET speak about our grab, not some ambient glowing orbs."*
    *
    * Spec [04 · §3](../../docs/spec/04-bodies.md) is what speaks instead — a held
-   * body is E2 and alive, and the compass draws itself around that glow — so the
-   * grab already had a voice and the flash was a second one saying the same
-   * thing. The **release goes quiet** with it, accepted for now: the award word
-   * and the farewell ring are M2.4's.
+   * body is E2 and alive — so the grab already had a voice. What fills the quiet
+   * is what the author named: *"the boost, the point rewards, and maybe even a
+   * planetary pulse/farewell ring."* Spec [06 · §2](../../docs/spec/06-awards.md)
+   * gives **PERFECT** energy E3 and gives the three tiers under it E1 and E2, so
+   * the slot is spent on the rarest word in the game and on nothing else.
    */
-  it('is never struck, over a whole run', () => {
+  it('is struck by a PERFECT and by nothing else', () => {
     expect(RUN.length).toBeGreaterThan(2000);
-    for (const view of RUN) expect(view.flash).toBeNull();
+    for (let i = 0; i < RUN.length; i++) {
+      const view = RUN[i]!;
+      if (view.flash === null) continue;
+      // Either it was struck on this tick by a PERFECT, or it is one that was and
+      // is still ageing — never anything else, and never two.
+      const born = view.flash.decay.age === 0;
+      if (born) expect(view.callout?.tier).toBe('PERFECT');
+      else expect(RUN[i - 1]!.flash).not.toBeNull();
+    }
+  });
+
+  /** And a grab strikes nothing, which is the half of the ruling that is a silence. */
+  it('is not struck by a grab', () => {
+    for (let i = 1; i < RUN.length; i++) {
+      const grabbed =
+        RUN[i]!.bodies.some((body) => body.held) && !RUN[i - 1]!.bodies.some((body) => body.held);
+      if (grabbed) expect(RUN[i]!.flash?.decay.age).not.toBe(0);
+    }
   });
 
   /**

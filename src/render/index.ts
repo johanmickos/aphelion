@@ -40,17 +40,31 @@ import { BOARD_PIXEL, DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
 import type {
   BodyState,
   BodyView,
+  CalloutView,
   CompassView,
   Energy,
+  FarewellView,
   FlashView,
   PresentationState,
   RingView,
   SightingView,
   TideView,
+  Tier,
 } from '../state/types.ts';
 import { fade } from '../state/decay.ts';
 import { letterbox, visible } from './letterbox.ts';
-import { BODY_FILL, CORE, dim, DUSK, identity, identityRising, VOID } from './palette.ts';
+import {
+  AURORA,
+  BODY_FILL,
+  CORE,
+  dim,
+  DUSK,
+  identity,
+  identityRising,
+  LUMEN,
+  SOLAR,
+  VOID,
+} from './palette.ts';
 
 /**
  * How far above a body's surface its floor sits, in design units.
@@ -593,16 +607,7 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
   // flown over the top of it in the craft's own light. Both walk the same sampled
   // curve, so the trail cannot come away from the path it is a piece of.
   drawPath(context, compass);
-  if (compass.path.length > 0) {
-    if (compass.swept > 0) {
-      const from = compass.hand - compass.swept * compass.direction;
-      const span = Math.min(compass.swept, Math.PI * 2);
-      traceArc(context, compass, from, span * compass.direction);
-      context.lineWidth = HAND_WIDTH;
-      context.strokeStyle = dim(CORE, STRENGTH[2] * compass.alpha);
-      context.stroke();
-    }
-  }
+  drawFlown(context, compass);
 
   // The hand: the radius through the craft, from the body's **surface** out past
   // the outermost ring. *"I want this line to end at the planet surface, not
@@ -628,7 +633,59 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
   for (const ring of compass.rings) drawRing(context, compass, ring);
 }
 
-/** How faint the whole orbit path is drawn, against the trail already flown. */
+/**
+ * The flown arc — the orbit already ridden, lit by what the boost was worth
+ * along it (`CONTEXT.md`: **flown arc**).
+ *
+ * **The boost envelope's clock, and the only thing that draws it.** Spec
+ * [01 · §11](../../docs/spec/01-swing.md)'s tension is an aim that wants one
+ * moment and a boost that wants another, and until this the aim half was drawn in
+ * detail and the timing half was invisible — flown, 34% of releases landed before
+ * the boost had armed at all. Ruled 2026-08-29: it is said here, on the path.
+ *
+ * Time runs along the arc from the freeze to the craft's own nose, so the
+ * brightest stretch is where the boost paid and the bright end is under the
+ * thing the eye is already on. What each stretch is worth is presentation
+ * state's ([`compass.ts`](../state/compass.ts)); this stroke it.
+ *
+ * One stroke per stretch, because a canvas cannot put a gradient along an arc.
+ * Each is drawn at its own midpoint, which is why the stretches are cut fine
+ * enough that the step between two of them is under a fifth of the range.
+ */
+function drawFlown(context: CanvasRenderingContext2D, compass: CompassView): void {
+  if (compass.path.length === 0) return;
+  context.lineWidth = HAND_WIDTH;
+  for (const run of compass.flown) {
+    traceArc(context, compass, run.from, run.span);
+    const worth = (run.at + run.to) / 2;
+    // **The floor is not zero**, and that is what keeps it a clock rather than a
+    // disappearance: the arc is still the orbit the craft has ridden whatever it
+    // is now worth, and what the light says on top of that is what a release
+    // there would have paid.
+    context.strokeStyle = dim(
+      CORE,
+      STRENGTH[2] * (FLOWN_FLOOR + (1 - FLOWN_FLOOR) * worth) * compass.alpha,
+    );
+    context.stroke();
+  }
+}
+
+/**
+ * How faint the flown arc goes where the boost is worth nothing.
+ *
+ * **Not zero, and that is the difference between a clock and a disappearance.**
+ * The arc is still the orbit the craft has ridden, which is a fact worth keeping
+ * whatever it is now worth; what the light says on top of that is what a release
+ * there would have paid. An arc that went out would take the trail with it.
+ *
+ * It is an **alpha** and therefore lives here rather than in presentation state,
+ * which is spec [00 · §1](../../docs/spec/00-tokens.md)'s own line and
+ * [`energy.ts`](../state/energy.ts)'s: a radius is a length and is asserted
+ * without a canvas, and an alpha is paint.
+ */
+const FLOWN_FLOOR = 0.22;
+
+/** How faint the whole orbit path is drawn, against the arc already flown. */
 const PATH_STRENGTH = 0.16;
 const PATH_WIDTH = 1 * BOARD_PIXEL;
 
@@ -864,6 +921,117 @@ function drawSighting(context: CanvasRenderingContext2D, mark: SightingView): vo
   context.restore();
 }
 
+/**
+ * The farewell ring — the orbit detaching from the body and expanding away, in
+ * AURORA (spec [02 · §6](../../docs/spec/02-release.md)).
+ *
+ * *"The only AURORA the baseline field ever wears."* Violet means the rules are
+ * different here, and for 400ms after a release they were: the path the craft was
+ * bound to stops being a constraint and leaves.
+ *
+ * **A stroke and never a fill.** A large expanding filled ring is the one shape
+ * in this milestone whose area grows as the square of what is being animated, and
+ * it is the only thing that could have moved the renderer's overdraw off its
+ * measured 1.53 screens. The design asks for an orbit detaching, which is a line.
+ */
+function drawFarewell(context: CanvasRenderingContext2D, farewell: FarewellView): void {
+  const n = farewell.path.length;
+  if (n === 0) return;
+  context.beginPath();
+  for (let k = 0; k <= n; k++) {
+    const angle = ((k % n) / n) * Math.PI * 2;
+    const r = farewell.path[k % n]! * farewell.spread;
+    const x = farewell.x + Math.cos(angle) * r;
+    const y = farewell.y + Math.sin(angle) * r;
+    if (k === 0) context.moveTo(x, y);
+    else context.lineTo(x, y);
+  }
+  context.lineWidth = FAREWELL_WIDTH;
+  context.strokeStyle = dim(AURORA, STRENGTH[2] * fade(farewell.decay));
+  context.stroke();
+}
+
+/** The ring leaves at the weight the instrument was drawn at, so it reads as the same line. */
+const FAREWELL_WIDTH = 1.5 * BOARD_PIXEL;
+
+/**
+ * How each tier's word is painted — spec
+ * [06 · §2](../../docs/spec/06-awards.md)'s ladder, white → green → gold.
+ *
+ * *"The rarity convention players arrive knowing. Violet is deliberately absent:
+ * purple means strange, never good."* And spec 00 §1's other half of the same
+ * rule: quality colours live **only in type**, so these three tokens appear here
+ * and on no geometry in the game.
+ */
+const TIER_TOKEN: Readonly<Record<Tier, string>> = {
+  MAKE: CORE,
+  TRUE: CORE,
+  SHARP: LUMEN,
+  PERFECT: SOLAR,
+};
+
+/** A make speaks in points alone (spec 06 §2), and points arrive with the economy. */
+const SPEAKS: Readonly<Record<Tier, boolean>> = {
+  MAKE: false,
+  TRUE: true,
+  SHARP: true,
+  PERFECT: true,
+};
+
+/**
+ * The callout: the window that was taken, still lit, and the word standing at its
+ * dot.
+ *
+ * Spec [02 · §6](../../docs/spec/02-release.md) — *"unused rings die instantly;
+ * the taken window stays lit and decays behind the craft"* — and spec 06 §4's
+ * *"the word, its points and its colour arrive as one unit at the release
+ * point."* They are drawn together because they are one fact: the arc is where
+ * the word was earned and the dot at its centre is where it is standing.
+ *
+ * The type is **Archivo 800, tracked caps** and never the display face: spec 00
+ * §4 bans Anton here outright, because *"moving text needs open counters"*
+ * (Direction 06).
+ */
+function drawCallout(context: CanvasRenderingContext2D, callout: CalloutView): void {
+  const token = TIER_TOKEN[callout.tier];
+
+  // The window it was taken on, in that body's own hue — identity, not grade.
+  // It decays where it was rather than following the craft, because what it marks
+  // is the arc that paid.
+  context.save();
+  context.lineCap = 'round';
+  context.beginPath();
+  context.arc(
+    callout.aboutX,
+    callout.aboutY,
+    callout.radius,
+    callout.dot - callout.halfWidth,
+    callout.dot + callout.halfWidth,
+  );
+  context.lineWidth = WINDOW_WIDTH * 2;
+  context.strokeStyle = identity(callout.hue, callout.strength);
+  context.stroke();
+  context.restore();
+
+  if (!SPEAKS[callout.tier]) return;
+
+  // Its bloom is drawn first and under it, so the word sits in its own light
+  // rather than behind a wash of it.
+  bloom(context, callout.x, callout.y, 0, callout.bloom, inToken(token), callout.strength);
+
+  context.save();
+  context.font = `800 ${callout.size}px ${UTILITY_FACE}`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.letterSpacing = `${callout.size * CALLOUT_TRACKING}px`;
+  context.fillStyle = dim(token, callout.strength);
+  context.fillText(callout.tier, callout.x, callout.y);
+  context.restore();
+}
+
+/** Spec 06 §4's tracking: caps at 0.1em, which is a tenth of the size. */
+const CALLOUT_TRACKING = 0.1;
+
 /** Spec 00 §4's utility face. Never a monospace — the figures do the technical work. */
 const UTILITY_FACE = "'Archivo', system-ui, sans-serif";
 const LABEL_SIZE = 9 * BOARD_PIXEL;
@@ -934,7 +1102,15 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
 
   if (view.compass !== null) drawCompass(context, view.compass);
 
+  // The orbit leaving, then the light that marks where it was let go of, then the
+  // word standing in that light. The flash is **under** the word rather than over
+  // it: additive light across type is a wash, and spec 06 §4 composes the callout
+  // as one unit rather than as a word with a glare on it.
+  if (view.farewell !== null) drawFarewell(context, view.farewell);
+
   if (view.flash !== null) drawFlash(context, view.flash);
+
+  if (view.callout !== null) drawCallout(context, view.callout);
 
   // The craft's own bloom is drawn round, and the dart inside it is what
   // stretches: spec 00 §5 puts every streak parallel to velocity, and a glow
