@@ -230,6 +230,17 @@ export interface BodyView {
    */
   readonly closing: number;
   /**
+   * How far through going out a body that has been let go is, or `null` when it
+   * is not going out — never held, or already out.
+   *
+   * Beside `state` rather than inside it. `SPENT` is the **record** — spec 04 §3
+   * makes a field of spent bodies the run's scoreboard, and it never comes
+   * back — and this is only how far through going out the picture is. The two
+   * answer different questions and end at different times: a body is spent
+   * forever, and it is *going out* for 210ms.
+   */
+  readonly spending: Decay | null;
+  /**
    * Its hue, in oklch degrees — **its name** (`CONTEXT.md`: identity).
    *
    * A number and not a colour, because a colour is paint and this layer holds

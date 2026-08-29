@@ -87,6 +87,17 @@ footer uses obsolete numbering and is void.
 > edge it sits on. Cubing was measured and overshoots the other way — it holds at 1.6× through the
 > *middle* of the approach, so the growing happens too late to be what the eye follows in.
 >
+> **§3 · The lamp goes out over 210ms, not on a tick.** *"The planet deactivation after release
+> — can we at least have it quickly fade out instead of just toggle 'off'?"* (author, 2026-08-29).
+> §3's *"the lamp goes out at release, not at grab"* was built as an instant: one tick at E2 and
+> the next at E0, in a game whose every other transition is a curve. **The load-bearing half is
+> untouched** — nothing happens at the grab — and what moved is only that the release now *starts*
+> the going-out rather than completing it. A body keeps its energy and its hue while it fades, and
+> both looks are drawn at once through it, because the crossing is identity hue to DUSK and a
+> canvas cannot mix two colours in one stroke. Half of §5's DECAY, and the halving is the author's:
+> the token's own 420ms was the first answer and *"let's make it about twice as fast"* was the
+> second.
+>
 > **§3 · A body glows when it is *gripping*, not when it is reachable.** This table's *"E0–E1"*
 > for AHEAD is read at **E0** until the body is actually pulling — see spec
 > [00 · §3](./00-tokens.md)'s notice, and `CONTEXT.md`'s new **grip**. A body in reach but far off

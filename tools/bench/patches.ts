@@ -193,6 +193,7 @@ export function lockOf(sim: SimState): number {
     'PATH_FADE_RATE',
     'how fast the oval fades in once it is possible',
   ),
+  settable('src/state/body.ts', 'SPEND_TICKS', 'how long a body takes to go out after a release'),
   settable('src/state/compass.ts', 'ENTER_FROM', 'spec 00 §5’s ENTER: how small it starts'),
   settable('src/state/compass.ts', 'ENTER_TICKS', 'and how long it takes to come online'),
   settable(

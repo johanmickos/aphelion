@@ -36,6 +36,7 @@ function view(x: number, y: number, heading: number): PresentationState {
         state: 'AHEAD',
         offered: false,
         closing: 0,
+        spending: null,
         grip: 0,
         hue: hueOf(0),
         energy: 1,

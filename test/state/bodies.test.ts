@@ -26,6 +26,7 @@ import { MEDIAN_RADIUS, SETTLE_TICKS } from '../../src/sim/units.ts';
 import {
   EMIT_AT,
   pullOf,
+  SPEND_TICKS,
   TIDE_HALF_WIDTH_MAX,
   TIDE_LAG_RATE_MAX,
   TIDE_LIFT,
@@ -110,11 +111,37 @@ describe('the four states', () => {
    * README records Direction 04 winning over Direction 01 on, so it gets an
    * assertion on the exact two ticks rather than a range.
    */
-  it('is E2 on the tick of the grab and E0 on the tick of the release, not before', () => {
+  /**
+   * Spec 04 §3's *"the lamp goes out at release, not at grab"*, with the half of
+   * it that moved marked. **The lamp starts going out at the release**, rather
+   * than being out on that tick: *"can we at least have it quickly fade out
+   * instead of just toggle 'off'?"* (author, 2026-08-29). §3's load-bearing half
+   * — *not at grab* — is untouched and is still checked here.
+   */
+  it('is E2 on the tick of the grab, and starts going out on the tick of the release', () => {
     expect(views[grabbed]!.bodies[address]!.energy).toBe(2);
     expect(views[released - 1]!.bodies[address]!.energy).toBe(2);
-    expect(views[released]!.bodies[address]!.energy).toBe(0);
-    expect(views[released]!.bodies[address]!.bloom).toBe(0);
+    expect(views[released - 1]!.bodies[address]!.spending).toBeNull();
+
+    // Still burning on the tick it is let go of, and only starting to go out.
+    expect(views[released]!.bodies[address]!.energy).toBe(2);
+    expect(views[released]!.bodies[address]!.spending).toEqual({ age: 0, span: SPEND_TICKS });
+
+    // It **ends** rather than becoming small — a counter and not a value, which
+    // is `decay.ts`'s own argument and the reason this is not a fraction stepped
+    // down each tick: a thirteenth is not a number a float can hold, and the lamp
+    // stopped at 2.8e-16 instead of going out.
+    const going = views.slice(released).map((view) => view.bodies[address]!.spending);
+    for (let i = 0; i < SPEND_TICKS; i++) expect(going[i]!.age).toBe(i);
+    expect(going[SPEND_TICKS]).toBeNull();
+
+    // And once it is out it is out: E0, no bloom, and it never comes back.
+    for (const view of views.slice(released + SPEND_TICKS)) {
+      const body = view.bodies[address]!;
+      expect(body.spending).toBeNull();
+      expect(body.energy).toBe(0);
+      expect(body.bloom).toBe(0);
+    }
   });
 
   /**
@@ -360,6 +387,13 @@ describe('the tide', () => {
     const spent = views.find((view) => view.bodies.some((body) => body.state === 'SPENT'))!;
     const body = spent.bodies.find((b) => b.state === 'SPENT')!;
     expect(body.tide).toBeNull();
-    expect(body.bloom).toBe(bloomOf(0));
+
+    // The **lamp** takes SPEND_TICKS to go out; the tide does not wait for it.
+    // Spec 04 §2's tide is a body reaching for the craft, and a spent one has
+    // stopped — so it is gone on the tick of the release while the glow is still
+    // on its way down.
+    const address = spent.bodies.indexOf(body);
+    const out = views[views.indexOf(spent) + SPEND_TICKS]!.bodies[address]!;
+    expect(out.bloom).toBe(bloomOf(0));
   });
 });

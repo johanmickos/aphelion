@@ -48,8 +48,9 @@ import type {
   SightingView,
   TideView,
 } from '../state/types.ts';
+import { fade } from '../state/decay.ts';
 import { letterbox, visible } from './letterbox.ts';
-import { BODY_FILL, CORE, dim, DUSK, identity, identityLit, VOID } from './palette.ts';
+import { BODY_FILL, CORE, dim, DUSK, identity, identityRising, VOID } from './palette.ts';
 
 /**
  * How far above a body's surface its floor sits, in design units.
@@ -454,13 +455,23 @@ function drawTide(context: CanvasRenderingContext2D, body: BodyView, tide: TideV
   // of the arc the tide is exactly as wide as the body's own edge, so there is no
   // width to step across — it becomes the rim, and the rim carries on round. That
   // is what turns a band with two cut ends into something emerging from the limb.
-  const rim = LOOK[body.state].rim * BOARD_PIXEL;
+  const look = LOOK[body.state];
+  const rim = look.rim * BOARD_PIXEL;
   // From the rim's own width at the edge of the reach to `1 + TIDE_SWELL` times
   // §1's figure at the surface. Far off there is no band, only a lit spot on the
   // limb; the band is what closing buys — and it buys it late, see above.
   const swell = body.closing * body.closing;
   const peak = rim + (TIDE_WIDTH * (1 + TIDE_SWELL) - rim) * swell;
-  const lit = TIDE_FLOOR + (1 - TIDE_FLOOR) * tide.strength;
+  // **It starts as the rim and rises out of it.** *"Let's make the initial colour
+  // more similar to the planet ring. I want it to be just barely noticeable, and
+  // then it'll grow in brightness"* (author, 2026-08-29). The distance between a
+  // rim and a tide is almost entirely **lightness** — 0.72 against 0.92, at
+  // alphas within a few hundredths of each other — so both ends are carried on
+  // the same ramp the width uses, and at the edge of a reach the two are the same
+  // colour. A body far off shows its own edge, a little brighter on one side, and
+  // nothing that reads as a second element.
+  const full = TIDE_FLOOR + (1 - TIDE_FLOOR) * tide.strength;
+  const lit = look.rimStrength + (full - look.rimStrength) * swell;
   const step = (tide.halfWidth * 2) / TIDE_SEGMENTS;
 
   context.save();
@@ -478,7 +489,7 @@ function drawTide(context: CanvasRenderingContext2D, body: BodyView, tide: TideV
     context.lineWidth = rim + (peak - rim) * taper;
     // The light goes all the way out, so the ends dissolve rather than stopping
     // at a width the eye can still find.
-    context.strokeStyle = identityLit(body.hue, lit * taper);
+    context.strokeStyle = identityRising(body.hue, swell, lit * taper);
     context.stroke();
   }
   context.restore();
@@ -898,7 +909,27 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
     // The reach includes the bloom, because a glow whose source is just off the
     // top of the picture still lights the top of the picture.
     const reach = body.radius + Math.max(FLOOR_GAP, body.bloom);
-    if (distance <= half + reach) drawBody(context, body);
+    if (distance > half + reach) continue;
+
+    // **A body does not go out the instant it is let go of.** Spec 04 §3's
+    // *"the lamp goes out at release"* was built as one tick lit and the next
+    // spent, in a game whose every other transition is a curve. What is drawn
+    // through the going-out is both looks at once: the ash underneath at full,
+    // and the body as it still burns fading over it. Two draws for a few ticks
+    // on one body, which is what buys a colour crossing a canvas cannot mix —
+    // identity hue to DUSK — without either look being invented here.
+    if (body.spending === null) {
+      drawBody(context, body);
+      continue;
+    }
+    // A spent body has no lamp. That is `energyOf`'s rule and it is restated
+    // here for one line, because this pass is the *finished* body and the field
+    // presentation state carries is the one still burning.
+    drawBody(context, { ...body, energy: 0, bloom: 0 });
+    context.save();
+    context.globalAlpha = fade(body.spending);
+    drawBody(context, { ...body, state: 'HELD' });
+    context.restore();
   }
 
   if (view.compass !== null) drawCompass(context, view.compass);

@@ -34,7 +34,9 @@ import { angleOf } from '../sim/trig.ts';
 import type { Craft } from '../sim/craft.ts';
 import { MEDIAN_MASS } from '../sim/units.ts';
 import { easeStep } from './decay.ts';
-import type { BodyState, Energy, TideView } from './types.ts';
+import { advance, place, ticksIn } from './decay.ts';
+import type { Decay } from './decay.ts';
+import type { BodyState, BodyView, Energy, TideView } from './types.ts';
 
 /**
  * How hard this body has hold of the craft **right now**, from 0 to 1
@@ -249,6 +251,49 @@ export function energyOf(state: BodyState, grip: number): Energy {
   if (state === 'HELD') return 2;
   if (state === 'SPENT') return 0;
   return grip > EMIT_AT ? 1 : 0;
+}
+
+/**
+ * How long a body takes to go out after the craft lets go of it.
+ *
+ * *"The planet deactivation after release... can we at least have it quickly
+ * fade out instead of just toggle 'off'?"* (author, 2026-08-29). Spec
+ * [04 · §3](../../docs/spec/04-bodies.md) rules that *"the lamp goes out at
+ * release, not at grab"* and says nothing about how long that takes, so it was
+ * built as an instant — one tick lit, the next spent, in a game whose every other
+ * transition is a curve.
+ *
+ * **Half of spec [00 · §5](../../docs/spec/00-tokens.md)'s DECAY.** The token's
+ * own 420ms was the first answer — it is what things in this game leave on, and
+ * it is a grammar rather than a taste. Flown, it is not what *quickly* meant:
+ * *"that's good, but let's make it about twice as fast to fade"* (author,
+ * 2026-08-29). At 210ms it is thirteen ticks, which is long enough to be a
+ * curve and short enough that the body is out before the eye has followed the
+ * craft away from it — which is the thing a release is competing with.
+ */
+export const SPEND_TICKS = ticksIn(210);
+
+/**
+ * How far through going out a body that has been let go is, or `null` if it is
+ * not going out — because it never was held, or because it is already out.
+ *
+ * **A counter and not a value**, which is [`decay.ts`](./decay.ts)'s whole
+ * argument and was worth re-learning the hard way: written first as a fraction
+ * stepped down by `1 / SPEND_TICKS` a tick, it landed on **2.8e-16** instead of
+ * zero, because a thirteenth is not a number a float can hold. So the lamp never
+ * quite went out, and *"something has to decide when it is close enough"* — the
+ * exact failure that file's header describes. [`advance`](./decay.ts) ends.
+ *
+ * **It is not a second opinion about `SPENT`.** The state is the record and never
+ * comes back; this is only how far through going out the *picture* is, and it
+ * runs once. A body that is spent and finished carries `null`, which is what
+ * every body that was never held carries.
+ */
+export function spendingOf(previous: BodyView | undefined, state: BodyState): Decay | null {
+  if (state !== 'SPENT') return null;
+  // The tick it is let go of: it was held a moment ago and is spent now.
+  if (previous?.state === 'HELD') return place(SPEND_TICKS);
+  return advance(previous?.spending ?? null);
 }
 
 /**

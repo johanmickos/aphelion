@@ -77,8 +77,34 @@ export function identity(hue: number, strength: number): string {
  * colour.
  */
 export function identityLit(hue: number, strength: number): string {
+  return identityRising(hue, 1, strength);
+}
+
+/**
+ * An identity part of the way up to the tide's lightness — `0` is the body's own
+ * colour and `1` is [`identityLit`](#).
+ *
+ * **The lift is the whole distance between a rim and a tide.** Spec 00 §2 fixes
+ * identity at `oklch(0.72 …)` and §1 puts the tide *"at high lightness"*, which
+ * is 0.92 here; the alphas the two are actually drawn at sit within a few
+ * hundredths of each other. So a tide that has not lifted at all **is** the rim,
+ * and one that has lifted fully is the tide as it was tuned — which is what lets
+ * a body far off show nothing but its own edge, quietly, and grow into a tide as
+ * the craft closes.
+ *
+ * Hue and chroma never move, so spec 00 §1's rule survives untouched: the frame
+ * still resolves to its eight names and greyscale still ranks it.
+ */
+export function identityRising(hue: number, lift: number, strength: number): string {
+  const at = Math.max(0, Math.min(1, lift));
+  // Rounded, and not for looks: interpolating between two decimal constants
+  // lands on `0.9200000000000001` at the top, which is a longer string for the
+  // canvas to parse on every segment of every tide of every frame and is not the
+  // colour anybody wrote down. Four places is finer than the display can show.
+  const lightness =
+    Math.round((IDENTITY_LIGHTNESS + (TIDE_LIGHTNESS - IDENTITY_LIGHTNESS) * at) * 1e4) / 1e4;
   const alpha = Math.max(0, Math.min(1, strength));
-  return `oklch(${TIDE_LIGHTNESS} ${IDENTITY_CHROMA} ${hue} / ${alpha})`;
+  return `oklch(${lightness} ${IDENTITY_CHROMA} ${hue} / ${alpha})`;
 }
 
 /**

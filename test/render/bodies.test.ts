@@ -264,6 +264,40 @@ describe('a body’s anatomy', () => {
   });
 
   /**
+   * *"Let's make the initial colour more similar to the planet ring. I want it
+   * to be just barely noticeable, and then it'll grow in brightness"* (author,
+   * 2026-08-29).
+   *
+   * Read off the drawn colours rather than off the constants: what a rim and a
+   * tide differ by is **lightness**, 0.72 against 0.92, and the claim is that at
+   * the edge of a reach there is no difference left. The edge cannot be drawn —
+   * the body is off screen there — so the two ends are measured and the line
+   * between them read back, the same way the width is.
+   */
+  it('starts as the body’s own rim colour and brightens out of it', () => {
+    const lightnessOf = (style: string): number => Number(style.split(' ')[0]!.slice(6));
+    const alphaOf = (style: string): number => Number(style.split('/')[1]!.replace(')', ''));
+
+    const rim = rimOf(strokesFor(MEDIAN_RADIUS), MEDIAN_RADIUS).style;
+    const far = tideOf(strokesFor(MEDIAN_RADIUS, FAR), MEDIAN_RADIUS).style;
+    const near = tideOf(strokesFor(MEDIAN_RADIUS, NEAR), MEDIAN_RADIUS).style;
+
+    // It brightens as the craft closes, which is the ask.
+    expect(lightnessOf(near)).toBeGreaterThan(lightnessOf(far));
+
+    // And where a reach begins it is the rim — the same lightness and the same
+    // alpha, so a body far off shows an edge and not a second element.
+    const per = (lightnessOf(near) - lightnessOf(far)) / (NEAR * NEAR - FAR * FAR);
+    expect(lightnessOf(far) - per * FAR * FAR).toBeCloseTo(lightnessOf(rim), 3);
+
+    // Two places, not three: the tide's own strength carries a grip term, which
+    // is not linear in closing, so the line through two samples of it lands a
+    // thousandth off. That is the strength curve and not the ramp.
+    const perAlpha = (alphaOf(near) - alphaOf(far)) / (NEAR * NEAR - FAR * FAR);
+    expect(alphaOf(far) - perAlpha * FAR * FAR).toBeCloseTo(alphaOf(rim), 2);
+  });
+
+  /**
    * *"I want it to really grow closer than this, right now it's a bit too
    * aggressively bold at a distance"* (author, 2026-08-29). Run straight, the
    * band was 1.8× the rim the moment a body came on offer; squared it is 1.2×.

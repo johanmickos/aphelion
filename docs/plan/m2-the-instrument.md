@@ -963,6 +963,28 @@ back to something barely thicker than the edge it sits on. Cubing was measured t
 the other way: it holds at 1.6× through the *middle* of the approach, so the growing happens too
 late to be the thing the eye follows in.
 
+**The tide starts as the rim's own colour.** *"Let's make the initial colour more similar to the
+planet ring. I want it to be just barely noticeable, and then it'll grow in brightness."* What a
+rim and a tide differ by is almost entirely **lightness** — 0.72 against 0.92, at alphas within a
+few hundredths of each other — so both are carried on the same squared ramp the width uses, and at
+the edge of a reach the two colours are byte-identical. A body far off shows its own edge, a little
+brighter on one side, and nothing that reads as a second element.
+
+**And a body no longer goes out on a tick.** *"The planet deactivation after release — can we at
+least have it quickly fade out instead of just toggle 'off'?"* Spec 04 §3's *"the lamp goes out at
+release"* was built as an instant, in a game whose every other transition is a curve. It now fades
+over **210ms** — half of spec 00 §5's DECAY, and the halving is the author's: the token's own 420ms
+was the first answer and *"about twice as fast"* was the second. Both looks are drawn at once
+through it, the ash underneath and the burning body over it, because the crossing is identity hue
+to DUSK and a canvas cannot mix two colours in one stroke.
+
+**And the counter was worth re-learning.** The going-out was written first as a fraction stepped
+down by `1 / SPEND_TICKS` a tick, and it landed on **2.8e-16** instead of zero — a thirteenth is not
+a number a float can hold, so the lamp never quite went out and two tests caught it. That is
+[`decay.ts`](../../src/state/decay.ts)'s own header, exactly: *"a multiplied value never reaches
+zero, so something has to decide when it is close enough… a counter ends."* The file already had
+the answer and it is a `Decay` now.
+
 **And the lag was measured against the wrong thing, twice.** The first pass halved it — 20.3° to
 9.0° at the median — on the argument that the lag should sit inside the arc's own half-width. Flown:
 *"it seems like we moved the wrong way. I want the tide to be more directly under the ship."* The

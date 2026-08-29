@@ -66,7 +66,7 @@
 import { headingOf, speedOf } from '../sim/craft.ts';
 import type { SimState } from '../sim/types.ts';
 import { bodyOnOffer } from '../sim/grab.ts';
-import { closingOf, energyOf, gripOf, stateOf, tideOf } from './body.ts';
+import { closingOf, energyOf, gripOf, spendingOf, stateOf, tideOf } from './body.ts';
 import { followCamera, openCamera } from './camera.ts';
 import { compassOf } from './compass.ts';
 import { advance, fade } from './decay.ts';
@@ -179,7 +179,12 @@ function bodiesOf(sim: SimState, previous: readonly BodyView[] | null): BodyView
     const held = address === sim.heldBody;
     const state = stateOf(body, sim.craft, held, wasSpent(before));
     const grip = gripOf(body, sim.craft);
-    const energy = energyOf(state, grip);
+    const spending = spendingOf(before, state);
+    // **A body on its way out is still lit**, which is what makes the going-out
+    // something to draw rather than a state it has already reached. It burns at
+    // what it burned at until it is out; the renderer fades that, and
+    // `spendingOf` is what ends it.
+    const energy = spending === null ? energyOf(state, grip) : energyOf('HELD', grip);
     const offered = address === onOffer && state !== 'SPENT';
     return {
       x: body.x,
@@ -190,6 +195,7 @@ function bodiesOf(sim: SimState, previous: readonly BodyView[] | null): BodyView
       offered,
       grip,
       closing: closingOf(body, sim.craft),
+      spending,
       hue: hueOf(address),
       energy,
       bloom: bloomOf(energy),

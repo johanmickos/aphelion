@@ -159,6 +159,7 @@ describe('presentation state', () => {
       'hue',
       'offered',
       'radius',
+      'spending',
       'state',
       'tide',
       'x',
