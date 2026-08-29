@@ -616,6 +616,14 @@ Criterion 1 is the acceptance gate. The other four are the shape.
 | Catch-up ceiling | 3 ticks | Measured |
 | What is integrated | **The dive only.** After the freeze the phase clock is closed-form | Measured |
 
+**Open, and this section is silent on it: what resolution the duration handed to `ticksDue` is
+measured at.** The table above fixes the tick and the ceiling; it does not say how precisely the
+outside world is allowed to report elapsed time, and on the author's phone that is a whole
+millisecond. A 1ms clock cannot express 16.667ms, so the leftover accumulates and the craft
+double-steps in bursts — measured on three phone runs, reproduced from `ticksDue` alone, with a
+tested fix, in [the performance write-up](../plan/performance.md) §10 and the spec README's open
+questions. Nothing here is withdrawn by it; what is missing is a ruling on the input.
+
 **Six substeps is converged, not chosen.** Measured against a 96-substep reference on six dives
 spanning the envelope: periapsis radius agrees to **0.03 units**, periapsis speed to **0.1 units/s**,
 and the dive duration is **identical to the tick**. Sixteen times the work buys nothing.
