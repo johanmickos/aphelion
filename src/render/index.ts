@@ -150,8 +150,27 @@ const TIDE_WIDTH = 4 * BOARD_PIXEL;
  * approach it grows and 'pulls' towards me"* (author, 2026-08-29). So the far end
  * of the ramp is the body's own edge — at the reach's edge there is no *band* at
  * all, only a brightening of the limb — and §1's 4px is no longer a constant the
- * tide has: it is the width it passes through roughly halfway in, on the way from
- * the rim to twice that.
+ * tide has: it is a width it passes through on the way from the rim to twice that.
+ *
+ * **The ramp is squared, and that is the second correction.** Run straight, the
+ * band was already **1.8× the rim** the moment a body came on offer: *"the tide's
+ * thickness is a bit too much at the start. I want it to really grow closer than
+ * this, right now it's a bit too aggressively bold at a distance"* (author,
+ * 2026-08-29). Against the approach as it is actually flown — `closing` at
+ * **0.31** when a body first comes on offer, **0.62** at the median, **0.93** at
+ * the tightest orbit — the two curves are:
+ *
+ * | closing | | straight | squared |
+ * |---|---|---|---|
+ * | 0.31 | first sight | 1.8× the rim | **1.2×** |
+ * | 0.62 | median approach | 2.6× | **2.0×** |
+ * | 0.93 | tightest orbit | 3.4× | **3.2×** |
+ *
+ * Squaring costs almost nothing at the near end — where the player is looking at
+ * it — and takes the far end back to something barely thicker than the edge it
+ * sits on, which is the *light spot* that was asked for. Cubing was measured too
+ * and overshoots the other way: it holds at 1.6× through the **middle** of the
+ * approach, so the growing happens too late to be the thing the eye follows in.
  */
 const TIDE_SWELL = 1;
 
@@ -438,8 +457,9 @@ function drawTide(context: CanvasRenderingContext2D, body: BodyView, tide: TideV
   const rim = LOOK[body.state].rim * BOARD_PIXEL;
   // From the rim's own width at the edge of the reach to `1 + TIDE_SWELL` times
   // §1's figure at the surface. Far off there is no band, only a lit spot on the
-  // limb; the band is what closing buys.
-  const peak = rim + (TIDE_WIDTH * (1 + TIDE_SWELL) - rim) * body.closing;
+  // limb; the band is what closing buys — and it buys it late, see above.
+  const swell = body.closing * body.closing;
+  const peak = rim + (TIDE_WIDTH * (1 + TIDE_SWELL) - rim) * swell;
   const lit = TIDE_FLOOR + (1 - TIDE_FLOOR) * tide.strength;
   const step = (tide.halfWidth * 2) / TIDE_SEGMENTS;
 

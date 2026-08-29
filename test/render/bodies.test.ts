@@ -209,13 +209,15 @@ describe('a body’s anatomy', () => {
     // 2026-08-29). The edge of a reach is off screen and cannot be drawn, so the
     // claim is checked where it is checkable: the line two drawn widths sit on,
     // read back to where the reach begins, **is the rim**.
+    // The ramp is squared, so the line is straight in `closing²` rather than in
+    // `closing` — see `TIDE_SWELL`. Both ends of it are checked.
     const far = tideOf(strokesFor(MEDIAN_RADIUS, FAR), MEDIAN_RADIUS).width;
     const near = tideOf(strokesFor(MEDIAN_RADIUS, NEAR), MEDIAN_RADIUS).width;
-    const perClosing = (near - far) / (NEAR - FAR);
-    expect(far - perClosing * FAR).toBeCloseTo(rim, 9);
+    const per = (near - far) / (NEAR * NEAR - FAR * FAR);
+    expect(far - per * FAR * FAR).toBeCloseTo(rim, 9);
 
     // And at the surface it is twice §1's figure — the other end of the same line.
-    expect(far + perClosing * (1 - FAR)).toBeCloseTo(8 * BOARD_PIXEL, 9);
+    expect(far + per * (1 - FAR * FAR)).toBeCloseTo(8 * BOARD_PIXEL, 9);
   });
 
   /**
@@ -261,14 +263,20 @@ describe('a body’s anatomy', () => {
     expect(alpha(fan.at(-1)!.style)).toBeLessThan(alpha(fan[peak]!.style) * 0.25);
   });
 
-  it('thickens as the craft closes, and is a straight line in it', () => {
+  /**
+   * *"I want it to really grow closer than this, right now it's a bit too
+   * aggressively bold at a distance"* (author, 2026-08-29). Run straight, the
+   * band was 1.8× the rim the moment a body came on offer; squared it is 1.2×.
+   */
+  it('holds back at a distance and does its growing near the body', () => {
     const widths = [FAR, (FAR + NEAR) / 2, NEAR].map(
       (closing) => tideOf(strokesFor(MEDIAN_RADIUS, closing), MEDIAN_RADIUS).width,
     );
     expect(widths[1]!).toBeGreaterThan(widths[0]!);
     expect(widths[2]!).toBeGreaterThan(widths[1]!);
-    // Evenly, so there is no distance at which it lurches.
-    expect(widths[1]! - widths[0]!).toBeCloseTo(widths[2]! - widths[1]!, 9);
+    // **Accelerating**, which is the whole of the note: the second half of the
+    // approach buys more width than the first half does.
+    expect(widths[2]! - widths[1]!).toBeGreaterThan(widths[1]! - widths[0]!);
   });
 
   /**

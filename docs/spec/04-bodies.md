@@ -73,11 +73,19 @@ footer uses obsolete numbering and is void.
 > the planet surface ring, so that when I first approach I see it as a light spot on the surface.
 > When I approach it grows and 'pulls' towards me"* (author, 2026-08-29). So the band grows out of
 > the body's own edge: at the edge of a reach it **is** the rim, and at the surface it is twice
-> §1's figure, passing through 4px about halfway in. It also tapers **along** its arc, from the
-> peak on the bearing back to the rim's width at both ends, which is what removes the step the
-> author was seeing where a constant-width band stopped dead against a much thinner edge. §1's
-> scale rule is untouched and was the thing checked: at equal approach a body of 20 and one of 120
-> draw the identical band.
+> §1's figure. It also tapers **along** its arc, from the peak on the bearing back to the rim's
+> width at both ends, which is what removes the step the author was seeing where a constant-width
+> band stopped dead against a much thinner edge. §1's scale rule is untouched and was the thing
+> checked: at equal approach a body of 20 and one of 120 draw the identical band.
+>
+> **The ramp is squared, which is the second correction to the same note.** Run straight it was
+> already **1.8× the rim** the moment a body came on offer — *"a bit too aggressively bold at a
+> distance"* (author, 2026-08-29). Against the approach as it is actually flown, `closing` **0.31**
+> at first sight, **0.62** at the median and **0.93** at the tightest orbit, the two curves give
+> 1.8× / 2.6× / 3.4× straight against **1.2× / 2.0× / 3.2×** squared. Squaring costs almost nothing
+> where the player is looking at it and takes the far end back to something barely thicker than the
+> edge it sits on. Cubing was measured and overshoots the other way — it holds at 1.6× through the
+> *middle* of the approach, so the growing happens too late to be what the eye follows in.
 >
 > **§3 · A body glows when it is *gripping*, not when it is reachable.** This table's *"E0–E1"*
 > for AHEAD is read at **E0** until the body is actually pulling — see spec

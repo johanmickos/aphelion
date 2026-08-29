@@ -954,6 +954,15 @@ start at the same thickness as the planet surface ring, so that when I first app
 light spot on the surface. When I approach it grows and pulls towards me."* So a distant body shows
 a lit spot on its limb and the band is what closing buys.
 
+**And the ramp was straight when it should have been squared.** *"The tide's thickness is a bit
+too much at the start. I want it to really grow closer than this, right now it's a bit too
+aggressively bold at a distance."* Run straight, the band was **1.8× the rim** the moment a body
+came on offer. Squared it is **1.2×** there, **2.0×** at the median approach and **3.2×** at the
+tightest orbit — almost nothing given up where the player is looking at it, and the far end taken
+back to something barely thicker than the edge it sits on. Cubing was measured too and overshoots
+the other way: it holds at 1.6× through the *middle* of the approach, so the growing happens too
+late to be the thing the eye follows in.
+
 **And the lag was measured against the wrong thing, twice.** The first pass halved it — 20.3° to
 9.0° at the median — on the argument that the lag should sit inside the arc's own half-width. Flown:
 *"it seems like we moved the wrong way. I want the tide to be more directly under the ship."* The
