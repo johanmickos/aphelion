@@ -128,6 +128,21 @@ export function lockOf(sim: SimState): number {
   },
   {
     file: 'src/render/index.ts',
+    find: 'const HAND_AT_AIM = 0.55;',
+    replace: 'export let HAND_AT_AIM = 0.55;',
+    append: '\nexport function set_HAND_AT_AIM(value: number): void {\n  HAND_AT_AIM = value;\n}\n',
+    why: 'and the other end of the same line, now that both are stated',
+  },
+  {
+    file: 'src/render/index.ts',
+    find: 'const CROSSING_AT_REST = 0.3;',
+    replace: 'export let CROSSING_AT_REST = 0.3;',
+    append:
+      '\nexport function set_CROSSING_AT_REST(value: number): void {\n  CROSSING_AT_REST = value;\n}\n',
+    why: 'how bright the dots on the hand are before the aim closes',
+  },
+  {
+    file: 'src/render/index.ts',
     find: 'const TIDE_FLOOR = 0.4;',
     replace: 'export let TIDE_FLOOR = 0.4;',
     append: '\nexport function set_TIDE_FLOOR(value: number): void {\n  TIDE_FLOOR = value;\n}\n',
@@ -241,8 +256,8 @@ export function lockOf(sim: SimState): number {
   },
   {
     file: 'src/render/index.ts',
-    find: 'const HAND_AT_REST = 0.35;',
-    replace: 'export let HAND_AT_REST = 0.35;',
+    find: 'const HAND_AT_REST = 0.18;',
+    replace: 'export let HAND_AT_REST = 0.18;',
     append:
       '\nexport function set_HAND_AT_REST(value: number): void {\n  HAND_AT_REST = value;\n}\n',
     why: 'spec 00 §6 brightens the hand as aim closes and states neither end',

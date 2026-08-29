@@ -77,6 +77,16 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      /* The one place on the page that is text and is meant to behave like it:
+         the note a dispatch carries. The blanket rules above are for a surface
+         nobody reads, and applied here they take away selecting, correcting and
+         pasting — so the chrome asks for them back. `app/input.ts` makes the
+         same exemption for the events. */
+      #chrome input {
+        -webkit-touch-callout: default;
+        -webkit-user-select: text;
+        user-select: text;
+      }
       #chrome button,
       #chrome input {
         pointer-events: auto;

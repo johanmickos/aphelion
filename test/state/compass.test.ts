@@ -188,6 +188,7 @@ describe('what it is allowed to say', () => {
       'predicted',
       'presence',
       'reach',
+      'rim',
       'rings',
       'scale',
       'swept',

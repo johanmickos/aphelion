@@ -123,6 +123,14 @@ footer uses obsolete numbering and is void.
 > measured against the **reach** rather than against grip, which falls as 1/r² and would put the
 > line at 0.009 exactly when the player catches something at range.
 >
+> **§6 · The hand is dimmer, starts at the body's surface, and its crossings ramp.** Three notes on
+> one screenshot (author, 2026-08-29). This section brightens the hand *"as aim closes"* and states
+> neither end: it ran 0.35 → full CORE, which read as a bright bar across the middle of the
+> instrument, and now runs 0.18 → 0.55. It is drawn from the body's **rim** outward rather than
+> from its centre — the part inside the body was a line through the thing it measures from. And the
+> crossing dots take the window's ramp rather than the energy table's step, so the mark that says
+> *the hand is here* brightens all the way in instead of jumping once.
+>
 > **§7 · The thumb line holds and is now load-bearing twice.** Sightings are pinned inside the
 > design space and never cross it, which falls out of the geometry rather than being clamped.
 

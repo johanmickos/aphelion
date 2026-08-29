@@ -313,6 +313,15 @@ export interface CompassView {
   /** The held body's centre, in world units — everything here is drawn about it. */
   readonly x: number;
   readonly y: number;
+  /**
+   * The held body's drawn radius, so the hand can start at its **surface**.
+   *
+   * *"I want this line to end at the planet surface, not extend from the center
+   * of the planet"* (author, 2026-08-29). The hand is a radius of the orbit and
+   * the part of it inside the body was never carrying anything — it drew a line
+   * through the thing it was measuring from.
+   */
+  readonly rim: number;
   /** The held body's hue, which the filament wears. */
   readonly hue: number;
   /** Where the craft is, so the filament has two ends without a second lookup. */

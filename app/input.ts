@@ -44,19 +44,49 @@ import { clearPress, pressDown, pressUp } from '../src/input/press.ts';
  * refuses it is refusing the selection itself, which is why `selectstart` is the
  * first line below rather than more CSS.
  *
- * `touchstart` is deliberately **not** cancelled. It would be the heaviest
- * hammer available and it is the one that can take the press with it — the
- * pointer events the game is bound to are synthesised from touches, and a
- * cancelled touch sequence is a way to lose the button rather than the menu.
- * `touch-action: none` already refuses the gestures that hammer was for.
+ * **`touchstart` is cancelled after all, and the reasoning that said otherwise
+ * was wrong.** This file used to argue that cancelling a touch default was the
+ * one hammer that could take the press with it, since the pointer events the
+ * game is bound to are synthesised from touches. Reported again from the phone
+ * on 2026-08-29 — the callout still comes up on a double-tap-and-hold — and the
+ * prototype had already settled it, in production, with its own comment saying
+ * so both ways: *"`preventDefault()` on `pointerdown` does not suppress the
+ * underlying touch default, so the gesture has to be cancelled on the touch
+ * events themselves"*, and *"these listeners only call preventDefault — gameplay
+ * still runs off pointer events, which are unaffected by cancelling a touch
+ * default."*
+ *
+ * It is safe for a reason worth writing down: `pointerdown` fires **before**
+ * `touchstart` and `pointerup` before `touchend`, so the press is already
+ * recorded by the time the default is refused. If anything it is safer than not
+ * doing it — a touch default left to run can start a scroll, and a scroll is
+ * what sends `pointercancel` and drops the button.
+ *
+ * **The dev chrome is exempt**, which is the other half of the prototype's fix.
+ * A dispatch carries a note the author types, and a document-wide refusal of
+ * `selectstart` takes away selecting, correcting and pasting in the one text
+ * field the page has. The touch listeners are on the canvas and never see the
+ * chrome; `selectstart` and `contextmenu` are on the document and have to ask.
  */
 export function suppressBrowserGestures(surface: HTMLElement): void {
   const refuse = (event: Event): void => event.preventDefault();
+  // Everything the author is meant to be able to type in, select and paste into.
+  const chrome = (event: Event): boolean =>
+    (event.target as HTMLElement | null)?.closest?.('#chrome') != null;
+  const refuseOutsideChrome = (event: Event): void => {
+    if (!chrome(event)) event.preventDefault();
+  };
+
+  // **The touch defaults themselves**, which is the only thing that reaches the
+  // loupe and the *Search with Firefox / Find in Page* callout. `passive: false`
+  // or the refusal is ignored. On the canvas alone, so the chrome keeps its own.
+  surface.addEventListener('touchstart', refuse, { passive: false });
+  surface.addEventListener('touchend', refuse, { passive: false });
 
   // The callout and the loupe are the *selection's* UI. No selection, neither.
-  document.addEventListener('selectstart', refuse);
+  document.addEventListener('selectstart', refuseOutsideChrome);
   // A long press, which on a game that holds its button is every press.
-  document.addEventListener('contextmenu', refuse);
+  document.addEventListener('contextmenu', refuseOutsideChrome);
   // Pinch zoom. iOS has ignored `user-scalable=no` since iOS 10, so the meta tag
   // in `index.html` is a statement of intent and this is the enforcement.
   document.addEventListener('gesturestart', refuse);

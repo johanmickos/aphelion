@@ -814,6 +814,60 @@ the end that was already tuned.
 tells the dive from the instrument by whether there is a hand, so the flag was write-only. It now
 carries the strength, which is the thing the renderer could not work out for itself.
 
+### The hand got quieter, shorter and better marked
+
+Three notes on one screenshot, all about the radial line through the craft.
+
+**Dimmer.** *"I want the brightness of my radial line going to the center of the planet to be a bit
+less."* It ran `0.35 → 1.0` and full CORE white made a bright bar across the middle of the
+instrument. Now `0.18 → 0.55` — about half at both ends, so the aim still reads as brightening and
+the line stops competing with the windows it is being aimed at. Spec 00 §6 states neither end, so
+both are opening positions and both are knobs.
+
+**It starts at the body's surface.** *"I want this line to end at the planet surface, not extend
+from the center of the planet."* The part of the radius inside the body was drawing a line through
+the thing it measures from. `CompassView` carries the held body's `rim` for it, and the inner end
+deliberately does **not** take the instrument's `scale`: the rings pop in at the freeze and the
+planet does not.
+
+**The crossings ramp instead of stepping.** *"I'd like this arm to have small white-ish dots on the
+compass orbits for each planet. These dots should also slightly increase in intensity as the player
+orbits, like the windows."* Those dots already existed — the **crossing**, where the hand cuts each
+ring — but they took the energy table, which is a *step*: E1 until the ring is under live aim, then
+E2. So the mark that says *the hand is here* changed in one jump and said nothing on the way in.
+On the window's own ramp (`CROSSING_AT_REST → full CORE` on `aim`) it brightens all the way round,
+which is the thing that lets a player time a release.
+
+### The iOS callout, and the reasoning that was wrong about it
+
+*"We still have the double tap+hold magnifying glass and search/find menu issue on Firefox on my
+iOS. I know we had a commit to fix this in the original repo, maybe look there to see what's
+missing?"*
+
+**What was missing is the touch defaults themselves.** `app/input.ts` cancelled `selectstart`,
+`contextmenu`, `gesturestart` and `dblclick`, and argued in its own doc comment that `touchstart`
+was the one hammer that could take the press with it, since the pointer events the game is bound to
+are synthesised from touches. The prototype had already settled that in production, and says so
+both ways: *"`preventDefault()` on `pointerdown` does not suppress the underlying touch default, so
+the gesture has to be cancelled on the touch events themselves"*, and *"these listeners only call
+preventDefault — gameplay still runs off pointer events, which are unaffected by cancelling a touch
+default."*
+
+It is safe for a reason worth writing down: **`pointerdown` fires before `touchstart`** and
+`pointerup` before `touchend`, so the press is already recorded by the time the default is refused.
+If anything it is safer than not doing it — a touch default left to run can start a scroll, and a
+scroll is what sends `pointercancel` and drops the button.
+
+**The other half of the prototype's fix is the exemption**, and taking the first half without it
+would have made the page worse. A dispatch carries a note the author types, and a document-wide
+refusal of `selectstart` takes away selecting, correcting and pasting in the one text field the
+page has — which the blanket `user-select: none` in `index.html` was already half-doing. The touch
+listeners are on the canvas and never see the chrome; `selectstart` and `contextmenu` are on the
+document and now ask.
+
+**Not verified on the device.** This is carried behaviour from a build that was flown, not
+something reproduced here — Firefox for iOS is the one place it can be confirmed.
+
 ### Queued, from the same sitting
 
 **A collision has no voice.** *"I want to show a quirky 'Clang!' or similar when I bounce into

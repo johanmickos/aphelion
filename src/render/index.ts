@@ -401,6 +401,17 @@ const DOT_RADIUS = 3 * BOARD_PIXEL;
 const CROSSING_RADIUS = 2 * BOARD_PIXEL;
 
 /**
+ * How bright a crossing dot is before any aim has closed.
+ *
+ * The window's own grammar, applied to the mark on the hand: at rest it is the
+ * E2 it used to jump to, and it ramps to full CORE under perfect aim rather than
+ * stepping. Brighter at rest than a window ([`WINDOW_AT_REST`](#)) because it is
+ * a two-pixel dot against a three-pixel arc, and the same alpha does not carry
+ * the same distance.
+ */
+const CROSSING_AT_REST = 0.3;
+
+/**
  * How bright a window is before any aim has closed.
  *
  * The compass heats **in place** from here to full as the hand comes in (spec
@@ -465,17 +476,24 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
     }
   }
 
-  // The hand: the radius through the craft, out past the outermost ring.
+  // The hand: the radius through the craft, from the body's **surface** out past
+  // the outermost ring. *"I want this line to end at the planet surface, not
+  // extend from the center of the planet"* (author, 2026-08-29) — the part inside
+  // the body was drawing a line through the thing it measures from. The inner end
+  // is the body's and does not take the instrument's `scale`: the rings pop in at
+  // the freeze and the planet does not.
+  const cos = Math.cos(compass.hand);
+  const sin = Math.sin(compass.hand);
   context.beginPath();
-  context.moveTo(compass.x, compass.y);
+  context.moveTo(compass.x + cos * compass.rim, compass.y + sin * compass.rim);
   context.lineTo(
-    compass.x + Math.cos(compass.hand) * compass.reach * compass.scale,
-    compass.y + Math.sin(compass.hand) * compass.reach * compass.scale,
+    compass.x + cos * compass.reach * compass.scale,
+    compass.y + sin * compass.reach * compass.scale,
   );
   context.lineWidth = HAND_WIDTH;
   context.strokeStyle = dim(
     CORE,
-    (HAND_AT_REST + (1 - HAND_AT_REST) * closest(compass)) * compass.alpha,
+    (HAND_AT_REST + (HAND_AT_AIM - HAND_AT_REST) * closest(compass)) * compass.alpha,
   );
   context.stroke();
 
@@ -622,7 +640,14 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
     0,
     Math.PI * 2,
   );
-  context.fillStyle = dim(CORE, STRENGTH[ring.energy] * clear);
+  // *"I'd like this arm to have small white-ish dots on the compass orbits for
+  // each planet. These dots should also slightly increase in intensity as the
+  // player orbits, like the windows"* (author, 2026-08-29). It used to take the
+  // energy table, which is a **step** — E1 until the ring is under live aim, then
+  // E2 — so the mark that says *the hand is here* changed in one jump and said
+  // nothing on the way in. On the window's own ramp it brightens all the way
+  // round, which is the thing that lets a player time a release.
+  context.fillStyle = dim(CORE, (CROSSING_AT_REST + (1 - CROSSING_AT_REST) * ring.aim) * clear);
   context.fill();
 }
 
@@ -634,13 +659,18 @@ function closest(compass: CompassView): number {
 }
 
 /**
- * How bright the hand is before any aim has closed.
+ * How bright the hand is before any aim has closed, and once it has fully.
  *
- * **An opening position.** Spec 00 §6 has the hand *"thickening and brightening
- * as aim closes"* and states neither end; this is the floor, and the rest of the
- * range is the aim itself.
+ * **Both ends are opening positions.** Spec 00 §6 has the hand *"thickening and
+ * brightening as aim closes"* and states neither. It used to run 0.35 → 1.0, and
+ * full CORE white made a bright bar across the middle of the instrument: *"I want
+ * the brightness of my radial line going to the center of the planet to be a bit
+ * less"* (author, 2026-08-29). It now runs 0.18 → 0.55 — about half, at both
+ * ends, so the aim still reads as brightening and the line stops competing with
+ * the windows it is being aimed at.
  */
-const HAND_AT_REST = 0.35;
+const HAND_AT_REST = 0.18;
+const HAND_AT_AIM = 0.55;
 
 /**
  * A sighting — spec [03 · §6](../../docs/spec/03-hud.md): an arrow at the edge of

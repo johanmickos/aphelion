@@ -241,6 +241,7 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     return {
       x: body.x,
       y: body.y,
+      rim: body.radius,
       hue,
       craftX: sim.craft.x,
       craftY: sim.craft.y,
@@ -319,6 +320,7 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     entrance,
     x: body.x,
     y: body.y,
+    rim: body.radius,
     hue,
     craftX: sim.craft.x,
     craftY: sim.craft.y,
