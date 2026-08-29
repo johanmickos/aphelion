@@ -148,60 +148,6 @@ export function home(decay: Decay): number {
 }
 
 /**
- * The same decay, **further along than it is** — its clock run on a square root.
- *
- * A shape read backwards keeps its ends: [`home`](#) settles into rest with no
- * remaining speed, which is a double root at its far end and exactly what makes
- * an entrance land softly. Reversed by [`leaving`](#) that double root becomes
- * the *start*, and a motion that starts with no speed is a **pause** — *"it
- * should pause even less"* (author, 2026-08-29).
- *
- * Rather than give the exit a second curve, its clock is hurried: `√x` is far
- * along early and ordinary late, so the flat start is spent in a couple of ticks
- * and the rest of the span belongs to the part that is actually moving. One
- * shape, two handednesses, and `Math.sqrt` is correctly rounded so it costs
- * ADR-0014 nothing.
- */
-export function hastened(decay: Decay): Decay {
-  return { age: decay.span * Math.sqrt(progress(decay)), span: decay.span };
-}
-
-/**
- * What is left of a thing that is **closing** rather than dying: **1 → 0, holding
- * and then going**.
- *
- * [`fade`](#) is the design's decay — fastest at the start, slowing to nothing —
- * and it is right for an E3, which is over the instant it has happened. It is
- * wrong for a shape that is *doing* something on its way out: measured on the
- * compass's exit, `fade` had it at 30% opacity by the time it began to collapse
- * and under 13% through the collapse itself, so the motion the author asked for
- * happened where it could not be seen.
- *
- * This is the same journey with the curvature the other way round, so the light
- * holds while the shape talks and goes when the shape does.
- */
-export function shut(decay: Decay): number {
-  const gone = progress(decay);
-  return 1 - gone * gone;
-}
-
-/**
- * The return home, run backwards: **0 → 1, bulging past nothing once on the way**.
- *
- * The same curve as [`home`](#) and therefore the same single overshoot, read
- * from the other end — so a thing that arrives by settling *into* place leaves by
- * the mirror of how it came. That is worth having as one function rather than two
- * shapes: spec [00 · §5](../../docs/spec/00-tokens.md)'s motion tokens are one
- * grammar, and an exit invented separately from its entrance is a second one.
- *
- * Multiplied into a displacement it reads as a **click**: a slight swell away
- * from rest, then back through it and out, accelerating.
- */
-export function leaving(decay: Decay): number {
-  return home({ age: decay.span - decay.age, span: decay.span });
-}
-
-/**
  * An exponential ease's per-tick coefficient, from a rate in 1/seconds.
  *
  * The third shape, and the one that has no end: a value chasing a target the

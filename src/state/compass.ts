@@ -46,7 +46,8 @@ import { grabRange } from '../sim/grab.ts';
 import { distance } from '../sim/math.ts';
 import { pathRadiusAt, predictOrbit } from '../sim/orbit.ts';
 import type { Orbit } from '../sim/orbit.ts';
-import { advance, easeStep, hastened, home, leaving, place, shut, ticksIn } from './decay.ts';
+import { advance, easeStep, fade, home, place, ticksIn } from './decay.ts';
+import type { Decay } from './decay.ts';
 import { SCALE } from '../sim/units.ts';
 import { alignmentOf, tierFor } from '../sim/tier.ts';
 import type { Tier } from '../sim/tier.ts';
@@ -185,30 +186,55 @@ export const ENTER_TICKS = ticksIn(120);
 export const ENTER_FROM = 0.92;
 
 /**
- * How long the instrument takes to click out, and how far in it collapses.
+ * How long the instrument takes to leave, and how far in it draws before it goes.
  *
- * *"When holding an orbit and release, the compass just disappears. Could we have
- * it pulse out slightly and then quickly in with a fadeout? So it looks like it
- * clicks out?"* (author, 2026-08-29).
+ * ## It was a click, and the click read as a jump
  *
- * **It leaves on the curve it arrived on, reversed** — [`leaving`](./decay.ts) is
- * [`home`](./decay.ts) read from the other end, so the swell on the way out is
- * the same single overshoot ENTER lands on, and the instrument's two ends are one
- * shape rather than two. Multiplied by [`EXIT_BY`](#) it swells about **3.5%**
- * away from rest, comes back through it, and then collapses inward, accelerating,
- * while the whole thing fades. That acceleration is the click.
+ * *"Before we added a kind of click or bubble effect to the compass when it
+ * disappears. It still reads jumpy, and I think we should try just having it
+ * shrink in radius a touch and then fade out"* (author, 2026-08-29). Measured on
+ * what it replaced, the complaint has two causes and neither is the idea:
+ *
+ * **The swell was one frame.** On [`leaving`](./decay.ts) with its clock hurried,
+ * the scale ran `1.000 → 1.035 → 1.017 → 0.964 → 0.882 → 0.777` — out on the tick
+ * after the release and already back on the next. Sixteen milliseconds out and
+ * sixteen back is under the span at which the eye reads a direction, so a swell
+ * that size arrives as a **jitter** rather than as a gesture. Spec
+ * [00 · §5](../../docs/spec/00-tokens.md)'s *attack ≤ 2 frames* is a rule about
+ * things **arriving**, where being over before it is seen is the point; run
+ * backwards onto an exit it buys a flinch.
+ *
+ * **And it never faded out.** The last frame it was drawn on was **78% scale at
+ * 31% opacity**, and the next one was nothing — so the shape that was supposed to
+ * be leaving was cut off while still a third lit and a fifth of the way collapsed.
+ * The acceleration made that worse: the steps ran −1.8%, −5.3%, −8.1%, −10.5%, so
+ * it was moving fastest at the instant it disappeared.
+ *
+ * ## What it does instead
+ *
+ * An even shrink and the game's own decay. The scale falls in equal steps —
+ * nothing accelerates, so there is no instant that reads as a snap — and the
+ * light goes on [`fade`](./decay.ts), which is at **3%** on the last frame it is
+ * drawn. It does not need to be cut off, because by then there is nothing to cut.
+ *
+ * **How far in is not a taste.** It shrinks by exactly what
+ * [`ENTER_FROM`](#) grew from, so the instrument leaves by the amount it arrived
+ * by and the two ends stay one gesture — which is what the reversed curve was
+ * reaching for and got wrong by reaching for the *shape* instead of the size. Out
+ * to 92% over six ticks is 1.6% a tick, which is a drift rather than a move.
  *
  * **This is where the farewell ring will want a word.** Spec
  * [02 · §6](../../docs/spec/02-release.md) has the orbit detaching from the body
  * and expanding away in AURORA, which is the same instant going the other
  * direction — so the **path** deliberately does not scale with this, only the
  * instrument does, leaving that expansion for [M2.4](../../docs/plan/m2-the-instrument.md)
- * to put on it.
+ * to put on it. A quiet exit is a better floor for it than a click that was
+ * already competing with it.
  */
 export const EXIT_TICKS = ticksIn(100);
 
-/** How far in it collapses before it is gone. */
-export const EXIT_BY = 0.35;
+/** How far in it draws before it is gone — the mirror of `ENTER_FROM`, above. */
+export const EXIT_BY = 1 - ENTER_FROM;
 
 const TWO_PI = Math.PI * 2;
 
@@ -383,11 +409,25 @@ function unstack(rings: RingView[]): void {
 }
 
 /**
+ * How far along the frames it is actually drawn for — **0 on the first, 1 on the
+ * last**.
+ *
+ * Not [`progress`](./decay.ts), which is `age / span` and therefore never reaches
+ * 1: a decay placed for six ticks is drawn on six of them, ages 0 to 5, and a
+ * shrink that is supposed to *land* on a size has to have spent all of itself by
+ * the last one. Progress would leave it at 93% where the mirror of the entrance
+ * is 92% — small, and the kind of small that makes a test say *about*.
+ */
+function across(exit: Decay): number {
+  return exit.span <= 1 ? 1 : exit.age / (exit.span - 1);
+}
+
+/**
  * The instrument on its way out, or `null` once it is gone.
  *
  * Everything is the previous tick's — the body does not move, the rings do not
  * move, and the **hand stays where the release happened**, which is the thing
- * worth still being able to see. What changes is the scale and the fade.
+ * worth still being able to see. What changes is the scale and the light.
  */
 function leave(previous: CompassView | null): CompassView | null {
   if (previous === null) return null;
@@ -398,8 +438,10 @@ function leave(previous: CompassView | null): CompassView | null {
     filament: 0,
     exit,
     entrance: null,
-    scale: 1 - EXIT_BY * leaving(hastened(exit)),
-    alpha: shut(exit),
+    // Linear, and that is the fix: every acceleration in the curve this replaced
+    // was an instant that read as a snap in six ticks.
+    scale: 1 - EXIT_BY * across(exit),
+    alpha: fade(exit),
   };
 }
 

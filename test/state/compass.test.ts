@@ -488,7 +488,7 @@ describe('the grab filament', () => {
   });
 });
 
-describe('the instrument clicking out', () => {
+describe('the instrument leaving', () => {
   /** One swing, and everything after the release until the compass is gone. */
   const exiting = (): PresentationState[] => {
     const sim: SimState = createInitialState(fixtureField(), fixtureCraft(), 1);
@@ -505,32 +505,47 @@ describe('the instrument clicking out', () => {
   };
 
   /**
-   * *"When holding an orbit and release, the compass just disappears. Could we
-   * have it pulse out slightly and then quickly in with a fadeout? So it looks
-   * like it clicks out?"* (author, 2026-08-29). It leaves on the curve it
-   * arrived on, reversed — so the swell is the same single overshoot ENTER lands
-   * on, and the two ends of the instrument are one shape.
+   * *"It still reads jumpy, and I think we should try just having it shrink in
+   * radius a touch and then fade out"* (author, 2026-08-29), replacing the click
+   * that came two sittings before it.
+   *
+   * Both halves of *jumpy* are asserted here because both were measured on what
+   * this replaced. Its swell was **one frame** — out to 1.035 on the tick after
+   * the release and back to 1.017 on the next — and sixteen milliseconds out and
+   * sixteen back is under the span at which the eye reads a direction, so it
+   * arrived as a flinch. And its steps **accelerated**, running −1.8%, −5.3%,
+   * −8.1%, −10.5%, so the shape was moving fastest at the instant it vanished.
    */
-  it('swells slightly, then collapses inward, and is gone', () => {
+  it('shrinks by even steps and never grows', () => {
     const out = exiting();
     const scales = out.map((view) => view.compass!.scale);
 
-    // Out, a little.
-    const swell = Math.max(...scales);
-    expect(swell).toBeGreaterThan(1);
-    expect(swell).toBeLessThan(1.06);
+    expect(scales[0]).toBe(1);
+    // Never out. A swell is what read as a jump.
+    expect(Math.max(...scales)).toBe(1);
 
-    // Then in, past where it started, accelerating — the click.
-    const last = scales.at(-1)!;
-    expect(last).toBeLessThan(1 - EXIT_BY / 2);
+    // And never faster at one moment than another: every step the same size, so
+    // there is no instant that reads as a snap.
+    const steps = scales.slice(1).map((scale, i) => scale - scales[i]!);
+    for (const step of steps) {
+      expect(step).toBeLessThan(0);
+      expect(step).toBeCloseTo(steps[0]!, 12);
+    }
+  });
 
-    // **And it does not pause first.** The curve it borrows settles into rest at
-    // one end, so read backwards it leaves rest with no speed — which is a pause
-    // (author, 2026-08-29). Its clock is hurried to spend that in a tick: the
-    // swell is all but complete on the tick after the release, and the peak is
-    // inside the first third rather than at the halfway mark.
-    expect(scales[1]!).toBeGreaterThan(1 + (swell - 1) * 0.8);
-    expect(scales.indexOf(swell)).toBeLessThan(scales.length / 3);
+  /**
+   * **It leaves by what it arrived by.** The entrance pops from
+   * [`ENTER_FROM`](../../src/state/compass.ts) and the exit draws back to the
+   * same size, so the two ends of the instrument are one gesture — which is what
+   * the reversed curve was reaching for and got wrong by mirroring the *shape*
+   * instead of the size.
+   */
+  it('draws back to exactly the size it came online from', () => {
+    const out = exiting();
+    expect(out.at(-1)!.compass!.scale).toBeCloseTo(ENTER_FROM, 12);
+    expect(EXIT_BY).toBeCloseTo(1 - ENTER_FROM, 12);
+    // A touch, and no more: a sixth of what the click took out of it.
+    expect(EXIT_BY).toBeLessThan(0.1);
 
     // And over quickly: 100ms and not a tick more.
     expect(out.length).toBeLessThanOrEqual(EXIT_TICKS);
@@ -584,23 +599,19 @@ describe('the instrument clicking out', () => {
   });
 
   /**
-   * **The light holds while the shape talks.** The design's own decay is fastest
-   * at the start, which had the collapse happening under 13% opacity — the motion
-   * asked for, where it could not be seen.
+   * **It fades out rather than being cut off**, which is the other half of what
+   * read as jumpy. The click's last drawn frame was 78% scale at **31% opacity**
+   * and the next was nothing, so a third-lit instrument disappeared mid-gesture.
+   * On the game's own decay the last frame is lit at a few percent, and by then
+   * there is nothing left to cut.
    */
-  it('fades so that the collapse is still visible', () => {
+  it('is all but out before it stops being drawn', () => {
     const out = exiting();
     const alphas = out.map((view) => view.compass!.alpha);
 
-    for (let i = 1; i < alphas.length; i++) expect(alphas[i]!).toBeLessThan(alphas[i - 1]!);
     expect(alphas[0]).toBe(1);
-
-    // Still well lit where the shape swells, and still visible where it shuts.
-    const swellAt = out.findIndex(
-      (view) => view.compass!.scale === Math.max(...out.map((v) => v.compass!.scale)),
-    );
-    expect(alphas[swellAt]!).toBeGreaterThan(0.6);
-    expect(alphas.at(-1)!).toBeGreaterThan(0.1);
+    for (let i = 1; i < alphas.length; i++) expect(alphas[i]!).toBeLessThan(alphas[i - 1]!);
+    expect(alphas.at(-1)!).toBeLessThan(0.05);
   });
 
   /**

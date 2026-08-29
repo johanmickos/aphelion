@@ -102,15 +102,21 @@ footer uses obsolete numbering and is void.
 > once, when the rings arrive at the freeze. It scales the rings and the hand and
 > never the orbit path, because the craft is on the path. What it is deliberately
 > **not** is the prototype's continuous pump, which that codebase measured at
-> *"85 out to 97 and back over about a second"* and removed. **And it leaves on the
-> same curve reversed** (2026-08-29): the compass clicks out at a release rather
-> than vanishing, swelling 3.5% and then collapsing inward over 100ms — on §5's
-> own overshoot read backwards, with its clock hurried, because a curve that
-> settles gently at one end starts gently at the other and a gentle start is a
-> pause. §5's DECAY
-> is not the fade used for it — measured, that curve had the collapse happening
-> under 13% opacity, so the motion was where it could not be seen; the exit holds
-> its light while the shape moves and goes when it does.
+> *"85 out to 97 and back over about a second"* and removed. **And it leaves by what it
+> arrived by** (2026-08-29, revised the same day): the compass draws back to §5's own 92% over
+> 100ms and fades out, rather than vanishing. It **was** §5's overshoot read backwards, swelling
+> 3.5% and then collapsing inward — and flown twice, that read as a jump rather than as a click:
+> *"it still reads jumpy, and I think we should try just having it shrink in radius a touch and
+> then fade out."* Measured, two things were wrong with it and neither was the idea. The swell was
+> **one frame** — out on the tick after the release and back on the next — and sixteen
+> milliseconds each way is under the span at which the eye reads a direction, so *attack ≤ 2
+> frames* buys a flinch when it is run backwards onto an exit rather than forwards onto an
+> arrival. And it never faded: the last frame it was drawn on was **78% scale at 31% opacity**,
+> cut off mid-gesture, with steps of −1.8%, −5.3%, −8.1%, −10.5% so it moved fastest at the
+> instant it disappeared. What replaces it is **even steps and §5's own DECAY** — 1.6% a tick,
+> nothing accelerating, and 3% opacity on the last frame, so there is nothing left to cut. The
+> mirror is the **size** rather than the shape, which is what made the two ends one gesture in the
+> first place.
 >
 > **§6 · The grab filament fades with distance.** State 1's row describes a line and not a
 > brightness, and it was drawn at a constant E2. The hold ends on a release and on nothing else, so

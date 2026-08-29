@@ -883,6 +883,48 @@ word — same class of thing (a word that blooms at the point that earned it, sp
 simulation reports the contact at all today, and whether a bounce costs the run anything, because
 a word that appears when nothing happened is a joke told twice.
 
+## Flown a fifth time, 2026-08-29 — the compass stops clicking and starts leaving
+
+*"Before we added a kind of click or bubble effect to the compass when it disappears. It still
+reads jumpy, and I think we should try just having it shrink in radius a touch and then fade
+out."* Two sittings ago the exit was **built** as a click, on the author's own description of one;
+flown twice, it kept reading as a jump. Measured, the idea was fine and the execution had two
+faults, both of which are the kind a six-tick animation makes and a long one hides.
+
+**The swell was one frame.** On `leaving` with its clock hurried, the scale ran
+`1.000 → 1.035 → 1.017 → 0.964 → 0.882 → 0.777`: out on the tick after the release and already
+back on the next. Sixteen milliseconds out and sixteen back is under the span at which the eye
+reads a direction, so a swell that size does not arrive as a gesture — it arrives as a flinch.
+Spec [00 · §5](../spec/00-tokens.md)'s *attack ≤ 2 frames* is a rule about things **arriving**,
+where being over before it is seen is exactly the point; reversed onto an exit, the same number
+buys the opposite.
+
+**And it never faded out.** The last frame it was drawn on was **78% scale at 31% opacity** and
+the next was nothing — a third-lit instrument cut off a fifth of the way through collapsing. The
+acceleration made it worse: the steps ran −1.8%, −5.3%, −8.1%, −10.5%, so it was moving fastest at
+the instant it vanished. `shut` existed to keep the light up *while the shape did something
+dramatic*; with the drama gone, the reason for the special curve went with it.
+
+**What it does now** is an even shrink and the game's own decay: 1.6% a tick with no acceleration
+anywhere, and `fade` taking the light to **3%** on the last frame it is drawn, so there is nothing
+left to cut off. `EXIT_BY` is no longer a taste — it is `1 - ENTER_FROM`, so the instrument leaves
+by exactly the amount it arrived by and the two ends stay one gesture. That is what the reversed
+curve was reaching for and got wrong by mirroring the *shape* instead of the size.
+
+**Three curves were deleted with it** — `hastened`, `leaving` and `shut` in
+[`decay.ts`](../../src/state/decay.ts) — because the compass exit was the only caller of any of
+them and a curve nobody calls is a curve that rots. `home` stays, because the entrance still pops
+on it, and `leaving` is one line to re-derive if M2.4's farewell ring wants a mirror.
+
+**One caveat worth carrying into M2.4.** Part of what read as jumpy may not have been this at all:
+the same sitting found that the phone's 1ms clock was handing `ticksDue` bursts of double-steps
+([performance](./performance.md) §10), and a six-tick animation losing one tick to a jump loses a
+sixth of itself. That is fixed too, and the two fixes have not yet been flown together. If the
+exit still reads wrong, it is now a question about **this** curve rather than about two things at
+once.
+
+---
+
 ## M2.4 · The release — 400ms
 
 Spec `02-release`. The most choreographed moment in the game, and the numbers are pinned:
