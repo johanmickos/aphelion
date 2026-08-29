@@ -127,7 +127,8 @@ footer uses obsolete numbering and is void.
 > one screenshot (author, 2026-08-29). This section brightens the hand *"as aim closes"* and states
 > neither end: it ran 0.35 → full CORE, which read as a bright bar across the middle of the
 > instrument, and now runs 0.18 → 0.55. It is drawn from the body's **rim** outward rather than
-> from its centre — the part inside the body was a line through the thing it measures from. And the
+> from its centre — the part inside the body was a line through the thing it measures from, and
+> state 1's grab filament starts at the rim for the same reason. And the
 > crossing dots take the window's ramp rather than the energy table's step, so the mark that says
 > *the hand is here* brightens all the way in instead of jumping once.
 >

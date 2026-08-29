@@ -1,9 +1,11 @@
 /**
- * Where the hand starts, and what the marks on it do.
+ * Where the compass's two straight lines start.
  *
  * *"I want this line to end at the planet surface, not extend from the center of
- * the planet"* (author, 2026-08-29) — the part of the radius inside the body was
- * drawing a line through the thing it measures from.
+ * the planet"* (author, 2026-08-29), and the same again for the filament one
+ * state earlier: *"the tether/grab line when not orbiting should also stop at
+ * the planet surface."* Neither had anything to say inside the body — both were
+ * drawing through the thing they measure from.
  */
 import { describe, expect, it } from 'vitest';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
@@ -105,5 +107,47 @@ describe('the hand starts at the body’s surface', () => {
     expect(along(hand![0]!)).toBeCloseTo(compass.rim, 9);
     expect(along(hand![1]!)).toBeCloseTo(compass.reach * compass.scale, 9);
     expect(compass.reach).toBeGreaterThan(compass.rim);
+  });
+});
+
+describe('the filament starts there too', () => {
+  /** A presentation mid-dive: a filament, and no instrument yet. */
+  const diving = (): PresentationState => {
+    const sim: SimState = createInitialState(fixtureField(), fixtureCraft(), 1);
+    let view = createPresentation(sim);
+    for (let tick = 0; tick < 400; tick++) {
+      stepSim(sim, tick >= 20 ? PRESS : NO_INPUT);
+      view = derive(view, sim);
+      if (view.compass !== null && view.compass.filament > 0 && view.compass.hand === null) break;
+    }
+    return view;
+  };
+
+  it('runs from the rim to the craft, and not from the centre', () => {
+    const view = diving();
+    const compass = view.compass!;
+    expect(compass.hand).toBeNull();
+    expect(compass.filament).toBeGreaterThan(0);
+
+    const { context, lines } = recorder();
+    draw(view, context);
+
+    // The filament is the only two-point line that ends on the craft.
+    const filament = lines.find(
+      (line) =>
+        line.length === 2 &&
+        Math.hypot(line[1]!.x - compass.craftX, line[1]!.y - compass.craftY) < 1e-6,
+    );
+    expect(filament).toBeDefined();
+
+    const from = filament![0]!;
+    // It begins on the rim...
+    expect(Math.hypot(from.x - compass.x, from.y - compass.y)).toBeCloseTo(compass.rim, 9);
+    // ...and on the line to the craft, so nothing about its bearing moved.
+    const cross =
+      (from.x - compass.x) * (compass.craftY - compass.y) -
+      (from.y - compass.y) * (compass.craftX - compass.x);
+    expect(cross).toBeCloseTo(0, 6);
+    expect(compass.rim).toBeGreaterThan(0);
   });
 });

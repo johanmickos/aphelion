@@ -830,6 +830,11 @@ the thing it measures from. `CompassView` carries the held body's `rim` for it, 
 deliberately does **not** take the instrument's `scale`: the rings pop in at the freeze and the
 planet does not.
 
+**And the filament starts there as well.** *"The tether/grab line when not orbiting should also
+stop at the planet surface, not go all the way to the center."* The same reasoning one state
+earlier, and the same `rim`. Guarded rather than assumed: a craft nearer than the rim would send
+the line backwards out of the far side of the body, so that case draws nothing.
+
 **The crossings ramp instead of stepping.** *"I'd like this arm to have small white-ish dots on the
 compass orbits for each planet. These dots should also slightly increase in intensity as the player
 orbits, like the windows."* Those dots already existed — the **crossing**, where the hand cuts each

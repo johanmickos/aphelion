@@ -446,8 +446,18 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
   // which is what makes the compass arriving *be* the freeze, seen.
   if (compass.hand === null) {
     drawPath(context, compass);
+    // From the body's **surface** to the craft, the same as the hand one state
+    // later: *"the tether/grab line when not orbiting should also stop at the
+    // planet surface, not go all the way to the center"* (author, 2026-08-29).
+    // Guarded, because a line to a craft nearer than the rim would run backwards
+    // out of the far side of the body.
+    const reach = Math.hypot(compass.craftX - compass.x, compass.craftY - compass.y);
+    if (reach <= compass.rim) return;
     context.beginPath();
-    context.moveTo(compass.x, compass.y);
+    context.moveTo(
+      compass.x + ((compass.craftX - compass.x) / reach) * compass.rim,
+      compass.y + ((compass.craftY - compass.y) / reach) * compass.rim,
+    );
     context.lineTo(compass.craftX, compass.craftY);
     context.lineWidth = HAND_WIDTH;
     // **It fades with distance**, which is the difference between a line that
