@@ -12,6 +12,82 @@ footer uses obsolete numbering and is void.
 
 ---
 
+> ## ⚠ Flown, 2026-08-29 — what the build found, and what it moved
+>
+> **M2.1 – M2.3 built this file and the author flew it.** Ten notes came back, and the ones that
+> land here are below. Everything not named still stands; nothing below is rewritten in place,
+> for the reason spec [02](./02-release.md)'s own notice gives — a rebase is a careful edit and
+> the numbers under it are still being flown.
+>
+> **§3 · The E3 no longer fires at a release or at a grab.** *"The white dot that is emitted when
+> I grab is too noisy and too much... let's let the PLANET speak about our grab, not some ambient
+> glowing orbs."* Spec [04 · §3](./04-bodies.md) already had the body doing that — a held body is
+> **E2 and alive**, and the compass draws itself around that glow — so the flash was a second
+> voice saying the same thing. The step, its 400ms and the **one-alive-at-a-time** rule are
+> untouched and still belong to the **award** and to the checkered line; the release is quiet
+> until [M2.4](../plan/m2-the-instrument.md) brings the word and the farewell ring.
+>
+> **§3 · The bloom radii stand; the percentages do not.** *"All glow is too much. I want it
+> fainter and more impactful."* E1 and E2 are drawn at **18%** and **30%** against this table's
+> 35% and 60%. The radii are exactly as written — 6px, 18px, 48px, +4px a chain link, read into
+> design units at three per board pixel — so the acceptance criterion below is untouched: bloom
+> radius is still a pure function of the energy step and the chain, and what moved is an alpha,
+> which §1 already makes the renderer's.
+>
+> **§3 · A body glows when it is *gripping*, not when it is reachable.** This table's *"E0–E1"*
+> for a body AHEAD is read at **E0** until the body is actually pulling: `CONTEXT.md` gains
+> **grip**, the live pull against the pull at that body's own floor, and a body lights at 0.3 of
+> it. Read at the top of the range instead, twenty-four bodies bloom at once. What survives at E0
+> is the rim, which is spec 04 §3's other sentence — *"a constellation of dim coloured rings,
+> never a row of grey balls."* Rings, not blooms.
+>
+> **§3 · There is a surface this table does not have**: a wide, faint halo from a body's floor
+> outward, in its own hue, at an alpha that grows with grip. *"The planets should have a fainter,
+> much wider glow that grows with proximity."* Carried from the prototype, where the same span is
+> the band an arrival's tightness is graded over — ours is spec 01's **depth**, and M4 is where
+> the two meet.
+>
+> **§6 · *Reachable* has a number now, and it is borrowed.** This section asks for *"one
+> concentric ring per reachable body"* and never says what reachable is. Unbounded, the geometry
+> offers ten to sixteen rings at once. It is the prototype's aim range — about two body-spacings,
+> *"anything beyond that is a long, featureless coast"* — capped at **four** rings, which is
+> measured: over 342 releases that reached another body, the one actually grabbed next was among
+> the four nearest **100%** of the time. Spec [17](./17-daily-field.md) still owns the number.
+>
+> **§6 · The window's width is the *quality* band.** *"Window width encodes difficulty"* stands
+> and is the reason this changed: measured as *reachability* — every release landing within grab
+> range — the median window is **360° wide**, because the median body is on offer from 1 680
+> design units against a field spaced nearer 700. It is now the arc over which a release arrives
+> within two of the target's **floors**, which is the one guarantee a grab makes: *"I don't want
+> to highlight grabbable for most planets, but instead — if I release here I'll have a good chance
+> of getting a high quality capture."* Flown, p50 **36.6°**, against this board's own 40° wedge.
+>
+> **§6 · A minimum width, and the compass grades the width it draws.** *"For very distant planets
+> we still need to show a window... it's more important that the player knows roughly where to aim
+> with little screen clutter."* An arc the geometry earns nothing of opens to 15° — spec
+> [06 · §2](./06-awards.md)'s own narrow worked example — and the grading opens with it, on the
+> prototype's rule that *"the player must never be scored against something they cannot see."*
+>
+> **§6 · A window heats over a quarter turn, not over itself.** *"When I hold an orbit and spin
+> around, the compass windows pass too quickly... the original starts glowing before I touch
+> them."* Measured, the hand is inside an arc for **3 to 4 ticks, 50 – 67ms**; heated on the
+> prototype's alignment ramp instead, a window is lit **15 ticks, 250ms** before its dot.
+>
+> **§6 · The *ghost* is a `CONTEXT.md` collision and the word is now *crossing*.** This section
+> calls the mark where the hand cuts a ring a ghost; the glossary spends that word on **a recipe
+> played back beside a live run**. One word for two things is the fork AGENTS.md §2 exists to
+> stop, and [M2.3](../plan/m2-the-instrument.md)'s own brief already writes *"the crossing dots"*.
+>
+> **§6 · The label is unbuilt, and it contradicts spec 04.** This table puts *"a chip at its
+> window's tip"* on every ring; spec [04 · §5](./04-bodies.md) rules that in a run an address chip
+> appears in **exactly one case** — two live targets too close in hue to tell apart — and the
+> `P11` chips are retired, so a label that is not an address has nothing left to say. **One of the
+> two is stale and neither says which.** Nothing is drawn, and §6's 12° label-collision rule is
+> unbuilt with it.
+>
+> **§7 · The thumb line holds and is now load-bearing twice.** Sightings are pinned inside the
+> design space and never cross it, which falls out of the geometry rather than being clamped.
+
 ## 1 · Palette — eight names, eight meanings
 
 Every colour in the game is one of these eight. Nothing is mixed, tinted or invented at

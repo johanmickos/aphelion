@@ -15,6 +15,33 @@ release **defers** the carry rather than destroying it (ADR-0008), which amends 
 
 ---
 
+> ## ⚠ Flown, 2026-08-29 — the zones stand; what `W` means has moved
+>
+> **§2's four zones are built exactly as written** and are asserted at every boundary from both
+> sides, including both worked examples: at `W = 15°` the PERFECT zone is 1.5° and the floor
+> binds; at `W = 40°` it is 3.2°. Nothing in the ladder, the streaks, the callout or the miss has
+> changed. Two things about the **`W`** those fractions are taken of are worth knowing here.
+>
+> **`W` is the width the compass *draws*, floor and all.** Spec [00 · §6](./00-tokens.md) now puts
+> a minimum width under an arc the geometry earns nothing of, so the drawn width and the earned
+> width come apart on the narrowest windows. The drawn one is what grades, on the prototype's
+> rule: *"the player must never be scored against something they cannot see. One sweep produces
+> the rings that get drawn AND the alignment that gets paid, so the two cannot drift apart."*
+>
+> **The 1.5° floor takes a larger share of a narrower window, and that is §2 working.** The floor
+> is absolute while every other zone is a fraction, so the narrower the window the more of it pays
+> the top word — at a 40° window the PERFECT zone is 16% of it, at 15° it is 20%, and below 3° it
+> is the whole window. Spec 00 §6 rules that a narrow window is *"automatically a better-paid
+> one"*, and this is the mechanism rather than a defect.
+>
+> **Which leaves one thing this file cannot settle.** Window width falls with distance, so the
+> furthest body always has the narrowest window and is therefore the best-paid release on the
+> instrument — *"the far away ones feel really tricky to aim for and that makes me WANT to aim for
+> them, even though I want to guide players to slingshot to nearby planets"* (author,
+> 2026-08-29). Grading is a pure function of `(d, W)` and imports nothing from the economy, which
+> is this file's own acceptance and is not up for negotiation; **pricing distance is spec
+> [08](./08-economy.md)'s arithmetic and [M4](../plan/m4-the-economy.md)'s**.
+
 ## 1 · The law
 
 **Points for the make. Words for the mastery.**

@@ -12,6 +12,47 @@ footer uses obsolete numbering and is void.
 
 ---
 
+> ## ⚠ Flown, 2026-08-29 — the tide narrowed, and one line of §2 is unbuilt
+>
+> **M2.2 built this file and the author flew it.** What moved:
+>
+> **§2 · The tide is on the body a press would take, or the one already held.** This section says
+> *"present on every body within grab range; absent beyond it"*, which on a real field is most of
+> them at once — flown, that reads as noise rather than as gravity. Narrowed to the same two the
+> prototype narrows it to, with its reason: the tide is the body **reaching for you**, and the
+> body reaching for you is the one a press would answer. §3's *"IN REACH: tide present"* is read
+> against that.
+>
+> **§2 · The inner ripple is not built.** *"One stratum ring tracks the tide at 0.6 × k, at α
+> 0.3"* is the one sentence in this file the prototype never implemented, and flown it was the
+> first thing the author asked about: *"what's the purpose of the innermost ring within a planet,
+> that also has a tide tracking my orbiting ship? It doesn't look great and I don't know why it's
+> there."* The **strata** stay — §1's structure without texture, which the prototype has — and the
+> thing that tracked is gone.
+>
+> **§2 · The stated tracking and *"always faces the craft"* cannot both hold, and this is open.**
+> `CONTEXT.md` says the tide always faces the craft; §2 says it follows with a first-order lag at
+> `k ≈ 6 /s`; the acceptance below asks that lag be *"bounded and non-zero"*. Built exactly as
+> written, and measured on a settled orbit, the standing lag is **45.3°** against an arc
+> half-width of 18° — so the tide's near edge sits 27° short of the craft and it never overlaps
+> the bearing it is supposed to face. At this game's settled turn rates (spec 01: p50 3.50°/tick,
+> p90 5.07) the lag is 30 – 46° at the stated `k`, and roughly 15° at `k ≈ 15 /s`. **It is the
+> author's**, and it is on the bench.
+>
+> **§3 · A body glows when it is *gripping*, not when it is reachable.** This table's *"E0–E1"*
+> for AHEAD is read at **E0** until the body is actually pulling — see spec
+> [00 · §3](./00-tokens.md)'s notice, and `CONTEXT.md`'s new **grip**. A body in reach but far off
+> is a rim and nothing else, which is this section's own *"constellation of dim coloured rings."*
+>
+> **§3 · And there is a surface this file does not have**: a wide faint halo from the floor
+> outward in the body's hue, at an alpha that grows with grip. *"The planets should have a
+> fainter, much wider glow that grows with proximity."*
+>
+> **§1, §4 and §5 stand as written.** The rim and tide widths are constant in design px whatever
+> the radius, the strata sit at 0.68r and 0.39r, the core is the type slot at 0.08r, and a body is
+> named by hue in the run — which is the ruling that keeps a **sighting**'s new label a distance
+> and not a name (spec [03 · §6](./03-hud.md)).
+
 ## 1 · Anatomy
 
 A body is a lamp, not a rock: flat vector anatomy that emits its own identity. No gradients, no

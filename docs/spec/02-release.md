@@ -32,6 +32,32 @@ for what word is chosen, [08 · Economy](./08-economy.md) for what is cashed.
 > rebasing it is a careful edit that wants the compass in front of it. Spec
 > [01 · §7](./01-swing.md) already fixes the envelope the release kick's quality is read from.
 
+> ## ⚠ Flown, 2026-08-29 — the E3 goes too, and the stretch is built
+>
+> **The flash is withdrawn at both ends.** §2's `E3 flash` row and §7's `E3: Yes, at the grab
+> point` are both off (author, 2026-08-29): *"the white dot that is emitted when I grab is too
+> noisy and too much... let's let the PLANET speak about our grab, not some ambient glowing
+> orbs."* Spec [04 · §3](./04-bodies.md) already had the body doing that job — a held body is E2
+> and alive — so the flash was a second voice on the same beat. **The release is therefore quiet**
+> until this file's award word and farewell ring are built, which is
+> [M2.4](../plan/m2-the-instrument.md)'s, and the craft's stretch is what marks it meanwhile.
+>
+> **§4's stretch is built, dated from `T0`** exactly as the notice above prescribes, and two
+> divergences from the board's keyframes are worth stating. Both axes return on **one** rebound
+> shape rather than two, because spec [00 · §5](./00-tokens.md)'s motion tokens are one grammar:
+> the along axis matches the board's 0.95 against a 1.5 stretch exactly, and the across axis
+> rebounds to **1.03** where the board draws 1.06. And the rebound is deepest **58%** of the way
+> home where the board puts it at 83% — four hand-set keyframes are not a curve, and the depth is
+> the half worth matching.
+>
+> **§5's camera kick is still unbuilt, and there is a conflict waiting in it.** The kick travels
+> *along the exit tangent*, so it has a horizontal component — and
+> [`camera.ts`](../../src/state/camera.ts) does not move sideways at all until
+> [M3.1](../plan/m3-the-field.md), with a test asserting `camera.x` is the centreline on every
+> tick of every swing. Both are right; what has to happen is that the kick becomes a displacement
+> *from* the camera's position rather than a second opinion about where the camera is. M2.1 built
+> the machinery it needs — a displacement that homes past rest once — and stopped there.
+
 ## 1 · The three rules
 
 1. **A 70ms hitstop where only the player's energy stays lit.** The pause is the punch.

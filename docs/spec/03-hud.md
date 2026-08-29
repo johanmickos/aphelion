@@ -22,6 +22,46 @@ anything the field pays says what it pays, where it is.
 
 ---
 
+> ## ⚠ Flown, 2026-08-29 — the sighting points now
+>
+> **§6's central ruling is reversed by the author who made it.** On 2026-08-28: *"a sighting does
+> not point"* — Direction 03's edge dot, position as direction, no vector, and `CONTEXT.md` listed
+> *arrow* and *pointer* under `_Avoid_`. On 2026-08-29, having flown it: *"the coloured dots —
+> personally I hate them. Let's instead re-design them to be arrows with distance markers, like in
+> the original prototype"*, and on the maxim that forbade exactly that: **"this is another
+> instance of an original rule being too strict."**
+>
+> So a sighting is an **arrow** in the body's identity hue with **how far away it is** beneath it.
+> Concretely, against §6's table:
+>
+> - **Form** — an arrow, not a dot. Its *position* on the edge still carries the direction and the
+>   arrow agrees with it rather than replacing it, so the two can never disagree.
+> - **Distance** — carried, as a number. It is a **distance and not a name**: the author called
+>   the labels *"a different class"* from the retired `P11` chips, and that retirement is
+>   explicitly about naming, so identity stays hue-only. It is set in Archivo with tracked figures
+>   rather than in the prototype's monospace, because spec [00 · §4](./00-tokens.md) rules that
+>   nothing in the game is set in a monospace face.
+> - **Reach** — §6 records *"reach is not yet a number"* and defers it to spec
+>   [17](./17-daily-field.md). It has one meanwhile, carried from the prototype with the behaviour
+>   it buys: past it the coast is long and featureless, and marking it *"invites the player to aim
+>   past the interesting part of the field."* Spec 17 still replaces it.
+> - **Distance, again, as brightness** — §6's own escape hatch is taken: *"stepping its energy is
+>   the one answer that needs no label and breaks no rule."* A mark fades with range and is at
+>   full strength for the body a press would take. The **step** stays E1; the fade is an alpha.
+> - **The ring on the offered body** — §6 records it unbuilt and *"worth revisiting only after the
+>   compass exists."* It exists, so it is built, and `BodyView` carries the fact from
+>   [`bodyOnOffer`](../../src/sim/grab.ts) rather than working it out a second time.
+>
+> **The acceptance criterion below moves with it.** *"A sighting is held to the same line: its
+> position carries the direction and no vector is drawn"* is superseded for sightings and holds
+> everywhere else: no arrows in the world, no `RISK ZONE`, nothing that says *turn*. The line
+> between a fact and a command is unchanged — a bearing and a distance are facts.
+>
+> **Everything else in §6 stands**, including the two rules that are the reason it exists: never
+> for a body already on screen, and never for one behind the climb. A **spent** body is added to
+> those, which §6 does not say and spec [04 · §3](./04-bodies.md) does — its lamp is out, and a
+> sighting is that lamp seen from further away.
+
 ## 1 · The frame
 
 Design space **1170 × 2532** (ADR-0010). Everything is drawn in world space in design
