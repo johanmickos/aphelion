@@ -128,6 +128,13 @@ export function lockOf(sim: SimState): number {
   },
   {
     file: 'src/render/index.ts',
+    find: 'const TIDE_SWELL = 1;',
+    replace: 'export let TIDE_SWELL = 1;',
+    append: '\nexport function set_TIDE_SWELL(value: number): void {\n  TIDE_SWELL = value;\n}\n',
+    why: 'how much thicker the tide draws as the craft closes — zero is the old behaviour',
+  },
+  {
+    file: 'src/render/index.ts',
     find: 'const HAND_AT_AIM = 0.55;',
     replace: 'export let HAND_AT_AIM = 0.55;',
     append: '\nexport function set_HAND_AT_AIM(value: number): void {\n  HAND_AT_AIM = value;\n}\n',

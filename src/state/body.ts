@@ -59,6 +59,34 @@ export function gripOf(body: Body, craft: Craft): number {
 }
 
 /**
+ * How far the craft has closed into this body's reach, from 0 to 1
+ * (`CONTEXT.md`: **closing**).
+ *
+ * **Nought at the edge of what this body can hold, one against its surface, and
+ * linear in between.** It is the distance reading, and [`gripOf`](#) is what that
+ * distance buys — the glossary keeps the two apart deliberately, and the reason
+ * is that they are wanted for different jobs.
+ *
+ * **Grip is the physical truth and the wrong curve to paint with.** It falls as
+ * 1/r², and a body's reach is 10.5× its own floor, so grip at the edge of a hold
+ * is `0.009`: anything drawn with it is invisible over most of the span it is
+ * supposed to describe. That was measured once already, for the grab filament
+ * ([`FILAMENT_FLOOR`](./compass.ts)), and the ruling there was to paint with the
+ * distance instead. This is that ruling, named and shared, rather than the same
+ * three lines written twice.
+ *
+ * Measured over a real run: across an approach to the body a press would take it
+ * runs **0.31 → 0.88** (p10 – p90, 0.45 – 0.80), against `strength`'s 0.42 – 0.63
+ * over the same frames. It is the reading that actually moves while the craft
+ * closes, which is what makes it the one to draw an approach with.
+ */
+export function closingOf(body: Body, craft: Craft): number {
+  const reach = grabRange(body);
+  if (reach <= 0) return 0;
+  return 1 - Math.min(1, distance(craft.x, craft.y, body.x, body.y) / reach);
+}
+
+/**
  * How much grip it takes before a body lights up at all.
  *
  * **The bloom is not always on, and spec 04 §3 says so**: its energy column

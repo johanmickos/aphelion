@@ -152,6 +152,7 @@ describe('presentation state', () => {
     const view = createPresentation(world());
     expect(Object.keys(view.bodies[0]!).sort()).toEqual([
       'bloom',
+      'closing',
       'energy',
       'grip',
       'held',

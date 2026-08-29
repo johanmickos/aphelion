@@ -42,8 +42,6 @@
  * reading the field.
  */
 import { AIM_RANGE, handOf, windowsOn } from '../sim/compass.ts';
-import { grabRange } from '../sim/grab.ts';
-import { distance } from '../sim/math.ts';
 import { pathRadiusAt, predictOrbit } from '../sim/orbit.ts';
 import type { Orbit } from '../sim/orbit.ts';
 import { advance, easeStep, fade, home, place, ticksIn } from './decay.ts';
@@ -52,6 +50,7 @@ import { SCALE } from '../sim/units.ts';
 import { alignmentOf, tierFor } from '../sim/tier.ts';
 import type { Tier } from '../sim/tier.ts';
 import type { SimState } from '../sim/types.ts';
+import { closingOf } from './body.ts';
 import { BOARD_PIXEL } from './design.ts';
 import { hueOf } from './identity.ts';
 import type { CompassView, Energy, RingView } from './types.ts';
@@ -260,10 +259,11 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     // gravity has bound the craft at all, is the path it is currently on: faded
     // in, and firming up as the prediction converges.
     const guess = predictOrbit(sim.craft, body);
-    // How much of this body's hold is left — 1 against the body, 0 at the edge
-    // of its reach, and floored past it so the thread survives the miss.
-    const held =
-      1 - Math.min(1, distance(sim.craft.x, sim.craft.y, body.x, body.y) / grabRange(body));
+    // How much of this body's hold is left — `closing`, floored below so the
+    // thread survives a miss. It was written out here once; it is named now,
+    // because the tide wanted the same reading and two copies of a formula are
+    // one copy too many.
+    const closing = closingOf(body, sim.craft);
     return {
       x: body.x,
       y: body.y,
@@ -272,7 +272,7 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
       craftX: sim.craft.x,
       craftY: sim.craft.y,
       direction: guess === null ? 1 : guess.direction,
-      filament: FILAMENT_FLOOR + (1 - FILAMENT_FLOOR) * held,
+      filament: FILAMENT_FLOOR + (1 - FILAMENT_FLOOR) * closing,
       predicted: guess !== null,
       hand: null,
       // Nothing to come online yet: the dive has no instrument.

@@ -219,6 +219,17 @@ export interface BodyView {
    */
   readonly grip: number;
   /**
+   * How far the craft has closed into this body's reach, from 0 to 1
+   * (`CONTEXT.md`: **closing**).
+   *
+   * Beside `grip` rather than instead of it, and the pair is the point: grip is
+   * what the distance buys and this is the distance. Grip falls as 1/r² and is
+   * the right thing to gate a glow on; it is the wrong thing to *draw a closing
+   * approach with*, because it is 0.009 over most of the span. This is linear
+   * across exactly the reach the body has, so it is what the tide swells on.
+   */
+  readonly closing: number;
+  /**
    * Its hue, in oklch degrees — **its name** (`CONTEXT.md`: identity).
    *
    * A number and not a colour, because a colour is paint and this layer holds

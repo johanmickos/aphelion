@@ -112,8 +112,40 @@ const STRATA: ReadonlyArray<readonly [at: number, share: number]> = [
 /** Spec 04 §1's core: a filled dot at 0.08 × the body's radius. The type slot. */
 const CORE_SHARE = 0.08;
 
-/** Spec 04 §1's tide: 4 board pixels, constant whatever the body's radius. */
+/**
+ * Spec 04 §1's tide: 4 board pixels, constant whatever the body's radius.
+ *
+ * **§1's rule is about the body's size and this is about the craft's distance**,
+ * so [`TIDE_SWELL`](#) below does not break it: a small body and a giant one show
+ * the same tide at the same approach, which is what *"constant in design px
+ * regardless of body radius"* is protecting. Four is what it is at the **edge of
+ * the body's reach**, where the tide is only just there.
+ */
 const TIDE_WIDTH = 4 * BOARD_PIXEL;
+
+/**
+ * How much thicker the tide draws as the craft closes, as a multiple of its own
+ * width.
+ *
+ * *"I'd love for the tide window to grow in thickness as I approach, too"*
+ * (author, 2026-08-29). It already grows in **length** along the limb and in
+ * **brightness**; this is the third reading of the same closing distance, and the
+ * one that makes the band read as reaching rather than as merely brightening.
+ *
+ * **One, because that is the grammar the compass window already has** — its arc
+ * runs `WINDOW_WIDTH * (1 + aim)` and doubles at full, carried from the
+ * prototype's own pair. An arc in this game that heats also thickens, by the same
+ * amount, and inventing a second number for the tide would be inventing a second
+ * grammar.
+ *
+ * **It swells on [`closing`](../state/body.ts) rather than on `strength`**, and
+ * that is measured rather than preferred: over a real run, across an approach to
+ * the body a press would take, `closing` runs **0.31 → 0.88** while `strength`
+ * runs 0.42 – 0.63 over the same frames. Strength mixes the body's mass into the
+ * reading, so a heavy body would arrive already thick and barely move; the
+ * distance is the thing that is actually changing while the player closes.
+ */
+const TIDE_SWELL = 1;
 
 /**
  * How faint the lightest tide in the field may be.
@@ -382,7 +414,7 @@ function drawTide(context: CanvasRenderingContext2D, body: BodyView, tide: TideV
     tide.bearing - tide.halfWidth,
     tide.bearing + tide.halfWidth,
   );
-  context.lineWidth = TIDE_WIDTH;
+  context.lineWidth = TIDE_WIDTH * (1 + TIDE_SWELL * body.closing);
   context.strokeStyle = identityLit(body.hue, TIDE_FLOOR + (1 - TIDE_FLOOR) * tide.strength);
   context.stroke();
 }
@@ -397,8 +429,18 @@ const DOT_RADIUS = 3 * BOARD_PIXEL;
  * How wide the crossing dot is. Spec 00 §6 calls it a *ghost*; `CONTEXT.md`
  * spends that word on a replay flown beside a live run, so this milestone's own
  * brief calls it **the crossing dot** and so does everything here.
+ *
+ * *"Let's make the white dots on my ship's arm that goes through the compass a
+ * bit larger. Just a hair. At this size moving that fast they're hard to see"*
+ * (author, 2026-08-29). Two board pixels to **two and a half**, which is a
+ * quarter wider and a little over half again in area — a hair, and the reason it
+ * needs one is **speed** rather than size: the crossing sweeps the ring at
+ * orbital rate, and a mark small enough to read while still is not the same mark
+ * while moving. It stops short of [`DOT_RADIUS`](#)'s three, because the window's
+ * own dot is the target and the crossing is the pointer; a pointer that outgrew
+ * what it points at would invert the instrument.
  */
-const CROSSING_RADIUS = 2 * BOARD_PIXEL;
+const CROSSING_RADIUS = 2.5 * BOARD_PIXEL;
 
 /**
  * How bright a crossing dot is before any aim has closed.

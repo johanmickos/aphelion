@@ -57,6 +57,12 @@ function recorder(): { context: CanvasRenderingContext2D; strokes: Stroke[] } {
       pending = null;
     },
     closePath: () => {},
+    // The renderer writes a sighting's distance beneath it. Nothing here reads
+    // text, but a recorder that throws when the renderer draws some is a
+    // recorder that fails for a reason the test is not about.
+    fillText: () => {},
+    measureText: () => ({ width: 0 }),
+    setLineDash: () => {},
     moveTo: () => {},
     lineTo: () => {},
     rect: () => {},
@@ -88,15 +94,40 @@ function recorder(): { context: CanvasRenderingContext2D; strokes: Stroke[] } {
  * giant is on offer from far enough away to be off the picture entirely, and the
  * renderer would draw nothing at all.
  */
-function strokesFor(radius: number): Stroke[] {
+function strokesFor(radius: number, closing = FAR): Stroke[] {
   const body = createBody(DESIGN_WIDTH / 2, 0, radius);
   const field = openField([body]);
-  const gap = Math.min(grabRange(body) * 0.5, radius * 2 + 60);
-  const craft = createCraft(DESIGN_WIDTH / 2, gap, 0, 0);
+  // Placed by **how far into the body's reach it is** rather than by a distance,
+  // because that is what the tide's thickness is now a function of and a fixed
+  // gap means different things to a body of 20 and one of 200 — their reaches
+  // are 38.6 and 3 856.7, which is the mass rule and not a rounding.
+  const craft = createCraft(DESIGN_WIDTH / 2, grabRange(body) * (1 - closing), 0, 0);
   const { context, strokes } = recorder();
   draw(createPresentation(createInitialState(field, craft, 1)), context);
   return strokes;
 }
+
+/**
+ * The two approaches these tests draw at, and **neither end is reachable**.
+ *
+ * A body has to be near enough to be on screen at all — the renderer culls by
+ * the camera's band — and far enough that the craft is not inside it. For the
+ * median body those two put the usable window at **0.17 to 0.92**, so the edge
+ * of a reach cannot be drawn and neither can a surface. Everything about the
+ * tide's thickness is therefore read as a **slope between two approaches** and
+ * extrapolated, rather than asserted at an endpoint no frame can contain.
+ */
+const FAR = 0.25;
+const NEAR = 0.65;
+
+/**
+ * The approaches the radius pair is compared at.
+ *
+ * Tighter, because they have to suit both: a body of 20 reaches only 38.6, so
+ * closing past 0.48 puts the craft inside it.
+ */
+const PAIR_FAR = 0.2;
+const PAIR_NEAR = 0.4;
 
 /** The rim is the full circle at exactly the body's radius; the tide is the arc on it. */
 const rimOf = (strokes: Stroke[], radius: number): Stroke =>
@@ -109,22 +140,82 @@ describe('a body’s anatomy', () => {
   const large = 200;
 
   /**
+   * The pair the **tide** is compared across, and it is not §1's 20-and-200.
+   *
+   * Reach grows with mass, so those two reach 39 and 3 857 — and the tide's
+   * thickness is now a function of how far into a reach the craft is, so the
+   * comparison has to hold that fixed. There is no closing that does: at any
+   * fraction where the 200 is still on screen (it needs to be closer than half
+   * the design height) the craft is **inside** the 20. Six times the radius is
+   * the spread that fits, and it is still the same question.
+   */
+  const [tideSmall, tideLarge] = [20, 120];
+
+  /**
    * §1's scale rule, and the reason it exists: *"small bodies read as bright
    * rings; giants as thin luminous horizons."* A stroke that scaled with the
    * radius would make every body look the same size in the one channel that is
    * supposed to distinguish them.
+   *
+   * **Held at equal approach, which is what the rule was always about.** The tide
+   * now thickens as the craft closes (author, 2026-08-29), so *"whatever the
+   * radius"* has to be asked with the other variable pinned — and it is the
+   * sharper question: a body of 20 and one of 200, the same fraction into their
+   * very different reaches, draw the identical band.
    */
   it('strokes the rim and the tide at the same width whatever the radius', () => {
-    const [thin, fat] = [strokesFor(small), strokesFor(large)];
-    expect(rimOf(thin, small).width).toBe(rimOf(fat, large).width);
-    expect(tideOf(thin, small).width).toBe(tideOf(fat, large).width);
+    // The rim takes no reading from the craft at all, so §1's own pair stands —
+    // and the two are placed at whatever closing keeps each of them on screen,
+    // which is the sharpest way to say the rim does not care.
+    expect(rimOf(strokesFor(small, 0.2), small).width).toBe(
+      rimOf(strokesFor(large, 0.7), large).width,
+    );
+
+    for (const closing of [PAIR_FAR, PAIR_NEAR]) {
+      const thin = strokesFor(tideSmall, closing);
+      const fat = strokesFor(tideLarge, closing);
+      expect(rimOf(thin, tideSmall).width).toBe(rimOf(fat, tideLarge).width);
+      expect(tideOf(thin, tideSmall).width).toBeCloseTo(tideOf(fat, tideLarge).width, 9);
+    }
   });
 
-  /** And they are the board's own numbers, read into design units. */
-  it('uses spec 04 §1’s 2.25px rim and 4px tide for a body in reach', () => {
+  /**
+   * And they are the board's own numbers, read into design units.
+   *
+   * The tide's 4px is now what it is at the **edge of the body's reach**, which
+   * is off screen and cannot be drawn — so it is recovered from two approaches
+   * that can be, by measuring the line the drawn widths sit on and reading its
+   * value where the reach begins. That measures the renderer's output rather
+   * than restating its constants.
+   */
+  it('uses spec 04 §1’s 2.25px rim, and a 4px tide where a reach begins', () => {
     const strokes = strokesFor(MEDIAN_RADIUS);
     expect(rimOf(strokes, MEDIAN_RADIUS).width).toBeCloseTo(2.25 * BOARD_PIXEL, 9);
-    expect(tideOf(strokes, MEDIAN_RADIUS).width).toBeCloseTo(4 * BOARD_PIXEL, 9);
+
+    const far = tideOf(strokesFor(MEDIAN_RADIUS, FAR), MEDIAN_RADIUS).width;
+    const near = tideOf(strokesFor(MEDIAN_RADIUS, NEAR), MEDIAN_RADIUS).width;
+    const perClosing = (near - far) / (NEAR - FAR);
+    expect(far - perClosing * FAR).toBeCloseTo(4 * BOARD_PIXEL, 9);
+  });
+
+  /**
+   * *"I'd love for the tide window to grow in thickness as I approach, too"*
+   * (author, 2026-08-29). It already grew in length and in brightness; this is
+   * the third reading of the same closing distance.
+   *
+   * Asserted as a **slope** rather than at an endpoint, because the endpoint is
+   * unreachable: full closing is the body's own surface, and a craft there is a
+   * contact rather than an approach. The slope is the whole of the behaviour
+   * anyway — 40% of the way in is 40% thicker, which is the compass window's own
+   * grammar and pins `TIDE_SWELL` at one.
+   */
+  it('thickens as the craft closes, on the window’s own ramp', () => {
+    const far = tideOf(strokesFor(MEDIAN_RADIUS, FAR), MEDIAN_RADIUS).width;
+    const near = tideOf(strokesFor(MEDIAN_RADIUS, NEAR), MEDIAN_RADIUS).width;
+    expect(near).toBeGreaterThan(far);
+    // The window's grammar is `1 + aim`, doubling at full; the tide takes the
+    // same slope against how far the craft has closed.
+    expect(near / far).toBeCloseTo((1 + NEAR) / (1 + FAR), 9);
   });
 
   /**
@@ -151,7 +242,9 @@ describe('a body’s anatomy', () => {
 
   /** The strata are fractions of the radius, which is what makes them structure. */
   it('places the strata at 0.68 and 0.39 of the radius', () => {
-    const strokes = strokesFor(large);
+    // A body of 200 reaches 3 857, so it is only on screen well inside its own
+    // reach — see the pair's note above.
+    const strokes = strokesFor(large, 0.7);
     const rings = strokes.filter((s) => s.sweep === null).map((s) => s.radius / large);
     expect(rings.some((at) => Math.abs(at - 0.68) < 1e-9)).toBe(true);
     expect(rings.some((at) => Math.abs(at - 0.39) < 1e-9)).toBe(true);

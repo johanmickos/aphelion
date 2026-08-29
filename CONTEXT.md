@@ -74,6 +74,16 @@ body lights up at all: the field ahead is a constellation of rims, and a body gl
 gripping rather than when it is merely reachable.
 _Avoid_: gravity, force, attraction, proximity (grip is what proximity buys, not the distance)
 
+**Closing**:
+How far the craft has come into a body's **reach** — nothing at the edge of what that body can
+hold, all of it against the surface, and linear in between. It is the *distance*, where **grip**
+is what the distance buys, and the two are kept apart because they are wanted for different jobs:
+grip is the physical truth and decides whether a body lights up at all, and closing is what an
+approach is *drawn* with. Grip falls as 1/r², so at the edge of a hold it is 0.009 — anything
+painted with it is invisible across most of the span it is meant to describe. Measured on a real
+approach, closing runs 0.31 → 0.88 where the tide's own strength runs 0.42 → 0.63.
+_Avoid_: proximity (see **grip**), nearness, distance (unqualified — closing is the *ratio*)
+
 **Tide**:
 The bright limb segment of a body that always faces the craft — gravity drawn at
 close range. It **lags**, and the lag is the point: a heavier body reaches with a longer,

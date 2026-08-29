@@ -66,7 +66,7 @@
 import { headingOf, speedOf } from '../sim/craft.ts';
 import type { SimState } from '../sim/types.ts';
 import { bodyOnOffer } from '../sim/grab.ts';
-import { energyOf, gripOf, stateOf, tideOf } from './body.ts';
+import { closingOf, energyOf, gripOf, stateOf, tideOf } from './body.ts';
 import { followCamera, openCamera } from './camera.ts';
 import { compassOf } from './compass.ts';
 import { advance, fade } from './decay.ts';
@@ -189,6 +189,7 @@ function bodiesOf(sim: SimState, previous: readonly BodyView[] | null): BodyView
       state,
       offered,
       grip,
+      closing: closingOf(body, sim.craft),
       hue: hueOf(address),
       energy,
       bloom: bloomOf(energy),
