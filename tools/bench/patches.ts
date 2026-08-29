@@ -157,6 +157,11 @@ export function lockOf(sim: SimState): number {
     'the A/B: 0 is width from mass alone, 1 from proximity',
   ),
   settable(
+    'src/state/body.ts',
+    'TIDE_LIFT',
+    'how far proximity lifts the tide’s brightness toward full',
+  ),
+  settable(
     'src/state/compass.ts',
     'PATH_FADE_RATE',
     'how fast the oval fades in once it is possible',

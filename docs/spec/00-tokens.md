@@ -104,7 +104,7 @@ footer uses obsolete numbering and is void.
 > **not** is the prototype's continuous pump, which that codebase measured at
 > *"85 out to 97 and back over about a second"* and removed. **And it leaves on the
 > same curve reversed** (2026-08-29): the compass clicks out at a release rather
-> than vanishing, swelling 3.3% and then collapsing inward over 150ms — on §5's
+> than vanishing, swelling 3.5% and then collapsing inward over 100ms — on §5's
 > own overshoot read backwards, with its clock hurried, because a curve that
 > settles gently at one end starts gently at the other and a gentle start is a
 > pause. §5's DECAY

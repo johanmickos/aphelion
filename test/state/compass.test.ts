@@ -26,6 +26,7 @@ import {
   STACK_GAP,
   takenBy,
 } from '../../src/state/compass.ts';
+import { compassOf } from '../../src/state/compass.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { hueOf } from '../../src/state/identity.ts';
 import type { CompassView, PresentationState } from '../../src/state/types.ts';
@@ -439,8 +440,55 @@ describe('the instrument clicking out', () => {
     expect(scales[1]!).toBeGreaterThan(1 + (swell - 1) * 0.8);
     expect(scales.indexOf(swell)).toBeLessThan(scales.length / 3);
 
-    // And over quickly: 150ms and not a tick more.
+    // And over quickly: 100ms and not a tick more.
     expect(out.length).toBeLessThanOrEqual(EXIT_TICKS);
+  });
+
+  /**
+   * The bug the speed complaint was actually about.
+   *
+   * [`leave`](../../src/state/compass.ts) carries the hand through the exit, and
+   * the entrance was placed on `hand === null` — so a grab landing inside those
+   * few exit ticks took the *other* branch and advanced an entrance that had
+   * finished long ago. `advance(null)` is `null`, which is scale 1: the compass
+   * came back at full size with no bounce at all, exactly during the fast
+   * grab-release-grab of *"it feels a bit laggy when I'm zipping around"*
+   * (author, 2026-08-29). The instrument has to come online every time it comes
+   * online, and most of all when it is doing it often.
+   */
+  it('comes online again when the grab lands inside its own exit', () => {
+    // Driven at the seam rather than flown: a release followed by a grab within
+    // six ticks needs a second body already in range at the release point, which
+    // the fixture field takes 65 ticks to offer. The branch is the subject, so
+    // the branch is what is exercised — with a real held view and a real sim on
+    // either side of it.
+    const sim: SimState = createInitialState(fixtureField(), fixtureCraft(), 1);
+    let view = createPresentation(sim);
+    // Held until the freeze has happened and the entrance has finished — the
+    // dive has no hand and no instrument to click out.
+    for (let tick = 0; tick < 400 && view.compass?.hand == null; tick++) {
+      stepSim(sim, tick >= 20 ? PRESS : NO_INPUT);
+      view = derive(view, sim);
+    }
+    for (let tick = 0; tick < ENTER_TICKS + 2; tick++) {
+      stepSim(sim, PRESS);
+      view = derive(view, sim);
+    }
+
+    const live = view.compass!;
+    expect(live.hand).not.toBeNull();
+    expect(live.exit).toBeNull();
+    expect(live.scale).toBeCloseTo(1, 9); // Long since arrived.
+
+    // Let go — the instrument starts clicking out, still carrying its hand.
+    const leaving = compassOf(live, { ...sim, heldBody: null });
+    expect(leaving!.exit).not.toBeNull();
+    expect(leaving!.hand).not.toBeNull();
+
+    // And grab again on the next tick, while that exit is still on screen.
+    const back = compassOf(leaving, sim)!;
+    expect(back.exit).toBeNull();
+    expect(back.scale).toBeCloseTo(ENTER_FROM, 9);
   });
 
   /**

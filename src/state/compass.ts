@@ -174,7 +174,7 @@ export const ENTER_FROM = 0.92;
  * instrument does, leaving that expansion for [M2.4](../../docs/plan/m2-the-instrument.md)
  * to put on it.
  */
-export const EXIT_TICKS = ticksIn(150);
+export const EXIT_TICKS = ticksIn(100);
 
 /** How far in it collapses before it is gone. */
 export const EXIT_BY = 0.35;
@@ -268,8 +268,16 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
 
   // The instrument arrives with the freeze, so the entrance is placed on the tick
   // the hand first exists and aged from there.
-  const entrance =
-    previous === null || previous.hand === null ? place(ENTER_TICKS) : advance(previous.entrance);
+  //
+  // **A compass on its way out is not an instrument**, which is why the test is
+  // `exit === null` and not just `hand !== null`: [`leave`](#) carries the hand
+  // through the exit, so a re-grab inside those few ticks used to advance an
+  // entrance that had already finished — `advance(null)` — and the compass came
+  // back at full size with no bounce at all. That is precisely the fast
+  // grab-release-grab the author was flying: *"it feels a bit laggy when I'm
+  // zipping around"* (2026-08-29). Zipping around is when the bounce was missing.
+  const live = previous !== null && previous.hand !== null && previous.exit === null;
+  const entrance = live ? advance(previous.entrance) : place(ENTER_TICKS);
 
   return {
     scale: entrance === null ? 1 : 1 + (ENTER_FROM - 1) * home(entrance),

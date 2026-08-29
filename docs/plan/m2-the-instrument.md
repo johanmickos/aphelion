@@ -696,7 +696,7 @@ correctly rounded so ADR-0014 has nothing to say.
 
 Measured: it swells to **1.033 by the second tick**, is back through 1.0 at the fourth, collapses
 to **0.74**, and is gone at **nine — 150ms**. The peak sits at a fifth of the span where it used to
-sit at two fifths.
+sit at two fifths. *(Shortened again to **100ms** on the fourth flight — see below.)*
 
 **One curve had to be added, and the reason is a measurement.** `fade` is the design's decay,
 fastest at the start and slowing to nothing, which is right for an E3 that is over the instant it
@@ -734,6 +734,61 @@ approval rather than written:
 **548 tests, 46 files.** Every number that moved is on the bench, which is now at `/bench` on the dev server.
 
 ---
+
+## Flown a fourth time, 2026-08-29 — the click again, and the brightness the tide was missing
+
+### The click was still lagging, and half of it was a bug
+
+*"Can we speed it up even more? It feels a bit laggy when I'm zipping around."* Two things were
+true at once, and only one of them was the number.
+
+**The number.** `EXIT_TICKS` goes 150ms → **100ms**, six ticks: out to 1.035 on the first tick,
+back through rest on the third, in to 0.78, gone on the sixth. The hurried clock from the last
+pass is what makes six ticks enough to still read as a click rather than as a cut.
+
+**The bug, which is what "laggy" was actually describing.** [`leave`](../../src/state/compass.ts)
+carries the hand through the exit, and the entrance was placed on `hand === null`. So a grab
+landing inside those few exit ticks took the *other* branch and advanced an entrance that had
+finished long ago — `advance(null)` is `null`, which is scale 1. **The compass came back at full
+size with no bounce at all**, and only ever when the player was grabbing again quickly: the
+HUD-coming-online bounce the author asked for two flights ago was missing from exactly the fast
+play it was asked for. The test is now `exit === null`, and a test drives the seam directly —
+the fixture field takes 65 ticks to offer a second body, so this branch cannot be reached by
+flying it, and a test that cannot fail is worse than no test. It fails without the fix.
+
+### And the tide grows brighter as well as wider
+
+*"I also want the tide window to grow in brightness as I get near. So we can tweak each final tide
+color to be a touch brighter than right now."* The width had grown into itself since the third
+flight and the brightness had not: `strength` read `pull` alone, so a tide was exactly as bright
+the moment it bubbled in as it was at the floor.
+
+`TIDE_LIFT = 0.55` **lifts** rather than scales — `pull + (1 - pull) * LIFT * grip` — and that is
+the whole design. The far end lands on `pull` exactly where the author already tuned it, so
+nothing in the field gets dimmer, which matters in a game whose first note was *"all glow is too
+much"*. The lift is spent on the range mass left unused, so a light body borrows more of it than a
+heavy one, and the near end arrives brighter than anything that has shipped:
+
+| body | far | halfway | near | before |
+|---|---|---|---|---|
+| light (pull 0.25) | 0.55 | 0.67 | **0.80** | 0.55 flat |
+| median (0.50) | 0.70 | 0.78 | **0.87** | 0.70 flat |
+| heavy (0.85) | 0.91 | 0.94 | **0.96** | 0.91 flat |
+
+**Mass still orders them.** The derivative in `pull` is `1 - LIFT · grip`, positive everywhere
+below 1, so at any fixed distance the heavier body is still the brighter one — spec
+[04 · §2](../spec/04-bodies.md)'s *"reaches with a longer and brighter tide"* survives being made
+to depend on distance as well. It is a knob on the bench beside the width's A/B.
+
+### Queued, from the same sitting
+
+**A collision has no voice.** *"I want to show a quirky 'Clang!' or similar when I bounce into
+another planet while holding a different one"* (author, 2026-08-29). Recorded here rather than
+built: it is a **release-and-impact** moment and belongs with M2.4's vocabulary, next to the award
+word — same class of thing (a word that blooms at the point that earned it, spec
+[06](../spec/06-awards.md)), opposite register. Two questions come before any pixels: whether the
+simulation reports the contact at all today, and whether a bounce costs the run anything, because
+a word that appears when nothing happened is a joke told twice.
 
 ## M2.4 · The release — 400ms
 

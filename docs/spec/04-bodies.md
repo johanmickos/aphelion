@@ -30,6 +30,16 @@ footer uses obsolete numbering and is void.
 > there."* The **strata** stay — §1's structure without texture, which the prototype has — and the
 > thing that tracked is gone.
 >
+> **§2 · Both the tide's width and its brightness now depend on how near the craft is.** This
+> section derives each from mass alone. Flown, that made a tide arrive at its full size and its
+> full brightness the instant it appeared, whatever the distance. Two notes moved it: *"I'd love
+> if they grew into their width based on my distance — a waterdrop effect when it first bubbles
+> in"* and *"I also want the tide window to grow in brightness as I get near"* (author,
+> 2026-08-29). Width is `TIDE_HALF_WIDTH_MAX · pull · (1 − GROWTH · (1 − grip))` and brightness is
+> `pull + (1 − pull) · LIFT · grip`, both on the bench. **Mass still orders both** — at any fixed
+> distance the heavier body has the longer and brighter tide, which is what this section is
+> actually about; distance decides how much of that reach is showing.
+>
 > **§2 · The stated tracking and *"always faces the craft"* cannot both hold, and this is open.**
 > `CONTEXT.md` says the tide always faces the craft; §2 says it follows with a first-order lag at
 > `k ≈ 6 /s`; the acceptance below asks that lag be *"bounded and non-zero"*. Built exactly as

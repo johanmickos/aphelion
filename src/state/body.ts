@@ -134,6 +134,32 @@ export const TIDE_LAG_RATE_MAX = 12;
 export const TIDE_GROWTH = 0.67;
 
 /**
+ * How far **proximity** lifts the tide's brightness toward full.
+ *
+ * The width grows into itself as the craft closes ([`TIDE_GROWTH`](#)) and the
+ * brightness did not: it read `pull` alone, so a tide was exactly as bright the
+ * moment it bubbled in as it was at the floor. *"I also want the tide window to
+ * grow in brightness as I get near. So we can tweak each final tide color to be
+ * a touch brighter than right now"* (author, 2026-08-29).
+ *
+ * It **lifts** rather than scales, which is the whole difference: `pull +
+ * (1 - pull) * LIFT * grip` leaves the far end exactly where the author already
+ * tuned it — nothing gets dimmer — and spends the lift on the part of the range
+ * mass left unused. So the near end arrives brighter, which is the ask, and a
+ * light body borrows more of the lift than a heavy one because it has more room
+ * to borrow.
+ *
+ * **Mass still orders them.** The derivative in `pull` is `1 - LIFT * grip`,
+ * positive everywhere below 1, so at any fixed distance the heavier body is
+ * still the brighter one — spec [04 · §2](../../docs/spec/04-bodies.md)'s
+ * *"reaches with a longer and brighter tide"* survives being made to depend on
+ * distance as well.
+ *
+ * **An opening position**, and a knob on the bench beside the width's.
+ */
+export const TIDE_LIFT = 0.55;
+
+/**
  * Which of spec 04 §3's four states a body is in.
  *
  * **SPENT is a fact and not a distance**: a body that has been held and let go
@@ -199,15 +225,18 @@ export function tideOf(
   // Mass sets the ceiling and proximity decides how much of it is showing.
   const open = 1 - TIDE_GROWTH * (1 - grip);
   const halfWidth = TIDE_HALF_WIDTH_MAX * pull * open;
+  // Mass sets the brightness and proximity lifts it toward full — see
+  // [`TIDE_LIFT`](#). Both readings of the same closing distance.
+  const strength = pull + (1 - pull) * TIDE_LIFT * grip;
   const bearing = angleOf(craft.x - body.x, craft.y - body.y);
   if (previous === null) {
-    return { bearing, halfWidth, strength: pull };
+    return { bearing, halfWidth, strength };
   }
 
   return {
     bearing: towards(previous.bearing, bearing, easeStep(TIDE_LAG_RATE_MAX * pull)),
     halfWidth,
-    strength: pull,
+    strength,
   };
 }
 

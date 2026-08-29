@@ -23,7 +23,13 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS, SETTLE_TICKS } from '../../src/sim/units.ts';
-import { EMIT_AT, pullOf, TIDE_HALF_WIDTH_MAX, TIDE_LAG_RATE_MAX } from '../../src/state/body.ts';
+import {
+  EMIT_AT,
+  pullOf,
+  TIDE_HALF_WIDTH_MAX,
+  TIDE_LAG_RATE_MAX,
+  TIDE_LIFT,
+} from '../../src/state/body.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { bloomOf } from '../../src/state/energy.ts';
 import type { BodyState, PresentationState } from '../../src/state/types.ts';
@@ -274,6 +280,39 @@ describe('the tide', () => {
     }
     // And they never run away: an arc lives on a circle, so the law saturates.
     for (const tide of tides) expect(tide.halfWidth).toBeLessThan(TIDE_HALF_WIDTH_MAX);
+  });
+
+  /**
+   * *"I also want the tide window to grow in brightness as I get near. So we can
+   * tweak each final tide color to be a touch brighter than right now"* (author,
+   * 2026-08-29). The width already grew into itself as the craft closed and the
+   * brightness did not.
+   *
+   * The lift is additive on purpose, and this pins both halves of why: the far
+   * end lands exactly on `pull`, where the author already tuned it, so nothing
+   * in the field gets dimmer — and the near end arrives brighter than anything
+   * that shipped before it.
+   */
+  it('brightens as the craft closes, without dimming anything far away', () => {
+    const body = createBody(0, 0, MEDIAN_RADIUS);
+    const field = openField([body]);
+    const at = (fraction: number): number => {
+      const sim = createInitialState(field, createCraft(0, grabRange(body) * fraction, 0, 0), 1);
+      return createPresentation(sim).bodies[0]!.tide!.strength;
+    };
+
+    const far = at(0.999);
+    const near = at(0.05);
+
+    // Monotone the whole way in.
+    const walk = [0.999, 0.8, 0.6, 0.4, 0.2, 0.05].map(at);
+    for (let i = 1; i < walk.length; i++) expect(walk[i]!).toBeGreaterThan(walk[i - 1]!);
+
+    // The floor is mass alone — untouched.
+    expect(far).toBeCloseTo(pullOf(body), 2);
+    // And the ceiling is the lift, spent on the room mass left over.
+    expect(near).toBeCloseTo(pullOf(body) + (1 - pullOf(body)) * TIDE_LIFT, 2);
+    expect(near).toBeLessThanOrEqual(1);
   });
 
   /** The median body is where the spec's own reference numbers land. */
