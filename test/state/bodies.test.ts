@@ -15,7 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createBody } from '../../src/sim/body.ts';
+import { createBody, floorRadius } from '../../src/sim/body.ts';
 import { createCraft } from '../../src/sim/craft.ts';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { grabRange } from '../../src/sim/grab.ts';
@@ -23,7 +23,7 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MEDIAN_RADIUS, SETTLE_TICKS } from '../../src/sim/units.ts';
-import { pullOf, TIDE_HALF_WIDTH_MAX, TIDE_LAG_RATE_MAX } from '../../src/state/body.ts';
+import { EMIT_AT, pullOf, TIDE_HALF_WIDTH_MAX, TIDE_LAG_RATE_MAX } from '../../src/state/body.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { bloomOf } from '../../src/state/energy.ts';
 import type { BodyState, PresentationState } from '../../src/state/types.ts';
@@ -105,11 +105,42 @@ describe('the four states', () => {
    * assertion on the exact two ticks rather than a range.
    */
   it('is E2 on the tick of the grab and E0 on the tick of the release, not before', () => {
-    expect(views[grabbed - 1]!.bodies[address]!.energy).toBe(1);
     expect(views[grabbed]!.bodies[address]!.energy).toBe(2);
     expect(views[released - 1]!.bodies[address]!.energy).toBe(2);
     expect(views[released]!.bodies[address]!.energy).toBe(0);
     expect(views[released]!.bodies[address]!.bloom).toBe(0);
+  });
+
+  /**
+   * **A body glows when it is gripping you, not when it is reachable.** Spec 04
+   * §3 gives a body AHEAD *"E0–E1"* and [`EMIT_AT`](../../src/state/body.ts) is
+   * where in that range it sits — M2.2 read it at the top and lit twenty-four
+   * bodies at once, which the author's first note after flying it was about.
+   * What is left of a distant body is its rim, which is §3's other sentence:
+   * *"a constellation of dim coloured rings, never a row of grey balls."*
+   */
+  it('does not bloom until it is actually gripping the craft', () => {
+    const quiet = views.filter((view) => view.bodies[address]!.state !== 'HELD');
+    const dark = quiet.filter((view) => view.bodies[address]!.energy === 0);
+    expect(dark.length).toBeGreaterThan(0);
+    for (const view of views) {
+      const body = view.bodies[address]!;
+      if (body.state === 'HELD' || body.state === 'SPENT') continue;
+      expect(body.energy).toBe(body.grip > EMIT_AT ? 1 : 0);
+    }
+  });
+
+  /** And grip is a fact about *now*: it rises as the craft closes and never sticks. */
+  it('grips harder the nearer the craft is', () => {
+    const field = fixtureField();
+    const body = field.bodies[0]!;
+    const at = (gap: number): number => {
+      const sim = createInitialState(field, createCraft(body.x, body.y + gap, 0, 0), 1);
+      return createPresentation(sim).bodies[0]!.grip;
+    };
+    expect(at(floorRadius(body))).toBeCloseTo(1, 6);
+    expect(at(floorRadius(body) * 2)).toBeLessThan(at(floorRadius(body)));
+    expect(at(grabRange(body))).toBeLessThan(0.1);
   });
 
   it('never changes hue, whatever happens to it', () => {
@@ -169,7 +200,14 @@ describe('the four states', () => {
 });
 
 describe('the tide', () => {
-  it('is absent beyond grab range and present inside it', () => {
+  /**
+   * **On the body a press would take, and nowhere else.** Spec 04 §2 says
+   * *"present on every body within grab range"*, which on this field is most of
+   * them at once; flown, that is noise rather than gravity (author, 2026-08-29),
+   * and the prototype narrows it to the same two with the same reason — the tide
+   * is the body *reaching for you*, and that is the one a press would answer.
+   */
+  it('is on the offered body and absent beyond its reach', () => {
     const field = fixtureField();
     const body = field.bodies[0]!;
     const at = (gap: number): boolean => {
@@ -178,6 +216,14 @@ describe('the tide', () => {
     };
     expect(at(grabRange(body) * 0.9)).toBe(true);
     expect(at(grabRange(body) * 1.1)).toBe(false);
+  });
+
+  it('is drawn on at most one body that is not held', () => {
+    for (const view of fly(20, 300)) {
+      const lit = view.bodies.filter((body) => body.tide !== null && !body.held);
+      expect(lit.length).toBeLessThanOrEqual(1);
+      for (const body of lit) expect(body.offered).toBe(true);
+    }
   });
 
   /**
@@ -204,15 +250,6 @@ describe('the tide', () => {
 
     expect(Math.min(...lags)).toBeGreaterThan(0);
     expect(Math.max(...lags)).toBeLessThan(Math.PI / 2);
-  });
-
-  /** And the ripple is behind the tide, which is what makes it a second thing. */
-  it('drags one stratum behind the limb', () => {
-    const views = fly(20, 320);
-    const late = views[200]!;
-    const body = late.bodies.find((b) => b.held);
-    expect(body?.tide).not.toBeNull();
-    expect(body!.tide!.ripple).not.toBe(body!.tide!.bearing);
   });
 
   /**
@@ -266,7 +303,6 @@ describe('the tide', () => {
     }
     const bearing = Math.atan2(sim.craft.y - body.y, sim.craft.x - body.x);
     expect(view.bodies[0]!.tide!.bearing).toBeCloseTo(bearing, 6);
-    expect(view.bodies[0]!.tide!.ripple).toBe(view.bodies[0]!.tide!.bearing);
   });
 
   it('is gone once the body is spent, because the lamp is out', () => {

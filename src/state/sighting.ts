@@ -2,11 +2,8 @@
  * The bodies the picture cannot show, marked on its edge.
  *
  * Spec [03 · §6](../../docs/spec/03-hud.md), and `CONTEXT.md`'s **sighting**: a
- * dot on the edge of the picture in the body's own hue, saying *which body* and
- * *which way* and nothing else. **It does not point.** The mark's position on
- * the edge is the direction, which is the whole reason the form survives spec
- * 03's own acceptance — *"no instruction text is drawn anywhere in the world"*,
- * and an arrow is an instruction.
+ * mark at the edge of the picture in the body's own hue, saying which body, which
+ * way, and how far.
  *
  * **It is how the game pays for a fixed width** (author, 2026-08-28). Spec
  * [00 · §7](../../docs/spec/00-tokens.md) fixes the design width and lets the
@@ -15,75 +12,104 @@
  * off the picture **12%** of the time as the space is fitted today and **32%**
  * under §7's ruled fit. This is what that 32% reads instead.
  *
- * ## The picture is the design space, and that is a decision
+ * ## It points now, and that is a ruling that was reversed
  *
- * A device shows the design space *plus* whatever the fit left over — the
- * **bleed** — and how much of it depends on the device. Presentation state
- * cannot know that and must not: ADR-0006's promise is that a frame is a pure
- * function of `(recipe, tick)`, which stops being true the moment the count of
- * marks depends on a viewport. So *"off the picture"* means **outside the design
- * space**, the rectangle spec 00 §7 makes the contract, and the mark sits on
- * that rectangle's own edge rather than on the buffer's.
+ * On 2026-08-28 the author ruled that **a sighting does not point** — Direction
+ * 03's edge dot, position as direction, no vector — and `CONTEXT.md` listed
+ * *arrow* and *pointer* under `_Avoid_`. Flown, on 2026-08-29, they reversed it:
+ * *"the coloured dots — personally I hate them. Let's instead re-design them to
+ * be arrows with distance markers, like in the original prototype"*, and on the
+ * no-instruction maxim that forbade it: *"this is another instance of an original
+ * rule being too strict."*
  *
- * The cost is stated: a wide desktop window can show a body in the bleed *and* a
- * mark for it just inside the design space. That is the same trade the bleed
- * already makes everywhere else — the composition is identical on every device,
- * and what differs is only how much world is visible beside it.
+ * So a sighting carries a **bearing** and a **distance**. Two things about that
+ * are worth having written down rather than inferred:
  *
- * ## What is not built, and it is recorded rather than forgotten
+ * - **The distance is a number and not a name.** The author called the labels
+ *   *"a different class"* from the retired `P11` chips, and that retirement is
+ *   explicitly about naming — *"a body is named by hue in the run and address in
+ *   the retelling."* Identity stays hue-only; what the label says is how far.
+ * - **What the unit means is still open.** Spec [05 · §3](../../docs/spec/05-field.md)
+ *   has the same question about rung labels — metres, or an address — and it is
+ *   the author's. This says design units until that is ruled, and follows it when
+ *   it is.
  *
- * **Distance.** The prototype fades a marker with range and prints the number.
- * Direction 03 refuses the label and §6 records that the fade has no replacement
- * here, because brightness is the only ordinal channel and hue is already spent
- * on identity — so a sighting is flat **E1** and says nothing about how far.
- * **The ring on the body a press would take** is §6's other recorded absence,
- * and it is worth revisiting only after the compass exists, because the compass
- * is built over the same question.
+ * ## Reach, which the spec left open and the prototype had measured
+ *
+ * §6 records *"reach is not yet a number"* and defers it to spec
+ * [17](../../docs/spec/17-daily-field.md). The prototype carries one —
+ * `edgeMarkerRange`, 1 300 of its units — and the behaviour it buys is what
+ * ADR-0013 says to carry: past it there is nothing to read and a mark is clutter.
+ * It is [`SIGHTING_RANGE`](#) here, converted, and spec 17 still replaces it.
  */
 import type { Body } from '../sim/body.ts';
 import type { Craft } from '../sim/craft.ts';
+import { distance } from '../sim/math.ts';
+import { angleOf } from '../sim/trig.ts';
+import { SCALE } from '../sim/units.ts';
 import { bloomOf } from './energy.ts';
 import { hueOf } from './identity.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from './design.ts';
 import type { BodyState, CameraView, SightingView } from './types.ts';
 
 /**
- * How big the mark itself is, in design units.
+ * How big the mark is, in design units.
  *
- * **An opening position.** Direction 03 draws a dot and states no size, and the
- * only constraint that is not taste is spec 00 §7's: nothing the player reads
- * may be drawn outside the design space, so the dot is inset by its own radius
- * and never straddles the edge. It is on the bench.
+ * **An opening position**, and the only constraint that is not taste is spec
+ * 00 §7's: nothing the player reads may be drawn outside the design space, so
+ * the mark is inset by its own size and never straddles the edge.
  */
 export const SIGHTING_RADIUS = 12;
 
 /**
- * The energy a sighting burns at — **E1, flat**.
+ * How far a body may be and still be marked — the prototype's 1 300, converted.
  *
- * Spec 03 §6 is explicit that this is where the distance information went: *"if
- * a sighting ever needs to say how far, stepping its energy is the one answer
- * that needs no label and breaks no rule. It says nothing about distance today,
- * at a flat E1."* So the step is a constant here on purpose, and the day it
- * stops being one is the day distance is ruled.
+ * Spec 03 §6 leaves this open and spec 17 closes it. What is carried meanwhile is
+ * the behaviour rather than the number's authority: past this the coast is long
+ * and featureless, and marking it *"invites the player to aim past the
+ * interesting part of the field"* — the prototype's own words about the same
+ * bound one instrument over.
+ */
+export const SIGHTING_RANGE = 1300 * SCALE;
+
+/** Where the fade begins and ends — the prototype's 200 and 1 600, converted. */
+const FADE_FROM = 200 * SCALE;
+const FADE_TO = 1600 * SCALE;
+
+/**
+ * How faint the furthest mark may get.
+ *
+ * Not zero: a mark that fades to nothing is a body that vanishes rather than one
+ * that is far away, and the range above is what says *nothing to read here*.
+ */
+const FAINTEST = 0.35;
+
+/**
+ * The energy a sighting burns at — **E1**.
+ *
+ * Spec 03 §6 records that this is where distance went: *"brightness is the only
+ * ordinal channel and hue is already spent on identity, so if a sighting ever
+ * needs to say how far, stepping its energy is the one answer."* It now says so
+ * twice — the label, and the fade — and the step stays E1 because the fade is an
+ * alpha rather than a step.
  */
 const SIGHTING_ENERGY = 1;
 
 /**
  * Every body the picture cannot show, in address order.
  *
- * Three rules, and each is a line in spec 03 §6's table. A body **already on
- * screen** has none — *"a mark pointing at a thing the player can see is clutter
- * over the exact thing it was pointing at."* A body **behind the climb** has
- * none — *"a mark below the craft points at somewhere it has already been, which
- * is clutter and a suggestion to turn around."* And a **spent** body has none,
- * which §6 does not say and spec [04 · §3](../../docs/spec/04-bodies.md) does:
- * its lamp is out, and a sighting is that lamp seen from further away. There is
- * no fourth rule, because *"reach is not yet a number"* — §6 defers it to spec
- * 17 and draws every body ahead until then.
+ * Four rules. A body **already on screen** has none — *"a mark pointing at a
+ * thing the player can see is clutter over the exact thing it was pointing
+ * at."* A body **behind the climb** has none — *"a mark below the craft points at
+ * somewhere it has already been."* A **spent** body has none, which §6 does not
+ * say and spec [04 · §3](../../docs/spec/04-bodies.md) does: its lamp is out, and
+ * a sighting is that lamp seen from further away. And a body **past
+ * [`SIGHTING_RANGE`](#)** has none.
  */
 export function sightingsOf(
   bodies: readonly Body[],
   states: readonly BodyState[],
+  offered: readonly boolean[],
   craft: Craft,
   camera: CameraView,
 ): SightingView[] {
@@ -93,7 +119,12 @@ export function sightingsOf(
     if (states[address] === 'SPENT') continue;
     if (body.y >= craft.y) continue;
     if (onScreen(body, camera)) continue;
-    found.push(markFor(body, address, camera));
+
+    // Measured from the **craft**, not from the camera: it is how far the player
+    // has to fly, and the camera is only where it is being watched from.
+    const away = distance(craft.x, craft.y, body.x, body.y);
+    if (away > SIGHTING_RANGE) continue;
+    found.push(markFor(body, address, camera, away, offered[address] === true));
   }
   return found;
 }
@@ -109,30 +140,39 @@ function onScreen(body: Body, camera: CameraView): boolean {
 /**
  * Where the mark sits, in **design-space** coordinates rather than world ones.
  *
- * Every other position in this layer is a world position and this deliberately
- * is not: the mark belongs to the composition, not to the world, and spec 00 §7
- * rules that the composition is identical on every device. A world position
- * would also shimmer, because the renderer interpolates the camera between ticks
- * and the mark would slide against the edge it is supposed to be pinned to.
- *
- * The point is where the ray from the middle of the picture to the body leaves
- * the rectangle, inset by the mark's own radius so it never straddles the edge.
+ * Every other position in this layer is a world position and this deliberately is
+ * not: the mark belongs to the composition, not to the world, and spec 00 §7
+ * rules the composition identical on every device. A world position would also
+ * shimmer, because the renderer interpolates the camera between ticks and the
+ * mark would slide against the edge it is pinned to.
  */
-function markFor(body: Body, address: number, camera: CameraView): SightingView {
+function markFor(
+  body: Body,
+  address: number,
+  camera: CameraView,
+  away: number,
+  offered: boolean,
+): SightingView {
   const dx = body.x - camera.x;
   const dy = body.y - camera.y;
   const halfWidth = DESIGN_WIDTH / 2 - SIGHTING_RADIUS;
   const halfHeight = DESIGN_HEIGHT / 2 - SIGHTING_RADIUS;
-
-  // The ray always leaves through one of the two axes, and the nearer crossing
-  // is the one on the rectangle. `dy` is never zero for a body ahead of the
-  // craft, so the vertical crossing is always available.
   const reach = Math.min(dx === 0 ? Infinity : halfWidth / Math.abs(dx), halfHeight / Math.abs(dy));
 
   return {
     x: DESIGN_WIDTH / 2 + dx * reach,
     y: DESIGN_HEIGHT / 2 + dy * reach,
+    // Which way the body actually lies, which the mark now points along. Its
+    // position on the edge still carries the same fact; the arrow is what the
+    // author asked for on top of it.
+    bearing: angleOf(dx, dy),
     hue: hueOf(address),
+    away,
+    offered,
+    // Full strength for the one a press would take, whatever the fade would
+    // otherwise say — the difference between *there is a body over there* and
+    // *take it now*.
+    strength: offered ? 1 : Math.max(FAINTEST, Math.min(1, 1 - (away - FADE_FROM) / FADE_TO)),
     energy: SIGHTING_ENERGY,
     bloom: bloomOf(SIGHTING_ENERGY),
     radius: SIGHTING_RADIUS,

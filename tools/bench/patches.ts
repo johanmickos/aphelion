@@ -137,7 +137,57 @@ export function lockOf(sim: SimState): number {
   // picture, except the ring count — which is measured, and worth flying to see
   // whether four reads as four.
   settable('src/sim/compass.ts', 'RINGS', 'measured at four over 342 conversions, not chosen'),
-  settable('src/state/compass.ts', 'RING_GAP', 'spec 00 §6 stacks rings and states no spacing'),
+  settable('src/state/compass.ts', 'RING_INNER', 'how far the instrument clears the orbit'),
+  settable('src/state/compass.ts', 'RING_SPREAD', 'how much of the stack the furthest body gets'),
+  settable(
+    'src/sim/compass.ts',
+    'AIM_RANGE',
+    'spec 00 §6 leaves “reachable” open; the prototype had a number',
+  ),
+  settable(
+    'src/sim/compass.ts',
+    'MIN_HALF_WIDTH',
+    'the narrowest arc worth aiming at, ruled 2026-08-29',
+  ),
+  settable('src/state/body.ts', 'EMIT_AT', 'how much grip it takes before a body lights up at all'),
+  settable('src/state/sighting.ts', 'SIGHTING_RANGE', 'spec 03 §6’s “reach is not yet a number”'),
+  {
+    file: 'src/render/index.ts',
+    find: 'const GRIP_SPAN = 200 * BOARD_PIXEL;',
+    replace: 'export let GRIP_SPAN = 200 * BOARD_PIXEL;',
+    append: '\nexport function set_GRIP_SPAN(value: number): void {\n  GRIP_SPAN = value;\n}\n',
+    why: 'how wide the proximity halo reaches, asked for on 2026-08-29',
+  },
+  {
+    file: 'src/render/index.ts',
+    find: 'const GRIP_STRENGTH = 0.16;',
+    replace: 'export let GRIP_STRENGTH = 0.16;',
+    append:
+      '\nexport function set_GRIP_STRENGTH(value: number): void {\n  GRIP_STRENGTH = value;\n}\n',
+    why: 'and how faint it is, which is the other half of “tastefully so”',
+  },
+  {
+    file: 'src/render/index.ts',
+    find: 'const E1_STRENGTH = 0.18;',
+    replace: 'export let E1_STRENGTH = 0.18;',
+    append: '\nexport function set_E1_STRENGTH(value: number): void {\n  E1_STRENGTH = value;\n}\n',
+    why: 'spec 00 §3 says 35%; flown, all of it was too much',
+  },
+  {
+    file: 'src/render/index.ts',
+    find: 'const E2_STRENGTH = 0.3;',
+    replace: 'export let E2_STRENGTH = 0.3;',
+    append: '\nexport function set_E2_STRENGTH(value: number): void {\n  E2_STRENGTH = value;\n}\n',
+    why: 'the same for the craft and a held body — spec 00 §3 says 60%',
+  },
+  {
+    file: 'src/render/index.ts',
+    find: 'const WINDOW_AT_REST = 0.45;',
+    replace: 'export let WINDOW_AT_REST = 0.45;',
+    append:
+      '\nexport function set_WINDOW_AT_REST(value: number): void {\n  WINDOW_AT_REST = value;\n}\n',
+    why: 'how vibrant a window is before aim closes',
+  },
   {
     file: 'src/render/index.ts',
     find: 'const WINDOW_WIDTH = 3 * BOARD_PIXEL;',

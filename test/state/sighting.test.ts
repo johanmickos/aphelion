@@ -26,7 +26,7 @@ import { MEDIAN_RADIUS } from '../../src/sim/units.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
 import { hueOf } from '../../src/state/identity.ts';
-import { SIGHTING_RADIUS } from '../../src/state/sighting.ts';
+import { SIGHTING_RADIUS, SIGHTING_RANGE } from '../../src/state/sighting.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import { parseDispatch } from '../../tools/dispatch.ts';
 import { openField } from '../sim/fixtures.ts';
@@ -71,6 +71,17 @@ describe('which bodies get one', () => {
     expect(withBodyAt(0, -DESIGN_HEIGHT).sightings.length).toBe(1);
   });
 
+  /**
+   * And none past **reach**. Spec 03 §6 records *"reach is not yet a number"* and
+   * defers it to spec 17; the prototype carries one, and what is carried is the
+   * behaviour it buys — past it the coast is long and featureless, and marking it
+   * *"invites the player to aim past the interesting part of the field."*
+   */
+  it('never marks a body past reach', () => {
+    expect(withBodyAt(0, -(SIGHTING_RANGE * 0.9)).sightings.length).toBe(1);
+    expect(withBodyAt(0, -(SIGHTING_RANGE * 1.1)).sightings).toEqual([]);
+  });
+
   /** A body whose disc merely touches the picture is on it, and gets none. */
   it('counts a body that only half fits as on screen', () => {
     const justInside = -(DESIGN_HEIGHT / 2) - MEDIAN_RADIUS * 0.5;
@@ -108,7 +119,7 @@ describe('where the mark sits', () => {
    * outside it, ever."*
    */
   it('is on the design space, inset by its own radius', () => {
-    const mark = withBodyAt(0, -9000).sightings[0]!;
+    const mark = withBodyAt(0, -3000).sightings[0]!;
     expect(mark.y).toBeCloseTo(SIGHTING_RADIUS, 6);
     expect(mark.x).toBeCloseTo(MIDDLE, 6);
   });
@@ -119,12 +130,44 @@ describe('where the mark sits', () => {
    * sighting says about where.
    */
   it('moves along the edge with the body it is for', () => {
-    const left = withBodyAt(-4000, -4000).sightings[0]!;
-    const middle = withBodyAt(0, -4000).sightings[0]!;
-    const right = withBodyAt(4000, -4000).sightings[0]!;
+    const left = withBodyAt(-1800, -1800).sightings[0]!;
+    const middle = withBodyAt(0, -1800).sightings[0]!;
+    const right = withBodyAt(1800, -1800).sightings[0]!;
     expect(left.x).toBeLessThan(middle.x);
     expect(middle.x).toBeLessThan(right.x);
-    expect(Object.keys(left).sort()).toEqual(['bloom', 'energy', 'hue', 'radius', 'x', 'y']);
+    expect(Object.keys(left).sort()).toEqual([
+      'away',
+      'bearing',
+      'bloom',
+      'energy',
+      'hue',
+      'offered',
+      'radius',
+      'strength',
+      'x',
+      'y',
+    ]);
+  });
+
+  /**
+   * **And it points now**, which reverses the ruling of the day before that it
+   * must not (author, 2026-08-29). Its position on the edge still carries the
+   * same fact; the arrow agrees with it rather than replacing it — so the two
+   * cannot disagree about which way a body is.
+   */
+  it('points the way the body actually lies', () => {
+    for (const [dx, dy] of [
+      [0, -1800],
+      [-1800, -1800],
+      [1800, -1800],
+    ] as const) {
+      const mark = withBodyAt(dx, dy).sightings[0]!;
+      expect(Math.cos(mark.bearing)).toBeCloseTo(dx / Math.hypot(dx, dy), 6);
+      expect(Math.sin(mark.bearing)).toBeCloseTo(dy / Math.hypot(dx, dy), 6);
+      // The mark sits on the same ray it points along.
+      const along = Math.atan2(mark.y - DESIGN_HEIGHT / 2, mark.x - MIDDLE);
+      expect(Math.cos(along)).toBeCloseTo(Math.cos(mark.bearing), 6);
+    }
   });
 
   it('never leaves the design space', () => {
@@ -170,12 +213,45 @@ describe('what it says', () => {
    * if a sighting ever needs to say how far, stepping its energy is the one
    * answer that needs no label."*
    */
-  it('says nothing about how far, at a flat E1', () => {
-    const near = withBodyAt(0, -2000).sightings[0]!;
-    const far = withBodyAt(0, -20000).sightings[0]!;
+  /**
+   * **It says how far, twice**: as a number, and as brightness. Spec 03 §6
+   * recorded both as unbuilt — the label because Direction 03 refused it, the
+   * fade because nothing replaced it — and the author ruled them back in on
+   * 2026-08-29: *"the distance labels, I think, are a different class, and I
+   * personally like the more technical, blueprint-y look of the pointers with
+   * distances."*
+   */
+  it('says how far, as a number and as brightness', () => {
+    // Both off the picture: a body nearer than half the design space is on it,
+    // and a body on it has no sighting at all.
+    const near = withBodyAt(0, -1500).sightings[0]!;
+    const far = withBodyAt(0, -3500).sightings[0]!;
+    expect(near.away).toBeCloseTo(1500, 6);
+    expect(far.away).toBeCloseTo(3500, 6);
+    expect(far.strength).toBeLessThan(near.strength);
+    // The step stays E1: the fade is an alpha, not a second ordinal channel.
     expect(near.energy).toBe(1);
     expect(far.energy).toBe(1);
     expect(far.bloom).toBe(near.bloom);
+  });
+
+  /**
+   * A body **a press would take** is at full strength whatever the fade would
+   * otherwise say — the difference between *there is a body over there* and *take
+   * it now*. Spec 03 §6 records the prototype's measurement of the gap that
+   * leaves: inside the grab window for 1.03s, and able to see the body itself for
+   * 0.23 of it.
+   */
+  it('is full strength for the body a press would take', () => {
+    const field = fixtureField();
+    const sim = createInitialState(field, fixtureCraft(), 1);
+    let view = createPresentation(sim);
+    for (let tick = 0; tick < 200; tick++) {
+      stepSim(sim, NO_INPUT);
+      view = derive(view, sim);
+      const offered = view.sightings.filter((mark) => mark.offered);
+      for (const mark of offered) expect(mark.strength).toBe(1);
+    }
   });
 
   /**

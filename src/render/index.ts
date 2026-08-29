@@ -125,9 +125,6 @@ const TIDE_WIDTH = 4 * BOARD_PIXEL;
  */
 const TIDE_FLOOR = 0.4;
 
-/** Spec 04 §2's inner ripple, at α 0.3. */
-const RIPPLE_STRENGTH = 0.3;
-
 /** Strata and the spent core are hairlines: one board pixel. */
 const STRATUM_WIDTH = BOARD_PIXEL;
 
@@ -149,8 +146,17 @@ const FLOOR_WIDTH = 1.5;
  * E3 is 1 because it is drawn additively: what falls over its 400ms is the
  * radius, because brightness in this game **is** radius (§3), and an alpha
  * fading in parallel would be a second ordinal channel saying the same thing.
+ *
+ * **E1 and E2 came down from the board's 35% and 60%** (author, 2026-08-29):
+ * *"all glow is too much. I want it fainter and more impactful. It looks childish
+ * and tacky right now."* The radii are untouched, so spec 00 §3's acceptance —
+ * bloom radius is a pure function of the energy step and the chain — is exactly
+ * as it was; what moved is the alpha, which spec 00 §1 makes this layer's own.
+ * They are opening positions and they are on the bench.
  */
-const STRENGTH: Readonly<Record<Energy, number>> = { 0: 0, 1: 0.35, 2: 0.6, 3: 1 };
+const E1_STRENGTH = 0.18;
+const E2_STRENGTH = 0.3;
+const STRENGTH: Readonly<Record<Energy, number>> = { 0: 0, 1: E1_STRENGTH, 2: E2_STRENGTH, 3: 1 };
 
 /**
  * A glow of `radius` design units around a point, in one palette token.
@@ -224,6 +230,25 @@ function craftPath(context: CanvasRenderingContext2D): void {
 }
 
 /**
+ * How wide the grip halo reaches past a body's floor, in design units.
+ *
+ * *"The planets should have a fainter, much wider glow that grows with
+ * proximity"* (author, 2026-08-29). The prototype's `closeSpan`, converted, and
+ * it is a wide soft field rather than a rim light: three times the E2 bloom, at a
+ * fraction of its strength.
+ *
+ * **It will come to mean something.** In the prototype this span is the band an
+ * arrival's tightness is graded over, and its comment is emphatic that drawing it
+ * is required rather than decorative — *"a multiplier the player did not see
+ * drawn BEFORE it scored is invisible math."* Ours is spec 01's **depth**, and
+ * M4 is where the two meet; until then the span is an opening position.
+ */
+const GRIP_SPAN = 200 * BOARD_PIXEL;
+
+/** How strong that halo is at the floor, where the grip is total. */
+const GRIP_STRENGTH = 0.16;
+
+/**
  * A body — spec [04 · §1](../../docs/spec/04-bodies.md)'s anatomy, in the order
  * it is lit.
  *
@@ -242,6 +267,22 @@ function drawBody(context: CanvasRenderingContext2D, body: BodyView): void {
   const paint = (strength: number): string =>
     spent ? dim(DUSK, strength) : identity(body.hue, strength);
 
+  // The grip: a wide, faint field that grows as the body takes hold. Faded by
+  // the grip itself, so a field of distant bodies is a constellation of rims
+  // rather than sixty haloes.
+  if (!spent) {
+    bloom(
+      context,
+      body.x,
+      body.y,
+      body.radius,
+      GRIP_SPAN,
+      inHue(body.hue),
+      GRIP_STRENGTH * body.grip,
+    );
+  }
+
+  // And the bloom, which is the energy step and is off entirely below it.
   bloom(
     context,
     body.x,
@@ -307,8 +348,13 @@ function drawBody(context: CanvasRenderingContext2D, body: BodyView): void {
  * a heavier body reaches with a longer and brighter tide without this file
  * knowing what mass is.
  *
- * The **ripple** is §2's second sentence — one stratum tracking the same bearing
- * more slowly still, so the body's inside is visibly behind its own limb.
+ * Spec 04 §2's **inner ripple** — a stratum tracking the same bearing more slowly
+ * still — is deliberately absent. It is a Direction 04 board line the prototype
+ * never implemented, and flown it was the first thing the author asked about:
+ * *"what's the purpose of the innermost ring within a planet, that also has a
+ * tide tracking my orbiting ship? It doesn't look great and I don't know why it's
+ * there"* (2026-08-29). The **strata** stay — the prototype has those, and §1
+ * calls them structure without texture — and the thing that tracked is gone.
  */
 function drawTide(context: CanvasRenderingContext2D, body: BodyView, tide: TideView): void {
   context.beginPath();
@@ -321,19 +367,6 @@ function drawTide(context: CanvasRenderingContext2D, body: BodyView, tide: TideV
   );
   context.lineWidth = TIDE_WIDTH;
   context.strokeStyle = identityLit(body.hue, TIDE_FLOOR + (1 - TIDE_FLOOR) * tide.strength);
-  context.stroke();
-
-  const [inner] = STRATA[1]!;
-  context.beginPath();
-  context.arc(
-    body.x,
-    body.y,
-    body.radius * inner,
-    tide.ripple - tide.halfWidth,
-    tide.ripple + tide.halfWidth,
-  );
-  context.lineWidth = STRATUM_WIDTH;
-  context.strokeStyle = identityLit(body.hue, RIPPLE_STRENGTH);
   context.stroke();
 }
 
@@ -349,6 +382,17 @@ const DOT_RADIUS = 3 * BOARD_PIXEL;
  * brief calls it **the crossing dot** and so does everything here.
  */
 const CROSSING_RADIUS = 2 * BOARD_PIXEL;
+
+/**
+ * How bright a window is before any aim has closed.
+ *
+ * The compass heats **in place** from here to full as the hand comes in (spec
+ * 00 §6), and it thickens on the same ramp — the prototype's own pair, whose arc
+ * runs `0.15 + 0.5 × align` in alpha and `2 + 2 × align` in weight. It is the one
+ * surface in the game that does not take the energy table's alpha, because it is
+ * the instrument rather than the world.
+ */
+const WINDOW_AT_REST = 0.45;
 
 /**
  * The compass — spec [00 · §6](../../docs/spec/00-tokens.md), and the thing
@@ -374,16 +418,24 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
     return;
   }
 
-  // The trail: the arc of orbit already flown, on the orbit path itself, which
-  // is the innermost ring's radius. E2 — it is the craft's own light, left behind.
-  if (compass.swept > 0 && compass.rings.length > 0) {
-    const path = compass.rings[0]!.radius;
-    const from = compass.hand - compass.swept * compass.direction;
-    context.beginPath();
-    context.arc(compass.x, compass.y, path, from, compass.hand, compass.direction < 0);
-    context.lineWidth = HAND_WIDTH;
-    context.strokeStyle = dim(CORE, STRENGTH[2]);
+  // **The orbit path, which is an oval and rounds out as the settle spends it.**
+  // Drawn as a thin light line the whole way round, and then the part already
+  // flown over the top of it in the craft's own light. Both walk the same sampled
+  // curve, so the trail cannot come away from the path it is a piece of.
+  if (compass.path.length > 0) {
+    tracePath(context, compass, 0, compass.path.length);
+    context.lineWidth = PATH_WIDTH;
+    context.strokeStyle = dim(CORE, PATH_STRENGTH);
     context.stroke();
+
+    if (compass.swept > 0) {
+      const from = compass.hand - compass.swept * compass.direction;
+      const span = Math.min(compass.swept, Math.PI * 2);
+      traceArc(context, compass, from, span * compass.direction);
+      context.lineWidth = HAND_WIDTH;
+      context.strokeStyle = dim(CORE, STRENGTH[2]);
+      context.stroke();
+    }
   }
 
   // The hand: the radius through the craft, out past the outermost ring.
@@ -398,6 +450,54 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
   context.stroke();
 
   for (const ring of compass.rings) drawRing(context, compass, ring);
+}
+
+/** How faint the whole orbit path is drawn, against the trail already flown. */
+const PATH_STRENGTH = 0.16;
+const PATH_WIDTH = 1 * BOARD_PIXEL;
+
+/** Where the sampled path is at one angle, interpolated between its samples. */
+function pathAt(compass: CompassView, angle: number): { x: number; y: number } {
+  const n = compass.path.length;
+  const t = (((angle / (Math.PI * 2)) % 1) + 1) % 1;
+  const at = t * n;
+  const i = Math.floor(at);
+  const f = at - i;
+  const r = compass.path[i % n]! * (1 - f) + compass.path[(i + 1) % n]! * f;
+  return { x: compass.x + Math.cos(angle) * r, y: compass.y + Math.sin(angle) * r };
+}
+
+/** The whole closed path, sample by sample. */
+function tracePath(
+  context: CanvasRenderingContext2D,
+  compass: CompassView,
+  from: number,
+  count: number,
+): void {
+  const n = compass.path.length;
+  context.beginPath();
+  for (let k = 0; k <= count; k++) {
+    const angle = (((from + k) % n) / n) * Math.PI * 2;
+    const p = pathAt(compass, angle);
+    if (k === 0) context.moveTo(p.x, p.y);
+    else context.lineTo(p.x, p.y);
+  }
+}
+
+/** An arc of that same path, from an angle across a signed span. */
+function traceArc(
+  context: CanvasRenderingContext2D,
+  compass: CompassView,
+  from: number,
+  span: number,
+): void {
+  const steps = Math.max(2, Math.ceil((Math.abs(span) / (Math.PI * 2)) * compass.path.length));
+  context.beginPath();
+  for (let k = 0; k <= steps; k++) {
+    const p = pathAt(compass, from + (span * k) / steps);
+    if (k === 0) context.moveTo(p.x, p.y);
+    else context.lineTo(p.x, p.y);
+  }
 }
 
 /**
@@ -415,6 +515,14 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
 
   // The window heats **in place**: E1 at rest, E2 under live aim, and the hue
   // never moves (spec 00 §6).
+  // *"I want the compass windows to be a bit more vibrant and have more rounded
+  // edges"* (author, 2026-08-29). Vibrant is the one place in this renderer that
+  // does **not** take the energy table's alpha: the compass is the instrument, it
+  // is drawn on the orbit rather than in the world, and it is the thing the
+  // milestone is measured by. Round caps are `lineCap`, and they are why the arc
+  // reads as a window rather than as a cut segment.
+  context.save();
+  context.lineCap = 'round';
   context.beginPath();
   context.arc(
     compass.x,
@@ -423,9 +531,10 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
     ring.dot - ring.halfWidth,
     ring.dot + ring.halfWidth,
   );
-  context.lineWidth = WINDOW_WIDTH;
-  context.strokeStyle = identity(ring.hue, STRENGTH[ring.energy]);
+  context.lineWidth = WINDOW_WIDTH * (1 + ring.aim);
+  context.strokeStyle = identity(ring.hue, WINDOW_AT_REST + (1 - WINDOW_AT_REST) * ring.aim);
   context.stroke();
+  context.restore();
 
   // The dot at the window's centre — a perfect release — CORE white when matched.
   const dotX = compass.x + Math.cos(ring.dot) * ring.radius;
@@ -467,25 +576,73 @@ function closest(compass: CompassView): number {
 const HAND_AT_REST = 0.35;
 
 /**
- * A sighting — spec [03 · §6](../../docs/spec/03-hud.md), a dot on the edge of
- * the picture in the body's own hue.
+ * A sighting — spec [03 · §6](../../docs/spec/03-hud.md): an arrow at the edge of
+ * the picture in the body's own hue, with how far away it is.
  *
  * Drawn in **design-space** coordinates rather than world ones, which is why it
  * happens outside the camera's translate: the mark belongs to the composition,
  * and spec [00 · §7](../../docs/spec/00-tokens.md) rules that nothing the player
  * reads is drawn outside the design space, ever.
  *
- * **No vector is drawn**, and that is the acceptance criterion rather than a
- * style: the mark's position on the edge is the direction, and an arrow would be
- * the instruction spec 03 refuses.
+ * **It points, and that reverses a ruling** — see
+ * [`sighting.ts`](../state/sighting.ts) for the reversal and its date. What has
+ * not changed is that its *position* on the edge still carries the direction; the
+ * arrow agrees with it rather than replacing it.
+ *
+ * The label is a **distance and not a name**: a body is named by hue in the run,
+ * which is the ruling that retired the `P11` chips and is untouched. It is set in
+ * the utility face — spec [00 · §4](../../docs/spec/00-tokens.md) bans monospace,
+ * so the technical look comes from tracked tabular figures rather than from a
+ * typewriter.
  */
 function drawSighting(context: CanvasRenderingContext2D, mark: SightingView): void {
-  bloom(context, mark.x, mark.y, mark.radius, mark.bloom, inHue(mark.hue), STRENGTH[mark.energy]);
+  const paint = (strength: number): string => identity(mark.hue, strength * mark.strength);
+
+  context.save();
+  context.translate(mark.x, mark.y);
+  context.rotate(mark.bearing);
   context.beginPath();
-  context.arc(mark.x, mark.y, mark.radius, 0, Math.PI * 2);
-  context.fillStyle = identity(mark.hue, 1);
+  context.moveTo(mark.radius, 0);
+  context.lineTo(-mark.radius * 0.6, mark.radius * 0.65);
+  context.lineTo(-mark.radius * 0.6, -mark.radius * 0.65);
+  context.closePath();
+  context.fillStyle = paint(1);
   context.fill();
+  context.restore();
+
+  // The one a press would take wears a ring, and it keeps it as the body comes
+  // into view. Spec 03 §6 records the prototype's reason with its measurement:
+  // the craft was inside the grab window for 1.03s and could see the body itself
+  // for 0.23 of that.
+  if (mark.offered) {
+    context.beginPath();
+    context.arc(mark.x, mark.y, mark.radius * 1.6, 0, Math.PI * 2);
+    context.lineWidth = BOARD_PIXEL;
+    context.strokeStyle = paint(0.85);
+    context.stroke();
+  }
+
+  const away =
+    mark.away >= 1000
+      ? `${(mark.away / 1000).toFixed(1)}k`
+      : String(Math.round(mark.away / 10) * 10);
+  context.save();
+  context.font = `500 ${LABEL_SIZE}px ${UTILITY_FACE}`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = paint(0.9);
+  context.fillText(
+    away,
+    mark.x - Math.cos(mark.bearing) * LABEL_OFFSET,
+    mark.y - Math.sin(mark.bearing) * LABEL_OFFSET,
+  );
+  context.restore();
 }
+
+/** Spec 00 §4's utility face. Never a monospace — the figures do the technical work. */
+const UTILITY_FACE = "'Archivo', system-ui, sans-serif";
+const LABEL_SIZE = 9 * BOARD_PIXEL;
+const LABEL_OFFSET = 22 * BOARD_PIXEL;
 
 /**
  * Draw one frame of a world.

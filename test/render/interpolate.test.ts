@@ -34,6 +34,8 @@ function view(x: number, y: number, heading: number): PresentationState {
         radius: 132,
         held: false,
         state: 'AHEAD',
+        offered: false,
+        grip: 0,
         hue: hueOf(0),
         energy: 1,
         bloom: bloomOf(1),

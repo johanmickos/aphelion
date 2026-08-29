@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 import { openRun, replayRun } from '../../src/sim/replay.ts';
 import { DEFORM_TICKS, STRETCH_ACROSS, STRETCH_ALONG } from '../../src/state/deformation.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
+import { EMIT_AT } from '../../src/state/body.ts';
 import { bloomOf, E3_BLOOM, E3_TICKS } from '../../src/state/energy.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import { parseDispatch } from '../../tools/dispatch.ts';
@@ -66,72 +67,48 @@ describe('the run pnpm replay ships', () => {
 
 describe('the one E3', () => {
   /**
-   * Spec [00 · §3](../../docs/spec/00-tokens.md) gives an E3 to a release and to
-   * a grab alike, and spec [02 · §7](../../docs/spec/02-release.md) makes the
-   * grab the release's mirror. It arrives at full radius: spec 00 §5's first
-   * motion rule is that things arrive rather than fading in.
+   * **Nothing strikes one yet, and that is a ruling rather than a gap.** M2.1
+   * built spec [00 · §3](../../docs/spec/00-tokens.md)'s flash at the grab and at
+   * the release; flown, the author took both off the list (2026-08-29): *"the
+   * white dot that is emitted when I grab is too noisy and too much... let's let
+   * the PLANET speak about our grab, not some ambient glowing orbs."*
+   *
+   * Spec [04 · §3](../../docs/spec/04-bodies.md) is what speaks instead — a held
+   * body is E2 and alive, and the compass draws itself around that glow — so the
+   * grab already had a voice and the flash was a second one saying the same
+   * thing. The **release goes quiet** with it, accepted for now: the award word
+   * and the farewell ring are M2.4's.
    */
-  it('is struck at the grab, at full radius, where the craft was', () => {
-    expect(at(GRAB - 1).flash).toBeNull();
-
-    const flash = at(GRAB).flash!;
-    expect(flash.decay).toEqual({ age: 0, span: E3_TICKS });
-    expect(flash.radius).toBe(E3_BLOOM);
-    expect(flash.x).toBe(at(GRAB).craft.x);
-    expect(flash.y).toBe(at(GRAB).craft.y);
-  });
-
-  /** And it stays where it was struck. The craft has left; the flash has not. */
-  it('does not travel with the craft', () => {
-    const struck = at(GRAB).flash!;
-    expect(at(GRAB + 6).flash!.x).toBe(struck.x);
-    expect(at(GRAB + 6).flash!.y).toBe(struck.y);
-    expect(at(GRAB + 6).craft.x).not.toBe(struck.x);
-  });
-
-  it('falls to nothing over 400ms and then is gone', () => {
-    expect(at(RELEASE).flash!.radius).toBe(E3_BLOOM);
-    expect(at(RELEASE + 12).flash!.radius).toBe(E3_BLOOM * 0.25);
-    expect(at(RELEASE + E3_TICKS - 1).flash!.decay.age).toBe(E3_TICKS - 1);
-    expect(at(RELEASE + E3_TICKS).flash).toBeNull();
+  it('is never struck, over a whole run', () => {
+    expect(RUN.length).toBeGreaterThan(3000);
+    for (const view of RUN) expect(view.flash).toBeNull();
   });
 
   /**
-   * Spec 00 §3's rule, and spec 00's acceptance criterion: *"at most one E3 is
-   * alive on any tick."* It holds over the whole run and not by a check — the
-   * layer has one slot, so a second E3 has nowhere to be.
+   * The slot stays, and so does the machinery under it. Spec 00 §3 still gives
+   * the E3 to the **award** and to the **checkered line**, and the rule that at
+   * most one is alive is a shape rather than a check — one nullable field, so a
+   * second has nowhere to be. This is what M2.4 will decay through.
    */
-  it('is at most one, on every tick of a whole run', () => {
-    for (const view of RUN) {
-      expect(view.flash === null || typeof view.flash.radius === 'number').toBe(true);
-    }
-    // 32 swings' worth of events, and never two at once: the count of ticks
-    // carrying a flash is bounded by one span per event rather than by their sum.
-    const lit = RUN.filter((view) => view.flash !== null).length;
-    expect(lit).toBeGreaterThan(1000);
-    expect(lit).toBeLessThan(RUN.length);
-  });
-
-  /**
-   * A new one replaces the old rather than stacking, which is only observable as
-   * the clock going back to zero. The shipped run re-grabs body 11 on the tick
-   * after it lets go of it, so the release's E3 is 1 tick old when the grab's
-   * arrives.
-   */
-  it('is replaced by the next one rather than stacked with it', () => {
-    const struck = RUN.flatMap((view, tick) => (view.flash?.decay.age === 0 ? [tick] : []));
-    const second = struck.findIndex((tick, i) => i > 0 && tick - struck[i - 1]! < E3_TICKS);
-    expect(second).toBeGreaterThan(0);
-
-    const older = struck[second - 1]!;
-    const newer = struck[second]!;
-    // The tick before, the older E3 is still alive and counting from its own
-    // strike; the tick after, the clock is back at zero and the flash is
-    // somewhere else. That is a replacement, and there is nowhere for a second
-    // one to have gone.
-    expect(RUN[newer - 1]!.flash!.decay.age).toBe(newer - 1 - older);
-    expect(RUN[newer]!.flash!.decay.age).toBe(0);
-    expect(RUN[newer]!.flash!.x).not.toBe(RUN[older]!.flash!.x);
+  it('is still a single slot the layer cannot double', () => {
+    const view = RUN[GRAB]!;
+    expect('flash' in view).toBe(true);
+    const struck: PresentationState = {
+      ...view,
+      flash: { x: 1, y: 2, radius: E3_BLOOM, decay: { age: 0, span: E3_TICKS } },
+    };
+    // Placed by hand and then aged by the layer: it falls to nothing and ends,
+    // which is what an award will do when M2.4 lights one.
+    let carried = struck;
+    const sim = openRun(
+      parseDispatch(
+        JSON.parse(readFileSync(new URL('../recipes/pilot-60s.json', import.meta.url), 'utf8')),
+      ).recipe,
+    );
+    for (let i = 0; i < E3_TICKS - 1; i++) carried = derive(carried, sim);
+    expect(carried.flash).not.toBeNull();
+    expect(carried.flash!.radius).toBeLessThan(E3_BLOOM);
+    expect(derive(carried, sim).flash).toBeNull();
   });
 });
 
@@ -189,7 +166,7 @@ describe('the bodies', () => {
    * after release"*. The E0 a spent body drops to needs a memory of what has
    * been released and is [M2.2](../../docs/plan/m2-the-instrument.md)'s.
    */
-  it('burn at E1, and the held one at E2', () => {
+  it('burn at E2 when held, and only glow at all when they are gripping', () => {
     const held = at(GRAB + 40);
     const lit = held.bodies.filter((body) => body.held);
     expect(lit.length).toBe(1);
@@ -197,14 +174,26 @@ describe('the bodies', () => {
     expect(lit[0]!.bloom).toBe(bloomOf(2));
 
     for (const body of held.bodies.filter((body) => !body.held)) {
-      expect(body.energy).toBe(1);
-      expect(body.bloom).toBe(bloomOf(1));
+      expect(body.energy).toBe(body.state === 'SPENT' ? 0 : body.grip > EMIT_AT ? 1 : 0);
+      expect(body.bloom).toBe(bloomOf(body.energy));
     }
   });
 
-  it('are all at E1 while the craft coasts', () => {
-    const coasting = at(GRAB - 1);
-    expect(coasting.bodies.every((body) => body.energy === 1)).toBe(true);
+  /**
+   * **The field ahead is dark, and that is the point.** Over a whole run the vast
+   * majority of body-ticks carry no bloom at all — only a rim, which is spec 04
+   * §3's *"constellation of dim coloured rings"*. M2.2 lit every one of them.
+   */
+  it('leaves almost the whole field unlit at any moment', () => {
+    let lit = 0;
+    let total = 0;
+    for (const view of RUN) {
+      for (const body of view.bodies) {
+        total++;
+        if (body.energy > 0) lit++;
+      }
+    }
+    expect(lit / total).toBeLessThan(0.05);
   });
 });
 
@@ -226,11 +215,8 @@ describe('a frame as a function of (recipe, tick)', () => {
    */
   it('is not the same as asking a state what it looks like', () => {
     const arrived = at(RELEASE);
-    expect(arrived.flash).not.toBeNull();
     expect(arrived.craft.deformation.recovery).not.toBeNull();
 
-    // A picture opened on that same tick has neither, because neither is a fact
-    // about the tick — both are facts about what happened on it.
     const opened = createPresentation(
       replayRun(
         parseDispatch(
@@ -238,7 +224,15 @@ describe('a frame as a function of (recipe, tick)', () => {
         ).recipe,
       ),
     );
-    expect(opened.flash).toBeNull();
+    // The stretch is a fact about what happened on the tick rather than about the
+    // tick, so a picture opened there does not have it.
     expect(opened.craft.deformation.recovery).toBeNull();
+
+    // And the sharpest case is now the scoreboard: a run arrived at has spent
+    // bodies behind it, and one opened at the same instant has none, because
+    // *spent* is a record of releases nobody watching only this tick could know.
+    const last = RUN.at(-1)!;
+    expect(last.bodies.some((body) => body.state === 'SPENT')).toBe(true);
+    expect(opened.bodies.every((body) => body.state !== 'SPENT')).toBe(true);
   });
 });

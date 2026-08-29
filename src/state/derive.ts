@@ -65,12 +65,13 @@
  */
 import { headingOf, speedOf } from '../sim/craft.ts';
 import type { SimState } from '../sim/types.ts';
-import { energyOf, stateOf, tideOf } from './body.ts';
+import { bodyOnOffer } from '../sim/grab.ts';
+import { energyOf, gripOf, stateOf, tideOf } from './body.ts';
 import { followCamera, openCamera } from './camera.ts';
 import { compassOf } from './compass.ts';
-import { advance, fade, place } from './decay.ts';
+import { advance, fade } from './decay.ts';
 import { relax, stretch, UNDEFORMED } from './deformation.ts';
-import { bloomOf, E3_BLOOM, E3_TICKS } from './energy.ts';
+import { bloomOf, E3_BLOOM } from './energy.ts';
 import { hueOf } from './identity.ts';
 import { sightingsOf } from './sighting.ts';
 import type {
@@ -131,16 +132,26 @@ function eventOf(previous: PresentationState, sim: SimState): Event {
 }
 
 /**
- * The one E3: struck fresh by an event, aged otherwise, and gone at 400ms.
+ * The one E3, aged toward nothing — and **nothing strikes one yet**.
  *
- * *"A new E3 replaces the old one; it does not stack"* — which here is a slot
- * being overwritten rather than a rule being applied, because there is only one
- * slot to overwrite.
+ * Spec [00 · §3](../../docs/spec/00-tokens.md) lists *"release, grab, award, the
+ * checkered line"*, and M2.1 built the first two. Flown, the author took them
+ * both off the list (2026-08-29): *"the white dot that is emitted when I grab is
+ * too noisy and too much... let's let the PLANET speak about our grab, not some
+ * ambient glowing orbs."*
+ *
+ * That is spec [04 · §3](../../docs/spec/04-bodies.md) doing the job instead —
+ * a held body is **E2 and alive**, and *"the compass draws itself around this
+ * glow"* — so the grab already had a voice and the flash was a second one saying
+ * the same thing. The **release** goes quiet with it, accepted for now: the award
+ * word and the farewell ring are [M2.4](../../docs/plan/m2-the-instrument.md)'s,
+ * and the craft's stretch is what marks it meanwhile.
+ *
+ * The slot stays, because the award and the checkered line still want it and the
+ * one-alive-at-a-time rule is a shape rather than a check. The ageing below is
+ * what those will decay through.
  */
-function flashOf(previous: FlashView | null, sim: SimState, event: Event): FlashView | null {
-  if (event !== null) {
-    return { x: sim.craft.x, y: sim.craft.y, radius: E3_BLOOM, decay: place(E3_TICKS) };
-  }
+function flashOf(previous: FlashView | null): FlashView | null {
   if (previous === null) return null;
   const decay = advance(previous.decay);
   if (decay === null) return null;
@@ -158,21 +169,29 @@ function wasSpent(previous: BodyView | undefined): boolean {
 }
 
 function bodiesOf(sim: SimState, previous: readonly BodyView[] | null): BodyView[] {
+  // Which body a press would take, asked once for the whole field rather than
+  // per body — it is a comparison between bodies, not a property of one.
+  const onOffer = sim.heldBody === null ? bodyOnOffer(sim.field, sim.craft) : null;
+
   return sim.field.bodies.map((body, address) => {
     const before = previous?.[address];
     const held = address === sim.heldBody;
     const state = stateOf(body, sim.craft, held, wasSpent(before));
-    const energy = energyOf(state);
+    const grip = gripOf(body, sim.craft);
+    const energy = energyOf(state, grip);
+    const offered = address === onOffer && state !== 'SPENT';
     return {
       x: body.x,
       y: body.y,
       radius: body.radius,
       held,
       state,
+      offered,
+      grip,
       hue: hueOf(address),
       energy,
       bloom: bloomOf(energy),
-      tide: tideOf(before?.tide ?? null, body, sim.craft, state),
+      tide: tideOf(before?.tide ?? null, body, sim.craft, state, offered),
     };
   });
 }
@@ -186,6 +205,7 @@ function present(
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
+  const offered: boolean[] = bodies.map((body) => body.offered);
 
   return {
     tick: sim.tick,
@@ -205,7 +225,7 @@ function present(
       halfWidth: sim.field.corridor.halfWidth,
     },
     flash,
-    sightings: sightingsOf(sim.field.bodies, states, sim.craft, camera),
+    sightings: sightingsOf(sim.field.bodies, states, offered, sim.craft, camera),
     compass: compassOf(sim),
   };
 }
@@ -229,7 +249,7 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
   return present(
     sim,
     followCamera(previous.camera, sim),
-    flashOf(previous.flash, sim, event),
+    flashOf(previous.flash),
     event === 'RELEASE' ? stretch() : relax(previous.craft.deformation),
     previous.bodies,
   );

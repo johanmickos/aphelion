@@ -177,8 +177,6 @@ export interface TideView {
    * its body is.
    */
   readonly bearing: number;
-  /** The inner stratum, following the same bearing more slowly still. */
-  readonly ripple: number;
   /** How far the arc reaches either side of its bearing, in radians. */
   readonly halfWidth: number;
   /** How loud it is, from 0 toward 1. The renderer spends this as light. */
@@ -198,6 +196,28 @@ export interface BodyView {
    * around.
    */
   readonly state: BodyState;
+  /**
+   * Whether a press **right now** would take this body — the fifth distinction,
+   * and a tighter one than IN_REACH.
+   *
+   * Spec [03 · §6](../../docs/spec/03-hud.md) records *"the body a press would
+   * take"* as the prototype's cue, unbuilt, and worth revisiting *"once the
+   * compass exists, because the compass is about to be built over the same
+   * question."* It exists, so this is that moment. It is
+   * [`bodyOnOffer`](../sim/grab.ts)'s own answer rather than a second opinion
+   * about it, so the picture and the press cannot disagree.
+   */
+  readonly offered: boolean;
+  /**
+   * How hard this body has hold of the craft right now, from 0 to 1
+   * (`CONTEXT.md`: **grip**).
+   *
+   * A different fact from mass: mass is how strong the body is and never
+   * changes, grip is how much of that the craft is feeling. It is what decides
+   * whether a body glows at all, and what the wide faint halo is drawn at — so a
+   * field of distant bodies is a constellation of rims rather than sixty haloes.
+   */
+  readonly grip: number;
   /**
    * Its hue, in oklch degrees — **its name** (`CONTEXT.md`: identity).
    *
@@ -232,8 +252,17 @@ export interface RingView {
   readonly body: number;
   /** That body's own hue. A window and its target never need a legend. */
   readonly hue: number;
-  /** How far out this ring sits from the held body's centre, in design units. */
+  /**
+   * How far out this ring sits from the held body's centre, in design units.
+   *
+   * **The gap says how far the body is.** Rings are not equidistant: each clears
+   * the orbit by a fixed amount and then steps out in proportion to its body's
+   * own distance, so the innermost is the next hop and reading the stack is
+   * reading the field.
+   */
   readonly radius: number;
+  /** How far that body is from the one being held, in design units. */
+  readonly away: number;
   /** The perfect release (`CONTEXT.md`: **dot**), at the window's centre. */
   readonly dot: number;
   /** Half the window's width. Spec 06's zones are fractions of the whole. */
@@ -280,6 +309,25 @@ export interface CompassView {
   readonly filament: boolean;
   /** Where a release would land right now (`CONTEXT.md`: **hand**), or `null` while diving. */
   readonly hand: number | null;
+  /**
+   * What the rings are stacked outward from, in design units — the periapsis.
+   *
+   * Fixed from the freeze, so the stack does not breathe with the oval. It is
+   * deliberately **not** the path: the rings clear the line the craft is flying
+   * rather than sitting on it.
+   */
+  readonly anchor: number;
+  /**
+   * The orbit path itself, as radii at `i / length` of a turn from angle zero.
+   *
+   * **An ellipse, and a changing one.** Through the settle the orbit rounds from
+   * the oval the freeze handed out toward a circle, and this is that shape at the
+   * shape it has *this tick* — so the drawn path and the flown path are one
+   * curve. Sampled rather than parameterised because the renderer draws answers:
+   * handing it a periapsis, an eccentricity and an argument would be handing it a
+   * formula to get wrong.
+   */
+  readonly path: readonly number[];
   /** How far out the hand is drawn — past the outermost ring, as §6 asks. */
   readonly reach: number;
   /** One per reachable body, innermost nearest. */
@@ -300,9 +348,29 @@ export interface CompassView {
 export interface SightingView {
   readonly x: number;
   readonly y: number;
+  /**
+   * Which way the body lies, in radians — the arrow points along it.
+   *
+   * A sighting **pointed** from 2026-08-29 (author), reversing the ruling of the
+   * day before that it must not. Its position on the edge still carries the same
+   * fact; the arrow is what was asked for on top of it. See
+   * [`sighting.ts`](./sighting.ts).
+   */
+  readonly bearing: number;
   /** The body's own hue. A sighting is that body's light, seen further away. */
   readonly hue: number;
-  /** Flat E1 — spec [03 · §6](../../docs/spec/03-hud.md), where distance went. */
+  /**
+   * How far the craft is from it, in design units — the label's number.
+   *
+   * **A distance and not a name.** The retirement of the `P11` chips is about
+   * naming, and identity stays hue-only; what this says is how far.
+   */
+  readonly away: number;
+  /** Whether a press right now would take this body. */
+  readonly offered: boolean;
+  /** How brightly it is drawn: it fades with distance, and is full when offered. */
+  readonly strength: number;
+  /** E1 — spec [03 · §6](../../docs/spec/03-hud.md). The fade is an alpha, not a step. */
   readonly energy: Energy;
   readonly bloom: number;
   readonly radius: number;

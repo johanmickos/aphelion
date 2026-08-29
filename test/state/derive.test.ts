@@ -153,8 +153,10 @@ describe('presentation state', () => {
     expect(Object.keys(view.bodies[0]!).sort()).toEqual([
       'bloom',
       'energy',
+      'grip',
       'held',
       'hue',
+      'offered',
       'radius',
       'state',
       'tide',

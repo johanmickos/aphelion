@@ -63,13 +63,14 @@
  * *first-body-wins* is what keeps the answer local.
  */
 import type { Body } from './body.ts';
+import { floorRadius } from './body.ts';
 import { grabRange } from './grab.ts';
 import { magnitude } from './math.ts';
 import { pathRadiusAt } from './orbit.ts';
 import { fellBehindLine } from './run.ts';
 import { angleOf, cos, sin } from './trig.ts';
 import type { SimState } from './types.ts';
-import { CORRIDOR_GRACE } from './units.ts';
+import { CORRIDOR_GRACE, SCALE } from './units.ts';
 
 /**
  * One arc of the compass (`CONTEXT.md`: **window**) — every release that arrives
@@ -84,10 +85,21 @@ export interface Window {
   readonly body: number;
   /** The release that reaches it best — the **dot**, and a perfect release. */
   readonly dot: number;
-  /** Half the arc's width, in radians. Spec 06's zones are fractions of it. */
+  /**
+   * Half the arc's width, in radians. Spec 06's zones are fractions of the whole.
+   *
+   * **This is the width the player is graded on, because it is the width they are
+   * shown.** Where the quality band is narrower than [`MIN_HALF_WIDTH`](#) the
+   * arc opens to that floor and the grading opens with it: the prototype's rule
+   * is that *"the player must never be scored against something they cannot see.
+   * One sweep produces the rings that get drawn AND the alignment that gets paid,
+   * so the two cannot drift apart."*
+   */
   readonly halfWidth: number;
   /** How close to the body's centre the best release passes, in design units. */
   readonly closest: number;
+  /** How far the body is from the one being held — what its ring's radius says. */
+  readonly away: number;
 }
 
 /**
@@ -101,6 +113,39 @@ export interface Window {
  * instrument should promise.
  */
 const SWEEP = 120;
+
+/**
+ * How far a body may be from the one being held and still get a ring — the
+ * prototype's `AIM_RANGE`, converted.
+ *
+ * Spec 00 §6 says *"one ring per **reachable** body"* and does not say what
+ * reachable is. The prototype does, with its reason: *"about two body-spacings:
+ * the next step of the climb and the one after, no further. Anything beyond that
+ * is a long, featureless coast, and signposting it invites the player to aim past
+ * the interesting part of the field."* That is behaviour rather than a number's
+ * authority, which is what ADR-0013 says to carry.
+ *
+ * It works with [`RINGS`](#) rather than instead of it: the range says what is
+ * worth aiming at, the count says how many can be read at once.
+ */
+export const AIM_RANGE = 800 * SCALE;
+
+/**
+ * The narrowest arc the compass will draw, as a half-width.
+ *
+ * **Ruled from flying it** (author, 2026-08-29): *"for very distant planets, I
+ * think we still need to show a window, which makes me think we need a minimum
+ * width. It's more important that the player knows roughly where to aim with
+ * little screen clutter than showing them exactly where they need to release,
+ * because it's so randomly timed anyway."*
+ *
+ * So an arc the geometry earns nothing of still opens to this, and the grading
+ * opens with it. Fifteen degrees whole, which is spec
+ * [06 · §2](../../docs/spec/06-awards.md)'s own narrow worked example — and at
+ * that width §2's 1.5° floor under PERFECT is still what binds, so the top word
+ * does not get easier for being far away. An opening position, and on the bench.
+ */
+export const MIN_HALF_WIDTH = (7.5 * Math.PI) / 180;
 
 /** How many halvings an edge is measured with — about 0.003° at this sweep. */
 const BISECTIONS = 10;
@@ -157,13 +202,18 @@ export function windowsOn(state: SimState): Window[] {
   const held = state.heldBody;
   if (held === null || state.orbit === null) return [];
   const centre = state.field.bodies[held]!;
-  const near = nearest(state, held);
+  // Everything worth arriving at, and then the handful that get a ring. Both
+  // come off the same list so the instrument and the partition agree.
+  const candidates = within(state, held);
+  const near = candidates.slice(0, RINGS);
 
-  // One pass round the orbit, asking each release the same question. Every body
-  // answers — a nearer one hides a further one whether or not it has a ring —
-  // and only the near ones are drawn.
+  // One pass round the orbit, asking each release the same question. Every
+  // candidate answers — a nearer one hides a further one whether or not it has a
+  // ring — and only the near ones are drawn.
   const answers: number[] = [];
-  for (let i = 0; i < SWEEP; i++) answers.push(arrivesAt(state, centre, (i / SWEEP) * TWO_PI));
+  for (let i = 0; i < SWEEP; i++) {
+    answers.push(arrivesAt(state, centre, (i / SWEEP) * TWO_PI, candidates));
+  }
 
   // **One window per ring**, which is spec 00 §6's own shape: *"an arc on the
   // ring belonging to one reachable body"*, singular. A body can be arrived at
@@ -176,7 +226,7 @@ export function windowsOn(state: SimState): Window[] {
     // `measured` rather than `window`: the glossary's word is the type's, and
     // the lower-case identifier is a DOM global that `pnpm portable` bans in
     // this directory — which is the rule working, not the rule getting in the way.
-    const measured = measure(state, centre, arc.body, arc.from, arc.to);
+    const measured = measure(state, centre, arc.body, arc.from, arc.to, candidates);
     if (measured === null) continue;
     const standing = best.get(arc.body);
     if (standing === undefined || measured.closest < standing.closest) best.set(arc.body, measured);
@@ -189,11 +239,24 @@ export function windowsOn(state: SimState): Window[] {
   return found;
 }
 
-/** The [`RINGS`](#) bodies nearest the one being held, nearest first. */
-function nearest(state: SimState, held: number): number[] {
+/**
+ * Every body worth arriving at from the one being held, nearest first.
+ *
+ * **[`AIM_RANGE`](#) bounds the partition and not just the drawing**, and that is
+ * the difference between an instrument and a decoration. Bounding only the rings
+ * left bodies far up the corridor still *winning* release angles they would never
+ * be flown to — measured, that squeezed half of the drawn arcs below the minimum
+ * width, because a body's window is only the angles where it beats everything
+ * else. A destination past the range is not a destination.
+ */
+function within(state: SimState, held: number): number[] {
   const centre = state.field.bodies[held]!;
   const order: number[] = [];
-  for (let i = 0; i < state.field.bodies.length; i++) if (i !== held) order.push(i);
+  for (let i = 0; i < state.field.bodies.length; i++) {
+    if (i === held) continue;
+    if (away(centre, state.field.bodies[i]!) > AIM_RANGE) continue;
+    order.push(i);
+  }
   order.sort((a, b) => away(centre, state.field.bodies[a]!) - away(centre, state.field.bodies[b]!));
   return order.slice(0, RINGS);
 }
@@ -255,10 +318,11 @@ function measure(
   body: number,
   from: number,
   to: number,
+  candidates: readonly number[],
 ): Window | null {
   const step = TWO_PI / SWEEP;
-  const start = edge(state, centre, body, from, -step);
-  const end = edge(state, centre, body, to - step, step);
+  const start = edge(state, centre, body, from, -step, candidates);
+  const end = edge(state, centre, body, to - step, step, candidates);
 
   const target = state.field.bodies[body]!;
   let dot = start;
@@ -285,8 +349,54 @@ function measure(
   dot = (lo + hi) / 2;
   closest = missFrom(state, centre, target, dot);
 
-  const halfWidth = span / 2;
-  return halfWidth > 0 ? { body, dot: start + halfWidth, halfWidth, closest } : null;
+  const arcHalf = span / 2;
+  if (arcHalf <= 0) return null;
+
+  // **The window is the quality band, not the reachable one.** Measured over the
+  // sixty seconds this repo ships, an arc drawn where the release merely lands
+  // within grab range is p50 **360°** — true, and useless, because the median
+  // body is on offer from 1 680 design units against a field spaced nearer 700.
+  // Drawn where the release arrives within the body's **floor** instead it is
+  // p10 18°, p50 24°, p90 40° — which is spec 06 §2's own worked scale (15° and
+  // 40°) and the prototype's fixed 40° wedge agreeing from three directions.
+  //
+  // The floor is the right line because it is the one guarantee a grab makes: a
+  // release inside this arc arrives at a *dive*, and one outside it arrives
+  // merely in reach. *"I don't want to highlight grabbable for most planets, but
+  // instead: if I release here I'll have a good chance of getting a high quality
+  // capture"* (author, 2026-08-29).
+  const quality = band(state, centre, target, dot, floorRadius(target), arcHalf);
+  const halfWidth = Math.min(arcHalf, Math.max(quality, MIN_HALF_WIDTH));
+  return { body, dot, halfWidth, closest, away: away(centre, target) };
+}
+
+/**
+ * How far either side of the dot the release still passes within `tolerance`.
+ *
+ * Walked out from the dot rather than bracketed, because the dot is where the
+ * miss is smallest by construction: it rises away from it in both directions, so
+ * the first crossing on each side is the edge.
+ */
+function band(
+  state: SimState,
+  centre: Body,
+  target: Body,
+  dot: number,
+  tolerance: number,
+  limit: number,
+): number {
+  if (missFrom(state, centre, target, dot) > tolerance) return 0;
+  let lo = 0;
+  let hi = limit;
+  for (let i = 0; i < BISECTIONS; i++) {
+    const mid = (lo + hi) / 2;
+    const out =
+      missFrom(state, centre, target, dot + mid) > tolerance ||
+      missFrom(state, centre, target, dot - mid) > tolerance;
+    if (out) hi = mid;
+    else lo = mid;
+  }
+  return lo;
 }
 
 /**
@@ -295,12 +405,19 @@ function measure(
  * Bisected between the last angle that still arrives there and the first that
  * does not, so a window's width is measured rather than rounded to the sweep.
  */
-function edge(state: SimState, centre: Body, body: number, from: number, step: number): number {
+function edge(
+  state: SimState,
+  centre: Body,
+  body: number,
+  from: number,
+  step: number,
+  candidates: readonly number[],
+): number {
   let lo = from;
   let hi = from + step;
   for (let i = 0; i < BISECTIONS; i++) {
     const mid = (lo + hi) / 2;
-    if (arrivesAt(state, centre, mid) === body) lo = mid;
+    if (arrivesAt(state, centre, mid, candidates) === body) lo = mid;
     else hi = mid;
   }
   return lo;
@@ -313,7 +430,12 @@ function edge(state: SimState, centre: Body, body: number, from: number, step: n
  * craft could survive. A body the ray is already inside the range of answers at
  * once, which is the same thing a press would say standing there.
  */
-function arrivesAt(state: SimState, centre: Body, angle: number): number {
+function arrivesAt(
+  state: SimState,
+  centre: Body,
+  angle: number,
+  candidates: readonly number[],
+): number {
   const orbit = state.orbit!;
   const radius = pathRadiusAt(orbit, angle);
   const px = centre.x + radius * cos(angle);
@@ -324,8 +446,7 @@ function arrivesAt(state: SimState, centre: Body, angle: number): number {
   const limit = survives(state, px, py, dx, dy);
   let first = -1;
   let soonest = limit;
-  for (let index = 0; index < state.field.bodies.length; index++) {
-    if (index === state.heldBody) continue;
+  for (const index of candidates) {
     const body = state.field.bodies[index]!;
     const at = closesOn(px, py, dx, dy, body);
     if (at !== null && at < soonest) {

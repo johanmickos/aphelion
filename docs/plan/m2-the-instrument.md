@@ -317,6 +317,148 @@ a test holds it to that. The bench grew a fifth card.
 
 ---
 
+## Flown, 2026-08-29 — what six notes moved
+
+The author flew M2.1 – M2.3 and sent six notes. Two of them were the prototype telling this
+repo it had already solved the problem and been ignored, and the rest are rulings.
+
+### The prototype had already measured two of these
+
+**The compass bounced because it was anchored to the craft.** M2.3 stacked the rings on the
+craft's *live* radius, arguing that a stack swinging with the oval reads as an instrument drawn
+on the thing it describes. The prototype's own compass carries the measurement of exactly that:
+*"frozen, it made the ring pump out and back as the ship swept periapsis to apoapsis and home
+again — measured on a real capture, 85 out to 97 and back over about a second, on top of a curve
+the player is trying to read."* Its fix is the one now taken — anchor to the **periapsis**, which
+the freeze fixes and nothing afterwards moves.
+
+**Every body glowed because AHEAD was read as E1.** Spec [04 · §3](../spec/04-bodies.md)'s
+energy column says *"E0–E1"*, and M2.2 took the top of the range, lighting twenty-four bodies at
+once. The prototype gates it on live pull and its comment is unambiguous: *"the bloom is not
+always on, and the board says so."* What survives at E0 is the rim, which is §3's other
+sentence — *"a constellation of dim coloured rings, never a row of grey balls."* **Rings, not
+blooms.**
+
+That gave the layer a quantity it was missing: **grip**, how hard a body has hold of the craft
+right now, normalised against the pull at its own floor. It is what gates the bloom and what the
+wide faint halo the author asked for is drawn at — *"faded by pull, so a field of distant bodies
+is not sixty haloes"* is the prototype's reason and it is the right one.
+
+### The window was measuring the wrong thing
+
+*"Up close, the grab lines are often way too wide, sometimes spanning half a circle."* Measured,
+p50 **360°** — and true: the window was the set of releases landing within **grab range**, which
+is 1 680 design units against a field spaced nearer 700, so from most of the orbit you genuinely
+can reach it. That is a fact and a useless one.
+
+The author's own framing is the fix: *"I don't want to highlight grabbable for most planets, but
+instead — if I release here I'll have a good chance of getting a high quality capture."* So the
+window is measured against the body's **floor**, which is the one guarantee a grab makes: inside
+the arc a release arrives at a *dive*, outside it merely in reach.
+
+| the window is where a release lands within… | p10 | p50 | p90 | max |
+|---|---|---|---|---|
+| the grab range (what M2.3 built) | 220° | 360° | 360° | 360° |
+| the **floor** | 18° | 24° | 40° | 77° |
+
+Three sources agree on that scale: spec [06 · §2](../spec/06-awards.md) works its examples at
+**15°** and **40°**, and the prototype draws a fixed **40°** wedge. Flown on the fixture field
+the built version lands p50 **18.6°** and never above 20.4°.
+
+**Two bounds came with it, and neither is invented.** `AIM_RANGE` — the prototype's, about two
+body-spacings — is what spec 00 §6's *"reachable"* has always been missing, and it bounds the
+**partition** rather than only the drawing: bounding only the drawing left bodies far up the
+corridor still *winning* release angles nobody would fly to, which squeezed half the drawn arcs
+below the minimum. And a **minimum width**, ruled: *"for very distant planets we still need to
+show a window... it's more important that the player knows roughly where to aim with little
+screen clutter than showing them exactly where they need to release, because it's so randomly
+timed anyway."* Fifteen degrees, which is spec 06's own narrow example — and at that width §2's
+1.5° PERFECT floor still binds, so the top word does not get easier for being far away.
+
+**The compass grades the width it draws**, because the minimum makes earned and drawn diverge
+and the prototype's rule decides it: *"the player must never be scored against something they
+cannot see. One sweep produces the rings that get drawn AND the alignment that gets paid, so the
+two cannot drift apart."*
+
+### And the rings say how far
+
+*"I don't want the orbits to be equidistant; instead I want the distances between the compass
+orbits to be indicative of how far away the planet is."* Which is the prototype's formula
+exactly: a fixed clearance from the orbit, then an offset proportional to the body's distance,
+clamped at the aim range. So the innermost ring is the next hop, and reading the stack is
+reading the field.
+
+### The path is the oval, and it rounds out
+
+*"The trail that shows behind the ship when we orbit isn't always aligned with the orbit taken by
+the ship... on an eccentric oval initial orbit we see the oval with a thin light line, and this
+oval then changes shape over the course of the trajectory to round out into the true orbit."*
+
+It was an arc of a **circle** at the ring anchor, which is not the line being flown. It is now
+the simulation's own ellipse, sampled from [`pathRadiusAt`](../../src/sim/orbit.ts) at the shape
+it has *this tick*, handed over as points rather than as three numbers the renderer would have to
+know the formula for. Through the settle it is visibly eccentric and by the end of it it is a
+circle — which is spec [01 · §6](../spec/01-swing.md)'s settle, drawn for the first time.
+
+### Three things were deleted
+
+- **The E3 at the grab and at the release.** *"Let's let the PLANET speak about our grab, not
+  some ambient glowing orbs."* Spec [04 · §3](../spec/04-bodies.md) already had it doing that —
+  a held body is E2 and alive, and the compass draws itself around that glow — so the flash was
+  a second voice saying the same thing. **The release goes quiet**, accepted: the award word and
+  the farewell ring are M2.4's, and the craft's stretch is what marks it meanwhile. The slot and
+  its decay stay, for the award and the checkered line.
+- **The inner ripple.** *"What's the purpose of the innermost ring within a planet, that also
+  has a tide tracking my orbiting ship?"* It is spec 04 §2's one sentence about a stratum
+  tracking the tide, and the prototype never implemented it. The **strata** stay; the thing that
+  tracked is gone.
+- **The tide on every body in reach.** Spec 04 §2 says *"present on every body within grab
+  range"*, which on this field is most of them at once. It is on the body a press would take, or
+  the one already held — the prototype's `TIDE_ONLY_ON_THE_OFFER`, and its reason: the tide is
+  the body **reaching for you**, and that is the one a press would answer.
+
+That last one needed a fact the layer did not have: **which body a press would take**. Spec
+[03 · §6](../spec/03-hud.md) records it as worth revisiting *"once the compass exists"*, and it
+does, so `BodyView` carries `offered` — [`bodyOnOffer`](../../src/sim/grab.ts)'s own answer, so
+the picture and the press cannot disagree.
+
+### Sightings point now, and say how far
+
+The 2026-08-28 ruling that **a sighting does not point** is reversed (author, 2026-08-29): *"the
+coloured dots — personally I hate them"*, and on the maxim that forbade the alternative, *"this
+is another instance of an original rule being too strict."* They are arrows in the identity hue
+with a distance beneath, fading with range, at full strength for the body a press would take.
+
+**The label is a distance and not a name**, which is a reading and is recorded as one: the
+author called the labels *"a different class"* from the retired `P11` chips, and that retirement
+is explicitly about naming. Identity stays hue-only. The number is set in Archivo with tracked
+figures rather than in the prototype's monospace, because spec
+[00 · §4](../spec/00-tokens.md) rules that nothing in the game is set in a monospace face —
+raised rather than assumed.
+
+`SIGHTING_RANGE` closes the other half of §6's *"reach is not yet a number"*, carried from the
+prototype and still spec 17's to replace.
+
+### What this makes false in the specs, and is not edited here
+
+`docs/` is author-owned and these are rebases rather than tidying, so they are listed for
+approval rather than written:
+
+| Where | The sentence the build has made false |
+|---|---|
+| [00 · §3](../spec/00-tokens.md) | E3's *"release, grab"*, and E1/E2's *"@ 35%"* and *"@ 60%"* — the radii are untouched and the alphas are 18% and 30% |
+| [00 · §6](../spec/00-tokens.md) | *"window width encodes difficulty"* survives, but the width is now the **quality** band with a floor under it; and *"reachable"* now has a number |
+| [02 · §7](../spec/02-release.md) | the grab's *"E3: Yes, at the grab point"* |
+| [02 · §2](../spec/02-release.md) | the release's E3 flash row |
+| [03 · §6](../spec/03-hud.md) | the whole *"a dot, not an arrow"* table, *"distance: not carried"*, and *"reach is not yet a number"* |
+| [03 acceptance](../spec/03-hud.md) | *"a sighting is held to the same line: its position carries the direction and no vector is drawn"* |
+| [04 · §2](../spec/04-bodies.md) | *"present on every body within grab range"*, and the inner ripple |
+| [04 · §3](../spec/04-bodies.md) | IN REACH's *"E1 + tide"* — a body glows on grip, and the tide is on the offer |
+
+**525 tests, 46 files.** Every number that moved is on the bench.
+
+---
+
 ## M2.4 · The release — 400ms
 
 Spec `02-release`. The most choreographed moment in the game, and the numbers are pinned:

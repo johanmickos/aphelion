@@ -66,6 +66,14 @@ and nothing else about a body changes with it. The player reads mass off the dis
 the tide, never off a gauge.
 _Avoid_: gravity strength, GM, weight
 
+**Grip**:
+How hard a body has hold of the craft **right now**, from nothing to all of it — the live pull,
+against the hardest that body could ever pull, which is the pull at its own **floor**. A ratio,
+so it means the same thing on every body whatever its **mass**. It is what decides whether a
+body lights up at all: the field ahead is a constellation of rims, and a body glows when it is
+gripping rather than when it is merely reachable.
+_Avoid_: gravity, force, attraction, proximity (grip is what proximity buys, not the distance)
+
 **Tide**:
 The bright limb segment of a body that always faces the craft — gravity drawn at
 close range. It **lags**, and the lag is the point: a heavier body reaches with a longer,
@@ -228,11 +236,15 @@ A body the picture cannot show, marked at the edge of it in that body's own hue.
 the **compass** is drawn on the thing it describes and needs a **grab** to exist at all, a
 sighting is about something out of sight and is always there — which is the whole of what a
 craft has to go on while **coasting**. It says three facts and gives no instruction: which
-body, which way, and how far. Never drawn for a body already on screen, and never for one
-behind the climb.
-_Avoid_: pointer and arrow (a sighting does not point — its **position** on the edge is the
-direction, and an arrow is the instruction `VISION.md`'s fourth pillar refuses), waypoint,
-marker, blip, radar, edge dot (**dot** is the compass's, and **carpet dot** is the carpet's)
+body, which way, and how far. Never drawn for a body already on screen, never for one
+behind the climb, and never for one past reach.
+**It points, and it says how far.** That reverses the ruling of 2026-08-28 that it must not,
+flown (author, 2026-08-29): *"this is another instance of an original rule being too strict."*
+Its **position** on the edge still carries the direction and the arrow agrees with it rather
+than replacing it, so the two can never disagree. The number is a **distance and not a name** —
+a body is still named by hue in the run, and the `P11` chips stay retired.
+_Avoid_: waypoint, blip, radar, edge dot (**dot** is the compass's, and **carpet dot** is the
+carpet's)
 
 **Farewell ring**:
 The orbit detaching from the body and expanding away at release, in AURORA.
