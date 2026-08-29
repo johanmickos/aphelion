@@ -681,7 +681,14 @@ console.log(
     'and only the walking grows.\x1b[0m',
 );
 console.log('');
-console.log('  bodies    tick p50  tick p99   × 24-body p99   budget');
+// **The mean is here because the phone reports one.** `frameCost` recovers a
+// *mean* cost per tick from the tick groups, so that is the statistic the two
+// machines have in common and the only one it is legitimate to multiply. The
+// percentiles are beside it because a tick is bimodal — a held tick runs the
+// root search and a coasting one does not — and the two ends scale differently:
+// the search is fixed at 4 rings however big the field gets, so p99 grows slowly
+// and p50 grows with the field. Reading a scaling factor off p99 flatters it.
+console.log('  bodies   tick mean  tick p50  tick p99   × 24-body mean   budget');
 let firstOver: number | null = null;
 for (const size of FIELD_SIZES) {
   const field = size === baseline.bodies.length ? null : paddedField(baseline, size);
@@ -689,11 +696,12 @@ for (const size of FIELD_SIZES) {
   const total = grown[0]!.ticks.map((value, i) => value + grown[1]!.ticks[i]!);
   const s = spread(total);
   const same = sample.print === one.print;
-  const share = s.p99 / wholeSpread.p99;
+  const share = s.mean / wholeSpread.mean;
   const over = s.p99 > TICK_BUDGET_MS;
   if (over && firstOver === null) firstOver = size;
   console.log(
-    `  ${String(size).padStart(6)}  ${ms(s.p50)}  ${ms(s.p99)}  ${share.toFixed(2).padStart(13)}×   ` +
+    `  ${String(size).padStart(6)}  ${ms(s.mean)}  ${ms(s.p50)}  ${ms(s.p99)}  ` +
+      `${share.toFixed(2).padStart(14)}×   ` +
       `${over ? '\x1b[31mover\x1b[0m' : '\x1b[32mfits\x1b[0m'}` +
       (same ? '' : '  \x1b[31m← the run changed; this row means nothing\x1b[0m'),
   );

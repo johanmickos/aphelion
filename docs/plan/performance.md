@@ -263,29 +263,33 @@ phone's own meter confirms it**, and confirming it is one line of the next dispa
 
 The same run, the extra bodies parked out of every reach, the flight asserted unchanged:
 
-| bodies | tick p50 | tick p99 | × the 24-body p99 |
-|---|---|---|---|
-| 24 | 0.004 | 0.042 | 1.03× |
-| 48 | 0.005 | 0.044 | 1.08× |
-| 96 | 0.009 | 0.046 | 1.14× |
-| 192 | 0.016 | 0.054 | 1.32× |
-| 384 | 0.030 | 0.070 | 1.73× |
-| 768 | 0.059 | 0.103 | 2.53× |
-| 1 536 | 0.120 | 0.172 | 4.25× |
+| bodies | tick mean | tick p50 | tick p99 | × the 24-body mean |
+|---|---|---|---|---|
+| 24 | 0.007 | 0.004 | 0.041 | 0.99× |
+| 48 | 0.009 | 0.005 | 0.043 | 1.21× |
+| 96 | 0.012 | 0.009 | 0.046 | 1.70× |
+| 192 | 0.019 | 0.016 | 0.054 | 2.63× |
+| 384 | 0.034 | 0.030 | 0.070 | 4.63× |
+| 768 | 0.064 | 0.059 | 0.103 | 8.76× |
+| 1 536 | 0.126 | 0.122 | 0.170 | **17.20×** |
 
-Linear, at **0.086 µs per body per tick** (p99). The intercept — the root search, which is fixed at
-4 rings however large the field gets — is 0.040ms and does not move.
+**Read the mean, not the p99, and this file got that wrong once.** A tick is bimodal — a held tick
+runs the root search and a coasting one does not — and the two ends scale differently. `windowsOn`
+is fixed at 4 rings however large the field grows, so it dominates p99 at 24 bodies and stops
+dominating by 1 536: **p99 grows 4.1× across the sweep while the mean grows 17.2×.** An earlier
+draft of this section extrapolated the p99 slope and concluded the field could reach *"roughly
+32 000 bodies"*. That was the wrong statistic to extrapolate on, and it is also the wrong one to
+convert with — [`frameCost`](../../tools/trail.ts) recovers a **mean** from the phone, so the mean
+is the only figure the two machines have in common.
 
-- **Headroom today: 67×.** A tick is 0.042ms against a 2.8ms budget.
-- **The field could reach roughly 32 000 bodies** before per-tick work meets the budget on this
-  laptop. State it as the ratio instead, because that is what travels: **the field can grow about
-  1 300× before the tick stops fitting.** A phone 20× slower than this laptop still leaves room for
-  ~1 500 bodies.
+Converting properly: the phone's measured **0.17ms** a tick (§8) against the **2.8ms** budget is
+16.5× of headroom, and the sweep reaches 17.2× just past 1 536 bodies.
 
-**M3 is not close.** The right reading is not *"we have 32 000 bodies of headroom"* — it is
-**per-tick work is not the constraint on how big the field gets, and a future session should not
-spend a day making `bodiesOf` allocate less on the theory that it might be.** If something does
-bind first it will be the renderer, and it will bind on **local density** and not on field size.
+> **The per-tick work stops fitting at roughly 1 500 bodies.** That is the number M3 inherits.
+
+The term that takes it there is `bodiesOf` — three passes over the whole field per tick — which is
+why it is the one lead in §3 marked *"real, and irrelevant at this size"* rather than closed. It is
+irrelevant at 24 bodies and at 240. It is the constraint at 1 500.
 
 ### Per frame — 0.40 screens per visible body
 

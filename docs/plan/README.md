@@ -58,6 +58,8 @@ playing it, so a plan whose first playable moment is late is a plan that cannot 
   work of which two were long and eighteen were not, which is as close to a control as a phone
   offers. It is a dropped frame, sometimes compounded by the phone's 1ms clock handing the next
   frame two ticks, which is a **jump** and is the one part of this that is ours to rule on.
+  **Nothing has been optimised and nothing needs to be**: the budget M3 inherits is that per-tick
+  work stops fitting at roughly **1 500 bodies**, and the term that takes it there is `bodiesOf`.
 
 ## What is deliberately not here
 
