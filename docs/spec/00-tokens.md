@@ -32,7 +32,10 @@ footer uses obsolete numbering and is void.
 > 35% and 60%. The radii are exactly as written — 6px, 18px, 48px, +4px a chain link, read into
 > design units at three per board pixel — so the acceptance criterion below is untouched: bloom
 > radius is still a pure function of the energy step and the chain, and what moved is an alpha,
-> which §1 already makes the renderer's.
+> which §1 already makes the renderer's. **A body takes a third of that again**
+> (2026-08-29): a held body jumping to E2 on top of its grip halo read as a lit
+> blob rather than a rim. The craft keeps the table's own, because Direction 01
+> rules it the brightest thing on screen always.
 >
 > **§3 · A body glows when it is *gripping*, not when it is reachable.** This table's *"E0–E1"*
 > for a body AHEAD is read at **E0** until the body is actually pulling: `CONTEXT.md` gains
@@ -91,6 +94,15 @@ footer uses obsolete numbering and is void.
 > forbids is exactly the defect it names. What fades here is a **prediction firming up** — the
 > compass draws the orbit the craft is currently on from the moment gravity binds it, and the fade
 > is that answer's confidence. The element does not enter softly; the answer does.
+>
+> **§5 · ENTER is spent, and on the instrument.** *"When I grabbed and captured,
+> the compass would grow/shrink bounce a little... like my ship's HUD was coming
+> online in orbit"* (author, 2026-08-29). §5's token is exactly that — 120ms,
+> from 92% scale, with the overshoot its curve's 1.6 describes — and it fires
+> once, when the rings arrive at the freeze. It scales the rings and the hand and
+> never the orbit path, because the craft is on the path. What it is deliberately
+> **not** is the prototype's continuous pump, which that codebase measured at
+> *"85 out to 97 and back over about a second"* and removed.
 >
 > **§7 · The thumb line holds and is now load-bearing twice.** Sightings are pinned inside the
 > design space and never cross it, which falls out of the geometry rather than being clamped.

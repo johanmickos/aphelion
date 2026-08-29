@@ -44,7 +44,7 @@
 import { AIM_RANGE, handOf, windowsOn } from '../sim/compass.ts';
 import { pathRadiusAt, predictOrbit } from '../sim/orbit.ts';
 import type { Orbit } from '../sim/orbit.ts';
-import { easeStep } from './decay.ts';
+import { advance, easeStep, home, place, ticksIn } from './decay.ts';
 import { SCALE } from '../sim/units.ts';
 import { alignmentOf, tierFor } from '../sim/tier.ts';
 import type { Tier } from '../sim/tier.ts';
@@ -123,6 +123,36 @@ export const PATH_POINTS = 64;
  */
 export const PATH_FADE_RATE = 8;
 
+/**
+ * How long the instrument takes to come online, and how small it starts.
+ *
+ * **Spec [00 · §5](../../docs/spec/00-tokens.md)'s ENTER token, applied to the
+ * compass**: *"120ms, `cubic-bezier(.2, 1.6, .3, 1)`, from 92% scale"* — a pop
+ * that overshoots once and settles, which is what that curve's 1.6 is. It fires
+ * when the rings arrive at the **freeze** and nowhere else.
+ *
+ * *"When I grabbed and captured, the compass would grow/shrink bounce a little...
+ * it made the grab and orbit feel dynamic, like my ship's HUD was coming online
+ * in orbit. I forget if this was accidental or controlled as a feature"*
+ * (author, 2026-08-29). **It was accidental**, and the prototype removed it: its
+ * ring radius followed the ship through the whole swing, and frozen that *"made
+ * the ring pump out and back as the ship swept periapsis to apoapsis and home
+ * again — 85 out to 97 and back over about a second, on top of a curve the player
+ * is trying to read."* M2.3 reintroduced it by accident too, and it was reported
+ * as bouncing.
+ *
+ * So what is built is the half that reads as arrival rather than as wobble: **one
+ * pop, at the freeze, over 120ms**, and nothing that pumps while the craft
+ * sweeps. It scales the **instrument** and not the path — the rings, their
+ * windows and the hand's reach — because the path is the world's orbit and the
+ * craft is on it. A HUD coming online over a world that stays put is the thing
+ * being described.
+ */
+export const ENTER_TICKS = ticksIn(120);
+
+/** Where that pop starts from — spec 00 §5's 92%. */
+export const ENTER_FROM = 0.92;
+
 const TWO_PI = Math.PI * 2;
 
 /**
@@ -157,6 +187,9 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
       filament: true,
       predicted: guess !== null,
       hand: null,
+      // Nothing to come online yet: the dive has no instrument.
+      scale: 1,
+      entrance: null,
       anchor: guess === null ? 0 : guess.periapsis,
       path: guess === null ? [] : sample(guess),
       presence: fadedIn(previous, guess !== null),
@@ -205,7 +238,14 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
 
   unstack(rings);
 
+  // The instrument arrives with the freeze, so the entrance is placed on the tick
+  // the hand first exists and aged from there.
+  const entrance =
+    previous === null || previous.hand === null ? place(ENTER_TICKS) : advance(previous.entrance);
+
   return {
+    scale: entrance === null ? 1 : 1 + (ENTER_FROM - 1) * home(entrance),
+    entrance,
     x: body.x,
     y: body.y,
     hue,

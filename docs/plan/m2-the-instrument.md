@@ -587,6 +587,46 @@ above the thumb line, and a ruling on whether the game says this in words at all
 first thing M2.4 should be asked about**, and until it exists the gate is judging half of §11's
 tension.
 
+### And three from the same sitting
+
+**The sliders were never on the dev server, and that was the honest answer to the wrong
+question.** *"Where is the A/B slider? I don't see it on the dev server build."* The bench is a
+separate build from a patched copy of `src/` — the constants stay `const` in the game, which is
+AGENTS.md §6's whole argument — and it lived as a file on disk while the game lived at a URL. The
+build is unchanged; what is new is that [`vite-plugin-bench.ts`](../../tools/vite-plugin-bench.ts)
+serves that page at **`/bench`** in dev, so the QR that puts the game on a phone puts the knobs on
+the same phone one path along. It refuses rather than serving a stale page: if `src/` has changed
+since `pnpm bench` last ran, the sliders would be wired to an older copy of the simulation, which
+is the failure `test/bench.test.ts` exists for.
+
+**A planet's bloom takes a third of the energy table's strength.** *"I don't want that glow effect
+on the planet ring when I grab it. Maybe just lessen it a lot?"* A held body jumps to E2 — three
+times E1's radius, in its own hue, hugging the rim — and lands on top of the grip halo at its
+strongest, so the rim read as lit rather than as a rim. `BODY_BLOOM` is a **body's** scale and not
+the table's, deliberately: Direction 01 rules *"the craft is the brightest object on screen,
+always"*, and dimming the shared number would have dimmed the craft with it. The ordering across
+the four steps is untouched.
+
+**The compass comes online with a pop, and the thing being remembered was a bug.** *"When I
+grabbed and captured, the compass would grow/shrink bounce a little... it made the grab and orbit
+feel dynamic, like my ship's HUD was coming online in orbit. I forget if this was accidental or
+controlled as a feature."*
+
+**It was accidental.** The prototype's ring radius followed the ship through the whole swing, and
+its own comment records what that cost once frozen: *"it made the ring pump out and back as the
+ship swept periapsis to apoapsis and home again — 85 out to 97 and back over about a second, on
+top of a curve the player is trying to read."* It removed it. M2.3 reintroduced the same thing by
+a different route and the author reported it as bouncing two days ago.
+
+So what is built is the half that reads as *arrival* rather than as wobble, and the design already
+had it: spec [00 · §5](../spec/00-tokens.md)'s **ENTER** token — *"120ms,
+`cubic-bezier(.2, 1.6, .3, 1)`, from 92% scale"* — fired once when the rings arrive at the freeze.
+It uses [`home`](../../src/state/decay.ts), the same overshoot every returning value in this layer
+shares, so the 1.6 in that curve is the rebound already argued for. **It scales the instrument and
+never the path**: the rings, their windows and the hand's reach pop, and the orbit does not,
+because the craft is on the orbit. A HUD coming online over a world that stays put is the thing
+being described.
+
 ### What this makes false in the specs, and is not edited here
 
 `docs/` is author-owned and these are rebases rather than tidying, so they are listed for
@@ -604,7 +644,7 @@ approval rather than written:
 | [04 · §3](../spec/04-bodies.md) | IN REACH's *"E1 + tide"* — a body glows on grip, and the tide is on the offer |
 | [00 · §6](../spec/00-tokens.md) | the **ghost** is a **crossing**; and a window heats over a quarter turn rather than over itself |
 
-**536 tests, 46 files.** Every number that moved is on the bench.
+**541 tests, 46 files.** Every number that moved is on the bench, which is now at `/bench` on the dev server.
 
 ---
 

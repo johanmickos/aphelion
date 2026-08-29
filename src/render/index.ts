@@ -249,6 +249,23 @@ const GRIP_SPAN = 200 * BOARD_PIXEL;
 const GRIP_STRENGTH = 0.16;
 
 /**
+ * How much of the energy table's strength a **body's** bloom takes.
+ *
+ * *"I don't want that glow effect on the planet ring when I grab it. Maybe just
+ * lessen it a lot?"* (author, 2026-08-29). A held body jumps to E2 — three times
+ * the radius and nearly twice the alpha of E1, in its own hue, hugging the rim —
+ * and on top of the grip halo, which is at its strongest at exactly that moment,
+ * the rim read as lit rather than as a rim.
+ *
+ * **A body and not the craft**, which is the whole reason it is a separate
+ * number: Direction 01 rules *"the craft is the brightest object on screen,
+ * always"*, and dimming the shared table would have dimmed the craft with it.
+ * The ordering across the four steps is untouched — E2 is still brighter than E1
+ * — and the craft keeps its own.
+ */
+const BODY_BLOOM = 0.35;
+
+/**
  * A body — spec [04 · §1](../../docs/spec/04-bodies.md)'s anatomy, in the order
  * it is lit.
  *
@@ -290,7 +307,7 @@ function drawBody(context: CanvasRenderingContext2D, body: BodyView): void {
     body.radius,
     body.bloom,
     spent ? inToken(DUSK) : inHue(body.hue),
-    STRENGTH[body.energy],
+    STRENGTH[body.energy] * BODY_BLOOM,
   );
 
   context.beginPath();
@@ -446,8 +463,8 @@ function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): v
   context.beginPath();
   context.moveTo(compass.x, compass.y);
   context.lineTo(
-    compass.x + Math.cos(compass.hand) * compass.reach,
-    compass.y + Math.sin(compass.hand) * compass.reach,
+    compass.x + Math.cos(compass.hand) * compass.reach * compass.scale,
+    compass.y + Math.sin(compass.hand) * compass.reach * compass.scale,
   );
   context.lineWidth = HAND_WIDTH;
   context.strokeStyle = dim(CORE, HAND_AT_REST + (1 - HAND_AT_REST) * closest(compass));
@@ -540,8 +557,12 @@ function traceArc(
  * a body is that body's own hue, so target and window never need a legend.
  */
 function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring: RingView): void {
+  // The instrument comes online with a pop and the world does not — see
+  // [`CompassView.scale`](../state/types.ts).
+  const radius = ring.radius * compass.scale;
+
   context.beginPath();
-  context.arc(compass.x, compass.y, ring.radius, 0, Math.PI * 2);
+  context.arc(compass.x, compass.y, radius, 0, Math.PI * 2);
   context.lineWidth = RING_WIDTH;
   context.strokeStyle = dim(DUSK, STRENGTH[1]);
   context.stroke();
@@ -562,13 +583,7 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
   context.save();
   context.lineCap = 'round';
   context.beginPath();
-  context.arc(
-    compass.x,
-    compass.y,
-    ring.radius,
-    ring.dot - ring.halfWidth,
-    ring.dot + ring.halfWidth,
-  );
+  context.arc(compass.x, compass.y, radius, ring.dot - ring.halfWidth, ring.dot + ring.halfWidth);
   context.lineWidth = WINDOW_WIDTH * (1 + ring.aim);
   context.strokeStyle = identity(
     ring.hue,
@@ -578,8 +593,8 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
   context.restore();
 
   // The dot at the window's centre — a perfect release — CORE white when matched.
-  const dotX = compass.x + Math.cos(ring.dot) * ring.radius;
-  const dotY = compass.y + Math.sin(ring.dot) * ring.radius;
+  const dotX = compass.x + Math.cos(ring.dot) * radius;
+  const dotY = compass.y + Math.sin(ring.dot) * radius;
   context.beginPath();
   context.arc(dotX, dotY, DOT_RADIUS, 0, Math.PI * 2);
   context.fillStyle = ring.matched
@@ -592,8 +607,8 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
   const hand = compass.hand!;
   context.beginPath();
   context.arc(
-    compass.x + Math.cos(hand) * ring.radius,
-    compass.y + Math.sin(hand) * ring.radius,
+    compass.x + Math.cos(hand) * radius,
+    compass.y + Math.sin(hand) * radius,
     CROSSING_RADIUS,
     0,
     Math.PI * 2,

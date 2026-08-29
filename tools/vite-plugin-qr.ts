@@ -48,6 +48,9 @@ export function qrPlugin(): Plugin {
           log.info('\n  (QR unavailable)\n');
         }
         log.info(`  \x1b[1mScan to play on your phone\x1b[0m  ${url}`);
+        // The knobs live one path along, on the same address, so the phone that
+        // flies the game can also move the numbers it is being flown with.
+        log.info(`  \x1b[2mand the bench, with the open questions on sliders\x1b[0m  ${url}bench`);
         log.info(
           '  \x1b[2mpress s to reprint · S for a larger code · same Wi-Fi required\x1b[0m\n',
         );

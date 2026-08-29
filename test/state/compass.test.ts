@@ -16,7 +16,13 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MIN_HALF_WIDTH } from '../../src/sim/compass.ts';
-import { RING_INNER, STACK_GAP, takenBy } from '../../src/state/compass.ts';
+import {
+  ENTER_FROM,
+  ENTER_TICKS,
+  RING_INNER,
+  STACK_GAP,
+  takenBy,
+} from '../../src/state/compass.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { hueOf } from '../../src/state/identity.ts';
 import type { CompassView, PresentationState } from '../../src/state/types.ts';
@@ -162,6 +168,7 @@ describe('what it is allowed to say', () => {
       'craftX',
       'craftY',
       'direction',
+      'entrance',
       'filament',
       'hand',
       'hue',
@@ -170,6 +177,7 @@ describe('what it is allowed to say', () => {
       'presence',
       'reach',
       'rings',
+      'scale',
       'swept',
       'x',
       'y',
@@ -269,6 +277,42 @@ describe('the window is the quality band', () => {
     const r = Math.hypot(view.craft.x - c.x, view.craft.y - c.y);
     expect(r).toBeGreaterThanOrEqual(Math.min(...c.path) - 1);
     expect(r).toBeLessThanOrEqual(Math.max(...c.path) + 1);
+  });
+});
+
+describe('the instrument coming online', () => {
+  /**
+   * Spec [00 · §5](../../docs/spec/00-tokens.md)'s **ENTER**, applied to the
+   * compass: from 92% with one overshoot, over 120ms, when the rings arrive at
+   * the freeze. *"It made the grab and orbit feel dynamic, like my ship's HUD was
+   * coming online in orbit"* (author, 2026-08-29) — and it is **one pop**, not
+   * the continuous pump the prototype measured and removed.
+   */
+  it('pops from 92%, overshoots once, and settles', () => {
+    const views = held();
+    const armed = views.filter((v) => v.compass?.hand != null);
+    expect(armed.length).toBeGreaterThan(200);
+
+    const scales = armed.map((v) => v.compass!.scale);
+    expect(scales[0]).toBeCloseTo(ENTER_FROM, 9);
+    expect(Math.max(...scales)).toBeGreaterThan(1);
+    expect(Math.max(...scales)).toBeLessThan(1.02);
+
+    // Over in 120ms, and then exactly one for the rest of the swing.
+    expect(scales.slice(ENTER_TICKS).every((s) => s === 1)).toBe(true);
+    expect(armed.slice(ENTER_TICKS).every((v) => v.compass!.entrance === null)).toBe(true);
+  });
+
+  /** And the world does not pop with it: the path is the orbit, at its own size. */
+  it('leaves the orbit path alone', () => {
+    const armed = held().filter((v) => v.compass?.hand != null);
+    const early = armed[1]!.compass!;
+    expect(early.scale).toBeLessThan(1);
+    // The craft is on the path whatever the instrument is doing around it.
+    const craft = armed[1]!.craft;
+    const r = Math.hypot(craft.x - early.x, craft.y - early.y);
+    expect(r).toBeGreaterThanOrEqual(Math.min(...early.path) - 1);
+    expect(r).toBeLessThanOrEqual(Math.max(...early.path) + 1);
   });
 });
 

@@ -341,6 +341,18 @@ export interface CompassView {
    * fade in"*.
    */
   readonly presence: number;
+  /**
+   * How big the instrument is drawn, as a fraction — spec
+   * [00 · §5](../../docs/spec/00-tokens.md)'s **ENTER**, from 92% with one
+   * overshoot when the rings arrive at the freeze.
+   *
+   * It scales the rings, their windows and the hand's reach, and **not the
+   * path**: the path is the world's orbit and the craft is on it. A HUD coming
+   * online over a world that stays put is the thing this is for.
+   */
+  readonly scale: number;
+  /** The entrance in progress, or `null` once it has settled. */
+  readonly entrance: Decay | null;
   /** Where a release would land right now (`CONTEXT.md`: **hand**), or `null` while diving. */
   readonly hand: number | null;
   /**

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { qrPlugin } from './tools/vite-plugin-qr.ts';
 import { diagPlugin } from './tools/vite-plugin-diag.ts';
+import { benchPlugin } from './tools/vite-plugin-bench.ts';
 
 export default defineConfig(({ command }) => ({
   // The game lives in app/; src/ holds the game's modules, imported from here.
@@ -10,7 +11,11 @@ export default defineConfig(({ command }) => ({
   // a backend — it is the dev server, on the author's own machine (ADR-0003).
   // It outlived the M0.5 spike that needed it (ADR-0011), which is why it is
   // still here and `vite-plugin-spike.ts` is not.
-  plugins: [qrPlugin(), diagPlugin()],
+  // `benchPlugin` serves `pnpm bench`'s page at /bench, dev only. The bench is
+  // still a separate build from a patched copy of `src/` — the constants stay
+  // `const` in the game — and this only puts it at the same address, so the QR
+  // that puts the game on a phone puts the knobs on the same phone.
+  plugins: [qrPlugin(), diagPlugin(), benchPlugin()],
   // Relative, not '/': GitHub Pages serves a project site from a subpath
   // (/aphelion-2/), so absolute asset URLs 404 there. './' is correct at any
   // mount point, and Vite resolves it back to '/' for the dev server

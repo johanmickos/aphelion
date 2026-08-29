@@ -161,6 +161,15 @@ export function lockOf(sim: SimState): number {
     'PATH_FADE_RATE',
     'how fast the oval fades in once it is possible',
   ),
+  settable('src/state/compass.ts', 'ENTER_FROM', 'spec 00 §5’s ENTER: how small it starts'),
+  settable('src/state/compass.ts', 'ENTER_TICKS', 'and how long it takes to come online'),
+  {
+    file: 'src/render/index.ts',
+    find: 'const BODY_BLOOM = 0.35;',
+    replace: 'export let BODY_BLOOM = 0.35;',
+    append: '\nexport function set_BODY_BLOOM(value: number): void {\n  BODY_BLOOM = value;\n}\n',
+    why: 'how much a planet glows, asked to be lessened a lot on 2026-08-29',
+  },
   settable('src/state/sighting.ts', 'SIGHTING_RANGE', 'spec 03 §6’s “reach is not yet a number”'),
   {
     file: 'src/render/index.ts',
