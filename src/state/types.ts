@@ -7,6 +7,7 @@
  * boundary heat — precisely so that a frame can be asserted without a canvas.
  */
 import type { Tick } from '../sim/types.ts';
+import type { Tier } from '../sim/tier.ts';
 import type { Decay } from './decay.ts';
 
 /**
@@ -220,6 +221,74 @@ export interface BodyView {
 }
 
 /**
+ * One ring of the compass, and the window on it (`CONTEXT.md`: **window**).
+ *
+ * Every angle here is an absolute position angle about the held body, which is
+ * the one coordinate the whole instrument shares: the hand is an angle, the dot
+ * is an angle, and the gap between them is the grade.
+ */
+export interface RingView {
+  /** Which body it belongs to — its **address**, and therefore its hue. */
+  readonly body: number;
+  /** That body's own hue. A window and its target never need a legend. */
+  readonly hue: number;
+  /** How far out this ring sits from the held body's centre, in design units. */
+  readonly radius: number;
+  /** The perfect release (`CONTEXT.md`: **dot**), at the window's centre. */
+  readonly dot: number;
+  /** Half the window's width. Spec 06's zones are fractions of the whole. */
+  readonly halfWidth: number;
+  /**
+   * How far the hand is from the dot, signed and folded the short way round.
+   *
+   * Signed because the compass **draws** which side the aim is on, and spec
+   * [06 · §2](../../docs/spec/06-awards.md)'s grade does not use the sign — two
+   * readings of one geometry, neither derived from the other.
+   */
+  readonly offset: number;
+  /** How far inside the window the hand is, from 0 at the edge to 1 at the dot. */
+  readonly aim: number;
+  /** What a release now would score here, or `null` for a miss. */
+  readonly tier: Tier | null;
+  /** E1 at rest, E2 under live aim — heating **in place**, never changing hue. */
+  readonly energy: Energy;
+  /** Whether the hand and the dot have merged: spec 00 §6's MATCHED. */
+  readonly matched: boolean;
+}
+
+/**
+ * The compass (`CONTEXT.md`), or `null` when no body is held.
+ *
+ * It exists from the **press** rather than from the freeze, because spec
+ * [00 · §6](../../docs/spec/00-tokens.md)'s first state is the grab filament and
+ * its second is the orbit. Through the dive there is no hand and there are no
+ * rings, which is what makes the freeze something the player sees rather than
+ * infers.
+ */
+export interface CompassView {
+  /** The held body's centre, in world units — everything here is drawn about it. */
+  readonly x: number;
+  readonly y: number;
+  /** The held body's hue, which the filament wears. */
+  readonly hue: number;
+  /** Where the craft is, so the filament has two ends without a second lookup. */
+  readonly craftX: number;
+  readonly craftY: number;
+  /** Which way round the craft goes: +1 counter-clockwise, −1 clockwise. */
+  readonly direction: number;
+  /** Spec 00 §6 state 1: the line from the craft to the body, drawn while diving. */
+  readonly filament: boolean;
+  /** Where a release would land right now (`CONTEXT.md`: **hand**), or `null` while diving. */
+  readonly hand: number | null;
+  /** How far out the hand is drawn — past the outermost ring, as §6 asks. */
+  readonly reach: number;
+  /** One per reachable body, innermost nearest. */
+  readonly rings: readonly RingView[];
+  /** How much of the orbit has been flown since the freeze, capped at one turn. */
+  readonly swept: number;
+}
+
+/**
  * A body the picture cannot show, marked on its edge (`CONTEXT.md`: sighting).
  *
  * **In design-space coordinates**, alone among the positions in this file, and
@@ -286,4 +355,9 @@ export interface PresentationState {
    * orbit and this does not, so it is the whole of what a coasting craft reads.
    */
   readonly sightings: readonly SightingView[];
+  /**
+   * The instrument, or `null` while coasting. The compass needs a body; a
+   * **sighting** is what a craft without one reads.
+   */
+  readonly compass: CompassView | null;
 }

@@ -1,0 +1,101 @@
+/**
+ * Spec [06 · §2](../../docs/spec/06-awards.md)'s tiers, and its acceptance:
+ *
+ * > *"Grading is a pure function of `(d, W)` and imports nothing from the
+ * > economy. The four zone boundaries are exact at `d = W/2`, `0.30W`, `0.15W`,
+ * > `max(0.08W, 1.5°)`. With `W = 15°`, the PERFECT zone is 1.5° (the floor
+ * > binds). With `W = 40°`, it is 3.2°."*
+ *
+ * Every one of those is below, and the two worked examples are asserted as the
+ * spec writes them rather than as fractions — a worked example that is
+ * recomputed from the formula it is checking has stopped being a check.
+ */
+import { describe, expect, it } from 'vitest';
+import { aimFor, PERFECT_FLOOR, SHARP_ZONE, tierFor, TRUE_ZONE } from '../../src/sim/tier.ts';
+
+const deg = (x: number): number => (x * Math.PI) / 180;
+/** A hair, so a boundary can be probed from both sides without touching it. */
+const HAIR = 1e-9;
+
+describe('the four zones', () => {
+  const W = deg(40);
+
+  it('is a miss outside the window and a make on its edge', () => {
+    expect(tierFor(W / 2 + HAIR, W)).toBeNull();
+    expect(tierFor(W / 2, W)).toBe('MAKE');
+    expect(tierFor(-W / 2, W)).toBe('MAKE');
+  });
+
+  it('is exact at every boundary, from both sides', () => {
+    expect(tierFor(TRUE_ZONE * W, W)).toBe('TRUE');
+    expect(tierFor(TRUE_ZONE * W + HAIR, W)).toBe('MAKE');
+    expect(tierFor(SHARP_ZONE * W, W)).toBe('SHARP');
+    expect(tierFor(SHARP_ZONE * W + HAIR, W)).toBe('TRUE');
+  });
+
+  it('grades the same either side of the dot', () => {
+    for (const d of [0, 0.05, 0.1, 0.14, 0.2, 0.3, 0.49]) {
+      expect(tierFor(d * W, W)).toBe(tierFor(-d * W, W));
+    }
+  });
+
+  it('is a pure function of two numbers', () => {
+    expect(tierFor(deg(3), deg(40))).toBe(tierFor(deg(3), deg(40)));
+    expect(tierFor(0, 0)).toBeNull();
+  });
+});
+
+describe('the PERFECT floor', () => {
+  /** Spec 06's own worked examples, written as the spec writes them. */
+  it('binds at a 15° window and does not at 40°', () => {
+    expect(tierFor(deg(1.5), deg(15))).toBe('PERFECT');
+    expect(tierFor(deg(1.5) + HAIR, deg(15))).toBe('SHARP');
+
+    expect(tierFor(deg(3.2), deg(40))).toBe('PERFECT');
+    expect(tierFor(deg(3.2) + HAIR, deg(40))).toBe('SHARP');
+  });
+
+  it('is 1.5° and nothing else', () => {
+    expect((PERFECT_FLOOR * 180) / Math.PI).toBeCloseTo(1.5, 12);
+  });
+
+  /**
+   * **And the consequence, which is worth seeing rather than discovering.** The
+   * floor is absolute and every other zone is a fraction, so the narrower the
+   * window the *larger a share of it* pays the top word — and below **3°** the
+   * PERFECT zone covers the whole window and every make is a PERFECT.
+   *
+   * That is not a defect: spec 00 §6 rules that a narrow window is a harder
+   * release and *"automatically a better-paid one"*, and this is the mechanism.
+   * It is written down because the geometry earns its own widths here rather
+   * than being authored, and flown on the fixture field it offers windows at a
+   * p10 of 7.2° — where the PERFECT zone is **42%** of the window against
+   * **16%** at 40°.
+   */
+  it('takes a larger share of a narrower window, and all of one under 3°', () => {
+    const share = (w: number): number => Math.max(0.08 * w, 1.5) / (w / 2);
+    expect(share(40)).toBeCloseTo(0.16, 2);
+    expect(share(7.2)).toBeCloseTo(0.42, 2);
+
+    // Under three degrees there is no room for a lesser word at all.
+    expect(tierFor(deg(1.4), deg(3))).toBe('PERFECT');
+    expect(tierFor(deg(1.6), deg(3))).toBeNull();
+    // At seven there is.
+    expect(tierFor(deg(3.4), deg(7))).toBe('MAKE');
+  });
+});
+
+describe('the aim', () => {
+  /**
+   * Not a tier and not derived from one: spec 00 §6 heats a window
+   * *continuously* as the hand closes, while the tier is four steps. Two
+   * readings of one geometry.
+   */
+  it('runs from nothing at the edge to whole at the dot', () => {
+    const W = deg(40);
+    expect(aimFor(0, W)).toBe(1);
+    expect(aimFor(W / 2, W)).toBe(0);
+    expect(aimFor(W / 4, W)).toBeCloseTo(0.5, 12);
+    expect(aimFor(W, W)).toBe(0);
+  });
+});

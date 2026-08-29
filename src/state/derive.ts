@@ -67,6 +67,7 @@ import { headingOf, speedOf } from '../sim/craft.ts';
 import type { SimState } from '../sim/types.ts';
 import { energyOf, stateOf, tideOf } from './body.ts';
 import { followCamera, openCamera } from './camera.ts';
+import { compassOf } from './compass.ts';
 import { advance, fade, place } from './decay.ts';
 import { relax, stretch, UNDEFORMED } from './deformation.ts';
 import { bloomOf, E3_BLOOM, E3_TICKS } from './energy.ts';
@@ -205,6 +206,7 @@ function present(
     },
     flash,
     sightings: sightingsOf(sim.field.bodies, states, sim.craft, camera),
+    compass: compassOf(sim),
   };
 }
 

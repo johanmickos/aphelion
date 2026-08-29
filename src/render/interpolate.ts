@@ -121,6 +121,12 @@ export function interpolate(
     // bearing, is the next derivation's input rather than this frame's
     // (ADR-0015).
     sightings: current.sightings,
+    // The compass is taken from the later tick whole. Its angles are the craft's
+    // own position on the orbit, which is already interpolated as `craft`, and a
+    // hand crossed halfway between two ticks would sit at an angle the craft was
+    // never at — which is the one thing an instrument drawn on the world must
+    // not do.
+    compass: current.compass,
     // The corridor does not move, and taking it from the later tick is the same
     // promise `bodies` above makes: interpolating a thing that cannot change
     // would be a promise this function should not make before spec 17's

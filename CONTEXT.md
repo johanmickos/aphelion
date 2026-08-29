@@ -212,7 +212,16 @@ place as aim closes.
 The single point on the compass marking a perfect release.
 
 **Hand**:
-The moving indicator on the compass showing where a release would land right now.
+The moving indicator on the compass showing where a release would land right now. It is the
+radius through the craft, drawn out past the outermost ring, so the thing that says *when* is
+the same line the craft is standing on.
+
+**Crossing**:
+Where the **hand** cuts one of the compass's rings — one mark per ring, and the gap between it
+and that ring's **dot** is the grade, drawn on the geometry rather than said. Spec 00 §6 calls
+it a *ghost*; that word is spent on a **recipe** played back beside a live run, and one word
+for two things is a fork, so this is the word.
+_Avoid_: ghost (a ghost is a replay), ghost dot, marker
 
 **Sighting**:
 A body the picture cannot show, marked at the edge of it in that body's own hue. Where
@@ -301,6 +310,7 @@ report
 
 **Ghost**:
 A recipe played back alongside a live run.
+_Avoid_: using it for the compass's mark where the hand cuts a ring — that is a **crossing**
 
 **Carpet dot**:
 Loose points scattered across the carpet, swept up by whatever line the finish happens to

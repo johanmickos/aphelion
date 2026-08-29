@@ -40,9 +40,11 @@ import { BOARD_PIXEL, DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
 import type {
   BodyState,
   BodyView,
+  CompassView,
   Energy,
   FlashView,
   PresentationState,
+  RingView,
   SightingView,
   TideView,
 } from '../state/types.ts';
@@ -335,6 +337,135 @@ function drawTide(context: CanvasRenderingContext2D, body: BodyView, tide: TideV
   context.stroke();
 }
 
+/** Spec 00 §6's compass, in board pixels — one grammar of weights for the lot. */
+const RING_WIDTH = 1 * BOARD_PIXEL;
+const WINDOW_WIDTH = 3 * BOARD_PIXEL;
+const HAND_WIDTH = 1.5 * BOARD_PIXEL;
+const DOT_RADIUS = 3 * BOARD_PIXEL;
+
+/**
+ * How wide the crossing dot is. Spec 00 §6 calls it a *ghost*; `CONTEXT.md`
+ * spends that word on a replay flown beside a live run, so this milestone's own
+ * brief calls it **the crossing dot** and so does everything here.
+ */
+const CROSSING_RADIUS = 2 * BOARD_PIXEL;
+
+/**
+ * The compass — spec [00 · §6](../../docs/spec/00-tokens.md), and the thing
+ * `VISION.md` calls the best piece of UI in the game.
+ *
+ * Everything is drawn **on the orbit**, about the body, because that is what
+ * makes it diegetic rather than a gauge: the windows are arcs of the path the
+ * craft is on, and the hand is the radius it is standing on. Nothing here is an
+ * instruction — *"the gap between ghost and dot is the grade, drawn on the
+ * geometry. It is a fact, never a command."*
+ */
+function drawCompass(context: CanvasRenderingContext2D, compass: CompassView): void {
+  // State 1 · PRESS. *"The grab filament: a line from the craft to the body
+  // pulling hardest, in that body's identity hue."* There is no instrument yet,
+  // which is what makes the compass arriving *be* the freeze, seen.
+  if (compass.hand === null) {
+    context.beginPath();
+    context.moveTo(compass.x, compass.y);
+    context.lineTo(compass.craftX, compass.craftY);
+    context.lineWidth = HAND_WIDTH;
+    context.strokeStyle = identity(compass.hue, STRENGTH[2]);
+    context.stroke();
+    return;
+  }
+
+  // The trail: the arc of orbit already flown, on the orbit path itself, which
+  // is the innermost ring's radius. E2 — it is the craft's own light, left behind.
+  if (compass.swept > 0 && compass.rings.length > 0) {
+    const path = compass.rings[0]!.radius;
+    const from = compass.hand - compass.swept * compass.direction;
+    context.beginPath();
+    context.arc(compass.x, compass.y, path, from, compass.hand, compass.direction < 0);
+    context.lineWidth = HAND_WIDTH;
+    context.strokeStyle = dim(CORE, STRENGTH[2]);
+    context.stroke();
+  }
+
+  // The hand: the radius through the craft, out past the outermost ring.
+  context.beginPath();
+  context.moveTo(compass.x, compass.y);
+  context.lineTo(
+    compass.x + Math.cos(compass.hand) * compass.reach,
+    compass.y + Math.sin(compass.hand) * compass.reach,
+  );
+  context.lineWidth = HAND_WIDTH;
+  context.strokeStyle = dim(CORE, HAND_AT_REST + (1 - HAND_AT_REST) * closest(compass));
+  context.stroke();
+
+  for (const ring of compass.rings) drawRing(context, compass, ring);
+}
+
+/**
+ * One ring, its window, its dot and its crossing.
+ *
+ * The ring is DUSK at E0 — *"rings at rest"* — and everything on it belonging to
+ * a body is that body's own hue, so target and window never need a legend.
+ */
+function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring: RingView): void {
+  context.beginPath();
+  context.arc(compass.x, compass.y, ring.radius, 0, Math.PI * 2);
+  context.lineWidth = RING_WIDTH;
+  context.strokeStyle = dim(DUSK, STRENGTH[1]);
+  context.stroke();
+
+  // The window heats **in place**: E1 at rest, E2 under live aim, and the hue
+  // never moves (spec 00 §6).
+  context.beginPath();
+  context.arc(
+    compass.x,
+    compass.y,
+    ring.radius,
+    ring.dot - ring.halfWidth,
+    ring.dot + ring.halfWidth,
+  );
+  context.lineWidth = WINDOW_WIDTH;
+  context.strokeStyle = identity(ring.hue, STRENGTH[ring.energy]);
+  context.stroke();
+
+  // The dot at the window's centre — a perfect release — CORE white when matched.
+  const dotX = compass.x + Math.cos(ring.dot) * ring.radius;
+  const dotY = compass.y + Math.sin(ring.dot) * ring.radius;
+  context.beginPath();
+  context.arc(dotX, dotY, DOT_RADIUS, 0, Math.PI * 2);
+  context.fillStyle = ring.matched ? dim(CORE, 1) : identity(ring.hue, STRENGTH[1]);
+  context.fill();
+
+  // The crossing: where the hand cuts this ring. The gap between it and the dot
+  // is the grade, and it is drawn rather than said.
+  const hand = compass.hand!;
+  context.beginPath();
+  context.arc(
+    compass.x + Math.cos(hand) * ring.radius,
+    compass.y + Math.sin(hand) * ring.radius,
+    CROSSING_RADIUS,
+    0,
+    Math.PI * 2,
+  );
+  context.fillStyle = dim(CORE, STRENGTH[ring.energy]);
+  context.fill();
+}
+
+/** How close the best-aimed window is, from 0 to 1 — what the hand brightens on. */
+function closest(compass: CompassView): number {
+  let best = 0;
+  for (const ring of compass.rings) best = Math.max(best, ring.aim);
+  return best;
+}
+
+/**
+ * How bright the hand is before any aim has closed.
+ *
+ * **An opening position.** Spec 00 §6 has the hand *"thickening and brightening
+ * as aim closes"* and states neither end; this is the floor, and the rest of the
+ * range is the aim itself.
+ */
+const HAND_AT_REST = 0.35;
+
 /**
  * A sighting — spec [03 · §6](../../docs/spec/03-hud.md), a dot on the edge of
  * the picture in the body's own hue.
@@ -398,6 +529,8 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
     const reach = body.radius + Math.max(FLOOR_GAP, body.bloom);
     if (distance <= half + reach) drawBody(context, body);
   }
+
+  if (view.compass !== null) drawCompass(context, view.compass);
 
   if (view.flash !== null) drawFlash(context, view.flash);
 

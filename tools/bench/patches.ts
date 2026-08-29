@@ -133,6 +133,35 @@ export function lockOf(sim: SimState): number {
     why: 'spec 04 §2 says brighter with mass and states neither end',
   },
 
+  // Spec 00 §6's compass. Every one of these is a number the spec leaves to the
+  // picture, except the ring count — which is measured, and worth flying to see
+  // whether four reads as four.
+  settable('src/sim/compass.ts', 'RINGS', 'measured at four over 342 conversions, not chosen'),
+  settable('src/state/compass.ts', 'RING_GAP', 'spec 00 §6 stacks rings and states no spacing'),
+  {
+    file: 'src/render/index.ts',
+    find: 'const WINDOW_WIDTH = 3 * BOARD_PIXEL;',
+    replace: 'export let WINDOW_WIDTH = 3 * BOARD_PIXEL;',
+    append:
+      '\nexport function set_WINDOW_WIDTH(value: number): void {\n  WINDOW_WIDTH = value;\n}\n',
+    why: 'how heavy an arc is, which is the first thing the eye finds',
+  },
+  {
+    file: 'src/render/index.ts',
+    find: 'const DOT_RADIUS = 3 * BOARD_PIXEL;',
+    replace: 'export let DOT_RADIUS = 3 * BOARD_PIXEL;',
+    append: '\nexport function set_DOT_RADIUS(value: number): void {\n  DOT_RADIUS = value;\n}\n',
+    why: 'the perfect release, and the only mark the hand has to land on',
+  },
+  {
+    file: 'src/render/index.ts',
+    find: 'const HAND_AT_REST = 0.35;',
+    replace: 'export let HAND_AT_REST = 0.35;',
+    append:
+      '\nexport function set_HAND_AT_REST(value: number): void {\n  HAND_AT_REST = value;\n}\n',
+    why: 'spec 00 §6 brightens the hand as aim closes and states neither end',
+  },
+
   {
     // Spec 00 §7's ruling: the width is the contract and the height flexes.
     // Built today as the whole rectangle fitted; M3.1 changes it. Both readings

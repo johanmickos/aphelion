@@ -43,6 +43,7 @@ function view(x: number, y: number, heading: number): PresentationState {
     corridor: { centreline: 585, halfWidth: 1111.5 },
     flash: null,
     sightings: [],
+    compass: null,
   };
 }
 

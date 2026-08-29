@@ -231,6 +231,90 @@ already said so.
 **Acceptance**: grading is computed in the simulation, is deterministic, and a recipe replays
 to identical tiers. **Verify**: `pnpm test`.
 
+### Done, 2026-08-28
+
+**The compass is a fact the world can be asked for, and two of this game's own rules are what
+make the question answerable.** A **coasting craft feels nothing, from anything, at any
+distance** (spec [01 · §2](../spec/01-swing.md)), so a release is not a trajectory to integrate
+— it is a straight ray, and where it goes is a line-and-circle problem. And **the nose points
+along the exit tangent for the whole orbit**, so the release *angle is the aim*, with nothing
+else to steer by. That is why the instrument can be drawn on the orbit path: the path and the
+aim are the same coordinate, which is spec [01 · §11](../spec/01-swing.md)'s tension in one
+sentence — the **envelope** is a shape in time, the **window** is a shape in angle, and hitting
+both means shaping the dive so they arrive together.
+
+So a window is **where you actually end up**: every release angle is answered with one body, the
+first whose grab range the ray enters, and a window is the arc of angles answered with the same
+one. The windows therefore partition the orbit instead of overlapping it, a body hiding behind a
+nearer body gets no window at all, and every arc is a promise the press will keep, because the
+range it is measured against is [`grab.ts`](../../src/sim/grab.ts)'s own. **The width is earned
+rather than assigned**, which is what makes spec 00 §6's *"the arc's width is the posted odds"*
+true instead of asserted.
+
+**Two readings were built and rejected, and both failed loudly enough to be worth recording.**
+
+| Reading | What it drew | Why it is wrong |
+|---|---|---|
+| The ray passes within grab range, unbounded | **23 rings** | The median body is on offer from 1 680 design units, so a line up a corridor eventually passes near everything in it |
+| The first body whose range the ray *enters* | **one 360° window** | A craft on its orbit is routinely already inside a neighbour's range, so that neighbour answered every angle. Asking where the ray gets **nearest** instead makes flying away from a body you are standing beside a release that does not arrive at it — which is what it is |
+
+**How far the ray is traced is not an invented number.** Spec 00 §6 says *"one ring per
+**reachable** body"* and does not say what reachable is — the same hole spec
+[03 · §6](../spec/03-hud.md) records for sightings and spec [17](../spec/17-daily-field.md)'s to
+fill. Rather than pick a distance, the ray is traced **exactly as far as the craft could
+survive**: it stops where spec [01 · §10](../spec/01-swing.md)'s own endings stop it — outside
+the corridor, past its foot, or below the fell-behind line. A window past that is a promise the
+field itself breaks.
+
+**And the ring count is measured.** Left open, the geometry offers ten to sixteen rings at once,
+which is not an instrument. Over 120 pilot runs and **342 releases that reached another body**,
+the body the craft actually grabs next is among the **four** nearest to the one it just left
+**100%** of the time — 99.7% at three, 92.7% at two, 68.1% at one. Four is where the cohort runs
+out, and it is close to what Direction 01's board draws. They are ordered **nearest first and
+not best-aimed**, because a stack sorted by aim would reshuffle its own radii every tick and the
+distance between two bodies never changes. The cohort is the headless pilot's and is a stand-in
+until recorded play replaces it (spec [01 · §13.7](../spec/01-swing.md)).
+
+**The rings breathe, and that is the point.** The innermost is the craft's *own* radius, so the
+crossing on it is the craft and the trail behind it lies on the path actually flown; through the
+settle the whole stack swings with the oval. Spec 00 §6's rings are circles and an orbit
+mid-settle is not one, and the craft's radius is the only anchor that keeps the trail and the
+innermost ring the same line.
+
+**Two things the specs say that this step could not build, recorded rather than invented.**
+
+- **The label.** Spec 00 §6 puts *"a chip at its window's tip"* on every ring, and spec
+  [04 · §5](../spec/04-bodies.md) rules that in a run an address chip appears in **exactly one
+  case** — two live targets too close in hue to tell apart. The board's `P11` chips are retired
+  and a body is named by hue in the run, so a label that is not an address has nothing left to
+  say. **One of the two is stale and the specs do not say which.** Nothing is drawn, and the
+  collision rule that goes with it (*"if two window tips come within 12°, the outer label slides
+  along its own ring"*) is unbuilt with it.
+- **The word `ghost`.** Spec 00 §6 calls the mark where the hand cuts a ring a *ghost*;
+  `CONTEXT.md` spends that word on **a recipe played back beside a live run**. One word for two
+  things is the fork [AGENTS.md](../../AGENTS.md) §2 exists to stop, and this milestone's own
+  brief already writes *"the crossing dots"* — so **crossing** is the word, and the glossary now
+  says so on both entries.
+
+**What flying it found, beyond the picture.** Spec [06 · §2](../spec/06-awards.md)'s **1.5°
+floor** under the PERFECT zone is absolute while every other zone is a fraction, so the narrower
+the window the larger a share of it pays the top word: **42%** at the fixture field's p10 width
+of 7.2°, against **16%** at 40°, and *all* of a window under 3°. That is spec 00 §6's own
+*"automatically a better-paid one"* as a mechanism rather than a defect, and it is worth seeing
+before M4 prices it. Graded against the pilot's own 351 releases the compass calls **77% of them
+misses** — which is not a verdict on the pilot but the same finding the M1 gate recorded from the
+other side: *"the split inverted because half of the decision is missing"*, and the pilot has no
+compass either.
+
+**509 tests, 46 files.** The load-bearing one runs the whole instrument through `stepSim`: hold
+until the hand reaches a dot, let go, coast, and assert the craft **arrives within that body's
+grab range** — nothing read back from the compass's own arithmetic, because an instrument that
+is merely self-consistent would draw a beautiful arc for a body the craft cannot reach and
+nothing would fail. Spec 06's four zone boundaries are asserted exactly and from both sides,
+with its own worked examples (`W = 15°` → 1.5°, `W = 40°` → 3.2°) written as the spec writes
+them. `SIM_VERSION` did not move: the compass is asked *of* a state and never writes to one, and
+a test holds it to that. The bench grew a fifth card.
+
 ---
 
 ## M2.4 · The release — 400ms

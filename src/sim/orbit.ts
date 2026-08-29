@@ -142,6 +142,25 @@ function phaseAt(orbit: Orbit, mass: number, ticks: number): number {
 }
 
 /**
+ * Where the orbit path is at `angle` about the body, at the shape it has **now**.
+ *
+ * The compass is drawn on the orbit path (spec
+ * [00 · §6](../../docs/spec/00-tokens.md)), so something outside this file has
+ * to be able to ask where that path is at an angle the craft is not at. It is
+ * exported from here rather than recomputed there because the ellipse is one
+ * thing: a second copy of it would be a compass drawn on a path the craft is not
+ * on, and the settle rounds the shape every tick, so the two would agree at rest
+ * and disagree exactly when it mattered.
+ */
+export function pathRadiusAt(orbit: Orbit, angle: number): number {
+  return radiusAt(
+    orbit,
+    eccentricityAt(orbit, orbit.ticksSinceFreeze),
+    angle - orbit.periapsisAngle,
+  );
+}
+
+/**
  * Hand the craft from integrated gravity onto a fixed orbit.
  *
  * The craft does not move: spec 01 §6 fixes *"an ellipse through the craft's

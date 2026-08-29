@@ -31,6 +31,8 @@ import * as cameraKnobs from './src/state/camera.ts';
 import * as curve from './src/state/decay.ts';
 import * as shape from './src/state/deformation.ts';
 import * as lamp from './src/state/body.ts';
+import * as arcs from './src/sim/compass.ts';
+import * as instrument from './src/state/compass.ts';
 import * as light from './src/state/energy.ts';
 import * as mark from './src/state/sighting.ts';
 import * as view from './src/render/index.ts';
@@ -60,7 +62,7 @@ interface Knob {
   /** Physics knobs change what a run *is*, so the run starts again. */
   readonly restarts: boolean;
   /** Which card it sits under. Only the first of the three restarts a run. */
-  readonly group: 'physics' | 'camera' | 'light' | 'bodies';
+  readonly group: 'physics' | 'camera' | 'light' | 'bodies' | 'compass';
   readonly places: number;
 }
 
@@ -365,6 +367,71 @@ const KNOBS: Knob[] = [
     group: 'light',
     places: 2,
   },
+  {
+    id: 'rings',
+    label: 'Rings',
+    what: 'how many bodies get one. Spec 00 §6 says “one per reachable body” and does not say what reachable is; four is measured — over 342 releases that converted, the body actually grabbed next was among the four nearest 100% of the time',
+    min: 1,
+    max: 10,
+    step: 1,
+    base: arcs.RINGS,
+    apply: arcs.set_RINGS,
+    restarts: false,
+    group: 'compass',
+    places: 0,
+  },
+  {
+    id: 'ringgap',
+    label: 'Ring spacing',
+    what: 'design units between rings. Far enough apart to tell four arcs apart, near enough that the outermost is still the same instrument',
+    min: 12,
+    max: 240,
+    step: 6,
+    base: instrument.RING_GAP,
+    apply: instrument.set_RING_GAP,
+    restarts: false,
+    group: 'compass',
+    places: 0,
+  },
+  {
+    id: 'windowweight',
+    label: 'Window weight',
+    what: 'how heavy an arc is, in design units. The first thing the eye finds, and the thing that says which body a release goes to',
+    min: 1.5,
+    max: 30,
+    step: 1.5,
+    base: view.WINDOW_WIDTH,
+    apply: view.set_WINDOW_WIDTH,
+    restarts: false,
+    group: 'compass',
+    places: 1,
+  },
+  {
+    id: 'dot',
+    label: 'The dot',
+    what: 'a perfect release, in design units. The only mark the hand has to land on, and it goes CORE white when it is matched',
+    min: 1.5,
+    max: 30,
+    step: 1.5,
+    base: view.DOT_RADIUS,
+    apply: view.set_DOT_RADIUS,
+    restarts: false,
+    group: 'compass',
+    places: 1,
+  },
+  {
+    id: 'handrest',
+    label: 'Hand, at rest',
+    what: 'how bright the hand is before any aim has closed. Spec 00 §6 has it brightening as aim closes and states neither end; this is the floor',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    base: view.HAND_AT_REST,
+    apply: view.set_HAND_AT_REST,
+    restarts: false,
+    group: 'compass',
+    places: 2,
+  },
 ];
 
 /**
@@ -611,7 +678,7 @@ function renderKnobs(): void {
   // again and the recipe still describes it; everything below it changes only
   // the picture, and presentation state converges (ADR-0015), so it lands live
   // on the swing already in the air.
-  for (const group of ['physics', 'camera', 'light', 'bodies'] as const) {
+  for (const group of ['physics', 'camera', 'light', 'bodies', 'compass'] as const) {
     byId(`knobs-${group}`).innerHTML = markup(KNOBS.filter((knob) => knob.group === group));
   }
 
