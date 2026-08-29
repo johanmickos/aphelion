@@ -315,12 +315,23 @@ describe('the tide', () => {
     expect(near).toBeLessThanOrEqual(1);
   });
 
-  /** The median body is where the spec's own reference numbers land. */
+  /**
+   * The median body is where the spec's own reference numbers land.
+   *
+   * The tracking is **30** and not §2's stated 6, and the size of that gap is
+   * the taper's doing. The arc peaks on the bearing and fades to nothing at both
+   * ends, so what reads as *the tide* is its bright middle half — and against
+   * that, halving the lag was not enough: *"it seems like we moved the wrong way.
+   * I want the tide to be more directly under the ship"* (author, 2026-08-29).
+   * Measured, the craft is inside the bright core 11% of the time at 12 and
+   * **91%** at 30, where the lag is still a readable p50 2.1°. Ruled by the
+   * author and carried in §2's notice.
+   */
   it('reads spec 04 §2 at the median body', () => {
     const median = createBody(0, 0, MEDIAN_RADIUS);
     expect(pullOf(median)).toBeCloseTo(0.5, 12);
     expect(TIDE_HALF_WIDTH_MAX * pullOf(median)).toBeCloseTo(0.3, 12);
-    expect(TIDE_LAG_RATE_MAX * pullOf(median)).toBeCloseTo(6, 12);
+    expect(TIDE_LAG_RATE_MAX * pullOf(median)).toBeCloseTo(30, 12);
   });
 
   /**

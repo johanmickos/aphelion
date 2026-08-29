@@ -925,6 +925,47 @@ once.
 
 ---
 
+### And the tide became a thing that reaches
+
+Four notes from the same sitting, and the last two corrected the first two — which is worth
+keeping, because the correction is where the measurement was wrong rather than the taste.
+
+**The crossing dots grew a hair.** *"At this size moving that fast they're hard to see."* Two
+board pixels to 2.5. The reason is speed rather than size: the mark sweeps its ring at orbital
+rate, and one that reads while still is not the same mark while moving. It stops short of the
+window's own dot at three, because the window is the target and the crossing is the pointer.
+
+**The tide swells as the craft closes.** It already grew in length and brightness; thickness is the
+third reading of the same distance. The multiplier is the compass window's own — an arc in this
+game that heats also thickens, doubling at full — so no new number was invented. What it swells
+*on* was measured: over a real run the distance reading runs **0.31 → 0.88** across an approach
+while the tide's strength runs 0.42 – 0.63, because strength mixes the body's mass in and a heavy
+body would arrive already thick. That reading is now `CONTEXT.md`'s **closing**, kept apart from
+**grip** — grip falls as 1/r² and is 0.009 at the edge of a hold, so it is the right thing to gate
+a glow on and the wrong thing to draw an approach with. The grab filament had already learned that
+and written the formula out inline; there is one function now.
+
+**Then it tapered, and started at the rim.** *"There's big contrast between the planet's edge ring
+and the tide, and I want the tide to seem like it's roundly growing out of the planet's surface
+towards us."* Drawn as one arc it was a constant-width band with two cut ends, and the cut against
+a much thinner rim was the contrast. It is walked in eleven segments now, thinning to **exactly the
+rim's own width** at both ends and fading out with them — and it starts there too: *"let's have it
+start at the same thickness as the planet surface ring, so that when I first approach I see it as a
+light spot on the surface. When I approach it grows and pulls towards me."* So a distant body shows
+a lit spot on its limb and the band is what closing buys.
+
+**And the lag was measured against the wrong thing, twice.** The first pass halved it — 20.3° to
+9.0° at the median — on the argument that the lag should sit inside the arc's own half-width. Flown:
+*"it seems like we moved the wrong way. I want the tide to be more directly under the ship."* The
+taper is why. The arc no longer burns evenly, so what the eye reads as the tide is its **bright
+middle half**, and against *that* the craft was still inside it only **11%** of the time. At
+`k ≈ 30` the lag is p50 2.1° and the core covers the craft **91%** — and thirty is the last value
+where the lag exists at all: at 45 it is half a degree, and spec 04 §2's *"a heavier body tracks
+tighter"* stops being readable off the picture. **The lesson is the measurement, not the number**:
+a statistic taken against a shape the renderer no longer draws will confirm whatever it is asked to.
+
+---
+
 ## M2.4 · The release — 400ms
 
 Spec `02-release`. The most choreographed moment in the game, and the numbers are pinned:

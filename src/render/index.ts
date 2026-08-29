@@ -124,8 +124,7 @@ const CORE_SHARE = 0.08;
 const TIDE_WIDTH = 4 * BOARD_PIXEL;
 
 /**
- * How much thicker the tide draws as the craft closes, as a multiple of its own
- * width.
+ * How wide the tide grows, as a multiple of spec §1's figure, at the surface.
  *
  * *"I'd love for the tide window to grow in thickness as I approach, too"*
  * (author, 2026-08-29). It already grows in **length** along the limb and in
@@ -144,8 +143,34 @@ const TIDE_WIDTH = 4 * BOARD_PIXEL;
  * runs 0.42 – 0.63 over the same frames. Strength mixes the body's mass into the
  * reading, so a heavy body would arrive already thick and barely move; the
  * distance is the thing that is actually changing while the player closes.
+ *
+ * **And it grows out of the rim rather than arriving with a width of its own.**
+ * *"Let's have it start at the same thickness as the planet surface ring, so
+ * that when I first approach I see it as a light spot on the surface. When I
+ * approach it grows and 'pulls' towards me"* (author, 2026-08-29). So the far end
+ * of the ramp is the body's own edge — at the reach's edge there is no *band* at
+ * all, only a brightening of the limb — and §1's 4px is no longer a constant the
+ * tide has: it is the width it passes through roughly halfway in, on the way from
+ * the rim to twice that.
  */
 const TIDE_SWELL = 1;
+
+/**
+ * How many strokes the tide is drawn in, so that it can **taper**.
+ *
+ * *"Now there's big contrast between the planet's edge ring and the tide, and I
+ * want the tide to seem like it's roundly growing out of the planet's surface
+ * towards us"* (author, 2026-08-29). Drawn as one arc it is a band of constant
+ * width with two cut ends, and the cut is what makes the contrast: a 24-unit
+ * band stops dead against a 7-unit rim.
+ *
+ * Canvas2D cannot vary a stroke's width along a path, so the arc is walked in
+ * segments and each takes its own width and alpha from where it sits. Eleven is
+ * odd on purpose — one segment lands on the bearing, so the peak is the peak
+ * rather than the gap between two — and at this scale each is shorter than it is
+ * wide, so they overlap into one shape rather than reading as beads.
+ */
+const TIDE_SEGMENTS = 11;
 
 /**
  * How faint the lightest tide in the field may be.
@@ -406,17 +431,37 @@ function drawBody(context: CanvasRenderingContext2D, body: BodyView): void {
  * calls them structure without texture — and the thing that tracked is gone.
  */
 function drawTide(context: CanvasRenderingContext2D, body: BodyView, tide: TideView): void {
-  context.beginPath();
-  context.arc(
-    body.x,
-    body.y,
-    body.radius,
-    tide.bearing - tide.halfWidth,
-    tide.bearing + tide.halfWidth,
-  );
-  context.lineWidth = TIDE_WIDTH * (1 + TIDE_SWELL * body.closing);
-  context.strokeStyle = identityLit(body.hue, TIDE_FLOOR + (1 - TIDE_FLOOR) * tide.strength);
-  context.stroke();
+  // **It thins to the rim it grows out of, rather than to nothing.** At the ends
+  // of the arc the tide is exactly as wide as the body's own edge, so there is no
+  // width to step across — it becomes the rim, and the rim carries on round. That
+  // is what turns a band with two cut ends into something emerging from the limb.
+  const rim = LOOK[body.state].rim * BOARD_PIXEL;
+  // From the rim's own width at the edge of the reach to `1 + TIDE_SWELL` times
+  // §1's figure at the surface. Far off there is no band, only a lit spot on the
+  // limb; the band is what closing buys.
+  const peak = rim + (TIDE_WIDTH * (1 + TIDE_SWELL) - rim) * body.closing;
+  const lit = TIDE_FLOOR + (1 - TIDE_FLOOR) * tide.strength;
+  const step = (tide.halfWidth * 2) / TIDE_SEGMENTS;
+
+  context.save();
+  // Round, so consecutive segments blend instead of showing their joins.
+  context.lineCap = 'round';
+  for (let i = 0; i < TIDE_SEGMENTS; i++) {
+    // Where this segment's middle sits across the arc, from −1 to 1.
+    const across = ((i + 0.5) / TIDE_SEGMENTS) * 2 - 1;
+    // A parabola: full in the middle, nothing at the ends, and no corner at the
+    // top — which is the *roundly* in what was asked for.
+    const taper = 1 - across * across;
+    const from = tide.bearing - tide.halfWidth + i * step;
+    context.beginPath();
+    context.arc(body.x, body.y, body.radius, from, from + step);
+    context.lineWidth = rim + (peak - rim) * taper;
+    // The light goes all the way out, so the ends dissolve rather than stopping
+    // at a width the eye can still find.
+    context.strokeStyle = identityLit(body.hue, lit * taper);
+    context.stroke();
+  }
+  context.restore();
 }
 
 /** Spec 00 §6's compass, in board pixels — one grammar of weights for the lot. */

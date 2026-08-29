@@ -127,14 +127,48 @@ export const TIDE_HALF_WIDTH_MAX = 0.6;
 
 /**
  * How fast the tide follows the craft's bearing, in 1/seconds, at the median
- * body — spec 04 §2's `k ≈ 6 /s`, doubled for the same reason.
+ * body.
  *
  * The lag is the behaviour, not a defect in the tracking: spec 04's acceptance
  * asks that a craft orbiting at a constant rate leaves the tide *"lagging by a
  * bounded, non-zero angle"*, so a tide that kept up exactly would be a tide that
  * had stopped saying anything about how heavy the body is.
+ *
+ * **But it was lagging so far that it had stopped facing the craft at all**,
+ * which `CONTEXT.md` says is the one thing a tide does. That was already an open
+ * question against spec [04 · §2](../../docs/spec/04-bodies.md) — measured on a
+ * settled orbit, the standing lag ran wider than the arc's own half-width, so the
+ * tide's near edge never reached the bearing it is supposed to face. Flown,
+ * *"let's have the tide lag a bit less, i.e. follow the ship more closely"*
+ * (author, 2026-08-29), which is that question answered.
+ *
+ * **Five times the stated rate, and the reason it is that much is the taper.**
+ * The arc no longer burns evenly across its width: it peaks on the bearing and
+ * fades to nothing at both ends, so what the eye actually reads as *the tide* is
+ * the **bright middle half** rather than the whole span. Halving the lag against
+ * the full arc was not enough — *"it seems like we moved the wrong way. I want
+ * the tide to be more directly under the ship"* (author, 2026-08-29) — because
+ * the measurement that matters is the one against the bright core.
+ *
+ * Over a real 1 809-tick run, both readings side by side:
+ *
+ * | `k` at the median | lag p50 | p90 | max | inside the bright core |
+ * |---|---|---|---|---|
+ * | 6 (spec 04 §2 as written) | 20.3° | 43.8° | 61.6° | — |
+ * | 12 | 9.0° | 21.9° | 35.1° | **11%** |
+ * | 20 | 4.6° | 11.6° | 20.3° | 71% |
+ * | **30** | **2.1°** | **6.0°** | **11.6°** | **91%** |
+ * | 45 | 0.5° | 2.3° | 5.4° | 100% |
+ *
+ * Thirty is the last row where the lag is still **there**. At 45 it is half a
+ * degree — the acceptance's *non-zero* survives as arithmetic and not as
+ * anything anyone could see, and spec 04 §2's *"a heavier body tracks tighter"*
+ * stops being readable off the picture with it. At 30 the spot sits under the
+ * craft nine times out of ten and a light body still visibly drags: the effective
+ * rate is this times [`pullOf`](#), so a light body tracks at 18/s against a
+ * heavy one's 42.
  */
-export const TIDE_LAG_RATE_MAX = 12;
+export const TIDE_LAG_RATE_MAX = 60;
 
 /**
  * How much of the tide's width is spent on **proximity** rather than on mass.

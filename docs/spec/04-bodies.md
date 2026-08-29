@@ -40,14 +40,44 @@ footer uses obsolete numbering and is void.
 > distance the heavier body has the longer and brighter tide, which is what this section is
 > actually about; distance decides how much of that reach is showing.
 >
-> **§2 · The stated tracking and *"always faces the craft"* cannot both hold, and this is open.**
-> `CONTEXT.md` says the tide always faces the craft; §2 says it follows with a first-order lag at
-> `k ≈ 6 /s`; the acceptance below asks that lag be *"bounded and non-zero"*. Built exactly as
-> written, and measured on a settled orbit, the standing lag is **45.3°** against an arc
-> half-width of 18° — so the tide's near edge sits 27° short of the craft and it never overlaps
-> the bearing it is supposed to face. At this game's settled turn rates (spec 01: p50 3.50°/tick,
-> p90 5.07) the lag is 30 – 46° at the stated `k`, and roughly 15° at `k ≈ 15 /s`. **It is the
-> author's**, and it is on the bench.
+> **§2 · The tracking is `k ≈ 30 /s`, and *"always faces the craft"* is now true enough to be
+> worth saying.** This was open for two days: `CONTEXT.md` says the tide always faces the craft,
+> §2 said `k ≈ 6 /s`, and the acceptance below asks that lag be *"bounded and non-zero"* — and
+> built exactly as written the standing lag ran **wider than the arc's own half-width**, so the
+> near edge never reached the bearing it is supposed to face. Flown, *"let's have the tide lag a
+> bit less, i.e. follow the ship more closely"* (author, 2026-08-29), which settles it.
+>
+>
+> **Five times the stated rate, and the taper is why it is that much.** The arc no longer burns
+> evenly: it peaks on the bearing and fades to nothing at both ends, so what the eye reads as *the
+> tide* is its **bright middle half** and not the whole span. Measured against the full arc,
+> halving the lag looked sufficient and was not — *"it seems like we moved the wrong way, I want
+> the tide to be more directly under the ship"* (author, 2026-08-29). Over a real 1 809-tick run:
+>
+> | `k` at the median | lag p50 | p90 | max | inside the bright core |
+> |---|---|---|---|---|
+> | 6 (as written) | 20.3° | 43.8° | 61.6° | — |
+> | 12 | 9.0° | 21.9° | 35.1° | **11%** |
+> | 20 | 4.6° | 11.6° | 20.3° | 71% |
+> | **30** | **2.1°** | **6.0°** | **11.6°** | **91%** |
+> | 45 | 0.5° | 2.3° | 5.4° | 100% |
+>
+> Thirty is the last row where the lag is still **there**. At 45 it is half a degree: the
+> acceptance's *non-zero* survives as arithmetic and not as anything anyone can see, and §2's *"a
+> heavier body tracks tighter"* stops being readable off the picture with it. At 30 the spot sits
+> under the craft nine times in ten and a light body still visibly drags — the rate is scaled by
+> the body's own pull, so a light one tracks at 18/s against a heavy one's 42. The table below
+> still says 6; this notice is what is true.
+>
+> **§1's 4px is no longer a width the tide has.** *"Let's have it start at the same thickness as
+> the planet surface ring, so that when I first approach I see it as a light spot on the surface.
+> When I approach it grows and 'pulls' towards me"* (author, 2026-08-29). So the band grows out of
+> the body's own edge: at the edge of a reach it **is** the rim, and at the surface it is twice
+> §1's figure, passing through 4px about halfway in. It also tapers **along** its arc, from the
+> peak on the bearing back to the rim's width at both ends, which is what removes the step the
+> author was seeing where a constant-width band stopped dead against a much thinner edge. §1's
+> scale rule is untouched and was the thing checked: at equal approach a body of 20 and one of 120
+> draw the identical band.
 >
 > **§3 · A body glows when it is *gripping*, not when it is reachable.** This table's *"E0–E1"*
 > for AHEAD is read at **E0** until the body is actually pulling — see spec
@@ -95,7 +125,7 @@ The tide is the gravity vector drawn on the thing that owns it.
 |---|---|
 | Position | Centred on the bearing from the body to the craft |
 | Angular half-width | **±0.3 rad** (≈17°) at reference mass; scales with mass — see below |
-| Tracking | Follows the craft's bearing with a first-order lag, coefficient **k ≈ 6 /s** |
+| Tracking | Follows the craft's bearing with a first-order lag, coefficient **k ≈ 6 /s** — ⚠ **ruled to 30** on 2026-08-29, see the notice above |
 | Inner ripple | One stratum ring tracks the tide at **0.6 × k**, at α 0.3 |
 | Range | Present on every body within grab range; absent beyond it |
 

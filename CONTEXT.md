@@ -88,7 +88,11 @@ _Avoid_: proximity (see **grip**), nearness, distance (unqualified — closing i
 The bright limb segment of a body that always faces the craft — gravity drawn at
 close range. It **lags**, and the lag is the point: a heavier body reaches with a longer,
 brighter, tighter-tracking tide, so how hard something pulls is read off the picture rather
-than off a gauge. One of the **strata** follows the same bearing more slowly still.
+than off a gauge. It **grows out of the body's own edge** rather than arriving with a width:
+far off it is the rim, lit; as the craft closes it swells to twice its stated width and
+tapers back into the rim at both ends of its arc, so it reads as reaching rather than as a
+band laid on top. The lag stays visible — p50 2.1° — and small enough that the bright core
+sits under the craft (2026-08-29).
 
 **Anomaly**:
 A stretch of field where the sky itself changes: purple aurora, cloud, different rules.

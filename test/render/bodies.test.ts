@@ -132,8 +132,19 @@ const PAIR_NEAR = 0.4;
 /** The rim is the full circle at exactly the body's radius; the tide is the arc on it. */
 const rimOf = (strokes: Stroke[], radius: number): Stroke =>
   strokes.find((s) => s.sweep === null && Math.abs(s.radius - radius) < 1e-9)!;
+/**
+ * The tide is drawn as a fan of segments so that it can taper, so *the* tide
+ * stroke is the widest of them — the one on the bearing, where the arc peaks.
+ * Everything these tests say about "the tide's width" is about that one.
+ */
 const tideOf = (strokes: Stroke[], radius: number): Stroke =>
-  strokes.find((s) => s.sweep !== null && Math.abs(s.radius - radius) < 1e-9)!;
+  strokes
+    .filter((s) => s.sweep !== null && Math.abs(s.radius - radius) < 1e-9)
+    .reduce((widest, s) => (s.width > widest.width ? s : widest));
+
+/** Every segment of it, in the order they were drawn. */
+const tideFan = (strokes: Stroke[], radius: number): Stroke[] =>
+  strokes.filter((s) => s.sweep !== null && Math.abs(s.radius - radius) < 1e-9);
 
 describe('a body’s anatomy', () => {
   const small = 20;
@@ -188,14 +199,23 @@ describe('a body’s anatomy', () => {
    * value where the reach begins. That measures the renderer's output rather
    * than restating its constants.
    */
-  it('uses spec 04 §1’s 2.25px rim, and a 4px tide where a reach begins', () => {
+  it('uses spec 04 §1’s 2.25px rim, and grows the tide out of it', () => {
     const strokes = strokesFor(MEDIAN_RADIUS);
-    expect(rimOf(strokes, MEDIAN_RADIUS).width).toBeCloseTo(2.25 * BOARD_PIXEL, 9);
+    const rim = rimOf(strokes, MEDIAN_RADIUS).width;
+    expect(rim).toBeCloseTo(2.25 * BOARD_PIXEL, 9);
 
+    // *"Start at the same thickness as the planet surface ring, so that when I
+    // first approach I see it as a light spot on the surface"* (author,
+    // 2026-08-29). The edge of a reach is off screen and cannot be drawn, so the
+    // claim is checked where it is checkable: the line two drawn widths sit on,
+    // read back to where the reach begins, **is the rim**.
     const far = tideOf(strokesFor(MEDIAN_RADIUS, FAR), MEDIAN_RADIUS).width;
     const near = tideOf(strokesFor(MEDIAN_RADIUS, NEAR), MEDIAN_RADIUS).width;
     const perClosing = (near - far) / (NEAR - FAR);
-    expect(far - perClosing * FAR).toBeCloseTo(4 * BOARD_PIXEL, 9);
+    expect(far - perClosing * FAR).toBeCloseTo(rim, 9);
+
+    // And at the surface it is twice §1's figure — the other end of the same line.
+    expect(far + perClosing * (1 - FAR)).toBeCloseTo(8 * BOARD_PIXEL, 9);
   });
 
   /**
@@ -209,13 +229,46 @@ describe('a body’s anatomy', () => {
    * anyway — 40% of the way in is 40% thicker, which is the compass window's own
    * grammar and pins `TIDE_SWELL` at one.
    */
-  it('thickens as the craft closes, on the window’s own ramp', () => {
-    const far = tideOf(strokesFor(MEDIAN_RADIUS, FAR), MEDIAN_RADIUS).width;
-    const near = tideOf(strokesFor(MEDIAN_RADIUS, NEAR), MEDIAN_RADIUS).width;
-    expect(near).toBeGreaterThan(far);
-    // The window's grammar is `1 + aim`, doubling at full; the tide takes the
-    // same slope against how far the craft has closed.
-    expect(near / far).toBeCloseTo((1 + NEAR) / (1 + FAR), 9);
+  /**
+   * *"I want the tide to seem like it's roundly growing out of the planet's
+   * surface towards us"* (author, 2026-08-29). Drawn as one arc it was a band of
+   * constant width with two cut ends, and the cut against the much thinner rim
+   * was the contrast being complained about.
+   */
+  it('tapers to the rim’s own width at its ends, and fades out with it', () => {
+    const fan = tideFan(strokesFor(MEDIAN_RADIUS), MEDIAN_RADIUS);
+    const rim = rimOf(strokesFor(MEDIAN_RADIUS), MEDIAN_RADIUS);
+    expect(fan.length).toBeGreaterThan(1);
+
+    // Widest in the middle and thinnest at both ends — a shape, not a ramp.
+    const widths = fan.map((s) => s.width);
+    const peak = widths.indexOf(Math.max(...widths));
+    expect(peak).toBeGreaterThan(0);
+    expect(peak).toBeLessThan(widths.length - 1);
+    for (let i = 1; i <= peak; i++) expect(widths[i]!).toBeGreaterThan(widths[i - 1]!);
+    for (let i = peak + 1; i < widths.length; i++) {
+      expect(widths[i]!).toBeLessThan(widths[i - 1]!);
+    }
+
+    // **It never goes under the rim it grows out of**, which is the whole point:
+    // there is no width to step across where the tide ends and the edge carries on.
+    for (const width of widths) expect(width).toBeGreaterThanOrEqual(rim.width);
+
+    // And the ends are all but out, so nothing stops at a brightness the eye can
+    // still find.
+    const alpha = (style: string): number => Number(style.split('/')[1]!.replace(')', ''));
+    expect(alpha(fan[0]!.style)).toBeLessThan(alpha(fan[peak]!.style) * 0.25);
+    expect(alpha(fan.at(-1)!.style)).toBeLessThan(alpha(fan[peak]!.style) * 0.25);
+  });
+
+  it('thickens as the craft closes, and is a straight line in it', () => {
+    const widths = [FAR, (FAR + NEAR) / 2, NEAR].map(
+      (closing) => tideOf(strokesFor(MEDIAN_RADIUS, closing), MEDIAN_RADIUS).width,
+    );
+    expect(widths[1]!).toBeGreaterThan(widths[0]!);
+    expect(widths[2]!).toBeGreaterThan(widths[1]!);
+    // Evenly, so there is no distance at which it lurches.
+    expect(widths[1]! - widths[0]!).toBeCloseTo(widths[2]! - widths[1]!, 9);
   });
 
   /**
