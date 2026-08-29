@@ -154,7 +154,10 @@ describe('presentation state', () => {
       'bloom',
       'energy',
       'held',
+      'hue',
       'radius',
+      'state',
+      'tide',
       'x',
       'y',
     ]);

@@ -134,6 +134,87 @@ written down because an ordering nobody wrote down is an ordering that gets swap
 the tide tracks with lag; hue generation obeys the exclusion rule; a body on screen has no sighting
 and one behind the climb has none. **Verify**: `pnpm test` plus eyes.
 
+### Done, 2026-08-28
+
+**A hue is a name, so it is generated a layer below the paint.** Spec 00 §2 fixes the lightness
+and the chroma *"so that every identity is equally loud"*, which leaves exactly one free
+coordinate — and that one is a **number on presentation state**, derived per tick from the
+body's address. It has to be: *"two live targets too close in hue to tell apart"* is spec 04
+§5's one reason to print an address, and that is a fact about the field that no test could
+reach if the hue were chosen inside a `fillStyle`.
+
+**The step is the golden section of what the reserved ranges leave**, and that is the one real
+decision in this step. Spec 00 §2 closes four windows and stops generated blues short of
+AURORA, leaving three arcs totalling **167.3°** to fit a day's forty bodies into at ≥50°
+between neighbours. Measured over 200 addresses the golden step gives **63.9°** between
+neighbours, 39.5° two apart, 24.4° three apart, and **40 distinct hues** in a day. A step
+*tuned* to this arc beats it on neighbours — 106.9° at a stride of 66.94 — and does it by
+sitting a hair off `2/5` of the arc, which collapses to **six** repeating hues the moment the
+arc changes length. §2a's colour-vision sweep is flagged to change exactly that length, so the
+tuned step is a number that would quietly stop working and the golden one is not.
+
+**One reading is recorded rather than assumed.** Spec 00 §2's four windows, read strictly,
+leave **315.5 – 337.7** open: a magenta shoulder on ION's own window, in the one hue the world
+reserves for risk. This milestone's own brief describes the rule as excluding *"the violet–pink
+band"*, and that is the reading taken — the range is shut in
+[`hues.ts`](../../src/state/hues.ts) with the argument beside it. **And flying it found the
+other end of the same question**: an identity generated just above 17.7 reads as a soft salmon
+at this lightness and chroma, which is close enough to ION that it is worth the sweep's
+attention. It is not fixed here, because §2a *"has authority over every hue value and every
+separation number in this spec"* and this is one.
+
+**The tide's three numbers are one number.** §2 requires that a heavier body reach with a
+longer, brighter, tighter-tracking tide and that *"the three must move together and
+monotonically with mass"* — a promise three separate formulas break silently the first time one
+is edited. All three are readings of `pullOf`, which is `m / (m + median)`: strictly monotone,
+bounded, and exactly a half at the median body, so §2's stated reference values fall out of it
+rather than being written twice. **The saturation is not a flourish**: an arc lives on a circle,
+and a law with no ceiling eventually draws a body whose tide is a ring. The curve between the
+reference point and the ceiling is an **opening position** — §2 states the direction and the
+reference and not the law — and it is on the bench.
+
+**SPENT is the first memory in this layer that never converges, and it is named rather than
+smuggled.** ADR-0015's third rule is that every carried value eases toward something the
+current tick determines; a spent body stays spent for the run, because *"a field of spent
+bodies behind the craft is the run's scoreboard, drawn in the world."* The rule does not reach
+it, and the reason is the shape of the failure the rule guards against: **an eased value is a
+feedback loop** — computed from itself every tick, so a wrong tick feeds the next one — while a
+latched event flag is never an input to its own next value and has no path by which it drifts.
+It can only be wrong from the start, which is the same exposure the recipe has. It is stored as
+the previous tick's `state`, so a body's state lives in exactly one place. **This is worth the
+author's eye**, because it is a genuine widening of what ADR-0015 contemplates and the ADR does
+not say so yet.
+
+**Sightings are pinned to the design space, and that is a decision.** *"Off the picture"* has to
+mean *outside the design space* rather than outside the buffer, because a device shows the
+design space plus whatever bleed its shape allows and presentation state must not know that —
+ADR-0006's promise stops being true the moment the count of marks depends on a viewport. So the
+marks sit on the design space's own edge, in **design-space coordinates**, alone among the
+positions in this layer. The cost is stated: a wide desktop window can show a body in the bleed
+*and* a mark for it. A world position would also shimmer, because the renderer interpolates the
+camera between ticks and the mark would slide against the edge it is pinned to.
+
+Three rules decide which bodies get one. Two are §6's — not on screen, not behind the climb —
+and the third is derived rather than invented: **a spent body has none**, because §6 draws the
+mark in the body's identity hue and spec 04 §3 says a spent body's lamp is out. There is no
+fourth, because *"reach is not yet a number"*: §6 defers it to spec 17 and draws every body
+ahead until then. **They never land under the thumb line** and are not clamped to avoid it — a
+body ahead of the climb cannot be far enough below the camera to put a mark there, and the test
+holds the geometry to it rather than the arithmetic.
+
+**The palette lint got stronger on the way past.** Identity is the one colour in the game that
+is *built* rather than named, so it arrives as a template — and the lint only scanned plain
+strings, which meant any file in the render layer could have assembled a colour out of
+`` `oklch(${…})` `` and passed. It scans template pieces now, and `palette.ts` is still the only
+file allowed to write one down.
+
+**476 tests, 43 files.** Spec 04's acceptance is asserted without a canvas — the four-state
+journey over the run `pnpm replay` ships, the E2-at-grab and E0-at-release ticks exactly, the
+tide's lag bounded and non-zero through a settled orbit — and §1's *"radius 20 and radius 200
+produce identical stroke widths"* is asserted against a context that records what it was asked
+to draw. The bench grew a fourth card. `CONTEXT.md` gained **strata** and **spent**, **body**
+gained its four states, and **tide** gained the sentence that the lag is the point.
+
 ---
 
 ## M2.3 · The compass

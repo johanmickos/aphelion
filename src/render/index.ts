@@ -36,10 +36,18 @@
  * rest — it says it in brightness, which §3 makes the only ordinal channel in
  * the game.
  */
-import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
-import type { BodyView, Energy, FlashView, PresentationState } from '../state/types.ts';
+import { BOARD_PIXEL, DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
+import type {
+  BodyState,
+  BodyView,
+  Energy,
+  FlashView,
+  PresentationState,
+  SightingView,
+  TideView,
+} from '../state/types.ts';
 import { letterbox, visible } from './letterbox.ts';
-import { BODY_FILL, CORE, dim, DUSK, VOID } from './palette.ts';
+import { BODY_FILL, CORE, dim, DUSK, identity, identityLit, VOID } from './palette.ts';
 
 /**
  * How far above a body's surface its floor sits, in design units.
@@ -54,9 +62,75 @@ import { BODY_FILL, CORE, dim, DUSK, VOID } from './palette.ts';
  */
 const FLOOR_GAP = 36;
 
-/** The rim of a body at rest, and the rim of one that has the craft. */
-const RIM_AT_REST = 0.35;
-const RIM_HELD = 1;
+/**
+ * How a body is painted in each of its four states — spec
+ * [04 · §3](../../docs/spec/04-bodies.md)'s table, transcribed.
+ *
+ * `rim` is in **board pixels** because §1's scale rule is written in them and is
+ * the point: *"rim 2.5px and tide 4px are constant in design px regardless of
+ * body radius"*, so small bodies read as bright rings and giants as thin
+ * luminous horizons. Everything else here is an alpha.
+ *
+ * AHEAD's rim width is §1's base, because §3 gives a width for the other three
+ * and not for it. `RIM_AT_REST` is that state's strength and is the number the
+ * author asked to be able to move — *"how legible a body at rest is"* — which
+ * §3 now answers at 40%.
+ */
+const RIM_AT_REST = 0.4;
+
+interface Look {
+  /** Rim stroke width, in board pixels (§1's scale rule). */
+  readonly rim: number;
+  readonly rimStrength: number;
+  /** The outer stratum's alpha; the inner takes §1's ratio of it. */
+  readonly strata: number;
+  readonly core: number;
+}
+
+const LOOK: Readonly<Record<BodyState, Look>> = {
+  AHEAD: { rim: 2.5, rimStrength: RIM_AT_REST, strata: 0.1, core: 0.3 },
+  IN_REACH: { rim: 2.25, rimStrength: 0.85, strata: 0.18, core: 0.5 },
+  HELD: { rim: 2.5, rimStrength: 1, strata: 0.3, core: 0.8 },
+  SPENT: { rim: 1.5, rimStrength: 0.5, strata: 0.14, core: 0.5 },
+};
+
+/**
+ * Where the strata sit, as fractions of the radius, and how much of the state's
+ * alpha each takes — spec 04 §1's 0.68r and 0.39r at α 0.22 and 0.14.
+ *
+ * §1 gives the pair absolute alphas and §3 gives the state one; the state's is
+ * what varies, so it is taken as the outer ring's and the inner keeps §1's ratio
+ * to it. That way the two rings stay a pair through all four states.
+ */
+const STRATA: ReadonlyArray<readonly [at: number, share: number]> = [
+  [0.68, 1],
+  [0.39, 0.14 / 0.22],
+];
+
+/** Spec 04 §1's core: a filled dot at 0.08 × the body's radius. The type slot. */
+const CORE_SHARE = 0.08;
+
+/** Spec 04 §1's tide: 4 board pixels, constant whatever the body's radius. */
+const TIDE_WIDTH = 4 * BOARD_PIXEL;
+
+/**
+ * How faint the lightest tide in the field may be.
+ *
+ * **An opening position.** Spec 04 §2 rules that a heavier body's tide is
+ * *brighter* and states no number for either end, so what is fixed here is only
+ * the floor; the rest of the range is the body's own mass, read straight off
+ * [`TideView.strength`](../state/types.ts).
+ */
+const TIDE_FLOOR = 0.4;
+
+/** Spec 04 §2's inner ripple, at α 0.3. */
+const RIPPLE_STRENGTH = 0.3;
+
+/** Strata and the spent core are hairlines: one board pixel. */
+const STRATUM_WIDTH = BOARD_PIXEL;
+
+/** The floor ring, which is developer scaffolding rather than composition. */
+const FLOOR_WIDTH = 1.5;
 
 /**
  * How strongly each energy step is painted — spec
@@ -91,18 +165,28 @@ function bloom(
   y: number,
   from: number,
   radius: number,
-  token: string,
+  paint: (strength: number) => string,
   strength: number,
 ): void {
   if (radius <= 0 || strength <= 0) return;
   const gradient = context.createRadialGradient(x, y, from, x, y, from + radius);
-  gradient.addColorStop(0, dim(token, strength));
-  gradient.addColorStop(1, dim(token, 0));
+  gradient.addColorStop(0, paint(strength));
+  gradient.addColorStop(1, paint(0));
   context.fillStyle = gradient;
   context.beginPath();
   context.arc(x, y, from + radius, 0, Math.PI * 2);
   context.fill();
 }
+
+/** The two ways a thing in this game is coloured: a palette token, or a body's own hue. */
+const inToken =
+  (token: string) =>
+  (strength: number): string =>
+    dim(token, strength);
+const inHue =
+  (hue: number) =>
+  (strength: number): string =>
+    identity(hue, strength);
 
 /**
  * The one E3 — spec 00 §3's *"48px, additive, 400ms decay"*.
@@ -115,7 +199,7 @@ function bloom(
 function drawFlash(context: CanvasRenderingContext2D, flash: FlashView): void {
   context.save();
   context.globalCompositeOperation = 'lighter';
-  bloom(context, flash.x, flash.y, 0, flash.radius, CORE, STRENGTH[3]);
+  bloom(context, flash.x, flash.y, 0, flash.radius, inToken(CORE), STRENGTH[3]);
   context.restore();
 }
 
@@ -137,23 +221,139 @@ function craftPath(context: CanvasRenderingContext2D): void {
   context.closePath();
 }
 
+/**
+ * A body — spec [04 · §1](../../docs/spec/04-bodies.md)'s anatomy, in the order
+ * it is lit.
+ *
+ * *"A body is a lamp, not a rock: flat vector anatomy that emits its own
+ * identity. No gradients, no terminator, no implied depth."* The disc is the one
+ * surface that is not the identity hue, and it is `BODY_FILL` because §1 rules
+ * it *"never brighter than the craft"*.
+ *
+ * The rim and the tide are **constant in design units regardless of radius**
+ * (§1's scale rule), so a small body reads as a bright ring and a giant as a
+ * thin luminous horizon. Everything else in here is a fraction of the radius.
+ */
 function drawBody(context: CanvasRenderingContext2D, body: BodyView): void {
-  bloom(context, body.x, body.y, body.radius, body.bloom, DUSK, STRENGTH[body.energy]);
+  const look = LOOK[body.state];
+  const spent = body.state === 'SPENT';
+  const paint = (strength: number): string =>
+    spent ? dim(DUSK, strength) : identity(body.hue, strength);
+
+  bloom(
+    context,
+    body.x,
+    body.y,
+    body.radius,
+    body.bloom,
+    spent ? inToken(DUSK) : inHue(body.hue),
+    STRENGTH[body.energy],
+  );
 
   context.beginPath();
   context.arc(body.x, body.y, body.radius, 0, Math.PI * 2);
   context.fillStyle = BODY_FILL;
   context.fill();
-  context.lineWidth = 3;
-  context.strokeStyle = dim(DUSK, body.held ? RIM_HELD : RIM_AT_REST);
+
+  // Strata — concentric internal rings, "structure without texture" (§1). The
+  // outer takes the state's own alpha and the inner is the ratio §1 states
+  // between the two, so the pair stays a pair however the state moves.
+  for (const [at, share] of STRATA) {
+    context.beginPath();
+    context.arc(body.x, body.y, body.radius * at, 0, Math.PI * 2);
+    context.lineWidth = STRATUM_WIDTH;
+    context.strokeStyle = paint(look.strata * share);
+    context.stroke();
+  }
+
+  context.beginPath();
+  context.arc(body.x, body.y, body.radius, 0, Math.PI * 2);
+  context.lineWidth = look.rim * BOARD_PIXEL;
+  context.strokeStyle = paint(look.rimStrength);
   context.stroke();
+
+  if (body.tide !== null) drawTide(context, body, body.tide);
+
+  // The core is the type slot (§4). Only STANDARD ships, so it is a filled dot —
+  // except on a spent body, where §3 hollows it out and the lamp is out.
+  context.beginPath();
+  context.arc(body.x, body.y, body.radius * CORE_SHARE, 0, Math.PI * 2);
+  if (spent) {
+    context.lineWidth = STRATUM_WIDTH;
+    context.strokeStyle = dim(DUSK, look.core);
+    context.stroke();
+  } else {
+    context.fillStyle = paint(look.core);
+    context.fill();
+  }
 
   if (!body.held) return;
   context.beginPath();
   context.arc(body.x, body.y, body.radius + FLOOR_GAP, 0, Math.PI * 2);
-  context.lineWidth = 1.5;
+  context.lineWidth = FLOOR_WIDTH;
   context.strokeStyle = dim(DUSK, 0.28);
   context.stroke();
+}
+
+/**
+ * The tide — spec [04 · §2](../../docs/spec/04-bodies.md), *"the gravity vector
+ * drawn on the thing that owns it."*
+ *
+ * An arc on the rim centred on the bearing presentation state carries, which is
+ * already behind the craft: the lag is derived once per tick and this only
+ * paints it. Its width and its strength are the same body's mass read twice, so
+ * a heavier body reaches with a longer and brighter tide without this file
+ * knowing what mass is.
+ *
+ * The **ripple** is §2's second sentence — one stratum tracking the same bearing
+ * more slowly still, so the body's inside is visibly behind its own limb.
+ */
+function drawTide(context: CanvasRenderingContext2D, body: BodyView, tide: TideView): void {
+  context.beginPath();
+  context.arc(
+    body.x,
+    body.y,
+    body.radius,
+    tide.bearing - tide.halfWidth,
+    tide.bearing + tide.halfWidth,
+  );
+  context.lineWidth = TIDE_WIDTH;
+  context.strokeStyle = identityLit(body.hue, TIDE_FLOOR + (1 - TIDE_FLOOR) * tide.strength);
+  context.stroke();
+
+  const [inner] = STRATA[1]!;
+  context.beginPath();
+  context.arc(
+    body.x,
+    body.y,
+    body.radius * inner,
+    tide.ripple - tide.halfWidth,
+    tide.ripple + tide.halfWidth,
+  );
+  context.lineWidth = STRATUM_WIDTH;
+  context.strokeStyle = identityLit(body.hue, RIPPLE_STRENGTH);
+  context.stroke();
+}
+
+/**
+ * A sighting — spec [03 · §6](../../docs/spec/03-hud.md), a dot on the edge of
+ * the picture in the body's own hue.
+ *
+ * Drawn in **design-space** coordinates rather than world ones, which is why it
+ * happens outside the camera's translate: the mark belongs to the composition,
+ * and spec [00 · §7](../../docs/spec/00-tokens.md) rules that nothing the player
+ * reads is drawn outside the design space, ever.
+ *
+ * **No vector is drawn**, and that is the acceptance criterion rather than a
+ * style: the mark's position on the edge is the direction, and an arrow would be
+ * the instruction spec 03 refuses.
+ */
+function drawSighting(context: CanvasRenderingContext2D, mark: SightingView): void {
+  bloom(context, mark.x, mark.y, mark.radius, mark.bloom, inHue(mark.hue), STRENGTH[mark.energy]);
+  context.beginPath();
+  context.arc(mark.x, mark.y, mark.radius, 0, Math.PI * 2);
+  context.fillStyle = identity(mark.hue, 1);
+  context.fill();
 }
 
 /**
@@ -183,6 +383,7 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   context.rect(seen.left, seen.top, seen.right - seen.left, seen.bottom - seen.top);
   context.clip();
 
+  context.save();
   context.translate(DESIGN_WIDTH / 2 - view.camera.x, DESIGN_HEIGHT / 2 - view.camera.y);
 
   // A body is drawn if any of it can be seen. There is no horizontal test: the
@@ -210,7 +411,7 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
     view.craft.y,
     0,
     view.craft.bloom,
-    CORE,
+    inToken(CORE),
     STRENGTH[view.craft.energy],
   );
 
@@ -222,6 +423,14 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   craftPath(context);
   context.fillStyle = CORE;
   context.fill();
+
+  context.restore();
+
+  // Back in design-space coordinates, and that is where the sightings belong:
+  // they are composition rather than world, so they are pinned to the design
+  // space's own edge on every device (spec 00 §7) rather than to a point the
+  // camera happens to be looking at.
+  for (const mark of view.sightings) drawSighting(context, mark);
 
   context.restore();
 }

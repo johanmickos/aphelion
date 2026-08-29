@@ -115,6 +115,12 @@ export function interpolate(
     },
     bodies: current.bodies,
     flash: flashBetween(previous.flash, current.flash, alpha),
+    // Sightings are taken from the later tick whole. They are pinned to the
+    // design space's edge rather than to a world point, so there is nothing for
+    // a fraction of a tick to move them along — and their memory, the tide's
+    // bearing, is the next derivation's input rather than this frame's
+    // (ADR-0015).
+    sightings: current.sightings,
     // The corridor does not move, and taking it from the later tick is the same
     // promise `bodies` above makes: interpolating a thing that cannot change
     // would be a promise this function should not make before spec 17's

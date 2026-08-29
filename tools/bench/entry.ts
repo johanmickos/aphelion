@@ -30,7 +30,9 @@ import { SECONDS_PER_TICK } from './src/sim/units.ts';
 import * as cameraKnobs from './src/state/camera.ts';
 import * as curve from './src/state/decay.ts';
 import * as shape from './src/state/deformation.ts';
+import * as lamp from './src/state/body.ts';
 import * as light from './src/state/energy.ts';
+import * as mark from './src/state/sighting.ts';
 import * as view from './src/render/index.ts';
 import * as fit from './src/render/letterbox.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from './src/state/design.ts';
@@ -58,7 +60,7 @@ interface Knob {
   /** Physics knobs change what a run *is*, so the run starts again. */
   readonly restarts: boolean;
   /** Which card it sits under. Only the first of the three restarts a run. */
-  readonly group: 'physics' | 'camera' | 'light';
+  readonly group: 'physics' | 'camera' | 'light' | 'bodies';
   readonly places: number;
 }
 
@@ -130,29 +132,81 @@ const KNOBS: Knob[] = [
   },
   {
     id: 'rim',
-    label: 'Planet rim',
-    what: 'how brightly a body at rest is drawn. Brightness is the only ordinal channel (spec 00 §3) and this moves the alpha `dim()` already sanctions — so anything you like here is something the game can draw',
+    label: 'Rim, at rest',
+    what: 'how brightly a body out of reach is drawn — spec 04 §3 answers it at 40%. Brightness is the only ordinal channel (spec 00 §3) and this moves the alpha `dim()` already sanctions',
     min: 0.1,
     max: 1,
     step: 0.05,
     base: view.RIM_AT_REST,
     apply: view.set_RIM_AT_REST,
     restarts: false,
-    group: 'camera',
+    group: 'bodies',
     places: 2,
   },
   {
-    id: 'rimwidth',
-    label: 'Rim weight',
-    what: 'how heavy that rim is, in design units. The renderer\u2019s own choice rather than a ruling — the disc\u2019s fill is spec 00 §1\u2019s and does not move',
-    min: 1,
-    max: 12,
-    step: 0.5,
-    base: view.RIM_WIDTH,
-    apply: view.set_RIM_WIDTH,
+    id: 'tidewidth',
+    label: 'Tide weight',
+    what: 'how heavy the bright limb is, in design units. Spec 04 §1 holds it constant whatever the body\u2019s radius, so a small body reads as a bright ring and a giant as a thin horizon',
+    min: 3,
+    max: 36,
+    step: 1.5,
+    base: view.TIDE_WIDTH,
+    apply: view.set_TIDE_WIDTH,
     restarts: false,
-    group: 'camera',
+    group: 'bodies',
     places: 1,
+  },
+  {
+    id: 'tidefloor',
+    label: 'Tide, at its faintest',
+    what: 'spec 04 §2 rules a heavier body\u2019s tide is brighter and states neither end. This is the floor; the rest of the range is the body\u2019s own mass',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    base: view.TIDE_FLOOR,
+    apply: view.set_TIDE_FLOOR,
+    restarts: false,
+    group: 'bodies',
+    places: 2,
+  },
+  {
+    id: 'tidearc',
+    label: 'Tide reach',
+    what: 'radians either side, for a body of unbounded mass. The median body gets half of it, which is spec 04 §2\u2019s ±0.3 rad — the law between them is an opening position',
+    min: 0.1,
+    max: 3,
+    step: 0.05,
+    base: lamp.TIDE_HALF_WIDTH_MAX,
+    apply: lamp.set_TIDE_HALF_WIDTH_MAX,
+    restarts: false,
+    group: 'bodies',
+    places: 2,
+  },
+  {
+    id: 'tidelag',
+    label: 'Tide tracking',
+    what: 'per second, for a body of unbounded mass; the median gets half, which is spec 04 §2\u2019s k \u2248 6/s. The lag it leaves is the behaviour, not a defect',
+    min: 1,
+    max: 60,
+    step: 1,
+    base: lamp.TIDE_LAG_RATE_MAX,
+    apply: lamp.set_TIDE_LAG_RATE_MAX,
+    restarts: false,
+    group: 'bodies',
+    places: 0,
+  },
+  {
+    id: 'sighting',
+    label: 'Sighting dot',
+    what: 'design units. Direction 03 draws a dot on the edge of the picture and states no size; it is inset by exactly this so it never straddles the edge (spec 00 §7)',
+    min: 3,
+    max: 48,
+    step: 1,
+    base: mark.SIGHTING_RADIUS,
+    apply: mark.set_SIGHTING_RADIUS,
+    restarts: false,
+    group: 'bodies',
+    places: 0,
   },
   {
     id: 'deadzone',
@@ -557,7 +611,7 @@ function renderKnobs(): void {
   // again and the recipe still describes it; everything below it changes only
   // the picture, and presentation state converges (ADR-0015), so it lands live
   // on the swing already in the air.
-  for (const group of ['physics', 'camera', 'light'] as const) {
+  for (const group of ['physics', 'camera', 'light', 'bodies'] as const) {
     byId(`knobs-${group}`).innerHTML = markup(KNOBS.filter((knob) => knob.group === group));
   }
 

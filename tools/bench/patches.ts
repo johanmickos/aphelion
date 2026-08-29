@@ -90,23 +90,47 @@ export function lockOf(sim: SimState): number {
     why: 'the lock has no off switch of its own',
   },
 
+  // Spec 04's body language. The rim's weight stopped being one number when
+  // §3 gave it four — one per state — so the knob the author asked for is now
+  // the one §3 puts a number on, its strength at rest.
+  settable(
+    'src/state/body.ts',
+    'TIDE_HALF_WIDTH_MAX',
+    'spec 04 §2 states ±0.3 rad at the median and not the law',
+  ),
+  settable(
+    'src/state/body.ts',
+    'TIDE_LAG_RATE_MAX',
+    'spec 04 §2’s k ≈ 6/s, and the lag is the behaviour',
+  ),
+  settable(
+    'src/state/sighting.ts',
+    'SIGHTING_RADIUS',
+    'Direction 03 draws a dot and states no size',
+  ),
   {
     // Brightness is the only ordinal channel (spec 00 §3) and the rim's strength
     // is the renderer's own choice rather than a ruling — the disc's fill is
     // spec 00 §1's and is not touched.
     file: 'src/render/index.ts',
-    find: 'const RIM_AT_REST = 0.35;',
-    replace: 'export let RIM_AT_REST = 0.35;',
+    find: 'const RIM_AT_REST = 0.4;',
+    replace: 'export let RIM_AT_REST = 0.4;',
     append: '\nexport function set_RIM_AT_REST(value: number): void {\n  RIM_AT_REST = value;\n}\n',
     why: 'how legible a body at rest is, which the author asked to be able to move',
   },
   {
     file: 'src/render/index.ts',
-    find: 'context.lineWidth = 3;',
-    replace: 'context.lineWidth = RIM_WIDTH;',
-    append:
-      '\nexport let RIM_WIDTH = 3;\nexport function set_RIM_WIDTH(value: number): void {\n  RIM_WIDTH = value;\n}\n',
-    why: 'the other half of the same legibility question',
+    find: 'const TIDE_WIDTH = 4 * BOARD_PIXEL;',
+    replace: 'export let TIDE_WIDTH = 4 * BOARD_PIXEL;',
+    append: '\nexport function set_TIDE_WIDTH(value: number): void {\n  TIDE_WIDTH = value;\n}\n',
+    why: 'the other half of the same legibility question, now that §1 owns the rim',
+  },
+  {
+    file: 'src/render/index.ts',
+    find: 'const TIDE_FLOOR = 0.4;',
+    replace: 'export let TIDE_FLOOR = 0.4;',
+    append: '\nexport function set_TIDE_FLOOR(value: number): void {\n  TIDE_FLOOR = value;\n}\n',
+    why: 'spec 04 §2 says brighter with mass and states neither end',
   },
 
   {

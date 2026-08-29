@@ -14,6 +14,21 @@
  * the renderer owns is the mapping from here to pixels, which is
  * [`letterbox.ts`](../render/letterbox.ts) and is a different question.
  */
+import { SCALE } from '../sim/units.ts';
+
+/**
+ * Design units per **board pixel** — the factor that turns a number the design
+ * boards state into a number this space is drawn in.
+ *
+ * The boards frame the game at phone size (Direction 01's artboard is 430 × 760)
+ * and this space is a phone at three device pixels to the point, so a rim the
+ * board calls 2.5px is 7.5 design units. It is the same factor
+ * [`units.ts`](../sim/units.ts) carries for spec 01's lengths, arriving from the
+ * other direction, and it is re-exported here rather than reached for directly
+ * because the render layer may not import the simulation
+ * (`test/render/boundary.test.ts`).
+ */
+export const BOARD_PIXEL = SCALE;
 
 /** The design space's width, in design units. */
 export const DESIGN_WIDTH = 1170;

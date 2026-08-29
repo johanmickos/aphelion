@@ -42,8 +42,23 @@ orbit's, below)
 
 **Body**:
 Anything in the field with mass that the craft can be caught by. A planet is the common
-kind; black holes, pulsars and binaries are others.
+kind; black holes, pulsars and binaries are others. A body is always in one of four states —
+**ahead**, **in reach**, **held** and **spent** — and it says which by how it is lit, never
+by changing hue.
 _Avoid_: object, entity, obstacle
+
+**Strata**:
+The concentric rings inside a body, in its own hue. Structure without texture: they say the
+body has an inside without implying a surface, a light source or a depth the world does not
+have. One of them drags behind the **tide**.
+_Avoid_: bands (a band is the boundary's), layers, rings (a ring is the compass's)
+
+**Spent**:
+A body that has been held and let go. Its lamp goes out at the **release** and not at the
+grab, and it stays out for the rest of the run unless the craft grabs it again — so the field
+of them behind the craft is the run's scoreboard, drawn in the world rather than in a corner
+of it.
+_Avoid_: used, dead, exhausted
 
 **Mass**:
 How strongly a body pulls. It **is** size — a body's radius is the only thing that sets it,
@@ -53,7 +68,9 @@ _Avoid_: gravity strength, GM, weight
 
 **Tide**:
 The bright limb segment of a body that always faces the craft — gravity drawn at
-close range.
+close range. It **lags**, and the lag is the point: a heavier body reaches with a longer,
+brighter, tighter-tracking tide, so how hard something pulls is read off the picture rather
+than off a gauge. One of the **strata** follows the same bearing more slowly still.
 
 **Anomaly**:
 A stretch of field where the sky itself changes: purple aurora, cloud, different rules.

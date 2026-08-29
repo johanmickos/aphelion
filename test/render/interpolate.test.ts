@@ -10,6 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import { UNDEFORMED } from '../../src/state/deformation.ts';
 import { bloomOf, E3_BLOOM, E3_TICKS } from '../../src/state/energy.ts';
+import { hueOf } from '../../src/state/identity.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import { interpolate } from '../../src/render/interpolate.ts';
 
@@ -26,9 +27,22 @@ function view(x: number, y: number, heading: number): PresentationState {
       bloom: bloomOf(2),
       deformation: UNDEFORMED,
     },
-    bodies: [{ x: 0, y: 0, radius: 132, held: false, energy: 1, bloom: bloomOf(1) }],
+    bodies: [
+      {
+        x: 0,
+        y: 0,
+        radius: 132,
+        held: false,
+        state: 'AHEAD',
+        hue: hueOf(0),
+        energy: 1,
+        bloom: bloomOf(1),
+        tide: null,
+      },
+    ],
     corridor: { centreline: 585, halfWidth: 1111.5 },
     flash: null,
+    sightings: [],
   };
 }
 

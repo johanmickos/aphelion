@@ -143,27 +143,100 @@ export interface CameraView {
  * and alive, the lamp the compass draws itself around. The renderer is told
  * *which state a body is in*, never asked to work it out from the simulation.
  */
+/**
+ * What a body is telling the player — spec [04 · §3](../../docs/spec/04-bodies.md)'s
+ * four states.
+ *
+ * `AHEAD` is out of reach and `IN_REACH` is inside the grab-range predicate of
+ * spec [01](../../docs/spec/01-swing.md), so the transition between them is the
+ * same fact a press would act on. `SPENT` is a body that has been held and let
+ * go: *"the lamp goes out at release, not at grab"*, and a field of them behind
+ * the craft is the run's scoreboard drawn in the world.
+ */
+export type BodyState = 'AHEAD' | 'IN_REACH' | 'HELD' | 'SPENT';
+
+/**
+ * The bright limb segment that always faces the craft (`CONTEXT.md`: tide) —
+ * *"the gravity vector drawn on the thing that owns it"*
+ * (spec [04 · §2](../../docs/spec/04-bodies.md)).
+ *
+ * All three numbers are readings of the body's mass, and spec 04 §2 requires
+ * exactly that: *"a heavier body reaches with a longer, brighter,
+ * tighter-tracking tide ... the three must move together and monotonically with
+ * mass."* The tracking is not a number here because it is already spent — it is
+ * why `bearing` lags, and the lag is the behaviour.
+ */
+export interface TideView {
+  /**
+   * Which way it faces, in radians, **behind** the craft's true bearing.
+   *
+   * The one thing a tide remembers. Spec 04's acceptance asks that a craft
+   * orbiting at a constant rate leaves this lagging by a bounded, non-zero
+   * angle — so a tide that tracked exactly would have stopped saying how heavy
+   * its body is.
+   */
+  readonly bearing: number;
+  /** The inner stratum, following the same bearing more slowly still. */
+  readonly ripple: number;
+  /** How far the arc reaches either side of its bearing, in radians. */
+  readonly halfWidth: number;
+  /** How loud it is, from 0 toward 1. The renderer spends this as light. */
+  readonly strength: number;
+}
+
 export interface BodyView {
   readonly x: number;
   readonly y: number;
   readonly radius: number;
   readonly held: boolean;
   /**
-   * How brightly it burns — **E2 while it is held, E1 otherwise** (spec
-   * [00 · §3](../../docs/spec/00-tokens.md)).
+   * Which of spec 04 §3's four states it is in.
    *
    * Beside `held` rather than instead of it, and they are not the same fact:
-   * `held` is what the body *is* and this is how loud it is about it. Spec
-   * [04 · §3](../../docs/spec/04-bodies.md) gives a body four states —
-   * ahead, in reach, held, spent — and only one of the four is `held`, so the
-   * two stop being interchangeable in [M2.2](../../docs/plan/m2-the-instrument.md)
-   * when the other three arrive. The E0 a body goes to after release is one of
-   * them, and is deliberately not derived yet: it needs a memory of what has
-   * been released, which is M2.2's to hold rather than this step's to guess.
+   * `held` is one of the four, and it is the one the compass draws itself
+   * around.
+   */
+  readonly state: BodyState;
+  /**
+   * Its hue, in oklch degrees — **its name** (`CONTEXT.md`: identity).
+   *
+   * A number and not a colour, because a colour is paint and this layer holds
+   * none: spec [00 · §2](../../docs/spec/00-tokens.md) fixes the lightness and
+   * the chroma so that every identity is equally loud, and what is left to
+   * carry is the one coordinate that varies. It also makes *"no two adjacent
+   * addresses closer than 50°"* a thing a test can ask of presentation state
+   * rather than of a canvas.
+   */
+  readonly hue: number;
+  /**
+   * How brightly it burns — spec [00 · §3](../../docs/spec/00-tokens.md)'s step,
+   * from its state.
    */
   readonly energy: Energy;
   /** Its bloom radius, in design units, measured outward from its surface. */
   readonly bloom: number;
+  /** Its tide, or `null` where spec 04 §2 says it has none. */
+  readonly tide: TideView | null;
+}
+
+/**
+ * A body the picture cannot show, marked on its edge (`CONTEXT.md`: sighting).
+ *
+ * **In design-space coordinates**, alone among the positions in this file, and
+ * for the reason [`sighting.ts`](./sighting.ts) gives: the mark belongs to the
+ * composition rather than to the world, and spec
+ * [00 · §7](../../docs/spec/00-tokens.md) makes the composition identical on
+ * every device.
+ */
+export interface SightingView {
+  readonly x: number;
+  readonly y: number;
+  /** The body's own hue. A sighting is that body's light, seen further away. */
+  readonly hue: number;
+  /** Flat E1 — spec [03 · §6](../../docs/spec/03-hud.md), where distance went. */
+  readonly energy: Energy;
+  readonly bloom: number;
+  readonly radius: number;
 }
 
 /**
@@ -206,4 +279,11 @@ export interface PresentationState {
    * [`FlashView`](#flashview).
    */
   readonly flash: FlashView | null;
+  /**
+   * Every body the picture cannot show, marked on its edge, in address order.
+   *
+   * *"Always, whether or not a body is held"* (spec 03 §6): the compass needs an
+   * orbit and this does not, so it is the whole of what a coasting craft reads.
+   */
+  readonly sightings: readonly SightingView[];
 }
