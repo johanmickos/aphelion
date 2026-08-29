@@ -653,8 +653,7 @@ the bug itself as a test so it cannot come back unnoticed.
 **Three things it is careful not to be**, and they were the reasons it waited for a ruling:
 
 - **It changes how the game paces itself**, and pacing is feel — so it was the author's call to
-  make and they made it. It wants its own flight before M2.4's gate, so the choreography is judged
-  on a clean clock rather than through this.
+  make and they made it, and it was flown on its own before M2.4 rather than underneath it.
 - **Where it lives** settled itself. The grain is a fact about the *measuring device*, so the shell
   finds it out and hands it over — which is the rule `ticksDue` was already written under, extended
   by one argument. The simulation still hears only numbers, and the logic stayed pure and testable.
@@ -663,7 +662,50 @@ the bug itself as a test so it cannot come back unnoticed.
 
 **Determinism is not at risk**, and that is worth stating plainly: `replayRun` never calls
 `ticksDue`, so a recipe replays identically either way and `SIM_VERSION` does not move.
-`test/sim/clock.test.ts` would gain cases, not lose them.
+`test/sim/clock.test.ts` gained seven cases and lost none.
+
+### And the phone confirmed it
+
+`diagnostics/2026-08-29T22-52-18-693Z-run-dispatch.json` — **1 101 frames**, the first flight with
+the grain fix in it. Author: *"the look and feel is mostly right."*
+
+| | frames | ran two ticks | per 128-frame segment |
+|---|---|---|---|
+| §10's run, before | 1 811 | 34 (1.9%) | `1 1 0 2 0 0 0 9 2 2 1 0 7 2 1` |
+| **after** | 1 101 | **11 (1.0%)** | `3 1 2 2 2 0 0 1 0` |
+
+The rate halved, and — the part that was actually the complaint — **the bursts are gone**. A
+maximum of three per segment against clumps of nine and seven, which is the random walk no longer
+lingering against a threshold it should never have been near.
+
+**And the eleven that remain are real.** Twelve frames in that run had an interval of 25ms or more;
+eleven frames ran two ticks. Those two numbers matching is the guard doing exactly what it was
+measured to do — every genuinely dropped frame still gets caught up, and only the invented ones
+went away. It is the same result as the fabricated test that reported 17 of 17 real drops, arriving
+from the device.
+
+**What did not change is the grab.** Eleven of the twelve worst frames are still `diving at #N, 0
+ticks in`, at a cpu of 0 – 1ms — the fifth run in a row to say that the browser's touch-begin costs
+one deferred frame per press and that it is not this game's work. It stays open, it stays not ours,
+and **M2.4 should not chase it**.
+
+### What the milestone's own drawing cost, since it landed in the same window
+
+M2.3's flown notes added a tapered tide (eleven strokes where there was one) and a body that fades
+out instead of switching off. The before and after, in the same units:
+
+| per frame | before | after |
+|---|---|---|
+| arcs | 27.3 | 37.0 |
+| strokes | 17.4 | 26.9 |
+| **overdraw, screens** | **1.532** | **1.574** |
+
+Nine more strokes for **2.7% more paint**, because the tide's segments overlap rather than add
+area. On the phone the frame term is **0.59ms against 0.58ms**, flat inside its ±0.06 error bar.
+The fitted *tick* reads 0.25ms against 0.17ms, which is **not** a result to lean on: only 96 frames
+in that run ran anything other than one tick, so the slope carries ±0.061ms and the two overlap.
+The headless profiler agrees it is small — a whole tick at 0.008ms against 0.007ms — and either way
+it is sixty times under budget.
 
 ---
 
