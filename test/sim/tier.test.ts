@@ -11,7 +11,7 @@
  * recomputed from the formula it is checking has stopped being a check.
  */
 import { describe, expect, it } from 'vitest';
-import { aimFor, PERFECT_FLOOR, SHARP_ZONE, tierFor, TRUE_ZONE } from '../../src/sim/tier.ts';
+import { alignmentOf, PERFECT_FLOOR, SHARP_ZONE, tierFor, TRUE_ZONE } from '../../src/sim/tier.ts';
 
 const deg = (x: number): number => (x * Math.PI) / 180;
 /** A hair, so a boundary can be probed from both sides without touching it. */
@@ -85,17 +85,28 @@ describe('the PERFECT floor', () => {
   });
 });
 
-describe('the aim', () => {
+describe('the alignment ramp', () => {
   /**
-   * Not a tier and not derived from one: spec 00 §6 heats a window
-   * *continuously* as the hand closes, while the tier is four steps. Two
-   * readings of one geometry.
+   * **It runs over a quarter turn, not over the window** — which is what lets a
+   * window brighten before the hand reaches it. Measured against the window a
+   * window is dark until you are inside it, and by then the release has passed;
+   * this is the prototype's `alignment`, and the one definition of *lined up*.
    */
-  it('runs from nothing at the edge to whole at the dot', () => {
-    const W = deg(40);
-    expect(aimFor(0, W)).toBe(1);
-    expect(aimFor(W / 2, W)).toBe(0);
-    expect(aimFor(W / 4, W)).toBeCloseTo(0.5, 12);
-    expect(aimFor(W, W)).toBe(0);
+  it('is whole at the dot and nothing a quarter turn off', () => {
+    expect(alignmentOf(0)).toBe(1);
+    expect(alignmentOf(Math.PI / 2)).toBe(0);
+    expect(alignmentOf(Math.PI)).toBe(0);
+    expect(alignmentOf(-Math.PI / 4)).toBeCloseTo(0.5, 12);
+  });
+
+  /** And it is already lifting well outside any window the compass draws. */
+  it('is well up before the hand is anywhere near the arc', () => {
+    const wide = deg(40) / 2;
+    expect(alignmentOf(wide * 3)).toBeGreaterThan(0.3);
+    expect(alignmentOf(wide)).toBeGreaterThan(0.7);
+  });
+
+  it('does not care which side of the dot the hand is on', () => {
+    for (const d of [0.1, 0.4, 1.2]) expect(alignmentOf(d)).toBe(alignmentOf(-d));
   });
 });

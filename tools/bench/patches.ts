@@ -182,8 +182,8 @@ export function lockOf(sim: SimState): number {
   },
   {
     file: 'src/render/index.ts',
-    find: 'const WINDOW_AT_REST = 0.45;',
-    replace: 'export let WINDOW_AT_REST = 0.45;',
+    find: 'const WINDOW_AT_REST = 0.22;',
+    replace: 'export let WINDOW_AT_REST = 0.22;',
     append:
       '\nexport function set_WINDOW_AT_REST(value: number): void {\n  WINDOW_AT_REST = value;\n}\n',
     why: 'how vibrant a window is before aim closes',

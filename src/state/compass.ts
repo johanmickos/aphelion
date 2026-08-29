@@ -44,7 +44,7 @@
 import { AIM_RANGE, handOf, windowsOn } from '../sim/compass.ts';
 import { pathRadiusAt } from '../sim/orbit.ts';
 import { SCALE } from '../sim/units.ts';
-import { aimFor, tierFor } from '../sim/tier.ts';
+import { alignmentOf, tierFor } from '../sim/tier.ts';
 import type { Tier } from '../sim/tier.ts';
 import type { SimState } from '../sim/types.ts';
 import { BOARD_PIXEL } from './design.ts';
@@ -68,6 +68,28 @@ export const RING_INNER = 26 * SCALE;
  * gets none, so the gap between two rings **is** the gap between two bodies.
  */
 export const RING_SPREAD = 62 * SCALE;
+
+/**
+ * How far apart two rings are pushed when their windows sit on top of each other.
+ *
+ * *"There should be some minimum distance between compass windows that are
+ * essentially stacked on top because their direction is so similar. Right now
+ * they're messy, let's add some minimum buffer between them"* (author,
+ * 2026-08-29).
+ *
+ * The distance-proportional radii above are what say *how far*, and two bodies
+ * at similar distances in similar directions land two arcs on top of each other.
+ * Rather than move an arc — which would put the dot somewhere a release does not
+ * go — the **ring** moves, which is the same instinct spec
+ * [00 · §6](../../docs/spec/00-tokens.md) already has for labels: *"if two window
+ * tips come within 12°, the outer label slides along its own ring until clear."*
+ * Here the outer ring slides outward until its window clears the one below.
+ *
+ * The radius stops being exactly proportional to distance when this bites, and
+ * that is the trade: the **order** still says which body is nearer, and two
+ * legible arcs beat one unreadable pair.
+ */
+export const STACK_GAP = 20 * BOARD_PIXEL;
 
 /** How far past the outermost ring the hand is drawn — spec 00 §6's *"extended outward"*. */
 export const HAND_OVERSHOOT = 12 * BOARD_PIXEL;
@@ -136,9 +158,7 @@ export function compassOf(sim: SimState): CompassView | null {
   }
   const rings: RingView[] = windowsOn(sim).map((arc) => {
     const offset = shortWay(hand - arc.dot);
-    const width = arc.halfWidth * 2;
-    const tier = tierFor(offset, width);
-    const aim = aimFor(offset, width);
+    const tier = tierFor(offset, arc.halfWidth * 2);
     return {
       body: arc.body,
       hue: hueOf(arc.body),
@@ -147,14 +167,19 @@ export function compassOf(sim: SimState): CompassView | null {
       dot: arc.dot,
       halfWidth: arc.halfWidth,
       offset,
-      aim,
+      // The wide ramp, so a window is already brightening while the hand is a
+      // quarter turn away — see [`alignmentOf`](../sim/tier.ts).
+      aim: alignmentOf(offset),
       tier,
+      blocked: arc.blocked,
       // Spec 00 §3 and §6: a window is E1 at rest and heats **in place** to E2
       // under live aim. The hue never moves; only the brightness does.
       energy: (tier === null ? 1 : 2) as Energy,
       matched: tier === 'PERFECT',
     };
   });
+
+  unstack(rings);
 
   return {
     x: body.x,
@@ -191,6 +216,29 @@ export function takenBy(rings: readonly RingView[]): { body: number; tier: Tier 
     if (best === null || ring.aim > best.aim) best = ring;
   }
   return best === null ? null : { body: best.body, tier: best.tier! };
+}
+
+/**
+ * Push a ring outward until its window clears every window inside it.
+ *
+ * Walked nearest-first, so a ring only ever moves out and only ever because of a
+ * ring already placed — which keeps the pass single and its result independent of
+ * how the list was built. Two windows *"stacked on top because their direction is
+ * so similar"* is exactly when their arcs overlap, so overlap is the test rather
+ * than a fixed angle.
+ */
+function unstack(rings: RingView[]): void {
+  for (let i = 1; i < rings.length; i++) {
+    const ring = rings[i]!;
+    let radius = ring.radius;
+    for (let j = 0; j < i; j++) {
+      const inner = rings[j]!;
+      const apart = Math.abs(shortWay(ring.dot - inner.dot));
+      if (apart >= ring.halfWidth + inner.halfWidth) continue;
+      radius = Math.max(radius, inner.radius + STACK_GAP);
+    }
+    rings[i] = { ...ring, radius };
+  }
 }
 
 /** An angle folded onto (−π, π] — the short way round, which is what an aim error is. */

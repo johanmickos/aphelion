@@ -391,8 +391,15 @@ const CROSSING_RADIUS = 2 * BOARD_PIXEL;
  * runs `0.15 + 0.5 × align` in alpha and `2 + 2 × align` in weight. It is the one
  * surface in the game that does not take the energy table's alpha, because it is
  * the instrument rather than the world.
+ *
+ * **It is low because the ramp now has a quarter turn to run over**: the window
+ * starts lifting while the hand is far away, so where it starts matters more than
+ * it did when it only lit inside its own arc.
  */
-const WINDOW_AT_REST = 0.45;
+const WINDOW_AT_REST = 0.22;
+
+/** How much of itself a window keeps when the run to its body is blocked. */
+const BLOCKED = 0.3;
 
 /**
  * The compass — spec [00 · §6](../../docs/spec/00-tokens.md), and the thing
@@ -521,6 +528,11 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
   // is drawn on the orbit rather than in the world, and it is the thing the
   // milestone is measured by. Round caps are `lineCap`, and they are why the arc
   // reads as a window rather than as a cut segment.
+  // A **blocked** window is dimmed rather than removed: a release that runs into
+  // another body is worth saying, and a window that vanished would be the
+  // blinking this instrument was rebuilt to stop.
+  const clear = ring.blocked ? BLOCKED : 1;
+
   context.save();
   context.lineCap = 'round';
   context.beginPath();
@@ -532,7 +544,10 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
     ring.dot + ring.halfWidth,
   );
   context.lineWidth = WINDOW_WIDTH * (1 + ring.aim);
-  context.strokeStyle = identity(ring.hue, WINDOW_AT_REST + (1 - WINDOW_AT_REST) * ring.aim);
+  context.strokeStyle = identity(
+    ring.hue,
+    (WINDOW_AT_REST + (1 - WINDOW_AT_REST) * ring.aim) * clear,
+  );
   context.stroke();
   context.restore();
 
@@ -541,7 +556,9 @@ function drawRing(context: CanvasRenderingContext2D, compass: CompassView, ring:
   const dotY = compass.y + Math.sin(ring.dot) * ring.radius;
   context.beginPath();
   context.arc(dotX, dotY, DOT_RADIUS, 0, Math.PI * 2);
-  context.fillStyle = ring.matched ? dim(CORE, 1) : identity(ring.hue, STRENGTH[1]);
+  context.fillStyle = ring.matched
+    ? dim(CORE, clear)
+    : identity(ring.hue, (WINDOW_AT_REST + (1 - WINDOW_AT_REST) * ring.aim) * clear);
   context.fill();
 
   // The crossing: where the hand cuts this ring. The gap between it and the dot

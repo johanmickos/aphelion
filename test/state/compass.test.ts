@@ -16,7 +16,7 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { MIN_HALF_WIDTH } from '../../src/sim/compass.ts';
-import { RING_INNER, takenBy } from '../../src/state/compass.ts';
+import { RING_INNER, STACK_GAP, takenBy } from '../../src/state/compass.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { hueOf } from '../../src/state/identity.ts';
 import type { CompassView, PresentationState } from '../../src/state/types.ts';
@@ -175,6 +175,7 @@ describe('what it is allowed to say', () => {
     expect(Object.keys(armed.rings[0]!).sort()).toEqual([
       'aim',
       'away',
+      'blocked',
       'body',
       'dot',
       'energy',
@@ -266,6 +267,65 @@ describe('the window is the quality band', () => {
     const r = Math.hypot(view.craft.x - c.x, view.craft.y - c.y);
     expect(r).toBeGreaterThanOrEqual(Math.min(...c.path) - 1);
     expect(r).toBeLessThanOrEqual(Math.max(...c.path) + 1);
+  });
+});
+
+describe('windows that sit on top of each other', () => {
+  /**
+   * *"There should be some minimum distance between compass windows that are
+   * essentially stacked on top because their direction is so similar"* (author,
+   * 2026-08-29). The **ring** moves rather than the arc, because moving an arc
+   * would put the dot somewhere a release does not go — the same instinct spec
+   * 00 §6 already has for labels.
+   */
+  it('pushes the outer ring out until its window clears the inner one', () => {
+    let checked = 0;
+    for (const view of held()) {
+      const rings = view.compass?.rings ?? [];
+      for (let i = 1; i < rings.length; i++) {
+        for (let j = 0; j < i; j++) {
+          const apart = Math.abs(
+            ((rings[i]!.dot - rings[j]!.dot + Math.PI) % (Math.PI * 2)) - Math.PI,
+          );
+          if (apart >= rings[i]!.halfWidth + rings[j]!.halfWidth) continue;
+          expect(rings[i]!.radius - rings[j]!.radius).toBeGreaterThanOrEqual(STACK_GAP - 1e-9);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  /** And the order still says which body is nearer, whatever the pushing did. */
+  it('keeps the nearer body on the inner ring', () => {
+    for (const view of held()) {
+      const rings = view.compass?.rings ?? [];
+      for (let i = 1; i < rings.length; i++) {
+        expect(rings[i]!.away).toBeGreaterThanOrEqual(rings[i - 1]!.away);
+        expect(rings[i]!.radius).toBeGreaterThan(rings[i - 1]!.radius);
+      }
+    }
+  });
+});
+
+describe('the glow arrives before the hand does', () => {
+  /**
+   * *"When I hold an orbit and spin around, the compass windows pass too
+   * quickly... the original starts glowing before I touch them, which helps me
+   * predict when to click"* (author, 2026-08-29). So the heat ramps over a
+   * quarter turn rather than over the window: a window is already well up while
+   * the hand is far outside its arc.
+   */
+  it('is already lifting while the hand is outside the arc', () => {
+    const outside = held()
+      .flatMap((view) => view.compass?.rings ?? [])
+      .filter((ring) => Math.abs(ring.offset) > ring.halfWidth);
+    expect(outside.length).toBeGreaterThan(50);
+    expect(outside.some((ring) => ring.aim > 0.4)).toBe(true);
+    // And it is monotone in the aim error, so it can be read as a countdown.
+    for (const ring of outside) {
+      expect(ring.aim).toBeCloseTo(Math.max(0, 1 - Math.abs(ring.offset) / (Math.PI / 2)), 9);
+    }
   });
 });
 

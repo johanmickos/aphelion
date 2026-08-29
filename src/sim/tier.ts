@@ -69,14 +69,25 @@ export function tierFor(offset: number, width: number): Tier | null {
 }
 
 /**
- * How far inside its window a release landed, from 0 at the edge to 1 at the dot.
+ * How lined up a release is, from 1 at the dot to 0 at ninety degrees off.
  *
  * Not a tier and not a substitute for one: it is what the compass **heats** on,
  * because spec [00 · §6](../../docs/spec/00-tokens.md) has a window go E1 → E2
- * *"as the hand closes on the dot"* — continuously, while the tier is four
- * steps. Two readings of one geometry, and neither is derived from the other.
+ * *"as the hand closes on the dot"* — continuously, while the tier is four steps.
+ * Two readings of one geometry, and neither is derived from the other.
+ *
+ * **It ramps over a quarter turn rather than over the window**, and that is the
+ * whole of the difference between an instrument you can read ahead and one you
+ * cannot. Measured against the window, a window is dark until the hand is inside
+ * it and then it is too late — *"when I hold an orbit and spin around, the
+ * compass windows pass too quickly... the original starts glowing before I touch
+ * them, which helps me predict when to click"* (author, 2026-08-29). This is the
+ * prototype's `alignment`, and its own comment is the reason it is one function:
+ * *"the single definition of 'lined up' in the game. The compass brightens on it,
+ * the ship's halo fades in on it, and the score pays for it — so it is defined
+ * once. Reporting the same quantity two different ways is what made the
+ * prototype's glow snap on while its wedge brightened smoothly."*
  */
-export function aimFor(offset: number, width: number): number {
-  if (width <= 0) return 0;
-  return Math.max(0, 1 - Math.abs(offset) / (width / 2));
+export function alignmentOf(offset: number): number {
+  return Math.max(0, 1 - Math.abs(offset) / (Math.PI / 2));
 }

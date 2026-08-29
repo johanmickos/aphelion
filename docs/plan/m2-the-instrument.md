@@ -439,6 +439,66 @@ raised rather than assumed.
 `SIGHTING_RANGE` closes the other half of §6's *"reach is not yet a number"*, carried from the
 prototype and still spec 17's to replace.
 
+## Flown again, 2026-08-29 — four more, and the compass got simpler
+
+A second dispatch, and four notes about the instrument. Answering them **removed** the whole
+partition machinery M2.3 built: the model is now the prototype's, and it is about half the code.
+
+**Windows blinked because the ring set was derived from the geometry.** M2.3 worked out which
+body each release angle would *arrive at* and made a window of each run of equal answers — so as
+the orbit rounded, the answers shifted and windows appeared and vanished under the player.
+*"This is unacceptable. Once they're on the compass they should stay."* The targets are now
+chosen from the **field**: bodies above the held one, within `AIM_RANGE`, nearest first. Nothing
+in that changes while a body is held, so nothing can blink — over a whole swing the ring set is
+one set, asserted. It brings the prototype's **upward-only** rule with it, and its reason:
+*"offering the planet you just came from as an equal option invites you to bounce between two
+bodies forever, which is a local maximum neither the compass nor the score should signpost."*
+
+**The dot is solved now rather than sampled.** It was the minimum of the miss *within the arc a
+body won*, so when the true best release lay where another body won, the dot sat at an edge —
+which is what *"I'm not convinced the compass windows are appearing where they should"* was. It
+is now the root of the signed heading error: a coarse sweep brackets the crossing and bisection
+lands on it, exact to a thousandth of a degree, which is the prototype's method and cheaper than
+what it replaced. A test asserts the exit tangent at the dot points at the body to within 0.01
+rad.
+
+**And the window around it is hand-wavy on purpose.** *"They don't need
+mathematical/physics-based precision... most of the windows should be a bit wider to give me a
+better opportunity to score well."* `WINDOW_REACH` is how generous *near* is, in floors: at two,
+the widths go **p50 18.6° → 36.6°**, p10 28.4°, max 40.9° — which is Direction 01's own fixed 40°
+wedge and spec 06 §2's wider worked example.
+
+**Occlusion stopped deleting windows.** The partition handled a body behind another by giving it
+no arc — which is the blinking again. A blocked run is now **reported and dimmed to 30%**, on the
+prototype's reason: *"a marker that points at a planet you cannot actually reach is worse than no
+marker, and paying points for aiming at one would be worse still."*
+
+**Stacked windows push their rings apart.** *"There should be some minimum distance between
+compass windows that are essentially stacked on top because their direction is so similar."* When
+two arcs overlap, the outer **ring** slides out until they clear — the ring and not the arc,
+because moving an arc would put the dot somewhere a release does not go. It is the instinct spec
+00 §6 already has for labels (*"the outer label slides along its own ring until clear"*), applied
+one element up. The radius stops being exactly proportional to distance when it bites; the order
+still says which body is nearer.
+
+**And the glow arrives before the hand does.** *"When I hold an orbit and spin around, the
+compass windows pass too quickly. This is something the original gets right: the windows start
+glowing before I touch them, which helps me predict when to click."* The heat was measured
+against the window's own width, so a window was dark until the hand was inside it — and measured,
+**the hand is inside an arc for 3 to 4 ticks, 50 to 67ms**. It now ramps over a **quarter turn**,
+which is the prototype's `alignment` and its own note on why it is one function: *"the compass
+brightens on it, the ship's halo fades in on it, and the score pays for it — so it is defined
+once."* Measured, a window is lit for **15 ticks, 250ms**, before the dot — nearly four times the
+warning, on the same geometry.
+
+**One thing the notes imply and this cannot fix.** *"The far away ones feel really tricky to aim
+for and that makes me WANT to aim for them, even though I want to guide players to slingshot to
+nearby planets."* Widening helps the aiming and does not touch the pull, because the pull is the
+**pay**: spec 00 §6 rules that a narrow window is *"automatically a better-paid one"* and spec 06
+§2's zones scale with the width, so the hardest window is worth the most and the far one is
+hardest. Guiding play toward near bodies means pricing distance, which is spec
+[08](../spec/08-economy.md)'s arithmetic and **M4's**. Recorded here so the step inherits it.
+
 ### What this makes false in the specs, and is not edited here
 
 `docs/` is author-owned and these are rebases rather than tidying, so they are listed for
@@ -454,8 +514,9 @@ approval rather than written:
 | [03 acceptance](../spec/03-hud.md) | *"a sighting is held to the same line: its position carries the direction and no vector is drawn"* |
 | [04 · §2](../spec/04-bodies.md) | *"present on every body within grab range"*, and the inner ripple |
 | [04 · §3](../spec/04-bodies.md) | IN REACH's *"E1 + tide"* — a body glows on grip, and the tide is on the offer |
+| [00 · §6](../spec/00-tokens.md) | the **ghost** is a **crossing**; and a window heats over a quarter turn rather than over itself |
 
-**525 tests, 46 files.** Every number that moved is on the bench.
+**532 tests, 46 files.** Every number that moved is on the bench.
 
 ---
 

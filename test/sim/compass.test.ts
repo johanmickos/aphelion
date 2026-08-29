@@ -15,6 +15,7 @@ import { handOf, RINGS, windowsOn } from '../../src/sim/compass.ts';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { grabRange } from '../../src/sim/grab.ts';
 import { distance } from '../../src/sim/math.ts';
+import { pathRadiusAt } from '../../src/sim/orbit.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
@@ -124,24 +125,71 @@ describe('the windows are true', () => {
    * window: the ray through it passes nearer the body than the ray from either
    * edge does.
    */
-  it('puts the dot where the ray passes closest', () => {
+  it('puts the dot where the exit tangent points straight at the body', () => {
     const sim = orbiting();
+    const anchor = sim.field.bodies[sim.heldBody!]!;
     for (const ring of windowsOn(sim)) {
-      expect(ring.closest).toBeLessThanOrEqual(grabRange(sim.field.bodies[ring.body]!));
+      const target = sim.field.bodies[ring.body]!;
+      // The release point at the dot, and the direction it leaves in.
+      const radius = pathRadiusAt(sim.orbit!, ring.dot);
+      const x = anchor.x + radius * Math.cos(ring.dot);
+      const y = anchor.y + radius * Math.sin(ring.dot);
+      const heading = Math.atan2(
+        Math.cos(ring.dot) * sim.orbit!.direction,
+        -Math.sin(ring.dot) * sim.orbit!.direction,
+      );
+      const bearing = Math.atan2(target.y - y, target.x - x);
+      expect(Math.abs(shortWay(heading - bearing))).toBeLessThan(0.01);
       expect(ring.halfWidth).toBeGreaterThan(0);
       expect(ring.halfWidth).toBeLessThanOrEqual(Math.PI);
     }
   });
 
-  /** Windows partition the orbit rather than overlapping it: one release, one body. */
-  it('does not overlap another window', () => {
-    const rings = windowsOn(orbiting());
-    for (let i = 0; i < rings.length; i++) {
-      for (let j = i + 1; j < rings.length; j++) {
-        const gap = Math.abs(shortWay(rings[i]!.dot - rings[j]!.dot));
-        expect(gap).toBeGreaterThan(rings[i]!.halfWidth + rings[j]!.halfWidth - 1e-6);
-      }
+  /**
+   * **The set of rings never changes while a body is held**, which is the whole
+   * reason it is chosen from the field rather than from the geometry: *"sometimes
+   * the compass windows appear and then disappear. This is unacceptable"*
+   * (author, 2026-08-29). M2.3 derived it from which body each release angle
+   * arrived at, and that answer shifts as the orbit rounds.
+   */
+  it('offers the same bodies for the whole swing', () => {
+    const sim = world();
+    const seen: string[] = [];
+    for (let tick = 0; tick < 600; tick++) {
+      stepSim(sim, tick >= 20 ? PRESS : NO_INPUT);
+      if (sim.orbit === null) continue;
+      seen.push(
+        windowsOn(sim)
+          .map((ring) => ring.body)
+          .join(','),
+      );
     }
+    expect(seen.length).toBeGreaterThan(300);
+    expect(new Set(seen).size).toBe(1);
+  });
+
+  /**
+   * And it offers only bodies **up the climb**, which is the prototype's rule and
+   * its reason: *"offering the planet you just came from as an equal option
+   * invites you to bounce between two bodies forever, which is a local maximum
+   * neither the compass nor the score should signpost."*
+   */
+  it('offers only bodies above the one being held', () => {
+    const sim = orbiting();
+    const anchor = sim.field.bodies[sim.heldBody!]!;
+    const rings = windowsOn(sim);
+    expect(rings.length).toBeGreaterThan(0);
+    for (const ring of rings) expect(sim.field.bodies[ring.body]!.y).toBeLessThan(anchor.y);
+  });
+
+  /**
+   * A window whose run is blocked is **reported and kept**, never dropped — a
+   * disappearing window is the thing this was rebuilt to stop, and *"a marker
+   * that points at a planet you cannot actually reach is worse than no marker."*
+   */
+  it('reports a blocked run rather than dropping the window', () => {
+    const sim = orbiting();
+    for (const ring of windowsOn(sim)) expect(typeof ring.blocked).toBe('boolean');
   });
 });
 

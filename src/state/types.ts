@@ -275,10 +275,25 @@ export interface RingView {
    * readings of one geometry, neither derived from the other.
    */
   readonly offset: number;
-  /** How far inside the window the hand is, from 0 at the edge to 1 at the dot. */
+  /**
+   * How lined up the hand is, from 1 at the dot to 0 a quarter turn off.
+   *
+   * **Not measured against the window**, deliberately: a window that only lights
+   * once the hand is inside it lights too late to aim with, which is what flying
+   * it found. This is the ramp everything on the instrument heats and thickens
+   * on, and it starts long before the arc.
+   */
   readonly aim: number;
   /** What a release now would score here, or `null` for a miss. */
   readonly tier: Tier | null;
+  /**
+   * Whether the straight run from the dot hits another body first.
+   *
+   * The window is still drawn, dimmed: one that vanished would be the blinking
+   * this instrument was rebuilt to stop, and *"a marker that points at a planet
+   * you cannot actually reach is worse than no marker"*.
+   */
+  readonly blocked: boolean;
   /** E1 at rest, E2 under live aim — heating **in place**, never changing hue. */
   readonly energy: Energy;
   /** Whether the hand and the dot have merged: spec 00 §6's MATCHED. */
