@@ -163,6 +163,23 @@ On press, the tide flares into the **grab filament** — the line drawn from the
 (spec [00](./00-tokens.md), compass state 1). While the craft orbits, the tide races around the
 rim underneath it.
 
+> ## ⚠ Ruled by the author, 2026-08-30 — the rim strengths below moved
+>
+> *"Make the planet ring colour a bit less bright when it's not grabbed, and then toggle it to the
+> current colour when I do grab. That'll help visually identify the grabbed planet."*
+>
+> **IN REACH: 85% → 55%. AHEAD: 40% → 34%. HELD is unchanged at 100%**, and that it did not move is
+> the point. The table below put a body in reach fifteen points under a held one, on rims 2.25px and
+> 2.5px wide — and in a field where several bodies are in reach at once, that is not a distinction
+> the eye can make at a glance while flying. The one thing the compass draws itself around was the
+> hardest thing on screen to pick out. The gap under HELD goes from **1.18× to 1.82×**.
+>
+> AHEAD is trimmed only a little, because §3's own guard still binds: *"the field ahead must read as
+> a constellation of dim coloured rings, never a row of grey balls."* At 34% the AHEAD → IN REACH
+> step is still 1.6×.
+>
+> Tide, strata, core and every width are untouched.
+
 ## 3 · The four states
 
 A body is always telling the player its relationship to them.

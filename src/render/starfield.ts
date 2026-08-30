@@ -69,13 +69,18 @@ import { DUSK, INK, mix } from './palette.ts';
 /**
  * How many stars there are.
  *
- * The prototype's own 160, kept because it is a **measured** number in the sense
- * that matters — it is what the author looked at for months — and because
- * density is the one property of a starfield that cannot be reasoned about from
- * first principles. It is spread over a field one design space wide and two
- * tall, so the count per screen is a little under half of it.
+ * **160 per screen, which is the prototype's density and not its count.** The
+ * prototype scatters 160 over exactly one view height; this field is two design
+ * heights tall, so matching what the eye sees means twice the number. The first
+ * build copied the 160 across and drew a sky **half as dense as the one it was
+ * carried from** — reported by the author as *"tiny specks of white with little
+ * to no variation, so it doesn't look very deep or immersive."*
+ *
+ * Density is the one property of a starfield that cannot be reasoned about from
+ * first principles, so it is taken from the thing the author looked at for
+ * months rather than chosen here.
  */
-export const STAR_COUNT = 160;
+export const STAR_COUNT = 320;
 
 /**
  * How tall the field is before it repeats, in design units.
@@ -107,20 +112,31 @@ const PARALLAX_MAX = 0.195;
 /**
  * How big the furthest and nearest stars are, in design units.
  *
+ * ## These were four times too small, and the unit is why
+ *
+ * The prototype sizes its stars `max(1, tier.size * cam.scale)` — in **device
+ * pixels**, after the scale — so on the phone it was tuned on (390 css × 3 dpr,
+ * `cam.scale` 3) its stars are **3, 3 and 5.4 device pixels**. This draws in
+ * **design units**, and the letterbox puts one design unit on one device pixel on
+ * that same phone. Carrying the numbers across without carrying the scale gave a
+ * sky of 0.7-to-2.7 pixel stars where the prototype has 3-to-5.4 — and a
+ * sub-pixel rectangle is not a small star, it is an antialiased smear of the
+ * background, which is why the brightness ramp stopped reading as depth too.
+ * ADR-0013 exactly: the behaviour is the apparent size, and the mechanism it is
+ * expressed in did not survive the crossing.
+ *
+ * The range now spans the prototype's and is **wider than it at both ends**,
+ * which is the author's own instruction — *"more depth with more varied star
+ * sizes"* — and the reason the ramp is squared rather than linear.
+ *
  * **Spread on a square rather than a line**, so the near stars pull away from the
  * pack instead of the field ramping evenly. That is the same shape the prototype
  * uses for its warp streaks and its reasoning carries over unchanged: *"the
  * things near you tear past and the things far away barely move — and the eye
- * reads that difference long before it reads any individual"* star. An even ramp
- * across a 0.7-to-2.7 range made every star look much like its neighbour.
- *
- * The floor is above half a design unit on purpose. A star is drawn as a filled
- * rectangle and the letterbox may scale below 1:1 on a wide desktop window, so a
- * size that starts sub-pixel is one that disappears on some screens rather than
- * being faint on all of them.
+ * reads that difference long before it reads any individual"* star.
  */
-const SIZE_MIN = 0.7;
-const SIZE_GAIN = 2.0;
+const SIZE_MIN = 2.4;
+const SIZE_GAIN = 4.0;
 
 /**
  * Where the tiers cut the depth, and they are **only** for batching now.

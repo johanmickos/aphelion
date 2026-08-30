@@ -91,12 +91,35 @@ describe('the sky', () => {
   it('spreads its sizes on a curve, so the near ones pull away from the pack', () => {
     const sizes = sky.flatMap((tier) => tier.stars.map((star) => star.size)).sort((a, b) => a - b);
     expect(sizes.length).toBe(STAR_COUNT);
-    // A real spread rather than the 1.8x the first build had.
-    expect(sizes.at(-1)! / sizes[0]!).toBeGreaterThan(3);
+    // A real spread rather than the 1.8x the prototype's three fixed sizes give.
+    expect(sizes.at(-1)! / sizes[0]!).toBeGreaterThan(2.5);
     // And squared rather than even: the median sits well below the midpoint of
     // the range, which is what leaves the near stars room to stand out.
     const middle = (sizes[0]! + sizes.at(-1)!) / 2;
     expect(sizes[Math.floor(sizes.length / 2)]!).toBeLessThan(middle);
+  });
+
+  /**
+   * **The regression that made the author report the sky as wrong**, and it is a
+   * unit error rather than a taste one. The prototype sizes its stars in *device
+   * pixels* after its own scale — `max(1, tier.size * cam.scale)`, which on the
+   * phone it was tuned on is 3 to 5.4 — and this draws in *design units*, which
+   * the letterbox puts on device pixels one-for-one on that same phone. Carrying
+   * the numbers without the scale gave 0.7-to-2.7, and a sub-pixel rectangle is
+   * not a small star: it is an antialiased smear of the background. Reported as
+   * *"tiny specks of white with little to no variation."*
+   */
+  it('is drawn at the prototype\u2019s apparent size, not its raw numbers', () => {
+    const sizes = sky.flatMap((tier) => tier.stars.map((star) => star.size));
+    // Nothing sub-pixel, and the range spans the prototype's 3 – 5.4 at both ends.
+    expect(Math.min(...sizes)).toBeGreaterThan(2);
+    expect(Math.min(...sizes)).toBeLessThan(3);
+    expect(Math.max(...sizes)).toBeGreaterThan(5.4);
+  });
+
+  /** And at its density: 160 per screen, over a field two screens tall. */
+  it('is as dense as the sky it was carried from', () => {
+    expect(STAR_COUNT / (FIELD_HEIGHT / DESIGN_HEIGHT)).toBe(160);
   });
 
   it('makes a nearer star both faster and bigger, always', () => {

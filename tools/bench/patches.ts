@@ -166,10 +166,21 @@ export function lockOf(sim: SimState): number {
     // is the renderer's own choice rather than a ruling — the disc's fill is
     // spec 00 §1's and is not touched.
     file: 'src/render/index.ts',
-    find: 'const RIM_AT_REST = 0.4;',
-    replace: 'export let RIM_AT_REST = 0.4;',
+    find: 'const RIM_AT_REST = 0.34;',
+    replace: 'export let RIM_AT_REST = 0.34;',
     append: '\nexport function set_RIM_AT_REST(value: number): void {\n  RIM_AT_REST = value;\n}\n',
     why: 'how legible a body at rest is, which the author asked to be able to move',
+  },
+  {
+    // The distance a held body stands above one merely in reach, which is what
+    // the author actually asked to be able to see — see `RIM_AT_REST`'s note in
+    // the renderer. HELD stays at 1 and is not a knob: this is the gap under it.
+    file: 'src/render/index.ts',
+    find: 'const RIM_IN_REACH = 0.55;',
+    replace: 'export let RIM_IN_REACH = 0.55;',
+    append:
+      '\nexport function set_RIM_IN_REACH(value: number): void {\n  RIM_IN_REACH = value;\n}\n',
+    why: 'how far a held body stands out from one merely in reach',
   },
   {
     file: 'src/render/index.ts',

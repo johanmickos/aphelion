@@ -45,7 +45,7 @@
  * watched.
  */
 import type { SimState } from '../sim/types.ts';
-import { FLOOR_GAP, MEDIAN_RADIUS, SETTLE_TICKS } from '../sim/units.ts';
+import { FLOOR_GAP, MEDIAN_RADIUS, SCALE, SETTLE_TICKS } from '../sim/units.ts';
 import { easeStep } from './decay.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from './design.ts';
 import type { CameraView } from './types.ts';
@@ -90,6 +90,42 @@ export const DEADZONE = MEDIAN_RADIUS + FLOOR_GAP;
  * convenient. Three is the slowest rate that keeps it.
  */
 export const FOLLOW_RATE = 3;
+
+/**
+ * How far ahead of the craft the view sits at [`LOOK_REF_SPEED`](#) and above, as
+ * a fraction of the design space along the axis of travel.
+ *
+ * **The prototype's 0.18, carried across an axis** (ADR-0013). Its own look-ahead
+ * is *horizontal*, because its playfield is wider than its window and sideways is
+ * where its interesting movement is; this field is a vertical corridor and the
+ * whole game is a climb, so the behaviour — *"look where you are going, not where
+ * you have been"* — belongs on the other axis. Carrying the code would have
+ * carried the axis and done nothing (`camera.ts` has no sideways movement to
+ * lead); carrying the behaviour moves it to the axis this game actually has.
+ *
+ * **It answers a measured complaint.** The author, 2026-08-30: *"when I go fast I
+ * often feel like the camera isn't showing me far enough ahead to make a safe
+ * capture."* Measured over 6 267 ticks of climbing in their own dispatches, the
+ * craft sat **337 design units above centre at p50 and 497 at p95** — the ease
+ * lag and the deadzone between them — so the view was spending a third of its
+ * height showing where the craft had been.
+ *
+ * The prototype's own reason is the same one and it names the mechanism exactly:
+ * *"a deadzone that has no idea which way you are going."* It also records why
+ * this is safe where centring the target is not — *"this is a function of the
+ * ship's velocity, which the camera cannot influence, so there is no loop."*
+ */
+export const LOOK_AHEAD = 0.18;
+
+/**
+ * The speed at which the look-ahead reaches its full extent, in design units per
+ * second — the prototype's 260 at this repo's `SCALE`.
+ *
+ * Signed and symmetric, as the prototype's is: falling is also going somewhere,
+ * and a lead that only worked upward would step to zero at the top of a climb,
+ * which is the moment the view can least afford a discontinuity.
+ */
+export const LOOK_REF_SPEED = 260 * SCALE;
 
 /**
  * How long the lock takes to arrive, in ticks, once the settle is over.
@@ -218,13 +254,34 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   const offset =
     lock > 0 ? (stillPoint(previous.y, sim.field.bodies[sim.heldBody!]!.y) - craftY) * lock : 0;
 
-  const subjectY = craftY + offset;
+  // **Look where you are going.** Off entirely once the dive has frozen, which is
+  // the prototype's own hard-learned gate rather than a precaution: after the
+  // freeze the craft rides a phase clock and its velocity reverses every half
+  // orbit — *"measured at +397 -> -285 -> +137 -> -207 across one settle. Anything
+  // steering off it swings the view"* — so what the velocity means stops being a
+  // heading. It stays **on through the dive**, where the craft is on real physics
+  // with a real heading and where suppressing it *"put a 110px lurch into the
+  // dive"*. `sim.orbit` is exactly that distinction and needs no second flag.
+  const lead = sim.orbit === null ? leadOf(sim.craft.vy) : 0;
+
+  const subjectY = craftY + offset + lead;
   return {
     x: centreline(),
     y: previous.y + (targetY(previous.y, subjectY) - previous.y) * easeStep(FOLLOW_RATE),
     lock,
     offset,
   };
+}
+
+/**
+ * How far ahead of the craft to look, in design units, from its vertical speed.
+ *
+ * Clamped rather than ramped without bound, so that the fastest run in the game
+ * and a merely fast one frame alike — the prototype's `clamp(v / ref, -1, 1)`.
+ */
+function leadOf(vy: number): number {
+  const share = Math.max(-1, Math.min(1, vy / LOOK_REF_SPEED));
+  return share * LOOK_AHEAD * DESIGN_HEIGHT;
 }
 
 /**

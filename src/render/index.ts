@@ -104,11 +104,36 @@ const FLOOR_GAP = 36;
  * luminous horizons. Everything else here is an alpha.
  *
  * AHEAD's rim width is §1's base, because §3 gives a width for the other three
- * and not for it. `RIM_AT_REST` is that state's strength and is the number the
- * author asked to be able to move — *"how legible a body at rest is"* — which
- * §3 now answers at 40%.
+ * and not for it.
+ *
+ * ## The rim strengths are the author's, 2026-08-30, and they moved
+ *
+ * *"Make the planet ring colour a bit less bright when it's not grabbed, and then
+ * toggle it to the current colour when I do grab. That'll help visually identify
+ * the grabbed planet."*
+ *
+ * **The fault was IN_REACH and not HELD.** Spec 04 §3 puts a body in reach at
+ * **85%** and a held one at **100%** — fifteen points apart, on rims 2.25px and
+ * 2.5px wide. In a field where several bodies are in reach at once, that is not a
+ * distinction the eye can make at a glance while flying, and the one thing the
+ * compass draws itself around was the hardest thing on screen to pick out. So
+ * HELD does not move at all: what changed is the gap under it, from 1.18× to
+ * **1.82×**.
+ *
+ * `RIM_AT_REST` is trimmed with it — the author asked for *"not grabbed"* rather
+ * than for one state — but only a little, and deliberately: it is the number they
+ * themselves asked to be able to move and set at 40%, and spec 04 §3 guards it
+ * with *"the field ahead must read as a constellation of dim coloured rings,
+ * never a row of grey balls."* 34% keeps AHEAD → IN_REACH a clear step (1.6×)
+ * while taking a little of the glare out of a crowded field.
  */
-const RIM_AT_REST = 0.4;
+const RIM_AT_REST = 0.34;
+
+/**
+ * A body in reach, and the whole point of the number is the distance **below**
+ * HELD rather than its own value. See `RIM_AT_REST` above.
+ */
+const RIM_IN_REACH = 0.55;
 
 interface Look {
   /** Rim stroke width, in board pixels (§1's scale rule). */
@@ -121,7 +146,7 @@ interface Look {
 
 const LOOK: Readonly<Record<BodyState, Look>> = {
   AHEAD: { rim: 2.5, rimStrength: RIM_AT_REST, strata: 0.1, core: 0.3 },
-  IN_REACH: { rim: 2.25, rimStrength: 0.85, strata: 0.18, core: 0.5 },
+  IN_REACH: { rim: 2.25, rimStrength: RIM_IN_REACH, strata: 0.18, core: 0.5 },
   HELD: { rim: 2.5, rimStrength: 1, strata: 0.3, core: 0.8 },
   SPENT: { rim: 1.5, rimStrength: 0.5, strata: 0.14, core: 0.5 },
 };

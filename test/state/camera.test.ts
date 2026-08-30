@@ -17,7 +17,14 @@ import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { FLOOR_GAP, MEDIAN_RADIUS, SETTLE_TICKS } from '../../src/sim/units.ts';
-import { DEADZONE, FOLLOW_RATE, THUMB_BUDGET } from '../../src/state/camera.ts';
+import {
+  DEADZONE,
+  FOLLOW_RATE,
+  LOOK_AHEAD,
+  LOOK_REF_SPEED,
+  lockOf,
+  THUMB_BUDGET,
+} from '../../src/state/camera.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../../src/state/design.ts';
 import type { PresentationState } from '../../src/state/types.ts';
@@ -31,6 +38,8 @@ interface Flight {
   readonly held: readonly boolean[];
   /** Which of them were riding a settled orbit. */
   readonly settled: readonly boolean[];
+  /** Which of them had a frozen orbit at all — the look-ahead's own gate. */
+  readonly frozen: readonly boolean[];
 }
 
 function world(): SimState {
@@ -50,13 +59,15 @@ function fly(grabAt: number, letGoAt: number, ticks = 420): Flight {
   const views: PresentationState[] = [createPresentation(sim)];
   const held: boolean[] = [sim.heldBody !== null];
   const settled: boolean[] = [false];
+  const frozen: boolean[] = [false];
   for (let tick = 0; tick < ticks; tick++) {
     stepSim(sim, tick >= grabAt && tick < letGoAt ? PRESS : LET_GO);
     views.push(derive(views[views.length - 1]!, sim));
     held.push(sim.heldBody !== null);
     settled.push(sim.orbit !== null && sim.orbit.ticksSinceFreeze >= SETTLE_TICKS);
+    frozen.push(sim.orbit !== null);
   }
-  return { views, held, settled };
+  return { views, held, settled, frozen };
 }
 
 /** The craft's height on screen, in design coordinates. */
@@ -150,8 +161,15 @@ describe('the camera', () => {
    * the band does not move the view at all — and the band is derived rather than
    * chosen, so a craft circling a typical body at its floor is inside it.
    */
-  it('ignores movement smaller than the deadzone', () => {
+  /** `vy` is zeroed to take the look-ahead out of the picture; it has its own tests. */
+  function still(): SimState {
     const sim = world();
+    sim.craft.vy = 0;
+    return sim;
+  }
+
+  it('ignores movement smaller than the deadzone', () => {
+    const sim = still();
     let view = createPresentation(sim);
     const settledAt = view.camera.y;
     sim.craft.y = settledAt + DEADZONE * 0.9;
@@ -159,14 +177,8 @@ describe('the camera', () => {
     expect(view.camera.y).toBe(settledAt);
   });
 
-  /**
-   * It converges on the band's *edge*, never on its centre — the limit cycle
-   * `targetY` exists to avoid. Long enough for the ease to arrive: at
-   * `FOLLOW_RATE` 3 the time constant is a third of a second, so this is about
-   * two seconds of settling rather than the one it took at 8.
-   */
   it('follows once the craft leaves the band', () => {
-    const sim = world();
+    const sim = still();
     let view = createPresentation(sim);
     sim.craft.y = view.camera.y + DEADZONE * 4;
     for (let i = 0; i < 400; i++) view = derive(view, sim);
@@ -333,5 +345,91 @@ describe('presentation state as a recurrence', () => {
     expect(opened.camera.y).toBe(sim.craft.y);
     expect(opened.camera.lock).toBe(0);
     expect(opened.camera.offset).toBe(0);
+  });
+});
+
+/**
+ * The look-ahead, carried from the prototype's horizontal one onto the axis this
+ * game actually climbs (ADR-0013).
+ *
+ * Asked for by the author on 2026-08-30: *"follow the ship a bit more
+ * preemptively when it's traveling upwards... when I go fast I often feel like
+ * the camera isn't showing me far enough ahead to make a safe capture."*
+ */
+describe('the look-ahead', () => {
+  const settle = (sim: SimState): PresentationState => {
+    let view = createPresentation(sim);
+    for (let i = 0; i < 400; i++) view = derive(view, sim);
+    return view;
+  };
+
+  it('puts the view ahead of a climbing craft, and behind a falling one', () => {
+    const up = world();
+    up.craft.vy = -LOOK_REF_SPEED;
+    const down = world();
+    down.craft.vy = LOOK_REF_SPEED;
+    // Same craft position, opposite headings: the view sits on opposite sides.
+    down.craft.y = up.craft.y;
+    expect(settle(up).camera.y).toBeLessThan(up.craft.y);
+    expect(settle(down).camera.y).toBeGreaterThan(down.craft.y);
+  });
+
+  it('reaches its full extent at the reference speed and no further', () => {
+    const fast = world();
+    fast.craft.vy = -LOOK_REF_SPEED;
+    const faster = world();
+    faster.craft.vy = -LOOK_REF_SPEED * 4;
+    faster.craft.y = fast.craft.y;
+    expect(settle(faster).camera.y).toBeCloseTo(settle(fast).camera.y, 6);
+    // And the extent is the prototype's fraction of the axis it travels, less
+    // the deadzone the view settles at the edge of.
+    expect(fast.craft.y - settle(fast).camera.y).toBeCloseTo(
+      LOOK_AHEAD * DESIGN_HEIGHT - DEADZONE,
+      3,
+    );
+  });
+
+  /**
+   * **The prototype's hard-learned gate.** After the freeze the craft rides a
+   * phase clock and its velocity reverses every half orbit — *"anything steering
+   * off it swings the view"* — so velocity stops meaning heading and the lead
+   * goes off. It stays on through the **dive**, where suppressing it *"put a
+   * 110px lurch"* into the prototype's own.
+   */
+  it('is off once the dive has frozen, and on through the dive', () => {
+    // Fly to a frozen tick where the craft is actually going somewhere
+    // vertically, then derive that one tick twice: once as the simulation has
+    // it, and once with the freeze taken away. Nothing else differs — the lock
+    // is still 0 this early — so any difference is the gate.
+    const sim = world();
+    let tick = 0;
+    for (; tick < 420; tick++) {
+      stepSim(sim, tick >= 30 ? PRESS : LET_GO);
+      // Enough vertical speed that the lead would clear the deadzone if it ran —
+      // otherwise the band absorbs it and the test proves nothing either way.
+      if (sim.orbit !== null && Math.abs(sim.craft.vy) > LOOK_REF_SPEED) break;
+    }
+    expect(sim.orbit).not.toBeNull();
+    expect(lockOf(sim)).toBe(0);
+
+    const before = createPresentation(sim);
+    const frozen = derive(before, sim);
+    const diving = derive(before, { ...sim, orbit: null });
+    // Frozen, the view does not move at all: the craft is inside the band and
+    // nothing is steering off its phase clock. Diving, the lead carries it out.
+    expect(frozen.camera.y).toBe(before.camera.y);
+    expect(Math.abs(diving.camera.y - before.camera.y)).toBeGreaterThan(1);
+  });
+
+  /** The craft may never be pushed below the thumb line by any of this. */
+  it('never spends more than the thumb budget', () => {
+    for (const [grab, go] of [
+      [30, 120],
+      [30, 260],
+      [60, 400],
+    ] as const) {
+      for (const view of fly(grab, go).views)
+        expect(view.craft.y - view.camera.y).toBeLessThan(THUMB_BUDGET);
+    }
   });
 });

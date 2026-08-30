@@ -11,6 +11,42 @@ feel is read.
 
 ---
 
+## Flown, 2026-08-30 · the camera looks ahead, and the sky was four times too small
+
+Three notes from one sitting, all measured against the author's own dispatches.
+
+**The camera was showing where the craft had been.** *"When I go fast I often feel like the camera
+isn't showing me far enough ahead to make a safe capture."* Measured over 6 267 ticks of climbing,
+the craft sat **337 design units above centre at p50 and 497 at p95** — the deadzone and the ease
+lag between them — so a third of the view was spent on the past. The prototype's own diagnosis
+names the mechanism: *"a deadzone that has no idea which way you are going."*
+
+Its fix is a **velocity look-ahead**, and it is horizontal, because its playfield is wider than its
+window. This field is a vertical corridor, so the behaviour crosses axes and the code does not
+(ADR-0013). `LOOK_AHEAD` 0.18 of the design space at `LOOK_REF_SPEED`, gated off once the dive has
+frozen — the prototype's hard-learned rule, since after the freeze velocity stops meaning heading
+and *"anything steering off it swings the view."* Headroom lost at p50: **337 → 56**.
+
+**The first attempt overshot and the author caught it in one flight.** Removing the deadzone while
+coasting — which the prototype does, having none on this axis — took the craft to dead centre and
+read as *"WAY too fixed on the ship... the camera needs to be MUCH smoother."* **The band is the
+float.** It went back, and the lead alone carries the headroom: the camera is still perfectly still
+on **36.2%** of ticks against 39.3% before, and the tick-to-tick change in its movement is
+unchanged at p50. Only 0.5% of ticks move further than the old maximum, none of them at the freeze.
+
+**The starfield was carried in the wrong unit.** *"Tiny specks of white with little to no
+variation, so it doesn't look very deep or immersive."* The prototype sizes stars in **device
+pixels after its own scale** — `max(1, tier.size * cam.scale)`, so 3 to 5.4 on the phone it was
+tuned on — and this draws in **design units**, which the letterbox puts one-to-one on that same
+phone. The numbers came across; the scale did not. A sub-pixel rectangle is not a small star, it is
+an antialiased smear of the background, which is why the brightness ramp stopped reading as depth
+too. Sizes now span 2.4 – 6.4, and the count doubled to 320, because the prototype's 160 is a
+density **per screen** and this field is two screens tall.
+
+**And a held body was the hardest thing on screen to find.** Spec 04 §3 put IN REACH at 85% against
+HELD's 100%. HELD did not move; the gap under it went from 1.18× to **1.82×**.
+
+
 ## Queued · the arrival's word becomes a number
 
 Ruled by the author on 2026-08-30, on the same day the word was built and flown:
