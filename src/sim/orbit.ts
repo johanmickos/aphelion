@@ -232,9 +232,29 @@ export function predictOrbit(craft: Craft, body: Body): Orbit | null {
   // approximated, and `pnpm portable` bans it in this directory (ADR-0014).
   const ex = (craft.vy * momentum) / body.mass - dx / r;
   const ey = (-craft.vx * momentum) / body.mass - dy / r;
-  const shape = Math.min(magnitude(ex, ey), 0.999);
+  // **Capped where the freeze caps it**, because a prediction that draws a shape
+  // the freeze will never hand out is not a prediction. `freeze` clamps the
+  // eccentricity at [`ECCENTRICITY_CAP`](./units.ts) and this did not, so a dive
+  // whose natural ellipse is longer than the cap drew a thin oval right up to the
+  // freeze and then snapped to a fat one — measured on the shipped run, **84% of
+  // a radius on one tick**, on one capture in thirteen. *"I see one, and once I am
+  // deeper in the capture it switches to a different oval"* (author, 2026-08-30).
+  const shape = Math.min(magnitude(ex, ey), ECCENTRICITY_CAP);
 
-  let periapsis = semiLatus / (1 + shape);
+  const periapsisAngle = angleOf(ex, ey);
+
+  // **The craft has to stay on the drawn line, and capping the shape moves the
+  // line off it.** So the ellipse is re-sized to pass through where the craft
+  // actually is: at a true anomaly `v` from periapsis, `r = a(1+e) / (1 + e·cos
+  // v)`, and solving that for the periapsis is one expression. Without it a capped
+  // prediction draws an oval the craft is outside of, which is worse than the jump
+  // it was fixing — the compass is drawn **on** the path the craft is flying.
+  //
+  // It is the same trick this function already plays on the floor below, and both
+  // are the same idea: keep the ellipse's *shape* honest about what the freeze
+  // will hand out, and its *size* honest about where the craft is.
+  const anomaly = angleOf(dx, dy) - periapsisAngle;
+  let periapsis = (r * (1 + shape * cos(anomaly))) / (1 + shape);
   if (periapsis <= 0) return null;
 
   // The floor is never crossed, so neither is it drawn crossed.
@@ -245,7 +265,7 @@ export function predictOrbit(craft: Craft, body: Body): Orbit | null {
     periapsis,
     eccentricity: shape,
     momentum,
-    periapsisAngle: angleOf(ex, ey),
+    periapsisAngle,
     direction: momentum < 0 ? -1 : 1,
     depth: 0,
     phase: 0,

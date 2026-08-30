@@ -278,6 +278,15 @@ footer uses obsolete numbering and is void.
 > should show that first one, it looks like it jumps aggressively to the smaller, second one"*
 > (author).
 >
+> **And it was two faults wearing one coat.** The other is at the **freeze**, and it survived the
+> first fix: `predictOrbit` did not cap its eccentricity where `freeze` does, so a dive whose
+> natural ellipse is longer than `ECCENTRICITY_CAP` drew a thin oval right up to the freeze and
+> then snapped to a fat one — measured on the shipped run, **84% of a radius in one tick**, on one
+> capture in thirteen. The prediction now caps where the freeze caps, **and is re-sized to still
+> pass through the craft**, because a capped ellipse the craft is outside of would be worse than
+> the jump: the compass is drawn *on* the path being flown. The worst jump is now 16% and none
+> exceeds 20%.
+>
 > Measured on the shipped run, the pre-clearance oval was drawn for **4 to 9 ticks** on each of
 > twelve dives — long enough to register and far too short to read as a shape. The path now waits
 > until the clearance has been paid, which leaves §5's own reading of the fade intact: *"what fades
