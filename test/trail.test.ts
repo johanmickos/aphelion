@@ -109,7 +109,7 @@ describe('a whole run, read from outside', () => {
    * that could not be compared against the measurement.
    */
   it('accounts for every press as a swing or a refusal', () => {
-    const recipe = pilotRecipe(266);
+    const recipe = pilotRecipe(38);
     const trail = walkRun(recipe);
     const presses = Math.ceil(recipe.log.length / 2);
     expect(trail.refused).toBeGreaterThan(0);
@@ -127,7 +127,7 @@ describe('a whole run, read from outside', () => {
     // M1.4 measured that **87% of out-of-bounds endings happen with a body still
     // held** — *you are not flying out of the corridor, you are being swung out
     // of it* — so this is the common shape of a death rather than an edge case.
-    const trail = walkRun(pilotRecipe(1));
+    const trail = walkRun(pilotRecipe(3));
     const last = trail.swings.at(-1)!;
     expect(trail.ending).toBe('OUT_OF_BOUNDS');
     expect(last.releasedAt).toBeNull();

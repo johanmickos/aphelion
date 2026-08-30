@@ -64,8 +64,8 @@ function tally(views: readonly PresentationState[]): Census {
 describe('the draw census', () => {
   /**
    * The whole run, every element the game has: bodies in all four states, the
-   * compass with its rings and its flown arc, sightings, the farewell ring and
-   * the award word with its rim. If the renderer reaches for a canvas call the
+   * compass with its rings and its flown arc, sightings, and the award word
+   * with its rim. If the renderer reaches for a canvas call the
    * stand-in lacks, this throws — which is what it is for.
    */
   it('survives every frame of the shipped run', () => {
@@ -83,9 +83,8 @@ describe('the draw census', () => {
     expect(into.strokes).toBeGreaterThan(RUN.length);
     expect(into.gradients).toBeGreaterThan(RUN.length);
     expect(into.fills).toBeGreaterThan(RUN.length);
-    // Overdraw is the figure spec-level decisions are argued with — the farewell
-    // ring is stroked rather than filled because of it — so it has to be a real
-    // area rather than a zero that never moves.
+    // Overdraw is the figure spec-level decisions are argued with, so it has to
+    // be a real area rather than a zero that never moves.
     expect(into.filled).toBeGreaterThan(0);
     expect(into.gradientFilled).toBeGreaterThan(0);
     expect(into.gradientFilled).toBeLessThanOrEqual(into.filled);
@@ -100,7 +99,7 @@ describe('the draw census', () => {
     const releases: PresentationState[] = [];
     const coasts: PresentationState[] = [];
     for (const view of RUN) {
-      if (view.callout !== null || view.farewell !== null) releases.push(view);
+      if (view.callout !== null) releases.push(view);
       else if (view.compass === null) coasts.push(view);
     }
     expect(releases.length).toBeGreaterThan(50);

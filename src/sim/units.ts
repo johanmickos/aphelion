@@ -332,6 +332,73 @@ export const PAYING_DEPTH = 0.5;
 export const PERMANENT_SHARE = 0.22;
 
 /**
+ * How much faster a release leaves than it will be travelling a moment later.
+ *
+ * **Spec [01 · §8](../../docs/spec/01-swing.md) measured the prototype at ×1.8
+ * and 0.45 is what was flown**: *"all of the velocity kicks are a bit too
+ * intense, let's scale them back a touch"* (author, 2026-08-29). The measurement
+ * stands as a measurement of that codebase; this is a different game with a
+ * different camera, a different field scale and no hitstop under it, and
+ * `VISION.md`'s seventh pillar is that a carried number is a starting position
+ * and not an authority. **It is the first slider on the bench.**
+ *
+ * **The other 78% of the boost, and the half of ADR-0012 that was never built.**
+ * That ADR replaced the hitstop with *"a kick on every release, scaled by the
+ * quality of the swing"* and said it is *"bought with speed rather than with
+ * stopped time"* — and `CONTEXT.md`'s **punch** is *"carried entirely by the
+ * transient"*. [M2.4](../../docs/plan/m2-the-instrument.md) built the punch's
+ * **feel**, on the craft's own stretch; this is its **speed**, and it is what the
+ * author asked for after flying that: *"both a good capture and a good release
+ * should provide a small kick to the ship's velocity, that fades after a bit,
+ * scaled by the quality."*
+ *
+ * ## It does not bend the ray, and that is what makes it safe
+ *
+ * The thing that looked like it would forbid this is spec 01 §11: the compass is
+ * a **solved reading** rather than a simulation *"because drift is a straight
+ * line"*, so *"where do I let go to reach that body"* has a closed form. A burst
+ * along the **exit tangent** adds no sideways component at all — the craft
+ * covers the same ray, only faster — so the geometry the compass solves is
+ * untouched, the same bodies are reachable, and the route is identical. What
+ * changes is **when**: measured at the median exit speed, a body 700 design units
+ * out arrives in 0.43s against 0.72s, **40% sooner**.
+ *
+ * ## What it costs, stated
+ *
+ * Spec 01 §9's *"speed constant to within 1 part in 10⁹ over 600 ticks"* is no
+ * longer true of a craft that has just let go, and that tolerance is amended
+ * rather than quietly broken. **The half of §9 that was load-bearing survives
+ * exactly**: the heading is still constant to 10⁻⁶ radians, the path is still an
+ * exact straight line, and coasting still applies no force — this is the release
+ * spending what the release paid, not something coasting does to itself.
+ */
+export const TRANSIENT_SHARE = 0.45;
+
+/**
+ * How long the burst takes to spend itself, in seconds — spec 01 §8's **1.3s**,
+ * *"decaying linearly to nothing"*.
+ *
+ * Linear rather than exponential because §8 says so and because it has to **end**:
+ * an exponential never reaches zero, and a craft that never quite returns to
+ * constant speed is a craft whose coast is never the straight-line-at-constant-speed
+ * the compass is solved on.
+ */
+export const TRANSIENT_SECONDS = 1.3;
+
+/**
+ * How much longer the burst carries at full quality, as a fraction of the span
+ * above — spec 01 §8's parenthetical **×1.5**, and ADR-0012's *"half again as
+ * long"*.
+ *
+ * Quality's second channel, and deliberately the gentler one: a mistimed release
+ * still gets a burst, and what it loses is how far the burst carries it. The
+ * craft's stretch is scaled on the same pair of curves
+ * ([`punch.ts`](../state/punch.ts)), so the thing seen and the thing felt are one
+ * reading of one number.
+ */
+export const TRANSIENT_STRETCH = 0.5;
+
+/**
  * How close to a body's surface counts as contact for a coasting craft — spec
  * 01 §10's `R + 5`, converted.
  *

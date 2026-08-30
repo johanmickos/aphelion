@@ -32,5 +32,15 @@
  * ([`CLIMB_BIAS`](./units.ts)), so the same log can take a different body. Every
  * dispatch recorded before now is refused with its version in the message, which
  * is the correct outcome and the reason this exists.
+ *
+ * **4, on 2026-08-29**: the release pays its **transient**. Spec
+ * [01 · §8](../../docs/spec/01-swing.md) has measured it since M1.1 — *"×1.8 on
+ * release, decaying linearly to nothing over 1.3s"* — and it had never been
+ * built, so ADR-0012's punch had its feel and not its speed. The craft now
+ * carries a burst beside its velocity for a second or so after letting go, which
+ * moves it further in the same direction on the same ray: the route is identical
+ * and the timing is not. **Every dispatch recorded before now is refused**, which
+ * is a real cost paid deliberately — the alternative was a gate flown on a game
+ * the specs describe and the build does not have.
  */
-export const SIM_VERSION = 3;
+export const SIM_VERSION = 4;

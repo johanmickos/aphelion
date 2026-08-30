@@ -28,9 +28,10 @@ import type { SimState } from './types.ts';
  * generator for the same reason — so a stored one has to be able to say it was
  * written by a different game.
  */
-export const SNAPSHOT_VERSION = 3;
+export const SNAPSHOT_VERSION = 4;
 
-const HEADER_BYTES = 4 + 4 + 4 + 4 + 4 * 8 + 4 * 4 + 1 + 1 + 8;
+// The craft's four numbers, then the three the release's burst rides on.
+const HEADER_BYTES = 4 + 4 + 4 + 4 + (4 + 3) * 8 + 4 * 4 + 1 + 1 + 8;
 /** The corridor's centreline, half-width and foot. */
 const CORRIDOR_BYTES = 3 * 8;
 /** A presence byte, then a dive's four numbers. */
@@ -85,6 +86,11 @@ export function snapshot(state: SimState): Uint8Array {
   f64(state.craft.y);
   f64(state.craft.vx);
   f64(state.craft.vy);
+  // The release's burst is world state: it moves the craft, so two runs that
+  // agree everywhere else and disagree here are two different runs.
+  f64(state.craft.burst);
+  f64(state.craft.burstLeft);
+  f64(state.craft.burstSpan);
 
   u32(state.rng[0]);
   u32(state.rng[1]);

@@ -52,6 +52,16 @@ export const PATCHES: readonly Patch[] = [
   settable('src/sim/units.ts', 'GRAZE_RESTITUTION', 'spec 01 §10 leaves it unstated'),
   settable('src/sim/units.ts', 'BOUNCE_RESTITUTION', 'moved at the M1 gate, 0.6 → 0.2'),
   settable('src/sim/units.ts', 'CLIMB_BIAS', 'how much a press prefers a body up the climb'),
+  settable(
+    'src/sim/units.ts',
+    'TRANSIENT_SHARE',
+    'spec 01 §8 measured ×1.8; 0.45 is what was flown',
+  ),
+  settable(
+    'src/sim/units.ts',
+    'TRANSIENT_SECONDS',
+    'spec 01 §8’s 1.3s, decaying linearly to nothing',
+  ),
   settable('src/state/camera.ts', 'DEADZONE', 'an opening position; only the gate can judge it'),
   settable('src/state/camera.ts', 'FOLLOW_RATE', 'moved at the M1 gate, 8 → 3'),
   settable('src/state/camera.ts', 'LOCK_TICKS', 'the prototype’s third of a second, carried'),
@@ -87,11 +97,6 @@ export const PATCHES: readonly Patch[] = [
     'PUNCH_STRETCH',
     'ADR-0012’s “half again as long” at full quality',
   ),
-
-  // The farewell ring. Spec 02 §6 fixes the colour and says only "expands away",
-  // so how far is an opening position with nothing behind it.
-  settable('src/state/farewell.ts', 'FAREWELL_SPREAD', 'how far the orbit gets before it goes'),
-  settable('src/state/farewell.ts', 'FAREWELL_TICKS', 'spec 02 §2’s 400ms, dated from T0'),
 
   // The callout. `LINGER_TICKS` is the one number in this milestone two specs
   // disagree about — spec 02 §2 ends the word at T+510ms and spec 06 §4's own

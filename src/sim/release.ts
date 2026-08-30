@@ -11,14 +11,19 @@
  * the whole of an orbit. A release only changes how fast.
  *
  * **The exit speed is the orbital speed at the release radius plus the boost's
- * permanent share.** The other 78% is the punch, and it is spent rather than
- * kept (ADR-0012) — it never reaches the craft's velocity, so a coasting craft
- * still travels *"an exact straight line at exactly constant speed"* (spec 01
- * §9) from the first tick after a release, and what a run is worth is untouched
- * by how good it felt. **A release that put all of its boost into permanent
+ * permanent share.** **A release that put all of its boost into permanent
  * velocity would compound up the field forever**; 22% is what keeps the
  * escalation bounded, and spec 01 §5a's flat median speed across eight altitude
  * bands is the evidence it works.
+ *
+ * **The other 78% is the punch, and it is spent rather than kept** (ADR-0012).
+ * It never reaches `vx`/`vy` — it rides beside them as a decaying burst and is
+ * gone within a second or so, so nothing about it compounds and what a run is
+ * worth is untouched by how good it felt. Spec 01 §9's *"exact straight line"*
+ * survives it exactly, because the burst runs **along the exit tangent** and
+ * scales a velocity rather than adding to one: the heading is untouched, the ray
+ * is the same ray, and spec 01 §11's closed-form compass is solved on it
+ * unchanged. What §9 gives up is *"exactly constant speed"*, and it says so.
  *
  * **A release during the dive changes nothing about the craft.** It has no
  * frozen orbit to be paid on, and turning it onto a tangent would hand the
@@ -30,7 +35,8 @@
 import { boostOf } from './boost.ts';
 import { speedOf } from './craft.ts';
 import type { SimState } from './types.ts';
-import { PERMANENT_SHARE } from './units.ts';
+import { qualityOf } from './quality.ts';
+import { PERMANENT_SHARE, TRANSIENT_SECONDS, TRANSIENT_SHARE, TRANSIENT_STRETCH } from './units.ts';
 
 /**
  * Let go.
@@ -48,6 +54,18 @@ export function release(state: SimState): void {
       state.craft.vy *= scale;
     }
   }
+
+  // **And the other 78%, which is the punch** — spent rather than kept, and
+  // carried beside the velocity rather than in it (`craft.ts`). It is scaled by
+  // the quality of the swing on the same two curves the craft's stretch is:
+  // a square root on the size, half again on the span. A release that never froze
+  // an orbit gets the bend instead, and a tap gets nothing without anything
+  // having to check.
+  const quality = qualityOf(state);
+  const strength = Math.sqrt(Math.min(Math.max(quality, 0), 1));
+  state.craft.burst = TRANSIENT_SHARE * strength;
+  state.craft.burstSpan = TRANSIENT_SECONDS * (1 + TRANSIENT_STRETCH * strength);
+  state.craft.burstLeft = state.craft.burstSpan;
 
   state.heldBody = null;
   state.dive = null;

@@ -101,12 +101,15 @@ export const SPEAKS: Readonly<Record<Tier, boolean>> = {
  * is born, slows all the way, and never comes back down. That is the physics
  * feeling — an overshoot is a spring, and this is a throw.
  *
- * Thirty-four prototype units, converted at three design units to one
- * (ADR-0010), against the ~30 board px spec 06 §4 asked for. Carried as a
- * **behaviour** and not as a mechanism (ADR-0013): what crosses is *how far it
- * gets and on what curve*, both of which a test can see.
+ * **Fifty, against the prototype's thirty-four**, converted at three design units
+ * to one (ADR-0010). The curve is carried as a behaviour (ADR-0013) and the
+ * amplitude is not: *"the accolade text should bump a bit more, think of a
+ * classic 'ka-ching' money effect"* (author, 2026-08-29). This game's picture is
+ * a phone held in portrait where the prototype's was a third of the size, and a
+ * throw that reads at one scale is a twitch at another — which is the same
+ * reason spec 01's lengths were multiplied by three on the way in.
  */
-export const POP_RISE = 34 * SCALE;
+export const POP_RISE = 50 * SCALE;
 
 /**
  * How far off the dot it is born, in design units — spec 06 §4's 8–30px.
@@ -190,9 +193,14 @@ const CAP_HEIGHT = 0.75;
  * render shows fully on the page. Some of the edge award text was getting cut
  * off"* (author, 2026-08-29).
  *
- * **It stays world-anchored**, which is spec 06 §4's own word for it: what moves
- * the word is the camera, and this only bites on the ticks it would otherwise be
- * off the page. A word born in the middle of the picture is never touched by it
+ * **It runs once, at birth, and never again.** Applied every tick it held the
+ * word against the top of the picture and slid it upward as the camera climbed —
+ * *"the text seems to travel up if I move the ship and camera upwards. It's OK to
+ * leave the text where it lands, it should be a marker left behind at the point
+ * of scoring"* (author, 2026-08-29). That is spec 06 §4's **world-anchored**, and
+ * a marker that follows the camera is not a marker. So what this fixes is the
+ * only thing it was ever for: a word *born* at a dot near the edge, cut in half
+ * before it had been read. A word born in the middle of the picture is never touched by it
  * and drifts past exactly as before.
  */
 function insideThePicture(
@@ -241,23 +249,21 @@ export function struck(
 }
 
 /** The same word one tick on, or `null` once it is gone. */
-export function linger(previous: CalloutView | null, camera: CameraView): CalloutView | null {
+export function linger(previous: CalloutView | null): CalloutView | null {
   if (previous === null) return null;
   const life = advance(previous.life);
   if (life === null) return null;
-  const held = insideThePicture(
-    previous.bornX,
-    previous.bornY - POP_RISE * risen(life),
-    previous.size,
-    previous.bloom,
-    SPEAKS[previous.tier],
-    camera,
-  );
   return {
     ...previous,
     life,
-    x: held.x,
-    y: held.y,
+    // **Where it was born, and it stays there.** The clamp below is a *birth*
+    // rule and not a per-tick one: applied every tick it slid the word up the
+    // screen as the camera climbed, which is the opposite of what a marker does.
+    // *"It's OK to leave the text where it lands, it should be a marker left
+    // behind at the point of scoring"* (author, 2026-08-29) — which is spec 06
+    // §4's own **world-anchored**, and drifting out of the picture is what being
+    // left behind looks like.
+    y: previous.bornY - POP_RISE * risen(life),
     strength: lit(life),
     windowStrength: windowLit(life),
   };

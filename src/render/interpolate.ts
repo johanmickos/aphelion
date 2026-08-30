@@ -14,13 +14,7 @@
  * the gap between two ticks that have both already happened, so no frame ever
  * shows a position the simulation did not reach.
  */
-import type {
-  CalloutView,
-  DeformationView,
-  FarewellView,
-  FlashView,
-  PresentationState,
-} from '../state/types.ts';
+import type { CalloutView, DeformationView, FlashView, PresentationState } from '../state/types.ts';
 
 const TWO_PI = Math.PI * 2;
 
@@ -109,17 +103,6 @@ function calloutBetween(
   };
 }
 
-/** And the ring leaving, whose whole visible behaviour is how far out it has got. */
-function farewellBetween(
-  previous: FarewellView | null,
-  current: FarewellView | null,
-  alpha: number,
-): FarewellView | null {
-  if (current === null) return null;
-  if (previous === null || arriving(current.decay)) return current;
-  return { ...current, spread: between(previous.spread, current.spread, alpha) };
-}
-
 /**
  * A view `alpha` of the way from one tick to the next.
  *
@@ -179,6 +162,5 @@ export function interpolate(
     // narrowing corridor exists to test it.
     corridor: current.corridor,
     callout: calloutBetween(previous.callout, current.callout, alpha),
-    farewell: farewellBetween(previous.farewell, current.farewell, alpha),
   };
 }

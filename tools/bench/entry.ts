@@ -32,7 +32,6 @@ import * as curve from './src/state/decay.ts';
 import * as shape from './src/state/deformation.ts';
 import * as blow from './src/state/punch.ts';
 import * as word from './src/state/callout.ts';
-import * as leaving from './src/state/farewell.ts';
 import * as lamp from './src/state/body.ts';
 import * as arcs from './src/sim/compass.ts';
 import * as instrument from './src/state/compass.ts';
@@ -437,6 +436,32 @@ const KNOBS: Knob[] = [
   },
 
   {
+    id: 'transient',
+    label: 'Release kick · strength',
+    what: 'how much faster a release leaves than it will be travelling a moment later, as a fraction. Spec 01 §8 measured the prototype at 0.8 (×1.8) and 0.45 is what was flown — “all of the velocity kicks are a bit too intense”. It runs along the exit tangent, so it never bends the ray: the route is identical and only the timing moves. Zero removes it',
+    min: 0,
+    max: 1.5,
+    step: 0.05,
+    base: units.TRANSIENT_SHARE,
+    apply: units.set_TRANSIENT_SHARE,
+    restarts: true,
+    group: 'physics',
+    places: 2,
+  },
+  {
+    id: 'transientspan',
+    label: 'Release kick · span',
+    what: 'seconds the kick takes to spend itself, decaying linearly to exactly nothing. Spec 01 §8’s 1.3s, and half again as long at the top of the envelope',
+    min: 0.1,
+    max: 4,
+    step: 0.1,
+    base: units.TRANSIENT_SECONDS,
+    apply: units.set_TRANSIENT_SECONDS,
+    restarts: true,
+    group: 'physics',
+    places: 1,
+  },
+  {
     id: 'punchfloor',
     label: 'Punch · floor',
     what: 'how much of spec 02 §4’s stretch a release of NO quality still earns. At 1 quality reaches nothing and the stretch is exactly what spec 02 §4 wrote; at 0 a release that never armed does not mark itself at all',
@@ -513,32 +538,6 @@ const KNOBS: Knob[] = [
     restarts: false,
     group: 'release',
     places: 2,
-  },
-  {
-    id: 'farewellspread',
-    label: 'Farewell ring · reach',
-    what: 'how far the detached orbit gets, as a multiple of the orbit it was. Spec 02 §6 fixes the colour and says only “expands away”, so this has nothing behind it',
-    min: 1,
-    max: 4,
-    step: 0.05,
-    base: leaving.FAREWELL_SPREAD,
-    apply: leaving.set_FAREWELL_SPREAD,
-    restarts: false,
-    group: 'release',
-    places: 2,
-  },
-  {
-    id: 'farewellticks',
-    label: 'Farewell ring · span',
-    what: 'ticks the ring takes to expand and go. Spec 02 §2’s 400ms is 24, the same clock the E3 decays on',
-    min: 1,
-    max: 90,
-    step: 1,
-    base: leaving.FAREWELL_TICKS,
-    apply: leaving.set_FAREWELL_TICKS,
-    restarts: false,
-    group: 'release',
-    places: 0,
   },
   {
     id: 'linger',

@@ -210,11 +210,16 @@ The kick a release lands, scaled by the **quality** of the swing and gone within
 Bought with speed rather than with stopped time (ADR-0012), and carried entirely by the
 transient, so it never changes what a run is worth. **Quality enters twice** — as how far it
 displaces the view and as how long it takes coming home — and the second is the gentler channel,
-so a mistimed release still gets a punch and what it loses is how far the punch carries. **It moves the craft and not the world.** It was built on the camera — 6px along the exit
-tangent — and flown, and refused: *"we don't really want shake effects or pauses like that, it
-turns out that really disrupts the flow"* (author, 2026-08-29). So it is spent on the craft's
-**deformation**, which was already the element about the craft leaving. Spec 00 §5's motion table
-calls the camera's share of it KICK, and that row is void; **the word is punch**.
+so a mistimed release still gets a punch and what it loses is how far the punch carries. **It is felt in two places and neither of them is the camera.** The craft's own **deformation**
+carries how it looks, and a decaying burst of **speed** along the exit tangent carries how it
+flies — spec 01 §8's transient, which is the 78% of the **boost** a release does not keep. The
+camera was tried and refused: *"we don't really want shake effects or pauses like that, it turns
+out that really disrupts the flow"* (author, 2026-08-29). Spec 00 §5's motion table calls the
+camera's share of it KICK, and that row is void; **the word is punch**.
+
+**The burst never bends the ray**, only how fast the craft covers it, which is what lets it exist
+at all: **coasting**'s straight line is what makes the **compass** a solved reading rather than a
+simulation, and a burst along the tangent leaves that geometry untouched.
 _Avoid_: kick, impulse, boost (the boost is the lasting part, and they are different things),
 shake (a shake says damage, and this game has none)
 
@@ -286,9 +291,11 @@ _Avoid_: award (that is the grading, and a callout is how it is said), banner, t
 score text
 
 **Farewell ring**:
-The orbit detaching from the body and expanding away at release, in AURORA. It is the ellipse the
-craft actually rode, at the shape it had on the tick it let go, so a shallow swing's ring leaves
-oval and a settled one's leaves round.
+**Refused** (author, 2026-08-29). It named the orbit detaching from the body and expanding away at
+a release, in AURORA, and it was built and flown: *"when I release mid-circularisation, the oval of
+the orbit I'm on turns a bit purple and expands a bit. Let's remove that functionality."* The word
+is kept here so that a reader who meets it in an older document knows it was decided against rather
+than forgotten. What marks a release instead is the **callout** and the craft's own **punch**.
 
 **Hitstop**:
 **Refused** (ADR-0012). It named a brief world freeze at grab and release — *"the pause is the

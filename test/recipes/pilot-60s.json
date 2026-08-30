@@ -7,17 +7,18 @@
       "generator": "fixture",
       "version": 1
     },
-    "sim": 3,
-    "seed": 1180,
-    "ticks": 2775,
+    "sim": 4,
+    "seed": 289,
+    "ticks": 3772,
     "log": [
-      73, 257, 293, 309, 350, 371, 403, 421, 451, 460, 486, 497, 523, 535, 558, 583, 611, 655, 658,
-      866, 867, 976, 977, 1106, 1107, 1238, 1240, 1383, 1384, 1534, 1535, 1686, 1687, 1843, 1844,
-      2002, 2003, 2163, 2188, 2301, 2330, 2355, 2374, 2398, 2424, 2488, 2519
+      123, 286, 301, 332, 350, 469, 482, 511, 527, 617, 632, 663, 683, 887, 888, 1155, 1156, 1382,
+      1383, 1579, 1580, 1783, 1784, 2053, 2055, 2231, 2240, 2500, 2510, 2756, 2770, 2817, 2830,
+      2866, 2885, 2921, 2922, 2960, 2981, 3004, 3020, 3045, 3062, 3091, 3101, 3137, 3152, 3169,
+      3184, 3295, 3312, 3348, 3363, 3415, 3416, 3452, 3454, 3755
     ]
   },
   "observed": {
     "ticks": [],
-    "note": "Flown by the headless pilot in test/sim/run.ts at seed 1180 — not by a person. It is here so pnpm replay has a real run in the real format to prove itself on, and it is replaced the first time the author sends one from the phone."
+    "note": "Flown by the headless pilot in test/sim/run.ts, not by a person."
   }
 }

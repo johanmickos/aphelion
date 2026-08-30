@@ -462,6 +462,34 @@ the escalation bounded, and §5a's flat speed-by-altitude is the evidence it wor
 
 ---
 
+> ## ⚠ Built and amended, 2026-08-29 — §8's transient exists, and §9 gives up one word
+>
+> **§8's transient row was measured in M1.1 and never built.** This repo applied the 22% permanent
+> share and nothing else, so ADR-0012's punch had its feel and not its speed. It is built now, on
+> the author's ask: *"both a good capture and a good release should provide a small kick to the
+> ship's velocity, that fades after a bit, scaled by the quality."*
+>
+> **§9 gives up *"exactly constant speed"* and keeps everything that sentence was for.** The burst
+> runs along the exit tangent and **scales** a velocity rather than adding to one, so the heading
+> is untouched to the last bit and the path is still an exact straight line. §9's own reason for
+> the rule survives intact — *"because drift is a straight line, 'where do I let go to reach that
+> body' has a closed-form answer, which is what makes the compass a solved reading rather than a
+> simulation"* — and so does *"coasting earns nothing and costs nothing"*, because the burst is the
+> **release** spending what the release paid, not something coasting does to itself. What its
+> tolerance now reads is: heading constant to 10⁻⁶ radians over 600 ticks, exactly as before; speed
+> constant to 1 part in 10⁹ **once the burst has run out**, which it does in under two seconds and
+> to exactly zero.
+>
+> **The strength is 0.45 and not §8's measured 0.8.** Flown: *"all of the velocity kicks are a bit
+> too intense, let's scale them back a touch"* (author, 2026-08-29). §8's ×1.8 stays a measurement
+> of the prototype — a different camera, a third of this field's scale, and a hitstop underneath
+> it — and `VISION.md`'s seventh pillar is that a carried number is an opening position, not an
+> authority. It is on the bench.
+>
+> **What it changes about a run, and what it does not.** Same ray, same bodies reachable, same
+> route; a body 700 design units out arrives **40% sooner**. `SIM_VERSION` is **4**, and every
+> recipe recorded before it is refused.
+
 ## 9 · Coasting
 
 **No drag. No gravity. No force of any kind.** A coasting craft travels in an exact straight line

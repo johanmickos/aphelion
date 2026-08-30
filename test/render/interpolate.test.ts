@@ -49,7 +49,6 @@ function view(x: number, y: number, heading: number): PresentationState {
     sightings: [],
     compass: null,
     callout: null,
-    farewell: null,
   };
 }
 

@@ -73,7 +73,6 @@ import { compassOf, takenRing } from './compass.ts';
 import { advance, fade } from './decay.ts';
 import { relax, stretch, UNDEFORMED } from './deformation.ts';
 import { bloomOf, E3_BLOOM } from './energy.ts';
-import { detach, expand } from './farewell.ts';
 import { hueOf } from './identity.ts';
 import { sightingsOf } from './sighting.ts';
 import type {
@@ -84,7 +83,6 @@ import type {
   CompassView,
   DeformationView,
   Energy,
-  FarewellView,
   FlashView,
   PresentationState,
 } from './types.ts';
@@ -225,7 +223,6 @@ function present(
   previousBodies: readonly BodyView[] | null,
   previousCompass: CompassView | null,
   callout: CalloutView | null,
-  farewell: FarewellView | null,
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
@@ -252,7 +249,6 @@ function present(
     sightings: sightingsOf(sim.field.bodies, states, offered, sim.craft, camera),
     compass: compassOf(previousCompass, sim),
     callout,
-    farewell,
   };
 }
 
@@ -266,7 +262,7 @@ function present(
  * run opens with its scoreboard empty, however the last one ended.
  */
 export function createPresentation(sim: SimState): PresentationState {
-  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null, null);
+  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null);
 }
 
 /**
@@ -311,7 +307,7 @@ function calloutOf(
     );
     if (word !== null) return word;
   }
-  return linger(previous.callout, camera);
+  return linger(previous.callout);
 }
 
 /** The presentation one tick on. Call once per tick, in the same loop as `stepSim`. */
@@ -334,6 +330,5 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
     previous.bodies,
     previous.compass,
     callout,
-    event === 'RELEASE' ? detach(previous.compass) : expand(previous.farewell),
   );
 }

@@ -22,7 +22,6 @@ import { BOOST_ARM_TICKS, BOOST_PLATEAU_TICKS, SETTLE_TICKS } from '../../src/si
 import { calloutTicks, POP_RISE } from '../../src/state/callout.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
-import { FAREWELL_TICKS } from '../../src/state/farewell.ts';
 import { PUNCH_FLOOR, PUNCH_TICKS, punchSize, punchSpan } from '../../src/state/punch.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 
@@ -177,10 +176,13 @@ describe('the word, held inside the picture', () => {
    */
   it('never puts a word where the picture would cut it', () => {
     for (const flight of [AT_PEAK, AT_FREEZE]) {
-      for (const view of flight.views) {
+      for (let i = 0; i < flight.views.length; i++) {
+        const view = flight.views[i]!;
         const word = view.callout;
-        if (word === null || word.tier === 'MAKE') continue;
-        // The word's own extent, bounded the way `callout.ts` bounds it.
+        // **At birth**, which is the only tick the clamp runs on. After that the
+        // word is world-anchored and being left behind, so drifting out of the
+        // picture is what is supposed to happen to it.
+        if (word === null || word.life.age !== 0 || word.tier === 'MAKE') continue;
         const halfWide = (7 * 0.8 * word.size) / 2 + word.bloom;
         const halfTall = (0.75 * word.size) / 2 + word.bloom;
         expect(word.x - halfWide).toBeGreaterThanOrEqual(view.camera.x - DESIGN_WIDTH / 2 - 1e-6);
@@ -195,10 +197,28 @@ describe('the word, held inside the picture', () => {
     }
   });
 
-  /** And it is still world-anchored: the clamp only bites where it has to. */
-  it('leaves a word born in the middle of the picture exactly where it was', () => {
-    const word = AT_PEAK.views[AT_PEAK.released]!.callout!;
-    expect(word.x).toBe(word.bornX);
+  /**
+   * **And then it stays where it landed.** *"It's OK to leave the text where it
+   * lands, it should be a marker left behind at the point of scoring"* (author,
+   * 2026-08-29) — so `x` never moves after birth, and `y` only ever climbs on its
+   * own throw. A word that tracked the camera would be a HUD element, and spec
+   * 06 §4 is emphatic that this is not one: *"no band at the top of the screen."*
+   */
+  it('leaves the word where it landed, whatever the camera does', () => {
+    const from = AT_PEAK.released;
+    const born = AT_PEAK.views[from]!.callout!;
+    let cameraMoved = 0;
+    for (let i = from; i < from + calloutTicks(); i++) {
+      const word = AT_PEAK.views[i]!.callout!;
+      expect(word.x).toBe(born.bornX);
+      expect(word.y).toBeLessThanOrEqual(born.bornY);
+      cameraMoved = Math.max(
+        cameraMoved,
+        Math.abs(AT_PEAK.views[i]!.camera.y - AT_PEAK.views[from]!.camera.y),
+      );
+    }
+    // And the camera really did move underneath it, or this proves nothing.
+    expect(cameraMoved).toBeGreaterThan(100);
   });
 });
 
@@ -216,43 +236,6 @@ describe('the craft, leaving', () => {
     expect(home.craft.deformation.along).toBe(1);
     expect(home.craft.deformation.across).toBe(1);
     expect(home.craft.deformation.recovery).toBeNull();
-  });
-});
-
-describe('the farewell ring', () => {
-  /** Spec 02 §6: the orbit itself, detaching and expanding away from the body. */
-  it('is the orbit that was flown, placed at T0', () => {
-    const at = AT_PEAK.views[AT_PEAK.released]!;
-    expect(at.farewell).not.toBeNull();
-    expect(at.farewell!.spread).toBe(1);
-    expect(at.farewell!.decay.age).toBe(0);
-    // The same body, and the same sampled shape the compass was drawing.
-    const before = AT_PEAK.views[AT_PEAK.released - 1]!.compass!;
-    expect(at.farewell!.x).toBe(before.x);
-    expect(at.farewell!.path).toEqual(before.path);
-  });
-
-  it('expands away and is gone after 400ms', () => {
-    const from = AT_PEAK.released;
-    const spreads = [];
-    for (let i = from; i < from + FAREWELL_TICKS; i++) {
-      expect(AT_PEAK.views[i]!.farewell).not.toBeNull();
-      spreads.push(AT_PEAK.views[i]!.farewell!.spread);
-    }
-    expect(AT_PEAK.views[from + FAREWELL_TICKS]!.farewell).toBeNull();
-    for (let i = 1; i < spreads.length; i++) expect(spreads[i]!).toBeGreaterThan(spreads[i - 1]!);
-  });
-
-  /**
-   * A release during the **dive** has no frozen orbit, so there is no path to
-   * detach. Expanding a prediction away would be a farewell to something that
-   * never happened.
-   */
-  it('is not placed by a release that never froze', () => {
-    // Released while still diving, so there was never a frozen orbit to leave.
-    const early = flyDuringDive();
-    expect(early.released).toBeGreaterThan(0);
-    expect(early.views[early.released]!.farewell).toBeNull();
   });
 });
 
@@ -345,22 +328,6 @@ describe('the callout', () => {
   });
 });
 
-/** A swing let go of part way down the dive, before any orbit was frozen. */
-function flyDuringDive(): Flight {
-  const sim: SimState = createInitialState(fixtureField(), fixtureCraft(), 1);
-  const views: PresentationState[] = [createPresentation(sim)];
-  let grabbed = -1;
-  let released = -1;
-  for (let tick = 0; tick < 320; tick++) {
-    const before = sim.heldBody;
-    stepSim(sim, tick >= GRAB_AT && released === -1 && tick < GRAB_AT + 40 ? PRESS : LET_GO);
-    if (before === null && sim.heldBody !== null) grabbed = views.length;
-    if (before !== null && sim.heldBody === null) released = views.length;
-    views.push(derive(views[views.length - 1]!, sim));
-  }
-  return { views, grabbed, released };
-}
-
 /** What the swing was worth on the tick the button came up. */
 function quality(flight: Flight): number {
   return flight.views[flight.released - 1]!.compass!.envelope;
@@ -377,8 +344,7 @@ describe('the whole sequence', () => {
    */
   it('is over, except the word, 400ms after the release', () => {
     const from = AT_PEAK.released;
-    const settled = AT_PEAK.views[from + FAREWELL_TICKS]!;
-    expect(settled.farewell).toBeNull();
+    const settled = AT_PEAK.views[from + 24]!;
     expect(settled.craft.deformation.recovery).toBeNull();
     expect(settled.compass).toBeNull();
     // And the word is still there, world-anchored and being left behind.
@@ -398,7 +364,7 @@ describe('the whole sequence', () => {
     for (let i = 0; i < AT_PEAK.views.length; i++) {
       expect(again.views[i]!.camera).toEqual(AT_PEAK.views[i]!.camera);
       expect(again.views[i]!.callout).toEqual(AT_PEAK.views[i]!.callout);
-      expect(again.views[i]!.farewell).toEqual(AT_PEAK.views[i]!.farewell);
+      expect(again.views[i]!.craft.deformation).toEqual(AT_PEAK.views[i]!.craft.deformation);
     }
   });
 

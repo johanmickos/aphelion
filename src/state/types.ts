@@ -640,33 +640,6 @@ export interface CalloutView {
 }
 
 /**
- * The farewell ring (`CONTEXT.md`) — the orbit detaching from the body and
- * expanding away at a release, in AURORA.
- *
- * Spec [02 · §6](../../docs/spec/02-release.md), and *"the only AURORA the
- * baseline field ever wears"* — violet means the rules are different here, and
- * for 400ms after a release they were.
- *
- * It carries the compass's own sampled path rather than a radius, so the ring
- * that leaves is the ellipse the craft actually rode and not a circle standing in
- * for it. **A stroke and never a fill**: a large expanding filled ring is the one
- * element in this milestone that could move the renderer's overdraw off its
- * measured 1.53 screens ([performance](../../docs/plan/performance.md) §6), and
- * the design asks for a detaching orbit, which is a line.
- */
-export interface FarewellView {
-  /** The body it is leaving, in world units. */
-  readonly x: number;
-  readonly y: number;
-  /** The orbit it was, as radii at `i / length` of a turn from angle zero. */
-  readonly path: readonly number[];
-  /** How far it has expanded, as a multiplier on those radii. */
-  readonly spread: number;
-  /** How far through its 400ms it is. */
-  readonly decay: Decay;
-}
-
-/**
  * The sides of the world, as the renderer needs them.
  *
  * It is here for one job today — **the picture never shows more world than there
@@ -726,6 +699,4 @@ export interface PresentationState {
    * shape [`FlashView`](#flashview) uses for the same reason.
    */
   readonly callout: CalloutView | null;
-  /** The orbit expanding away from the body it was, or `null`. */
-  readonly farewell: FarewellView | null;
 }

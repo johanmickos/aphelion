@@ -43,7 +43,6 @@ import type {
   CalloutView,
   CompassView,
   Energy,
-  FarewellView,
   FlashView,
   PresentationState,
   RingView,
@@ -55,7 +54,6 @@ import { fade } from '../state/decay.ts';
 import { SPEAKS } from '../state/callout.ts';
 import { letterbox, visible } from './letterbox.ts';
 import {
-  AURORA,
   BODY_FILL,
   CORE,
   dim,
@@ -923,39 +921,6 @@ function drawSighting(context: CanvasRenderingContext2D, mark: SightingView): vo
 }
 
 /**
- * The farewell ring — the orbit detaching from the body and expanding away, in
- * AURORA (spec [02 · §6](../../docs/spec/02-release.md)).
- *
- * *"The only AURORA the baseline field ever wears."* Violet means the rules are
- * different here, and for 400ms after a release they were: the path the craft was
- * bound to stops being a constraint and leaves.
- *
- * **A stroke and never a fill.** A large expanding filled ring is the one shape
- * in this milestone whose area grows as the square of what is being animated, and
- * it is the only thing that could have moved the renderer's overdraw off its
- * measured 1.53 screens. The design asks for an orbit detaching, which is a line.
- */
-function drawFarewell(context: CanvasRenderingContext2D, farewell: FarewellView): void {
-  const n = farewell.path.length;
-  if (n === 0) return;
-  context.beginPath();
-  for (let k = 0; k <= n; k++) {
-    const angle = ((k % n) / n) * Math.PI * 2;
-    const r = farewell.path[k % n]! * farewell.spread;
-    const x = farewell.x + Math.cos(angle) * r;
-    const y = farewell.y + Math.sin(angle) * r;
-    if (k === 0) context.moveTo(x, y);
-    else context.lineTo(x, y);
-  }
-  context.lineWidth = FAREWELL_WIDTH;
-  context.strokeStyle = dim(AURORA, STRENGTH[2] * fade(farewell.decay));
-  context.stroke();
-}
-
-/** The ring leaves at the weight the instrument was drawn at, so it reads as the same line. */
-const FAREWELL_WIDTH = 1.5 * BOARD_PIXEL;
-
-/**
  * How each tier's word is painted — spec
  * [06 · §2](../../docs/spec/06-awards.md)'s ladder, white → green → gold.
  *
@@ -992,7 +957,7 @@ function drawCallout(context: CanvasRenderingContext2D, callout: CalloutView): v
   // It decays where it was rather than following the craft, because what it marks
   // is the arc that paid — and **on its own clock**, spec 02 §6's 420ms, which is
   // a quarter of the word's. The two arrive together and do not leave together.
-  if (callout.windowStrength <= 0) return drawWord(context, callout, token);
+  if (callout.windowStrength <= 0) return drawMark(context, callout, token);
   context.save();
   context.lineCap = 'round';
   context.beginPath();
@@ -1008,12 +973,45 @@ function drawCallout(context: CanvasRenderingContext2D, callout: CalloutView): v
   context.stroke();
   context.restore();
 
-  drawWord(context, callout, token);
+  drawMark(context, callout, token);
 }
 
-/** The word itself, in the tier's own colour, sitting in its own light. */
+/**
+ * What a **make** shows: its taken window, and nothing else.
+ *
+ * Spec [06 · §1](../../docs/spec/06-awards.md)'s law is *"points for the make,
+ * words for the mastery"*, and §2 gives it *"none — points only"*. **The points
+ * are spec 08's and arrive in M4**, so until then a make is marked by the one
+ * thing it does draw: the window it was taken on, lit in that body's hue and
+ * decaying over 420ms with the rest of the instrument.
+ *
+ * **A dot was tried here and withdrawn the same evening.** *"I released what I
+ * thought was within the planet window and I got no text accolade for it"*
+ * (author) — measured on that run, four of its seven graded releases were makes,
+ * so more than half of what the player got right said nothing. A CORE dot at
+ * §2's own 70% was put at the release point to stand in for the missing number,
+ * and flown it read as litter: *"there's some small white dot being left behind
+ * at times. Can you identify it, and remove it?"* It was white in a world where
+ * nothing else is, it was small, and it outlived every other part of the release
+ * by more than a second.
+ *
+ * **The gap it was covering is real and this is not the thing that closes it.**
+ * What a make is owed is a number, the number is M4's, and a stand-in that reads
+ * as debris is worse than the silence it was filling.
+ */
+function drawMark(context: CanvasRenderingContext2D, callout: CalloutView, token: string): void {
+  if (SPEAKS[callout.tier]) drawWord(context, callout, token);
+}
+
+/**
+ * The word itself, in the tier's own colour, over a rim that keeps it legible.
+ *
+ * The type is **Archivo 800, tracked caps** and never the display face: spec 00
+ * §4 bans Anton here outright, because *"moving text needs open counters"*
+ * (Direction 06).
+ */
 function drawWord(context: CanvasRenderingContext2D, callout: CalloutView, token: string): void {
-  if (!SPEAKS[callout.tier] || callout.strength <= 0) return;
+  if (callout.strength <= 0) return;
 
   context.save();
   context.font = `800 ${callout.size}px ${UTILITY_FACE}`;
@@ -1116,12 +1114,6 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   }
 
   if (view.compass !== null) drawCompass(context, view.compass);
-
-  // The orbit leaving, then the light that marks where it was let go of, then the
-  // word standing in that light. The flash is **under** the word rather than over
-  // it: additive light across type is a wash, and spec 06 §4 composes the callout
-  // as one unit rather than as a word with a glare on it.
-  if (view.farewell !== null) drawFarewell(context, view.farewell);
 
   if (view.flash !== null) drawFlash(context, view.flash);
 

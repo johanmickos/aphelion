@@ -173,6 +173,53 @@ for what word is chosen, [08 · Economy](./08-economy.md) for what is cashed.
 > every ungraded one was genuinely outside its window — the nearest by 12% of a half-width. Pinned
 > in `test/state/goldens.test.ts` so it cannot quietly become one-sided.
 
+> ## ⚠ Flown again, 2026-08-29 — the punch gets its speed, and §6 loses its ring
+>
+> **The transient is built at last, and it is the half of ADR-0012 nothing had.** Spec
+> [01 · §8](./01-swing.md) has measured it since M1.1 — *"×1.8 on release, decaying linearly to
+> nothing over 1.3s"*, the 78% of the boost a release does **not** keep — and this repo had only
+> ever applied the 22% that is kept. Asked for after flying M2.4: *"both a good capture and a good
+> release should provide a small kick to the ship's velocity, that fades after a bit, scaled by the
+> quality."*
+>
+> **It runs along the exit tangent, so it does not bend the ray.** That is the thing that looked
+> like it would forbid it: spec [01 · §11](./01-swing.md) rests the compass's closed form on drift
+> being a straight line. A burst that scales a velocity rather than adding to one leaves the
+> heading exactly alone — same ray, same bodies reachable, same route — and moves only **when** the
+> craft gets there. Measured at the median exit speed, a body 700 design units out arrives in 0.43s
+> against 0.72s.
+>
+> **0.45 and not 0.8**, which is spec 01 §8's measurement scaled back on the author's word: *"all
+> of the velocity kicks are a bit too intense, let's scale them back a touch."* The prototype's
+> figure stays a measurement of the prototype. It is the first slider on the bench.
+>
+> **`SIM_VERSION` is 4 and every dispatch recorded before it is refused.** That is the cost, paid
+> deliberately: the alternative was flying the gate on a game the specs describe and the build did
+> not have. The shipped recipe is regenerated, on a new seed — the old one now leaves the field
+> after eleven edges.
+>
+> **§6's farewell ring is withdrawn.** Built and flown: *"when I release mid-circularisation, the
+> oval of the orbit I'm on turns a bit purple and expands a bit. Let's remove that
+> functionality."* It was the ellipse actually ridden, at the shape it had on the tick of release,
+> which mid-settle is an oval — so what the author describes is the element working exactly as this
+> file specified it. `CONTEXT.md` keeps the word and marks it refused.
+>
+> **And two on the word.** It is **left where it lands**: the clamp that keeps it inside the
+> picture now runs at **birth only**, because applied every tick it slid the word up the screen as
+> the camera climbed — *"it's OK to leave the text where it lands, it should be a marker left
+> behind at the point of scoring"*, which is spec [06 · §4](./06-awards.md)'s own world-anchoring.
+> And it climbs further: 50 prototype units against the 34 that codebase uses, for *"a classic
+> 'ka-ching' money effect"*. The curve is still carried; the amplitude is this game's.
+>
+> **A make still says nothing, and that is now a known gap rather than an oversight.** *"I released
+> what I thought was within the planet window and I got no text accolade for it. Do we need to add
+> another text tier?"* Measured on that run, four of its seven graded releases were makes — so more
+> than half of what the player got right was silent. **No new tier**: spec 06 §1 refuses a fourth
+> word outright, and spec 06 §2 already gives a make *"points only"*. What is missing is the
+> **number**, and the number is spec [08](./08-economy.md)'s and M4's. A CORE dot was tried as a
+> stand-in and withdrawn the same evening — *"there's some small white dot being left behind at
+> times"* — because a stand-in that reads as debris is worse than the silence it fills.
+
 ## 1 · The two rules
 
 1. **Every motion is strictly along the exit tangent** — the line the nose has been pointing down
@@ -194,7 +241,6 @@ a freeze exists.
 |---|---|---|---|
 | Craft deformation | T0 | T+180ms | See §4 |
 | The punch | T0 | T+180ms | Spent on the craft's own stretch, scaled by quality. See §5 |
-| Farewell ring | T0 | T+400ms | The orbit detaches from the body and expands away, in AURORA |
 | The taken window | T0 | T+420ms | Stays lit and decays where it was earned. Unused rings die instantly |
 | Award word | T+20ms | T+1 740ms | Pop, linger, then decay. See spec [06 · §4](./06-awards.md) |
 | Its bloom | T+20ms | with the word | 5 / 8 / 12px in the tier's own colour. **No E3** — withdrawn 2026-08-29 |
@@ -220,7 +266,7 @@ this file and spec [06](./06-awards.md) could not both be right:
 | Frame | What is true |
 |---|---|
 | **T−80 · MATCHED** | The hand lies on the dot; the window is E2. The player already knows the tier. Peak tension |
-| **T0 · IMPULSE** | The craft leaves along its nose, deformed by what the swing was worth — 1.5 / 0.7 at full quality. The farewell ring detaches and expands. Unused rings die instantly; the taken window stays lit. **The camera does not move** |
+| **T0 · IMPULSE** | The craft leaves along its nose, deformed by what the swing was worth — 1.5 / 0.7 at full quality — and **faster than it will be a moment later** (spec [01 · §8](./01-swing.md)'s transient). Unused rings die instantly; the taken window stays lit. **The camera does not move** |
 | **T+20 · CONFIRM** | The word blooms at the dot that earned it, in its own tier colour |
 | **T+180 · RIDE** | The word rides its pop out on the dot while the craft runs. The stretch arrives home, past rest once. The trail is a solid luminous line — no breadcrumbs |
 | **T+400 · SETTLED** | Quiet. The body is DUSK, the ring is gone, the compass has left. The word is still lit and being left behind. The only permanent change is chain +1, so the craft's bloom is 4px wider than an orbit ago |
@@ -249,14 +295,17 @@ none of itself into velocity, which is what lets it be large: *"a player tapping
 the punch and keeps none of it, while a player flying well gets the punch **and** the boost
 underneath it."* What a run is worth is untouched by how good it felt.
 
-**It is spent on §4's stretch and on nothing else.** Quality decides how much of that stretch a
-release earns and how long it takes coming home:
+**It is felt in two places, and neither of them is the camera.** §4's stretch carries how the
+release *looks*, and spec [01 · §8](./01-swing.md)'s transient carries how it *flies* — a burst of
+speed along the exit tangent that decays linearly to nothing. Quality scales both, on one pair of
+curves:
 
 | | Value |
 |---|---|
 | Amplitude at full quality | §4's own — **1.5 / 0.7**, unchanged |
 | Amplitude at no quality | **0.45** of it, and never zero: the craft still left |
 | Return | **180ms × (1 + ½ quality)**, one overshoot |
+| Speed at full quality | **+45%**, decaying linearly to nothing over 1.3s × (1 + ½ quality) |
 | At a grab | **Nothing.** Grabs are never graded (spec [06 · §1](./06-awards.md)) |
 
 **Quality enters twice, and the second channel is deliberately the gentler one.** A release at the
@@ -288,9 +337,8 @@ indistinguishable from no release at all.
   a quarter of the word's, and carried by the callout rather than by a compass that has already
   left.
 - **The held body goes DUSK at release**, not at grab (spec [04](./04-bodies.md)).
-- **The farewell ring** is the orbit itself, detaching and expanding away from the body, in
-  AURORA — the only AURORA the baseline field ever wears. It is the ellipse actually ridden, at
-  the shape it had on the tick the craft let go, and it is **stroked and never filled**.
+- **There is no farewell ring.** It was specified here, built, flown and refused (see the notice
+  above). AURORA has no wearer in the baseline field.
 - **The flown arc stops being a clock.** Through the swing it is lit by what the boost was worth
   along it (`CONTEXT.md`: flown arc); at the release there is no envelope left to read, so it
   falls to its floor and is carried out with the instrument. It never goes dark, because it is

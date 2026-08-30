@@ -118,7 +118,18 @@ describe('the snapshot', () => {
       'rng',
       'tick',
     ]);
-    expect(Object.keys(state.craft).sort()).toEqual(['vx', 'vy', 'x', 'y']);
+    // The three `burst` fields are the release's transient (spec 01 §8), which
+    // moves the craft and is therefore world state — a snapshot that did not see
+    // it would call two different runs the same run.
+    expect(Object.keys(state.craft).sort()).toEqual([
+      'burst',
+      'burstLeft',
+      'burstSpan',
+      'vx',
+      'vy',
+      'x',
+      'y',
+    ]);
     expect(Object.keys(fly(1, 100).dive!).sort()).toEqual([
       'clearanceTicks',
       'grabRadius',

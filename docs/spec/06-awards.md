@@ -78,6 +78,29 @@ release **defers** the carry rather than destroying it (ADR-0008), which amends 
 > because `d` is an **absolute** offset. Measured over the recorded dispatches, 40 graded releases
 > fell short of the dot and 50 past it. Now asserted rather than merely true.
 
+> ## ⚠ Flown, 2026-08-29 — the make's silence is a missing number, not a missing word
+>
+> *"I released what I thought was within the planet window and I got no text accolade for it. How
+> does this translate to the future points system and current tiers of text? Do we need to add
+> another text tier?"* (author).
+>
+> **The grading was right.** Measured on that run, four of its seven graded releases were **makes**
+> and landed well inside their windows; the one release that said nothing *and* deserved nothing
+> was outside its window by 29% of a half-width.
+>
+> **No new tier.** §1 refuses a fourth word outright and gives the reason — *"a word for 'merely
+> made it' devalues every word above it"* — and §2 already answers the question: a make is
+> `×1.0`, **CORE at 70%**, E1, *"none — points only"*, and §4 gives it *"points only, at 13px."*
+> **A make is specified to speak, in numbers.** It is silent today because the economy is spec
+> [08](./08-economy.md)'s and arrives in M4, so there is no number to show yet.
+>
+> So this is a **sequencing gap** and it is worth naming as one: until M4, the most common
+> successful release in the game says nothing, and the M2 gate is being flown that way. A CORE dot
+> was tried as a stand-in for the missing number and withdrawn the same evening — *"there's some
+> small white dot being left behind at times, can you identify it and remove it?"* — because a
+> stand-in that reads as debris is worse than the silence it fills. What a make shows meanwhile is
+> its **taken window**, lit and decaying over spec 02 §6's 420ms with the rest of the instrument.
+
 ## 1 · The law
 
 **Points for the make. Words for the mastery.**

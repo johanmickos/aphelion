@@ -14,6 +14,7 @@
  */
 import type { Body } from './body.ts';
 import type { Craft } from './craft.ts';
+import { burstOf } from './craft.ts';
 import { pullScale } from './gravity.ts';
 
 /**
@@ -62,6 +63,21 @@ export function integrate(craft: Craft, body: Body, seconds: number, substeps: n
  * than approximately.
  */
 export function coast(craft: Craft, seconds: number): void {
-  craft.x += craft.vx * seconds;
-  craft.y += craft.vy * seconds;
+  // **The burst moves the craft and never turns it.** Spec 01 §8's transient is
+  // a multiplier on the speed along the exit tangent, so it scales a velocity
+  // rather than adding to it — the heading is untouched, the path stays an exact
+  // straight line, and spec 01 §11's closed-form compass is solved on the same
+  // ray it always was. What changes is how fast the craft covers it.
+  const along = 1 + burstOf(craft);
+  craft.x += craft.vx * along * seconds;
+  craft.y += craft.vy * along * seconds;
+  // And it spends itself, linearly, to exactly nothing.
+  if (craft.burstLeft > 0) {
+    craft.burstLeft -= seconds;
+    if (craft.burstLeft <= 0) {
+      craft.burstLeft = 0;
+      craft.burst = 0;
+      craft.burstSpan = 0;
+    }
+  }
 }

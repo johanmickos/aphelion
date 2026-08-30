@@ -263,19 +263,30 @@ describe('quality, which the punch is scaled by', () => {
 
 describe('a release during the dive', () => {
   /**
-   * There is no orbit to be paid on and nothing is applied: the craft leaves on
-   * exactly the velocity gravity had given it. Turning it onto a tangent would
-   * hand the player a way to steer, which is a second verb.
+   * **No boost, and no change of direction.** There is no orbit to be paid on, so
+   * the craft leaves on exactly the velocity gravity had given it — turning it
+   * onto a tangent would hand the player a way to steer, which is a second verb.
+   *
+   * What it *does* get is the **punch**, which is a different channel: ADR-0012
+   * grades an unfrozen release on how hard the body is bending its heading, and
+   * pays a transient on that. The transient rides beside the velocity rather than
+   * in it, so both of those sentences are true at once — and this asserts the
+   * first one exactly by naming the fields it is about.
    */
-  it('changes nothing about the craft at all', () => {
+  it("changes neither the craft's velocity nor its position", () => {
     const state = placed(geometry(350, 60, 120));
     stepSim(state, PRESS);
     for (let tick = 0; tick < 20; tick++) stepSim(state, PRESS);
     expect(state.orbit).toBeNull();
 
-    const before = { ...state.craft };
+    const { x, y, vx, vy } = state.craft;
     release(state);
-    expect(state.craft).toEqual(before);
+    expect({ x: state.craft.x, y: state.craft.y, vx: state.craft.vx, vy: state.craft.vy }).toEqual({
+      x,
+      y,
+      vx,
+      vy,
+    });
     expect(state.heldBody).toBeNull();
   });
 
