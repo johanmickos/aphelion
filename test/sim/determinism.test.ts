@@ -134,6 +134,7 @@ describe('the snapshot', () => {
       'aim',
       'clearanceTicks',
       'grabRadius',
+      'knock',
       'peakEnergy',
       'smallestRadius',
     ]);

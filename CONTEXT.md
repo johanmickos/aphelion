@@ -315,6 +315,16 @@ which already grows with **grip** and swells with **closing** as the craft comes
 _Avoid_: capture quality (a **capture** is the event and this is the reading of it), tightness
 (that is on **depth**'s avoid line), approach, capture grade
 
+**Knock**:
+How much of its speed the **floor** took from the craft in one tick, as a share of what it had —
+and the word a hard one earns. The floor keeps the tangential half of the velocity and removes the
+radial half, so this is a reading of **aim** from the other end: a craft that came in sideways
+loses almost nothing, one pointed at the body loses nearly all of it. The **arrival**'s opposite,
+and the two can never be said of the same **capture**. Spoken in ION, the world's reserved pink,
+because it is about what the floor had to do and not about the body.
+_Avoid_: bounce (the **floor** does that on every dive and mostly for free), crash (a run ends on
+one; this does not), impact (that is an **ending**), collision
+
 **Farewell ring**:
 **Refused** (author, 2026-08-29). It named the orbit detaching from the body and expanding away at
 a release, in AURORA, and it was built and flown: *"when I release mid-circularisation, the oval of

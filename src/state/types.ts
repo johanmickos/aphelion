@@ -677,6 +677,31 @@ export interface ArrivalView {
 }
 
 /**
+ * The word a hard landing on the floor earned — `CONTEXT.md`'s **knock**.
+ *
+ * It carries no `body` and no `hue`, and both absences are the design. A knock is
+ * not about the body it happened at, it is about what the **floor** had to do, so
+ * it is drawn in spec 00 §1's **ION** — the world's reserved pink for risk — and
+ * it is the one word in the game that does not wear an identity.
+ */
+export interface KnockView {
+  /** What it says — one of [`KNOCK_WORDS`](./knock.ts), chosen by the tick. */
+  readonly word: string;
+  /** Where it is drawn, in world units: the point of contact, plus the climb. */
+  readonly x: number;
+  readonly y: number;
+  /** The contact itself, which does not move — where it was born. */
+  readonly bornX: number;
+  readonly bornY: number;
+  /** How tall it is set, in design units. */
+  readonly size: number;
+  /** Linger then decay: one clock, two stretches, climbing throughout. */
+  readonly life: Decay;
+  /** How lit it is now, from 1 through the linger to 0. */
+  readonly strength: number;
+}
+
+/**
  * The sides of the world, as the renderer needs them.
  *
  * It is here for one job today — **the picture never shows more world than there
@@ -747,4 +772,15 @@ export interface PresentationState {
    * event, and there are now two kinds of event.
    */
   readonly arrival: ArrivalView | null;
+  /**
+   * The word the last hard landing on the **floor** earned, or `null`.
+   *
+   * **A third slot**, following the shape the author already ruled for the
+   * second. It is not lit at the same time as an `arrival` — the two grade the
+   * same geometry from opposite ends and their thresholds are set so they cannot
+   * both fire on one capture — but it is struck a tick *before* the freeze, so
+   * sharing that slot would mean a knock and the arrival of the **next** swing
+   * fighting over one field for no reason.
+   */
+  readonly knock: KnockView | null;
 }

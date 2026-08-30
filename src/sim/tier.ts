@@ -193,3 +193,40 @@ export function tierFor(offset: number, width: number): Tier | null {
 export function alignmentOf(offset: number): number {
   return Math.max(0, 1 - Math.abs(offset) / (Math.PI / 2));
 }
+
+/**
+ * How much of its speed the floor has to take before the collision is worth
+ * saying out loud — `CONTEXT.md`'s **knock**, as a share.
+ *
+ * **0.15 is derived from the arrival and not chosen for its own sake.** The two
+ * words read the same geometry from opposite ends: a dive that comes in sideways
+ * and commits earns [`arrivedTight`](#arrivedtight), and a dive pointed at the
+ * body slams into the floor, because the floor keeps the tangential half of the
+ * velocity and removes the radial half. Measured over 77 real captures, the
+ * share the floor takes runs against the aim at **r = −0.44**.
+ *
+ * That relationship is what fixes this number. **The two words must never
+ * contradict each other** — congratulating a capture and calling it a crash in
+ * the same breath is worse than saying nothing — so the line goes above the
+ * hardest knock any *tight* arrival takes, which is measured at **12.9%** (the
+ * author's own *"really tight"* capture, which loses 13% of its speed to the
+ * floor and still earns its word). 0.15 clears that with margin and selects
+ * **4% of captures**, all of them plunges: the three that qualify came in at aim
+ * 0.02, 0.05 and 0.36.
+ *
+ * The floor is touched at all on only 14% of captures, and most of those cost
+ * nothing — the share is p25 0.00, p50 0.03, and then jumps to 0.13 and above
+ * for the four hardest. It is a tail, not a spread, which is what a word about
+ * collisions wants.
+ */
+export const KNOCK_BAND = 0.15;
+
+/**
+ * Whether the floor caught the craft hard enough to say so.
+ *
+ * A pure function of one number, and the same acceptance as everything else in
+ * this file: grading imports nothing from the economy.
+ */
+export function struckHard(knock: number): boolean {
+  return knock >= KNOCK_BAND;
+}

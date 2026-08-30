@@ -126,6 +126,41 @@ release **defers** the carry rather than destroying it (ADR-0008), which amends 
 > **What is graded is a distance and not depth**, and that is measured: depth saturates at p50
 > exactly **1.00** over 493 captures, so more than half of everything would earn the top word.
 >
+> ## ⚠ Built, 2026-08-30 — a third word, for the collision, and §8's register is broken on purpose
+>
+> Asked for by the author after flying a capture that read as a crash: *"I caught a planet at the
+> very last second, abruptly changing angle/course to circularize. For moments like these, with
+> strong kinks in the capture/arrival path, I'd like to pop up thematic pink text saying things
+> like 'Bonk!' 'Oof!' etc. to indicate a big collision."*
+>
+> **Nothing had to be invented to detect it.** Spec 01 §10's **floor** has caught the craft since
+> M1, keeping the tangential half of the velocity and removing the radial half, and that removal
+> *is* the kink. On the flagged run the tick before the freeze turns the craft **45.7°** and takes
+> **290** of its speed — three times sharper than anything else in the run. The word is
+> `BONK · OOF · THUD`, chosen by the tick, because a knock is a property of the moment where an
+> **arrival** is a property of the body.
+>
+> **It is the arrival's opposite end, and that fixes its threshold rather than taste doing it.**
+> How much the floor takes is a reading of **aim**: over 77 real captures the two run together at
+> **r = −0.44**. So the plunges that used to steal the arrival's word are exactly the ones that get
+> this one. Because the two grade one geometry from opposite ends, **they must never contradict** —
+> congratulating a capture and calling it a crash in the same breath is worse than silence — so the
+> band sits above the hardest knock any tight arrival takes, measured at **12.9%**. At 15% it
+> selects **4% of captures**, and over the author's whole corpus there is not one tick where both
+> words are lit.
+>
+> **§8's register is broken, and the break is the author's.** *"State what happened, name the
+> place, one true number, never scold, never joke at the player"* exists so the game is never
+> clever at the player's expense, and onomatopoeia is not: it is the noise the world made, not a
+> remark about the pilot. `OOF` is the closest to that line and stays because the author wrote it.
+>
+> **Pink was already spoken for, and correctly.** Spec 00 §1 gives **ION** a monopoly — *"risk, and
+> nothing else in the world glows pink"* — so the author's *"thematic pink"* needed no new token.
+> It is the only word in the game drawn in something other than a body's own hue, because it is not
+> about the body: it is about what the floor had to do.
+>
+> `SIM_VERSION` did not move, checked the same way as the aim change below.
+
 > ## ⚠ Ruled and rebuilt, 2026-08-30 — closeness is half the test, and **aim** is the other half
 >
 > The band below shipped alone for a day and the author flew it: *"some of the captures were too

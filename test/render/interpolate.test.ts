@@ -50,6 +50,7 @@ function view(x: number, y: number, heading: number): PresentationState {
     compass: null,
     callout: null,
     arrival: null,
+    knock: null,
   };
 }
 

@@ -36,6 +36,7 @@ import {
 } from '../../src/state/callout.ts';
 import { STRETCH_ACROSS, STRETCH_ALONG } from '../../src/state/deformation.ts';
 import { ARRIVAL_WORDS, arrivalTicks } from '../../src/state/arrival.ts';
+import { KNOCK_WORDS, knockTicks } from '../../src/state/knock.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { DESIGN_WIDTH } from '../../src/state/design.ts';
 import { bloomOf } from '../../src/state/energy.ts';
@@ -94,6 +95,31 @@ function flownArrivals(): PresentationState[] {
 }
 
 const FLOWN = flownArrivals();
+
+/**
+ * A third run, for the **knock** — the run that asked for it.
+ *
+ * Flown by the author on 2026-08-30: *"I caught a planet at the very last second,
+ * abruptly changing angle/course to circularize... I'd like to pop up thematic
+ * pink text."* The kink is **tick 368**, where the floor takes 290 of the craft's
+ * speed and turns it 45.7° in a single tick — three times sharper than anything
+ * else in the run, and the reason this word exists.
+ */
+function flownKnocks(): PresentationState[] {
+  const text = readFileSync(new URL('../recipes/knock-flown.json', import.meta.url), 'utf8');
+  const { recipe } = parseDispatch(JSON.parse(text));
+  let view = createPresentation(openRun(recipe));
+  const views = [view];
+  replayRun(recipe, {
+    onTick: (state) => {
+      view = derive(view, state);
+      views.push(view);
+    },
+  });
+  return views;
+}
+
+const KNOCKED = flownKnocks();
 
 /** The picture on a named tick. Indices are ticks, because tick zero is index zero. */
 const at = (tick: number): PresentationState => {
@@ -700,5 +726,54 @@ describe('the craft', () => {
     }
     // Spec 00 §3's +4px a link, converted: chain 7 is 54 + 7 × 12.
     expect(bloomOf(2, 7)).toBe(138);
+  });
+});
+
+describe('the knock · a word for the collision', () => {
+  /**
+   * Asked for by the author, 2026-08-30, after flying a capture that read as a
+   * crash. It is not a new event: spec 01 §10's floor has been catching the craft
+   * since M1, and the radial speed it removes **is** the kink. This says so.
+   */
+  it('is struck on the tick the floor takes the speed, and once in the run', () => {
+    const born = KNOCKED.filter((view) => view.knock?.life.age === 0);
+    expect(born.length).toBe(1);
+    expect(born[0]!.tick).toBe(368);
+  });
+
+  /** At the point of contact, which is the place that earned it. */
+  it('is born where the craft hit', () => {
+    const at = KNOCKED.find((view) => view.knock?.life.age === 0)!;
+    expect(at.knock!.bornX).toBe(at.craft.x);
+    expect(at.knock!.bornY).toBe(at.craft.y);
+  });
+
+  it('says one of its three words, and the tick decides which', () => {
+    const at = KNOCKED.find((view) => view.knock?.life.age === 0)!;
+    expect(KNOCK_WORDS as readonly string[]).toContain(at.knock!.word);
+    expect(at.knock!.word).toBe(KNOCK_WORDS[at.tick % KNOCK_WORDS.length]);
+  });
+
+  /**
+   * **Never at the same time as an arrival**, and this is the test that keeps it
+   * true end to end rather than only at the threshold. Over the author's whole
+   * dispatch corpus there is not one tick where both are lit.
+   */
+  it('is never lit beside the arrival, on either run', () => {
+    for (const run of [KNOCKED, FLOWN])
+      expect(run.filter((v) => v.knock !== null && v.arrival !== null).length).toBe(0);
+  });
+
+  /** It climbs and leaves on the callout's own curves, because they are one grammar. */
+  it('climbs and fades like the other two words do', () => {
+    const born = KNOCKED.findIndex((v) => v.knock?.life.age === 0);
+    const rise: number[] = [];
+    for (let i = born; i < born + knockTicks(); i++) {
+      const word = KNOCKED[i]!.knock!;
+      rise.push(word.bornY - word.y);
+    }
+    for (let i = 1; i < rise.length; i++) expect(rise[i]!).toBeGreaterThanOrEqual(rise[i - 1]!);
+    expect(KNOCKED[born + knockTicks() - 1]!.knock!.strength).toBeLessThan(0.05);
+    expect(KNOCKED[born + knockTicks()]!.knock).toBeNull();
   });
 });

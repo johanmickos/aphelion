@@ -45,6 +45,7 @@ import type {
   CompassView,
   Energy,
   FlashView,
+  KnockView,
   PresentationState,
   RingView,
   SightingView,
@@ -61,6 +62,7 @@ import {
   DUSK,
   identity,
   identityRising,
+  ION,
   LUMEN,
   SOLAR,
   VOID,
@@ -1075,6 +1077,36 @@ function drawArrival(context: CanvasRenderingContext2D, arrival: ArrivalView): v
   context.restore();
 }
 
+/**
+ * The knock's word, at the point of contact.
+ *
+ * **In ION, and it is the only word in the game that wears no identity.** Spec
+ * [00 · §1](../../docs/spec/00-tokens.md) gives ION a monopoly — *"risk, and
+ * nothing else in the world glows pink"* — and the author asked for this one in
+ * *"thematic pink"* without knowing the token was already sitting there waiting
+ * for it. A collision is risk arriving, so it takes the reserved colour rather
+ * than borrowing a body's hue: the arrival says *which body you did it to*, and
+ * this says *what the floor had to do*, which is not about the body at all.
+ *
+ * Rimmed and set in the same face as the other two, because three words drawn
+ * three ways would be three grammars.
+ */
+function drawKnock(context: CanvasRenderingContext2D, knock: KnockView): void {
+  if (knock.strength <= 0) return;
+  context.save();
+  context.font = `800 ${knock.size}px ${UTILITY_FACE}`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.letterSpacing = `${knock.size * CALLOUT_TRACKING}px`;
+  context.lineWidth = RIM_WIDTH;
+  context.lineJoin = 'round';
+  context.strokeStyle = dim(VOID, RIM_STRENGTH * knock.strength);
+  context.strokeText(knock.word, knock.x, knock.y);
+  context.fillStyle = dim(ION, knock.strength);
+  context.fillText(knock.word, knock.x, knock.y);
+  context.restore();
+}
+
 /** Spec 00 §4's utility face. Never a monospace — the figures do the technical work. */
 const UTILITY_FACE = "'Archivo', system-ui, sans-serif";
 const LABEL_SIZE = 9 * BOARD_PIXEL;
@@ -1150,6 +1182,10 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   if (view.callout !== null) drawCallout(context, view.callout);
 
   if (view.arrival !== null) drawArrival(context, view.arrival);
+  // Last, so the one word that means *something just went wrong* is never drawn
+  // under another. They cannot both be a capture's, but a knock and the previous
+  // swing's release word can overlap.
+  if (view.knock !== null) drawKnock(context, view.knock);
 
   // The craft's own bloom is drawn round, and the dart inside it is what
   // stretches: spec 00 §5 puts every streak parallel to velocity, and a glow

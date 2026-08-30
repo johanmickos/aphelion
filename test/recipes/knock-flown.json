@@ -1,0 +1,19 @@
+{
+  "kind": "run-dispatch",
+  "at": "2026-08-30T05:46:58.806Z",
+  "recipe": {
+    "version": 2,
+    "field": {
+      "generator": "fixture",
+      "version": 1
+    },
+    "sim": 6,
+    "seed": 1,
+    "ticks": 1054,
+    "log": [32, 155, 172, 217, 244, 343, 362, 462, 479, 532, 552, 610, 636, 955, 982, 992]
+  },
+  "observed": {
+    "ticks": [],
+    "note": "Flown by the author on a phone, 2026-08-30, and the run that asked for the knock: \"I caught a planet at the very last second, abruptly changing angle/course to circularize. For moments like these, with strong kinks in the capture/arrival path, I'd like to pop up thematic pink text.\" The kink is tick 368 -- the floor takes 290 of the craft's speed and turns it 45.7 degrees in one tick, three times sharper than anything else in the run. Seven captures, one knock."
+  }
+}

@@ -97,6 +97,23 @@ export interface Dive {
    * only thing that has to be remembered is how long there is left to pay it.
    */
   clearanceTicks: number;
+  /**
+   * How much of its speed the floor took from the craft **this tick**, as a
+   * share of what it had at the start of it (`CONTEXT.md`: **knock**).
+   *
+   * Zero on every tick the floor was not reached, which is most of them. A
+   * per-tick reading and not an accumulation, because what it feeds is a word
+   * said **at the moment of the collision** rather than a verdict on the dive —
+   * written fresh each tick and read on the same one.
+   *
+   * What it measures is the price of the guarantee. [`holdAboveFloor`](#) keeps
+   * the tangential half of the velocity and removes the radial half, so a craft
+   * that came in sideways loses almost nothing and one pointed at the body loses
+   * nearly all of it. That is the collision the author saw — *"abruptly changing
+   * angle/course"* — and the reading is a **share** rather than a speed because
+   * the same slam at half the speed should say the same thing.
+   */
+  knock: number;
 }
 
 export function beginDive(craft: Craft, body: Body, clearanceTicks: number): Dive {
@@ -115,6 +132,7 @@ export function beginDive(craft: Craft, body: Body, clearanceTicks: number): Div
     smallestRadius: radius,
     peakEnergy: specificEnergy(body.mass, radius, speedOf(craft)),
     clearanceTicks,
+    knock: 0,
   };
 }
 
@@ -157,11 +175,20 @@ export function flyDive(craft: Craft, field: Field, body: Body, dive: Dive): boo
     dive.clearanceTicks -= 1;
   }
 
+  // What the floor takes over the whole tick, against what the craft brought into
+  // it. Summed across the substeps rather than compared end to end, because
+  // gravity is *adding* speed between them and a net reading would hide the cut.
+  const brought = speedOf(craft);
+  let taken = 0;
+
   const dt = SECONDS_PER_TICK / SUBSTEPS;
   for (let i = 0; i < SUBSTEPS; i++) {
     integrate(craft, body, dt, 1);
+    const before = speedOf(craft);
     holdAboveFloor(craft, body);
+    taken += before - speedOf(craft);
   }
+  dive.knock = brought > 0 ? taken / brought : 0;
 
   // The rest of the field, at spec 01 §10's `R + 6` and never lethally. Once per
   // tick rather than per substep, which is where the prototype puts it too: a

@@ -73,6 +73,6 @@ describe('the simulation behaviour version', () => {
       digest.digest('hex').slice(0, 16),
       'the swing changed: bump SIM_VERSION and this fingerprint together, and every recipe ' +
         'recorded before now stops replaying',
-    ).toBe('6d63575f6e477356');
+    ).toBe('8d9b5544e49ce2b1');
   });
 });

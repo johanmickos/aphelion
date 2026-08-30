@@ -67,9 +67,10 @@ import { headingOf, speedOf } from '../sim/craft.ts';
 import type { SimState } from '../sim/types.ts';
 import { floorRadius } from '../sim/body.ts';
 import { bodyOnOffer } from '../sim/grab.ts';
-import { arrivedTight } from '../sim/tier.ts';
+import { arrivedTight, struckHard } from '../sim/tier.ts';
 import { closingOf, energyOf, gripOf, spendingOf, stateOf, tideOf } from './body.ts';
 import { arrived, fadeArrival } from './arrival.ts';
+import { fadeKnock, knocked } from './knock.ts';
 import { linger, struck } from './callout.ts';
 import { followCamera, openCamera } from './camera.ts';
 import { compassOf, takenRing } from './compass.ts';
@@ -88,6 +89,7 @@ import type {
   DeformationView,
   Energy,
   FlashView,
+  KnockView,
   PresentationState,
 } from './types.ts';
 
@@ -228,6 +230,7 @@ function present(
   previousCompass: CompassView | null,
   callout: CalloutView | null,
   arrival: ArrivalView | null,
+  knock: KnockView | null,
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
@@ -255,6 +258,7 @@ function present(
     compass: compassOf(previousCompass, sim),
     callout,
     arrival,
+    knock,
   };
 }
 
@@ -268,7 +272,7 @@ function present(
  * run opens with its scoreboard empty, however the last one ended.
  */
 export function createPresentation(sim: SimState): PresentationState {
-  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null, null);
+  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null, null, null);
 }
 
 /**
@@ -340,6 +344,28 @@ function arrivalOf(previous: PresentationState, sim: SimState): ArrivalView | nu
   return fadeArrival(previous.arrival);
 }
 
+/**
+ * The word a hard landing earned, or the one before it a tick older.
+ *
+ * **Struck while the dive is still flying**, which is the whole difference
+ * between this and the arrival: an arrival is a verdict on a dive that has
+ * finished, and a knock is a thing that is happening. The tick it is said on is
+ * the tick the floor took the speed, so the word lands with the kink rather than
+ * after it.
+ *
+ * Read off [`Dive.knock`](../sim/dive.ts), which the simulation writes fresh each
+ * tick — so this is the same *true now and not last tick* reading every other
+ * event in this file makes, and nothing is recorded for the picture's benefit.
+ *
+ * Placed where the craft is, which is on the floor: the point of contact, and the
+ * place that earned it.
+ */
+function knockOf(previous: PresentationState, sim: SimState): KnockView | null {
+  const dive = sim.dive;
+  if (dive !== null && struckHard(dive.knock)) return knocked(sim.tick, sim.craft.x, sim.craft.y);
+  return fadeKnock(previous.knock);
+}
+
 /** The presentation one tick on. Call once per tick, in the same loop as `stepSim`. */
 export function derive(previous: PresentationState, sim: SimState): PresentationState {
   const event = eventOf(previous, sim);
@@ -361,5 +387,6 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
     previous.compass,
     callout,
     arrivalOf(previous, sim),
+    knockOf(previous, sim),
   );
 }

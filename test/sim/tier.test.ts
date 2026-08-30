@@ -16,6 +16,8 @@ import {
   ARRIVAL_BAND,
   ARRIVAL_SIDEWAYS,
   arrivedTight,
+  KNOCK_BAND,
+  struckHard,
   PERFECT_FLOOR,
   SHARP_ZONE,
   tierFor,
@@ -168,5 +170,36 @@ describe('the arrival · both halves have to be true', () => {
     expect(arrivedTight(FLOOR + ARRIVAL_BAND, FLOOR, ARRIVAL_SIDEWAYS)).toBe(true);
     expect(arrivedTight(FLOOR + ARRIVAL_BAND + 0.001, FLOOR, ARRIVAL_SIDEWAYS)).toBe(false);
     expect(arrivedTight(FLOOR, FLOOR, ARRIVAL_SIDEWAYS - 0.001)).toBe(false);
+  });
+});
+
+describe('the knock · the price the floor charges', () => {
+  it('says nothing for the floor merely being touched', () => {
+    // The floor is reached on most dives and costs almost nothing on nearly all
+    // of them: over 77 real captures the share it takes is p25 0.00, p50 0.03.
+    // A word said then would be a word said constantly.
+    expect(struckHard(0)).toBe(false);
+    expect(struckHard(0.03)).toBe(false);
+  });
+
+  it('says something when the floor takes a fifth of the speed', () => {
+    expect(struckHard(0.21)).toBe(true);
+  });
+
+  /**
+   * **The invariant, and the reason `KNOCK_BAND` is where it is.** The two words
+   * read the same geometry from opposite ends — a sideways dive earns an arrival,
+   * a dive pointed at the body slams into the floor — so congratulating a capture
+   * and calling it a crash in the same breath has to be impossible rather than
+   * merely unlikely. The hardest knock any tight arrival takes is measured at
+   * 12.9%: the author's own *"really tight"* capture, which loses 13% of its
+   * speed to the floor and keeps its word.
+   */
+  it('can never fire on a capture that earned an arrival', () => {
+    const FLOOR = 159;
+    const hardestTight = 0.129;
+    expect(arrivedTight(FLOOR + 0.9, FLOOR, 0.708)).toBe(true);
+    expect(struckHard(hardestTight)).toBe(false);
+    expect(KNOCK_BAND).toBeGreaterThan(hardestTight);
   });
 });

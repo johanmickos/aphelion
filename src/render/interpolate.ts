@@ -19,6 +19,7 @@ import type {
   CalloutView,
   DeformationView,
   FlashView,
+  KnockView,
   PresentationState,
 } from '../state/types.ts';
 
@@ -125,6 +126,28 @@ function arrivalBetween(
 }
 
 /**
+ * And the knock's, which has no body to compare and uses its own birth instead.
+ *
+ * `bornY` is the point of contact and it does not move for the life of one word,
+ * so two knocks born in different places are two different words — the same test
+ * the other two make with `body`, made on the one identity a knock has.
+ */
+function knockBetween(
+  previous: KnockView | null,
+  current: KnockView | null,
+  alpha: number,
+): KnockView | null {
+  if (current === null) return null;
+  if (previous === null || arriving(current.life) || previous.bornY !== current.bornY)
+    return current;
+  return {
+    ...current,
+    y: between(previous.y, current.y, alpha),
+    strength: between(previous.strength, current.strength, alpha),
+  };
+}
+
+/**
  * A view `alpha` of the way from one tick to the next.
  *
  * Bodies are taken from the later tick whole rather than interpolated: they do
@@ -184,5 +207,6 @@ export function interpolate(
     corridor: current.corridor,
     callout: calloutBetween(previous.callout, current.callout, alpha),
     arrival: arrivalBetween(previous.arrival, current.arrival, alpha),
+    knock: knockBetween(previous.knock, current.knock, alpha),
   };
 }
