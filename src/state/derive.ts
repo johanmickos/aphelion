@@ -79,6 +79,7 @@ import { relax, stretch, UNDEFORMED } from './deformation.ts';
 import { bloomOf, E3_BLOOM } from './energy.ts';
 import { hueOf } from './identity.ts';
 import { sightingsOf } from './sighting.ts';
+import { bowOf, wakeOf } from './rung.ts';
 import type {
   ArrivalView,
   BodyState,
@@ -91,6 +92,7 @@ import type {
   FlashView,
   KnockView,
   PresentationState,
+  WakeView,
 } from './types.ts';
 
 /**
@@ -217,6 +219,7 @@ function bodiesOf(sim: SimState, previous: readonly BodyView[] | null): BodyView
       energy,
       bloom: bloomOf(energy),
       tide: tideOf(before?.tide ?? null, body, sim.craft, state, offered),
+      bow: bowOf(body),
     };
   });
 }
@@ -231,6 +234,7 @@ function present(
   callout: CalloutView | null,
   arrival: ArrivalView | null,
   knock: KnockView | null,
+  wake: readonly WakeView[],
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
@@ -252,6 +256,7 @@ function present(
     corridor: {
       centreline: sim.field.corridor.centreline,
       halfWidth: sim.field.corridor.halfWidth,
+      foot: sim.field.corridor.foot,
     },
     flash,
     sightings: sightingsOf(sim.field.bodies, states, offered, sim.craft, camera),
@@ -259,6 +264,7 @@ function present(
     callout,
     arrival,
     knock,
+    wake,
   };
 }
 
@@ -272,7 +278,11 @@ function present(
  * run opens with its scoreboard empty, however the last one ended.
  */
 export function createPresentation(sim: SimState): PresentationState {
-  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null, null, null);
+  // The wake opens **empty**, not seeded from where the craft is standing: a run
+  // that began with the rungs already parted would be showing a passage that has
+  // not happened. ADR-0015's second rule, and the same reason nothing here is
+  // mid-decay.
+  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null, null, null, []);
 }
 
 /**
@@ -388,5 +398,6 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
     callout,
     arrivalOf(previous, sim),
     knockOf(previous, sim),
+    wakeOf(previous.wake, sim),
   );
 }

@@ -56,6 +56,7 @@ import { fade } from '../state/decay.ts';
 import { SPEAKS } from '../state/callout.ts';
 import { letterbox, visible } from './letterbox.ts';
 import { drawStarfield, starfield } from './starfield.ts';
+import { drawRungs } from './rungs.ts';
 import {
   BODY_FILL,
   CORE,
@@ -1185,6 +1186,12 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
 
   context.save();
   context.translate(DESIGN_WIDTH / 2 - view.camera.x, DESIGN_HEIGHT / 2 - view.camera.y);
+
+  // **The rungs, under everything else in the world.** Spec 05 §2's stack is SKY,
+  // DUST, STRATA, BODIES, PLAYER, and this is STRATA — the medium the rest of the
+  // picture is drawn on top of. Unlike the sky above it, it moves at world speed,
+  // which is why it is inside this transform and the sky is not.
+  drawRungs(context, view.camera, view.corridor, view.bodies, view.wake, seen);
 
   // A body is drawn if any of it can be seen. There is no horizontal test: the
   // field is no wider than the design space, which is the same fact the camera

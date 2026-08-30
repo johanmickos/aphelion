@@ -59,6 +59,71 @@ export const SUBSTEPS = 6;
 export const MAX_CATCH_UP_TICKS = 3;
 
 /**
+ * How many design units a **metre** is — the field's own unit of altitude, and a
+ * ruling made here on 2026-08-30 because nothing had ever said.
+ *
+ * ## Why it had to be settled, and by whom
+ *
+ * Spec [17 · §4](../../docs/spec/17-daily-field.md) authors the whole difficulty
+ * curve in metres, spec [07 · §2](../../docs/spec/07-boundary.md) places the
+ * boundary bands *"in world metres"*, spec [08](../../docs/spec/08-economy.md)
+ * pays one point per metre climbed, and spec
+ * [05 · §3](../../docs/spec/05-field.md) hangs a rung *"every 25 m"*. Not one of
+ * them says what a metre is. [`fixture-field.ts`](./fixture-field.ts) recorded
+ * the gap twice — *"in metres it has not reconciled with this repo's design
+ * units, and reconciling them is not this step's to do"* — and
+ * [M3.2](../../docs/plan/m3-the-field.md) is where the deferral came due, because
+ * *every 25 m* is unbuildable until a metre is a number.
+ *
+ * ## A metre is a prototype unit, so it is [`SCALE`](#scale) design units
+ *
+ * **It adds no factor.** The prototype-to-design conversion is already ruled at
+ * ×3 (§0 above, author 2026-08-27); this says that the unit the specs write
+ * their metres in is the unit spec 01 took its measurements in, so the metre
+ * inherits that conversion rather than needing one of its own.
+ *
+ * Three pieces of arithmetic, and the third is the one that settles it:
+ *
+ * - **Radius.** Spec 17 §4 runs a body from **55 m** at address 1 to **32 m** at
+ *   address 40. Spec 01 §13.2 *measured* the prototype's own field at
+ *   **34.3 – 55.5**. The two ranges are the same numbers, and `docs/spec/README.md`
+ *   already records why — §4 is written in *"prototype magnitudes wearing
+ *   design-space labels"*, with the fix being *"apply the ×3 once, when they are
+ *   measured"*. That note is about a drafting error in one table; read the other
+ *   way round it says what a metre is.
+ * - **The corridor.** Spec 17 §4 runs the half-width **480 → 300 m**. The one
+ *   this field is actually flown in is `(390 × 1.9) / 2 = 370.5` prototype units,
+ *   which lands inside that range and nowhere near it under any other reading.
+ * - **The boundary, and this is the check that decides it.** Spec 07 §2 fixes the
+ *   outer band at **220 m** inward from the line and the fire band at **90 m**.
+ *   At a metre of `SCALE` the corridor here is 370.5 m of half-width and the ×1
+ *   core is 150.5 m deep. At the only competing reading — the design board's, see
+ *   below — the same corridor is 201 m and the **outer band alone is deeper than
+ *   the whole corridor**, so a run would open inside the boundary. One reading
+ *   produces a game and the other does not.
+ *
+ * ## What disagrees, recorded rather than buried
+ *
+ * Direction 05's live component is the only place in the whole project where a
+ * rung is drawn at a size, and it draws them **46 board pixels apart** and labels
+ * them in metres. Carried at [`BOARD_PIXEL`](../state/design.ts) the way every
+ * other board number is, that would make 25 m = 138 design units and a metre
+ * **5.52** — 1.84× this. Its canvas is 410 × 620 where the design space is
+ * 390 × 844 board pixels, and its planet is 58 board pixels against this field's
+ * median body of 44, so its absolute lengths do not transfer; what does transfer
+ * is that it draws **13.5 rungs** in its own frame against **26** on the author's
+ * phone at this metre. **That density is a taste question and it is on the
+ * bench** ([`RUNG_SPACING`](../state/rung.ts)), which is where the author settles
+ * it.
+ *
+ * Spec 17 §4's **gap** endpoints — 110 → 190 m — read against this metre as
+ * narrower than the 275-unit gaps this field is actually built with. They are an
+ * opening position in that spec's own words and M3 re-measures them; nothing here
+ * depends on them.
+ */
+export const METRE = SCALE;
+
+/**
  * The gravitational parameter of a body of median radius — spec 01 §2's
  * 5 500 000, converted.
  *

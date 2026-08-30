@@ -36,9 +36,31 @@ chosen.
 **Rung**:
 A stratum of the field hung perpendicular to intended travel, marking one unit of
 altitude. Rungs bow toward mass and part around the craft, so the field states gravity
-and speed without an instrument.
+and speed without an instrument. Every fifth is **addressed** — drawn brighter and
+carrying a number.
 _Avoid_: grid, grid line, carpet, mesh, floor (a rung is never a floor; **Floor** is the
 orbit's, below)
+
+**Bow**:
+How a rung bends toward a body. The field's statement of gravity at a distance, made
+before the player presses — the **tide** is the same statement at the rim. It is a
+property of mass, so it is there whatever the craft is doing.
+_Avoid_: sag, warp, dent, gravity well (the bow is what is drawn, not what it means)
+
+**Wake**:
+How a rung parts around the craft, and relaxes behind it. A displacement of a structure
+that is already there, never something emitted — nothing in this game radiates from a
+point. It has a **place** rather than a centre: what relaxes is the rung's memory of
+where the craft pressed.
+_Avoid_: ripple, wave, shockwave, trail (the **trail** is the craft's own line through
+the field)
+
+**Metre**:
+The field's unit of altitude, and the unit every spec states the world's geometry in —
+rung spacing, the boundary's bands, the corridor's width, the points a climb pays. One
+metre is one of the prototype's units, so it converts into design units by the same
+factor everything else does.
+_Avoid_: unit (unqualified), design unit (that is what a metre converts *to*), pixel
 
 **Body**:
 Anything in the field with mass that the craft can be caught by. A planet is the common
@@ -331,7 +353,9 @@ its motion, so the world reads as having distance behind it. **The one thing in 
 not move at world speed**, and the one depth cue — spec 05 §2 refuses all of them and was
 overturned by the author on 2026-08-30, on the grounds that parallax conveys speed and nothing else
 in the field does yet. One colour at three brightnesses, DUSK to INK, never **CORE**. It lives
-wholly in the renderer and the simulation cannot see it.
+wholly in the renderer and the simulation cannot see it. **It keeps its place beside the rungs and
+comes down to meet them** (author, 2026-08-30, once they landed): *"I still want it there, but only
+as background noise."*
 _Avoid_: background (it is a layer of the world, not behind it), stars (the tier, not the thing),
 parallax layers (that names the mechanism; this names the thing)
 

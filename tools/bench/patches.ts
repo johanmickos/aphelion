@@ -359,6 +359,57 @@ export function lockOf(sim: SimState): number {
     why: 'the fit spec 00 §7 replaced, kept flyable beside the one that replaced it',
   },
 
+  // Spec 05's field. Everything here is either a number the spec deferred, a
+  // number the author moved on the first flight, or the open question itself —
+  // which is exactly what §7 says a bench is for.
+  settable(
+    'src/state/rung.ts',
+    'RUNG_SPACING',
+    'spec 05 §3 deferred it; 25 m flew as “chaotic at speed” and it is 50 now',
+  ),
+  settable(
+    'src/state/rung.ts',
+    'BOW_GAIN',
+    'the board’s gravityBend, whose own slider runs 0 – 44',
+  ),
+  settable(
+    'src/state/rung.ts',
+    'BOW_CAP',
+    'spec 05 says 30px; 30 broke its own monotonic acceptance',
+  ),
+  settable('src/state/rung.ts', 'BOW_FALLOFF', 'how wide a patch of field a body bends'),
+  settable('src/state/rung.ts', 'WAKE_AMPLITUDE', 'the board’s wake, whose own slider runs 0 – 34'),
+  settable('src/state/rung.ts', 'WAKE_FALLOFF', 'how much of the field the craft parts as it goes'),
+  {
+    file: 'src/render/rungs.ts',
+    find: 'const RUNG_STEP = 8 * BOARD_PIXEL;',
+    replace: 'export let RUNG_STEP = 8 * BOARD_PIXEL;',
+    append: '\nexport function set_RUNG_STEP(value: number): void {\n  RUNG_STEP = value;\n}\n',
+    why: 'how finely a bow is drawn, and the first number to move if the budget fails',
+  },
+  {
+    // **Spec 05's one open question**, which this milestone deliberately does not
+    // answer: what an addressed rung says. The spec records that the evidence
+    // leans to metres and declines to rule, so both readings ship and the author
+    // flies them against each other.
+    file: 'src/state/rung.ts',
+    find: "export const RUNG_LABEL: 'METRES' | 'ADDRESS' = 'METRES';",
+    replace: "export let RUNG_LABEL: 'METRES' | 'ADDRESS' = 'METRES';",
+    append:
+      "\nexport function set_RUNG_LABEL(value: boolean): void {\n  RUNG_LABEL = value ? 'ADDRESS' : 'METRES';\n}\n",
+    why: 'spec 05 §3 records two readings and rules neither',
+  },
+  {
+    // The author's answer to the question `starfield.ts` said to ask once the
+    // rungs landed: it keeps its place and comes down. How far down is taste.
+    file: 'src/render/starfield.ts',
+    find: 'export const STAR_STRENGTH = 0.4;',
+    replace: 'export let STAR_STRENGTH = 0.4;',
+    append:
+      '\nexport function set_STAR_STRENGTH(value: number): void {\n  STAR_STRENGTH = value;\n}\n',
+    why: '“much less noticeable… only as background noise” is a judgement about a moving picture',
+  },
+
   {
     // The trail reader is the same one `pnpm replay` prints, which is the point
     // — the bench must not grow a second opinion about where on the envelope a

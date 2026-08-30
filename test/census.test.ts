@@ -51,6 +51,7 @@ function tally(views: readonly PresentationState[]): Census {
     arcs: 0,
     fills: 0,
     strokes: 0,
+    points: 0,
     filled: 0,
     gradientFilled: 0,
   };
@@ -82,6 +83,10 @@ describe('the draw census', () => {
     expect(into.arcs).toBeGreaterThan(RUN.length);
     expect(into.strokes).toBeGreaterThan(RUN.length);
     expect(into.gradients).toBeGreaterThan(RUN.length);
+    // Path points are the rungs' own axis, and the one a stroke count cannot
+    // see: a rung drawn from two points and one drawn from a hundred are one
+    // stroke either way.
+    expect(into.points).toBeGreaterThan(into.strokes);
     expect(into.fills).toBeGreaterThan(RUN.length);
     // Overdraw is the figure spec-level decisions are argued with, so it has to
     // be a real area rather than a zero that never moves.

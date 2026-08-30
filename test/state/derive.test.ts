@@ -147,11 +147,31 @@ describe('presentation state', () => {
    * mass: it is physics, the player reads it as size, and a renderer holding it
    * is a renderer that could disagree with the simulation about how strong a
    * body is.
+   *
+   * ## `bow` is not that, and the distinction is the whole of this rule
+   *
+   * M3.2 added it, and it fired this test on the way in, which is what it is for.
+   * Spec [05 · §3](../../docs/spec/05-field.md) says the bow's `G` *"scales with
+   * the body's mass"*, so a field that carries how hard a body bends the rungs is
+   * carrying something monotone in mass — and that looks like the thing barred
+   * above.
+   *
+   * It is not, for the same reason `grip` is not, and `grip` is the harder case:
+   * it is the body's live gravitational pull as a fraction of its own hardest,
+   * which is more physics than a bow ratio and has been handed over since M2.
+   * **What the rule bars is a renderer that could compute a second opinion**, and
+   * neither can: both are derived from the simulation's own body in the one layer
+   * whose job is that translation, so a disagreement has nowhere to come from.
+   * `bow` is a **ratio to the median body** and the renderer is not told what the
+   * median is, so `μ` cannot be recovered from it.
+   *
+   * A raw `mass` still fails here, which is the tooth this keeps.
    */
   it('hands the renderer geometry and not physics', () => {
     const view = createPresentation(world());
     expect(Object.keys(view.bodies[0]!).sort()).toEqual([
       'bloom',
+      'bow',
       'closing',
       'energy',
       'grip',

@@ -149,7 +149,11 @@ describe('the bleed', () => {
  * this accepts and does not hide.
  */
 describe('what a frame paints into', () => {
-  const CORRIDOR: CorridorView = { centreline: DESIGN_WIDTH / 2, halfWidth: 1111.5 };
+  const CORRIDOR: CorridorView = {
+    centreline: DESIGN_WIDTH / 2,
+    halfWidth: 1111.5,
+    foot: 4795.44,
+  };
 
   /**
    * **The bleed either side is 3.5 design units now, against 179 before.** That

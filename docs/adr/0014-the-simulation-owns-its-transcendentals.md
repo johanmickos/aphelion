@@ -58,6 +58,26 @@ tick, so a 90-second run costs on the order of ten thousand calls, well under a 
 total. ADR-0011 measured the frame budget at p99 3ms of 8ms with the whole renderer running; this
 does not appear in it.
 
+> ## `exp` came due, 2026-08-30, and the probe was pointed at it
+>
+> The list below was written before anything in the game needed `exp`. Spec
+> [05 · §3](../spec/05-field.md) is the first thing that does — **both** the rungs' gravity bow and
+> their wake are exponential falloffs — so `src/sim/math.ts` gained one, written the same way
+> `trig.ts` was and measured the same way.
+>
+> | Function | Arguments where the two engines return different bits |
+> |---|---|
+> | `Math.exp`, over ±300 | **9.5%** |
+> | `Math.exp`, over −3 … 0, where the falloffs live | **10.0%** |
+> | `src/sim/math.ts`'s own, both ranges | **0%**, over all 40 000 |
+>
+> Accuracy is level: 0.914 ulp worst against V8's 0.808 over 50 000 arguments, on a 400-bit
+> reference. It costs **3.1×** — 71M calls/s against 221M — which is the same order `sin` pays, and
+> unlike `sin` this one is called per sample point of every rung; `docs/plan/m3-the-field.md`
+> records what that came to in a frame. It carries a **stated domain** rather than saturating, on
+> the reasoning `power` already used, and that guard earned itself on the first run: it threw on a
+> `NaN` from an unbounded rung index instead of drawing a field of nothing.
+
 **Two `Math` functions are now banned in `src/sim/` and `src/state/` alongside `Math.hypot`**:
 every implementation-approximated one (`sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `exp`,
 `log`, `log2`, `log10`, `pow`, `cbrt`, `expm1`, `log1p`, and the hyperbolics), **and the `**`

@@ -38,6 +38,9 @@ import * as instrument from './src/state/compass.ts';
 import * as light from './src/state/energy.ts';
 import * as mark from './src/state/sighting.ts';
 import * as view from './src/render/index.ts';
+import * as rung from './src/state/rung.ts';
+import * as sky from './src/render/starfield.ts';
+import * as strata from './src/render/rungs.ts';
 import * as fit from './src/render/letterbox.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from './src/state/design.ts';
 import { SCALE } from './src/sim/units.ts';
@@ -64,7 +67,7 @@ interface Knob {
   /** Physics knobs change what a run *is*, so the run starts again. */
   readonly restarts: boolean;
   /** Which card it sits under. Only the first of the three restarts a run. */
-  readonly group: 'physics' | 'camera' | 'light' | 'bodies' | 'compass' | 'release';
+  readonly group: 'physics' | 'camera' | 'light' | 'bodies' | 'compass' | 'release' | 'field';
   readonly places: number;
 }
 
@@ -838,6 +841,110 @@ const KNOBS: Knob[] = [
     group: 'compass',
     places: 0,
   },
+  {
+    id: 'rungspacing',
+    label: 'Rung spacing',
+    what: 'spec 05 §3 deferred this on 2026-08-27 until there was a swing to measure it against. 25m was the first value it ever had and flew as “too close together, it feels chaotic at speed”; 50m shows what Direction 05’s own frame draws',
+    min: 75,
+    max: 450,
+    step: 15,
+    base: rung.RUNG_SPACING,
+    apply: rung.set_RUNG_SPACING,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'bowgain',
+    label: 'Gravity bow · strength',
+    what: 'the board’s own gravityBend, whose slider runs 0 – 44. Scaled per body by mass, so this moves the whole field at once and MASS_EXPONENT decides the spread',
+    min: 0,
+    max: 44,
+    step: 2,
+    base: rung.BOW_GAIN,
+    apply: rung.set_BOW_GAIN,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'bowcap',
+    label: 'Gravity bow · ceiling',
+    what: 'spec 05 says 30px in three places, and at 30 the clamp bites at the rim of any body above radius 44 — so the biggest body in the field bent less than the median one. 45 is the smallest value that clears the field’s own range',
+    min: 30,
+    max: 90,
+    step: 3,
+    base: rung.BOW_CAP,
+    apply: rung.set_BOW_CAP,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'bowfalloff',
+    label: 'Gravity bow · reach',
+    what: 'how wide a patch of field a body bends. The board’s 150 board pixels sits against rungs 46 apart; this sits against rungs 50 apart',
+    min: 150,
+    max: 900,
+    step: 30,
+    base: rung.BOW_FALLOFF,
+    apply: rung.set_BOW_FALLOFF,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'wakeamp',
+    label: 'Wake · how far it parts',
+    what: 'the board’s own wake, whose slider runs 0 – 34 board pixels. At zero the craft leaves no mark on the field at all',
+    min: 0,
+    max: 150,
+    step: 3,
+    base: rung.WAKE_AMPLITUDE,
+    apply: rung.set_WAKE_AMPLITUDE,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'wakefalloff',
+    label: 'Wake · how much it parts',
+    what: 'how much of the field the craft carries with it. Against 50m rungs, 144 reaches one rung either side and 300 reaches three',
+    min: 30,
+    max: 450,
+    step: 15,
+    base: rung.WAKE_FALLOFF,
+    apply: rung.set_WAKE_FALLOFF,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'rungstep',
+    label: 'Rung resolution',
+    what: 'how far apart the points a rung is drawn from are. Direction 05 spends 11.6 points across a body; this spends 11 at the default. It is the first number to move if the frame budget ever fails',
+    min: 6,
+    max: 90,
+    step: 3,
+    base: strata.RUNG_STEP,
+    apply: strata.set_RUNG_STEP,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'stars',
+    label: 'Sky · how loud',
+    what: 'the author’s answer, 2026-08-30, to the question starfield.ts said to ask once the rungs landed: “I still want it there, but only as background noise.” 1 is the sky as it was before the rungs',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    base: sky.STAR_STRENGTH,
+    apply: sky.set_STAR_STRENGTH,
+    restarts: false,
+    group: 'field',
+    places: 2,
+  },
 ];
 
 /**
@@ -964,6 +1071,7 @@ function offDefaults(): string[] {
   );
   if (!cameraKnobs.LOCK_ON) off.push('camera lock OFF');
   if (fit.FIT_WHOLE) off.push('fitted whole rather than to the width');
+  if (rung.RUNG_LABEL === 'ADDRESS') off.push('rungs print addresses rather than metres');
   return off;
 }
 
@@ -1084,7 +1192,15 @@ function renderKnobs(): void {
   // again and the recipe still describes it; everything below it changes only
   // the picture, and presentation state converges (ADR-0015), so it lands live
   // on the swing already in the air.
-  for (const group of ['physics', 'camera', 'light', 'bodies', 'compass', 'release'] as const) {
+  for (const group of [
+    'physics',
+    'camera',
+    'light',
+    'bodies',
+    'compass',
+    'release',
+    'field',
+  ] as const) {
     byId(`knobs-${group}`).innerHTML = markup(KNOBS.filter((knob) => knob.group === group));
   }
 
@@ -1144,6 +1260,8 @@ byId('defaults').addEventListener('click', (event) => {
   cameraKnobs.set_LOCK_ON(true);
   byId<HTMLInputElement>('fitwidth').checked = false;
   fit.set_FIT_WHOLE(false);
+  byId<HTMLInputElement>('rungaddress').checked = false;
+  rung.set_RUNG_LABEL(false);
   showDefaults();
   start();
   (event.currentTarget as HTMLElement).blur();
@@ -1154,6 +1272,13 @@ byId<HTMLInputElement>('fitwidth').addEventListener('change', (event) => {
   showDefaults();
   // So the dispatch says which reading the run was flown under: the fit changes
   // nothing about the run and everything about what the author could see of it.
+  redrawTrail();
+});
+// **Spec 05 §3's open question**, and the reason it is a checkbox rather than a
+// slider: the two readings are not two ends of a range, they are two answers.
+byId<HTMLInputElement>('rungaddress').addEventListener('change', (event) => {
+  rung.set_RUNG_LABEL((event.currentTarget as HTMLInputElement).checked);
+  showDefaults();
   redrawTrail();
 });
 byId<HTMLInputElement>('lock').addEventListener('change', (event) => {

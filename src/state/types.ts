@@ -283,6 +283,21 @@ export interface BodyView {
   readonly bloom: number;
   /** Its tide, or `null` where spec 04 §2 says it has none. */
   readonly tide: TideView | null;
+  /**
+   * How hard it bows the rungs, as a multiple of the median body's
+   * (`CONTEXT.md`: **bow**).
+   *
+   * Spec [05 · §3](../../docs/spec/05-field.md) says only that the bow's `G`
+   * *"scales with the body's mass"*, and mass is the one property of a body the
+   * renderer is not told: spec 04 §1 rules **mass is size**, so it is a function
+   * of `radius` and of [`MASS_EXPONENT`](../sim/units.ts), which the M1 gate
+   * still owns. Deriving it here rather than letting the renderer square a
+   * radius is what keeps that exponent in one place — and what lets
+   * `test/state/rungs.test.ts` sweep mass and assert spec 05's *"increases peak
+   * bow monotonically and never exceeds"* its clamp without a canvas — the sweep
+   * that found the clamp itself breaking that sentence at 30px.
+   */
+  readonly bow: number;
 }
 
 /**
@@ -719,6 +734,45 @@ export interface KnockView {
 export interface CorridorView {
   readonly centreline: number;
   readonly halfWidth: number;
+  /**
+   * The foot of the field, in design `y` — and the **datum every rung is
+   * counted from**.
+   *
+   * It was already the line a run falls out of the bottom of
+   * ([`Corridor`](../sim/types.ts)); what M3.2 added is that it is also where
+   * altitude is zero, because spec [17 · §3](../../docs/spec/17-daily-field.md)
+   * measures every body in a day *"bottom to top"* from it. A rung's label and a
+   * body's address therefore agree about where they are, which is the whole of
+   * spec 05 §6's *"the field is a ruler the player climbs"*.
+   */
+  readonly foot: number;
+}
+
+/**
+ * One rung's **wake** (`CONTEXT.md`): where the craft pressed on it, and how
+ * much of that press is left.
+ *
+ * There is one of these per rung the craft is near or has recently passed, and
+ * none at all for the rest of the field — a rung nobody has touched is straight
+ * apart from its bow, and absence is how this layer says so
+ * ([`decay.ts`](./decay.ts): *"a thing that is over is absent"*).
+ *
+ * It carries a **place** rather than an amplitude, and
+ * [`rung.ts`](./rung.ts)'s header argues why: what relaxes over spec 05 §3's
+ * ~400ms is the rung's memory of where the craft was, not a number attached to
+ * the craft. `strength` and `life` are the same fact twice, exactly as
+ * [`KnockView`](#knockview) carries them — one is what the picture is drawn at
+ * and the other is what a test says *four ticks into its twenty-four* about.
+ */
+export interface WakeView {
+  /** Which rung, counted in rungs above [`CorridorView.foot`](#corridorview). */
+  readonly rung: number;
+  /** Where the craft was when it pressed hardest on this rung. */
+  readonly x: number;
+  readonly y: number;
+  /** What is left of that press, 1 → 0. */
+  readonly strength: number;
+  readonly life: Decay;
 }
 
 /**
@@ -783,4 +837,16 @@ export interface PresentationState {
    * fighting over one field for no reason.
    */
   readonly knock: KnockView | null;
+  /**
+   * Every rung the craft is currently parting, or that is still relaxing behind
+   * it, in rung order.
+   *
+   * **The only part of the field that is presentation state**, and
+   * [ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)
+   * names it in its opening paragraph. Where a rung *hangs* and how far it
+   * **bows** are pure functions of this tick and are computed where they are
+   * drawn; this is the one thing about the field that a tick alone cannot
+   * answer. See [`rung.ts`](./rung.ts).
+   */
+  readonly wake: readonly WakeView[];
 }

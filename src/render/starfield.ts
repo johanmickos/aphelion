@@ -23,8 +23,24 @@
  * phone across many sittings and reports the absence. The specs' ruling is
  * therefore recorded as overturned rather than quietly ignored, and the author's
  * own expectation is that the two will coexist — *"it'll look even better once we
- * install the line markers/rungs with gravity bubbly effects."* When the rungs
- * land, whether this still earns its place is a question to ask again.
+ * install the line markers/rungs with gravity bubbly effects."*
+ *
+ * ## The rungs landed, the question was asked, and the sky keeps its place
+ *
+ * This file said *"when the rungs land, whether this still earns its place is a
+ * question to ask again"*, and spec 05 §2's notice added that it is the author's
+ * to answer. They landed on 2026-08-30 and the answer is **yes, quieter** —
+ * neither the deletion the original ruling would have implied nor the status quo:
+ *
+ * > *"The background starfield now needs to be much less noticeable. I still want
+ * > it there, but only as background noise."*
+ *
+ * So the objection spec 05 §2 raised — two systems saying *speed* in two visual
+ * languages — is settled by **rank** rather than by removing one of them. The
+ * rungs are the field's own statement of speed and the sky is behind it, which is
+ * what a background is. What came down is [`STAR_STRENGTH`](#star_strength), an
+ * alpha, and nothing else: the sizes and the per-star parallax are the depth the
+ * author asked for in the first place and are untouched.
  *
  * ## What is carried from the prototype, and what is not
  *
@@ -170,6 +186,34 @@ const TIERS = [
   { colour: mix(DUSK, INK, 0.9), alpha: 0.8 },
 ] as const;
 
+/**
+ * How much of that brightness the sky actually gets — **0.4, flown**.
+ *
+ * The author, 2026-08-30, with the rungs in for the first time: *"the background
+ * starfield now needs to be much less noticeable. I still want it there, but only
+ * as background noise."*
+ *
+ * ## Why it is one multiplier and not three new alphas
+ *
+ * The three above are a **ramp** — one colour at three brightnesses, and their
+ * ratios are the depth. Editing them individually would have let the ramp drift
+ * while nobody was looking at it; a single factor takes the sky down and leaves
+ * the thing that makes it read as a sky exactly where it was. It is the same
+ * shape the rim strengths took when *"all glow is too much"* moved them
+ * (`index.ts`).
+ *
+ * And it is an **alpha and not a size**. The first version of this sky was flown
+ * as *"tiny specks of white with little to no variation, so it doesn't look very
+ * deep or immersive"*, and the fix was to make the stars bigger. Dimming by
+ * shrinking would have walked straight back into that.
+ *
+ * At 0.4 the nearest tier draws at 0.32 and the furthest at 0.12, which is under
+ * spec 05 §2's own floor for **dust** (α 0.1 – 0.3) at the near end — so the sky
+ * is now quieter than the layer in front of it is specified to be, which is what
+ * *behind* means. It is on the bench.
+ */
+export const STAR_STRENGTH = 0.4;
+
 interface Star {
   readonly x: number;
   readonly y: number;
@@ -241,7 +285,7 @@ export function drawStarfield(
     context.fillStyle = tier.colour;
     // One alpha for the whole tier rather than one per star: the eye cannot tell
     // the difference, and it collapses a few hundred state changes into three.
-    context.globalAlpha = tier.alpha;
+    context.globalAlpha = tier.alpha * STAR_STRENGTH;
     for (const star of tier.stars) {
       // The sky falls as the craft climbs, so a *smaller* camera y — higher up
       // the world — pushes the stars down. The fraction is what makes it a sky

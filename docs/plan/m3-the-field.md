@@ -64,8 +64,95 @@ relax behind it in ~400ms, and every fifth carries its address.
 Rungs are **level sets of progress**, perpendicular to intended travel. Written that way, a
 ring course inherits the whole grammar unchanged later.
 
-**Acceptance**: bow ≤ 30px, wake relaxes in ~400ms, addresses on every fifth rung, and the
-frame budget still holds with rungs on. **Verify**: `pnpm test` plus the M3.6 harness.
+**Acceptance**: bow ≤ 30px ⚠ **45px, see below**, wake relaxes in ~400ms, addresses on every fifth
+rung, and the frame budget still holds with rungs on. **Verify**: `pnpm test` plus the M3.6 harness.
+
+### Built, 2026-08-30 — and flown twice in the same sitting
+
+**The layer question, answered from the ADRs rather than assumed.** The starfield is renderer-only
+because a star is fixed at construction and only the camera moves it. A rung is not like that, and
+its three parts answer differently. The **wake** is presentation state, and
+[ADR-0015](../adr/0015-presentation-state-carries-what-decays.md) names it by name in its opening
+paragraph — a rung the craft has passed is still displaced and is on its way back, which is a
+function of this tick *and what was already on screen*. The **geometry** is pure and lives beside it
+in `src/state/rung.ts`, so *"the bow at this point is 23 design units"* is a sentence a test makes
+without a canvas ([AGENTS.md](../../AGENTS.md) §4), and because the wake's own seeding needs the same
+falloff the drawing does — `src/render/` may import `src/state/` and never the reverse. The
+**sampling and the paint** are the renderer's, because how many points a curve is drawn from is a
+resolution decision. **Nothing is simulation**: `SIM_VERSION` does not move and
+`test/state/rungs.test.ts` proves it by stepping two runs side by side rather than by reading a
+fingerprint — `test/sim/version.test.ts`'s own *picture, not flight* case.
+
+**Two questions the spec left open had to be settled first.**
+
+- **What a metre is.** Ruled — a prototype unit, so `SCALE` design units — with the arithmetic in
+  `src/sim/units.ts` and the summary in the spec README. The check that decided it is spec 07 §2's
+  bands: at the only competing reading the outer band is deeper than this field's whole corridor.
+- **What an addressed rung says.** **Not settled, deliberately.** Spec 05 §3 records two readings and
+  declines to rule; both are built and the bench toggles them, with metres the default because that
+  is where the spec says the evidence leans. A default is not a ruling.
+
+**The author flew it the same day and moved three numbers.**
+
+| | Flown as | Now | Why |
+|---|---|---|---|
+| Rung spacing | 25 m | **50 m** | *"too close together, it feels chaotic at speed."* At 50 the phone shows 12.9 rungs; Direction 05's own frame draws 13.5 |
+| Sky | α ×1 | **α ×0.4** | *"much less noticeable. I still want it there, but only as background noise"* |
+| Ship's wake | 16 / 34 board px | **40 / 85** | *"the ship's wake… needs to be a bit larger."* Doubling the spacing halved the wake relative to the field, so 32/68 only restores what they saw; the ×1.25 is the *"a bit"* |
+| Bow clamp | 30px | **45px** | Half of *"maybe all gravity wakes"*, and a defect — see below |
+
+**The 30px clamp was breaking spec 05's own acceptance.** A rung point inside a body is hidden
+behind the disc, so the visible peak is at the **rim** — and at 30 the clamp bites there for any
+body above radius 44. Measured at radii 34 / 44 / 56 the rim bow ran 18.0 → **23.8** → 22.3: the
+biggest body in the field bent *less* field than the median one, which is the opposite of §6's
+*"the field states which bodies pull hardest."* So the clamp and *"increases peak bow
+monotonically"* could not both hold, and the acceptance was two criteria contradicting each other
+inside the field's own mass range. 45 is the smallest value that clears it.
+
+**The frame budget, measured rather than asserted.** `pnpm profile` on the author's own fast run
+(the 07:34 dispatch, 944 ticks, peak 1 716 units/s):
+
+| Per frame | Before | After |
+|---|---|---|
+| Path points | 61.8 mean, 153 max | **895.3 mean, 1 003 max** |
+| Strokes | 29.4 mean, 45 max | **46.3 mean, 62 max** |
+| Gradients, arcs, overdraw | 4.4 / 38.3 / 1.51 screens | **unchanged** |
+
+A **path-point tally was added to the census** to get that first row: a stroke count says a rung was
+drawn and cannot tell one drawn from a hundred points from one drawn from two, which is the whole of
+what `RUNG_STEP` decides. Overdraw does not move, because a 1px stroke paints no area — so the
+expensive thing the census watches is untouched and what grew is command volume. Headless, the rung
+geometry costs **0.13 ms a frame** (laptop, ~1 550 points, the full corridor width); in Chrome the
+rung pass records in **0.28 ms** against 0.37 – 0.41 for the whole frame. Canvas2D rasterises
+off-thread, so those are lower bounds and **the number that decides it is the phone's** — M3.6's,
+and the meter already rides in the dispatch.
+
+The cost is bounded by construction rather than by the field's size: `falloff` **ends** at three
+lengths instead of tapering forever, so a rung asks nothing of a body outside its reach, and a rung
+with nothing acting on it is drawn from two points. The field-size sweep confirms it — the frame is
+identical in a field of 1 536.
+
+**`exp` had to be written first.** ADR-0014 bans it and both of spec 05 §3's formulas are
+exponential falloffs; the ADR now carries the measurement, and the domain guard it asked for caught
+an unbounded rung index on the very first run of `pnpm portable`.
+
+### Still the author's, and asked rather than assumed
+
+1. **What an addressed rung says** — spec 05's own open question, now flyable both ways on the bench.
+2. **Where altitude is zero.** Rungs count from the field's **foot**, which is spec 17 §3's datum,
+   but the fixture's foot is a backstop *"rather than a line anyone meets"* — so a run opens reading
+   1 250 rather than near zero. An artefact of a hand-made field; spec 17's generator places its own.
+3. **Whether a rung label may cross the thumb line.** Built as the conservative reading of spec 00
+   §7 — it fades out as it crosses. `LABEL_FADE` goes to zero if a world-attached label is exempt.
+4. **Whether the gravity bow should be *"reserved for special tricks"*** (author, 2026-08-30).
+   Flown and assessed: **no** — it is the half of the system that makes the field a medium rather
+   than a ruler, it is spec 05 §6's second job (*gravity, drawn*, before the player presses), and a
+   bow that came and went would make the field lie about where the mass is. What the same flight
+   showed is the opposite problem: **near a held body the craft's wake and that body's bow fight in
+   the same place and the body wins**, so the craft's own passage is least visible exactly where the
+   player is looking. If a *trick* reading is wanted, the place for it is the **wake** responding to
+   something — speed, or the quality of a swing — and that is a new mechanism and the author's to
+   rule.
 
 ---
 
@@ -77,8 +164,9 @@ parallel at world speed, brightness varied α .1–.3, density rising gently wit
 parallax layers** — layers at different speeds are implied depth, and this world has none.
 *Overturned by the author on 2026-08-30 for the **sky** only: it has three tiers of parallax and
 is built ([05 · §2](../spec/05-field.md)'s notice). Everything in the list above is unaffected and
-still moves at world speed — and when the rungs land, whether the sky still earns its place beside
-them is the author's question to reopen.*
+still moves at world speed. **The rungs landed on 2026-08-30 and the author reopened it as promised:
+the sky keeps its place and comes down to meet them** — α ×0.4, *"I still want it there, but only as
+background noise"* — so two systems saying* speed *are settled by rank rather than by deleting one.*
 
 The anomaly is the only event permitted to repaint the sky: purple curtains over true black
 cloud gaps, planets reading through the tint. The baseline's restraint is what keeps it rare.

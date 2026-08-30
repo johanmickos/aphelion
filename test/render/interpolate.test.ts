@@ -42,15 +42,17 @@ function view(x: number, y: number, heading: number): PresentationState {
         energy: 1,
         bloom: bloomOf(1),
         tide: null,
+        bow: 1,
       },
     ],
-    corridor: { centreline: 585, halfWidth: 1111.5 },
+    corridor: { centreline: 585, halfWidth: 1111.5, foot: 4795.44 },
     flash: null,
     sightings: [],
     compass: null,
     callout: null,
     arrival: null,
     knock: null,
+    wake: [],
   };
 }
 

@@ -129,6 +129,17 @@ export interface Census {
   arcs: number;
   fills: number;
   strokes: number;
+  /**
+   * Points fed into a path — `moveTo` plus `lineTo`.
+   *
+   * **Added for the rungs**, which are the first thing in the game to build a
+   * path out of more than a handful of points: a stroke count says a rung was
+   * drawn and says nothing about it being drawn from a hundred points or from
+   * two, and the difference is the whole of what `RUNG_STEP` decides. A count
+   * travels to a phone and a millisecond does not, which is this file's own rule
+   * and the reason this is a tally rather than a timer.
+   */
+  points: number;
   /** Area filled, in design units², summed over the frame. */
   filled: number;
   /** The part of `filled` painted through a gradient. */
@@ -136,7 +147,7 @@ export interface Census {
 }
 
 function census(): Census {
-  return { gradients: 0, arcs: 0, fills: 0, strokes: 0, filled: 0, gradientFilled: 0 };
+  return { gradients: 0, arcs: 0, fills: 0, strokes: 0, points: 0, filled: 0, gradientFilled: 0 };
 }
 
 /**
@@ -189,8 +200,12 @@ export function counter(into: Census): CanvasRenderingContext2D {
       radius = null;
     },
     closePath: () => {},
-    moveTo: () => {},
-    lineTo: () => {},
+    moveTo: () => {
+      into.points += 1;
+    },
+    lineTo: () => {
+      into.points += 1;
+    },
     rect: () => {},
     quadraticCurveTo: () => {},
     bezierCurveTo: () => {},
@@ -605,6 +620,7 @@ function drawCensus(recipe: Recipe, field: Field | null): Record<string, number[
     gradients: [],
     arcs: [],
     strokes: [],
+    'path points': [],
     'overdraw, screens': [],
     '  of it gradient': [],
   };
@@ -621,6 +637,7 @@ function drawCensus(recipe: Recipe, field: Field | null): Record<string, number[
     per.gradients!.push(one.gradients);
     per.arcs!.push(one.arcs);
     per.strokes!.push(one.strokes);
+    per['path points']!.push(one.points);
     per['overdraw, screens']!.push(one.filled / SCREEN);
     per['  of it gradient']!.push(one.gradientFilled / SCREEN);
     if (state.ending !== null) break;

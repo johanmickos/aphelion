@@ -21,6 +21,7 @@ import type {
   FlashView,
   KnockView,
   PresentationState,
+  WakeView,
 } from '../state/types.ts';
 
 const TWO_PI = Math.PI * 2;
@@ -148,6 +149,39 @@ function knockBetween(
 }
 
 /**
+ * The wake, `alpha` of the way between two ticks.
+ *
+ * **Interpolated, where the compass beside it is not**, and the difference is
+ * worth stating because the compass's reason looks like it should apply here. A
+ * hand crossed halfway between two ticks sits at an angle the craft was never at;
+ * a wake's source crossed halfway sits at a point the craft **was** at, because
+ * that is what the source is — where the craft pressed. The parting is the craft
+ * going through the field, and the craft is interpolated, so a source taken whole
+ * would step at the tick rate under a dart gliding at the frame rate.
+ *
+ * Matched by rung rather than by position in the array: entries arrive and leave
+ * as the craft moves, so two ticks' lists are not the same list. A rung that is
+ * new this tick is taken whole — it has nothing to come from.
+ */
+function wakeBetween(
+  previous: readonly WakeView[],
+  current: readonly WakeView[],
+  alpha: number,
+): readonly WakeView[] {
+  if (previous.length === 0) return current;
+  return current.map((wake) => {
+    const before = previous.find((entry) => entry.rung === wake.rung);
+    if (before === undefined) return wake;
+    return {
+      ...wake,
+      x: between(before.x, wake.x, alpha),
+      y: between(before.y, wake.y, alpha),
+      strength: between(before.strength, wake.strength, alpha),
+    };
+  });
+}
+
+/**
  * A view `alpha` of the way from one tick to the next.
  *
  * Bodies are taken from the later tick whole rather than interpolated: they do
@@ -208,5 +242,6 @@ export function interpolate(
     callout: calloutBetween(previous.callout, current.callout, alpha),
     arrival: arrivalBetween(previous.arrival, current.arrival, alpha),
     knock: knockBetween(previous.knock, current.knock, alpha),
+    wake: wakeBetween(previous.wake, current.wake, alpha),
   };
 }
