@@ -170,7 +170,7 @@ describe('the recipe pnpm replay ships with', () => {
   it('is the pilot run it says it is', () => {
     const text = readFileSync(new URL('../recipes/pilot-60s.json', import.meta.url), 'utf8');
     const shipped = parseDispatch(JSON.parse(text));
-    expect(shipped.recipe).toEqual(pilotRecipe(289).recipe);
+    expect(shipped.recipe).toEqual(pilotRecipe(1243).recipe);
     expect(shipped.device).toBeUndefined();
     expect(shipped.observed.note).toMatch(/pilot/);
   });

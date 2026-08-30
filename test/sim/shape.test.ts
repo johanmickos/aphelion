@@ -118,29 +118,51 @@ describe('1 · the same orbit, flown faster', () => {
 
 describe('2 · the settle spends it', () => {
   /**
-   * *"Speed at the end of the settle is the circular speed at the settled
+   * §6a: *"speed at the end of the settle is the circular speed at the settled
    * radius, within 1%, for every dive — so the advantage is fully spent and no
    * dive keeps a permanent edge."* **A rewrite where holding indefinitely
    * preserves the advantage has removed the reason to let go.**
+   *
+   * **Amended 2026-08-29, and the second half is what matters.** The settle no
+   * longer spends the advantage *fully*: `SETTLE_RETURN` leaves the orbit a
+   * bounded share of what the dive earned, because erasing it entirely made every
+   * settled swing leave at the same speed whatever brought it in and read as
+   * being punished for going fast. What is asserted now is a **band with both
+   * ends**: the settled speed is above its own circle, and by a fixed amount that
+   * does not grow with how the craft arrived — so no dive keeps a *permanent
+   * edge*, which is the sentence §6a was actually protecting.
    */
-  it('leaves every dive at exactly the circular speed of its own circle', () => {
+  it('leaves every dive a fixed step above the circular speed of its own circle', () => {
+    const over: number[] = [];
     for (const g of ENVELOPE) {
       const s = fly(g, 240);
       const settled = s.taken.find((t) => t.since === SETTLE_TICKS);
       if (!settled) continue;
       const wanted = circularSpeed(BODY.mass, settled.radius);
-      expect(
-        Math.abs(settled.onOrbit / wanted - 1),
-        `${g.grabDistance}/${g.approachSpeed}/${g.aim}`,
-      ).toBeLessThan(0.01);
+      over.push(settled.onOrbit / wanted);
     }
+    expect(over.length).toBeGreaterThan(4);
+    for (const ratio of over) {
+      expect(ratio).toBeGreaterThan(1.0);
+      expect(ratio).toBeLessThan(1.2);
+    }
+    // The step is nearly the same step whatever the dive was — the spread across
+    // the whole envelope is under 15%, against the 20 – 45% the freeze itself
+    // hands out. It is not uniform, because the freeze's escape clamp binds on an
+    // energetic dive and not on a lazy one; what matters is that it is **bounded
+    // and does not grow with the approach**, so no dive keeps a permanent edge.
+    expect(Math.max(...over) / Math.min(...over) - 1).toBeLessThan(0.15);
   });
 
-  /** However fast it arrived. Four dives, four speeds at the freeze, one after. */
+  /**
+   * However fast it arrived. Four dives, four speeds at the freeze, one after —
+   * within **3%** rather than 1% since the settle stopped erasing the dive
+   * entirely, which is the whole of what that ruling cost this characteristic.
+   */
   it('brings four different arrivals to the same speed', () => {
     const rows = [160, 200, 230, 260].map((v) => fly(geometry(207, v, 0), 200));
     const settled = rows.map((s) => s.taken.find((t) => t.since === SETTLE_TICKS)!.onOrbit);
-    expect(Math.max(...settled) / Math.min(...settled) - 1).toBeLessThan(0.01);
+    expect(Math.max(...settled) / Math.min(...settled) - 1).toBeLessThan(0.03);
     const frozen = rows.map((s) => s.speedAtFreeze);
     expect(Math.max(...frozen) / Math.min(...frozen) - 1).toBeGreaterThan(0.05);
   });
@@ -168,18 +190,29 @@ describe('3 · what the freeze is worth', () => {
 
   /**
    * And the advantage has a shelf life of exactly the settle. Read as the excess
-   * over the circle, which starts positive and is gone by 1.2s — *"the reward
-   * for a good dive is a speed advantage with a 1.2-second shelf life, and
-   * cashing it before it expires is the whole of §11's timing problem."*
+   * over the circle, which starts at 20 – 45% and is **mostly** gone by 1.2s —
+   * *"the reward for a good dive is a speed advantage with a 1.2-second shelf
+   * life, and cashing it before it expires is the whole of §11's timing
+   * problem."*
+   *
+   * **Mostly, since 2026-08-29.** `SETTLE_RETURN` leaves a bounded share of it
+   * behind rather than all of it, so what expires is the difference between the
+   * two — measured here, an excess of 0.38 at the freeze falls to 0.12 and then
+   * holds. The timing problem survives it: **two thirds of what a dive earns is
+   * still gone by the settle**, and nothing further is lost afterwards, which is
+   * the *shelf life* half of the sentence.
    */
-  it('has spent the whole advantage by the time the settle ends', () => {
+  it('has spent most of the advantage by the time the settle ends', () => {
     const s = fly(geometry(207, 260, 0), 300);
     const excess = (since: number): number => {
       const t = s.taken.find((t) => t.since === since)!;
       return t.onOrbit / circularSpeed(BODY.mass, t.radius) - 1;
     };
     expect(excess(0)).toBeGreaterThan(0.2);
-    expect(Math.abs(excess(SETTLE_TICKS))).toBeLessThan(0.01);
-    expect(Math.abs(excess(SETTLE_TICKS + 120))).toBeLessThan(0.01);
+    // Most of it goes…
+    expect(excess(SETTLE_TICKS)).toBeLessThan(excess(0) / 2);
+    expect(excess(SETTLE_TICKS)).toBeGreaterThan(0);
+    // …and then nothing more does, however long the swing runs.
+    expect(Math.abs(excess(SETTLE_TICKS + 120) - excess(SETTLE_TICKS))).toBeLessThan(0.01);
   });
 });

@@ -309,7 +309,7 @@ momentum is eased toward the circular value over the same 1.2s, which is what ke
 seamless. A rewrite that rounds the shape without easing the momentum will produce an orbit that
 looks right and moves wrong.
 
-> ## ⚠ Open, 2026-08-29 — §6a is a speed governor, and the author has asked to bend it
+> ## ⚠ Ruled, 2026-08-29 — §6a's governor keeps 30% of the dive
 >
 > *"When I grab planets at farther distances, my velocity is cut down a noticeable and unpleasant
 > amount. I feel like I'm losing zippy progress and am being unnecessarily slowed down by the
@@ -341,8 +341,8 @@ looks right and moves wrong.
 >
 > | value | exit after a settle | a fast arrival pays | exit p05 | exit p50 | out of bounds |
 > |---|---|---|---|---|---|
-> | **0** — today | 971 | ×0.88 | 286 | 954 | 68% |
-> | **0.30** | 1 080 | ×0.98 | **359** | 938 | 69% |
+> | 0 — before | 971 | ×0.88 | 286 | 954 | 68% |
+> | **0.30 — ruled** | 1 080 | ×0.98 | **359** | 938 | 69% |
 > | 0.45 | 1 134 | ×1.03 | 681 | 966 | 73% |
 >
 > **0.30 is what the evidence recommends.** A fast arrival breaks even; the **slowest** swings in
@@ -351,9 +351,35 @@ looks right and moves wrong.
 > (median exit inside 840 – 1 050) and §10's (out-of-bounds the plurality at 60% or more) both
 > still hold; at 0.45 the median leaves the band and a run is over in a third fewer ticks.
 >
-> **Not ruled here.** Where the setpoint sits is a feel question and ADR-0004 makes the author the
-> gate for those, so it is a slider and the number below is unchanged until they fly it. Moving it
-> off zero bumps `SIM_VERSION` and refuses every recipe recorded before.
+> **Ruled 0.30 on the second asking**, after the author flew a capture and traced it: *"when I
+> captured it and entered orbit, I felt that my velocity dropped a bit too much while
+> circularising. Can we tweak that somehow to carry a bit more? I recall from the original
+> prototype that the orbital mechanics were not truly natural to improve the game's feel, and I
+> wonder if this is another instance of that."* **It is that instance** — this section says so in
+> its own words — and the recollection is exactly right.
+>
+> **What it changes in this file, stated rather than implied.** §6a's *"the settle spends it"* is
+> now *the settle spends most of it*: measured over the whole envelope, the settled speed sits
+> **1.00 – 1.20× its own circle** with a spread of under 15%, against a freeze that hands out
+> 20 – 45%. So **two thirds of what a dive earns is still gone by 1.2s and nothing more goes
+> afterwards** — the shelf life survives, and what it is a shelf life *of* is now the difference
+> rather than the whole. §6a's sentence that matters is *"no dive keeps a permanent edge"*, and the
+> step is bounded and does not grow with the approach, so it holds.
+>
+> The settled orbit is therefore a circle **ridden faster than a circle should be ridden**, which
+> is this section's third disagreement rather than a fourth: the floor sets the radius, the cap
+> sets the shape, and the dive now keeps a share of the speed. `test/sim/freeze.test.ts` asserts
+> both halves, because the pair is the mechanism.
+>
+> **What it does not fix.** On the swing that prompted it the craft went **1 031 at the freeze →
+> 618 at tick 40 (−40%) → 744**, and this moves only the last number: 744 becomes about 1 046, and
+> ×0.73 of the approach becomes ×1.02. The **dip** is the frozen ellipse carrying the craft out to
+> apoapsis where it is far from the body and slow, and it is [`ECCENTRICITY_CAP`](#)'s — measured,
+> 0.6 → 0.3 shallows the trough from −47% to −35% and changes the settled speed not at all. **The
+> dip is the oval**, which is the element the author asked for and the compass is drawn on, so it
+> is left alone and the cap stays on the bench where §13.5 put it.
+>
+> `SIM_VERSION` is **5**; every recipe recorded before it is refused.
 
 ### 6a · The floor sets the radius, the cap sets the shape, the dive sets the **speed**
 

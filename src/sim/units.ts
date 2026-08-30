@@ -418,12 +418,26 @@ export const PERMANENT_SHARE = 0.22;
  * plurality at 60% or more) both still hold, which they do not at 0.45: there the
  * median leaves the band and a run is over in a third fewer ticks.
  *
- * **It ships at zero**, which is arithmetically the game that was flown, so
- * nothing about a recipe changes and `SIM_VERSION` does not move. It is on the
- * bench, because where the setpoint sits is a feel question and ADR-0004 makes
- * the author the gate for those.
+ * **Ruled 0.30, 2026-08-29**, on the second asking and on that table: *"when I
+ * captured it and entered orbit, I felt that my velocity dropped a bit too much
+ * while circularising. Can we tweak that somehow to carry a bit more? I recall
+ * from the original prototype that the orbital mechanics were not truly natural
+ * to improve the game's feel, and I wonder if this is another instance of
+ * that."* It is exactly that instance — §6a says so in its own words — and this
+ * is the dial on it.
+ *
+ * **What it does not fix, and the distinction is worth keeping.** On the swing
+ * that prompted it the craft went **1 031 at the freeze → 618 at tick 40 (−40%)
+ * → 744**, and this dial moves only the last of those three numbers. The **dip**
+ * is the frozen ellipse carrying the craft out to apoapsis, where it is far from
+ * the body and therefore slow, and it is governed by
+ * [`ECCENTRICITY_CAP`](#eccentricity_cap) instead — measured, dropping that from
+ * 0.6 to 0.3 shallows the trough from −47% to −35% and changes where the craft
+ * ends up not at all. **The dip is the oval**, which is the element the author
+ * asked for and the compass is drawn on, so it is left alone and the cap stays
+ * on the bench where spec 01 §13.5 already put it.
  */
-export const SETTLE_RETURN = 0;
+export const SETTLE_RETURN = 0.3;
 
 export const TRANSIENT_SHARE = 0.45;
 

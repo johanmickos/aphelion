@@ -42,5 +42,13 @@
  * and the timing is not. **Every dispatch recorded before now is refused**, which
  * is a real cost paid deliberately — the alternative was a gate flown on a game
  * the specs describe and the build does not have.
+ *
+ * **5, on 2026-08-29**: the settle stops erasing the dive. Spec 01 §6a's
+ * circularisation eased the orbit's momentum all the way down to the circular
+ * speed at its floor, so every settled swing left at the same speed whatever
+ * brought it in — measured, exit correlated with approach at **−0.93** and
+ * arriving fast paid ×0.83. [`SETTLE_RETURN`](./units.ts) is now 0.30 and the
+ * ruling is the author's, on the second asking. It cannot compound: the freeze's
+ * escape clamp binds on every dive, so what moved is the setpoint.
  */
-export const SIM_VERSION = 4;
+export const SIM_VERSION = 5;

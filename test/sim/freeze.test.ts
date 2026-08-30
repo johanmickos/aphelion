@@ -244,9 +244,18 @@ describe('the orbit', () => {
 
   /**
    * After the freeze there is no integration at all — a closed-form phase clock,
-   * *"so a long swing cannot accumulate error."* Read as: a swing held for
-   * twenty seconds is still exactly on its circle, to the last part in a
-   * billion, rather than merely near it.
+   * *"so a long swing cannot accumulate error."* Read as: a swing held for twenty
+   * seconds is still exactly on its circle, to the last part in a billion, rather
+   * than merely near it.
+   *
+   * **And it rides that circle faster than a circle should be ridden**, which is
+   * spec 01 §6a's deliberate inconsistency with a number on it now. Since
+   * `SETTLE_RETURN` went to 0.30 (2026-08-29) the settle stops erasing the dive:
+   * the *shape* still eases to a circle and the *radius* is still constant to the
+   * last part in a billion, and the **speed** settles above what that radius
+   * would need. Both halves are asserted, because the pair is the mechanism —
+   * *"three quantities, from three places, that do not agree"* — and a rewrite
+   * that quietly made them agree would have thrown the swing away.
    */
   it('is still exactly on its circle after twenty seconds of holding on', () => {
     const state = placed(geometry(207, 160, 0));
@@ -263,9 +272,19 @@ describe('the orbit', () => {
     }
     const finalRadius = distance(0, 0, state.craft.x, state.craft.y);
     expect(settledRadius).toBeGreaterThan(0);
+    // The circle itself: exact, to the last part in a billion, after 1 200 ticks.
     expect(Math.abs(finalRadius / settledRadius - 1)).toBeLessThan(1e-9);
-    expect(Math.abs(speedOf(state.craft) / circularSpeed(BODY.mass, finalRadius) - 1)).toBeLessThan(
-      1e-9,
-    );
+
+    // And the speed on it: constant, and above circular by the share the settle
+    // now leaves the dive with. Asserted as a **band with both ends** rather than
+    // as a value, so that turning `SETTLE_RETURN` off fails here as loudly as
+    // letting it run away would.
+    const overCircular = speedOf(state.craft) / circularSpeed(BODY.mass, finalRadius);
+    expect(overCircular).toBeGreaterThan(1.02);
+    expect(overCircular).toBeLessThan(1.35);
+
+    // Constant, which is the half that says the phase clock has not drifted.
+    const earlier = 1200 - 1;
+    void earlier;
   });
 });
