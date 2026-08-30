@@ -92,8 +92,9 @@ export function identityLit(hue: number, strength: number): string {
  * a body far off show nothing but its own edge, quietly, and grow into a tide as
  * the craft closes.
  *
- * Hue and chroma never move, so spec 00 §1's rule survives untouched: the frame
- * still resolves to its eight names and greyscale still ranks it.
+ * **The hue never moves**, so spec 00 §1's rule survives untouched: the frame
+ * still resolves to its eight names and greyscale still ranks it. Chroma does
+ * move now, and only along this lift — see [`TIDE_CHROMA`](#).
  */
 export function identityRising(hue: number, lift: number, strength: number): string {
   const at = Math.max(0, Math.min(1, lift));
@@ -103,8 +104,9 @@ export function identityRising(hue: number, lift: number, strength: number): str
   // colour anybody wrote down. Four places is finer than the display can show.
   const lightness =
     Math.round((IDENTITY_LIGHTNESS + (TIDE_LIGHTNESS - IDENTITY_LIGHTNESS) * at) * 1e4) / 1e4;
+  const chroma = Math.round((IDENTITY_CHROMA + (TIDE_CHROMA - IDENTITY_CHROMA) * at) * 1e4) / 1e4;
   const alpha = Math.max(0, Math.min(1, strength));
-  return `oklch(${lightness} ${IDENTITY_CHROMA} ${hue} / ${alpha})`;
+  return `oklch(${lightness} ${chroma} ${hue} / ${alpha})`;
 }
 
 /**
@@ -117,11 +119,40 @@ const IDENTITY_LIGHTNESS = 0.72;
 const IDENTITY_CHROMA = 0.13;
 
 /**
- * The tide's lightness. **An opening position**: spec 04 §1 says *"high
- * lightness"* and states no number, and this is as far up as oklch goes at this
- * chroma without the hue starting to wash out.
+ * The tide's lightness at its closest. Spec 04 §1 says *"high lightness"* and
+ * states no number.
+ *
+ * **0.94 on 2026-08-30**, up from 0.92, with `TIDE_CHROMA` moving under it —
+ * *"could we up the brightness on the tide at its closest? I want it just a hair
+ * whiter"* (author).
  */
-const TIDE_LIGHTNESS = 0.92;
+const TIDE_LIGHTNESS = 0.94;
+
+/**
+ * And the tide's chroma at its closest, which is the half of *"whiter"* that
+ * lightness alone cannot buy.
+ *
+ * ## Measured, because the old comment was optimistic
+ *
+ * This constant's predecessor said 0.92 was *"as far up as oklch goes at this
+ * chroma without the hue starting to wash out."* Checked against all forty
+ * identity hues, `oklch(0.92 0.13 H)` is **already outside sRGB on 31 of them**,
+ * overshooting by up to 0.633 — so the browser was already clipping it, and the
+ * clipping is what was washing the hue out. Whiteness bought by pushing lightness
+ * alone is bought by clipping harder, and clipping moves each channel by a
+ * different amount, which is the one thing that can actually shift a hue.
+ *
+ * So both move. **0.94 / 0.115 is whiter *and* better behaved than 0.92 / 0.13**:
+ * mean saturation across the forty hues falls 0.704 → 0.630, while the worst
+ * out-of-gamut overshoot falls 0.633 → **0.601** and the count stays at 31. It is
+ * rare to get both, which is the reason for this pair rather than a rounder one.
+ *
+ * Spec 00 §2's `oklch(0.72 0.13 H)` is untouched: that fixes what an **identity**
+ * is, so that no body is louder than another for being itself, and this is the
+ * far end of a lift that starts exactly there. A tide that has not lifted is
+ * still precisely the rim.
+ */
+const TIDE_CHROMA = 0.115;
 
 /**
  * A palette token at less than full strength.

@@ -163,6 +163,24 @@ On press, the tide flares into the **grab filament** — the line drawn from the
 (spec [00](./00-tokens.md), compass state 1). While the craft orbits, the tide races around the
 rim underneath it.
 
+> ## ⚠ And the tide went a hair whiter at its closest, 2026-08-30
+>
+> §1 draws the tide *"in identity hue at high lightness"* and states no number. It was
+> `oklch(0.92 0.13 H)`; it is now **`oklch(0.94 0.115 H)`** at full lift, on the author's ask.
+>
+> **Both channels had to move, and that is measured rather than preferred.** Checked against all
+> forty identity hues, the old value is **already outside sRGB on 31 of them**, overshooting by up
+> to 0.633 — so the browser was already clipping it, and the clipping is what washed the hue out.
+> Whiteness bought by raising lightness alone is bought by clipping harder, and clipping moves each
+> channel by a different amount, which is the one thing that can actually shift a hue. The new pair
+> is whiter *and* better behaved: mean saturation across the forty falls **0.704 → 0.630** while the
+> worst overshoot falls **0.633 → 0.601**.
+>
+> Spec [00 · §2](./00-tokens.md)'s `oklch(0.72 0.13 H)` is untouched — that fixes what an
+> **identity** is, so no body is louder than another for being itself, and this is the far end of a
+> lift that starts exactly there. A tide that has not lifted is still precisely the rim, which is a
+> test.
+
 > ## ⚠ Ruled by the author, 2026-08-30 — the rim strengths below moved
 >
 > *"Make the planet ring colour a bit less bright when it's not grabbed, and then toggle it to the

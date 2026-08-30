@@ -128,9 +128,41 @@ describe('the render layer', () => {
     const [a, b] = [palette.identity(40, 1), palette.identity(215, 1)];
     expect(a.replace('40', 'H')).toBe(b.replace('215', 'H'));
     // The tide is the same hue further up the lightness axis, which is the
-    // ordinal channel inside one identity rather than a second colour.
-    expect(palette.identityLit(215, 1).endsWith('0.13 215 / 1)')).toBe(true);
+    // ordinal channel inside one identity rather than a second colour. Its
+    // chroma comes down with it as of 2026-08-30 — *"just a hair whiter"* — and
+    // the hue is what must not move, because the hue is the body's name.
+    expect(palette.identityLit(215, 1).endsWith(' 215 / 1)')).toBe(true);
     expect(palette.identityLit(215, 1)).not.toBe(palette.identity(215, 1));
+  });
+
+  /**
+   * **A tide that has not lifted is exactly the rim**, which is what lets a body
+   * far off show nothing but its own edge and grow a tide as the craft closes. It
+   * is the one end of the lift that has to be identical rather than merely close,
+   * because the two are drawn over each other.
+   */
+  it('starts the lift on the identity itself, at both ends', () => {
+    expect(palette.identityRising(215, 0, 1)).toBe(palette.identity(215, 1));
+    expect(palette.identityRising(215, 1, 1)).toBe(palette.identityLit(215, 1));
+  });
+
+  /**
+   * Whiter is bought in **both** channels, and it had to be. `oklch(0.92 0.13 H)`
+   * — the tide before this — is already outside sRGB on 31 of the 40 identity
+   * hues, so lightness alone buys whiteness by clipping harder, and clipping
+   * moves each channel by a different amount, which is the one thing that can
+   * shift a hue. Measured across all forty: mean saturation 0.704 → 0.630 while
+   * the worst overshoot *falls*, 0.633 → 0.601.
+   */
+  it('takes the tide whiter by lifting lightness and easing chroma together', () => {
+    const lit = palette.identityLit(215, 1);
+    const own = palette.identity(215, 1);
+    const read = (paint: string): [number, number] => {
+      const [l, c] = paint.slice('oklch('.length).split(' ');
+      return [Number(l), Number(c)];
+    };
+    expect(read(lit)[0]).toBeGreaterThan(read(own)[0]);
+    expect(read(lit)[1]).toBeLessThan(read(own)[1]);
   });
 
   it('dims a token without changing it', () => {
