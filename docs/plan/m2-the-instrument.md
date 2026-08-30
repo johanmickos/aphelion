@@ -1214,6 +1214,50 @@ canvas, no PNG diffing.
 
 **Acceptance**: a regression in any choreography above fails a test. **Verify**: `pnpm test`.
 
+### Done, 2026-08-29
+
+[`test/state/goldens.test.ts`](../../test/state/goldens.test.ts) — twenty-five assertions across
+the recipe `pnpm replay` flies with no argument, so **a number in the test and a number in that
+terminal output are the same number** and every tick named is a tick the author can fly.
+
+**Written out rather than snapshotted.** A digest of the whole stream would catch every regression
+and explain none of them: it fails as one opaque hash, and the fix for a deliberate change is to
+accept the new hash, which is not a review. What is asserted is what the picture *is* — a tier, a
+displacement, a span, a count of stretches — so a failure names the element that moved and a
+deliberate change requires editing the sentence describing it.
+
+Two of the named ticks are worth more than the rest:
+
+- **258**, the first swing and the best in the run: let go seventy ticks past the freeze, inside
+  the plateau, so the envelope is exactly 1 and the punch is at its full 18 design units over 17
+  ticks. Every element of the release is asserted against it.
+- **310**, which is the whole game in one tick. Frozen on 309 and let go on 310: the aim is
+  **PERFECT** and the envelope is **exactly zero**. The best word in the game and not one unit of
+  boost to go with it — spec 01 §11's tension is that the two wanted different moments, and this
+  is a release that took one and paid the whole price of the other. It strikes the E3 and lands no
+  punch at all, which is ADR-0012's *"a tap pays nothing, structurally rather than by a guard"*
+  read off a real swing.
+
+### The acceptance was demonstrated rather than claimed, and it found three gaps
+
+Sixteen mutations were applied to the built code, one at a time, and the goldens run against each.
+Twelve constants and four behaviours; **all sixteen now fail at least one test.** Three did not at
+first, and the first two share one cause worth writing down:
+
+**A golden that indexes by the constant it is testing cannot catch a change to that constant.**
+`expect(punch.magnitude).toBeCloseTo(PUNCH_RELEASE)` moves the expectation and the fixture
+together and passes for any value; so does `at(RELEASE + POP_TICKS)`. Every tick in the file is now
+a literal, and the arithmetic lives once in a block that asserts each constant against the spec
+that fixes it. It is the only way that class of gap ever shows up, and it would have shipped
+otherwise.
+
+**And a golden written on the most convenient swing can miss the bug it was written for.** The
+`swept` fix — the arc that froze at the settle's end — was asserted on the first swing, which
+freezes on 188 and is let go on 258, **inside its own 72-tick settle**. Every tick of it grows
+either way, so the assertion passed with the fault put back. The swing frozen on **2221** is the
+only one in the run held past its settle (81 ticks) and the only place the bug is visible at all.
+Reinstating it now fails.
+
 ---
 
 ## Gate
