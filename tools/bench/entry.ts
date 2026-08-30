@@ -30,6 +30,9 @@ import { SECONDS_PER_TICK } from './src/sim/units.ts';
 import * as cameraKnobs from './src/state/camera.ts';
 import * as curve from './src/state/decay.ts';
 import * as shape from './src/state/deformation.ts';
+import * as blow from './src/state/punch.ts';
+import * as word from './src/state/callout.ts';
+import * as leaving from './src/state/farewell.ts';
 import * as lamp from './src/state/body.ts';
 import * as arcs from './src/sim/compass.ts';
 import * as instrument from './src/state/compass.ts';
@@ -62,7 +65,7 @@ interface Knob {
   /** Physics knobs change what a run *is*, so the run starts again. */
   readonly restarts: boolean;
   /** Which card it sits under. Only the first of the three restarts a run. */
-  readonly group: 'physics' | 'camera' | 'light' | 'bodies' | 'compass';
+  readonly group: 'physics' | 'camera' | 'light' | 'bodies' | 'compass' | 'release';
   readonly places: number;
 }
 
@@ -327,19 +330,6 @@ const KNOBS: Knob[] = [
     group: 'camera',
     places: 0,
   },
-  {
-    id: 'release',
-    label: 'Lock release rate',
-    what: 'per second, how the displacement decays once there is no orbit holding it',
-    min: 0.5,
-    max: 20,
-    step: 0.5,
-    base: cameraKnobs.RELEASE_RATE,
-    apply: cameraKnobs.set_RELEASE_RATE,
-    restarts: false,
-    group: 'camera',
-    places: 1,
-  },
 
   {
     id: 'e1',
@@ -456,6 +446,137 @@ const KNOBS: Knob[] = [
     apply: shape.set_DEFORM_TICKS,
     restarts: false,
     group: 'light',
+    places: 0,
+  },
+
+  {
+    id: 'punch',
+    label: 'Punch · at full quality',
+    what: 'design units the view is displaced along the exit tangent by a release at the top of its envelope. Spec 02 §5’s 6px is 18, and ADR-0012 says it may be larger — it carries none of itself into velocity, so it cannot move what a run is worth',
+    min: 0,
+    max: 90,
+    step: 1,
+    base: blow.PUNCH_RELEASE,
+    apply: blow.set_PUNCH_RELEASE,
+    restarts: false,
+    group: 'release',
+    places: 0,
+  },
+  {
+    id: 'punchgrab',
+    label: 'Punch · at a grab',
+    what: 'and the mirror, reversed into the orbit. Spec 02 §5’s 3px is 9. Never scaled by quality — grabs are not graded',
+    min: 0,
+    max: 45,
+    step: 1,
+    base: blow.PUNCH_GRAB,
+    apply: blow.set_PUNCH_GRAB,
+    restarts: false,
+    group: 'release',
+    places: 0,
+  },
+  {
+    id: 'punchticks',
+    label: 'Punch · home in',
+    what: 'ticks the punch takes to come home past rest once. Spec 02 §5’s 180ms is 11',
+    min: 1,
+    max: 60,
+    step: 1,
+    base: blow.PUNCH_TICKS,
+    apply: blow.set_PUNCH_TICKS,
+    restarts: false,
+    group: 'release',
+    places: 0,
+  },
+  {
+    id: 'punchstretch',
+    label: 'Punch · quality’s second channel',
+    what: 'how much longer a punch at full quality carries, as a fraction of the span above. ADR-0012’s “half again as long” is 0.5; zero makes quality a size and nothing else',
+    min: 0,
+    max: 2,
+    step: 0.05,
+    base: blow.PUNCH_STRETCH,
+    apply: blow.set_PUNCH_STRETCH,
+    restarts: false,
+    group: 'release',
+    places: 2,
+  },
+  {
+    id: 'flownfloor',
+    label: 'Flown arc · floor',
+    what: 'how much light the arc keeps where the boost is worth nothing. Not zero: the arc is still the orbit the craft has ridden, and one that went out would take the trail with it',
+    min: 0,
+    max: 1,
+    step: 0.02,
+    base: view.FLOWN_FLOOR,
+    apply: view.set_FLOWN_FLOOR,
+    restarts: false,
+    group: 'release',
+    places: 2,
+  },
+  {
+    id: 'farewellspread',
+    label: 'Farewell ring · reach',
+    what: 'how far the detached orbit gets, as a multiple of the orbit it was. Spec 02 §6 fixes the colour and says only “expands away”, so this has nothing behind it',
+    min: 1,
+    max: 4,
+    step: 0.05,
+    base: leaving.FAREWELL_SPREAD,
+    apply: leaving.set_FAREWELL_SPREAD,
+    restarts: false,
+    group: 'release',
+    places: 2,
+  },
+  {
+    id: 'farewellticks',
+    label: 'Farewell ring · span',
+    what: 'ticks the ring takes to expand and go. Spec 02 §2’s 400ms is 24, the same clock the E3 decays on',
+    min: 1,
+    max: 90,
+    step: 1,
+    base: leaving.FAREWELL_TICKS,
+    apply: leaving.set_FAREWELL_TICKS,
+    restarts: false,
+    group: 'release',
+    places: 0,
+  },
+  {
+    id: 'linger',
+    label: 'Callout · linger',
+    what: 'ticks the word holds at full before it decays. THE ONE TWO SPECS DISAGREE ABOUT: spec 06 §4 says 1.2s (72) and spec 02 §2’s old end column implies about 0.4s. 72 is what is built',
+    min: 0,
+    max: 180,
+    step: 2,
+    base: word.LINGER_TICKS,
+    apply: word.set_LINGER_TICKS,
+    restarts: false,
+    group: 'release',
+    places: 0,
+  },
+  {
+    id: 'popticks',
+    label: 'Callout · pop',
+    what: 'ticks the word takes to rise off its dot, passing rest once. Spec 06 §4’s 120ms is 7',
+    min: 1,
+    max: 40,
+    step: 1,
+    base: word.POP_TICKS,
+    apply: word.set_POP_TICKS,
+    restarts: false,
+    group: 'release',
+    places: 0,
+  },
+  {
+    id: 'poprise',
+    label: 'Callout · rise',
+    what: 'design units the word carries upward off the dot that earned it. Spec 06 §4’s ~30px is 90',
+    min: 0,
+    max: 300,
+    step: 5,
+    base: word.POP_RISE,
+    apply: word.set_POP_RISE,
+    restarts: false,
+    group: 'release',
     places: 0,
   },
   {
@@ -964,7 +1085,7 @@ function renderKnobs(): void {
   // again and the recipe still describes it; everything below it changes only
   // the picture, and presentation state converges (ADR-0015), so it lands live
   // on the swing already in the air.
-  for (const group of ['physics', 'camera', 'light', 'bodies', 'compass'] as const) {
+  for (const group of ['physics', 'camera', 'light', 'bodies', 'compass', 'release'] as const) {
     byId(`knobs-${group}`).innerHTML = markup(KNOBS.filter((knob) => knob.group === group));
   }
 
