@@ -111,7 +111,7 @@ describe('the numbers the choreography is built from', () => {
     expect(TAKEN_WINDOW_TICKS).toBe(25); // spec 02 §6's 420ms, a quarter of the word's
     // Spec 00 §6's ring count, ruled to three on 2026-08-29.
     expect(RINGS).toBe(3);
-    expect(RING_MIN_GAP).toBe(24); // 8 board pixels, over the crossing dot's diameter
+    expect(RING_MIN_GAP).toBe(48); // a window's full width at full aim, clear
     // Spec 01 §7's envelope, which the flown arc is cut on.
     expect(BOOST_ARM_TICKS).toBe(27); // 0.45s
     expect(BOOST_PLATEAU_TICKS).toBe(72); // 1.2s, and the settle's end

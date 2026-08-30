@@ -124,11 +124,22 @@ export const STACK_GAP = 20 * BOARD_PIXEL;
  * ring is the nearer hop — and that is the reading spec 00 §6 asks the stack for.
  * Two rings the eye can separate beat one pair it cannot.
  *
- * Eight board pixels, which is a little over the crossing dot's own diameter, so
- * the marks the hand leaves on two neighbouring rings never touch. An opening
- * position, on the bench.
+ * **Sixteen board pixels, and it is derived rather than chosen** — *"the minimum
+ * distance between compass orbit rings should be slightly larger, they're a bit
+ * crowded"* (author, 2026-08-29), against an eight that was a guess. What has to
+ * fit between two rings is the widest either is ever drawn: a window is
+ * `WINDOW_WIDTH × (1 + aim)`, so **18 design units** at full aim, and a crossing
+ * dot is **15** across. Sixteen board pixels is 48 units — a window's full width
+ * clear of a window, or two dots and a half — so two neighbouring rings never
+ * touch even when both are lit and both are being aimed at, which is exactly the
+ * moment they are hardest to tell apart.
+ *
+ * **It costs the stack very little**, and that is measured: a three-ring stack is
+ * now at least 96 design units tall before distance says anything, against an
+ * outermost ring that sits at p50 **384** and never past **940**, in a picture
+ * with 1 266 units above the craft. The room was there.
  */
-export const RING_MIN_GAP = 8 * BOARD_PIXEL;
+export const RING_MIN_GAP = 16 * BOARD_PIXEL;
 
 /** How far past the outermost ring the hand is drawn — spec 00 §6's *"extended outward"*. */
 export const HAND_OVERSHOOT = 12 * BOARD_PIXEL;
