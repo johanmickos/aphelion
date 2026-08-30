@@ -168,6 +168,64 @@ and asserts *separately* that the shipped field draws flat over a whole run — 
 mechanism can each move without the other rotting, and the restore does not have to be re-derived
 from a flight.
 
+### The flythrough, 2026-08-30 — three asks and what each turned into
+
+The author flew the field and sent three things. Two were pictures and one was physics.
+
+**The planets read as beehives.** *"I want to remove the innermost circle within each planet."* Spec
+04 §1's inner **stratum** at 0.39r is what went, not the core: the core is a filled dot rather than a
+ring, so it is not part of the concentric pattern, and it is §4's **type slot** — the one element
+that makes a later body type a data change. Taking it would have cost the extension point and left
+the beehive. What survives is §1's *structure without texture*: a rim, one stratum, a core.
+
+**Tap fly-bys were being rewarded with speed.** *"Can we tweak the payback boost/speed to not
+encourage straight fly-throughs like this so much?"* Measured first, and **the boost was not the
+culprit** — it pays 0 – 14 design units/s on the swings in question. The culprit is the **dive**:
+gravity accelerates a falling craft and stops acting at the release (spec 01 §2), so the way in was
+free and the way out was never charged. Over the author's 129 swings a release taken in the dive
+handed the craft **+548** at the median and gained **81%** of the time, against +71 for a swing held
+past the settle — **7.7×**, and the best-paid move in the game. Spec 01 §7's *"a reflexive
+tap-through earns almost nothing"* and `release.ts`'s *"a release during the dive changes nothing
+about the craft"* were both false, and §5a's flat speed-by-altitude had already bent under it
+(213 → 356 across eight bands, against a stated 260 – 300 ceiling).
+
+`DIVE_PAYBACK` returns an unfinished swing toward the speed the press found it at, keeping the
+heading. **It shipped at 1 and was refused within the hour** — *"it feels too slow and anemic right
+now"* — so it sits at **½**, where the median dive release is +155 against +110 for a flown swing:
+level rather than 7.7×. It is on the bench, and 0 is the behaviour it replaced.
+
+**And the refusal is its own finding.** With the tap closed, `PERMANENT_SHARE × PEAK_BOOST` is about
+**40** design units/s against approach speeds near 1 000, so *nothing else in the game is an engine*.
+Half is a holding position, not an answer.
+
+**What it cost.** `SIM_VERSION` is **7**, so every recipe recorded before it is refused — the price
+of any physics change, and this is the first bump since the author's own flown fixtures arrived. The
+pilot recipe was re-flown and its seed chosen on **coverage** rather than length: of six thousand
+searched, five still give the goldens all four release tiers, a knock, a tight arrival and a swing
+held past its own settle in one flight. `arrival-flown.json` and `knock-flown.json` are **retired** —
+they existed because the pilot could not produce an arrival, and it now can, which is itself a
+consequence of the change. The author's dispatches remain in `diagnostics/` as input logs.
+
+**⚠ And one invariant broke, and it is the author's to close.** `knock.ts` states that a knock and an
+arrival *"must never contradict each other"*, with `KNOCK_BAND` set above the hardest knock any tight
+arrival takes. Under SIM_VERSION 7 one capture in the pilot run earns both — frozen on 1896, knocked
+on 1893, lit together for 45 ticks. Both thresholds were ruled by the author on measured play, so
+retuning them is theirs. `test/state/goldens.test.ts` pins the breach exactly — one capture, 45 ticks
+— so it fails if a second starts doing it and fails again when it is fixed.
+
+**Not addressed in this pass**, and named so it is not mistaken for done:
+
+- **The rungs still travel by too quickly.** *"I still don't love the effect."* Not changed, and
+  there is a reason to wait: the crossing rate **is** the speed. At the escalated 1 400 – 1 700
+  design units/s the flythrough reached, a rung crosses every 88 – 107ms; at §5a's intended flat
+  780 – 900 it is 167 – 192ms, near half. The payback is aimed at exactly that escalation, so the
+  next flight is the measurement. If it still reads wrong with the speed in band, the levers are the
+  spacing (bench) and the alpha, and the sky is already carrying speed in parallel.
+- **The double oval, reported again** — *"on the last orbit I see one clear oval, and once I start
+  circularizing it jumps to show a different one."* This is **not** the grab-time case fixed on
+  2026-08-30 (`goldens.test.ts` still holds that one): it is a second transition, dive → settle,
+  where the predicted path hands over to the frozen one.
+
 ### Still the author's, and asked rather than assumed
 
 1. **What an addressed rung says** — spec 05's own open question, now flyable both ways on the bench.

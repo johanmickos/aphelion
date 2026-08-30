@@ -37,8 +37,13 @@ interface Stroke {
  * point: the renderer's contract is *what it asks for in design units*, and a
  * real canvas would answer a different question with more equipment.
  */
-function recorder(): { context: CanvasRenderingContext2D; strokes: Stroke[] } {
+function recorder(): {
+  context: CanvasRenderingContext2D;
+  strokes: Stroke[];
+  fills: Array<{ radius: number }>;
+} {
   const strokes: Stroke[] = [];
+  const fills: Array<{ radius: number }> = [];
   let pending: { radius: number; sweep: number | null } | null = null;
   const context = {
     canvas: { width: 1170, height: 2532 },
@@ -68,7 +73,13 @@ function recorder(): { context: CanvasRenderingContext2D; strokes: Stroke[] } {
     lineTo: () => {},
     rect: () => {},
     fillRect: () => {},
-    fill: () => {},
+    fill: () => {
+      // Recorded the same way a stroke is, because the **core** is an arc that
+      // is filled rather than stroked — and since 2026-08-30 it is the only
+      // thing left inside a body besides its one stratum, so a test that could
+      // not see it could not tell a body with a type slot from one without.
+      if (pending !== null) fills.push({ radius: pending.radius });
+    },
     arc: (_x: number, _y: number, radius: number, from: number, to: number) => {
       const sweep = to - from;
       pending = { radius, sweep: Math.abs(sweep - Math.PI * 2) < 1e-9 ? null : sweep };
@@ -85,7 +96,7 @@ function recorder(): { context: CanvasRenderingContext2D; strokes: Stroke[] } {
       }
     },
   } as unknown as CanvasRenderingContext2D;
-  return { context, strokes: strokes };
+  return { context, strokes, fills };
 }
 
 /**
@@ -106,6 +117,15 @@ function strokesFor(radius: number, closing = FAR): Stroke[] {
   const { context, strokes } = recorder();
   draw(createPresentation(createInitialState(field, craft, 1)), context);
   return strokes;
+}
+
+/** The same body, and what the renderer *filled* rather than stroked. */
+function fillsFor(radius: number, closing = FAR): Array<{ radius: number }> {
+  const body = createBody(DESIGN_WIDTH / 2, 0, radius);
+  const craft = createCraft(DESIGN_WIDTH / 2, grabRange(body) * (1 - closing), 0, 0);
+  const { context, fills } = recorder();
+  draw(createPresentation(createInitialState(openField([body]), craft, 1)), context);
+  return fills;
 }
 
 /**
@@ -336,13 +356,36 @@ describe('a body’s anatomy', () => {
     expect(tide.style.split(' ')[2]).toBe(rim.style.split(' ')[2]);
   });
 
-  /** The strata are fractions of the radius, which is what makes them structure. */
-  it('places the strata at 0.68 and 0.39 of the radius', () => {
+  /**
+   * The strata are fractions of the radius, which is what makes them structure.
+   *
+   * **One of them now, and 0.39 is the one that went** — the author, 2026-08-30:
+   * *"I want to remove the innermost circle within each planet because they're
+   * starting to look like beehives."* Spec [04 · §1](../../docs/spec/04-bodies.md)
+   * states the pair and this is the notice's own reading of which is *innermost*:
+   * the core at 0.08r is a filled dot rather than a ring, so it is not part of
+   * the concentric pattern that reads as a beehive — and it is §4's **type slot**,
+   * which a later body type is a data change because of.
+   *
+   * Both halves are asserted, so that restoring the inner stratum fails here and
+   * has to be a decision rather than a drift.
+   */
+  it('places its one stratum at 0.68 of the radius, and draws no second ring', () => {
     // A body of 200 reaches 3 857, so it is only on screen well inside its own
     // reach — see the pair's note above.
     const strokes = strokesFor(large, 0.7);
     const rings = strokes.filter((s) => s.sweep === null).map((s) => s.radius / large);
     expect(rings.some((at) => Math.abs(at - 0.68) < 1e-9)).toBe(true);
-    expect(rings.some((at) => Math.abs(at - 0.39) < 1e-9)).toBe(true);
+    expect(rings.some((at) => Math.abs(at - 0.39) < 1e-9)).toBe(false);
+  });
+
+  /**
+   * And the **core** survives the same ruling, because it is a dot and not a
+   * ring. It is spec 04 §4's type slot — BINARY draws two, a BLACK HOLE none —
+   * so losing it would have cost the extension point and left the beehive.
+   */
+  it('keeps the core dot the body types are drawn from', () => {
+    const filled = fillsFor(large, 0.7).filter((f) => f.radius > 0);
+    expect(filled.some((f) => Math.abs(f.radius / large - 0.08) < 1e-9)).toBe(true);
   });
 });

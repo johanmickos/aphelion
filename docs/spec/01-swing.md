@@ -512,6 +512,43 @@ test can measure — where the grab happened and where the craft got to — prec
 not require the rewrite to keep a number by that name. Whether the implementation stores it, derives
 it, or never names it at all is not this file's business.
 
+> ## ⚠ The safety catch was not catching anything, 2026-08-30
+>
+> The paragraph below is the spec's own statement of intent and it was **false as built**, because
+> it guards the wrong channel. The boost is what the ramp gates, and the boost is worth 0 – 14
+> design units/s on the swings in question. What a tap-through actually banks is the speed the
+> **dive** gave it: gravity accelerates a falling craft and stops acting at the release (§2), so the
+> way in was free and the way out was never charged.
+>
+> Measured over the **129 swings** in the author's dispatches:
+>
+> | When the swing let go | n | Median speed handed to the craft | Share that gained |
+> |---|---|---|---|
+> | **Never froze — released in the dive** | 27 | **+548** | **81%** |
+> | Before the boost armed | 31 | +18 | 58% |
+> | Armed, inside the settle | 19 | −235 | 37% |
+> | Held past the settle | 52 | +71 | 56% |
+>
+> So the reflexive tap-through was the **best-paid move in the game**, at 7.7× a fully flown swing,
+> and it was the only category where four releases in five came out faster. The author flew it and
+> named it: *"my tap fly-bys towards the end were being rewarded with new speed despite not
+> interacting much with the planets."*
+>
+> **§5a had already bent under it.** Its headline — *"median speed is flat at 260 – 300 units/s in
+> every band"* — now reads **213, 307, 324, 299, 315, 356, 263, 349** over eight bands of the same
+> corpus, and periapsis speed p95 is **502** against §5a's 440.
+>
+> **What is built** is `DIVE_PAYBACK` (`src/sim/units.ts`), which returns an unfinished swing toward
+> the speed the press found it at. The heading a dive bent the craft onto is kept — that is the half
+> worth having, and taking it would be taking a verb away. **It ships at ½ rather than 1**: full
+> payback was flown the same hour and refused as *"too slow and anemic"*, which is its own finding —
+> with the tap closed, `PERMANENT_SHARE × PEAK_BOOST` is about **40** units/s against approach speeds
+> near 1 000, so nothing else in the game is an engine. What a well-flown swing should be worth is
+> the open question underneath, and the author has named **fuel** as their answer.
+>
+> **Nothing in §7's own tolerance moved**: the envelope is measured on releases from a frozen orbit
+> and never sees this. `SIM_VERSION` is 7 and every recipe recorded before it is refused.
+
 **The ramp is the footgun's safety catch.** A reflexive tap-through earns almost nothing; you must
 hold a moment to arm it. That is what turned the boost from an always-loaded weapon into a skill
 window, and it is not negotiable.

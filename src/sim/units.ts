@@ -434,6 +434,88 @@ export const PAYING_DEPTH = 0.5;
  * the field forever; 22% keeps the escalation bounded"*, and spec 01 §5a's flat
  * median speed across eight altitude bands is the evidence it works.
  */
+/**
+ * How much of what a **dive** gave the craft an unfinished swing gives back, from
+ * 0 to 1 — and it is a **ruling about escalation**, made 2026-08-30.
+ *
+ * ## A release during the dive was the best-paid move in the game
+ *
+ * [`release.ts`](./release.ts) has claimed since M1 that *"a release during the
+ * dive changes nothing about the craft"* and spec
+ * [01 · §7](../../docs/spec/01-swing.md) that *"a reflexive tap-through earns
+ * almost nothing; you must hold a moment to arm it… and it is not negotiable."*
+ * Measured over the **129 swings** in the author's own dispatches, both sentences
+ * were false, and not narrowly:
+ *
+ * | When the swing let go | n | Median speed it handed the craft | Share that gained |
+ * |---|---|---|---|
+ * | **Never froze — released in the dive** | 27 | **+548** | **81%** |
+ * | Before the boost armed | 31 | +18 | 58% |
+ * | Armed, inside the settle | 19 | −235 | 37% |
+ * | Held past the settle | 52 | +71 | 56% |
+ *
+ * So the tap-through paid **7.7×** what a fully flown swing paid and was the only
+ * category where four releases in five came out faster. Nothing was rewarding it:
+ * it simply helped itself on the way in. A dive is real gravity, falling toward a
+ * body accelerates the craft, and **gravity stops acting at a release** (spec 01
+ * §2) — so the way out is never paid for. The boost's arming ramp guards the
+ * boost, which is worth 0 – 14 units/s on these swings, and guards nothing at all
+ * against the 183 – 698 the fall itself hands over.
+ *
+ * The author flew it and named it: *"my tap fly-bys towards the end were being
+ * rewarded with new speed despite not interacting much with the planets."*
+ *
+ * ## And it had already bent a measured characteristic
+ *
+ * Spec 01 §5a's headline is that **the dive normalises speed** — *"it is why the
+ * top of the field is not faster than the bottom: median speed is flat at
+ * 260 – 300 units/s in every band."* Measured over the same corpus, 17 417 ticks
+ * across eight bands of a 17 129-unit climb, the median now runs **213, 307, 324,
+ * 299, 315, 356, 263, 349** — five of the seven bands above the opening are over
+ * §5a's ceiling and the top of the field is the fast end. Periapsis speed has
+ * moved with it: p95 **502** against §5a's stated 440 and its real-play 459.
+ *
+ * ## What one means
+ *
+ * **A swing you do not finish leaves you exactly as fast as it found you,
+ * pointing somewhere new.** The turn a dive gives is kept — that is the useful
+ * half and taking it would be taking a verb away — and the speed is not. It makes
+ * `release.ts`'s own sentence true rather than aspirational, and it leaves every
+ * tolerance spec 01 states untouched: §7's envelope is measured on releases from a
+ * frozen orbit and never sees this, §8's exit speed likewise, and §9's coast is
+ * downstream of both.
+ *
+ * ## Half, because one was flown and refused
+ *
+ * The first build of this shipped at **1** — an unfinished swing exactly
+ * speed-neutral, which is the only value that makes `release.ts`'s own sentence
+ * literally true. The author flew it within the hour: *"it feels too slow and
+ * anemic right now."*
+ *
+ * They are right, and why is worth writing down because it is the **next** ruling
+ * rather than this one. With the tap closed, nothing else in the game is an
+ * engine. A well-flown swing is paid [`PERMANENT_SHARE`](#permanent_share) of
+ * [`PEAK_BOOST`](#peak_boost) — 22% of 180 design units/s, so **about 40** —
+ * against approach speeds near 1 000. The tap was supplying the pace, badly.
+ * Taking all of it away leaves the craft with no way to build speed at all, which
+ * is a different broken game.
+ *
+ * So this sits at **half**. Measured over the author's own input logs re-flown
+ * under it, a release taken in the dive hands the craft **+155** at the median
+ * against +548 before, and 64% of them gain against 81% — level with the +110 a
+ * swing held past the settle pays, where it used to be **7.7×** it. It stops
+ * being the best-paid move in the game without becoming the worst.
+ *
+ * It is a **correction and not an erasure**, and it is explicitly a holding
+ * position: what a well-flown swing should be worth is the question underneath,
+ * the author has already named **fuel** as their own answer to it, and
+ * `docs/plan/m3-the-field.md` records both.
+ *
+ * **Zero is the behaviour before this ruling**, and it is on the bench beside
+ * the boost so the author can fly the whole range rather than the two ends.
+ */
+export const DIVE_PAYBACK = 0.5;
+
 export const PERMANENT_SHARE = 0.22;
 
 /**

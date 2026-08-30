@@ -159,10 +159,29 @@ const LOOK: Readonly<Record<BodyState, Look>> = {
  * §1 gives the pair absolute alphas and §3 gives the state one; the state's is
  * what varies, so it is taken as the outer ring's and the inner keeps §1's ratio
  * to it. That way the two rings stay a pair through all four states.
+ *
+ * ## The inner one is gone, 2026-08-30 — *"they're starting to look like beehives"*
+ *
+ * The author, flying the field with the rungs in: *"I want to remove the
+ * innermost circle within each planet because they're starting to look like
+ * beehives."*
+ *
+ * **The 0.39r stratum is what goes, and not the core.** A body draws four
+ * concentric things — the rim, these two, and the core — and *beehive* is what
+ * three nested rings read as. The core is a **filled dot at 0.08r**, not a ring,
+ * so it does not join that pattern; it is also spec
+ * [04 · §4](../../docs/spec/04-bodies.md)'s **type slot**, the one element that
+ * makes a later body type a data change rather than a redesign (BINARY has twin
+ * cores, a BLACK HOLE has none). Taking it would have cost the extension point
+ * and left the beehive.
+ *
+ * What survives is §1's *structure without texture*: a rim, one stratum, and a
+ * core. The pair is still written as a pair — the inner entry is commented out
+ * rather than deleted, and §1's α ratio with it — so putting it back is one line.
  */
 const STRATA: ReadonlyArray<readonly [at: number, share: number]> = [
   [0.68, 1],
-  [0.39, 0.14 / 0.22],
+  // [0.39, 0.14 / 0.22] — spec 04 §1's inner stratum, withdrawn above.
 ];
 
 /** Spec 04 §1's core: a filled dot at 0.08 × the body's radius. The type slot. */

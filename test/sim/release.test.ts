@@ -16,6 +16,7 @@ import {
   BOOST_ARM_TICKS,
   BOOST_PLATEAU_TICKS,
   BOOST_ZERO_TICKS,
+  DIVE_PAYBACK,
   PERMANENT_SHARE,
   SECONDS_PER_TICK,
 } from '../../src/sim/units.ts';
@@ -263,31 +264,59 @@ describe('quality, which the punch is scaled by', () => {
 
 describe('a release during the dive', () => {
   /**
-   * **No boost, and no change of direction.** There is no orbit to be paid on, so
-   * the craft leaves on exactly the velocity gravity had given it — turning it
-   * onto a tangent would hand the player a way to steer, which is a second verb.
+   * **No boost, and no change of direction** — but the speed goes back, and that
+   * is [`DIVE_PAYBACK`](../../src/sim/units.ts)'s ruling of 2026-08-30.
+   *
+   * This test used to assert that a dive release changed the velocity **not at
+   * all**, which is what `release.ts` claimed and what spec 01 §7 assumed when it
+   * called the arming ramp a safety catch against tap-throughs. Measured over the
+   * author's own 129 swings it was false by +548 design units/s at the median:
+   * the dive had already helped itself on the way in, and gravity stops at a
+   * release, so nothing ever took the fall back.
+   *
+   * So what is asserted now is the pair that is actually true. **The heading is
+   * untouched** — turning the craft onto a tangent would hand the player a way to
+   * steer, which is a second verb — and **the speed returns toward what the press
+   * found**, by the dial's own share. Position is untouched either way.
    *
    * What it *does* get is the **punch**, which is a different channel: ADR-0012
    * grades an unfrozen release on how hard the body is bending its heading, and
    * pays a transient on that. The transient rides beside the velocity rather than
-   * in it, so both of those sentences are true at once — and this asserts the
-   * first one exactly by naming the fields it is about.
+   * in it, so it is invisible to both assertions below.
    */
-  it("changes neither the craft's velocity nor its position", () => {
+  it('gives back the share of the fall the dial names, and turns the craft not at all', () => {
     const state = placed(geometry(350, 60, 120));
     stepSim(state, PRESS);
     for (let tick = 0; tick < 20; tick++) stepSim(state, PRESS);
     expect(state.orbit).toBeNull();
+    const entry = state.dive!.entrySpeed;
 
-    const { x, y, vx, vy } = state.craft;
+    const { x, y } = state.craft;
+    const before = speedOf(state.craft);
+    const heading = headingOf(state.craft);
+    // The dive really did hand the craft speed, or this proves nothing.
+    expect(before).toBeGreaterThan(entry);
+
     release(state);
-    expect({ x: state.craft.x, y: state.craft.y, vx: state.craft.vx, vy: state.craft.vy }).toEqual({
-      x,
-      y,
-      vx,
-      vy,
-    });
+    expect({ x: state.craft.x, y: state.craft.y }).toEqual({ x, y });
+    // Within an ulp rather than exactly, and the ulp is honest: the payback
+    // scales `vx` and `vy` by one factor, and the two products round
+    // independently. Spec 01 §9's *exactly* constant heading is about **coasting**
+    // — after this tick nothing touches the velocity again — and the punch keeps
+    // its own exactness by riding beside the velocity rather than in it.
+    expect(Math.abs(headingOf(state.craft) - heading)).toBeLessThan(1e-12);
+    expect(speedOf(state.craft)).toBeCloseTo(before + DIVE_PAYBACK * (entry - before), 9);
     expect(state.heldBody).toBeNull();
+  });
+
+  /**
+   * And the two ends of the dial, stated so that moving it is a decision. At 0
+   * this is the behaviour the ruling replaced; at 1 an unfinished swing is exactly
+   * speed-neutral and buys a heading and nothing else.
+   */
+  it('is a dial between keeping the fall and giving all of it back', () => {
+    expect(DIVE_PAYBACK).toBeGreaterThanOrEqual(0);
+    expect(DIVE_PAYBACK).toBeLessThanOrEqual(1);
   });
 
   it('leaves the craft coasting exactly, like any other release', () => {

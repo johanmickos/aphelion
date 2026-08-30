@@ -63,16 +63,21 @@ describe('the simulation behaviour version', () => {
       replayRun(recipeOf(recorder), { onTick: (state) => digest.update(snapshot(state)) });
     }
 
-    // Unmoved on 2026-08-30 while the fingerprint below moved, and deliberately:
-    // the snapshot gained the dive's **aim**, which is recorded and never read by
-    // the physics. Checked the way the comment above prescribes — the field was
-    // added to `Dive` and `Orbit` with the snapshot untouched, and this test went
-    // on passing at `5d8fb46a1c605645`.
-    expect(SIM_VERSION).toBe(6);
+    // **7 as of 2026-08-30: the dive payback.** This is the other case the header
+    // describes — a tick genuinely moved. `release.ts` now returns an unfinished
+    // swing toward the speed the press found it at, so a recipe replayed under
+    // this build flies a different run than it was recorded as, and every recipe
+    // before now is refused rather than quietly re-flown. `DIVE_PAYBACK` carries
+    // the measurement that made it a ruling.
+    //
+    // The bump before it was 6, where the snapshot gained the dive's **aim** and
+    // this number did *not* move — the picture-not-flight case, checked the way
+    // the comment above prescribes and recorded here so the two are told apart.
+    expect(SIM_VERSION).toBe(7);
     expect(
       digest.digest('hex').slice(0, 16),
       'the swing changed: bump SIM_VERSION and this fingerprint together, and every recipe ' +
         'recorded before now stops replaying',
-    ).toBe('8d9b5544e49ce2b1');
+    ).toBe('432e7fe36db0a2d7');
   });
 });

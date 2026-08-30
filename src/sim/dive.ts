@@ -47,6 +47,19 @@ export interface Dive {
    */
   readonly grabRadius: number;
   /**
+   * How fast the craft was flying when the press landed, before the clearance
+   * touched it.
+   *
+   * **What an unfinished swing gives back** — see
+   * [`DIVE_PAYBACK`](./units.ts). A dive accelerates the craft by falling, and
+   * before 2026-08-30 a release taken during it kept all of that: gravity stops
+   * acting at a release (spec 01 §2), so nothing ever took the fall back. This is
+   * the number the payback returns to, and it is taken **at the press** rather
+   * than after the clearance so that the clearance's own bought speed — a safety
+   * impulse that raises the periapsis, not a reward — cannot be banked either.
+   */
+  readonly entrySpeed: number;
+  /**
    * Where the press was pointed: the **sine of the approach angle**, from 0 for
    * a craft aimed dead at the body's centre to 1 for one going exactly sideways
    * past it (`CONTEXT.md`: **aim**).
@@ -125,6 +138,7 @@ export function beginDive(craft: Craft, body: Body, clearanceTicks: number): Div
   const spread = radius * speed;
   return {
     grabRadius: radius,
+    entrySpeed: speed,
     // A craft standing still, or somehow pressed at the body's own centre, was
     // pointed nowhere — and nowhere is dead centre, because what this is asked is
     // whether the approach was *sideways*, and a line that does not exist is not.

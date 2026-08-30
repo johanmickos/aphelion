@@ -164,14 +164,25 @@ describe('the recipe pnpm replay ships with', () => {
   /**
    * It is committed so the command has a real run in the real format to prove
    * itself on before the author has flown one. This holds it to being exactly
-   * what it claims: the pilot's run at seed 2472, and not a file that quietly
-   * stopped matching the thing that made it.
+   * what it claims: the pilot's run at the seed the file names, and not a file
+   * that quietly stopped matching the thing that made it.
+   *
+   * **The seed is read from the file rather than written here**, because it has
+   * had to move once and will again. A physics change re-flies every pilot run,
+   * and what this fixture is for is a *long* one — 463 gave 73 seconds under the
+   * physics before SIM_VERSION 7 and 21 under it, so the seed moved to 2836,
+   * which gives 58. Pinning it in two places is what made that a two-line change
+   * instead of one.
    */
   it('is the pilot run it says it is', () => {
     const text = readFileSync(new URL('../recipes/pilot-60s.json', import.meta.url), 'utf8');
     const shipped = parseDispatch(JSON.parse(text));
-    expect(shipped.recipe).toEqual(pilotRecipe(463).recipe);
+    expect(shipped.recipe).toEqual(pilotRecipe(shipped.recipe.seed).recipe);
     expect(shipped.device).toBeUndefined();
     expect(shipped.observed.note).toMatch(/pilot/);
+    // And it really is a whole run rather than a fragment, which is what the
+    // goldens need of it. Length is no longer the property it is chosen on —
+    // coverage is, and the recipe's own note says which five seeds still have it.
+    expect(shipped.recipe.ticks).toBeGreaterThan(2000);
   });
 });

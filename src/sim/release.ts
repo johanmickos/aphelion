@@ -25,18 +25,40 @@
  * is the same ray, and spec 01 §11's closed-form compass is solved on it
  * unchanged. What §9 gives up is *"exactly constant speed"*, and it says so.
  *
- * **A release during the dive changes nothing about the craft.** It has no
- * frozen orbit to be paid on, and turning it onto a tangent would hand the
- * player a way to steer — a second verb, which `VISION.md`'s first pillar calls
- * a repeal rather than a feature. What it still has is
- * [`quality.ts`](./quality.ts)'s reading of how hard the body was bending it,
- * which is what the punch is scaled by.
+ * **A release during the dive changes nothing about the craft** — which was a
+ * claim rather than a fact until 2026-08-30. It has no frozen orbit to be paid
+ * on, and turning it onto a tangent would hand the player a way to steer — a
+ * second verb, which `VISION.md`'s first pillar calls a repeal rather than a
+ * feature. What it still has is [`quality.ts`](./quality.ts)'s reading of how
+ * hard the body was bending it, which is what the punch is scaled by.
+ *
+ * ## It changed everything about the craft's speed, and now it gives it back
+ *
+ * Nothing here paid a dive release, and it did not need paying: a dive is real
+ * gravity, falling accelerates the craft, and gravity stops acting the instant
+ * the button comes up (spec 01 §2), so the way in was free and the way out was
+ * never charged. Measured over the author's own 129 swings, **a release taken
+ * during the dive handed the craft a median +548 design units/s and gained 81%
+ * of the time** — 7.7× what a fully flown swing paid, and the best-paid move in
+ * the game. [`DIVE_PAYBACK`](./units.ts) carries the whole measurement and the
+ * ruling.
+ *
+ * So an unfinished swing now returns the craft to the speed the press found it
+ * at. **The turn is kept and the speed is not**: what a tap buys is a different
+ * heading at the same pace, which is spec 01 §8's own description of what a
+ * release is and is the half of it worth having.
  */
 import { boostOf } from './boost.ts';
 import { speedOf } from './craft.ts';
 import type { SimState } from './types.ts';
 import { qualityOf } from './quality.ts';
-import { PERMANENT_SHARE, TRANSIENT_SECONDS, TRANSIENT_SHARE, TRANSIENT_STRETCH } from './units.ts';
+import {
+  DIVE_PAYBACK,
+  PERMANENT_SHARE,
+  TRANSIENT_SECONDS,
+  TRANSIENT_SHARE,
+  TRANSIENT_STRETCH,
+} from './units.ts';
 
 /**
  * Let go.
@@ -50,6 +72,22 @@ export function release(state: SimState): void {
     const speed = speedOf(state.craft);
     if (speed > 0) {
       const scale = (speed + PERMANENT_SHARE * boostOf(orbit)) / speed;
+      state.craft.vx *= scale;
+      state.craft.vy *= scale;
+    }
+  }
+
+  // **An unfinished swing gives back what falling gave it** — see
+  // [`DIVE_PAYBACK`](./units.ts) for the measurement that made this a ruling.
+  // Scaling the velocity rather than rebuilding it is what keeps the turn: the
+  // heading a dive bent the craft onto is exactly the heading it leaves on, and
+  // only the pace returns to what the press found. A dial rather than a flag so
+  // the author can fly the range, and at zero this is the behaviour it replaced.
+  const dive = state.dive;
+  if (dive !== null) {
+    const speed = speedOf(state.craft);
+    if (speed > 0) {
+      const scale = (speed + DIVE_PAYBACK * (dive.entrySpeed - speed)) / speed;
       state.craft.vx *= scale;
       state.craft.vy *= scale;
     }

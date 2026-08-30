@@ -130,9 +130,13 @@ describe('the snapshot', () => {
       'x',
       'y',
     ]);
+    // `entrySpeed` is the speed the press found, and it is world state for the
+    // same reason the burst is: it decides what a release does. Two runs that
+    // disagreed about it would hand back different speeds from the same swing.
     expect(Object.keys(fly(1, 100).dive!).sort()).toEqual([
       'aim',
       'clearanceTicks',
+      'entrySpeed',
       'grabRadius',
       'knock',
       'peakEnergy',

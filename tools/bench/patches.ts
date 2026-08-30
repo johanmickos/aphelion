@@ -59,6 +59,11 @@ export const PATCHES: readonly Patch[] = [
   ),
   settable(
     'src/sim/units.ts',
+    'DIVE_PAYBACK',
+    'how much of the fall an unfinished swing gives back — 0 is the behaviour before 2026-08-30',
+  ),
+  settable(
+    'src/sim/units.ts',
     'TRANSIENT_SHARE',
     'spec 01 §8 measured ×1.8; 0.45 is what was flown',
   ),
