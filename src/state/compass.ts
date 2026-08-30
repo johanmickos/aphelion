@@ -98,6 +98,38 @@ export const RING_SPREAD = 62 * SCALE;
  */
 export const STACK_GAP = 20 * BOARD_PIXEL;
 
+/**
+ * How far apart two rings are held **whatever** their windows are doing.
+ *
+ * [`STACK_GAP`](#) above only fires when two arcs land on top of each other, and
+ * that turns out to be the rarer half of the problem. The radii are proportional
+ * to distance — `away / AIM_RANGE × RING_SPREAD` — which spreads **186 design
+ * units over an aim range of 2 400**, so a ring moves outward by one design unit
+ * for every **12.9** units its body is further away. Two bodies a body's width
+ * apart therefore draw two rings that are not.
+ *
+ * Measured over **12 280 adjacent ring pairs** in the recorded dispatches:
+ * **half of them sit under 5 design units apart on screen**, against a ring
+ * stroke of 3 — and their bodies are a median of **32** design units apart in the
+ * world, so they are genuinely at different distances and the instrument is
+ * failing to say so. *"Two orbitals are sharing the same height on my compass.
+ * Were the planets really the same distance away? It's OK if they were, but if
+ * not, we should have some orbital separation"* (author, 2026-08-29). They were
+ * not.
+ *
+ * **What is given up is stated rather than hidden**, and it is the same trade
+ * `STACK_GAP` already makes: below this distance the gap stops being
+ * proportional, so a pair this close says *these two are near each other* rather
+ * than *these two are 32 units apart*. What survives is the **order** — which
+ * ring is the nearer hop — and that is the reading spec 00 §6 asks the stack for.
+ * Two rings the eye can separate beat one pair it cannot.
+ *
+ * Eight board pixels, which is a little over the crossing dot's own diameter, so
+ * the marks the hand leaves on two neighbouring rings never touch. An opening
+ * position, on the bench.
+ */
+export const RING_MIN_GAP = 8 * BOARD_PIXEL;
+
 /** How far past the outermost ring the hand is drawn — spec 00 §6's *"extended outward"*. */
 export const HAND_OVERSHOOT = 12 * BOARD_PIXEL;
 
@@ -156,6 +188,36 @@ export const PATH_FADE_RATE = 8;
  * already tuned; only the far end is new.
  */
 export const FILAMENT_FLOOR = 0.25;
+
+/**
+ * How much of the body's reach the filament spends its whole fade across.
+ *
+ * **The fade was calibrated over a distance the game never travels.** Built
+ * against the full reach, and flown: *"I felt that the tether line to the planet
+ * when moving away at the end should've gotten more faint as I pulled away"*
+ * (author, 2026-08-29). It **was** fading — measured on that run, 0.89 down to
+ * 0.52 over a 265-tick drift — and the reason that reads as *not fading* is
+ * arithmetic rather than taste.
+ *
+ * Measured over **40 tethered drifts** of thirty ticks or more in the recorded
+ * dispatches, a craft that grabs and floats away gets to **p50 0.36** of the
+ * body's reach, p90 **0.61**, and never past **0.71**. It cannot get further,
+ * because the thing it is drifting away from is still pulling it back. So a fade
+ * spanning the whole reach spends **a quarter of its range** on the entire
+ * gesture and holds the rest for a distance no craft reaches.
+ *
+ * And the drift is asymptotic, which makes it worse than the ratio suggests:
+ * **37% of each drift's ticks are spent past 80% of its own final distance**, so
+ * more than a third of the time the player is watching, the input to the fade is
+ * barely moving at all.
+ *
+ * Six tenths is the p90: a long drift now arrives at the floor rather than
+ * three-quarters of the way to it, and a median one spends two thirds of the
+ * range instead of a quarter. It costs a little at the near end — the filament
+ * burns at 0.88 of full at the freeze against 0.93 before — and that end was
+ * already tuned, so the cost is stated rather than hidden. On the bench.
+ */
+export const FILAMENT_SPAN = 0.6;
 
 /**
  * How long the instrument takes to come online, and how small it starts.
@@ -282,7 +344,7 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     // thread survives a miss. It was written out here once; it is named now,
     // because the tide wanted the same reading and two copies of a formula are
     // one copy too many.
-    const closing = closingOf(body, sim.craft);
+    const closing = closingOf(body, sim.craft, FILAMENT_SPAN);
     return {
       x: body.x,
       y: body.y,
@@ -543,11 +605,19 @@ export function takenRing(rings: readonly RingView[]): RingView | null {
  * how the list was built. Two windows *"stacked on top because their direction is
  * so similar"* is exactly when their arcs overlap, so overlap is the test rather
  * than a fixed angle.
+ *
+ * **Two rules, and they answer different complaints.** The overlap rule stops two
+ * *arcs* being drawn on top of each other; [`RING_MIN_GAP`](#) stops two *rings*
+ * being drawn at the same height whether or not their arcs ever meet. Half of all
+ * adjacent pairs need the second one and would never have triggered the first.
  */
 function unstack(rings: RingView[]): void {
   for (let i = 1; i < rings.length; i++) {
     const ring = rings[i]!;
-    let radius = ring.radius;
+    // Never nearer than a hair to the ring immediately inside it, whatever their
+    // windows are doing — see [`RING_MIN_GAP`](#), and the 12 280 pairs that
+    // measured how often the proportional radii alone are indistinguishable.
+    let radius = Math.max(ring.radius, rings[i - 1]!.radius + RING_MIN_GAP);
     for (let j = 0; j < i; j++) {
       const inner = rings[j]!;
       const apart = Math.abs(shortWay(ring.dot - inner.dot));

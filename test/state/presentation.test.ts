@@ -16,7 +16,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { openRun, replayRun } from '../../src/sim/replay.ts';
-import { DEFORM_TICKS, STRETCH_ACROSS, STRETCH_ALONG } from '../../src/state/deformation.ts';
+import { STRETCH_ACROSS, STRETCH_ALONG } from '../../src/state/deformation.ts';
+import { punchSpan } from '../../src/state/punch.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { EMIT_AT } from '../../src/state/body.ts';
 import { bloomOf, E3_BLOOM, E3_TICKS } from '../../src/state/energy.ts';
@@ -67,39 +68,26 @@ describe('the run pnpm replay ships', () => {
 
 describe('the one E3', () => {
   /**
-   * **Only the award strikes one, and only its top word.** M2.1 built spec
-   * [00 · §3](../../docs/spec/00-tokens.md)'s flash at the grab and at the
-   * release; flown, the author took both off the list (2026-08-29): *"the white
-   * dot that is emitted when I grab is too noisy and too much... let's let the
-   * PLANET speak about our grab, not some ambient glowing orbs."*
+   * **Nothing strikes one, and that is three rulings rather than a gap.** Spec
+   * [00 · §3](../../docs/spec/00-tokens.md) gives the E3 to *"release, grab,
+   * award, the checkered line"*, and the author has flown and refused the first
+   * three.
    *
-   * Spec [04 · §3](../../docs/spec/04-bodies.md) is what speaks instead — a held
-   * body is E2 and alive — so the grab already had a voice. What fills the quiet
-   * is what the author named: *"the boost, the point rewards, and maybe even a
-   * planetary pulse/farewell ring."* Spec [06 · §2](../../docs/spec/06-awards.md)
-   * gives **PERFECT** energy E3 and gives the three tiers under it E1 and E2, so
-   * the slot is spent on the rarest word in the game and on nothing else.
+   * The release and the grab went first — *"the white dot that is emitted when I
+   * grab is too noisy and too much... let's let the PLANET speak about our grab"*
+   * — and the **award** followed the same evening, once M2.4 had put a flash
+   * under the top word: *"there's a weird white-ish blur circle that appears when
+   * I get 'perfect', in addition to the yellow one beneath the text. I don't like
+   * that white one."* The word already blooms in its own tier colour, so a
+   * CORE-white additive flash under a SOLAR word was two glows arguing about one
+   * instant.
+   *
+   * What is left for it is the checkered line at the crossing, which is spec 12's
+   * and M6's.
    */
-  it('is struck by a PERFECT and by nothing else', () => {
+  it('is never struck, over a whole run', () => {
     expect(RUN.length).toBeGreaterThan(2000);
-    for (let i = 0; i < RUN.length; i++) {
-      const view = RUN[i]!;
-      if (view.flash === null) continue;
-      // Either it was struck on this tick by a PERFECT, or it is one that was and
-      // is still ageing — never anything else, and never two.
-      const born = view.flash.decay.age === 0;
-      if (born) expect(view.callout?.tier).toBe('PERFECT');
-      else expect(RUN[i - 1]!.flash).not.toBeNull();
-    }
-  });
-
-  /** And a grab strikes nothing, which is the half of the ruling that is a silence. */
-  it('is not struck by a grab', () => {
-    for (let i = 1; i < RUN.length; i++) {
-      const grabbed =
-        RUN[i]!.bodies.some((body) => body.held) && !RUN[i - 1]!.bodies.some((body) => body.held);
-      if (grabbed) expect(RUN[i]!.flash?.decay.age).not.toBe(0);
-    }
+    for (const view of RUN) expect(view.flash).toBeNull();
   });
 
   /**
@@ -148,17 +136,21 @@ describe('the craft', () => {
    * says every such offset becomes `T0`.
    */
   it('is stretched by the release and not by the grab', () => {
-    expect(at(GRAB).craft.deformation).toEqual({ along: 1, across: 1, recovery: null });
+    expect(at(GRAB).craft.deformation).toEqual({ along: 1, across: 1, amount: 0, recovery: null });
 
+    // The swing released on 258 is let go at the top of its envelope, so it earns
+    // the whole of spec 02 §4's stretch and holds it half again as long — which
+    // is where the **punch** lives since the camera's share of it was withdrawn.
     const struck = at(RELEASE).craft.deformation;
+    expect(struck.amount).toBe(1);
     expect(struck.along).toBe(STRETCH_ALONG);
     expect(struck.across).toBe(STRETCH_ACROSS);
-    expect(struck.recovery).toEqual({ age: 0, span: DEFORM_TICKS });
+    expect(struck.recovery).toEqual({ age: 0, span: punchSpan(1) });
   });
 
-  it('passes rest once on the way back, and is home in 180ms', () => {
+  it('passes rest once on the way back, and is home again', () => {
     const shapes = [];
-    for (let tick = RELEASE; tick <= RELEASE + DEFORM_TICKS; tick++) {
+    for (let tick = RELEASE; tick <= RELEASE + punchSpan(1); tick++) {
       shapes.push(at(tick).craft.deformation);
     }
 
@@ -169,9 +161,10 @@ describe('the craft', () => {
     expect(deepest).toBeCloseTo(0.95, 2);
     expect(shapes.filter((shape) => shape.along < 1).length).toBeGreaterThan(1);
 
-    expect(at(RELEASE + DEFORM_TICKS).craft.deformation).toEqual({
+    expect(at(RELEASE + punchSpan(1)).craft.deformation).toEqual({
       along: 1,
       across: 1,
+      amount: 0,
       recovery: null,
     });
   });

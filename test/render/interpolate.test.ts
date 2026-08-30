@@ -17,7 +17,7 @@ import { interpolate } from '../../src/render/interpolate.ts';
 function view(x: number, y: number, heading: number): PresentationState {
   return {
     tick: x,
-    camera: { x: 585, y, lock: 0, offset: 0, punch: null },
+    camera: { x: 585, y, lock: 0, offset: 0 },
     craft: {
       x,
       y,

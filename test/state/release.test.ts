@@ -19,18 +19,11 @@ import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { BOOST_ARM_TICKS, BOOST_PLATEAU_TICKS, SETTLE_TICKS } from '../../src/sim/units.ts';
-import { calloutTicks, POP_TICKS } from '../../src/state/callout.ts';
-import { subjectOf } from '../../src/state/camera.ts';
-import { DEFORM_TICKS } from '../../src/state/deformation.ts';
+import { calloutTicks, POP_RISE } from '../../src/state/callout.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
+import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
 import { FAREWELL_TICKS } from '../../src/state/farewell.ts';
-import {
-  PUNCH_GRAB,
-  PUNCH_RELEASE,
-  PUNCH_TICKS,
-  punchSize,
-  punchSpan,
-} from '../../src/state/punch.ts';
+import { PUNCH_FLOOR, PUNCH_TICKS, punchSize, punchSpan } from '../../src/state/punch.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 
 const PRESS = { pressed: true };
@@ -89,58 +82,19 @@ const AT_PEAK = fly(BOOST_PLATEAU_TICKS - 1);
 /** And one let go of at the freeze itself, where the envelope is exactly zero. */
 const AT_FREEZE = fly(0);
 
-/** How far a vector lies off a heading, as a fraction of its own length. */
-function acrossTangent(heading: number, x: number, y: number): number {
-  return Math.abs(x * -Math.sin(heading) + y * Math.cos(heading));
-}
-
 describe('the punch', () => {
   /**
-   * Spec 02 §5's first row, and the one the file's own acceptance is written
-   * about: **6px along the exit tangent**, which is 18 design units at three per
-   * board pixel.
+   * **It is on the craft, and nothing else moves.** Spec
+   * [02 · §5](../../docs/spec/02-release.md) put it on the camera — 6px along the
+   * exit tangent — and the author flew it and refused it: *"we don't really want
+   * shake effects or pauses like that, it turns out that really disrupts the
+   * flow"* (2026-08-29). This is the assertion the refusal is worth having: over
+   * a whole swing, at every quality, the view never leaves the centreline.
    */
-  it('displaces the view along the exit tangent, at T0', () => {
-    const at = AT_PEAK.views[AT_PEAK.released]!;
-    expect(at.camera.punch).not.toBeNull();
-    const punch = at.camera.punch!;
-    expect(punch.decay.age).toBe(0);
-    expect(Math.hypot(punch.x, punch.y)).toBeCloseTo(punchSize(quality(AT_PEAK)), 6);
-    expect(punchSize(1)).toBe(PUNCH_RELEASE);
-  });
-
-  /**
-   * Spec 02's rule 2, unchanged by the rebase because it was never the freeze:
-   * *"every motion is strictly along the exit tangent — never radial, never a
-   * shake."* Its acceptance states the test exactly: project each onto the
-   * tangent's normal and find zero.
-   */
-  it('has no component across the tangent it was struck along', () => {
-    // At the instant it is struck, against the craft's own heading.
+  it('never moves the world, at any quality', () => {
     for (const flight of [AT_PEAK, AT_FREEZE]) {
-      for (const tick of [flight.grabbed, flight.released]) {
-        const view = flight.views[tick]!;
-        const punch = view.camera.punch;
-        if (punch === null) continue;
-        expect(acrossTangent(view.craft.heading, punch.alongX, punch.alongY)).toBeLessThan(1e-12);
-      }
+      for (const view of flight.views) expect(view.camera.x).toBe(DESIGN_WIDTH / 2);
     }
-    // And on every tick after, against the direction it was struck along — which
-    // is the honest reading, because a grabbed craft is turning and a punch that
-    // swung round with it would be a second streak that is not parallel to the
-    // velocity it was born from.
-    for (const view of AT_PEAK.views) {
-      const punch = view.camera.punch;
-      if (punch === null) continue;
-      const along = Math.atan2(punch.alongY, punch.alongX);
-      expect(acrossTangent(along, punch.x, punch.y)).toBeLessThan(1e-12);
-    }
-  });
-
-  /** And it is a **displacement**, so the thing the camera follows never moves sideways. */
-  it('never moves the camera it is displacing', () => {
-    const centres = new Set(AT_PEAK.views.map((view) => subjectOf(view.camera).x));
-    expect(centres.size).toBe(1);
   });
 
   /**
@@ -149,9 +103,11 @@ describe('the punch', () => {
    * 29% of full and read as nothing happening."*
    */
   it('is scaled by quality, in size and in span', () => {
-    expect(punchSize(0.29) / PUNCH_RELEASE).toBeCloseTo(0.54, 2);
-    expect(punchSize(0)).toBe(0);
-    expect(punchSize(1)).toBe(PUNCH_RELEASE);
+    expect(punchSize(0)).toBe(PUNCH_FLOOR);
+    expect(punchSize(1)).toBe(1);
+    // √0.29 is 0.538, so the median release lands over half way up rather than
+    // at 29% — which is the whole argument for the curve.
+    expect((punchSize(0.29) - PUNCH_FLOOR) / (1 - PUNCH_FLOOR)).toBeCloseTo(0.54, 2);
     // Half again as long at the top of the envelope, and no longer than that.
     expect(punchSpan(0)).toBe(PUNCH_TICKS);
     expect(punchSpan(1)).toBe(Math.round(PUNCH_TICKS * 1.5));
@@ -159,49 +115,90 @@ describe('the punch', () => {
     expect(punchSpan(0.5)).toBeLessThan(punchSpan(1));
   });
 
+  /** A swing let go at the top of its envelope earns the whole of spec 02 §4's stretch. */
+  it('pays a release at full boost the whole stretch, for half again as long', () => {
+    const at = AT_PEAK.views[AT_PEAK.released]!;
+    expect(quality(AT_PEAK)).toBe(1);
+    expect(at.craft.deformation.amount).toBe(1);
+    expect(at.craft.deformation.along).toBeCloseTo(1.5, 9);
+    expect(at.craft.deformation.recovery!.span).toBe(punchSpan(1));
+  });
+
   /**
-   * *"A tap pays nothing, structurally rather than by a guard"* — a release at
-   * the freeze sits at exactly zero on the envelope, so there is nothing to
-   * place and nothing has to check.
+   * **And a release at the freeze still marks itself.** The envelope is exactly
+   * zero there, so the punch is at its floor — not absent, because the craft did
+   * leave and the stretch is what says so. What a tap pays nothing of is the
+   * **boost**, which is a different channel and stays zero (ADR-0012).
    */
-  it('pays a release at the freeze almost nothing', () => {
+  it('floors a release at the freeze rather than silencing it', () => {
     const at = AT_FREEZE.views[AT_FREEZE.released]!;
-    const struck = at.camera.punch === null ? 0 : Math.hypot(at.camera.punch.x, at.camera.punch.y);
-    expect(struck).toBeLessThan(PUNCH_RELEASE / 4);
+    expect(quality(AT_FREEZE)).toBe(0);
+    expect(at.craft.deformation.amount).toBe(PUNCH_FLOOR);
+    expect(at.craft.deformation.along).toBeGreaterThan(1);
+    expect(at.craft.deformation.along).toBeLessThan(
+      AT_PEAK.views[AT_PEAK.released]!.craft.deformation.along,
+    );
+    expect(at.craft.deformation.recovery!.span).toBe(PUNCH_TICKS);
   });
 
-  /** Spec 02 §7: the grab is the release's mirror, at lower amplitude and reversed. */
-  it('marks a grab at half the size, into the orbit', () => {
+  /** A grab is never graded (spec 06 §1), and it does not deform the craft at all. */
+  it('marks no grab, because a grab is not a release', () => {
     const at = AT_PEAK.views[AT_PEAK.grabbed]!;
-    expect(at.camera.punch).not.toBeNull();
-    expect(at.camera.punch!.size).toBe(-PUNCH_GRAB);
-    expect(Math.hypot(at.camera.punch!.x, at.camera.punch!.y)).toBeCloseTo(PUNCH_GRAB, 6);
-    // Reversed: the **displacement** points against the way the craft is going,
-    // which is what carrying a signed size rather than a flipped direction buys —
-    // the grab and the release are one rule with one sign between them.
-    const punch = at.camera.punch!;
-    const along = punch.x * Math.cos(at.craft.heading) + punch.y * Math.sin(at.craft.heading);
-    expect(along).toBeCloseTo(-PUNCH_GRAB, 6);
+    expect(at.craft.deformation.recovery).toBeNull();
+    expect(at.craft.deformation.amount).toBe(0);
   });
 
   /**
-   * Spec 02 §5's return: **home in 180ms with one overshoot** — and *"one"* is
-   * the whole of it, because a displacement that eases home has its story in the
-   * first third and then creeps.
+   * Spec 02 §4's return: **one overshoot** — and *"one"* is the whole of it,
+   * because a displacement that eases home has its story in the first third and
+   * then creeps.
    */
   it('comes home past rest exactly once, and then is gone', () => {
     const from = AT_PEAK.released;
-    const span = AT_PEAK.views[from]!.camera.punch!.decay.span;
+    const span = AT_PEAK.views[from]!.craft.deformation.recovery!.span;
     const along: number[] = [];
     for (let i = from; i < from + span; i++) {
-      const punch = AT_PEAK.views[i]!.camera.punch;
-      expect(punch).not.toBeNull();
-      along.push(punch!.x * punch!.alongX + punch!.y * punch!.alongY);
+      expect(AT_PEAK.views[i]!.craft.deformation.recovery).not.toBeNull();
+      along.push(AT_PEAK.views[i]!.craft.deformation.along - 1);
     }
-    expect(AT_PEAK.views[from + span]!.camera.punch).toBeNull();
+    expect(AT_PEAK.views[from + span]!.craft.deformation.recovery).toBeNull();
     const crossings = along.filter((v, i) => i > 0 && Math.sign(v) !== Math.sign(along[i - 1]!));
     expect(crossings.length).toBe(1);
     expect(Math.min(...along)).toBeLessThan(0);
+  });
+});
+
+describe('the word, held inside the picture', () => {
+  /**
+   * Spec [00 · §7](../../docs/spec/00-tokens.md), which is absolute: *"nothing
+   * the player reads is drawn outside it, ever"*, and *"the compass, the masthead
+   * and every award live above"* the thumb line. Reported from the phone —
+   * *"some of the edge award text was getting cut off"* (author, 2026-08-29).
+   */
+  it('never puts a word where the picture would cut it', () => {
+    for (const flight of [AT_PEAK, AT_FREEZE]) {
+      for (const view of flight.views) {
+        const word = view.callout;
+        if (word === null || word.tier === 'MAKE') continue;
+        // The word's own extent, bounded the way `callout.ts` bounds it.
+        const halfWide = (7 * 0.8 * word.size) / 2 + word.bloom;
+        const halfTall = (0.75 * word.size) / 2 + word.bloom;
+        expect(word.x - halfWide).toBeGreaterThanOrEqual(view.camera.x - DESIGN_WIDTH / 2 - 1e-6);
+        expect(word.x + halfWide).toBeLessThanOrEqual(view.camera.x + DESIGN_WIDTH / 2 + 1e-6);
+        expect(word.y - halfTall).toBeGreaterThanOrEqual(view.camera.y - DESIGN_HEIGHT / 2 - 1e-6);
+        // The thumb line, not the foot of the design space: nothing readable
+        // lives below it, ever, and spec 00 §7 names awards among them.
+        expect(word.y + halfTall).toBeLessThanOrEqual(
+          view.camera.y - DESIGN_HEIGHT / 2 + THUMB_LINE + 1e-6,
+        );
+      }
+    }
+  });
+
+  /** And it is still world-anchored: the clamp only bites where it has to. */
+  it('leaves a word born in the middle of the picture exactly where it was', () => {
+    const word = AT_PEAK.views[AT_PEAK.released]!.callout!;
+    expect(word.x).toBe(word.bornX);
   });
 });
 
@@ -215,7 +212,7 @@ describe('the craft, leaving', () => {
     const at = AT_PEAK.views[AT_PEAK.released]!;
     expect(at.craft.deformation.along).toBeCloseTo(1.5, 6);
     expect(at.craft.deformation.across).toBeCloseTo(0.7, 6);
-    const home = AT_PEAK.views[AT_PEAK.released + DEFORM_TICKS]!;
+    const home = AT_PEAK.views[AT_PEAK.released + punchSpan(quality(AT_PEAK))]!;
     expect(home.craft.deformation.along).toBe(1);
     expect(home.craft.deformation.across).toBe(1);
     expect(home.craft.deformation.recovery).toBeNull();
@@ -281,36 +278,45 @@ describe('the callout', () => {
   });
 
   /**
-   * Spec 06 §4's clock, each stretch measured from the start of its own element:
-   * a **120ms** pop, a **1.2s** linger at full, and a **400ms** decay to zero.
+   * Spec 06 §4's clock, with the pop replaced by the prototype's **rise**: the
+   * word climbs across its whole life, lingers at full, and decays over 400ms.
    */
-  it('pops, lingers and decays on its own clock', () => {
+  it('rises, lingers and decays on its own clock', () => {
     const from = AT_PEAK.released;
     const born = AT_PEAK.views[from]!.callout!;
     expect(born.life.age).toBe(0);
     expect(born.strength).toBe(1);
     expect(born.y).toBe(born.bornY);
-
-    // The pop is over at 120ms, and it has carried the word upward.
-    const popped = AT_PEAK.views[from + POP_TICKS]!.callout!;
-    expect(popped.y).toBeLessThan(born.bornY);
-    expect(popped.strength).toBe(1);
-
-    // Still full through the linger, and out by the end.
     expect(AT_PEAK.views[from + calloutTicks() - 1]!.callout!.strength).toBeLessThan(0.05);
     expect(AT_PEAK.views[from + calloutTicks()]!.callout).toBeNull();
   });
 
-  /** And the pop passes rest once, which is spec 06 §4's *"one overshoot"*. */
-  it('overshoots its rise exactly once', () => {
+  /**
+   * **A throw and not a spring**, which is the difference the author was
+   * describing when they sent me to the prototype: *"the popups should pop
+   * upwards a bit more, mimicking the physics feeling that we have in the
+   * original prototype."* Its own curve for the same element, carried as a
+   * behaviour (ADR-0013) — *"most of the travel happens early, so the popup
+   * leaves the ship promptly and then hangs where it can be read."*
+   *
+   * So it climbs monotonically, never comes back down, and is more than half way
+   * up by a quarter of its life. The overshoot spec 06 §4 asked for is gone: an
+   * overshoot is a spring.
+   */
+  it('climbs fastest at birth and never comes back down', () => {
     const from = AT_PEAK.released;
     const rise: number[] = [];
-    for (let i = from; i <= from + POP_TICKS; i++) {
+    for (let i = from; i < from + calloutTicks(); i++) {
       const word = AT_PEAK.views[i]!.callout!;
       rise.push(word.bornY - word.y);
     }
-    const top = Math.max(...rise);
-    expect(top).toBeGreaterThan(rise[rise.length - 1]!);
+    for (let i = 1; i < rise.length; i++) expect(rise[i]!).toBeGreaterThanOrEqual(rise[i - 1]!);
+    // `1 − (1 − u)²` puts it **43.75%** of the way up by a quarter of its life,
+    // against 25% for a straight line — which is the whole of *most of the travel
+    // happens early*.
+    expect(rise[24]! / POP_RISE).toBeGreaterThan(0.4);
+    expect(rise[24]! / POP_RISE).toBeLessThan(0.5);
+    expect(Math.max(...rise)).toBe(rise[rise.length - 1]!);
   });
 
   /**
@@ -373,7 +379,6 @@ describe('the whole sequence', () => {
     const from = AT_PEAK.released;
     const settled = AT_PEAK.views[from + FAREWELL_TICKS]!;
     expect(settled.farewell).toBeNull();
-    expect(settled.camera.punch).toBeNull();
     expect(settled.craft.deformation.recovery).toBeNull();
     expect(settled.compass).toBeNull();
     // And the word is still there, world-anchored and being left behind.

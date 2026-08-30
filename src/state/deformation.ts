@@ -7,7 +7,7 @@
  * screen axis, never around a centre"* — which is spec 00 §5's second motion
  * rule, that nothing in this game radiates from a point.
  *
- * ## Where the clock starts, after ADR-0012
+ * ## It is the punch now, and the clock starts at `T0`
  *
  * Spec 02's table dates the stretch from `T+70ms`, which was the end of a
  * hitstop that no longer exists:
@@ -35,7 +35,8 @@
  * bench, and M2.4 flies them.
  */
 import type { Decay } from './decay.ts';
-import { advance, home, place, ticksIn } from './decay.ts';
+import { advance, home, place } from './decay.ts';
+import { punchSize, punchSpan } from './punch.ts';
 import type { DeformationView } from './types.ts';
 
 /** How far the craft stretches along its velocity at a release — spec 02 §4. */
@@ -44,35 +45,39 @@ export const STRETCH_ALONG = 1.5;
 /** And how far it narrows across it, the same instant — spec 02 §4. */
 export const STRETCH_ACROSS = 0.7;
 
-/**
- * How long the recovery takes — spec 02 §4's `T+70 → T+250`, measured from its
- * own start and therefore untouched by ADR-0012's rebase.
- *
- * Eleven ticks. Spec 00 §5's motion law wants **decay ≥ 10 × attack** and the
- * attack here is one tick: the stretch is *placed* rather than eased into, which
- * is the same rule [`place`](./decay.ts) is named for.
- */
-export const DEFORM_TICKS = ticksIn(180);
-
 /** A craft that is not recovering from anything. */
-export const UNDEFORMED: DeformationView = { along: 1, across: 1, recovery: null };
+export const UNDEFORMED: DeformationView = { along: 1, across: 1, amount: 0, recovery: null };
 
-/** The craft's shape on the tick it lets go. */
-export function stretch(): DeformationView {
-  return shapeOf(place(DEFORM_TICKS));
+/**
+ * The craft's shape on the tick it lets go, for a swing of this **quality**.
+ *
+ * This is where the **punch** lives after 2026-08-29. ADR-0012 put it on the
+ * camera and the author flew it and refused it — *"we don't really want shake
+ * effects or pauses like that, it turns out that really disrupts the flow"* — so
+ * quality is spent here instead, on the one element in the sequence that is
+ * already about the craft leaving. See [`punch.ts`](./punch.ts) for the two
+ * curves and why the world is left alone.
+ *
+ * The amplitudes at full quality are spec 02 §4's own, unchanged, so a good
+ * release looks exactly as it did when the author accepted it; what moved is
+ * what a **poor** one does.
+ */
+export function stretch(quality: number): DeformationView {
+  return shapeOf(place(punchSpan(quality)), punchSize(quality));
 }
 
 /** The craft's shape one tick on, from what it was. */
 export function relax(previous: DeformationView): DeformationView {
   const recovery = advance(previous.recovery);
-  return recovery === null ? UNDEFORMED : shapeOf(recovery);
+  return recovery === null ? UNDEFORMED : shapeOf(recovery, previous.amount);
 }
 
-function shapeOf(recovery: Decay): DeformationView {
-  const left = home(recovery);
+function shapeOf(recovery: Decay, amount: number): DeformationView {
+  const left = home(recovery) * amount;
   return {
     along: 1 + (STRETCH_ALONG - 1) * left,
     across: 1 + (STRETCH_ACROSS - 1) * left,
+    amount,
     recovery,
   };
 }

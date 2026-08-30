@@ -42,6 +42,42 @@ release **defers** the carry rather than destroying it (ADR-0008), which amends 
 > is this file's own acceptance and is not up for negotiation; **pricing distance is spec
 > [08](./08-economy.md)'s arithmetic and [M4](../plan/m4-the-economy.md)'s**.
 
+> ## ⚠ Flown, 2026-08-29 — §4's pop is a throw and its bloom is a rim
+>
+> **§2's tier colours, sizes and zones all stand.** What moved is §4's presentation of them, in
+> three notes from one sitting.
+>
+> **The bloom is withdrawn.** §4 gives each tier a glow behind its word — 5 / 8 / 12px in the tier
+> colour — and flown it fights the thing it is lighting: *"the blur circle behind the popup text
+> isn't doing us any favours, it's blurring the legibility. We should remove it"* (author). What
+> keeps the type readable over a planet instead is a **rim**: a thin dark stroke around the
+> letters, in **VOID** rather than black, on the prototype's own reasoning for its own — *"a heavy
+> black outline under pale text reads as a sticker."* It is paint, so it lives in the renderer;
+> what presentation state carries is the space it needs, so spec [00 · §7](./00-tokens.md) stays
+> assertable without a canvas.
+>
+> **And the E3 under PERFECT goes with it** — *"there's a weird white-ish blur circle that appears
+> when I get 'perfect', in addition to the yellow one beneath the text. I don't like that white
+> one."* §2's energy column still ranks the tiers; what it no longer does is light spec 00 §3's
+> single flash. **Nothing strikes one now**, the release and the grab having gone the same day.
+>
+> **The pop is a throw.** §4's *"120ms upward, ~30px, one overshoot"* is superseded, on the
+> author's instruction to consult the prototype: *"the popups should pop upwards a bit more,
+> mimicking the physics feeling that we have in the original prototype."* What that codebase does
+> is not a pop — the word **rises across its whole life** on `1 − (1 − u)²`, decelerating, *"so the
+> popup leaves the ship promptly and then hangs where it can be read."* Carried as behaviour
+> (ADR-0013): **34 prototype units** (102 design), fastest at birth, 43.75% of the way up by a
+> quarter of its life, and never coming back down. An overshoot is a spring; this is a throw.
+>
+> **§4's linger and decay stand**, and they are what settle this file's old disagreement with spec
+> [02 · §2](./02-release.md) — see that file's rebase notice. The word now lives **1 600ms**: the
+> linger, the decay, and no separate pop to add.
+>
+> **§2's grading is symmetric and stays so.** Raised from flying — *"the player should still get
+> award text if they grab after the planet dot, but still in the window"* — and it already does,
+> because `d` is an **absolute** offset. Measured over the recorded dispatches, 40 graded releases
+> fell short of the dot and 50 past it. Now asserted rather than merely true.
+
 ## 1 · The law
 
 **Points for the make. Words for the mastery.**

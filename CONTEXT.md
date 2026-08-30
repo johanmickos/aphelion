@@ -210,10 +210,11 @@ The kick a release lands, scaled by the **quality** of the swing and gone within
 Bought with speed rather than with stopped time (ADR-0012), and carried entirely by the
 transient, so it never changes what a run is worth. **Quality enters twice** — as how far it
 displaces the view and as how long it takes coming home — and the second is the gentler channel,
-so a mistimed release still gets a punch and what it loses is how far the punch carries. It runs
-along the exit tangent at a release and reversed into the orbit at a grab, so even the camera
-distinguishes catching from letting go. Spec 00 §5's motion table calls the camera's share of it
-KICK; **the word is punch**.
+so a mistimed release still gets a punch and what it loses is how far the punch carries. **It moves the craft and not the world.** It was built on the camera — 6px along the exit
+tangent — and flown, and refused: *"we don't really want shake effects or pauses like that, it
+turns out that really disrupts the flow"* (author, 2026-08-29). So it is spent on the craft's
+**deformation**, which was already the element about the craft leaving. Spec 00 §5's motion table
+calls the camera's share of it KICK, and that row is void; **the word is punch**.
 _Avoid_: kick, impulse, boost (the boost is the lasting part, and they are different things),
 shake (a shake says damage, and this game has none)
 
@@ -451,10 +452,13 @@ the edge of whatever emits it, never as a disc over it.
 _Avoid_: glow, halo, aura, emission
 
 **Flash**:
-The E3 — the brightest step, additive, and **the only one of its kind alive at any moment**.
-A release strikes one, a grab strikes one, an award strikes one; a new one replaces the one
-before rather than stacking with it, so two can never fight over the same instant. It stays
-where it was struck, because what it marks is the place the thing happened and not the thing.
+The E3 — the brightest step, additive, and **the only one of its kind alive at any moment**. A new
+one replaces the one before rather than stacking with it, so two can never fight over the same
+instant. It stays where it was struck, because what it marks is the place the thing happened and
+not the thing. **Nothing strikes one today**: the release, the grab and the award have each been
+flown and taken off it (author, 2026-08-29) — the body already speaks for a grab, and the award's
+word already blooms in its own tier colour, so the flash was a second glow arguing about one
+instant. What is left for it is the checkered line at the crossing.
 _Avoid_: burst, pop, blast, spark (a spark is the bank's, in the economy)
 
 **Decay**:

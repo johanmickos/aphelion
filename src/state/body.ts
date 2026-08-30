@@ -82,8 +82,8 @@ export function gripOf(body: Body, craft: Craft): number {
  * over the same frames. It is the reading that actually moves while the craft
  * closes, which is what makes it the one to draw an approach with.
  */
-export function closingOf(body: Body, craft: Craft): number {
-  const reach = grabRange(body);
+export function closingOf(body: Body, craft: Craft, span = 1): number {
+  const reach = grabRange(body) * span;
   if (reach <= 0) return 0;
   return 1 - Math.min(1, distance(craft.x, craft.y, body.x, body.y) / reach);
 }

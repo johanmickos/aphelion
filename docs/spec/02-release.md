@@ -112,6 +112,67 @@ for what word is chosen, [08 · Economy](./08-economy.md) for what is cashed.
 > assertion is now about the camera's **subject**. Nothing else in the game may take the view off
 > that line.
 
+> ## ⚠ Flown the same evening, 2026-08-29 — the punch comes off the camera
+>
+> **§5's displacement is withdrawn.** It was built exactly as this file wrote it — 6px along the
+> exit tangent, home in 180ms with one overshoot — and the author flew it: *"I still feel a brief
+> pause or shake at release, we don't want that... we don't really want shake effects or pauses
+> like that, it turns out that really disrupts the flow."*
+>
+> That is the same shape of finding the hitstop got, one element along, and this file half-predicted
+> it. §5 argued that a **directional** kick says departure where a shake says damage, and that spec
+> [00 · §5](./00-tokens.md)'s *"never shaken"* therefore did not reach it. Flown, the distinction did
+> not survive: moving the whole world moves the whole world, whichever way it goes.
+>
+> **The punch is spent on the craft instead**, on §4's stretch — the one element in the sequence
+> that is already about the craft leaving. Quality now decides **how much of that stretch a release
+> earns and how long it takes coming home**, which is ADR-0012's *"as size and as duration"* with
+> the world left alone. The amplitudes at full quality are §4's own and are unchanged, so a good
+> release looks exactly as it did; what moved is what a poor one does. §5 below is rewritten
+> around that, and `camera.ts` is back to a rule with no exception in it.
+>
+> **The E3 goes too, and with it the last of spec 00 §3's four users.** M2.4 spent the slot on the
+> award, at the dot, under the word — and: *"there's a weird white-ish blur circle that appears
+> when I get 'perfect', in addition to the yellow one beneath the text. I don't like that white
+> one, let's remove it. The text plus its own blur/glow and pop-up effect should be enough."* The
+> word already blooms in its own tier colour (spec [06 · §4](./06-awards.md)'s 12px at PERFECT), so
+> a CORE-white additive flash under a SOLAR word was two glows arguing about one instant — the
+> same complaint the grab's flash got. **Nothing strikes an E3 now.** The slot stays for spec
+> [12](./12-finish.md)'s checkered line.
+>
+> **The taken window gets its own clock back.** §6 gives it **420ms** and spec 06 §4 gives the word
+> 1 720ms; built as one unit they were built on one clock, and the arc hung on screen four times
+> longer than this file allows — *"the planet's compass window stays after the rest of the compass
+> disappears."* They arrive together and leave apart: the word is the verdict, meant to be read and
+> left behind; the arc is the last of the instrument and goes when the instrument does.
+>
+> **And the word is held inside the picture.** Spec [00 · §7](./00-tokens.md) is absolute —
+> *"nothing the player reads is drawn outside it, ever"*, and *"every award"* lives above the thumb
+> line — and a word born at a dot near the edge was being cut in half. It stays world-anchored;
+> the clamp only bites on the ticks it would otherwise be off the page.
+>
+> **The word's own bloom goes too, and the prototype supplies what replaces it.** *"The blur circle
+> behind the popup text isn't doing us any favours, it's blurring the legibility. We should remove
+> it."* Spec [06 · §4](./06-awards.md)'s per-tier bloom is withdrawn; what keeps the type readable
+> over a planet is a **rim** — a thin dark stroke around the letters, in VOID rather than black,
+> because *"a heavy black outline under pale text reads as a sticker"* (the prototype's own comment
+> on its own rim). Carried as a behaviour: the mechanism is ours.
+>
+> **And the pop becomes a throw**, on the author's instruction to go and look: *"I think the popups
+> should pop upwards a bit more, mimicking the physics feeling that we have in the original
+> prototype."* What the prototype does is not a pop — the word **rises across its whole life** on
+> `1 − (1 − u)²`, *"so the popup leaves the ship promptly and then hangs where it can be read"*. So
+> spec 06 §4's *"120ms upward, ~30px, one overshoot"* is superseded: it climbs 34 prototype units
+> (102 design), fastest at birth, and never comes back down. **An overshoot is a spring and this is
+> a throw** — which is the same distinction §5 above just lost the camera over.
+>
+> **One thing was raised and is already true.** *"I feel like the player should still get award text
+> if they grab after the planet dot on the compass, but still in the window."* It does: spec 06 §2
+> grades on the **absolute** offset from the window's centre, so both sides pay the same. Measured
+> over the recorded dispatches, **40 graded releases fell short of the dot and 50 past it**, and
+> every ungraded one was genuinely outside its window — the nearest by 12% of a half-width. Pinned
+> in `test/state/goldens.test.ts` so it cannot quietly become one-sided.
+
 ## 1 · The two rules
 
 1. **Every motion is strictly along the exit tangent** — the line the nose has been pointing down
@@ -132,11 +193,11 @@ a freeze exists.
 | Element | Starts | Ends | Notes |
 |---|---|---|---|
 | Craft deformation | T0 | T+180ms | See §4 |
-| The punch | T0 | T+180ms | 6px along the exit tangent at full quality, home with one overshoot. See §5 |
+| The punch | T0 | T+180ms | Spent on the craft's own stretch, scaled by quality. See §5 |
 | Farewell ring | T0 | T+400ms | The orbit detaches from the body and expands away, in AURORA |
 | The taken window | T0 | T+420ms | Stays lit and decays where it was earned. Unused rings die instantly |
 | Award word | T+20ms | T+1 740ms | Pop, linger, then decay. See spec [06 · §4](./06-awards.md) |
-| Its E3 | T+20ms | T+420ms | PERFECT only, at the dot. Spec [06 · §2](./06-awards.md) |
+| Its bloom | T+20ms | with the word | 5 / 8 / 12px in the tier's own colour. **No E3** — withdrawn 2026-08-29 |
 
 **Everything except the word is over by T+420ms.** The word outlives it, and that is the one place
 this file and spec [06](./06-awards.md) could not both be right:
@@ -159,14 +220,17 @@ this file and spec [06](./06-awards.md) could not both be right:
 | Frame | What is true |
 |---|---|
 | **T−80 · MATCHED** | The hand lies on the dot; the window is E2. The player already knows the tier. Peak tension |
-| **T0 · IMPULSE** | The craft leaves along its nose, deformed 1.5 / 0.7. The farewell ring detaches and expands. The view is punched along the exit tangent. Unused rings die instantly; the taken window stays lit |
-| **T+20 · CONFIRM** | The word blooms at the dot that earned it. A PERFECT strikes the game's one E3 there |
-| **T+180 · RIDE** | The word rides its pop out on the dot while the craft runs. The deformation and the punch both arrive home, past rest once. The trail is a solid luminous line — no breadcrumbs |
+| **T0 · IMPULSE** | The craft leaves along its nose, deformed by what the swing was worth — 1.5 / 0.7 at full quality. The farewell ring detaches and expands. Unused rings die instantly; the taken window stays lit. **The camera does not move** |
+| **T+20 · CONFIRM** | The word blooms at the dot that earned it, in its own tier colour |
+| **T+180 · RIDE** | The word rides its pop out on the dot while the craft runs. The stretch arrives home, past rest once. The trail is a solid luminous line — no breadcrumbs |
 | **T+400 · SETTLED** | Quiet. The body is DUSK, the ring is gone, the compass has left. The word is still lit and being left behind. The only permanent change is chain +1, so the craft's bloom is 4px wider than an orbit ago |
 
 ## 4 · Craft deformation
 
 Stretch is always along the velocity vector. Never along a screen axis, never around a centre.
+
+**It carries the punch** (§5), so the amplitudes below are what a release at the top of its
+envelope earns; a release that earned nothing takes 0.45 of them, and never none.
 
 | Time | Scale (along velocity / across) |
 |---|---|
@@ -180,15 +244,20 @@ queued behind the systems settling; nothing in the game may depend on the curren
 
 ## 5 · The punch
 
-`CONTEXT.md`'s **punch**, and what replaced the hitstop (ADR-0012). It is a transient displacement
-of the view and carries none of itself into velocity, which is what lets it be large: *"a player
-tapping beside bodies gets the punch and keeps none of it, while a player flying well gets the
-punch **and** the boost underneath it."* What a run is worth is untouched by how good it felt.
+`CONTEXT.md`'s **punch**, and what replaced the hitstop (ADR-0012). It is transient and carries
+none of itself into velocity, which is what lets it be large: *"a player tapping beside bodies gets
+the punch and keeps none of it, while a player flying well gets the punch **and** the boost
+underneath it."* What a run is worth is untouched by how good it felt.
 
-| Event | Displacement | Direction | Return |
-|---|---|---|---|
-| Release | **6px × √quality** | Along the exit tangent | 180ms × (1 + ½ quality), one overshoot |
-| Grab | 3px, ungraded | Into the orbit (reversed) | 180ms, one overshoot |
+**It is spent on §4's stretch and on nothing else.** Quality decides how much of that stretch a
+release earns and how long it takes coming home:
+
+| | Value |
+|---|---|
+| Amplitude at full quality | §4's own — **1.5 / 0.7**, unchanged |
+| Amplitude at no quality | **0.45** of it, and never zero: the craft still left |
+| Return | **180ms × (1 + ½ quality)**, one overshoot |
+| At a grab | **Nothing.** Grabs are never graded (spec [06 · §1](./06-awards.md)) |
 
 **Quality enters twice, and the second channel is deliberately the gentler one.** A release at the
 top of its envelope holds its punch half again as long as a scraped one: strength is the punch,
@@ -201,20 +270,23 @@ prototype's median recorded release paid 29% of full and read as nothing happeni
 The curve lifts weak releases, leaves the top where it was, and cannot lift a tap, because it
 cannot lift zero.
 
-**A grab is never graded** (spec [06 · §1](./06-awards.md)), so its punch is a fixed 3px. It is the
-same gesture with one sign between it and the release, which is how *"even the camera distinguishes
-catching from letting go"* survives the hitstop's withdrawal.
+**The floor is not zero, and it is a different thing from the boost paying nothing.** A tap has no
+arc behind it and earns no boost — that is structural and stays true — but the craft still left,
+and the stretch is what says so. At zero the release of a swing that never armed would be
+indistinguishable from no release at all.
 
-Never rotational, never random, never a shake. And **it is a displacement from where the camera is
-standing, not a claim about where it should stand** — the camera's subject is on the corridor's
-centreline on every tick of every swing until [M3.1](../plan/m3-the-field.md), and the punch is the
-only thing that ever takes the view off that line.
+> **The camera does not move.** This section used to displace the view 6px along the exit tangent
+> and 3px reversed at a grab. Flown, it read as a shake and was withdrawn (see the notice above).
+> Spec [00 · §5](./00-tokens.md)'s *"the camera is never rotated, never shaken and never
+> randomised"* now has no exception in it, and `test/state/camera.test.ts` asserts the centreline
+> on every tick of every swing with nothing carved out.
 
 ## 6 · What the release does to the world
 
 - **Unused rings die instantly** at T0 — no fade.
-- **The taken window stays lit** and decays where it was earned, over 420ms, carried by the
-  callout rather than by a compass that has already left.
+- **The taken window stays lit** and decays where it was earned, over **420ms** — its own clock,
+  a quarter of the word's, and carried by the callout rather than by a compass that has already
+  left.
 - **The held body goes DUSK at release**, not at grab (spec [04](./04-bodies.md)).
 - **The farewell ring** is the orbit itself, detaching and expanding away from the body, in
   AURORA — the only AURORA the baseline field ever wears. It is the ellipse actually ridden, at
@@ -232,7 +304,7 @@ Grab is the release's mirror and shares its grammar, at lower amplitude:
 
 | Element | Value |
 |---|---|
-| The punch | 3px, reversed into the orbit, home in 180ms |
+| The punch | **None.** The camera's 3px was withdrawn with the release's, and a grab does not deform the craft |
 | E3 | **None.** Withdrawn 2026-08-29 — the body itself is E2 and alive, and the flash was a second voice on the same beat |
 | Award | None. Grabs are never graded; only releases are |
 
@@ -244,8 +316,10 @@ Grab is the release's mirror and shares its grammar, at lower amplitude:
   which spec [06 · §4](./06-awards.md) times and §2 above explains.
 - Every motion vector in the sequence is parallel or antiparallel to the exit tangent. A test
   that projects each onto the tangent normal finds zero.
-- **The camera's subject is on the centreline on every tick of every swing.** The punch is the
-  only thing that displaces the view sideways, and it is gone within its own span.
+- **The camera is on the centreline on every tick of every swing**, with nothing carved out of the
+  rule.
+- **Every readable thing in the sequence is drawn inside the design space and above the thumb
+  line** (spec 00 §7), on every tick it is drawn at all.
 - **The flown arc's light is the boost envelope's own value**, within 0.05 of it at every point,
   and it is read from the same function the simulation pays on rather than from a second one.
 - Deleting the economy (ZEN, spec [08](./08-economy.md)) removes the points but leaves every

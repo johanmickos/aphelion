@@ -70,19 +70,18 @@ export const PATCHES: readonly Patch[] = [
   ),
   settable('src/state/deformation.ts', 'STRETCH_ALONG', 'spec 02 §4, still to be flown'),
   settable('src/state/deformation.ts', 'STRETCH_ACROSS', 'the other half of the same stretch'),
-  settable('src/state/deformation.ts', 'DEFORM_TICKS', 'spec 02 §4’s 180ms, dated from T0'),
 
-  // Spec 02's release, rebased on ADR-0012. The punch is the whole of what
-  // replaced the hitstop, and the ADR's own words are the argument for flying
-  // it: it *"can be large without touching the economy"*, so where large stops
-  // being punch and starts being a shove is a question only the phone answers.
+  // Spec 02's release, rebased on ADR-0012 and then moved again: the camera's
+  // share of the punch was flown and refused (2026-08-29), so quality is spent on
+  // the craft's own stretch instead. `PUNCH_FLOOR` is the argument in one slider —
+  // at 1 it is spec 02 §4 exactly as it was written, with quality reaching
+  // nothing.
   settable(
     'src/state/punch.ts',
-    'PUNCH_RELEASE',
-    'spec 02 §5’s 6px, and ADR-0012 says it may be larger',
+    'PUNCH_FLOOR',
+    'what a release of no quality still earns of the stretch',
   ),
-  settable('src/state/punch.ts', 'PUNCH_GRAB', 'the grab’s mirror — half, and reversed'),
-  settable('src/state/punch.ts', 'PUNCH_TICKS', 'spec 02 §5’s 180ms home, with one overshoot'),
+  settable('src/state/punch.ts', 'PUNCH_TICKS', 'spec 02 §4’s 180ms home, with one overshoot'),
   settable(
     'src/state/punch.ts',
     'PUNCH_STRETCH',
@@ -103,8 +102,11 @@ export const PATCHES: readonly Patch[] = [
     'LINGER_TICKS',
     'spec 06 §4 says 1.2s and spec 02 §2 implies 0.4s',
   ),
-  settable('src/state/callout.ts', 'POP_TICKS', 'spec 06 §4’s 120ms upward, one overshoot'),
-  settable('src/state/callout.ts', 'POP_RISE', 'and how far up it carries — spec 06 §4’s ~30px'),
+  settable(
+    'src/state/callout.ts',
+    'POP_RISE',
+    'how far the word climbs over its life — the prototype’s 34, converted',
+  ),
   {
     file: 'src/render/index.ts',
     find: 'const FLOWN_FLOOR = 0.22;',
@@ -203,6 +205,11 @@ export function lockOf(sim: SimState): number {
   settable('src/state/compass.ts', 'RING_INNER', 'how far the instrument clears the orbit'),
   settable('src/state/compass.ts', 'RING_SPREAD', 'how much of the stack the furthest body gets'),
   settable(
+    'src/state/compass.ts',
+    'RING_MIN_GAP',
+    'how far apart two rings are held whatever their windows are doing',
+  ),
+  settable(
     'src/sim/compass.ts',
     'AIM_RANGE',
     'spec 00 §6 leaves “reachable” open; the prototype had a number',
@@ -227,6 +234,11 @@ export function lockOf(sim: SimState): number {
     'src/state/compass.ts',
     'FILAMENT_FLOOR',
     'how faint the tether goes once the craft is outside the body’s hold',
+  ),
+  settable(
+    'src/state/compass.ts',
+    'FILAMENT_SPAN',
+    'how much of the reach the tether spends its whole fade across',
   ),
   settable(
     'src/state/compass.ts',

@@ -17,8 +17,7 @@ import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { FLOOR_GAP, MEDIAN_RADIUS, SETTLE_TICKS } from '../../src/sim/units.ts';
-import { DEADZONE, FOLLOW_RATE, subjectOf, THUMB_BUDGET } from '../../src/state/camera.ts';
-import { PUNCH_TICKS, punchSpan } from '../../src/state/punch.ts';
+import { DEADZONE, FOLLOW_RATE, THUMB_BUDGET } from '../../src/state/camera.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../../src/state/design.ts';
 import type { PresentationState } from '../../src/state/types.ts';
@@ -82,32 +81,19 @@ const SWINGS: ReadonlyArray<readonly [name: string, grabAt: number, letGoAt: num
 
 describe('the camera', () => {
   /**
-   * **The assertion is about the camera's subject**, and that is the whole of how
-   * this rule and spec [02 · §5](../../docs/spec/02-release.md)'s punch coexist.
-   * The punch travels along the exit tangent, so it has a horizontal component;
-   * what does not move sideways is the thing the camera is *following*, and the
-   * punch is a displacement from it that is home again within 180ms. A test that
-   * asserted `camera.x` would have been asserting that the punch does not exist.
+   * **Nothing ever takes this camera off the centreline**, and that is a stronger
+   * statement than it was a day ago. Spec [02 · §5](../../docs/spec/02-release.md)
+   * put ADR-0012's punch here — a displacement along the exit tangent, which has a
+   * horizontal component — and the author flew it and refused it: *"we don't
+   * really want shake effects or pauses like that, it turns out that really
+   * disrupts the flow"* (2026-08-29). So the exception this test briefly carried
+   * is gone, and the rule is exact again.
    */
   it('does not move sideways, whatever the craft does', () => {
     const { views } = fly(20, 300);
     const travelled = Math.max(...views.map((v) => Math.abs(v.craft.x - views[0]!.craft.x)));
     expect(travelled).toBeGreaterThan(100);
-    for (const view of views) expect(subjectOf(view.camera).x).toBe(DESIGN_WIDTH / 2);
-  });
-
-  /**
-   * And the punch is the only thing that ever takes the view off that line, so
-   * the exception is bounded rather than general: it is gone within a punch's
-   * span of the release that struck it, and it never moves the subject.
-   */
-  it('is taken off the centreline only by a punch, and only briefly', () => {
-    const { views } = fly(20, 300);
-    const off = views.filter((view) => view.camera.x !== DESIGN_WIDTH / 2);
-    expect(off.length).toBeGreaterThan(0);
-    for (const view of off) expect(view.camera.punch).not.toBeNull();
-    // One grab and one release in this swing, so one punch of each length.
-    expect(off.length).toBeLessThanOrEqual(punchSpan(1) + PUNCH_TICKS);
+    for (const view of views) expect(view.camera.x).toBe(DESIGN_WIDTH / 2);
   });
 
   /**

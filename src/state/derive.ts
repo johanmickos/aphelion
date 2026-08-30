@@ -70,12 +70,11 @@ import { closingOf, energyOf, gripOf, spendingOf, stateOf, tideOf } from './body
 import { linger, struck } from './callout.ts';
 import { followCamera, openCamera } from './camera.ts';
 import { compassOf, takenRing } from './compass.ts';
-import { advance, fade, place } from './decay.ts';
+import { advance, fade } from './decay.ts';
 import { relax, stretch, UNDEFORMED } from './deformation.ts';
-import { bloomOf, E3_BLOOM, E3_TICKS } from './energy.ts';
+import { bloomOf, E3_BLOOM } from './energy.ts';
 import { detach, expand } from './farewell.ts';
 import { hueOf } from './identity.ts';
-import { grabPunch, relaxPunch, releasePunch } from './punch.ts';
 import { sightingsOf } from './sighting.ts';
 import type {
   BodyState,
@@ -88,7 +87,6 @@ import type {
   FarewellView,
   FlashView,
   PresentationState,
-  PunchView,
 } from './types.ts';
 
 /**
@@ -139,36 +137,35 @@ function eventOf(previous: PresentationState, sim: SimState): Event {
 }
 
 /**
- * The one E3, aged toward nothing — and **nothing strikes one yet**.
+ * The one E3, aged toward nothing — and **nothing strikes one.**
  *
- * Spec [00 · §3](../../docs/spec/00-tokens.md) lists *"release, grab, award, the
- * checkered line"*, and M2.1 built the first two. Flown, the author took them
- * both off the list (2026-08-29): *"the white dot that is emitted when I grab is
- * too noisy and too much... let's let the PLANET speak about our grab, not some
- * ambient glowing orbs."*
+ * Spec [00 · §3](../../docs/spec/00-tokens.md) lists four users: *"release,
+ * grab, award, the checkered line"*. Three of them have now been taken off it by
+ * the author, each after flying it.
  *
- * That is spec [04 · §3](../../docs/spec/04-bodies.md) doing the job instead —
- * a held body is **E2 and alive**, and *"the compass draws itself around this
- * glow"* — so the grab already had a voice and the flash was a second one saying
- * the same thing. The **release** goes quiet with it, accepted for now: the award
- * word and the farewell ring are [M2.4](../../docs/plan/m2-the-instrument.md)'s,
- * and the craft's stretch is what marks it meanwhile.
+ * The **release** and the **grab** went on 2026-08-29: *"the white dot that is
+ * emitted when I grab is too noisy and too much... let's let the PLANET speak
+ * about our grab, not some ambient glowing orbs."* Spec
+ * [04 · §3](../../docs/spec/04-bodies.md) already had a held body at E2 and
+ * alive, so the flash was a second voice on the same beat.
  *
- * The slot stays, because the award and the checkered line still want it and the
- * one-alive-at-a-time rule is a shape rather than a check. The ageing below is
- * what those will decay through.
+ * The **award** went the same evening, and for the same reason one element
+ * further on. Spec [06 · §2](../../docs/spec/06-awards.md) gives PERFECT energy
+ * E3, so M2.4 spent the slot there — at the dot, under the word. Flown: *"there's
+ * a weird white-ish blur circle that appears when I get 'perfect', in addition to
+ * the yellow one beneath the text. I don't like that white one, let's remove it.
+ * The text plus its own blur/glow and pop-up effect should be enough."* The word
+ * already blooms in its own tier colour (spec 06 §4's 12px at PERFECT), so a
+ * CORE-white additive flash under a SOLAR word was two glows arguing about the
+ * same instant — which is the exact shape of the grab's complaint.
+ *
+ * **The slot stays**, because spec 00 §3's fourth user is the checkered line at
+ * the crossing, and that is spec [12](../../docs/spec/12-finish.md)'s and M6's.
+ * The ageing below is what it will decay through, and the one-alive-at-a-time
+ * rule stays a shape the layer cannot express a violation of rather than a check
+ * someone has to remember.
  */
-function flashOf(previous: FlashView | null, callout: CalloutView | null): FlashView | null {
-  // **The award strikes one, and it is the only thing that does.** Spec 06 §2
-  // gives PERFECT — and PERFECT alone — energy E3, so the slot spec 00 §3 built
-  // for *"release, grab, award, the checkered line"* is finally spent on the
-  // third of those, at the dot that earned it. The release and the grab stay off
-  // it by the author's own ruling, and the one-alive-at-a-time rule is kept by
-  // the shape of the field rather than by a check.
-  if (callout !== null && callout.life.age === 0 && callout.tier === 'PERFECT') {
-    const decay = place(E3_TICKS);
-    return { x: callout.bornX, y: callout.bornY, radius: E3_BLOOM, decay };
-  }
+function flashOf(previous: FlashView | null): FlashView | null {
   if (previous === null) return null;
   const decay = advance(previous.decay);
   if (decay === null) return null;
@@ -288,20 +285,6 @@ function qualityBehind(previous: PresentationState): number {
 }
 
 /**
- * The punch this tick lands, or what is left of the one still coming home.
- *
- * A release is scaled by the quality of the swing and a grab is not — spec 06 §1
- * rules that *"grabs are never graded"* — so the two are the same gesture with
- * only the amplitude and the direction between them, which is spec 02 §7's
- * *"the release's mirror, at lower amplitude"* made literal.
- */
-function punchOf(previous: PresentationState, sim: SimState, event: Event): PunchView | null {
-  if (event === 'RELEASE') return releasePunch(sim.craft, qualityBehind(previous));
-  if (event === 'GRAB') return grabPunch(sim.craft);
-  return relaxPunch(previous.camera.punch);
-}
-
-/**
  * The word this release earned, or the one already in the air, one tick older.
  *
  * **One slot, and a new word takes it.** Spec 06 §4: *"queueing is structural:
@@ -314,23 +297,40 @@ function punchOf(previous: PresentationState, sim: SimState, event: Event): Punc
  * silence and ADR-0008 makes it *"a debt, not a loss"* — taking down the previous
  * release's word would be a punishment, which silence is precisely not.
  */
-function calloutOf(previous: PresentationState, event: Event): CalloutView | null {
+function calloutOf(
+  previous: PresentationState,
+  event: Event,
+  camera: CameraView,
+): CalloutView | null {
   if (event === 'RELEASE' && previous.compass !== null) {
-    const word = struck(takenRing(previous.compass.rings), previous.compass.x, previous.compass.y);
+    const word = struck(
+      takenRing(previous.compass.rings),
+      previous.compass.x,
+      previous.compass.y,
+      camera,
+    );
     if (word !== null) return word;
   }
-  return linger(previous.callout);
+  return linger(previous.callout, camera);
 }
 
 /** The presentation one tick on. Call once per tick, in the same loop as `stepSim`. */
 export function derive(previous: PresentationState, sim: SimState): PresentationState {
   const event = eventOf(previous, sim);
-  const callout = calloutOf(previous, event);
+  // **The camera first**, because the word is held inside the design space and
+  // the design space is wherever the camera is looking (spec 00 §7). Deriving it
+  // from the *previous* camera would put the word a tick behind the picture it is
+  // being kept inside, which is visible exactly where it matters — at the edge.
+  const camera = followCamera(previous.camera, sim);
+  const callout = calloutOf(previous, event, camera);
   return present(
     sim,
-    followCamera(previous.camera, sim, punchOf(previous, sim, event)),
-    flashOf(previous.flash, callout),
-    event === 'RELEASE' ? stretch() : relax(previous.craft.deformation),
+    camera,
+    flashOf(previous.flash),
+    // The **punch**, and it is the craft that carries it: quality decides how far
+    // the stretch goes and how long it takes coming home. See
+    // [`punch.ts`](./punch.ts) for why the camera's share of it was withdrawn.
+    event === 'RELEASE' ? stretch(qualityBehind(previous)) : relax(previous.craft.deformation),
     previous.bodies,
     previous.compass,
     callout,

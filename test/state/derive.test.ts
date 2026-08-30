@@ -80,7 +80,7 @@ describe('presentation state', () => {
     const honest = createPresentation(state);
     const haunted: PresentationState = {
       ...honest,
-      craft: { ...honest.craft, deformation: stretch() },
+      craft: { ...honest.craft, deformation: stretch(1) },
       flash: { x: 9e4, y: -9e4, radius: 9e4, decay: { age: 0, span: E3_TICKS } },
     };
 
@@ -104,7 +104,7 @@ describe('presentation state', () => {
   it('opens with nothing already decaying', () => {
     const opened = createPresentation(world());
     expect(opened.flash).toBeNull();
-    expect(opened.craft.deformation).toEqual({ along: 1, across: 1, recovery: null });
+    expect(opened.craft.deformation).toEqual({ along: 1, across: 1, amount: 0, recovery: null });
   });
 
   it('reports the tick it was derived from', () => {

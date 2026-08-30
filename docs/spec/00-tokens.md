@@ -183,11 +183,47 @@ footer uses obsolete numbering and is void.
 > window staying lit under the word that was earned. *"The compass resolves — it does not
 > vanish"* is unchanged and is what its exit does.
 >
-> **§3 · Something strikes the E3 at last, and it is the award.** The slot has been empty since
-> the release and the grab were taken off it. Spec [06 · §2](./06-awards.md) gives **PERFECT** —
-> and PERFECT alone — energy E3, so the rarest word in the game is the only thing that lights one,
-> at the dot it was earned on. The one-alive-at-a-time rule is unchanged and is still a shape
-> rather than a check.
+> **§3 · The E3's slot is empty, and all three of its live users are withdrawn.** The row lists
+> *"release, grab, award, the checkered line"*. M2.4 spent it on the award — PERFECT alone, at the
+> dot — and the author flew that too: *"there's a weird white-ish blur circle that appears when I
+> get 'perfect', in addition to the yellow one beneath the text. I don't like that white one."* The
+> word already blooms in its own tier colour, so a CORE-white additive flash under a SOLAR word was
+> two glows arguing about one instant — the same complaint the grab's flash got. **Nothing strikes
+> an E3 today.** The step, its radius, its 400ms and the one-alive-at-a-time rule are all
+> untouched, and what is left for them is the **checkered line at the crossing**, which is spec
+> [12](./12-finish.md)'s and M6's.
+>
+> **§5 · KICK is void as well as renamed.** The row's numbers were built, flown and refused: *"we
+> don't really want shake effects or pauses like that, it turns out that really disrupts the
+> flow"* (author, 2026-08-29). This section's own *"the camera is never rotated, never shaken and
+> never randomised"* now has **no exception in it** — spec 02 §5 argued a directional kick was
+> exempt and flying settled that it is not. What the punch is spent on instead is the craft's own
+> deformation, and spec [02 · §5](./02-release.md) carries it.
+>
+> **§6 · Two rings are never drawn at the same height.** The stack's radii are proportional to
+> distance — 186 design units spread over an aim range of 2 400, so **one unit of radius per 12.9
+> units of world** — which is finer than the stroke that draws them. Measured over **12 280
+> adjacent ring pairs**, half sat under 5 design units apart on screen while their bodies were a
+> median of **32** units apart in the world: *"two orbitals are sharing the same height on my
+> compass. Were the planets really the same distance away?"* (author, 2026-08-29). They were not.
+> A minimum separation is held whatever the windows are doing; below it the gap stops being
+> proportional and says *these two are near each other*, and the **order** still says which is the
+> nearer hop.
+>
+> **§6 · The grab filament's fade is recalibrated, not added.** It was already fading with
+> distance and the span was wrong: measured over **40 tethered drifts**, a craft that grabs and
+> floats away reaches **p50 0.36** of the body's reach and never past **0.71** — it cannot get
+> further, because the thing it is drifting from is still pulling it back. A fade calibrated to
+> the whole reach therefore spent a quarter of its range on the whole gesture. *"I felt that the
+> tether line to the planet when moving away at the end should've gotten more faint as I pulled
+> away"* (author, 2026-08-29). It now spends the whole fade across six tenths of the reach, so a
+> long drift arrives at the floor instead of three-quarters of the way to it.
+>
+> **§7 · Every readable thing is held inside the design space, and that is now enforced rather
+> than assumed.** *"Nothing the player reads is drawn outside it, ever"*, and *"the compass, the
+> masthead and every award live above"* the thumb line — and M2.4's award word, born in world space
+> at the dot, was being cut in half at the edge of the picture. It stays world-anchored; what is
+> held is where it is drawn.
 
 ## 1 · Palette — eight names, eight meanings
 

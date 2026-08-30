@@ -1184,6 +1184,87 @@ most of what the arc took, and the farewell ring is a stroke. The tick side did 
 
 ---
 
+### Flown the same evening, 2026-08-29 — eight notes, and two of them undid the step's own work
+
+The build went to the phone and came back with eight. Two withdrew things M2.4 had just built,
+which is the milestone working rather than failing.
+
+**The punch comes off the camera.** *"I still feel a brief pause or shake at release, we don't want
+that... we don't really want shake effects or pauses like that, it turns out that really disrupts
+the flow."* Spec 02 §5 had argued that a **directional** kick says departure where a shake says
+damage, and that spec 00 §5's *"never shaken"* therefore did not reach it. Flown, the distinction
+did not survive: moving the whole world moves the whole world, whichever way it goes. It is the
+same finding the hitstop got, one element along — and this is the second time in one milestone that
+a thing the design reasoned its way into was refused on contact.
+
+**So the punch is spent on the craft's own stretch**, which was already the element about the craft
+leaving, already flown and already accepted. Quality decides how much of it a release earns and how
+long it takes coming home — ADR-0012's *"as size and as duration"* with the world left alone. The
+amplitudes at full quality are spec 02 §4's own, so a good release looks exactly as it did; what
+moved is what a poor one does. `camera.ts` is back to a rule with no exception in it, and
+`test/state/camera.test.ts` asserts the centreline on every tick of every swing.
+
+**Nothing strikes an E3 any more.** M2.4 spent spec 00 §3's slot on the award — PERFECT alone, at
+the dot — and: *"there's a weird white-ish blur circle that appears when I get 'perfect'... I don't
+like that white one. The text plus its own blur/glow and pop-up effect should be enough."* All
+three of the slot's live users have now been flown and refused in turn. What is left for it is the
+checkered line, in M6.
+
+**And then the word's own bloom went too**, which is the note that sent me to the prototype:
+*"the blur circle behind the popup text isn't doing us any favours, it's blurring the legibility."*
+What replaces it is what that codebase uses for the same job — a **rim**, a thin dark stroke around
+the letters, in VOID rather than black because *"a heavy black outline under pale text reads as a
+sticker."*
+
+**The pop became a throw**, from the same visit. *"I think the popups should pop upwards a bit
+more, mimicking the physics feeling that we have in the original prototype."* What the prototype
+does is not a pop: the word **rises across its whole life** on `1 − (1 − u)²`, and its own comment
+says why — *"most of the travel happens early, so the popup leaves the ship promptly and then hangs
+where it can be read."* Carried as behaviour (ADR-0013): 34 prototype units, 43.75% of the way up
+by a quarter of the life, and never coming back down. **An overshoot is a spring and this is a
+throw**, which is the same distinction the camera had just lost.
+
+**The word is held inside the picture.** *"Some of the edge award text was getting cut off."* Spec
+00 §7 is absolute about it and M2.4 had drawn the word at a world point; it stays world-anchored,
+and what is clamped is where it is drawn.
+
+**And the taken window got its own clock back.** *"The planet's compass window stays after the rest
+of the compass disappears."* Spec 02 §6 gives it 420ms and spec 06 §4 gives the word 1 600ms; built
+as one unit they were built on one clock, so the arc hung on screen four times too long. They
+arrive together and leave apart.
+
+### Three more, each of which needed a measurement before it could be answered
+
+**The tether was already fading, and the span was wrong.** *"I felt that the tether line to the
+planet when moving away at the end should've gotten more faint as I pulled away. Did we not
+implement that earlier?"* It was implemented — measured on that very run it went 0.89 → 0.52 over a
+265-tick drift — and the reason that reads as *not fading* is arithmetic. Over **40 tethered
+drifts** in the recorded dispatches, a craft that grabs and floats away reaches **p50 0.36** of the
+body's reach, p90 0.61, and never past 0.71. It cannot get further: the thing it is drifting from
+is still pulling it back. So a fade calibrated across the whole reach spent **a quarter of its
+range** on the entire gesture — and the drift is asymptotic on top of that, with **37% of each
+drift's ticks spent past 80% of its own final distance**. Recalibrated to six tenths of the reach,
+the author's own drift now runs **0.82 → 0.25** and arrives at the floor at 61% of a reach.
+
+**The two rings at the same height were not two bodies at the same distance.** *"Were the planets
+really the same distance away? It's OK if they were, but if not, we should have some orbital
+separation."* Measured over **12 280 adjacent ring pairs**: **half sat under 5 design units apart on
+screen**, against a ring stroke of 3 — and their bodies were a median of **32** design units apart
+in the world. The radii are proportional at 186 units of stack over 2 400 of aim range, which is
+**one unit of radius per 12.9 units of world**: finer than the line that draws it. A minimum
+separation now holds whatever the windows are doing. What is given up is stated — below that
+distance the gap stops being proportional — and what survives is the order, which is the reading
+spec 00 §6 asks the stack for.
+
+**And one was raised that was already true.** *"I feel like the player should still get award text
+if they grab after the planet dot on the compass, but still in the window."* It does: spec 06 §2
+grades on the **absolute** offset from the window's centre. Measured over the recorded dispatches,
+**40 graded releases fell short of the dot and 50 past it**, and every ungraded one was genuinely
+outside its window — the nearest by 12% of a half-width. Nothing to change; a golden now pins it so
+it cannot quietly become one-sided.
+
+---
+
 ### Queued, with its remaining question now answered
 
 **A "Clang!" when the craft bounces into another body while holding one.** *"I want to show a

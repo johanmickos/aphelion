@@ -52,6 +52,7 @@ import type {
   Tier,
 } from '../state/types.ts';
 import { fade } from '../state/decay.ts';
+import { SPEAKS } from '../state/callout.ts';
 import { letterbox, visible } from './letterbox.ts';
 import {
   AURORA,
@@ -970,14 +971,6 @@ const TIER_TOKEN: Readonly<Record<Tier, string>> = {
   PERFECT: SOLAR,
 };
 
-/** A make speaks in points alone (spec 06 §2), and points arrive with the economy. */
-const SPEAKS: Readonly<Record<Tier, boolean>> = {
-  MAKE: false,
-  TRUE: true,
-  SHARP: true,
-  PERFECT: true,
-};
-
 /**
  * The callout: the window that was taken, still lit, and the word standing at its
  * dot.
@@ -997,7 +990,9 @@ function drawCallout(context: CanvasRenderingContext2D, callout: CalloutView): v
 
   // The window it was taken on, in that body's own hue — identity, not grade.
   // It decays where it was rather than following the craft, because what it marks
-  // is the arc that paid.
+  // is the arc that paid — and **on its own clock**, spec 02 §6's 420ms, which is
+  // a quarter of the word's. The two arrive together and do not leave together.
+  if (callout.windowStrength <= 0) return drawWord(context, callout, token);
   context.save();
   context.lineCap = 'round';
   context.beginPath();
@@ -1009,25 +1004,45 @@ function drawCallout(context: CanvasRenderingContext2D, callout: CalloutView): v
     callout.dot + callout.halfWidth,
   );
   context.lineWidth = WINDOW_WIDTH * 2;
-  context.strokeStyle = identity(callout.hue, callout.strength);
+  context.strokeStyle = identity(callout.hue, callout.windowStrength);
   context.stroke();
   context.restore();
 
-  if (!SPEAKS[callout.tier]) return;
+  drawWord(context, callout, token);
+}
 
-  // Its bloom is drawn first and under it, so the word sits in its own light
-  // rather than behind a wash of it.
-  bloom(context, callout.x, callout.y, 0, callout.bloom, inToken(token), callout.strength);
+/** The word itself, in the tier's own colour, sitting in its own light. */
+function drawWord(context: CanvasRenderingContext2D, callout: CalloutView, token: string): void {
+  if (!SPEAKS[callout.tier] || callout.strength <= 0) return;
 
   context.save();
   context.font = `800 ${callout.size}px ${UTILITY_FACE}`;
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.letterSpacing = `${callout.size * CALLOUT_TRACKING}px`;
+
+  // **A rim, not a glow.** Spec 06 §4's per-tier bloom was withdrawn — *"the blur
+  // circle behind the popup text isn't doing us any favours, it's blurring the
+  // legibility"* (author, 2026-08-29) — and what does the job instead is the
+  // prototype's own answer to it: a thin dark stroke around the letters, *"the
+  // dark rim that keeps text legible over planets and stars."*
+  //
+  // In **VOID** and not in black, which is that file's own reason and is spec
+  // 00 §1's too: true black exists in exactly two places in this game, and a
+  // heavy black outline under pale text *"reads as a sticker."*
+  context.lineWidth = RIM_WIDTH;
+  context.lineJoin = 'round';
+  context.strokeStyle = dim(VOID, RIM_STRENGTH * callout.strength);
+  context.strokeText(callout.tier, callout.x, callout.y);
+
   context.fillStyle = dim(token, callout.strength);
   context.fillText(callout.tier, callout.x, callout.y);
   context.restore();
 }
+
+/** The rim behind the word: two board pixels of VOID, at a little over a third. */
+const RIM_WIDTH = 2 * BOARD_PIXEL;
+const RIM_STRENGTH = 0.38;
 
 /** Spec 06 §4's tracking: caps at 0.1em, which is a tenth of the size. */
 const CALLOUT_TRACKING = 0.1;

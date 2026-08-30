@@ -26,20 +26,20 @@ import { describe, expect, it } from 'vitest';
 import { openRun, replayRun } from '../../src/sim/replay.ts';
 import { BOOST_ARM_TICKS, BOOST_PLATEAU_TICKS, BOOST_ZERO_TICKS } from '../../src/sim/units.ts';
 import { RINGS } from '../../src/sim/compass.ts';
+import { RING_MIN_GAP } from '../../src/state/compass.ts';
 import {
   CALLOUT_DECAY_TICKS,
   calloutTicks,
   LINGER_TICKS,
   POP_RISE,
-  POP_TICKS,
+  TAKEN_WINDOW_TICKS,
 } from '../../src/state/callout.ts';
-import { subjectOf } from '../../src/state/camera.ts';
-import { DEFORM_TICKS, STRETCH_ACROSS, STRETCH_ALONG } from '../../src/state/deformation.ts';
+import { STRETCH_ACROSS, STRETCH_ALONG } from '../../src/state/deformation.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { DESIGN_WIDTH } from '../../src/state/design.ts';
-import { bloomOf, E3_BLOOM, E3_TICKS } from '../../src/state/energy.ts';
+import { bloomOf } from '../../src/state/energy.ts';
 import { FAREWELL_SPREAD, FAREWELL_TICKS } from '../../src/state/farewell.ts';
-import { PUNCH_GRAB, PUNCH_RELEASE, PUNCH_STRETCH, PUNCH_TICKS } from '../../src/state/punch.ts';
+import { PUNCH_FLOOR, PUNCH_STRETCH, PUNCH_TICKS, punchSpan } from '../../src/state/punch.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import { parseDispatch } from '../../tools/dispatch.ts';
 
@@ -92,28 +92,26 @@ const edges = (kind: 'grab' | 'release'): number[] => {
  */
 describe('the numbers the choreography is built from', () => {
   it('are the ones the specs fix', () => {
-    // Spec 02 §5, at three design units per board pixel (ADR-0010).
-    expect(PUNCH_RELEASE).toBe(18);
-    expect(PUNCH_GRAB).toBe(9);
+    // Spec 02 §4 and §5, which are one element since the camera's share of the
+    // punch was withdrawn (2026-08-29).
     expect(PUNCH_TICKS).toBe(11); // 180ms
     expect(PUNCH_STRETCH).toBe(0.5); // ADR-0012's "half again as long"
-    // Spec 02 §4.
-    expect(DEFORM_TICKS).toBe(11); // 180ms
+    expect(PUNCH_FLOOR).toBe(0.45); // what a release of no quality still earns
+    expect(punchSpan(1)).toBe(17);
     expect(STRETCH_ALONG).toBe(1.5);
     expect(STRETCH_ACROSS).toBe(0.7);
     // Spec 02 §2 and §6.
     expect(FAREWELL_TICKS).toBe(24); // 400ms
     expect(FAREWELL_SPREAD).toBe(1.6); // an opening position, and on the bench
     // Spec 06 §4.
-    expect(POP_TICKS).toBe(7); // 120ms
-    expect(POP_RISE).toBe(90); // ~30px
+    expect(POP_RISE).toBe(102); // the prototype's 34, converted — a throw, not a pop
     expect(LINGER_TICKS).toBe(72); // 1.2s — the one two specs disagree about
     expect(CALLOUT_DECAY_TICKS).toBe(24); // 400ms
-    expect(calloutTicks()).toBe(103);
-    // Spec 00 §3, and spec 00 §6's ring count, ruled to three on 2026-08-29.
-    expect(E3_TICKS).toBe(24);
-    expect(E3_BLOOM).toBe(144);
+    expect(calloutTicks()).toBe(96);
+    expect(TAKEN_WINDOW_TICKS).toBe(25); // spec 02 §6's 420ms, a quarter of the word's
+    // Spec 00 §6's ring count, ruled to three on 2026-08-29.
     expect(RINGS).toBe(3);
+    expect(RING_MIN_GAP).toBe(24); // 8 board pixels, over the crossing dot's diameter
     // Spec 01 §7's envelope, which the flown arc is cut on.
     expect(BOOST_ARM_TICKS).toBe(27); // 0.45s
     expect(BOOST_PLATEAU_TICKS).toBe(72); // 1.2s, and the settle's end
@@ -154,24 +152,17 @@ describe('the release at 258 · a swing let go at full boost', () => {
     expect(at(RELEASE - 1).compass!.envelope).toBe(1);
   });
 
-  /** Spec 02 §5's 6px, converted, and its span half again as long at full quality. */
-  it('punches the view 18 design units along the exit tangent, for 17 ticks', () => {
-    const punch = at(RELEASE).camera.punch!;
-    expect(Math.hypot(punch.x, punch.y)).toBeCloseTo(18, 9);
-    expect(punch.decay.span).toBe(17);
-    expect(punch.decay.age).toBe(0);
-    // Home on the seventeenth tick, and the view back on the centreline with it.
-    expect(at(RELEASE + 16).camera.punch).not.toBeNull();
-    expect(at(RELEASE + 17).camera.punch).toBeNull();
-    expect(at(RELEASE + 17).camera.x).toBe(DESIGN_WIDTH / 2);
-  });
-
-  /** Spec 02 §4, dated from `T0` — the whole point of the rebase. */
-  it('stretches the craft on the release tick and recovers it by T+180ms', () => {
+  /**
+   * Spec 02 §4, dated from `T0` — and it carries the **punch** now, so a release
+   * at the top of its envelope earns the whole stretch and holds it half again as
+   * long: 17 ticks against 11.
+   */
+  it('stretches the craft the whole way, for seventeen ticks', () => {
+    expect(at(RELEASE).craft.deformation.amount).toBe(1);
     expect(at(RELEASE).craft.deformation.along).toBeCloseTo(1.5, 9);
     expect(at(RELEASE).craft.deformation.across).toBeCloseTo(0.7, 9);
-    expect(at(RELEASE + 10).craft.deformation.recovery).not.toBeNull();
-    expect(at(RELEASE + 11).craft.deformation.recovery).toBeNull();
+    expect(at(RELEASE + 16).craft.deformation.recovery).not.toBeNull();
+    expect(at(RELEASE + 17).craft.deformation.recovery).toBeNull();
   });
 
   /** Spec 02 §6's farewell ring: placed at 1.0 and expanding away over 400ms. */
@@ -183,16 +174,25 @@ describe('the release at 258 · a swing let go at full boost', () => {
     expect(at(RELEASE + 24).farewell).toBeNull();
   });
 
-  /** Spec 06 §4's word, born at the dot and lit through its pop and linger. */
-  it('says TRUE at the dot, pops it, and holds it lit', () => {
+  /** Spec 06 §4's word, born at the dot and lit through its climb and linger. */
+  it('says TRUE at the dot, climbs it, and holds it lit', () => {
     expect(at(RELEASE).callout!.tier).toBe('TRUE');
     expect(at(RELEASE).callout!.life.age).toBe(0);
     expect(at(RELEASE).callout!.y).toBe(at(RELEASE).callout!.bornY);
-    // Risen by the end of the pop — 30 design px, converted — and still at full
-    // light. The rise is asserted as a distance rather than as *less than where it
-    // started*, so a pop that stopped moving would fail rather than pass quietly.
-    expect(at(RELEASE).callout!.bornY - at(RELEASE + 7).callout!.y).toBeCloseTo(90, 6);
-    expect(at(RELEASE + 7).callout!.strength).toBe(1);
+    // The climb is a **throw**: fastest at birth, and asserted as a distance
+    // rather than as *less than where it started*, so a rise that stopped moving
+    // would fail rather than pass quietly. A quarter of the way through its life
+    // it is over half way up.
+    //
+    // **The climb and the clamp are both in this number**, and that is honest
+    // rather than a confound: the word is world-anchored, the craft is climbing,
+    // and spec 00 §7 holds the word above the thumb line — so what the player
+    // sees is the throw until the picture catches up with it. The curve puts it
+    // 43.75% of the way up by a quarter of its life, against 25% for a line.
+    const climbed = (tick: number): number =>
+      at(RELEASE).callout!.bornY - at(RELEASE + tick).callout!.y;
+    expect(climbed(24) / POP_RISE).toBeGreaterThan(0.4);
+    expect(climbed(24)).toBeGreaterThan(climbed(6));
     expect(at(RELEASE + 24).callout!.strength).toBe(1);
   });
 
@@ -222,12 +222,13 @@ describe('the release at 310 · perfect aim, no boost at all', () => {
   });
 
   /**
-   * *"A tap pays nothing, structurally rather than by a guard"* (ADR-0012) — at
-   * zero quality there is no punch to place, and nothing had to check for it.
+   * The punch is at its **floor** — the craft still left, and the stretch is what
+   * says so, but there was no quality to pay for anything above it. What a tap
+   * pays nothing of is the **boost**, which is a different channel (ADR-0012).
    */
-  it('lands no punch, because there was no quality to scale one by', () => {
-    expect(at(310).camera.punch).toBeNull();
-    expect(at(310).camera.x).toBe(DESIGN_WIDTH / 2);
+  it('earns only the floor of the punch, because there was no quality', () => {
+    expect(at(310).craft.deformation.amount).toBe(PUNCH_FLOOR);
+    expect(at(310).craft.deformation.recovery!.span).toBe(PUNCH_TICKS);
   });
 
   /**
@@ -235,14 +236,14 @@ describe('the release at 310 · perfect aim, no boost at all', () => {
    * 06's acceptance: *"grading is a pure function of `(d, W)` and imports nothing
    * from the economy."*
    */
-  it('still strikes the E3, because PERFECT is E3 whatever the boost was', () => {
-    const flash = at(310).flash!;
-    expect(flash.decay.age).toBe(0);
-    expect(flash.decay.span).toBe(24);
-    expect(flash.radius).toBe(144);
-    // At the dot that earned it, which is where the word is standing.
-    expect(flash.x).toBe(at(310).callout!.bornX);
-    expect(flash.y).toBe(at(310).callout!.bornY);
+  it('says the top word, and strikes no flash under it', () => {
+    expect(at(310).callout!.tier).toBe('PERFECT');
+    // No glow of any kind behind it. The CORE-white E3 went first, then spec 06
+    // §4's own per-tier bloom — *"the blur circle behind the popup text isn't
+    // doing us any favours, it's blurring the legibility."* What keeps the word
+    // legible is a rim, which is the renderer's and is paint.
+    expect(at(310).flash).toBeNull();
+    expect(at(310).callout!.bloom).toBe(6);
   });
 });
 
@@ -355,6 +356,39 @@ describe('the ring count, ruled to three on 2026-08-29', () => {
     }
     expect(most).toBe(3);
   });
+
+  /**
+   * **And no two of them are drawn at the same height.** The radii are
+   * proportional to distance at one design unit per 12.9 of world — finer than
+   * the stroke that draws them — so measured over 12 280 adjacent pairs, half sat
+   * under 5 units apart on screen while their bodies were a median of 32 units
+   * apart in the world. *"Two orbitals are sharing the same height on my compass.
+   * Were the planets really the same distance away?"* (author, 2026-08-29). They
+   * were not.
+   */
+  it('holds every ring clear of the one inside it', () => {
+    let checked = 0;
+    for (const view of RUN) {
+      const rings = view.compass?.rings;
+      if (!rings || rings.length < 2) continue;
+      for (let i = 1; i < rings.length; i++) {
+        expect(rings[i]!.radius - rings[i - 1]!.radius).toBeGreaterThanOrEqual(RING_MIN_GAP - 1e-9);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(500);
+  });
+
+  /** And the order still says which is the nearer hop, which is the stack's job. */
+  it('keeps the rings in the order of their bodies', () => {
+    for (const view of RUN) {
+      const rings = view.compass?.rings;
+      if (!rings || rings.length < 2) continue;
+      for (let i = 1; i < rings.length; i++) {
+        expect(rings[i]!.away).toBeGreaterThanOrEqual(rings[i - 1]!.away);
+      }
+    }
+  });
 });
 
 describe('which word is alive when', () => {
@@ -371,6 +405,21 @@ describe('which word is alive when', () => {
     expect(at(310).callout!.life.age).toBe(0);
   });
 
+  /**
+   * **The window leaves with the instrument, and the word stays.** Spec
+   * [02 · §6](../../docs/spec/02-release.md) gives the taken window 420ms and spec
+   * 06 §4 gives the word 1 720ms; built on one clock the arc hung on screen four
+   * times too long, and the author caught it — *"the planet's compass window stays
+   * after the rest of the compass disappears"* (2026-08-29).
+   */
+  it('lets the taken window go long before the word', () => {
+    expect(at(RELEASE).callout!.windowStrength).toBe(1);
+    // Gone at 420ms, while the word is still at full through its linger.
+    expect(at(RELEASE + 24).callout!.windowStrength).toBeGreaterThan(0);
+    expect(at(RELEASE + 25).callout!.windowStrength).toBe(0);
+    expect(at(RELEASE + 25).callout!.strength).toBe(1);
+  });
+
   /** A make is carried and speaks nothing — spec 06 §2's *"points only"*. */
   it('carries a make without spending a word on it', () => {
     expect(at(372).callout!.tier).toBe('MAKE');
@@ -381,7 +430,6 @@ describe('which word is alive when', () => {
   it('is the only thing still alive 400ms after a release', () => {
     const settled = at(RELEASE + 24);
     expect(settled.farewell).toBeNull();
-    expect(settled.camera.punch).toBeNull();
     expect(settled.compass).toBeNull();
     expect(settled.craft.deformation.recovery).toBeNull();
     expect(settled.callout).not.toBeNull();
@@ -393,38 +441,80 @@ describe('which word is alive when', () => {
    * ticks later, against a word that lives 103. The first nine swings all overlap,
    * which is spec 06 §3's merge rule waiting for the streaks that will need it.
    */
-  it('ends 1 720ms after the release that earned it', () => {
+  it('ends 1 600ms after the release that earned it', () => {
     expect(at(1384).callout!.tier).toBe('TRUE');
     expect(at(1384).callout!.life.age).toBe(0);
-    expect(at(1384 + 102).callout).not.toBeNull();
-    expect(at(1384 + 102).callout!.strength).toBeLessThan(0.05);
-    expect(at(1384 + 103).callout).toBeNull();
+    expect(at(1384 + 95).callout).not.toBeNull();
+    expect(at(1384 + 95).callout!.strength).toBeLessThan(0.05);
+    expect(at(1384 + 96).callout).toBeNull();
   });
 
   /**
-   * Over the whole run: twenty-three releases, three of them PERFECT, and the E3
-   * is struck exactly three times. Spec 00 §3's *"at most one E3 alive"* is a
-   * shape rather than a check, and this is what the shape produces.
+   * Over the whole run: twenty-three releases, three of them PERFECT — and the E3
+   * is struck **not once**. Spec 00 §3's *"at most one E3 alive"* is a shape
+   * rather than a check, and what the shape now holds is nothing: the author has
+   * taken the release, the grab and the award off the list in turn, and what is
+   * left for it is spec 12's checkered line, in M6.
    */
-  it('strikes the E3 once per PERFECT and never otherwise', () => {
+  it('leaves the E3 slot empty, for all three of its users are withdrawn', () => {
     const perfects = edges('release').filter((tick) => at(tick).callout?.tier === 'PERFECT');
     expect(perfects).toEqual([310, 422, 1239]);
-    const struck = RUN.filter((view) => view.flash?.decay.age === 0);
-    expect(struck).toHaveLength(perfects.length);
+    expect(RUN.filter((view) => view.flash !== null)).toHaveLength(0);
+  });
+});
+
+describe('which side of the dot a release fell', () => {
+  /**
+   * **The dot is a centre, not an edge.** Spec [06 · §2](../../docs/spec/06-awards.md)
+   * grades on `d`, *"the **absolute** angular offset of the release from the
+   * window's centre"*, so a release that has swept past the dot is worth exactly
+   * what one the same distance short of it is worth. Raised from flying — *"I
+   * feel like the player should still get award text if they grab after the
+   * planet dot on the compass, but still in the window"* (author, 2026-08-29).
+   *
+   * Measured over the recorded dispatches, they do: **40 graded releases fell
+   * before the dot and 50 after it**, and every ungraded one was genuinely
+   * outside its window — the nearest by 12% of a half-width. This is that as an
+   * assertion rather than as a measurement, so it cannot quietly become
+   * one-sided.
+   */
+  it('grades both sides of the dot the same', () => {
+    let past = 0;
+    let short = 0;
+    for (const view of RUN) {
+      for (const ring of view.compass?.rings ?? []) {
+        if (ring.tier === null) continue;
+        // Inside the window is inside the window, whichever way round.
+        expect(Math.abs(ring.offset)).toBeLessThanOrEqual(ring.halfWidth + 1e-9);
+        if (ring.offset > 0) past++;
+        else short++;
+      }
+    }
+    // Both sides happen, and neither is rare: the hand is only inside a window
+    // for a few ticks of each revolution, so these are counts of tens rather than
+    // of hundreds.
+    expect(past).toBeGreaterThan(20);
+    expect(short).toBeGreaterThan(20);
+    expect(Math.min(past, short) / Math.max(past, short)).toBeGreaterThan(0.3);
+  });
+
+  /** And nothing inside a window is ever ungraded, which is the other half of it. */
+  it('never withholds a word from a release inside the window', () => {
+    for (const view of RUN) {
+      for (const ring of view.compass?.rings ?? []) {
+        if (Math.abs(ring.offset) <= ring.halfWidth) expect(ring.tier).not.toBeNull();
+      }
+    }
   });
 });
 
 describe('the camera, over the whole run', () => {
-  /** The rule this milestone had to be careful with, asserted over 2 775 ticks. */
-  it('follows the centreline on every tick, and the punch is the only thing off it', () => {
-    let displaced = 0;
-    for (const view of RUN) {
-      expect(subjectOf(view.camera).x).toBe(DESIGN_WIDTH / 2);
-      if (view.camera.x === DESIGN_WIDTH / 2) continue;
-      expect(view.camera.punch).not.toBeNull();
-      displaced++;
-    }
-    expect(displaced).toBeGreaterThan(100);
+  /**
+   * The rule this milestone had to be careful with, asserted over 2 775 ticks —
+   * and exact again, now that the camera's share of the punch is withdrawn.
+   */
+  it('follows the centreline on every tick of the run', () => {
+    for (const view of RUN) expect(view.camera.x).toBe(DESIGN_WIDTH / 2);
   });
 
   /** And it carries nothing out of an orbit it has left — the delay that was removed. */

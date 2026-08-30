@@ -26,6 +26,7 @@ import {
   ENTER_FROM,
   ENTER_TICKS,
   FILAMENT_FLOOR,
+  FILAMENT_SPAN,
   EXIT_BY,
   EXIT_TICKS,
   RING_INNER,
@@ -425,7 +426,11 @@ describe('the grab filament', () => {
   const law = (sim: SimState): number => {
     const body = sim.field.bodies[sim.heldBody!]!;
     const away = Math.hypot(sim.craft.x - body.x, sim.craft.y - body.y);
-    return FILAMENT_FLOOR + (1 - FILAMENT_FLOOR) * (1 - Math.min(1, away / grabRange(body)));
+    // Across `FILAMENT_SPAN` of the reach rather than across the whole of it —
+    // the fade used to be calibrated over a distance the game never travels. See
+    // the constant for the forty drifts that measured it.
+    const span = grabRange(body) * FILAMENT_SPAN;
+    return FILAMENT_FLOOR + (1 - FILAMENT_FLOOR) * (1 - Math.min(1, away / span));
   };
 
   it('is exactly how much of the body’s hold is left, floored', () => {
@@ -452,10 +457,10 @@ describe('the grab filament', () => {
       if (view.compass !== null && view.compass.filament > 0) dive.push(view.compass.filament);
     }
     expect(dive.length).toBeGreaterThan(50);
-    // The end that was already tuned stays where it was: at the freeze the craft
-    // is about a tenth of a reach out, so the filament is near enough to full
-    // that the moment looks the way it always did.
-    expect(dive.at(-1)!).toBeGreaterThan(0.9);
+    // The near end still burns bright. It costs a little to shorten the span —
+    // 0.88 at the freeze against 0.93 before — and that is the stated price of
+    // the far end reaching its floor on a drift a craft actually makes.
+    expect(dive.at(-1)!).toBeGreaterThan(0.85);
     expect(dive.at(-1)!).toBeGreaterThan(dive[0]!);
   });
 
@@ -468,7 +473,10 @@ describe('the grab filament', () => {
     const field = openField([body]);
     const sim: SimState = createInitialState(
       field,
-      createCraft(0, grabRange(body) * 0.5, 0, 1200),
+      // Started well inside the fade rather than most of the way through it, so
+      // the whole gesture is exercised: shortening `FILAMENT_SPAN` moved where
+      // *dim* begins, and a fixture that opens at half a reach now opens dim.
+      createCraft(0, grabRange(body) * 0.15, 0, 1200),
       1,
     );
     let view = createPresentation(sim);
@@ -494,6 +502,14 @@ describe('the grab filament', () => {
     // fails here rather than passing by agreeing with itself: the far end is
     // less than half the near end.
     expect(Math.min(...out)).toBeLessThan(out[0]! / 2);
+
+    // **It reaches the floor on a drift a craft can actually make**, which is the
+    // whole of what shortening the span bought: measured over forty tethered
+    // drifts in the recorded dispatches, none gets past 0.71 of a reach, so a
+    // fade that only arrives at 1.0 arrives never.
+    const reached = out.findIndex((v) => v <= FILAMENT_FLOOR + 1e-9);
+    expect(reached).toBeGreaterThan(0);
+    expect(reached).toBeLessThan(out.length / 2);
   });
 });
 

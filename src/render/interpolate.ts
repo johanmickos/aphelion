@@ -76,6 +76,8 @@ function deformationBetween(
   return {
     along: between(previous.along, current.along, alpha),
     across: between(previous.across, current.across, alpha),
+    // What the release was worth is a fact about the release, not a frame of it.
+    amount: current.amount,
     recovery: current.recovery,
   };
 }

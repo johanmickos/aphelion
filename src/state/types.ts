@@ -48,6 +48,17 @@ export interface DeformationView {
   readonly along: number;
   /** Scale across it. */
   readonly across: number;
+  /**
+   * How much of the full stretch this release earned, from
+   * [`PUNCH_FLOOR`](./punch.ts) to 1 — the **punch** (`CONTEXT.md`), which lives
+   * here since the camera's share of it was flown and refused (2026-08-29).
+   *
+   * Beside the two scales rather than inside them, for the reason the pair above
+   * is here: a test that says *this release was worth a third of a punch* is
+   * saying it about this number, and inferring it back out of a scale that is
+   * also mid-rebound is arithmetic nobody should have to do.
+   */
+  readonly amount: number;
   /** The return in progress, or `null` when the craft is at rest. */
   readonly recovery: Decay | null;
 }
@@ -109,34 +120,6 @@ export interface FlashView {
 }
 
 /**
- * The punch (`CONTEXT.md`) — the transient displacement of the view that a
- * release lands, scaled by the quality of the swing.
- *
- * [ADR-0012](../../docs/adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)'s
- * replacement for the 70ms hitstop, and spec
- * [02 · §5](../../docs/spec/02-release.md)'s *"6px along the exit tangent, home
- * in 180ms with one overshoot"*. It carries none of itself into velocity, which
- * is what lets it be large: *"a player tapping beside bodies gets the punch and
- * keeps none of it."*
- *
- * `x` and `y` are the displacement **now**, and the three fields under them are
- * what it was struck with — see [`punch.ts`](./punch.ts) for why the direction
- * is carried rather than re-read off a craft that has since turned.
- */
-export interface PunchView {
-  /** How far the view is displaced this tick, in design units. */
-  readonly x: number;
-  readonly y: number;
-  /** The unit vector it was struck along: the exit tangent at that instant. */
-  readonly alongX: number;
-  readonly alongY: number;
-  /** How far it reached at full extension, signed — negative is a grab, reversed. */
-  readonly size: number;
-  /** The return in progress, which passes rest once. */
-  readonly decay: Decay;
-}
-
-/**
  * Where the world is being watched from — the world point the centre of the
  * design space is looking at, in design units.
  *
@@ -175,19 +158,6 @@ export interface CameraView {
    * how far the craft has since travelled away from a remembered point.
    */
   readonly offset: number;
-  /**
-   * The punch inside `x` and `y`, or `null` when the view is not carrying one.
-   *
-   * **It is a displacement from where the camera is standing, not a second
-   * opinion about where it should stand** — the distinction spec
-   * [02 · §5](../../docs/spec/02-release.md) and this file's *"it does not move
-   * sideways"* both need to be true at once. `x` and `y` above are where the
-   * world is watched from with the punch already in them, so the renderer draws
-   * an answer; what follows the craft, eases and is held to the centreline is
-   * the **subject**, which is these two minus this — see
-   * [`subjectOf`](./camera.ts).
-   */
-  readonly punch: PunchView | null;
 }
 
 /**
@@ -624,7 +594,18 @@ export interface CalloutView {
   readonly body: number;
   /** That body's hue, so the arc still knows whose it is once the compass is gone. */
   readonly hue: number;
-  /** Where the word is standing, in world units: the dot, plus the pop. */
+  /**
+   * Where the word is **drawn**, in world units: the dot, plus the pop, held
+   * inside the design space.
+   *
+   * Spec [00 · §7](../../docs/spec/00-tokens.md) is absolute — *"nothing the
+   * player reads is drawn outside it, ever"* — and *"the compass, the masthead
+   * and every award live above"* the thumb line. A word born at a dot near the
+   * edge of the picture was being cut in half (author, 2026-08-29), so this is
+   * the birth position slid back inside the readable band. It stays
+   * world-anchored: what moves it is the camera, and the clamp only bites while
+   * the word would otherwise be off the page.
+   */
   readonly x: number;
   readonly y: number;
   /** The dot itself, which does not move — where the word was born. */
@@ -644,8 +625,18 @@ export interface CalloutView {
   readonly size: number;
   /** The pop, then the linger, then the decay: one clock, three stretches. */
   readonly life: Decay;
-  /** How lit it is now, from 1 through the linger to 0. */
+  /** How lit the **word** is now, from 1 through the linger to 0. */
   readonly strength: number;
+  /**
+   * And how lit the **taken window** is — a different clock, spec
+   * [02 · §6](../../docs/spec/02-release.md)'s 420ms against the word's 1 720ms.
+   *
+   * They arrive as one unit and leave on their own schedules: the word is the
+   * verdict, meant to be read and left behind, and the arc is the last of the
+   * instrument and goes when the instrument does. Built on one clock, the arc hung
+   * on screen four times longer than spec 02 §6 allows.
+   */
+  readonly windowStrength: number;
 }
 
 /**
