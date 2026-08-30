@@ -857,7 +857,7 @@ const KNOBS: Knob[] = [
   {
     id: 'bowgain',
     label: 'Gravity bow · strength',
-    what: 'the board’s own gravityBend, whose slider runs 0 – 44. Scaled per body by mass, so this moves the whole field at once and MASS_EXPONENT decides the spread',
+    what: '**switched off on main** (author, 2026-08-30: “remove the gravity wake effect for now, for both planet and ship”). Put it to 24 — the board’s own default — to bring it back. Scaled per body by mass, so this moves the whole field at once and MASS_EXPONENT decides the spread',
     min: 0,
     max: 44,
     step: 2,
@@ -896,7 +896,7 @@ const KNOBS: Knob[] = [
   {
     id: 'wakeamp',
     label: 'Wake · how far it parts',
-    what: 'the board’s own wake, whose slider runs 0 – 34 board pixels. At zero the craft leaves no mark on the field at all',
+    what: '**switched off on main**, alongside the bow. Put it to 120 (40 board pixels) to bring it back; the reach beside it is already at its restored 85. At zero the craft leaves no mark on the field at all',
     min: 0,
     max: 150,
     step: 3,

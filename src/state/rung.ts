@@ -219,22 +219,37 @@ export const BOW_CAP = 45 * BOARD_PIXEL;
 /**
  * How hard the median body bows a rung, as the board's `gravityBend`.
  *
- * **24 is the board's own default**, on a slider it gives 0 – 44. It is the one
- * number in the bow the design states as a *setting* rather than as geometry, so
- * it is the one that comes across as an opening position and the one on the
- * bench.
+ * ## **Zero: the gravity bow is switched off, 2026-08-30**
  *
- * What it buys is checkable, and it is the number
- * [`BOW_CAP`](#bow_cap)'s table is measured against: at 24 the median body of
- * this field bows a rung at its own rim by **24.4 board pixels**, the smallest by
- * 18.0 and the largest by 31.7 — under a ceiling of 45, monotone across the whole
- * range a day places, which is spec 05's acceptance with room in it rather than
- * by luck.
+ * The author, having flown it: *"let's remove the gravity wake effect for now,
+ * for both planet and ship, but leave the underlying code so we can reactivate
+ * it later."* So the rungs hang straight, and **nothing below this line was
+ * deleted** — the law, the clamp, the falloff, the sum-then-clamp and every test
+ * that holds them are intact, and the only thing that changed is how much of it
+ * is turned on.
+ *
+ * **The value to put back is 24**, the board's own default (its slider gives
+ * 0 – 44), and it is one move of the `Gravity bow · strength` slider on the
+ * bench. What it buys at 24 is recorded so the restore does not have to be
+ * re-derived: the median body of this field bows a rung at its own rim by **24.4
+ * board pixels**, the smallest by 18.0 and the largest by 31.7, under a
+ * [`BOW_CAP`](#bow_cap) of 45 and monotone across the whole range a day places.
+ *
+ * **Zero is a real off and not a small on.** It reaches the picture through
+ * [`bowOf`](#bowof), so presentation state says every body bows nothing, and the
+ * renderer culls on that and draws two points per rung instead of ninety-three —
+ * the cost of the feature goes with the feature. That is why the gain lives here
+ * rather than in `rungPointAt`: a switch that only stops the ink still pays for
+ * the arithmetic.
+ *
+ * **When to reopen**: whenever the author wants it back. It is the first thing to
+ * try on the bench beside the wake, and `docs/plan/m3-the-field.md` records what
+ * the flight that switched it off was reacting to.
  */
-export const BOW_GAIN = 24;
+export const BOW_GAIN = 0;
 
 /**
- * How hard one body bows the rungs, as a multiple of the median body's.
+ * How hard one body bows the rungs — the whole strength, gain included.
  *
  * **Mass, and mass is size** (spec 04 §1), so this moves with
  * [`MASS_EXPONENT`](../sim/units.ts) and the author's answer to it — at 0 every
@@ -244,40 +259,46 @@ export const BOW_GAIN = 24;
  * *monotonically* mean something rather than being satisfied by any function at
  * all.
  *
- * It is a **ratio to the median** rather than an absolute so that
- * [`BOW_GAIN`](#bow_gain) stays the board's own number and keeps meaning what the
- * board's slider means.
+ * **[`BOW_GAIN`](#bow_gain) is folded in here rather than applied where the ink
+ * is**, and that is what lets the effect be switched off without a switch: at a
+ * gain of zero this returns zero, presentation state says the field is flat, and
+ * the renderer culls a body that bends nothing the same way it culls one that is
+ * too far away. The alternative — multiplying by the gain inside `rungPointAt` —
+ * would have gone on paying for ninety-three samples a rung to reach the same
+ * straight line.
+ *
+ * It is normalised to the **median** body so that the gain keeps meaning what the
+ * board's own slider means.
  */
 export function bowOf(body: Body): number {
-  return body.mass / MEDIAN_MASS;
+  return (BOW_GAIN * body.mass) / MEDIAN_MASS;
 }
 
 /**
  * How far the craft parts a rung it is standing on, in design units — a
  * **length**.
  *
- * ## It is 2.5× the board's, and the arithmetic is why rather than taste
+ * ## **Zero: the craft's wake is switched off, 2026-08-30**
  *
- * The author, 2026-08-30, having flown the rungs for the first time: *"I think
- * the ship's wake, and maybe all gravity wakes, need to be a bit larger."*
+ * The same ruling that switched off the bow — *"for both planet and ship, but
+ * leave the underlying code so we can reactivate it later"* — and the same
+ * shape: nothing is deleted, [`wakeOf`](#wakeof) still derives the wake every
+ * tick, ADR-0015's recurrence is still exercised and still tested, and the
+ * renderer declines to draw it. Re-enabling is one slider and needs no state to
+ * warm up, because the state was never switched off.
  *
- * The trap in answering that is that they said it about the build they were
- * looking at, and the **rungs moved in the same sitting**. What they flew was a
- * wake of the board's 16 against rungs 25 board pixels apart — so it lifted a
- * rung by 64% of a spacing. Doubling the spacing to 50 (`RUNG_SPACING`) halves
- * that on its own, so **32 merely restores the picture they were describing** and
- * anything less than 32 is a reduction wearing an increase's clothes. The
- * *"a bit larger"* is the ×1.25 on top of it.
- *
- * Flown here against the author's own fast run (the dispatch of 07:34), at a
- * coasting tick 555 units clear of every body so nothing competes: at 22 the
- * craft nicks one rung and reads as a kink; at 40 it carries a pocket of the
- * field with it across three, which is what *"part around the craft"* describes.
- *
- * It is on the bench, because it is a judgement about a moving picture and this
- * is the second value it has had in one sitting.
+ * **The value to put back is 40 board pixels, with [`WAKE_FALLOFF`](#wake_falloff)
+ * at 85**, and the arithmetic behind the pair is worth keeping because it is not
+ * obvious. The author flew the board's own 16 / 34 against rungs 25 board pixels
+ * apart, so it lifted a rung by 64% of a spacing; doubling the spacing to 50
+ * halves that on its own, so **32 / 68 merely restores the picture they were
+ * describing** and anything less is a reduction wearing an increase's clothes.
+ * The *"a bit larger"* they asked for is the ×1.25 on top. Measured against their
+ * own fast run at a coasting tick 555 units clear of every body: at 22 the craft
+ * nicks one rung and reads as a kink, at 40 it carries a pocket of field with it
+ * across three.
  */
-export const WAKE_AMPLITUDE = 40 * BOARD_PIXEL;
+export const WAKE_AMPLITUDE = 0;
 
 /**
  * How fast the parting dies with distance from the craft — a **length**, and the
@@ -371,7 +392,14 @@ export function wakeOf(previous: readonly WakeView[], sim: SimState): WakeView[]
       continue;
     }
     if (now <= 0) continue;
-    next.push({ rung, x: craft.x, y: craft.y, strength: 1, life: place(WAKE_TICKS) });
+    next.push({
+      rung,
+      x: craft.x,
+      y: craft.y,
+      amplitude: WAKE_AMPLITUDE,
+      strength: 1,
+      life: place(WAKE_TICKS),
+    });
   }
   // In rung order, so a picture asserted against another picture compares
   // element for element rather than by search.
@@ -436,11 +464,15 @@ export function rungPointAt(
   for (const body of bodies) {
     const toX = body.x - x;
     const toY = body.y - y;
+    // A body that bends nothing is skipped before the distance is measured — the
+    // whole field is in that state while the bow is switched off
+    // ([`BOW_GAIN`](#bow_gain)), and the renderer culls on the same fact one
+    // level up so that a flat rung costs two points rather than ninety-three.
+    if (body.bow <= 0) continue;
     const away = magnitude(toX, toY);
     const shape = falloff(away, BOW_FALLOFF);
     if (shape <= 0) continue;
-    const pull =
-      Math.min(BOW_CAP, (body.bow * BOW_GAIN * BOW_NUMERATOR) / (away + BOW_SOFTENING)) * shape;
+    const pull = Math.min(BOW_CAP, (body.bow * BOW_NUMERATOR) / (away + BOW_SOFTENING)) * shape;
     // A rung point exactly on a body's centre has no bearing to it, and the
     // board guards the same division the same way. It is unreachable in play —
     // the craft dies on contact long before — and it is guarded so that a test
@@ -461,7 +493,7 @@ export function rungPointAt(
     const fromX = x + dx - wake.x;
     const fromY = y + dy - wake.y;
     const away = magnitude(fromX, fromY);
-    const push = WAKE_AMPLITUDE * wake.strength * falloff(away, WAKE_FALLOFF);
+    const push = wake.amplitude * wake.strength * falloff(away, WAKE_FALLOFF);
     if (push > 0) {
       const unit = away === 0 ? 1 : away;
       dx += (fromX / unit) * push;

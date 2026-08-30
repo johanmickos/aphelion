@@ -63,7 +63,7 @@ corridors of any shape inherit the whole field grammar unchanged.
 |---|---|---|---|
 | **SKY** | VOID, with a slow altitude ramp | — | static; tint ≤ **6%** outside an anomaly |
 | **DUST** | Sparse motes, α **0.1 – 0.3** | E0 | world speed, **strictly parallel fall** |
-| **STRATA** | The rungs, DUSK α **0.16**; addressed rungs α **0.28** | E0 | world speed; bow ≤ **30px** ⚠ **now 45px — see §3** |
+| **STRATA** | The rungs, DUSK α **0.16**; addressed rungs α **0.28** | E0 | world speed; bow ≤ **30px** ⚠ **45px, and switched off — see §3** |
 | **BODIES** | Rims, tides, strata, glyph cores (spec [04](./04-bodies.md)) | E0–E2 | world speed |
 | **PLAYER** | Craft, trail, compass, deadline track | E2–E3 | world speed |
 
@@ -129,6 +129,45 @@ a slow one stipples. Streaks fall strictly parallel to velocity; nothing radiate
 >
 > **When to reopen**: when spec 17's generator replaces the fixture field, because
 > three of the four are measured against *this* field's radii and corridor.
+
+> ## ⚠ Switched off by the author, 2026-08-30 — the rungs hang straight
+>
+> **The gravity bow and the wake are both off**, later the same day and after the
+> numbers above were flown: *"let's remove the gravity wake effect for now, for
+> both planet and ship, but leave the underlying code so we can reactivate it
+> later."* What ships is the rest of the system — strata every 50 m, DUSK at α
+> 0.16 and 0.28, every fifth addressed and carrying a number, sweeping past at
+> world speed. §6's first and third jobs, **speed felt** and **altitude
+> addressed**, are intact; its second, **gravity drawn**, is the part that is
+> parked.
+>
+> **Nothing is deleted, and that is the instruction.** The law below, the clamp,
+> the falloff, the sum-then-clamp, the wake's ~400ms relaxation and its whole
+> ADR-0015 recurrence are all built and all still tested — `test/state/rungs.test.ts`
+> exercises them at **the strengths a restore would put back** and asserts
+> separately that the shipped field draws flat, so the ruling and the mechanism
+> can move independently without either rotting. Presentation state goes on
+> deriving the wake it is not drawing, so turning it back on needs no warm-up.
+>
+> **It is two numbers, and both are on the bench.** `BOW_GAIN` 0 → **24** (the
+> board's own default) and `WAKE_AMPLITUDE` 0 → **40** board pixels with
+> `WAKE_FALLOFF` at 85. Zero is a real off rather than a small on: it reaches the
+> picture through presentation state, so the renderer culls a body that bends
+> nothing and draws two points per rung instead of ninety-three — measured, path
+> points fall from **895 to 96** per frame, which is the pre-rung baseline plus the
+> straight lines themselves.
+>
+> **What the effect was protecting** is §1's whole idea — *"the player climbs
+> through a medium, not past a backdrop"* — and §6's second job, that the field
+> states which bodies pull hardest **before** the player presses. Straight rungs
+> are a ruler rather than a medium, and the **tide** (spec [04](./04-bodies.md))
+> is now the only thing saying gravity, at the rim rather than at a distance.
+> That is the cost, and it is worth restating when this is reopened.
+>
+> **When to reopen**: the author's call, and one slider. The flight that switched
+> it off, and the one open extension it suggested — a wake that answers to speed
+> or to the quality of a swing rather than being always-on — are in
+> `docs/plan/m3-the-field.md`.
 
 | Property | Value |
 |---|---|
@@ -226,9 +265,15 @@ Three jobs, one system:
 ## Acceptance
 
 - A frame rendered with the craft removed and a frame rendered with it present differ only within
-  `~3 × 34px` of the craft's position.
+  `~3 × 34px` of the craft's position. ⚠ Read as **the wake's own sources** rather than the craft's
+  current position, which the ~400ms relaxation two paragraphs above forces: a rung the craft has
+  left is still displaced, so a difference measured against where the craft is *now* must trail it.
+  `test/state/rungs.test.ts` holds both halves of what the criterion protects — every difference
+  sits inside the reach of a source, and every source is a place the craft was inside the decay's
+  span. Held at the restore strength while the wake is switched off (§3's second notice).
 - Sweeping a body's mass from minimum to maximum increases peak bow monotonically and never
-  exceeds 30px. ⚠ **The clamp is 45px** (§3's notice), and *monotonically* is asked over the mass
+  exceeds 30px. ⚠ **Held at the restore strength**, because the bow is switched off (§3's second
+  notice) and this would otherwise pass vacuously. **The clamp is 45px** (§3's notice), and *monotonically* is asked over the mass
   range a day actually places — at 30px the two halves of this sentence contradicted each other
   inside that range. `test/state/rungs.test.ts` holds both, and holds the turnover clear of the
   largest body spec 17 §4 authors.

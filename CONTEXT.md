@@ -44,14 +44,17 @@ orbit's, below)
 **Bow**:
 How a rung bends toward a body. The field's statement of gravity at a distance, made
 before the player presses — the **tide** is the same statement at the rim. It is a
-property of mass, so it is there whatever the craft is doing.
+property of mass, so it is there whatever the craft is doing. **Switched off in the
+build** (author, 2026-08-30) with the mechanism kept whole; the word stays because it is
+what is being turned back on.
 _Avoid_: sag, warp, dent, gravity well (the bow is what is drawn, not what it means)
 
 **Wake**:
 How a rung parts around the craft, and relaxes behind it. A displacement of a structure
 that is already there, never something emitted — nothing in this game radiates from a
 point. It has a **place** rather than a centre: what relaxes is the rung's memory of
-where the craft pressed.
+where the craft pressed. **Switched off in the build** alongside the **bow**, and still
+derived every tick so that turning it back on needs no warm-up.
 _Avoid_: ripple, wave, shockwave, trail (the **trail** is the craft's own line through
 the field)
 

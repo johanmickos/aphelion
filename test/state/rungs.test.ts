@@ -20,13 +20,16 @@ import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { snapshot } from '../../src/sim/snapshot.ts';
 import type { Field, SimState } from '../../src/sim/types.ts';
-import { MEDIAN_RADIUS, METRE, SCALE } from '../../src/sim/units.ts';
+import { MEDIAN_MASS, MEDIAN_RADIUS, METRE, SCALE } from '../../src/sim/units.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { ticksIn } from '../../src/state/decay.ts';
+import { BOARD_PIXEL } from '../../src/state/design.ts';
 import {
   ADDRESSED_EVERY,
   BOW_CAP,
   BOW_FALLOFF,
+  BOW_GAIN,
+  WAKE_AMPLITUDE,
   RUNG_SPACING,
   WAKE_FALLOFF,
   WAKE_TICKS,
@@ -44,10 +47,48 @@ import type { BodyView, PresentationState, WakeView } from '../../src/state/type
 const PRESS = { pressed: true };
 const LET_GO = { pressed: false };
 
-/** A body as the picture sees it — only the three fields a rung ever asks about. */
-function seen(x: number, y: number, radius: number): BodyView {
+/**
+ * The strengths the **law** is tested at, which are not the strengths the game
+ * currently ships.
+ *
+ * The bow and the wake were switched off by the author on 2026-08-30 — *"remove
+ * the gravity wake effect for now, for both planet and ship, but leave the
+ * underlying code so we can reactivate it later"* — so `BOW_GAIN` and
+ * `WAKE_AMPLITUDE` are zero on `main` and every assertion below about the shape
+ * of a bow would pass vacuously if it read them.
+ *
+ * That would be the worst of both worlds: code kept for reactivation and quietly
+ * untested, so *"reactivate later"* becomes *"debug later"*. So the law is
+ * exercised at **the values a restore would put back**, stated here, and a test
+ * at the end of this file asserts the shipped field is flat — the ruling and the
+ * mechanism are checked separately, which is what lets one move without the other
+ * rotting.
+ */
+const RESTORE_BOW_GAIN = 24;
+const RESTORE_WAKE_AMPLITUDE = 40 * BOARD_PIXEL;
+
+/**
+ * A body as the picture sees it — only the fields a rung ever asks about.
+ *
+ * `bow` is handed in at the restore strength rather than taken from
+ * [`bowOf`](../../src/state/rung.ts), for the reason above. That the two agree
+ * when the gain is restored is its own assertion, further down.
+ */
+function seen(x: number, y: number, radius: number, gain = RESTORE_BOW_GAIN): BodyView {
   const body = createBody(x, y, radius);
-  return { x, y, radius, bow: bowOf(body) } as BodyView;
+  return { x, y, radius, bow: (gain * body.mass) / MEDIAN_MASS } as BodyView;
+}
+
+/** A wake at the restore amplitude, full strength, freshly placed. */
+function pressed(x: number, y: number, rung = 0): WakeView {
+  return {
+    rung,
+    x,
+    y,
+    amplitude: RESTORE_WAKE_AMPLITUDE,
+    strength: 1,
+    life: { age: 0, span: WAKE_TICKS },
+  };
 }
 
 /** Where a rung point lands, as a displacement from where it hangs. */
@@ -306,7 +347,7 @@ describe('the wake', () => {
 
   /** Away from the source, never toward it — the parting is a parting. */
   it('pushes a rung away from where the craft pressed', () => {
-    const wake: WakeView = { rung: 0, x: 0, y: 0, strength: 1, life: { age: 0, span: WAKE_TICKS } };
+    const wake = pressed(0, 0);
     expect(displaced(60, 0, [], wake).dx).toBeGreaterThan(0);
     expect(displaced(-60, 0, [], wake).dx).toBeLessThan(0);
   });
@@ -318,7 +359,7 @@ describe('the wake', () => {
    * way out.
    */
   it('is strongest at the source and only ever weaker further out', () => {
-    const wake: WakeView = { rung: 0, x: 0, y: 0, strength: 1, life: { age: 0, span: WAKE_TICKS } };
+    const wake = pressed(0, 0);
     let previous = Infinity;
     for (let x = 1; x < reachOf(WAKE_FALLOFF); x += 5) {
       const here = magnitude(displaced(x, 0, [], wake));
@@ -373,10 +414,7 @@ describe('the wake', () => {
   it('sheds a disagreement within its own span', () => {
     const sim = createInitialState(fixtureField(), fixtureCraft(), 1);
     let honest = createPresentation(sim);
-    let lied: PresentationState = {
-      ...honest,
-      wake: [{ rung: 9999, x: 1e4, y: -1e4, strength: 1, life: { age: 0, span: WAKE_TICKS } }],
-    };
+    let lied: PresentationState = { ...honest, wake: [pressed(1e4, -1e4, 9999)] };
     for (let tick = 0; tick <= WAKE_TICKS + 1; tick++) {
       stepSim(sim, LET_GO);
       honest = derive(honest, sim);
@@ -417,6 +455,72 @@ describe('the falloff both formulas share', () => {
       expect(here).toBeLessThan(previous);
       previous = here;
     }
+  });
+});
+
+describe('switched off, and still whole', () => {
+  /**
+   * The ruling itself, 2026-08-30: *"let's remove the gravity wake effect for
+   * now, for both planet and ship, but leave the underlying code so we can
+   * reactivate it later."*
+   *
+   * Held as a **fact about the picture** rather than as a comparison of two
+   * constants against zero, because what was asked for is that the field draws
+   * flat — a build that zeroed one of the two, or that zeroed a constant the
+   * drawing no longer read, would pass the constants test and fail this one.
+   */
+  it('draws the shipped field flat, from end to end of a run', () => {
+    const views = fly(600, (tick) => tick > 60 && tick < 260);
+    let checked = 0;
+    for (const view of views) {
+      for (const body of view.bodies) expect(body.bow).toBe(0);
+      for (const wake of view.wake) expect(wake.amplitude).toBe(0);
+      // And the geometry agrees: no point of any rung is anywhere but on it.
+      const y = altitudeOf(view.corridor.foot, rungAbove(view.corridor.foot, view.camera.y));
+      for (let x = -1200; x <= 1200; x += 60) {
+        const at = displaced(x, y, view.bodies, view.wake[0]);
+        expect(at.dx).toBe(0);
+        expect(at.dy).toBe(0);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(1000);
+  });
+
+  /**
+   * And **the mechanism is intact**, which is the other half of what the author
+   * asked for. The two strengths are the only things that were moved, so putting
+   * them back is arithmetic rather than archaeology: at the restore gain, `bowOf`
+   * gives exactly what this file's own `seen` gives, and every law above is
+   * already asserted against that.
+   */
+  it('comes back whole when the two strengths are put back', () => {
+    const body = createBody(0, 0, MEDIAN_RADIUS);
+    expect(bowOf(body)).toBe(0);
+    expect(seen(0, 0, MEDIAN_RADIUS).bow).toBe((RESTORE_BOW_GAIN * body.mass) / MEDIAN_MASS);
+    // The median body at the restore gain bows its own rim by the 24.4 board
+    // pixels `BOW_GAIN`'s note records, so the restore does not have to be
+    // re-derived from a flight.
+    const peak = magnitude(displaced(MEDIAN_RADIUS, 0, [seen(0, 0, MEDIAN_RADIUS)])) / BOARD_PIXEL;
+    expect(peak).toBeGreaterThan(24);
+    expect(peak).toBeLessThan(25);
+    // Both switches are genuinely at zero and nothing else was zeroed with them.
+    expect(BOW_GAIN).toBe(0);
+    expect(WAKE_AMPLITUDE).toBe(0);
+    expect(BOW_CAP).toBeGreaterThan(0);
+    expect(BOW_FALLOFF).toBeGreaterThan(0);
+    expect(WAKE_FALLOFF).toBeGreaterThan(0);
+    expect(RUNG_SPACING).toBeGreaterThan(0);
+  });
+
+  /**
+   * The wake's own recurrence keeps running while it is switched off, which is
+   * what makes turning it back on a slider rather than a warm-up: the state is
+   * already correct on the tick the amplitude moves.
+   */
+  it('goes on deriving the wake it is not drawing', () => {
+    const views = fly(400, (tick) => tick > 60 && tick < 260);
+    expect(Math.max(...views.map((view) => view.wake.length))).toBeGreaterThan(0);
   });
 });
 

@@ -770,6 +770,19 @@ export interface WakeView {
   /** Where the craft was when it pressed hardest on this rung. */
   readonly x: number;
   readonly y: number;
+  /**
+   * How far that press parts the rung at its source, in design units.
+   *
+   * The same fact for the craft that [`BodyView.bow`](#bodyview) is for a body,
+   * and it is here for the same three reasons: **how hard a thing displaces the
+   * field belongs beside the thing**, so the renderer applies a strength rather
+   * than holding one; a strength of zero is then a fact presentation state states
+   * — which is how the wake is switched off (2026-08-30) without a switch, and
+   * what lets the renderer cull it and draw a straight rung; and it is where a
+   * wake that answered to speed or to the quality of a swing would land, which is
+   * the open extension `docs/plan/m3-the-field.md` records.
+   */
+  readonly amplitude: number;
   /** What is left of that press, 1 → 0. */
   readonly strength: number;
   readonly life: Decay;

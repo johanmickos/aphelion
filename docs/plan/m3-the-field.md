@@ -64,8 +64,9 @@ relax behind it in ~400ms, and every fifth carries its address.
 Rungs are **level sets of progress**, perpendicular to intended travel. Written that way, a
 ring course inherits the whole grammar unchanged later.
 
-**Acceptance**: bow ≤ 30px ⚠ **45px, see below**, wake relaxes in ~400ms, addresses on every fifth
-rung, and the frame budget still holds with rungs on. **Verify**: `pnpm test` plus the M3.6 harness.
+**Acceptance**: bow ≤ 30px ⚠ **45px, and both displacements switched off — see below**, wake relaxes
+in ~400ms, addresses on every fifth rung, and the frame budget still holds with rungs on.
+**Verify**: `pnpm test` plus the M3.6 harness.
 
 ### Built, 2026-08-30 — and flown twice in the same sitting
 
@@ -136,6 +137,37 @@ identical in a field of 1 536.
 exponential falloffs; the ADR now carries the measurement, and the domain guard it asked for caught
 an unbounded rung index on the very first run of `pnpm portable`.
 
+### Switched off the same day, and kept whole
+
+The author flew the finished thing and parked half of it: *"let's remove the gravity wake effect for
+now, for both planet and ship, but leave the underlying code so we can reactivate it later."*
+
+**What ships** is strata every 50 m, DUSK at α 0.16 and 0.28, every fifth addressed and carrying a
+number, sweeping past at world speed. Of spec 05 §6's three jobs, **speed felt** and **altitude
+addressed** are intact and **gravity drawn** is parked — so the **tide** goes back to being the only
+thing in the game that says gravity, at the rim rather than at a distance. That is the cost and it is
+worth restating when this is reopened.
+
+**How it is off matters as much as that it is off.** It is two constants — `BOW_GAIN` 0 → **24**,
+`WAKE_AMPLITUDE` 0 → **40** with `WAKE_FALLOFF` at 85 — and both are on the bench, so reactivating is
+a slider rather than a build. The gain was moved *into* `bowOf` so that zero reaches the picture
+through **presentation state**: a body that bends nothing says so on itself, the renderer culls it
+exactly as it culls one too far away, and a rung is drawn from two points instead of ninety-three.
+Measured on the same dispatch, **path points fall from 895 to 96 per frame** — the pre-rung baseline
+of 62 plus the straight lines themselves. A switch that only stopped the ink would have gone on
+paying for a curve it then drew flat.
+
+The wake's own recurrence keeps running while it is not drawn, so ADR-0015's machinery stays
+exercised and turning it back on needs no warm-up. `WakeView` gained an `amplitude` for this, which
+is the same fact for the craft that `BodyView.bow` is for a body — and it is where a wake that
+answered to speed or to the quality of a swing would land.
+
+**The law stays tested, which is the difference between *"reactivate later"* and *"debug later"*.**
+`test/state/rungs.test.ts` exercises the bow and the wake at the strengths a restore would put back,
+and asserts *separately* that the shipped field draws flat over a whole run — so the ruling and the
+mechanism can each move without the other rotting, and the restore does not have to be re-derived
+from a flight.
+
 ### Still the author's, and asked rather than assumed
 
 1. **What an addressed rung says** — spec 05's own open question, now flyable both ways on the bench.
@@ -144,15 +176,16 @@ an unbounded rung index on the very first run of `pnpm portable`.
    1 250 rather than near zero. An artefact of a hand-made field; spec 17's generator places its own.
 3. **Whether a rung label may cross the thumb line.** Built as the conservative reading of spec 00
    §7 — it fades out as it crosses. `LABEL_FADE` goes to zero if a world-attached label is exempt.
-4. **Whether the gravity bow should be *"reserved for special tricks"*** (author, 2026-08-30).
-   Flown and assessed: **no** — it is the half of the system that makes the field a medium rather
-   than a ruler, it is spec 05 §6's second job (*gravity, drawn*, before the player presses), and a
-   bow that came and went would make the field lie about where the mass is. What the same flight
-   showed is the opposite problem: **near a held body the craft's wake and that body's bow fight in
-   the same place and the body wins**, so the craft's own passage is least visible exactly where the
-   player is looking. If a *trick* reading is wanted, the place for it is the **wake** responding to
-   something — speed, or the quality of a swing — and that is a new mechanism and the author's to
-   rule.
+4. **What brings the bow back, and in what form.** It was asked whether it should be *"reserved for
+   special tricks"* and then switched off entirely, both on 2026-08-30. The assessment against that
+   first question stands and is the argument for restoring it as it is: it is the half of the system
+   that makes the field a medium rather than a ruler, it is §6's second job, and a bow that came and
+   went would make the field lie about where the mass is. What the same flight showed is a real
+   defect underneath both notes: **near a held body the craft's wake and that body's bow fight in the
+   same place and the body wins**, so the craft's own passage is least visible exactly where the
+   player is looking. If a *trick* reading is still wanted, the place for it is the **wake**
+   answering to something — speed, or the quality of a swing — which `WakeView.amplitude` is now
+   shaped for. That is a new mechanism and the author's to rule.
 
 ---
 

@@ -28,7 +28,9 @@
  *   sweep exists to check.
  * - **A rung with nothing acting on it is two points.** Between bodies and away
  *   from the craft a rung is a straight line, and the field is mostly between
- *   bodies.
+ *   bodies. It is also the whole field while the bow and the wake are switched
+ *   off (2026-08-30), which is why that switch costs a frame nothing rather than
+ *   paying for a curve it then draws flat.
  * - **The points are reused.** One mutable pair is written into per sample rather
  *   than a fresh object per point, because at this rate the prototype's own
  *   record is that per-frame allocation is paid for later, all at once.
@@ -201,17 +203,25 @@ function strokeRung(
 }
 
 /**
- * The bodies close enough to bend this rung at all.
+ * The bodies close enough to bend this rung at all — **and strong enough to.**
  *
  * Gathered once per rung rather than tested per sample point: the test is a
  * vertical distance and a rung has one, so asking it a hundred times an inch
  * would be asking the same question a hundred times. It is only the vertical half
  * of the reach, which admits a few bodies the horizontal half would rule out —
  * `rungPointAt` costs them one `falloff` each and they contribute nothing.
+ *
+ * The strength test is the same one, one property along. A body whose
+ * [`bow`](../state/types.ts) is zero bends nothing, so it is not near in any sense
+ * this loop cares about — and while the bow is switched off
+ * ([`BOW_GAIN`](../state/rung.ts)) that is every body in the field, which is what
+ * hands the straight-line path below the whole frame. **The cost of the feature
+ * goes with the feature**, rather than the field paying ninety-three samples a
+ * rung to arrive back at a horizontal line.
  */
 function near(bodies: readonly BodyView[], y: number, reach: number): readonly BodyView[] {
   const found: BodyView[] = [];
-  for (const body of bodies) if (Math.abs(body.y - y) < reach) found.push(body);
+  for (const body of bodies) if (body.bow > 0 && Math.abs(body.y - y) < reach) found.push(body);
   return found;
 }
 
@@ -226,7 +236,13 @@ function near(bodies: readonly BodyView[], y: number, reach: number): readonly B
  * above takes it.
  */
 function pressing(wake: readonly WakeView[], rung: number): WakeView | undefined {
-  return wake.find((entry) => entry.rung === rung);
+  // A wake of no amplitude parts nothing, and says so on itself — the same shape
+  // as a body whose `bow` is zero, one line up. Presentation state goes on
+  // deriving it while it is switched off, so ADR-0015's recurrence stays
+  // exercised and tested and turning it back on is one slider with the state
+  // already warm.
+  const found = wake.find((entry) => entry.rung === rung);
+  return found !== undefined && found.amplitude > 0 ? found : undefined;
 }
 
 /**
