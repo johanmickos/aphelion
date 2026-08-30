@@ -101,6 +101,47 @@ release **defers** the carry rather than destroying it (ADR-0008), which amends 
 > stand-in that reads as debris is worse than the silence it fills. What a make shows meanwhile is
 > its **taken window**, lit and decaying over spec 02 §6's 420ms with the rest of the instrument.
 
+> ## ⚠ Ruled and built, 2026-08-30 — a capture earns a word too, and §1 survives it
+>
+> **§1's *"grabs are never graded; only releases are"* is overturned by the author**, who asked for
+> quality keywords on good **captures** as well: *"a perfect capture is at the closest approach,
+> within some short distance of the planet surface... These are invisible, which is explicitly OK,
+> because the visual cue is really the ship's proximity to the planet."*
+>
+> **§1's law is kept rather than bent**, and how is the interesting part. *"A word that never
+> repeats never becomes a signal"* is a rule about **frequency**, so a second event spending the
+> same three words would have halved what each is worth. What was built instead is **one rung** —
+> ruled by the author — with **three words on it** so the one rung does not go stale:
+> `TIGHT · NERVE · BRAZEN`, chosen by the body's own address so a run replays to the same words.
+> They are about **nerve** rather than precision, which is where a first set went wrong: TRUE,
+> SHARP and PERFECT already own precision, and an arrival is not a more accurate release, it is a
+> braver one. The brief was *"driving your ship dangerously close, then slamming the brakes to get
+> a perfect slingshot."*
+>
+> **It gets its own slot**, also ruled: the two words are at different places — the body you
+> arrived at, versus the dot you left from — so they never collide, and sharing would have let a
+> freeze cut short a release word still lingering. §4's *"one release, one word"* is unchanged; it
+> is one word **per event**, and there are now two kinds of event.
+>
+> **What is graded is a distance and not depth**, and that is measured: depth saturates at p50
+> exactly **1.00** over 493 captures, so more than half of everything would earn the top word.
+>
+> ## ⚠ And the band is provisional, because the distance saturates too
+>
+> Measured at the freeze over **374 captures on the current physics**, the closest approach lands
+> p25 **0.3** design units above the floor, p50 **1.2**, p75 57, p95 250. That is not a spread —
+> it is very nearly **binary**, because the dive clamps at the floor and **68% of dives reach it**.
+> No threshold selects a rare group: 4 units catches 68%, 25 catches 71%, 80 catches 77%. Two other
+> axes saturate the same way — the speed at the freeze is at its clamp on **51%** of captures, and
+> *close **and** fast* is still 33%.
+>
+> **So closeness alone cannot make this rare.** What ships is the author's own *"short distance"* at
+> 25 units, which currently says *you reached the floor* on about seven captures in ten — more often
+> than §1 would like a word to be said. It is flagged in `src/sim/tier.ts` rather than tuned,
+> because tuning it cannot fix it. The two paths out are a **streak** — §3's grammar already
+> exists, and 68% per capture makes five in a row 15% — or a different axis, the dive's **aim**
+> being the one thing the player controls that the floor does not clamp.
+
 ## 1 · The law
 
 **Points for the make. Words for the mastery.**

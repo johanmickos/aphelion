@@ -51,6 +51,59 @@ export const PERFECT_ZONE = 0.08;
 export const PERFECT_FLOOR = (1.5 * Math.PI) / 180;
 
 /**
+ * How close a dive's closest approach has to come to the body's **floor** to be
+ * graded, in design units (`CONTEXT.md`: **arrival**).
+ *
+ * **A distance and not a ratio, and that is measured rather than preferred.**
+ * The obvious candidate was **depth**, which already exists and is what the boost
+ * is paid on — and it cannot grade an arrival, because it **saturates**: over 493
+ * captures its p50 is exactly **1.00**, so more than half of all captures would
+ * earn the top word. Spec [06 · §1](../../docs/spec/06-awards.md)'s whole law is
+ * that *"a word that never repeats never becomes a signal"*, and a word half of
+ * everything earns is not one.
+ *
+ * ## ⚠ The distance saturates too, and the band below is provisional
+ *
+ * Measured at the freeze itself, over **374 captures on the current physics**,
+ * the closest approach lands **p25 0.3 design units above the floor, p50 1.2,
+ * p75 57, p95 250**. It is not a spread — it is very nearly **binary**: the dive
+ * clamps at the floor, so a dive that gets there lands exactly on it, and **68%
+ * do**. There is no threshold that selects a rare group: 4 units catches 68%,
+ * 25 catches 71%, 80 catches 77%.
+ *
+ * Two other axes were measured for the same reason and saturate the same way: the
+ * speed at the freeze is at [`FREEZE_ESCAPE_FRACTION`](./units.ts)'s clamp on
+ * **51%** of captures, and *close **and** fast* is still **33%**.
+ *
+ * **So closeness alone cannot make this rare, and that is a finding rather than a
+ * tuning problem.** 25 is the author's own *"some short distance"* and is what
+ * ships until they rule on it; what it currently means is *you reached the
+ * floor*, said on about seven captures in ten. The paths out are a **streak**
+ * (spec 06 §3's grammar already exists, and 68% per capture makes five in a row
+ * 15%), or a different axis — the dive's **aim** is the one thing the player
+ * controls that the floor does not clamp.
+ *
+ * Ruled by the author, 2026-08-30.
+ */
+export const ARRIVAL_BAND = 25;
+
+/**
+ * Whether a dive's closest approach earned a word — `CONTEXT.md`'s **arrival**.
+ *
+ * One rung and no ladder, which is the author's ruling and spec 06 §1's law kept
+ * rather than bent: a release already spends three words, and a second event
+ * spending three more would double how often each is heard. What an arrival says
+ * is *you committed all the way to the floor*, or it says nothing.
+ *
+ * It takes the two distances rather than a body, so it is a pure function of two
+ * numbers exactly as [`tierFor`](#tierfor) is — spec 06's acceptance asks grading
+ * to import nothing, and the smallest signature is the strongest form of that.
+ */
+export function arrivedTight(periapsis: number, floor: number): boolean {
+  return periapsis - floor <= ARRIVAL_BAND;
+}
+
+/**
  * The tier of a release that fell `offset` from the dot of a window `width`
  * wide, or `null` if it fell outside it.
  *

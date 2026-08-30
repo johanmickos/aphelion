@@ -35,6 +35,7 @@ import {
   TAKEN_WINDOW_TICKS,
 } from '../../src/state/callout.ts';
 import { STRETCH_ACROSS, STRETCH_ALONG } from '../../src/state/deformation.ts';
+import { ARRIVAL_WORDS, arrivalTicks } from '../../src/state/arrival.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { DESIGN_WIDTH } from '../../src/state/design.ts';
 import { bloomOf } from '../../src/state/energy.ts';
@@ -540,6 +541,76 @@ describe('which side of the dot a release fell', () => {
         if (Math.abs(ring.offset) <= ring.halfWidth) expect(ring.tier).not.toBeNull();
       }
     }
+  });
+});
+
+describe('the arrival · a word for the capture', () => {
+  /**
+   * Ruled by the author, 2026-08-30: a capture earns a word of its own, graded on
+   * **how close the closest approach came to the body's floor**, on one rung
+   * rather than a ladder, in its own slot beside the release's.
+   */
+  it('is struck at the freeze and nowhere else', () => {
+    for (let i = 1; i < RUN.length; i++) {
+      const word = RUN[i]!.arrival;
+      if (word === null || word.life.age !== 0) continue;
+      // The freeze is the tick the closest approach becomes a fact: the compass
+      // has a hand from that tick and had none on the one before.
+      expect(RUN[i]!.compass?.hand).not.toBeNull();
+      expect(RUN[i - 1]!.compass?.hand ?? null).toBeNull();
+    }
+  });
+
+  /** And placed at the closest approach itself — the place that earned it. */
+  it('is born where the craft was when it froze', () => {
+    for (let i = 0; i < RUN.length; i++) {
+      const word = RUN[i]!.arrival;
+      if (word === null || word.life.age !== 0) continue;
+      expect(word.bornX).toBe(RUN[i]!.craft.x);
+      expect(word.bornY).toBe(RUN[i]!.craft.y);
+      expect(word.y).toBe(word.bornY);
+    }
+  });
+
+  /**
+   * **One rung, three words, chosen by the body's address** — so it is a pure
+   * function of the run and replays identically, and a body says the same thing
+   * every time it is arrived at well.
+   */
+  it('says one of its three words, and the body decides which', () => {
+    let said = 0;
+    for (const view of RUN) {
+      const word = view.arrival;
+      if (word === null) continue;
+      expect(ARRIVAL_WORDS as readonly string[]).toContain(word.word);
+      expect(word.word).toBe(ARRIVAL_WORDS[word.body % ARRIVAL_WORDS.length]);
+      if (word.life.age === 0) said++;
+    }
+    expect(said).toBeGreaterThan(0);
+  });
+
+  /**
+   * **Its own slot**, which is the point of the ruling: a capture word and a
+   * release word can be lit at once, because they are at different places — the
+   * body you arrived at, versus the dot you left from.
+   */
+  it('never displaces the release word, and can be lit beside it', () => {
+    const together = RUN.filter((view) => view.arrival !== null && view.callout !== null);
+    expect(together.length).toBeGreaterThan(0);
+  });
+
+  /** It climbs and leaves on the callout's own curves, because they are one grammar. */
+  it('climbs and fades like the release word does', () => {
+    const born = RUN.findIndex((v) => v.arrival?.life.age === 0);
+    expect(born).toBeGreaterThan(0);
+    const rise: number[] = [];
+    for (let i = born; i < born + arrivalTicks(); i++) {
+      const word = RUN[i]!.arrival!;
+      rise.push(word.bornY - word.y);
+    }
+    for (let i = 1; i < rise.length; i++) expect(rise[i]!).toBeGreaterThanOrEqual(rise[i - 1]!);
+    expect(RUN[born + arrivalTicks() - 1]!.arrival!.strength).toBeLessThan(0.05);
+    expect(RUN[born + arrivalTicks()]!.arrival).toBeNull();
   });
 });
 

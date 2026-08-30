@@ -283,12 +283,25 @@ _Avoid_: trail (the **trail** is the craft's own line through the field and its 
 **carry**), history, tail, swept arc
 
 **Callout**:
-The word a release earned, its points and its colour, arriving as one unit at the **dot** that
+The word an event earned, arriving at the place that earned it — for a **release** at the **dot**,
+for an **arrival** at the closest approach. There is **one of each alive at a time** and never a
+queue, so two words of the same kind can never fight over an instant.
+
+The release's: the word, its points and its colour, arriving as one unit at the **dot** that
 earned it — with the **window** it was taken on still lit behind it. It pops, lingers and decays
 where it was born, world-anchored, so the craft leaves it behind rather than carrying it. A
 **make** earns points and no word.
 _Avoid_: award (that is the grading, and a callout is how it is said), banner, toast, popup,
 score text
+
+**Arrival**:
+How close a **dive**'s closest approach came to the body's **floor**, and the word a tight one
+earns. It is graded as a **distance** and not as a ratio — **depth** is the ratio and it
+saturates — on one rung rather than a ladder, so a **capture** either says something or says
+nothing. There is no instrument for it and that is deliberate: the cue is the body's own light,
+which already grows with **grip** and swells with **closing** as the craft comes in.
+_Avoid_: capture quality (a **capture** is the event and this is the reading of it), tightness
+(that is on **depth**'s avoid line), approach
 
 **Farewell ring**:
 **Refused** (author, 2026-08-29). It named the orbit detaching from the body and expanding away at

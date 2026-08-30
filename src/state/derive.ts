@@ -65,8 +65,11 @@
  */
 import { headingOf, speedOf } from '../sim/craft.ts';
 import type { SimState } from '../sim/types.ts';
+import { floorRadius } from '../sim/body.ts';
 import { bodyOnOffer } from '../sim/grab.ts';
+import { arrivedTight } from '../sim/tier.ts';
 import { closingOf, energyOf, gripOf, spendingOf, stateOf, tideOf } from './body.ts';
+import { arrived, fadeArrival } from './arrival.ts';
 import { linger, struck } from './callout.ts';
 import { followCamera, openCamera } from './camera.ts';
 import { compassOf, takenRing } from './compass.ts';
@@ -76,6 +79,7 @@ import { bloomOf, E3_BLOOM } from './energy.ts';
 import { hueOf } from './identity.ts';
 import { sightingsOf } from './sighting.ts';
 import type {
+  ArrivalView,
   BodyState,
   BodyView,
   CalloutView,
@@ -223,6 +227,7 @@ function present(
   previousBodies: readonly BodyView[] | null,
   previousCompass: CompassView | null,
   callout: CalloutView | null,
+  arrival: ArrivalView | null,
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
@@ -249,6 +254,7 @@ function present(
     sightings: sightingsOf(sim.field.bodies, states, offered, sim.craft, camera),
     compass: compassOf(previousCompass, sim),
     callout,
+    arrival,
   };
 }
 
@@ -262,7 +268,7 @@ function present(
  * run opens with its scoreboard empty, however the last one ended.
  */
 export function createPresentation(sim: SimState): PresentationState {
-  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null);
+  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null, null);
 }
 
 /**
@@ -310,6 +316,30 @@ function calloutOf(
   return linger(previous.callout);
 }
 
+/**
+ * The word a capture earned, or the one already in the air, one tick older.
+ *
+ * **Struck at the freeze**, because that is the tick the closest approach becomes
+ * a fact: before it the dive is still falling, and after it the craft is on a
+ * fixed orbit and cannot get nearer. The freeze is read from the simulation the
+ * way every other event here is — a thing that is true this tick and was not last
+ * tick — so nothing has to be recorded for the picture's benefit and
+ * `SIM_VERSION` stays where it is.
+ *
+ * And placed **where the craft is on that tick**, which is the closest approach
+ * itself: the place that earned it, exactly as a release's word is born at the
+ * dot that earned it (spec 06 §4).
+ */
+function arrivalOf(previous: PresentationState, sim: SimState): ArrivalView | null {
+  const orbit = sim.orbit;
+  if (orbit !== null && orbit.ticksSinceFreeze === 0 && sim.heldBody !== null) {
+    const body = sim.field.bodies[sim.heldBody]!;
+    if (arrivedTight(orbit.periapsis, floorRadius(body)))
+      return arrived(sim.heldBody, sim.craft.x, sim.craft.y);
+  }
+  return fadeArrival(previous.arrival);
+}
+
 /** The presentation one tick on. Call once per tick, in the same loop as `stepSim`. */
 export function derive(previous: PresentationState, sim: SimState): PresentationState {
   const event = eventOf(previous, sim);
@@ -330,5 +360,6 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
     previous.bodies,
     previous.compass,
     callout,
+    arrivalOf(previous, sim),
   );
 }

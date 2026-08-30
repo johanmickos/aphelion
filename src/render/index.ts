@@ -38,6 +38,7 @@
  */
 import { BOARD_PIXEL, DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
 import type {
+  ArrivalView,
   BodyState,
   BodyView,
   CalloutView,
@@ -1045,6 +1046,35 @@ const RIM_STRENGTH = 0.38;
 /** Spec 06 §4's tracking: caps at 0.1em, which is a tenth of the size. */
 const CALLOUT_TRACKING = 0.1;
 
+/**
+ * The arrival's word, at the point of closest approach.
+ *
+ * In the **body's own hue** rather than in a tier colour, and that is spec
+ * [00 · §1](../../docs/spec/00-tokens.md)'s rule kept rather than an exception to
+ * it: *"quality colours live only in type"* is about LUMEN and SOLAR, which mark
+ * where a release landed on a ladder. An arrival has no ladder — one rung — so
+ * there is no quality to colour, and what is worth saying instead is **which body
+ * you did it to**. Identity is hue, and this is the body's light for a moment.
+ *
+ * Rimmed like the release's word and set in the same face, because they are two
+ * of one thing and a second grammar for the second one would be two.
+ */
+function drawArrival(context: CanvasRenderingContext2D, arrival: ArrivalView): void {
+  if (arrival.strength <= 0) return;
+  context.save();
+  context.font = `800 ${arrival.size}px ${UTILITY_FACE}`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.letterSpacing = `${arrival.size * CALLOUT_TRACKING}px`;
+  context.lineWidth = RIM_WIDTH;
+  context.lineJoin = 'round';
+  context.strokeStyle = dim(VOID, RIM_STRENGTH * arrival.strength);
+  context.strokeText(arrival.word, arrival.x, arrival.y);
+  context.fillStyle = identity(arrival.hue, arrival.strength);
+  context.fillText(arrival.word, arrival.x, arrival.y);
+  context.restore();
+}
+
 /** Spec 00 §4's utility face. Never a monospace — the figures do the technical work. */
 const UTILITY_FACE = "'Archivo', system-ui, sans-serif";
 const LABEL_SIZE = 9 * BOARD_PIXEL;
@@ -1118,6 +1148,8 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   if (view.flash !== null) drawFlash(context, view.flash);
 
   if (view.callout !== null) drawCallout(context, view.callout);
+
+  if (view.arrival !== null) drawArrival(context, view.arrival);
 
   // The craft's own bloom is drawn round, and the dart inside it is what
   // stretches: spec 00 §5 puts every streak parallel to velocity, and a glow

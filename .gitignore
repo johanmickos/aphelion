@@ -37,3 +37,6 @@ ex.png
 IMG_*.jpg
 screenshot.png
 prompt*.md
+
+# Worktrees the harness creates for isolated agents.
+.claude/worktrees/

@@ -61,6 +61,7 @@ function recorder(): { context: CanvasRenderingContext2D; strokes: Stroke[] } {
     // text, but a recorder that throws when the renderer draws some is a
     // recorder that fails for a reason the test is not about.
     fillText: () => {},
+    strokeText: () => {},
     measureText: () => ({ width: 0 }),
     setLineDash: () => {},
     moveTo: () => {},

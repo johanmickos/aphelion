@@ -640,6 +640,43 @@ export interface CalloutView {
 }
 
 /**
+ * The arrival (`CONTEXT.md`) — the word a tight capture earns, said at the point
+ * of closest approach.
+ *
+ * Ruled by the author, 2026-08-30. Graded on **how close the dive came to the
+ * body's floor** in design units and not on **depth**, because depth saturates:
+ * over 493 captures its p50 is exactly 1.00, so more than half of everything
+ * would earn the top word. One rung and three words rather than a ladder, so a
+ * second event does not double how often the release's three are heard.
+ *
+ * It has **no instrument**, deliberately — there is no window to aim a dive at
+ * and no dot. The cue is the body's own light: spec
+ * [00 · §3](../../docs/spec/00-tokens.md)'s halo grows with grip and spec
+ * [04 · §2](../../docs/spec/04-bodies.md)'s tide swells with closing, so a craft
+ * on the way in is already being told how close it is by the thing it is
+ * approaching.
+ */
+export interface ArrivalView {
+  /** What it says — one of [`ARRIVAL_WORDS`](./arrival.ts), chosen by address. */
+  readonly word: string;
+  /** Which body was arrived at, and therefore which hue and which word. */
+  readonly body: number;
+  readonly hue: number;
+  /** Where it is drawn, in world units: the closest approach, plus the climb. */
+  readonly x: number;
+  readonly y: number;
+  /** The closest approach itself, which does not move — where it was born. */
+  readonly bornX: number;
+  readonly bornY: number;
+  /** How tall it is set, in design units. */
+  readonly size: number;
+  /** Linger then decay: one clock, two stretches, climbing throughout. */
+  readonly life: Decay;
+  /** How lit it is now, from 1 through the linger to 0. */
+  readonly strength: number;
+}
+
+/**
  * The sides of the world, as the renderer needs them.
  *
  * It is here for one job today — **the picture never shows more world than there
@@ -699,4 +736,15 @@ export interface PresentationState {
    * shape [`FlashView`](#flashview) uses for the same reason.
    */
   readonly callout: CalloutView | null;
+  /**
+   * The word the last **capture** earned, or `null`.
+   *
+   * **Its own slot beside the callout's**, ruled by the author (2026-08-30). The
+   * two are at different places — the body you arrived at, versus the dot you
+   * left from — so they never collide on screen, and sharing one slot would have
+   * let a freeze cut short a release word still lingering from the swing before.
+   * Spec 06 §4's *"one release, one word"* is unchanged: it is one word per
+   * event, and there are now two kinds of event.
+   */
+  readonly arrival: ArrivalView | null;
 }

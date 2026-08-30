@@ -54,6 +54,7 @@ function recorder(): {
     fillRect: () => {},
     fill: () => {},
     fillText: () => {},
+    strokeText: () => {},
     measureText: () => ({ width: 0 }),
     arc: () => {},
     createRadialGradient: () => ({ addColorStop: () => {} }),

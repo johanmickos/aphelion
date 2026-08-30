@@ -14,7 +14,13 @@
  * the gap between two ticks that have both already happened, so no frame ever
  * shows a position the simulation did not reach.
  */
-import type { CalloutView, DeformationView, FlashView, PresentationState } from '../state/types.ts';
+import type {
+  ArrivalView,
+  CalloutView,
+  DeformationView,
+  FlashView,
+  PresentationState,
+} from '../state/types.ts';
 
 const TWO_PI = Math.PI * 2;
 
@@ -103,6 +109,21 @@ function calloutBetween(
   };
 }
 
+/** And the arrival's word, on the same terms as the release's. */
+function arrivalBetween(
+  previous: ArrivalView | null,
+  current: ArrivalView | null,
+  alpha: number,
+): ArrivalView | null {
+  if (current === null) return null;
+  if (previous === null || arriving(current.life) || previous.body !== current.body) return current;
+  return {
+    ...current,
+    y: between(previous.y, current.y, alpha),
+    strength: between(previous.strength, current.strength, alpha),
+  };
+}
+
 /**
  * A view `alpha` of the way from one tick to the next.
  *
@@ -162,5 +183,6 @@ export function interpolate(
     // narrowing corridor exists to test it.
     corridor: current.corridor,
     callout: calloutBetween(previous.callout, current.callout, alpha),
+    arrival: arrivalBetween(previous.arrival, current.arrival, alpha),
   };
 }
