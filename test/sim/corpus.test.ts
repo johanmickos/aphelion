@@ -22,6 +22,7 @@ import { attemptGrab } from '../../src/sim/grab.ts';
 import { energyAt } from '../../src/sim/gravity.ts';
 import { coast } from '../../src/sim/integrate.ts';
 import { distance } from '../../src/sim/math.ts';
+import { floorRadius } from '../../src/sim/body.ts';
 import { escapeSpeed } from '../../src/sim/kepler.ts';
 import { SECONDS_PER_TICK } from '../../src/sim/units.ts';
 import { BODY, FLOOR, corpus, diveSeconds, fly, percentile, placed, scaled } from './swing.ts';
@@ -140,12 +141,16 @@ describe('§5 · where a dive ends up', () => {
 
   /**
    * And the arrival is a narrow band whatever came in. Real play: p05 217,
-   * p50 406, p95 459 prototype units, against escape speed at the floor.
+   * p50 406, p95 459 prototype units, against escape speed at the floor — which
+   * is what this now measures against, rather than at whatever radius the dive
+   * happened to stop at. See `test/sim/freeze.test.ts` for the ruling that moved
+   * the denominator and the numbers either side of it.
    */
   it('arrives in a narrow band of speeds', () => {
-    const speeds = FROZEN.map((s) => s.speedAtFreeze / escapeSpeed(BODY.mass, s.closest));
+    const floor = floorRadius(BODY);
+    const speeds = FROZEN.map((s) => s.speedAtFreeze / escapeSpeed(BODY.mass, floor));
     expect(percentile(speeds, 5)).toBeGreaterThan(0.6);
-    expect(percentile(speeds, 95)).toBeLessThan(1.0);
+    expect(percentile(speeds, 95)).toBeLessThanOrEqual(1.0);
   });
 
   /** *"Median dive 0.30 – 0.55s, p95 below 2.6s"* — real play measured 0.42s and 2.13s. */

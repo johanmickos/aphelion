@@ -50,5 +50,14 @@
  * arriving fast paid ×0.83. [`SETTLE_RETURN`](./units.ts) is now 0.30 and the
  * ruling is the author's, on the second asking. It cannot compound: the freeze's
  * escape clamp binds on every dive, so what moved is the setpoint.
+ *
+ * **6, on 2026-08-30**: the freeze's escape bound is measured at the body's
+ * **floor** rather than at the radius the dive stopped at. It read as a speed
+ * limit that gets slower the further out you are, so a shallow grab was slammed
+ * hardest — traced at up to **−52% in one tick** — and the reason it existed did
+ * not bind, because after the freeze the craft rides a phase clock and cannot
+ * escape anything. Ruled by the author: *"this is another instance where the real
+ * world equations need to be bent, because at the end of the day we're chasing
+ * something that feels really good."*
  */
-export const SIM_VERSION = 5;
+export const SIM_VERSION = 6;

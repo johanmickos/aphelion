@@ -261,6 +261,46 @@ export const CLEARANCE_ESCAPE_FRACTION = 0.98;
 export const FREEZE_ESCAPE_FRACTION = 0.98;
 
 /**
+ * ## Measured at the body's **floor**, and not at the radius the dive stopped at
+ *
+ * **Ruled 2026-08-30**, and it is the third time this project has bent a real
+ * equation on purpose: *"this is another instance where the real world equations
+ * need to be bent, because at the end of the day we're chasing something that
+ * feels really good, regardless of what physics says"* (author).
+ *
+ * The bound above used to be evaluated at the **freeze radius**, and escape speed
+ * falls with radius — so it read as a speed limit that gets slower the further
+ * out you are. A deep dive freezes close and never notices it; a **shallow,
+ * glancing grab freezes far out, where the limit is low, and is slammed down to
+ * it in one tick.** That is the fastest, loosest grab in the game being punished
+ * hardest for being fast and loose. Traced on the author's own run: 1 606 → 1 244
+ * (−23%), 1 209 → 859 (−29%), and **1 247 → 597 (−52%)**, with the radial part of
+ * the velocity accounting for 0 – 5% of it. *"I had a nice release from a planet,
+ * grabbed another, and immediately felt slowed down."*
+ *
+ * **And the reason the bound existed does not bind.** Its own comment was *"an
+ * orbit cannot be ridden faster than the speed that would leave it"* — true under
+ * gravity, and after the freeze there is no gravity: the craft rides a closed-form
+ * phase clock ([`orbit.ts`](./orbit.ts)) and cannot leave anything. It was
+ * braking for an escape that the freeze had already made impossible.
+ *
+ * So it is measured at the **floor** — the tightest orbit the body offers, and
+ * the highest escape speed it has — which makes it one limit per body instead of
+ * one per landing spot. It is still a bound and still the same 0.98 of one;
+ * what changed is that it stopped depending on where the dive happened to stop.
+ *
+ * Measured over 120 pilot runs, on the thing that was the complaint:
+ *
+ * | | worst freeze | p10 | freezes losing over 20% |
+ * |---|---|---|---|
+ * | at the freeze radius | 54% kept | 67% | **91 of 333 — 27%** |
+ * | **at the floor** | **67% kept** | **73%** | **53 of 374 — 14%** |
+ *
+ * It halves how often the game slams the craft and lifts the worst slam from
+ * −46% to −33%. It also converts more captures — 374 against 333 — and doubles
+ * the slowest exits in the corpus, p05 359 → 765.
+
+/**
  * The most eccentric shape a freeze will hand out — spec 01 §6.
  *
  * **A feel call and the author's** (spec 01 §13.5): measured, it binds on all but

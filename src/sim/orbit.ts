@@ -288,14 +288,14 @@ export function freeze(craft: Craft, body: Body, dive: Dive): Orbit {
   const periapsis = magnitude(dx, dy);
 
   // The speed a craft of this energy has at this radius — the dive's, and not
-  // what the floor may have left the craft with. Held below escape speed here,
-  // because what the freeze hands out is an orbit and an orbit cannot be ridden
-  // faster than the speed that would leave it; see `units.ts`. The eccentricity
-  // cap below is a different clamp doing a different job, and §6a's rule that it
-  // must not reach the rate still holds.
+  // what the floor may have left the craft with. Held below escape speed here;
+  // see [`FREEZE_ESCAPE_FRACTION`](./units.ts) for what that bound is measured
+  // **at**, which is the body's floor and not this radius, and why. The
+  // eccentricity cap below is a different clamp doing a different job, and §6a's
+  // rule that it must not reach the rate still holds.
   const sweep = Math.min(
     Math.sqrt(Math.max(0, 2 * (dive.peakEnergy + body.mass / periapsis))),
-    FREEZE_ESCAPE_FRACTION * escapeSpeed(body.mass, periapsis),
+    FREEZE_ESCAPE_FRACTION * escapeSpeed(body.mass, floorRadius(body)),
   );
 
   const raw = eccentricityFor(body.mass, dive.peakEnergy, periapsis);

@@ -238,6 +238,43 @@ At the first radius minimum while the button is held, the orbit **freezes**: the
 from integrated gravity to a closed-form phase clock, and `VISION.md`'s second pillar starts its
 stopwatch here.
 
+> ## ⚠ Ruled, 2026-08-30 — the freeze's escape bound is measured at the floor
+>
+> **The bound was a speed limit that got slower the further out you froze.** §6 holds the frozen
+> sweep below `FREEZE_ESCAPE_FRACTION` of escape speed, and it was evaluated at the **radius the
+> dive stopped at**. Escape speed falls with radius, so a deep dive never noticed it and a
+> **shallow, glancing grab — which is the fastest, loosest grab in the game — was slammed down to
+> it in a single tick.** Traced on the author's own run: 1 606 → 1 244 (−23%), 1 209 → 859 (−29%),
+> and **1 247 → 597 (−52%)**, with the radial part of the velocity accounting for 0 – 5% of it.
+> *"I had a nice release from a planet, grabbed another, and immediately felt slowed down."*
+>
+> **And the reason the bound existed does not bind.** Its own words were *"an orbit cannot be
+> ridden faster than the speed that would leave it"* — true under gravity, and after the freeze
+> there is none: the craft rides a closed-form phase clock (§6) and cannot leave anything. It was
+> braking for an escape the freeze had already made impossible.
+>
+> So it is measured at the body's **floor** — the tightest orbit it offers, and its highest escape
+> speed — which makes it one limit per body rather than one per landing spot. Measured over 120
+> pilot runs:
+>
+> | | worst freeze | p10 | freezes losing over 20% |
+> |---|---|---|---|
+> | at the freeze radius | 54% kept | 67% | **91 of 333 — 27%** |
+> | **at the floor** | **67% kept** | **73%** | **53 of 374 — 14%** |
+>
+> It halves how often the game slams the craft, lifts the worst slam from −46% to −33%, converts
+> more captures (374 against 333) and doubles the slowest exits in the corpus (p05 359 → 765).
+>
+> **What it costs this file, stated.** §5a's arrival band is now measured against escape at the
+> **floor** rather than at the local radius, and in that form it is *tighter* than it was: the
+> whole of §5b's sweep lands in **0.65 – 0.98** where it used to run 0.72 – 1.81 against the local
+> radius, and the top of it is `FREEZE_ESCAPE_FRACTION` exactly. §6a's settled speed sits up to
+> **1.4×** its own circle against 1.2 before. And §8's median exit leaves its 840 – 1 050 band, at
+> **1 102** — the third tolerance in this file bent this week, and bent on the same principle the
+> author stated when they ruled it: *"this is another instance where the real world equations need
+> to be bent, because at the end of the day we're chasing something that feels really good,
+> regardless of what physics says."*
+
 ### 5a · Speed and radius at closest approach
 
 This is the headline characteristic and it is not the one a physics intuition predicts.

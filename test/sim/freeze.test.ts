@@ -12,7 +12,7 @@ import { energyAt } from '../../src/sim/gravity.ts';
 import { circularSpeed, escapeSpeed } from '../../src/sim/kepler.ts';
 import { distance } from '../../src/sim/math.ts';
 import { stepSim } from '../../src/sim/step.ts';
-import { SECONDS_PER_TICK, SETTLE_TICKS } from '../../src/sim/units.ts';
+import { FREEZE_ESCAPE_FRACTION, SECONDS_PER_TICK, SETTLE_TICKS } from '../../src/sim/units.ts';
 import {
   BODY,
   ENVELOPE,
@@ -77,15 +77,24 @@ describe('the dive', () => {
   /**
    * *"Periapsis speed is a narrow band, and the approach barely moves it."*
    * Stated dimensionlessly, which §5a calls *"the form that survives
-   * everything"*: `v_peri / v_escape(r_peri)`, inside **0.72 – 1.00** over the
-   * whole of §5b's sweep.
+   * everything"*.
+   *
+   * **The denominator moved on 2026-08-30 and the band got tighter for it.** It
+   * was `v_escape(r_peri)` — escape speed at wherever the dive stopped — and the
+   * freeze's own clamp is now measured at the body's **floor** instead, because
+   * the old form read as a speed limit that got slower the further out you froze
+   * and slammed a shallow grab by up to half its speed in one tick. Against the
+   * floor the whole sweep lands in **0.65 – 0.98**, where it used to run
+   * 0.72 – 1.81 against the local radius, and the top of it is
+   * [`FREEZE_ESCAPE_FRACTION`](../../src/sim/units.ts) exactly — the clamp,
+   * visible in the data.
    */
-  it('arrives at a speed that is a narrow band of local escape speed', () => {
+  it('arrives at a speed that is a narrow band of escape speed at the floor', () => {
     for (const s of ALL) {
-      const ratio = s.speedAtFreeze / escapeSpeed(BODY.mass, s.closest);
+      const ratio = s.speedAtFreeze / escapeSpeed(BODY.mass, FLOOR);
       const where = `${s.grabDistance}/${s.approachSpeed}/${s.aim}`;
-      expect(ratio, where).toBeGreaterThan(0.72);
-      expect(ratio, where).toBeLessThan(1.0);
+      expect(ratio, where).toBeGreaterThan(0.6);
+      expect(ratio, where).toBeLessThanOrEqual(FREEZE_ESCAPE_FRACTION + 1e-9);
     }
   });
 

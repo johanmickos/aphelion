@@ -49,7 +49,7 @@ function everyTick(recipe: Recipe, ticks: number): Uint8Array[] {
 }
 
 /** Three whole runs, long enough that a divergence has room to appear. */
-const SEEDS = [2670, 1875, 2640];
+const SEEDS = [28, 71, 139];
 
 describe('a recorded run', () => {
   it('replays to a bit-identical final state, four times its own length', () => {
@@ -103,7 +103,7 @@ describe('a recorded run', () => {
    * that kept flying would be inventing the part nobody flew.
    */
   it('stops at its ending, whatever is left in the log', () => {
-    const { recipe } = pilotRecipe(2670);
+    const { recipe } = pilotRecipe(28);
     const ended = replayRun(recipe);
     expect(ended.ending).not.toBeNull();
 
@@ -139,7 +139,7 @@ describe('the picture beside the run', () => {
   }
 
   it('replays identically too', () => {
-    const { recipe } = pilotRecipe(1875);
+    const { recipe } = pilotRecipe(71);
     const first = present(recipe);
     expect(first.length).toBeGreaterThan(1000);
     expect(present(recipe)).toEqual(first);
@@ -170,7 +170,7 @@ describe('the recipe pnpm replay ships with', () => {
   it('is the pilot run it says it is', () => {
     const text = readFileSync(new URL('../recipes/pilot-60s.json', import.meta.url), 'utf8');
     const shipped = parseDispatch(JSON.parse(text));
-    expect(shipped.recipe).toEqual(pilotRecipe(1243).recipe);
+    expect(shipped.recipe).toEqual(pilotRecipe(463).recipe);
     expect(shipped.device).toBeUndefined();
     expect(shipped.observed.note).toMatch(/pilot/);
   });

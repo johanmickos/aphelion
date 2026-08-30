@@ -45,11 +45,11 @@ describe('the simulation behaviour version', () => {
       replayRun(recipeOf(recorder), { onTick: (state) => digest.update(snapshot(state)) });
     }
 
-    expect(SIM_VERSION).toBe(5);
+    expect(SIM_VERSION).toBe(6);
     expect(
       digest.digest('hex').slice(0, 16),
       'the swing changed: bump SIM_VERSION and this fingerprint together, and every recipe ' +
         'recorded before now stops replaying',
-    ).toBe('0a6772cc861d9229');
+    ).toBe('5d8fb46a1c605645');
   });
 });

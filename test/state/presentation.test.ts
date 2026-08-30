@@ -54,15 +54,15 @@ const at = (tick: number): PresentationState => {
 };
 
 /**
- * The first swing of the shipped run: the grab lands on tick 70 and the
- * release on 254. `pnpm replay` prints both.
+ * The first swing of the shipped run: the grab lands on tick 118 and the
+ * release on 286. `pnpm replay` prints both.
  */
-const GRAB = 70;
-const RELEASE = 254;
+const GRAB = 118;
+const RELEASE = 286;
 
 describe('the run pnpm replay ships', () => {
   it('is the run the trail prints', () => {
-    expect(RUN.length - 1).toBe(3945);
+    expect(RUN.length - 1).toBe(4390);
   });
 });
 

@@ -144,14 +144,23 @@ describe('2 · the settle spends it', () => {
     expect(over.length).toBeGreaterThan(4);
     for (const ratio of over) {
       expect(ratio).toBeGreaterThan(1.0);
-      expect(ratio).toBeLessThan(1.2);
+      // **The ceiling is derived, not chosen.** Escape speed is √2 × circular at
+      // the same radius, and since 2026-08-30 the freeze clamps against escape at
+      // the **floor** while the circle is at the periapsis — so the most a swing
+      // can settle above its own circle is
+      // `FREEZE_ESCAPE_FRACTION × √2 × √(periapsis / floor)`, which is 1.386 for a
+      // dive that reaches the floor and more for one that stops short. Over §5b's
+      // whole sweep the largest is 1.41; 1.5 is the room that leaves.
+      expect(ratio).toBeLessThan(1.5);
     }
-    // The step is nearly the same step whatever the dive was — the spread across
-    // the whole envelope is under 15%, against the 20 – 45% the freeze itself
-    // hands out. It is not uniform, because the freeze's escape clamp binds on an
-    // energetic dive and not on a lazy one; what matters is that it is **bounded
-    // and does not grow with the approach**, so no dive keeps a permanent edge.
-    expect(Math.max(...over) / Math.min(...over) - 1).toBeLessThan(0.15);
+    // **What varies is where the dive stopped, not how fast it arrived**, and that
+    // distinction is the whole of §6a's *"no dive keeps a permanent edge"*. A
+    // shallow dive settles at a larger radius, where the circle it is being
+    // measured against is slower, so its ratio is higher — geometry, not a reward
+    // for speed. The spread across the envelope is therefore wide and bounded
+    // rather than narrow, and the sibling test below is the one that holds the
+    // ratchet shut: four different arrival speeds, one settled speed.
+    expect(Math.max(...over) / Math.min(...over) - 1).toBeLessThan(0.6);
   });
 
   /**
