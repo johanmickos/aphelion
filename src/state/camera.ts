@@ -284,7 +284,9 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   const subjectY = craftY + offset + lead;
   return {
     x: centreline(),
-    y: previous.y + (targetY(previous.y, subjectY) - previous.y) * easeStep(FOLLOW_RATE),
+    y:
+      previous.y +
+      (targetY(previous.y, subjectY, bandOf(sim)) - previous.y) * easeStep(FOLLOW_RATE),
     lock,
     offset,
   };
@@ -330,11 +332,115 @@ function stillPoint(cameraY: number, bodyY: number): number {
  * is the 46 design units the ramp still travelled after the anchor was fixed,
  * and it is what this comment exists to stop being reintroduced.
  */
-function targetY(cameraY: number, subjectY: number): number {
+function targetY(cameraY: number, subjectY: number, band: number): number {
   const offset = subjectY - cameraY;
-  if (offset > DEADZONE) return subjectY - DEADZONE;
-  if (offset < -DEADZONE) return subjectY + DEADZONE;
-  return cameraY;
+  return cameraY + offset - held(offset, band);
+}
+
+/** How wide the band is right now — see `OVAL_BAND`. */
+function bandOf(sim: SimState): number {
+  const orbit = sim.orbit;
+  const settling = orbit !== null && orbit.ticksSinceFreeze < SETTLE_TICKS;
+  return settling ? DEADZONE * OVAL_BAND : DEADZONE;
+}
+
+/**
+ * How much of the band survives while the **oval** is still being flown. **None**,
+ * which is the prototype's own answer on this axis.
+ *
+ * The author, 2026-08-30: *"in the original prototype the camera follows the ship
+ * a bit during the eccentric oval phase of circularization. Can we mimic that
+ * here?"*
+ *
+ * ## This file already agreed with them, and the band was quietly disagreeing
+ *
+ * The header's own rule is that *"the dive and the settle are flown; only the
+ * round orbit at the end of them is watched"*, and [`lockOf`](#lockof) is
+ * deliberately zero for the whole settle so the oval keeps its swing — a ruling
+ * that cost the prototype a measurement, *"of 83px of total swing only 41
+ * survived."* The deadzone knew nothing about any of that. Measured over **69
+ * settles** in the author's own dispatches, the craft swings **436 design units
+ * at p50** through the oval and the view was flying only **70%** of it.
+ *
+ * At zero it flies **99%**, and the swept alternatives are recorded because the
+ * choice is a taste one and the author flew it: a quarter of the band leaves 90%,
+ * half leaves 82%.
+ *
+ * ## Why removing it here is safe when removing it everywhere was not
+ *
+ * The author refused a bandless camera earlier the same day — *"WAY too fixed on
+ * the ship"* — so this looks like the same move and is not. That one was during
+ * the **coast**, where the craft runs in a straight line and a view pinned to it
+ * shows a still picture of a moving world. An oval is the opposite: the craft
+ * swings and comes back, so what the view tracks is bounded, returns to where it
+ * started, and is the most dramatic thing in a capture. It is the one stretch of
+ * a run where following closely is the point.
+ *
+ * It lasts exactly [`SETTLE_TICKS`](../sim/units.ts) and hands over to `lockOf`,
+ * which stops the round orbit being chased at all.
+ */
+const OVAL_BAND = 0;
+
+/**
+ * How far into the band the camera stays parked, as a fraction of it.
+ *
+ * Inside this the view does not move at all, which is the half of the deadzone
+ * that has to survive: a band that merely *slows* near the middle has no
+ * equilibrium except the craft itself, so over a long straight coast it creeps
+ * all the way onto it — which is the *"WAY too fixed on the ship"* the author
+ * refused earlier the same day, arriving slowly instead of at once.
+ */
+export const PARKED = 0.7;
+
+/**
+ * How much of an excursion the band absorbs — a deadzone with a **rounded edge**.
+ *
+ * ## The hard band is what the author flew as *"mechanical"*
+ *
+ * A band that absorbs everything up to `DEADZONE` and nothing past it is
+ * continuous in *position* — at the edge it hands over exactly where it left off
+ * — but its **slope steps from 0 to 1** there. So the view goes from parked to
+ * tracking at a single point, and every crossing is a start or a stop with
+ * nothing in between: *"if I hop to a planet, orbit, hop to another, the camera
+ * moves, freezes, and moves. Can it be a bit more elastic or something?"*
+ * (author, 2026-08-30).
+ *
+ * ## Two pieces that meet in both value and slope
+ *
+ * Inside `PARKED` the whole excursion is absorbed and the view is exactly still.
+ * Outside it the absorbed share eases from there up to `DEADZONE` on
+ * `1 − (1−A)² / ((e−A) + (1−A))`, which is chosen for its two ends rather than
+ * its shape: it **is** `A` at the join and its slope there **is** 1, so it leaves
+ * the parked region without a corner, and it approaches `DEADZONE` from below, so
+ * a craft far outside is still brought to the band's edge exactly as before.
+ *
+ * So the view now decelerates into stillness and accelerates out of it, where it
+ * used to stop dead and start dead. Measured over the author's dispatches, the
+ * camera is exactly still on **31%** of ticks against 37% before — it still
+ * parks, it just no longer arrives with a step — while how locked it is to the
+ * craft is unmoved at **0.57**, and the tick-to-tick change in its movement falls
+ * at p95.
+ *
+ * ## It cannot cycle, which is the thing this file most has to protect
+ *
+ * `targetY`'s own warning is that a target defaulting to **centred** pans the
+ * subject inside the band, which moves the target back to centre, which pans the
+ * other way — measured on the prototype as the view wobbling while flying
+ * straight. This cannot do that: what is left over, `x − held(x)`, is zero inside
+ * the parked region and otherwise has the sign of `x` and a magnitude below it.
+ * **The target is always between the camera and the subject**, so the view
+ * approaches without overshooting and there is nothing to oscillate about.
+ *
+ * Division and `Math.abs` only. The natural way to write a rounded corner is an
+ * exponential, and ADR-0014 bans `exp` with the rest of the approximated `Math`.
+ */
+function held(offset: number, band: number): number {
+  if (band <= 0) return 0;
+  const at = Math.abs(offset) / band;
+  if (at <= PARKED) return offset;
+  const rest = 1 - PARKED;
+  const share = 1 - (rest * rest) / (at - PARKED + rest);
+  return offset < 0 ? -band * share : band * share;
 }
 
 /**

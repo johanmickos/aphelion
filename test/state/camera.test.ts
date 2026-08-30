@@ -23,6 +23,7 @@ import {
   LOOK_AHEAD,
   LOOK_REF_SPEED,
   lockOf,
+  PARKED,
   THUMB_BUDGET,
 } from '../../src/state/camera.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
@@ -168,21 +169,88 @@ describe('the camera', () => {
     return sim;
   }
 
-  it('ignores movement smaller than the deadzone', () => {
+  it('ignores movement inside the parked part of the band', () => {
     const sim = still();
     let view = createPresentation(sim);
     const settledAt = view.camera.y;
-    sim.craft.y = settledAt + DEADZONE * 0.9;
+    sim.craft.y = settledAt + DEADZONE * PARKED * 0.99;
     view = derive(view, sim);
     expect(view.camera.y).toBe(settledAt);
+  });
+
+  /**
+   * **And leaves that region without a step**, which is what the author flew as
+   * *"the camera moves, freezes, and moves. Can it be a bit more elastic?"* The
+   * hard band's slope went from 0 to 1 at a single point; this one's is
+   * continuous, so the view decelerates into stillness rather than stopping dead.
+   */
+  it('eases out of the parked region rather than stepping out of it', () => {
+    const moved = (at: number): number => {
+      const sim = still();
+      let view = createPresentation(sim);
+      const from = view.camera.y;
+      sim.craft.y = from + DEADZONE * at;
+      view = derive(view, sim);
+      return view.camera.y - from;
+    };
+    // Nothing at the join, then a ramp — and each step bigger than the last, with
+    // no jump at the boundary itself.
+    expect(moved(PARKED)).toBe(0);
+    const ramp = [0.75, 0.85, 1, 1.25, 1.5].map(moved);
+    for (let i = 0; i < ramp.length; i++)
+      expect(ramp[i]!).toBeGreaterThan(i === 0 ? 0 : ramp[i - 1]!);
+    // The first step out is a small fraction of what a hard edge would have made
+    // it once fully outside.
+    expect(ramp[0]!).toBeLessThan(ramp.at(-1)! / 10);
   });
 
   it('follows once the craft leaves the band', () => {
     const sim = still();
     let view = createPresentation(sim);
     sim.craft.y = view.camera.y + DEADZONE * 4;
-    for (let i = 0; i < 400; i++) view = derive(view, sim);
-    expect(view.camera.y).toBeCloseTo(sim.craft.y - DEADZONE, 3);
+    for (let i = 0; i < 4000; i++) view = derive(view, sim);
+    // It comes to rest where the band starts absorbing everything, which is the
+    // edge of the parked region rather than the edge of the band. Approached from
+    // outside this is a limit rather than a stop — the leak shrinks as the view
+    // closes on it — exactly as an eased follow approaches anything.
+    expect(view.camera.y).toBeCloseTo(sim.craft.y - DEADZONE * PARKED, 0);
+  });
+
+  /**
+   * **The band still has a true equilibrium**, and that is why it is two pieces
+   * rather than one smooth curve. A band that merely slows near the middle comes
+   * to rest only on the craft itself, so a long straight coast creeps the view
+   * onto it — the *"WAY too fixed on the ship"* the author refused earlier the
+   * same day, arriving slowly instead of at once.
+   */
+  it('settles a band away and does not creep onto the craft', () => {
+    const sim = still();
+    let view = createPresentation(sim);
+    sim.craft.y = view.camera.y + DEADZONE * 4;
+    for (let i = 0; i < 4000; i++) view = derive(view, sim);
+    const near = sim.craft.y - view.camera.y;
+    // Ten times as long again, and it has not closed the gap: the limit is the
+    // parked edge and not the craft.
+    for (let i = 0; i < 40_000; i++) view = derive(view, sim);
+    expect(sim.craft.y - view.camera.y).toBeGreaterThan(DEADZONE * PARKED * 0.999);
+    expect(near - (sim.craft.y - view.camera.y)).toBeLessThan(1);
+  });
+
+  /**
+   * And it **is** exactly still whenever the craft is inside the parked region,
+   * which is the common case and the one the float is made of: measured over the
+   * author's dispatches the view does not move at all on 30% of ticks.
+   */
+  it('is exactly still, not merely slow, inside the parked region', () => {
+    const sim = still();
+    let view = createPresentation(sim);
+    const from = view.camera.y;
+    for (const at of [0, 0.2, 0.5, PARKED]) {
+      sim.craft.y = from + DEADZONE * at;
+      const before = view.camera.y;
+      view = derive(view, sim);
+      expect(view.camera.y).toBe(before);
+    }
   });
 
   /**
@@ -205,9 +273,17 @@ describe('the camera', () => {
    * bound. A settled orbit now keeps some of the dive's speed, so the craft is
    * going faster round the still point when the ramp runs and the follow ease has
    * less time to have stopped: measured, up to **10 design units** across the
-   * ramp against under 5 before. Ten units on a 2 532-tall design space is about
-   * two and a half pixels on the phone this was reported from, and **the fault it
-   * replaced was 49**.
+   * ramp against under 5 before.
+   *
+   * **And a little further again since the oval is flown** (2026-08-30,
+   * [`OVAL_BAND`](../../src/state/camera.ts)). With no band absorbing the swing,
+   * the view ends the settle wherever the craft took it rather than parked near
+   * the middle, so the ramp starts a little further from the point it will hold:
+   * measured at **12.6 design units** against 12.2 before. That is a second
+   * stated cost of a second ruling, and it is charged against the same budget —
+   * spread over the ramp's twenty ticks it is **0.6 units a tick**, well under a
+   * pixel on the phone this was reported from, where **the fault it replaced was
+   * 49** in movement the author could see.
    */
   const REPORTED = 49;
   it.each(SWINGS.slice(0, 2))(
@@ -223,7 +299,10 @@ describe('the camera', () => {
         travelled += Math.abs(views[i]!.camera.y - views[i - 1]!.camera.y);
       }
       expect(ramp).toBeGreaterThan(10);
-      expect(travelled).toBeLessThan(REPORTED / 4);
+      expect(travelled).toBeLessThan(REPORTED / 3);
+      // And the thing that was actually reported was movement, not distance: no
+      // single tick of the ramp may be visible.
+      expect(travelled / ramp).toBeLessThan(1);
     },
   );
 
@@ -359,7 +438,7 @@ describe('presentation state as a recurrence', () => {
 describe('the look-ahead', () => {
   const settle = (sim: SimState): PresentationState => {
     let view = createPresentation(sim);
-    for (let i = 0; i < 400; i++) view = derive(view, sim);
+    for (let i = 0; i < 4000; i++) view = derive(view, sim);
     return view;
   };
 
@@ -381,9 +460,9 @@ describe('the look-ahead', () => {
     faster.craft.vy = -LOOK_REF_SPEED * 4;
     faster.craft.y = fast.craft.y;
     expect(settle(faster).camera.y).toBeCloseTo(settle(fast).camera.y, 6);
-    // And the extent is the prototype's fraction of the axis it travels, less
-    // the deadzone the view settles at the edge of.
-    expect(fast.craft.y - settle(fast).camera.y).toBeCloseTo(LOOK_AHEAD - DEADZONE, 3);
+    // And the extent is the prototype's own reach, less the parked region the
+    // view comes to rest at the edge of.
+    expect(fast.craft.y - settle(fast).camera.y).toBeCloseTo(LOOK_AHEAD - DEADZONE * PARKED, 0);
   });
 
   /**

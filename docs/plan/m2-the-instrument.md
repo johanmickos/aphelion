@@ -55,6 +55,31 @@ against 41% with no lead; its worst single-tick movement is **26.4** against 25.
 mis-carry reached 35.4; and the ticks moving further than the old maximum fall from 0.5% to
 **0.03%**.
 
+**Then the band itself was the problem, twice over.** *"It still feels really mechanical between
+jumps. If I hop to a planet, orbit, hop to another, the camera moves, freezes, and moves. Can it be
+a bit more elastic?"* A deadzone that absorbs everything up to its width and nothing past it is
+continuous in position but its **slope steps from 0 to 1** at the edge, so every crossing is a start
+or a stop with nothing between. It now has a **rounded edge**: parked through its inner 70%, then
+easing out on `1 − (1−A)² / ((e−A) + (1−A))`, which meets the parked region in both value and slope
+and still saturates at the full band far out. Two pieces rather than one smooth curve, because a
+band that merely *slows* near the middle has no equilibrium except the craft itself and would creep
+onto it — the earlier complaint arriving slowly instead of at once. Exactly still on 30% of ticks
+against 37%, lockedness unmoved at 0.57, and the tick-to-tick change lower at p95.
+
+**And the oval was being absorbed by it.** *"In the original prototype the camera follows the ship a
+bit during the eccentric oval phase of circularization."* This file already agreed — *"the dive and
+the settle are flown; only the round orbit at the end of them is watched"*, which is why `lockOf` is
+zero for the whole settle — but the deadzone knew nothing about that. Measured over **69 settles**,
+the craft swings **436 design units at p50** through the oval and the view was flying **70%** of it.
+`OVAL_BAND` is 0 for the settle's duration and it flies **99%**. Removing the band here is safe
+where removing it everywhere was not: a coast is a straight line, so a view pinned to it is a still
+picture of a moving world, while an oval swings and returns — bounded, and the most dramatic thing
+in a capture.
+
+Stated cost: the lock's arrival ramp travels **12.6** design units where it travelled 12.2, because
+the view now ends the settle wherever the craft took it. Spread over the ramp that is 0.6 units a
+tick, against the **49** of visible movement the ramp was built to remove.
+
 **The starfield was carried in the wrong unit.** *"Tiny specks of white with little to no
 variation, so it doesn't look very deep or immersive."* The prototype sizes stars in **device
 pixels after its own scale** — `max(1, tier.size * cam.scale)`, so 3 to 5.4 on the phone it was
