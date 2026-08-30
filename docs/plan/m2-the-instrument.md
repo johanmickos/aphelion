@@ -1039,6 +1039,173 @@ plus the author's eyes.
 
 ---
 
+### Done, 2026-08-29
+
+**The step opened with a question rather than with code, and the question was the step.** Spec
+[01 · §11](../spec/01-swing.md) says the game *is* the fight between an aim that wants one moment
+and a boost that wants another — and the compass drew the aim in exquisite detail while **nothing
+on screen drew the boost's clock at all**. So the M2 gate would have judged the aiming half of the
+game with the timing half invisible.
+
+The evidence brought to the author, from their own seven replayable dispatches — 83 converted
+releases:
+
+| where the release fell | count | share |
+|---|---|---|
+| before the boost had armed | 28 | **34%** |
+| inside the plateau | 28 | 34% |
+| while it was decaying | 25 | 30% |
+| after it was gone entirely | 2 | 2% |
+
+Hold since the freeze: p10 **5** ticks, p50 **54**, p90 **91**, max **303** — against an envelope
+that is zero from 156. The 303 is the swing reported as *"I felt that I slowed down a LOT in the
+orbit — can you triple check the physics/math here?"* The physics was clean (`v / circular =
+1.000000` at all 302 settled ticks); what happened is 147 ticks of holding against nothing, with
+no way to see it. And of the boost their dive had already earned, timing threw away **p50 14%,
+p90 85%**.
+
+Four ways of saying it were put up, with what each would cost. **Ruled: on the orbit path**
+(author, 2026-08-29) — light the arc already flown with what a release along it would have been
+worth. It is the most diegetic of the four, it adds no element, it spends brightness (the game's
+only ordinal channel), and it puts both halves of the tension on one circle: measured, **the
+plateau covers 0.45 of a revolution** at p50 over the 27 orbits that reached its end, which is spec
+01 §11's own 43% arriving from the picture's side.
+
+### The flown arc, and the two things that had to be got right
+
+`CONTEXT.md` gains **flown arc**, because spec 00 §6's *"trail"* and the craft's own line through
+the field were one word for two things — the same collision *ghost* had, and AGENTS.md §2 is the
+rule that catches it.
+
+**A bug had to go first, and it had been there since M2.3.** `swept` read `orbit.phase`, which
+**stops advancing at the end of the settle**: after 1.2s the phase is closed-form and `phaseAt`
+computes it forward without writing it back, because that field is the datum the multiplication is
+measured from. So the drawn arc froze at 4.76 rad while the craft kept going round it, and the
+one-turn cap the field carried could never fire, because the value it capped never got there.
+`orbit.ts` now exports `sweptSince` and the compass asks rather than reads.
+
+**And the shading is measured rather than assumed.** Two of the envelope's three corners are free:
+the plateau ends exactly where the settle does — spec 01 §7 says that is *"not a coincidence"* —
+and everything after it is one multiplication. The ramp falls **inside** the settle, where the
+phase is accumulated at substep resolution and has no inverse. Cutting the ramp at its two ends and
+shading between them evenly along the arc is wrong by **0.19 of the range**, measured over 55
+swings, and wrong in the direction that matters: the craft leaves periapsis at its fastest, so an
+even light says *the boost armed sooner than it did* — the exact error the element exists to
+remove. Latched a tick at a time instead, the light is within **0.037** of the envelope's own value
+at every one of 78 840 sampled points.
+
+### The rebase, which was a real edit
+
+Spec [02](../spec/02-release.md) is rewritten, not find-and-replaced. Rule 1 withdrawn and the
+three rules are two; §2's timeline dated from `T0`; §3 reframed; §5 replaced by **the punch**; §7's
+grab hitstop gone; the acceptance criterion about hitstop advancing zero world state gone with it.
+
+**One contradiction had to be settled rather than carried.** Spec 02 §2 ended the award word at
+`T+510ms` and spec [06 · §4](../spec/06-awards.md) gives it a 120ms pop, a 1.2s linger and a 400ms
+decay — **1 720ms** — and then cites spec 02 for the 510. They were never consistent. The rebase
+notice's own rule settles it: *"every duration measured from the start of its own element is
+untouched"*, so spec 06's durations stand and spec 02's end column moves. What keeps spec 00 §5's
+*"nothing persists past 600ms"* true is spec 06 §4's next line — after its pop the word is
+**world-anchored**, so what happens to it after 600ms is that the world carries it away. **The
+linger is on the bench**, because that reading is the author's to confirm.
+
+### What was built
+
+- **The punch** ([`punch.ts`](../../src/state/punch.ts)) — 6px along the exit tangent at full
+  quality, √quality on the size and half again as long at the top of the envelope (ADR-0012's *"as
+  size and as duration"*), 3px reversed and ungraded at a grab. **The conflict M2.1 left is
+  resolved rather than avoided**: the punch is a displacement *from* the camera's position, and
+  `test/state/camera.test.ts`'s centreline assertion is now about the camera's **subject**. It is
+  the only thing in the game that ever takes the view off that line.
+- **The callout** ([`callout.ts`](../../src/state/callout.ts)) — the word at the dot that earned
+  it, carrying the window it was taken on, so *"unused rings die instantly; the taken window stays
+  lit"* is one element rather than two. A **make** is carried and speaks nothing.
+- **The E3 is spent at last.** It has been empty since the author took the release and the grab
+  off it. Spec 06 §2 gives PERFECT — and PERFECT alone — energy E3, so the rarest word in the game
+  is the only thing that lights one.
+- **The farewell ring** ([`farewell.ts`](../../src/state/farewell.ts)) — the ellipse actually
+  ridden, at the shape it had on the tick the craft let go, expanding away in AURORA. **Stroked and
+  never filled**, which is the one performance decision in the milestone: a filled expanding ring
+  is the only shape here whose area grows as the square of what is being animated, and it was
+  named as the thing that could move overdraw off 1.53 screens.
+
+### Two the author called mid-step
+
+**Three rings, not four** — *"four is a bit unwieldy and makes it hard to decide where to go
+next."* The cohort that set the number prices it exactly: over 342 releases that reached another
+body, the one actually grabbed next was among the three nearest **99.7%** of the time against
+four's 100%. The fourth ring is worth one release in 342 and costs a choice on every orbit. Two is
+92.7% and would put the body actually taken off the instrument once every fourteen releases.
+
+**The release delay, removed** — *"the slight delay is making it seem jagged and jumpy. Let's
+remove any camera/speed delay there."* There is no hitstop in the build and nothing time-scales;
+what was there was the camera carrying the orbit's hold after a release and decaying it at 5% a
+tick. Measured over the recorded dispatches: **41 ticks at p50 and up to 104** before it was shed,
+walking the view **356 design units** away from a craft accelerating in the other direction. The
+guard that argued for it — *"dropping it outright would snap the view by an orbit radius"* — was
+protecting a number that never reached the picture: what is dropped is the camera's *subject*, and
+the deadzone absorbs a whole `DEADZONE` of it before the follow ease spends the rest. It is
+asserted as a shape now, so there is no rate left to tune it back up with.
+
+### And the lag on release has an address, and it is the press
+
+`diagnostics/2026-08-29T23-53-31-915Z-run-dispatch.json`, flown against *"I kept feeling some kind
+of lag or freeze on release... maybe it's just the planet effect, the pulse?"*
+
+**All eight presses in that run land on one of the twelve worst frames, at +0 ticks. Not one
+release does.** 19 – 27ms each, at a cpu of **0 – 1ms**, so nothing in the game is doing the work.
+The two release-tagged frames in the list are 69 and 74 ticks after one. It is the browser's
+touch-begin, which [the performance write-up](./performance.md) §10 has now recorded **six runs
+running**, and it reads as belonging to the release because the next press follows 13 – 35 ticks
+later and the release is the moment the eye is waiting on.
+
+**A mechanism for it, which §10 did not have.** [`app/input.ts`](../../app/input.ts) registers
+`touchstart` and `touchend` with `passive: false`, because that is the only way to call
+`preventDefault` and it is what killed the iOS selection loupe and the *Search with Firefox*
+callout the author reported. A non-passive touch listener is precisely what makes WebKit wait for
+the handler before compositing. **So the press hitch and the suppressed callout may be the same
+decision seen from two sides** — a real trade, and an A/B only the phone can settle. Not chased
+here, on §10's own instruction.
+
+### What it cost to draw
+
+`pnpm profile`'s census, measured on the same machine in the same session before and after:
+
+| per frame | before | after |
+|---|---|---|
+| arcs | 36.98 | 37.02 |
+| strokes | 26.90 | 27.53 |
+| **overdraw, screens** | **1.574** | **1.574** |
+
+**Six new strokes' worth of flown arc, one farewell ring, one taken window and one word, for +0.6
+strokes a frame and no measurable paint at all.** Two reasons: the fourth ring going away gave back
+most of what the arc took, and the farewell ring is a stroke. The tick side did not move either —
+0.150ms before and 0.147 – 0.150 after at 1 536 bodies.
+
+---
+
+### Queued, with its remaining question now answered
+
+**A "Clang!" when the craft bounces into another body while holding one.** *"I want to show a
+quirky 'Clang!' or similar"* (author, 2026-08-29). Both of its questions are now closed and neither
+closes against it:
+
+- **Does the simulation report the contact?** Yes — `bounceOffOthers(craft, field, held)` in
+  [`contact.ts`](../../src/sim/contact.ts) already resolves it at `R + 6` with 0.2 restitution.
+  What it does not do is say so out loud.
+- **Does a bounce cost the run anything?** *"A word that fires when nothing happened stops being
+  funny the second time."* Measured over the eight replayable dispatches — **12 020 ticks, and
+  exactly one bounce**, in one run of eight. That one turned the craft **82°** and took **50% of
+  its speed**. So it is rare enough that the word cannot wear out and expensive enough that it is
+  never firing on nothing: it is a genuine event with a genuine price, which is the opposite
+  register to the award word and the same class of element — a word that blooms at the point that
+  earned it.
+
+Not built here. It wants the audio milestone's register or M4's, and it wants the author to hear
+the word before it is set in type.
+
+---
+
 ## M2.5 · Presentation goldens
 
 Assert derived presentation values at named ticks across a recorded recipe — the camera offset

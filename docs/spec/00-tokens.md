@@ -141,6 +141,54 @@ footer uses obsolete numbering and is void.
 > **§7 · The thumb line holds and is now load-bearing twice.** Sightings are pinned inside the
 > design space and never cross it, which falls out of the geometry rather than being clamped.
 
+> ## ⚠ Flown and built, 2026-08-29 — M2.4 spends three of this file's rows
+>
+> **§5 · HITSTOP is withdrawn and the row is void.** [ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)
+> refused it and spec [02](./02-release.md) is now rebased off it. Nothing in the game
+> time-scales, and no spec may assume a freeze exists. `CONTEXT.md` keeps the word so a reader who
+> meets it in an older document knows it was decided against rather than forgotten.
+>
+> **§5 · KICK is the camera's share of the punch, and the word is *punch*.** The token's numbers
+> stand — 6px along the exit tangent at a release, 3px reversed at a grab, home in 180ms with one
+> overshoot — with one addition ADR-0012 requires: it is **scaled by the quality of the swing**,
+> as √quality on the size and half again as long at the top of the envelope. `CONTEXT.md` spends
+> *kick* under **punch**'s `_Avoid_` line, so this row's name is the one exception and it is
+> flagged rather than renamed, because the boards print it.
+>
+> **§6 · The label row is retired** (author, 2026-08-29). This table put *"a chip at its window's
+> tip"* on every ring and spec [04 · §5](./04-bodies.md) rules that an address chip appears in
+> **exactly one case** — two live targets too close in hue to tell apart. One had to be stale and
+> neither said which; **spec 04 §5 wins**. Measured over 29 777 pairs of rings drawn together in
+> the author's own runs, two rings on one compass never come closer than **24.4°** in hue, so the
+> tie the label would have resolved does not arise on the instrument. §6's 12° label-collision
+> rule goes with it, and identity in the run stays hue-only.
+>
+> **§6 · The *Trail* row is renamed and given a job.** *"The arc of orbit already flown"* is now
+> the **flown arc** (`CONTEXT.md`), because *trail* is spent on the craft's own line through the
+> field, whose brightness is the carry — one word for two things is the fork AGENTS.md §2 exists
+> to stop, and it is the same collision *ghost* had. It is no longer drawn at a flat E2: it is lit
+> by what the **boost** was worth along it, which is spec 01 §7's envelope and the only element in
+> the game that draws it. Ruled 2026-08-29, on the measurement that 34% of releases landed before
+> the boost had armed. Spec [02](./02-release.md) carries the numbers.
+>
+> **§6 · Reachable is three rings, not four** (author, 2026-08-29): *"four is a bit unwieldy and
+> makes it hard to decide where to go next."* The cohort that set the number prices the change
+> exactly — over 342 releases that reached another body, the body actually grabbed next was among
+> the **three** nearest 99.7% of the time against four's 100%, so the fourth ring is worth one
+> release in 342 and costs a choice on every orbit. Two is 92.7% and is a different decision.
+>
+> **§6 · The five states' RELEASE row loses its hitstop and gains its word.** State 5 read *"E3
+> flash, 70ms hitstop, exit streak along the tangent."* There is no hitstop and no E3 at a
+> release; what is drawn is the punch, the craft's stretch, the farewell ring, and the taken
+> window staying lit under the word that was earned. *"The compass resolves — it does not
+> vanish"* is unchanged and is what its exit does.
+>
+> **§3 · Something strikes the E3 at last, and it is the award.** The slot has been empty since
+> the release and the grab were taken off it. Spec [06 · §2](./06-awards.md) gives **PERFECT** —
+> and PERFECT alone — energy E3, so the rarest word in the game is the only thing that lights one,
+> at the dot it was earned on. The one-alive-at-a-time rule is unchanged and is still a shape
+> rather than a check.
+
 ## 1 · Palette — eight names, eight meanings
 
 Every colour in the game is one of these eight. Nothing is mixed, tinted or invented at

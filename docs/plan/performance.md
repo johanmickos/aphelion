@@ -709,6 +709,59 @@ it is sixty times under budget.
 
 ---
 
+### And a sixth run said the same thing, with the correlation stated
+
+`diagnostics/2026-08-29T23-53-31-915Z-run-dispatch.json` — **697 frames**, flown against *"I kept
+feeling some kind of lag or freeze on release... maybe it's just the planet effect, the pulse?"*
+
+**It is the press, and this run says so without interpretation.** All eight presses in the run land
+on one of the twelve worst frames, at **+0 ticks**. Not one of the eight releases does; the two
+release-tagged frames in that list are 69 and 74 ticks after one. Every press frame costs 19 – 27ms
+at a **cpu of 0 – 1ms**, so nothing in the game is doing the work.
+
+It reads as belonging to the release because the next press follows one **13 – 35 ticks** later —
+0.2 to 0.6s — and the release is the moment the eye is waiting on. That is worth writing down: the
+artefact has been reported three different ways now (*lag when orbiting*, *visual stuttering*, *lag
+or freeze on release*) and this is the first time the reported moment and the measured moment are
+different events.
+
+**A mechanism, which §10 did not have.** [`app/input.ts`](../../app/input.ts) registers
+`touchstart` and `touchend` with **`passive: false`**, because that is the only way to call
+`preventDefault` — and it is what killed the iOS selection loupe and the *Search with Firefox /
+Find in Page* callout the author reported on 2026-08-29. A non-passive touch listener is precisely
+what makes WebKit wait for the handler before it composites. **So the one-frame press hitch and the
+suppressed callout may be the same decision seen from two sides.**
+
+That is a hypothesis and not a finding: it cannot be settled from a dispatch, because both terms
+are the browser's. What would settle it is an A/B on the phone — passive listeners for one run,
+non-passive for the next, counting worst frames at presses and watching for the callout. It stays
+**not ours** and it stays open, and it now has something to test rather than only something to
+rule out.
+
+### What M2.4's drawing cost
+
+The release's choreography — the flown arc's stretches, the farewell ring, the taken window and the
+award word — measured on the same machine in the same session, before and after:
+
+| per frame | before | after |
+|---|---|---|
+| arcs | 36.98 | 37.02 |
+| strokes | 26.90 | 27.53 |
+| **overdraw, screens** | **1.574** | **1.574** |
+
+**+0.6 strokes and no measurable paint.** Two reasons, and both were decisions rather than luck:
+the compass went from four rings to three in the same step, which gave back most of what the arc
+took; and **the farewell ring is stroked rather than filled**, which is the one thing §6 named as
+able to move overdraw — an expanding filled ring is the only shape in the milestone whose area
+grows as the square of what is being animated.
+
+The tick side did not move either: **0.150ms before and 0.147 – 0.150 after** at 1 536 bodies, on
+three runs. The sweep's × column shifts from 19.7 to 21.3 only because the 24-body baseline it
+divides by came down with the ring count — which is a reminder that **the ratio is a ratio**, and
+§6's *"roughly 1 500 bodies"* should be re-derived from a same-session pair whenever M3 wants it.
+
+---
+
 ## 11 · Queued from this session
 
 **Particle effects, as a visual language** (author, 2026-08-29), in the register of

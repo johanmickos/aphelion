@@ -213,6 +213,10 @@ exist, so the player learns one association.
   same body that day (spec [17](./17-daily-field.md)).
 - In-run, an address chip is shown in **exactly one case**: two live targets too close in hue to
   tell apart. It is small, utility-face and chip-bound. Nothing ever floats loose near a body.
+  **Confirmed against spec 00 §6, 2026-08-29** (author): that file's *"a chip at its window's tip"*
+  on every compass ring is the stale half and is retired. Measured over 29 777 pairs of rings drawn
+  together in recorded play, two rings on one compass never come closer than **24.4°** in hue — so
+  this rule's one case does not arise on the instrument, and nothing is drawn there.
 - Post-run, addresses own the stage: debrief, results, route, standings and shared recipes.
 - **Authored names** (`KILN`, `HARROW`) are reserved for adventure regions' signature bodies and
   are not used by the daily field.

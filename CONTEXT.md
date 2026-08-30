@@ -206,10 +206,16 @@ how it feels.
 _Avoid_: bonus, reward, punch (the punch is the transient, and they are different things)
 
 **Punch**:
-The kick a release lands, scaled by the quality of the swing and gone within a second or so.
+The kick a release lands, scaled by the **quality** of the swing and gone within a second or so.
 Bought with speed rather than with stopped time (ADR-0012), and carried entirely by the
-transient, so it never changes what a run is worth.
-_Avoid_: kick, impulse, boost (the boost is the lasting part, and they are different things)
+transient, so it never changes what a run is worth. **Quality enters twice** — as how far it
+displaces the view and as how long it takes coming home — and the second is the gentler channel,
+so a mistimed release still gets a punch and what it loses is how far the punch carries. It runs
+along the exit tangent at a release and reversed into the orbit at a grab, so even the camera
+distinguishes catching from letting go. Spec 00 §5's motion table calls the camera's share of it
+KICK; **the word is punch**.
+_Avoid_: kick, impulse, boost (the boost is the lasting part, and they are different things),
+shake (a shake says damage, and this game has none)
 
 **Quality**:
 How good a release is, as one number. **There is deliberately only one definition of it**
@@ -260,8 +266,28 @@ a body is still named by hue in the run, and the `P11` chips stay retired.
 _Avoid_: waypoint, blip, radar, edge dot (**dot** is the compass's, and **carpet dot** is the
 carpet's)
 
+**Flown arc**:
+The stretch of orbit the craft has already ridden since the **freeze**, drawn on the orbit path
+and lit by what the **boost** was worth along it. Time runs along it, so it is the **envelope**
+seen as a shape in space rather than one in time — dim while the boost was arming, brightest
+across the plateau, dying behind the craft as it expires. It is the only thing in the game that
+draws the timing half of the tension, and it exists because nothing did: flown, 34% of releases
+landed before the boost had armed (author, 2026-08-29).
+_Avoid_: trail (the **trail** is the craft's own line through the field and its brightness is the
+**carry**), history, tail, swept arc
+
+**Callout**:
+The word a release earned, its points and its colour, arriving as one unit at the **dot** that
+earned it — with the **window** it was taken on still lit behind it. It pops, lingers and decays
+where it was born, world-anchored, so the craft leaves it behind rather than carrying it. A
+**make** earns points and no word.
+_Avoid_: award (that is the grading, and a callout is how it is said), banner, toast, popup,
+score text
+
 **Farewell ring**:
-The orbit detaching from the body and expanding away at release, in AURORA.
+The orbit detaching from the body and expanding away at release, in AURORA. It is the ellipse the
+craft actually rode, at the shape it had on the tick it let go, so a shallow swing's ring leaves
+oval and a settled one's leaves round.
 
 **Hitstop**:
 **Refused** (ADR-0012). It named a brief world freeze at grab and release — *"the pause is the
