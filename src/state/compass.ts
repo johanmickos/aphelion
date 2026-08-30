@@ -350,7 +350,22 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     // the compass arriving is still the freeze made visible. What there is, once
     // gravity has bound the craft at all, is the path it is currently on: faded
     // in, and firming up as the prediction converges.
-    const guess = predictOrbit(sim.craft, body);
+    // **Not while the clearance is still being paid.**
+    // [`predictOrbit`](../sim/orbit.ts) says of itself that it *"does not model
+    // the clearance's remaining turn, so early in a dive that owes one the
+    // prediction is coarser than it will be"* — and coarser here means a much
+    // larger oval, because the path has not been bent toward the body yet. Drawn,
+    // that reads as two orbits rather than one firming up: *"first when I grab I
+    // see a large oval at times, and then when I start diving in it switches. I
+    // don't think we should show that first one, it looks like it jumps
+    // aggressively to the smaller, second one"* (author, 2026-08-30).
+    //
+    // So the path waits for the turn it does not model. What is left is spec 00
+    // §5's own reading of the fade — *"what fades is a prediction firming up"* —
+    // with the one stretch where it was not firming up but being replaced taken
+    // out of it.
+    const owed = sim.dive !== null && sim.dive.clearanceTicks > 0;
+    const guess = owed ? null : predictOrbit(sim.craft, body);
     // How much of this body's hold is left — `closing`, floored below so the
     // thread survives a miss. It was written out here once; it is named now,
     // because the tide wanted the same reading and two copies of a formula are

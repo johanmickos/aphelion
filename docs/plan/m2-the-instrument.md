@@ -1265,6 +1265,34 @@ it cannot quietly become one-sided.
 
 ---
 
+### Queued, 2026-08-30 — the punch wants more punch
+
+*"I also think the 'kick' after release should be punchier, more like the original prototype. I
+think that's a future task, so please file that away"* (author).
+
+**Where it stands.** ADR-0012's punch is spent in two places and neither is the camera, which was
+flown and refused. The craft's own stretch carries how it looks — spec 02 §4's 1.5/0.7 at full
+quality, scaled by `PUNCH_FLOOR` below it — and spec 01 §8's transient carries how it flies, at
+`TRANSIENT_SHARE` **0.45** against the prototype's measured **0.8**. The author asked for that
+number to come down on 2026-08-29 (*"all of the velocity kicks are a bit too intense"*) and is now
+asking for the kick to read harder, which is not a contradiction: what came down was the **speed**,
+and what is being asked for is the **hit**.
+
+**So the first thing to try is not the transient.** Three candidates, in the order the evidence
+favours them:
+
+1. **The stretch's attack.** It is *placed* at full amplitude on the release tick and eases home
+   over 180ms — one tick of attack. The prototype's punch is a **decay from a larger peak** and
+   this repo has never flown the amplitude above spec 02 §4's 1.5: `STRETCH_ALONG` is on the bench
+   and has not been moved since it was written.
+2. **`PUNCH_STRETCH`**, quality's second channel, at 0.5. A punch that carried half again as long
+   again would read as weight without adding speed.
+3. **`TRANSIENT_SHARE`** back toward the prototype's 0.8, now that the width-fit has changed what
+   any given speed reads as on screen — every earlier judgement about it was made at 77% of the
+   current scale.
+
+All three are sliders on the bench's release card, so this is a flight rather than a build.
+
 ### Queued, with its remaining question now answered
 
 **A "Clang!" when the craft bounces into another body while holding one.** *"I want to show a

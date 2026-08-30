@@ -268,6 +268,22 @@ footer uses obsolete numbering and is void.
 > trade and it is the same slack spent differently — fitting whole left room across and spent it on
 > extra field; fitting to the width spends it on drawing the world 1.3× larger everywhere.
 
+> ## ⚠ Flown, 2026-08-30 — §5's orbit path waits for the turn it cannot predict
+>
+> **One oval, not two.** §5's *"as soon as an oval orbit is possible I want it to fade in"* was
+> built as *from the moment gravity binds the craft*, and that is one tick too early:
+> [`predictOrbit`](../../src/sim/orbit.ts) does not model the **clearance**'s remaining turn, so a
+> dive that owes one is shown a much larger ellipse and then replaced by the real one. *"First when
+> I grab I see a large oval at times, and then when I start diving in it switches. I don't think we
+> should show that first one, it looks like it jumps aggressively to the smaller, second one"*
+> (author).
+>
+> Measured on the shipped run, the pre-clearance oval was drawn for **4 to 9 ticks** on each of
+> twelve dives — long enough to register and far too short to read as a shape. The path now waits
+> until the clearance has been paid, which leaves §5's own reading of the fade intact: *"what fades
+> is a prediction firming up"*, with the one stretch where it was not firming up but being replaced
+> taken out of it.
+
 ## 1 · Palette — eight names, eight meanings
 
 Every colour in the game is one of these eight. Nothing is mixed, tinted or invented at

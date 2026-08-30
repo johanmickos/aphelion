@@ -330,6 +330,41 @@ describe('the flown arc · the boost envelope, drawn', () => {
   });
 });
 
+describe('the orbit path, while the dive is still owed its clearance', () => {
+  /**
+   * **One oval, not two.** [`predictOrbit`](../../src/sim/orbit.ts) says of itself
+   * that it *"does not model the clearance's remaining turn, so early in a dive
+   * that owes one the prediction is coarser than it will be"* — and coarser means
+   * a much **larger** oval, because the path has not been bent toward the body
+   * yet. Drawn, that reads as two orbits rather than one firming up: *"first when
+   * I grab I see a large oval at times, and then when I start diving in it
+   * switches. I don't think we should show that first one, it looks like it jumps
+   * aggressively"* (author, 2026-08-30).
+   *
+   * Measured on this run, it was on screen for **4 to 9 ticks** on each of twelve
+   * dives — long enough to register and far too short to be a shape.
+   */
+  it('draws no path until the clearance has been paid', () => {
+    let owed = 0;
+    for (const view of RUN) {
+      const compass = view.compass;
+      if (compass === null || !compass.predicted) continue;
+      // A predicted path is only ever drawn once the turn it does not model has
+      // been made, so a drawn prediction always has a shape to show.
+      expect(compass.path.length).toBeGreaterThan(0);
+      owed++;
+    }
+    expect(owed).toBeGreaterThan(100);
+  });
+
+  /** And the fade still starts from nothing, so it arrives rather than appearing. */
+  it('still fades the path in from nothing when it does arrive', () => {
+    const first = RUN.findIndex((v) => v.compass?.predicted === true && v.compass.presence > 0);
+    expect(first).toBeGreaterThan(0);
+    expect(RUN[first]!.compass!.presence).toBeLessThan(0.3);
+  });
+});
+
 describe('the ring count, ruled to three on 2026-08-29', () => {
   /**
    * *"Four is a bit unwieldy and makes it hard to decide where to go next"*
