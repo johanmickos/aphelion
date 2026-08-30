@@ -437,6 +437,32 @@ export const PERMANENT_SHARE = 0.22;
  * asked for and the compass is drawn on, so it is left alone and the cap stays
  * on the bench where spec 01 §13.5 already put it.
  */
+/**
+ * How much faster the craft rides a frozen orbit than the orbit itself implies.
+ *
+ * **The prototype's `phaseRate`, carried**, and its own config calls it *"sweep
+ * rate vs. real orbital speed — the headline feel knob."* It sits at 1.0 there
+ * and never moved, so what crosses is the **mechanism** and not a value: it is
+ * the one lever that changes how fast an orbit reads without changing anything
+ * about its geometry.
+ *
+ * It multiplies the angular momentum the phase clock is driven from, so the
+ * sweep rate and the tangential speed scale **together** — `ω = L/r²` and
+ * `v = L/r`. What that leaves alone is everything that decides *where*: the
+ * radius at every angle, the shape the settle rounds toward, the periapsis the
+ * rings are stacked on, and the exit tangent. So spec
+ * [01 · §11](../../docs/spec/01-swing.md)'s compass is solved on exactly the same
+ * geometry — the dot does not move — and spec 01 §7's envelope is a clock in
+ * ticks and does not move either. **What changes is the pace of the orbit and
+ * the speed a release leaves at.**
+ *
+ * It is the answer to *"can't we add a base speed boost to the general ship
+ * velocity, without affecting the physics equations used for orbit
+ * calculations?"* (author, 2026-08-30) — and the prototype had already built the
+ * seam for it and left it at one.
+ */
+export const PHASE_RATE = 1;
+
 export const SETTLE_RETURN = 0.3;
 
 export const TRANSIENT_SHARE = 0.45;

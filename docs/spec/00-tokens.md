@@ -225,6 +225,49 @@ footer uses obsolete numbering and is void.
 > at the dot, was being cut in half at the edge of the picture. It stays world-anchored; what is
 > held is where it is drawn.
 
+> ## ⚠ Built, 2026-08-30 — §7's width-fit lands, and it was the missing pace
+>
+> **§7's own ruling is built.** *"The width is the contract and the height flexes... the scale
+> comes from the width — 1170 design units across, always"* (author, 2026-08-28) had been recorded
+> as [M3.1](../plan/m3-the-field.md)'s and the build still fitted the rectangle **whole**. On a
+> phone that fit is bound by the **height**, because browser chrome takes a bite the design space
+> was authored without — so everything was drawn at the **77%** this section already names.
+>
+> **It was the whole of a complaint that read as physics.** Asked to look at how the prototype
+> handles the same moment — *"it's quite zippy there"* — its source says its two settle knobs are
+> both at 1.0 (`phaseRate`, its own *"headline feel knob"*, and `tightenFrac`), so it circularises
+> completely and sweeps at true orbital rate, exactly as this repo did. Its circular speed at the
+> floor converts to ours exactly. Measured live in the browser, its canvas draws **390 world units
+> across the full viewport width**. It is not faster. It is bigger.
+>
+> | on the author's phone, 393 css | a settled orbit reads as |
+> |---|---|
+> | the prototype | **315** css px/s |
+> | fitted whole — before | **242** css px/s |
+> | fitted to the width — now | **316** css px/s |
+>
+> **The two match to within a third of a percent, and not one number in the simulation moved.**
+> [`letterbox.ts`](../../src/render/letterbox.ts)'s header has predicted this since M1.4: *"it is
+> not the same size in the hand as a build that sized itself to the viewport instead, and the M1
+> gate is flying this one against a prototype that does the latter."*
+>
+> **The first of §7's two guardrails is built with it.** `GUARANTEED_BAND` is **0.77** of the
+> design height — 1 950 units, measured from the author's own 393 × 651 viewport — and every device
+> shows it in full; a shorter one is scaled down until it does. The thumb line at 1 688 sits inside
+> it with room, which is what makes *"nothing readable below the thumb line"* keepable rather than
+> merely stated.
+>
+> **The second is deliberately not built, and the reason is this section's own absolute.** A cap on
+> the extra height, implemented as a scale, would zoom **in** on a tall device and crop the width —
+> and *"1170 design units across, always"* is the one thing §7 does not bend. It is a statement
+> about what is **drawn** rather than about the scale, and what to do with the space it refuses —
+> bleed, or a bar — is a composition question. It stays M3.1's and is named in the code as unbuilt
+> rather than forgotten.
+>
+> **What it cost:** the bleed either side falls from **179 design units to 3.5**. That is the right
+> trade and it is the same slack spent differently — fitting whole left room across and spent it on
+> extra field; fitting to the width spends it on drawing the world 1.3× larger everywhere.
+
 ## 1 · Palette — eight names, eight meanings
 
 Every colour in the game is one of these eight. Nothing is mixed, tinted or invented at

@@ -963,7 +963,7 @@ function offDefaults(): string[] {
     (knob) => `${knob.label} ${fmt(value(knob), knob.places)} (was ${fmt(knob.base, knob.places)})`,
   );
   if (!cameraKnobs.LOCK_ON) off.push('camera lock OFF');
-  if (fit.FIT_WIDTH) off.push('fitted to the width rather than whole');
+  if (fit.FIT_WHOLE) off.push('fitted whole rather than to the width');
   return off;
 }
 
@@ -1143,14 +1143,14 @@ byId('defaults').addEventListener('click', (event) => {
   byId<HTMLInputElement>('lock').checked = true;
   cameraKnobs.set_LOCK_ON(true);
   byId<HTMLInputElement>('fitwidth').checked = false;
-  fit.set_FIT_WIDTH(false);
+  fit.set_FIT_WHOLE(false);
   showDefaults();
   start();
   (event.currentTarget as HTMLElement).blur();
 });
 byId<HTMLSelectElement>('viewport').addEventListener('change', () => shapeStage());
 byId<HTMLInputElement>('fitwidth').addEventListener('change', (event) => {
-  fit.set_FIT_WIDTH((event.currentTarget as HTMLInputElement).checked);
+  fit.set_FIT_WHOLE((event.currentTarget as HTMLInputElement).checked);
   showDefaults();
   // So the dispatch says which reading the run was flown under: the fit changes
   // nothing about the run and everything about what the author could see of it.

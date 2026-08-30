@@ -334,17 +334,18 @@ export function lockOf(sim: SimState): number {
   },
 
   {
-    // Spec 00 §7's ruling: the width is the contract and the height flexes.
-    // Built today as the whole rectangle fitted; M3.1 changes it. Both readings
-    // are here so the one that is coming can be flown against the one that is.
+    // Spec 00 §7's ruling: the width is the contract and the height flexes. It is
+    // **built** as of 2026-08-30 and this toggle now goes the other way — back to
+    // the whole rectangle fitted — so the reading that was replaced stays flyable
+    // beside the one that replaced it.
     file: 'src/render/letterbox.ts',
-    find: '  const scale = Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);',
-    replace: `  const scale = FIT_WIDTH
-    ? width / DESIGN_WIDTH
-    : Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);`,
+    find: '  const scale = Math.min(fromWidth, showsTheBand);',
+    replace: `  const scale = FIT_WHOLE
+    ? Math.min(fromWidth, height / DESIGN_HEIGHT)
+    : Math.min(fromWidth, showsTheBand);`,
     append:
-      '\nexport let FIT_WIDTH = false;\nexport function set_FIT_WIDTH(value: boolean): void {\n  FIT_WIDTH = value;\n}\n',
-    why: 'spec 00 §7 is ruled and M3.1 builds it; both readings are flyable meanwhile',
+      '\nexport let FIT_WHOLE = false;\nexport function set_FIT_WHOLE(value: boolean): void {\n  FIT_WHOLE = value;\n}\n',
+    why: 'the fit spec 00 §7 replaced, kept flyable beside the one that replaced it',
   },
 
   {

@@ -38,9 +38,68 @@ export interface Letterbox {
   readonly offsetY: number;
 }
 
-/** Fit the design space into a buffer of `width` × `height` device pixels. */
+/**
+ * The shortest viewport the game supports, as a fraction of the design space's
+ * height — and therefore the band every device shows in full.
+ *
+ * Measured from the author's own phone: **651 css of a 393-wide viewport**, which
+ * against a design space of 1170 × 2532 scaled from the width is 1 938 design
+ * units, or **0.77** of it. Spec 00 §7's first guardrail is that everything the
+ * player reads is composed inside this, and the thumb line at 2/3 (1 688) sits
+ * inside it with room to spare — which is what makes the rule survivable rather
+ * than merely stated.
+ */
+export const GUARANTEED_BAND = 0.77;
+
+/**
+ * Fit the design space into a buffer of `width` × `height` device pixels.
+ *
+ * **The scale comes from the width** (spec 00 §7, author 2026-08-28): *"the
+ * width is the contract and the height flexes... 1170 design units across,
+ * always, and how much height a device shows follows from its own shape."*
+ *
+ * ## Why this is not the fit that was here before, and what it was costing
+ *
+ * It fitted the design space **whole**, bound by whichever axis ran out first —
+ * and on a phone that is always the height, because browser chrome takes a bite
+ * out of the viewport that the design space was authored without. Measured on
+ * the author's own device: 393 × 651 css against 1170 × 2532 fits at **0.257**
+ * where the width alone gives **0.336**, so everything was drawn at **77%** of
+ * the size the prototype draws it at on the same phone. That is spec 00 §7's own
+ * number, and this file's header has predicted the consequence since M1.4 — *"it
+ * is not the same size in the hand as a build that sized itself to the viewport
+ * instead, and the M1 gate is flying this one against a prototype that does the
+ * latter."*
+ *
+ * **The consequence was pace**, and it was the whole of a complaint that read as
+ * physics. A settled orbit runs at 940 design units per second; at the old fit
+ * that is **242 css px/s** and at this one it is **316**. The prototype,
+ * measured live in the browser, draws 390 world units across the full viewport
+ * width and puts the same orbit at **315 css px/s**. The two now match to within
+ * a third of a percent, and not one number in the simulation moved to do it.
+ *
+ * ## One of spec 00 §7's two guardrails, and why the other is not here
+ *
+ * [`GUARANTEED_BAND`](#) is the floor: every device shows the band in full, and
+ * a viewport too short for it at the width's scale is scaled down until it does.
+ * That one belongs here because it is a statement about the **scale**.
+ *
+ * The **cap on the extra** — *"a device tall enough to show more than the band
+ * does not get unbounded extra field"* — deliberately is not. Implemented as a
+ * scale it would zoom **in** on a tall device and crop the width, and the width
+ * is the one thing §7 makes absolute: *"1170 design units across, always."* It is
+ * a statement about what is **drawn**, which is [`visible`](#visible)'s
+ * business, and what to do with the space it would refuse — bleed, or a bar — is
+ * a composition question. It stays [M3.1](../../docs/plan/m3-the-field.md)'s, and
+ * it is named here so that it is unbuilt rather than forgotten.
+ */
 export function letterbox(width: number, height: number): Letterbox {
-  const scale = Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);
+  const fromWidth = width / DESIGN_WIDTH;
+  // **A larger scale shows less height**, so the band is a *ceiling* on the
+  // scale rather than a floor — and taking the smaller of the two is what makes
+  // both promises at once: the full width, always, and never less than the band.
+  const showsTheBand = height / (DESIGN_HEIGHT * GUARANTEED_BAND);
+  const scale = Math.min(fromWidth, showsTheBand);
   return {
     scale,
     offsetX: (width - DESIGN_WIDTH * scale) / 2,
@@ -52,9 +111,18 @@ export function letterbox(width: number, height: number): Letterbox {
  * How far outside the design space, in design units, the buffer can still show —
  * **the bleed**.
  *
- * The fit above is bound by one axis and leaves a bar on the other, and this is
- * the size of that bar said in design units instead of pixels. Exactly one of
- * the two is ever non-zero, because a uniform scale cannot leave slack in both.
+ * How much more world than the design space the buffer can show, per side, said
+ * in design units instead of pixels.
+ *
+ * **It can be negative, and since the width-fit landed it usually is on one
+ * axis.** A positive value is slack — world the device can draw beyond the
+ * design space, the *bleed* proper. A negative one is a **crop**: the design
+ * space is wider or taller than the buffer at this scale and some of it is off
+ * the picture. On the author's phone `x` is slack and `y` is a crop, which is
+ * exactly what *"the width is the contract and the height flexes"* means when
+ * the height flexes shorter. [`visible`](#visible) reads both the same way — it
+ * clips to what is actually on screen — so nothing downstream has to know which
+ * sign it got.
  *
  * ## Why the bars stopped being black
  *

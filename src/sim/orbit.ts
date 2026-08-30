@@ -61,6 +61,7 @@ import {
   ECCENTRICITY_CAP,
   FREEZE_ESCAPE_FRACTION,
   SECONDS_PER_TICK,
+  PHASE_RATE,
   SETTLE_RETURN,
   SETTLE_TICKS,
   SUBSTEPS,
@@ -131,7 +132,11 @@ function momentumAt(orbit: Orbit, mass: number, ticks: number): number {
   // is spec 01 §6a's governor and the thing that makes every settled swing leave
   // at the same speed whatever brought it in.
   const target = circular + SETTLE_RETURN * (orbit.momentum - circular);
-  return orbit.momentum + (target - orbit.momentum) * settled(ticks);
+  const eased = orbit.momentum + (target - orbit.momentum) * settled(ticks);
+  // **The pace, and nothing else** — see [`PHASE_RATE`](./units.ts). It scales the
+  // momentum the phase clock is driven from, so `ω = L/r²` and `v = L/r` move
+  // together and the geometry the compass is solved on is untouched.
+  return PHASE_RATE * eased;
 }
 
 /** Where the ellipse of this shape sits at this angle past its periapsis. */

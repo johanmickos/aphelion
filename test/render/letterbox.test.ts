@@ -6,8 +6,8 @@
  * three screenshots.
  */
 import { describe, expect, it } from 'vitest';
-import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../../src/state/design.ts';
-import { bleed, letterbox, visible } from '../../src/render/letterbox.ts';
+import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
+import { bleed, GUARANTEED_BAND, letterbox, visible } from '../../src/render/letterbox.ts';
 import type { CorridorView } from '../../src/state/types.ts';
 
 /** A phone with browser chrome, a phone without, a tablet, and a desktop window. */
@@ -19,10 +19,29 @@ const VIEWPORTS: ReadonlyArray<readonly [name: string, width: number, height: nu
 ];
 
 describe('the design space', () => {
-  it.each(VIEWPORTS)('fits whole inside %s', (_name, width, height) => {
+  /**
+   * **The width is the contract** — spec [00 · §7](../../docs/spec/00-tokens.md),
+   * ruled by the author on 2026-08-28 and built on 2026-08-30: *"1170 design
+   * units across, always, and how much height a device shows follows from its own
+   * shape."*
+   */
+  it.each(VIEWPORTS)('shows its full width inside %s', (_name, width, height) => {
     const fit = letterbox(width, height);
-    expect(DESIGN_WIDTH * fit.scale).toBeLessThanOrEqual(width + 1e-9);
-    expect(DESIGN_HEIGHT * fit.scale).toBeLessThanOrEqual(height + 1e-9);
+    expect(width / fit.scale).toBeGreaterThanOrEqual(DESIGN_WIDTH - 1e-9);
+  });
+
+  /**
+   * And the first of §7's two guardrails: a height, measured from the shortest
+   * viewport the game supports, that **every** device shows in full. Everything
+   * the player reads is composed inside it, and the thumb line at 2/3 is the
+   * lowest of those — so if the band ever stopped containing it, the rule that
+   * nothing readable lives below the thumb line would have become unkeepable.
+   */
+  it.each(VIEWPORTS)('shows the guaranteed band, and the thumb line, in %s', (_n, w, h) => {
+    const fit = letterbox(w, h);
+    const seen = h / fit.scale;
+    expect(seen).toBeGreaterThanOrEqual(GUARANTEED_BAND * DESIGN_HEIGHT - 1e-9);
+    expect(seen).toBeGreaterThan(THUMB_LINE);
   });
 
   it.each(VIEWPORTS)('is centred, so the bars are equal, in %s', (_name, width, height) => {
@@ -32,56 +51,59 @@ describe('the design space', () => {
   });
 
   /**
-   * The composition is the same everywhere or it is not a composition, and the
-   * fit is the largest one that still shows all of it: any larger and the design
-   * space would be cropped, which is how a masthead or a thumb line ends up off
-   * the screen it was composed against.
+   * It is the **largest** scale that keeps both promises, so no device is shown
+   * less of the world than its own shape allows: one of the two bounds is always
+   * touching.
    */
-  it.each(VIEWPORTS)('shows as much of the design space as %s can hold', (_n, width, height) => {
-    const fit = letterbox(width, height);
+  it.each(VIEWPORTS)('is the largest fit that keeps both promises, in %s', (_n, w, h) => {
+    const fit = letterbox(w, h);
     const larger = fit.scale * 1.001;
-    const overflows = DESIGN_WIDTH * larger > width || DESIGN_HEIGHT * larger > height;
-    expect(overflows).toBe(true);
+    const tooNarrow = w / larger < DESIGN_WIDTH;
+    const tooShort = h / larger < GUARANTEED_BAND * DESIGN_HEIGHT;
+    expect(tooNarrow || tooShort).toBe(true);
   });
 
   /** Never stretched: one scale, both axes, always. */
   it.each(VIEWPORTS)('never distorts %s', (_name, width, height) => {
     const fit = letterbox(width, height);
-    const spare = Math.min(width - DESIGN_WIDTH * fit.scale, height - DESIGN_HEIGHT * fit.scale);
-    expect(spare).toBeCloseTo(0, 6);
+    expect(fit.scale).toBeGreaterThan(0);
+    expect(Number.isFinite(fit.scale)).toBe(true);
   });
 
   /**
-   * A phone letterboxes too, and the author should know it before flying the
-   * gate: the design space is authored at the size of the whole screen and the
-   * browser's own chrome takes a bite out of the height, so what reaches the hand
-   * is the same composition at about four fifths of the size.
+   * **What this replaced, and what it was costing.** The design space used to be
+   * fitted *whole*, which on a phone is bound by the height because browser
+   * chrome takes a bite the design space was authored without — so everything
+   * landed at 77% of the size the prototype draws it at on the same phone, and a
+   * settled orbit crossed the screen at 242 css px/s against the prototype's 315.
+   * Held as a number because it is the whole reason the fit changed.
    */
-  it('is scaled down by browser chrome on a phone', () => {
+  it('draws the world 1.3x larger than the fit it replaced', () => {
     const fit = letterbox(1179, 1953);
-    expect(fit.scale).toBeCloseTo(1953 / DESIGN_HEIGHT, 6);
-    expect(fit.scale).toBeGreaterThan(0.75);
-    expect(fit.scale).toBeLessThan(0.79);
+    const whole = Math.min(1179 / DESIGN_WIDTH, 1953 / DESIGN_HEIGHT);
+    expect(fit.scale / whole).toBeGreaterThan(1.28);
+    expect(fit.scale / whole).toBeLessThan(1.32);
+    // In css pixels per design unit on the author's own phone, at dpr 3.
+    expect(fit.scale / 3).toBeCloseTo(0.334, 3);
   });
 });
 
 /**
- * The bleed: the bars, filled with world instead of black.
+ * The bleed: what the buffer can show beyond the design space, per side.
  *
- * The design space is still fitted whole and centred and every position in it is
- * unmoved — what changed is only that the leftover is painted rather than
- * blanked, which on the author's phone is **179 design units either side** that
- * the device could always draw and was throwing away. It matters because
- * [M1.4](../../docs/plan/m1-the-swing.md)'s corridor is 1.9× the design width
- * and the camera does not pan, so the craft leaves the picture a long way before
- * it reaches the line it dies at.
+ * **Since the width-fit it can be negative, and usually is on one axis.** A
+ * positive value is slack — world the device could always draw and used to be
+ * painting over. A negative one is a **crop**: the design space is taller than
+ * the buffer at this scale, and the part outside the guaranteed band is off the
+ * picture. On the author's phone `x` is slack and `y` is a crop, which is what
+ * *"the width is the contract and the height flexes"* means when the height
+ * flexes shorter.
  */
 describe('the bleed', () => {
   it.each(VIEWPORTS)('leaves the composition exactly where it was, in %s', (_n, w, h) => {
     const before = letterbox(w, h);
-    const slack = bleed(w, h);
+    bleed(w, h);
     expect(letterbox(w, h)).toEqual(before);
-    expect(Math.min(slack.x, slack.y)).toBeCloseTo(0, 9);
   });
 
   it.each(VIEWPORTS)('fills the whole buffer and no more, in %s', (_n, w, h) => {
@@ -92,15 +114,28 @@ describe('the bleed', () => {
   });
 
   /**
-   * On the phone the gate is flown on it is worth 179 design units either side.
-   * Held as a number because it is the whole reason the change was made, and a
-   * change whose benefit is not measured is a change nobody can argue with later.
+   * **The width never crops and the band never does either**, which is the pair
+   * of promises `letterbox` makes said from the other side: `x` is slack or zero,
+   * and `y` never eats into the band.
    */
-  it('recovers the bars on the phone the gate is flown on', () => {
-    // ADR-0011's measured CSS viewport, at its measured device pixel ratio.
-    const slack = bleed(393 * 3, 651 * 3);
-    expect(slack.x).toBeCloseTo(179.3, 1);
-    expect(slack.y).toBe(0);
+  it.each(VIEWPORTS)('never crops the width, and never the band, in %s', (_n, w, h) => {
+    const slack = bleed(w, h);
+    expect(slack.x).toBeGreaterThanOrEqual(-1e-9);
+    expect(DESIGN_HEIGHT + 2 * slack.y).toBeGreaterThanOrEqual(
+      GUARANTEED_BAND * DESIGN_HEIGHT - 1e-9,
+    );
+  });
+
+  /**
+   * On the phone the gate is flown on, the height is the axis that flexes: the
+   * picture shows **1 950** of the design space's 2 532 units, which is the
+   * guaranteed band, and a hair more than the full width across.
+   */
+  it('shows the band and the full width on the phone the gate is flown on', () => {
+    const fit = letterbox(393 * 3, 651 * 3);
+    expect((651 * 3) / fit.scale).toBeCloseTo(1950, 0);
+    expect((393 * 3) / fit.scale).toBeGreaterThanOrEqual(DESIGN_WIDTH);
+    expect((393 * 3) / fit.scale).toBeLessThan(DESIGN_WIDTH + 20);
   });
 });
 
@@ -116,10 +151,18 @@ describe('the bleed', () => {
 describe('what a frame paints into', () => {
   const CORRIDOR: CorridorView = { centreline: DESIGN_WIDTH / 2, halfWidth: 1111.5 };
 
-  it('is the design space plus the bleed where the corridor is wider', () => {
+  /**
+   * **The bleed either side is 3.5 design units now, against 179 before.** That
+   * is the width-fit's own cost, and it is a cost worth having: the bars existed
+   * because the design space was being fitted whole and left slack across, and
+   * fitting to the width spends that slack on drawing the world **larger**
+   * instead of wider. What used to be 179 units of extra field either side is now
+   * 1.3× magnification everywhere.
+   */
+  it('has almost no bleed left, because the width is now the fit', () => {
     const seen = visible(393 * 3, 651 * 3, CORRIDOR, CORRIDOR.centreline);
-    expect(seen.left).toBeCloseTo(-179.3, 1);
-    expect(seen.right).toBeCloseTo(DESIGN_WIDTH + 179.3, 1);
+    expect(seen.left).toBeCloseTo(-3.5, 1);
+    expect(seen.right).toBeCloseTo(DESIGN_WIDTH + 3.5, 1);
   });
 
   it('stops at the line where the window is wider than the world', () => {
