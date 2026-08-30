@@ -309,6 +309,52 @@ momentum is eased toward the circular value over the same 1.2s, which is what ke
 seamless. A rewrite that rounds the shape without easing the momentum will produce an orbit that
 looks right and moves wrong.
 
+> ## ⚠ Open, 2026-08-29 — §6a is a speed governor, and the author has asked to bend it
+>
+> *"When I grab planets at farther distances, my velocity is cut down a noticeable and unpleasant
+> amount. I feel like I'm losing zippy progress and am being unnecessarily slowed down by the
+> game... I think we need to bend physics here to make gameplay feel better. How can we address
+> this feeling, and keep the game rewarding at all speeds?"* (author, 2026-08-29).
+>
+> **The measurement first, because the attribution is inverted.** Over the author's own 20
+> converted swings, `exit ÷ approach` correlates with **approach speed at −0.93** and with **grab
+> distance at +0.77** — far grabs *gain*. Arriving fast (>950) pays **×0.83**; arriving slow pays
+> **×1.17**. The exits themselves cluster on p50 **936**, against a circular speed at the median
+> body's floor of **940**. Swept headlessly, exit speed is ~970 at **every** grab distance from 300
+> to 1 200 and at every approach speed. It is not a distance effect. **It is a governor**, and this
+> section is where it lives: the settle eases the momentum from what the dive earned all the way
+> down to `circular`, so nothing about the approach survives it.
+>
+> §8's non-monotone curve is the same fact seen along the hold: **1 298 at the freeze, 712 at tick
+> 30 (−45%), back to 976 by 72 and flat after** — this repo reproducing §8's measured 411 → 248 →
+> 326 (×3: 1 233 → 744 → 978) almost exactly. The simulation is faithful; what is missing is that
+> the player has no way to see it, and the boost's plateau (ticks 27 – 72) sits directly on the
+> exit-speed trough (tick 30).
+>
+> **`SETTLE_RETURN` is built and ships at zero**, which is arithmetically this section unchanged.
+> It is what the settle eases *toward*: `circular + SETTLE_RETURN × (what the dive earned −
+> circular)`. It cannot compound, and the reason is already in this section — the freeze clamps the
+> sweep below escape speed and that clamp binds on essentially every dive, so what the dial moves
+> is the **setpoint** and not a share of what the craft brought.
+>
+> Swept over 120 pilot runs at each value:
+>
+> | value | exit after a settle | a fast arrival pays | exit p05 | exit p50 | out of bounds |
+> |---|---|---|---|---|---|
+> | **0** — today | 971 | ×0.88 | 286 | 954 | 68% |
+> | **0.30** | 1 080 | ×0.98 | **359** | 938 | 69% |
+> | 0.45 | 1 134 | ×1.03 | 681 | 966 | 73% |
+>
+> **0.30 is what the evidence recommends.** A fast arrival breaks even; the **slowest** swings in
+> the corpus get 25% faster while the median does not move, which is the shape *"rewarding at all
+> speeds"* asks for — it lifts the floor of the distribution rather than its middle. §8's tolerance
+> (median exit inside 840 – 1 050) and §10's (out-of-bounds the plurality at 60% or more) both
+> still hold; at 0.45 the median leaves the band and a run is over in a third fewer ticks.
+>
+> **Not ruled here.** Where the setpoint sits is a feel question and ADR-0004 makes the author the
+> gate for those, so it is a slider and the number below is unchanged until they fly it. Moving it
+> off zero bumps `SIM_VERSION` and refuses every recipe recorded before.
+
 ### 6a · The floor sets the radius, the cap sets the shape, the dive sets the **speed**
 
 This is the mechanism the whole swing turns on, it is not what a physics engine does by default,

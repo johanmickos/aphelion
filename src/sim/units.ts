@@ -372,6 +372,59 @@ export const PERMANENT_SHARE = 0.22;
  * exact straight line, and coasting still applies no force — this is the release
  * spending what the release paid, not something coasting does to itself.
  */
+/**
+ * How much of the dive's own speed the **settle** leaves the orbit with, above
+ * the circular speed at its floor.
+ *
+ * **Zero is the game spec 01 §6a describes**, and it is a governor: the settle
+ * eases the momentum from what the dive earned all the way down to `circular`,
+ * so *"by 1.2s every one of those dives is at exactly the circular speed at the
+ * floor, however it arrived."* Every settled swing then leaves at the same speed
+ * whatever brought it in — measured over the author's own 20 converted swings,
+ * exit speed correlates with approach speed at **−0.93**, arriving fast (>950)
+ * pays ×0.83 and arriving slow pays ×1.17, and the exits themselves cluster on
+ * p50 **936** against a circular speed at the median floor of 940.
+ *
+ * Flown, that reads as being punished for going fast: *"I feel like I'm losing
+ * zippy progress and am being unnecessarily slowed down by the game"* (author,
+ * 2026-08-29). This is the dial that answers it, and the physics it bends is
+ * §6a's, which was already deliberately inconsistent.
+ *
+ * **It cannot compound, and the reason is a clamp that is already there.** The
+ * freeze holds the sweep below `FREEZE_ESCAPE_FRACTION` of escape speed at the
+ * periapsis, and measured, that clamp binds on essentially every dive — so the
+ * speed the settle eases *from* is near-constant whatever the approach was. What
+ * this returns is therefore a **bounded lift on the setpoint**, not a share of
+ * what the craft brought, and spec 01 §5a's flat speed-by-altitude survives it
+ * by construction. Swept over six pilot runs, the fastest exit in the corpus is
+ * **1 500 units/s at every value** — the governor still governs, and only where
+ * it sits has moved.
+ *
+ * ## What the sweep says, over 120 pilot runs each
+ *
+ * | value | exit after a settle | a fast arrival pays | exit p05 | exit p50 | out of bounds |
+ * |---|---|---|---|---|---|
+ * | **0** | 971 | ×0.88 | 286 | 954 | 68% |
+ * | 0.15 | 1 025 | ×0.93 | — | — | — |
+ * | **0.30** | 1 080 | ×0.98 | **359** | 938 | 69% |
+ * | 0.45 | 1 134 | ×1.03 | 681 | 966 | 73% |
+ *
+ * **0.30 is the value this file would recommend and it is the author's to rule.**
+ * A fast arrival breaks even instead of paying 12%; the *slowest* swings in the
+ * corpus get **25% faster** while the median does not move, which is the shape
+ * the ask asked for — *"keep the game rewarding at all speeds"* — because what it
+ * lifts is the floor of the distribution and not its middle. Spec 01 §8's
+ * tolerance (median exit inside 840 – 1 050) and spec 01 §10's (out-of-bounds the
+ * plurality at 60% or more) both still hold, which they do not at 0.45: there the
+ * median leaves the band and a run is over in a third fewer ticks.
+ *
+ * **It ships at zero**, which is arithmetically the game that was flown, so
+ * nothing about a recipe changes and `SIM_VERSION` does not move. It is on the
+ * bench, because where the setpoint sits is a feel question and ADR-0004 makes
+ * the author the gate for those.
+ */
+export const SETTLE_RETURN = 0;
+
 export const TRANSIENT_SHARE = 0.45;
 
 /**

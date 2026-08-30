@@ -54,6 +54,11 @@ export const PATCHES: readonly Patch[] = [
   settable('src/sim/units.ts', 'CLIMB_BIAS', 'how much a press prefers a body up the climb'),
   settable(
     'src/sim/units.ts',
+    'SETTLE_RETURN',
+    'how much of the dive the settle leaves the orbit with — 0 is the governor',
+  ),
+  settable(
+    'src/sim/units.ts',
     'TRANSIENT_SHARE',
     'spec 01 §8 measured ×1.8; 0.45 is what was flown',
   ),

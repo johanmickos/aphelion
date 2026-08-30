@@ -61,6 +61,7 @@ import {
   ECCENTRICITY_CAP,
   FREEZE_ESCAPE_FRACTION,
   SECONDS_PER_TICK,
+  SETTLE_RETURN,
   SETTLE_TICKS,
   SUBSTEPS,
 } from './units.ts';
@@ -125,7 +126,12 @@ function eccentricityAt(orbit: Orbit, ticks: number): number {
  */
 function momentumAt(orbit: Orbit, mass: number, ticks: number): number {
   const circular = circularSpeed(mass, orbit.periapsis) * orbit.periapsis;
-  return orbit.momentum + (circular - orbit.momentum) * settled(ticks);
+  // **How much of the dive survives the settle** — see [`SETTLE_RETURN`](./units.ts).
+  // At zero this eases all the way down to the circular speed at the floor, which
+  // is spec 01 §6a's governor and the thing that makes every settled swing leave
+  // at the same speed whatever brought it in.
+  const target = circular + SETTLE_RETURN * (orbit.momentum - circular);
+  return orbit.momentum + (target - orbit.momentum) * settled(ticks);
 }
 
 /** Where the ellipse of this shape sits at this angle past its periapsis. */

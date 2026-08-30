@@ -436,6 +436,19 @@ const KNOBS: Knob[] = [
   },
 
   {
+    id: 'settlereturn',
+    label: 'Settle · speed kept',
+    what: 'how much of the dive’s own speed the settle leaves the orbit with, above the circular speed at its floor. ZERO IS TODAY’S GAME: the settle erases the dive entirely, so every settled swing leaves at the same speed whatever brought it in — measured, exit correlates with approach at −0.93 and arriving fast pays ×0.88. At 0.30 a fast arrival breaks even, the slowest swings get 25% faster and the median does not move. It cannot compound: the freeze’s escape clamp binds on every dive, so this lifts the setpoint rather than paying a share of what you brought',
+    min: 0,
+    max: 0.8,
+    step: 0.05,
+    base: units.SETTLE_RETURN,
+    apply: units.set_SETTLE_RETURN,
+    restarts: true,
+    group: 'physics',
+    places: 2,
+  },
+  {
     id: 'transient',
     label: 'Release kick · strength',
     what: 'how much faster a release leaves than it will be travelling a moment later, as a fraction. Spec 01 §8 measured the prototype at 0.8 (×1.8) and 0.45 is what was flown — “all of the velocity kicks are a bit too intense”. It runs along the exit tangent, so it never bends the ray: the route is identical and only the timing moves. Zero removes it',
