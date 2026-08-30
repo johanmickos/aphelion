@@ -50,24 +50,63 @@ describe('the sky', () => {
 
   it('does not move at world speed, which is the whole of the ruling', () => {
     // Spec 05 §2: *"everything moves at world speed."* This does not, and that is
-    // the author's instruction. Every tier moves by strictly less than the camera
-    // did, and no two tiers move by the same amount — layers at different speeds
-    // are exactly what §2 calls implied depth and refuses.
+    // the author's instruction. Every star moves by strictly less than the camera
+    // did — layers at different speeds are exactly what §2 calls implied depth
+    // and refuses.
     const CLIMB = 100;
     const before = drawn(sky, 1000);
     const after = drawn(sky, 1000 - CLIMB);
-    const moved = new Set<number>();
+    const shifts: number[] = [];
     for (let i = 0; i < before.length; i++) {
       const shift = after[i]!.y - before[i]!.y;
       // Only stars that did not wrap this frame say anything about the rate.
       if (Math.abs(shift) > FIELD_HEIGHT / 2) continue;
-      moved.add(Math.round(shift * 1000) / 1000);
-    }
-    expect(moved.size).toBe(3);
-    for (const shift of moved) {
+      shifts.push(shift);
       expect(shift).toBeGreaterThan(0);
       expect(shift).toBeLessThan(CLIMB);
     }
+    expect(shifts.length).toBeGreaterThan(20);
+  });
+
+  /**
+   * **The depth is continuous, and that is the point of it.** The first build gave
+   * each of the three tiers one speed and one size, and three rates read as three
+   * flat planes sliding over each other rather than as space. Every star now
+   * carries its own depth and takes its speed and its size from it — *"more depth
+   * with more varied star sizes"* (author, 2026-08-30).
+   */
+  it('gives nearly every star its own speed, not one per tier', () => {
+    const CLIMB = 100;
+    const before = drawn(sky, 1000);
+    const after = drawn(sky, 1000 - CLIMB);
+    const rates = new Set<number>();
+    for (let i = 0; i < before.length; i++) {
+      const shift = after[i]!.y - before[i]!.y;
+      if (Math.abs(shift) > FIELD_HEIGHT / 2) continue;
+      rates.add(Math.round(shift * 1e6));
+    }
+    expect(rates.size).toBeGreaterThan(20);
+  });
+
+  it('spreads its sizes on a curve, so the near ones pull away from the pack', () => {
+    const sizes = sky.flatMap((tier) => tier.stars.map((star) => star.size)).sort((a, b) => a - b);
+    expect(sizes.length).toBe(STAR_COUNT);
+    // A real spread rather than the 1.8x the first build had.
+    expect(sizes.at(-1)! / sizes[0]!).toBeGreaterThan(3);
+    // And squared rather than even: the median sits well below the midpoint of
+    // the range, which is what leaves the near stars room to stand out.
+    const middle = (sizes[0]! + sizes.at(-1)!) / 2;
+    expect(sizes[Math.floor(sizes.length / 2)]!).toBeLessThan(middle);
+  });
+
+  it('makes a nearer star both faster and bigger, always', () => {
+    const all = sky.flatMap((tier) => tier.stars);
+    for (const star of all)
+      for (const other of all) {
+        if (star.z <= other.z) continue;
+        expect(star.parallax).toBeGreaterThan(other.parallax);
+        expect(star.size).toBeGreaterThan(other.size);
+      }
   });
 
   it('is the same sky every time it is asked for, from the same seed', () => {
@@ -121,6 +160,17 @@ describe('the sky', () => {
     for (const shade of shades) expect(shade).not.toBe(CORE);
     expect(sky.map((tier) => tier.alpha)).toEqual([...sky.map((t) => t.alpha)].sort());
     for (const tier of sky) expect(tier.alpha).toBeLessThan(1);
+  });
+
+  /**
+   * Brightness stays quantised where size and speed are continuous, and that is
+   * deliberate: `fillStyle` and `globalAlpha` are context state, so a per-star
+   * value would cost a state change per star where a per-star size costs nothing.
+   */
+  it('still draws the whole sky in three batches', () => {
+    const { context, marks } = recorder();
+    drawStarfield(context, sky, AT(0), 0, DESIGN_HEIGHT);
+    expect(new Set(marks.map((mark) => `${mark.fill}@${mark.alpha}`)).size).toBeLessThanOrEqual(3);
   });
 
   it('is one colour at three brightnesses, and not three colours', () => {
