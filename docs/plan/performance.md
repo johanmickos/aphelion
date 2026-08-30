@@ -745,15 +745,25 @@ award word — measured on the same machine in the same session, before and afte
 
 | per frame | before | after |
 |---|---|---|
-| arcs | 36.98 | 37.02 |
-| strokes | 26.90 | 27.53 |
+| gradients | 4.83 | **4.41** |
+| arcs | 36.98 | **36.26** |
+| strokes | 26.90 | 27.56 |
 | **overdraw, screens** | **1.574** | **1.574** |
 
-**+0.6 strokes and no measurable paint.** Two reasons, and both were decisions rather than luck:
+**+0.7 strokes, and fewer gradients and fewer arcs than it started with.** Three reasons, and all three were decisions rather than luck:
 the compass went from four rings to three in the same step, which gave back most of what the arc
-took; and **the farewell ring is stroked rather than filled**, which is the one thing §6 named as
-able to move overdraw — an expanding filled ring is the only shape in the milestone whose area
-grows as the square of what is being animated.
+took; **the farewell ring is stroked rather than filled**, which is the one thing §6 named as able
+to move overdraw — an expanding filled ring is the only shape in the milestone whose area grows as
+the square of what is being animated; and the award word's glow became a **rim**, which turned a
+radial gradient into a stroke around glyphs and is why the gradient count came *down*.
+
+**And the census itself was broken for part of the day**, which is worth recording because nothing
+caught it. Its counting context is a hand-written stand-in for a browser API, and it rots in one
+direction: the renderer starts using a call it does not have. `strokeText` went missing the moment
+the word gained its rim — `pnpm profile` threw, and `pnpm check` does not run `pnpm profile`, so
+the tool this section is written with was silently unusable. `test/census.test.ts` now drives the
+real renderer through the real stand-in over the shipped run, and fails if a call is missing or if
+the counters stop counting.
 
 The tick side did not move either: **0.150ms before and 0.147 – 0.150 after** at 1 536 bodies, on
 three runs. The sweep's × column shifts from 19.7 to 21.3 only because the 24-body baseline it

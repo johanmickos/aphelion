@@ -124,7 +124,7 @@ const now = (): number => Number(process.hrtime.bigint()) / 1e6;
  * units, and a real canvas would answer a different question with more
  * equipment. This one keeps sizes as well as widths.
  */
-interface Census {
+export interface Census {
   gradients: number;
   arcs: number;
   fills: number;
@@ -148,7 +148,17 @@ function census(): Census {
  * overdraw. It is one screen, every frame, on every machine, and it is not what
  * anybody is looking for.
  */
-function counter(into: Census): CanvasRenderingContext2D {
+/**
+ * A canvas that counts instead of painting.
+ *
+ * Exported so `test/census.test.ts` can drive the **real** renderer through it.
+ * It is a hand-written stand-in for a browser API, which means it rots in exactly
+ * one way: the renderer starts using a call it does not have, and the census
+ * throws — or, worse, would silently under-count if the missing member were
+ * optional. `strokeText` was the first to catch it out, on the tick the award
+ * word gained its rim.
+ */
+export function counter(into: Census): CanvasRenderingContext2D {
   // One object, handed back by every `createRadialGradient`, so a gradient fill
   // is told from a flat one by identity: the renderer assigns what it was given
   // to `fillStyle`, and nothing else in the file produces this object.
@@ -213,6 +223,14 @@ function counter(into: Census): CanvasRenderingContext2D {
     },
     measureText: () => ({ width: 0 }),
     fillText: () => {},
+    // Counted as a stroke, because that is what it costs: the callout's word is
+    // rimmed rather than bloomed (spec 06 §4, flown 2026-08-29), and a rim is a
+    // stroke around glyphs. It was missing here and the census threw rather than
+    // under-counting, which is the right way round — a fake context that quietly
+    // swallows a call the renderer really makes is a census that lies.
+    strokeText: () => {
+      into.strokes += 1;
+    },
     setLineDash: () => {},
   };
   return context as unknown as CanvasRenderingContext2D;
