@@ -383,10 +383,7 @@ describe('the look-ahead', () => {
     expect(settle(faster).camera.y).toBeCloseTo(settle(fast).camera.y, 6);
     // And the extent is the prototype's fraction of the axis it travels, less
     // the deadzone the view settles at the edge of.
-    expect(fast.craft.y - settle(fast).camera.y).toBeCloseTo(
-      LOOK_AHEAD * DESIGN_HEIGHT - DEADZONE,
-      3,
-    );
+    expect(fast.craft.y - settle(fast).camera.y).toBeCloseTo(LOOK_AHEAD - DEADZONE, 3);
   });
 
   /**

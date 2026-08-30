@@ -92,30 +92,47 @@ export const DEADZONE = MEDIAN_RADIUS + FLOOR_GAP;
 export const FOLLOW_RATE = 3;
 
 /**
- * How far ahead of the craft the view sits at [`LOOK_REF_SPEED`](#) and above, as
- * a fraction of the design space along the axis of travel.
+ * How far ahead of the craft the view sits at [`LOOK_REF_SPEED`](#) and above, in
+ * design units.
  *
- * **The prototype's 0.18, carried across an axis** (ADR-0013). Its own look-ahead
- * is *horizontal*, because its playfield is wider than its window and sideways is
- * where its interesting movement is; this field is a vertical corridor and the
- * whole game is a climb, so the behaviour — *"look where you are going, not where
- * you have been"* — belongs on the other axis. Carrying the code would have
- * carried the axis and done nothing (`camera.ts` has no sideways movement to
- * lead); carrying the behaviour moves it to the axis this game actually has.
+ * **The prototype's own extent, and it is a distance rather than a fraction.**
+ * Its look-ahead is written as `0.18` of the design window's **width**, because
+ * its playfield is wider than its window and sideways is where its interesting
+ * movement is — `0.18 x 390 = 70` prototype units, which is `70 x SCALE = 210`
+ * here. This field is a vertical corridor and the whole game is a climb, so the
+ * behaviour — *"look where you are going, not where you have been"* — belongs on
+ * the other axis (ADR-0013).
  *
- * **It answers a measured complaint.** The author, 2026-08-30: *"when I go fast I
- * often feel like the camera isn't showing me far enough ahead to make a safe
- * capture."* Measured over 6 267 ticks of climbing in their own dispatches, the
- * craft sat **337 design units above centre at p50 and 497 at p95** — the ease
- * lag and the deadzone between them — so the view was spending a third of its
- * height showing where the craft had been.
+ * ## The fraction did not survive the crossing, and the author felt it
  *
- * The prototype's own reason is the same one and it names the mechanism exactly:
- * *"a deadzone that has no idea which way you are going."* It also records why
- * this is safe where centring the target is not — *"this is a function of the
- * ship's velocity, which the camera cannot influence, so there is no loop."*
+ * Carrying `0.18` and applying it to `DESIGN_HEIGHT` gives **456** — more than
+ * twice the prototype's actual reach, because the axis it was a fraction *of* is
+ * this repo's short side and the axis it now leads along is the long one. Flown,
+ * that read as *"the camera is really aggressively locked on the ship"*
+ * (2026-08-30): a lead that large turns every change in vertical speed into a
+ * large movement of the target, so the view is always chasing something.
+ *
+ * Measured on the run the author flagged, as camera travel over craft travel
+ * where 1.0 is glued to the ship: **0.618 at 456, 0.568 at 210, and 0.553 with no
+ * lead at all.** So the prototype's own extent costs almost nothing over having
+ * none, and keeps most of the forward view it was added for. The number that is
+ * carried is the distance; the fraction was an artefact of which axis it was
+ * written against.
+ *
+ * ## Why it was added
+ *
+ * The author, 2026-08-30: *"when I go fast I often feel like the camera isn't
+ * showing me far enough ahead to make a safe capture."* Measured over 6 267 ticks
+ * of climbing in their own dispatches, the craft sat **337 design units above
+ * centre at p50 and 497 at p95** — the ease lag and the deadzone between them —
+ * so the view was spending a third of its height showing where the craft had
+ * been. The prototype's own reason is the same one and names the mechanism
+ * exactly: *"a deadzone that has no idea which way you are going."* It also
+ * records why this is safe where centring the target is not — *"this is a
+ * function of the ship's velocity, which the camera cannot influence, so there is
+ * no loop."*
  */
-export const LOOK_AHEAD = 0.18;
+export const LOOK_AHEAD = 70 * SCALE;
 
 /**
  * The speed at which the look-ahead reaches its full extent, in design units per
@@ -281,7 +298,7 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
  */
 function leadOf(vy: number): number {
   const share = Math.max(-1, Math.min(1, vy / LOOK_REF_SPEED));
-  return share * LOOK_AHEAD * DESIGN_HEIGHT;
+  return share * LOOK_AHEAD;
 }
 
 /**

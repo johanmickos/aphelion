@@ -27,12 +27,33 @@ window. This field is a vertical corridor, so the behaviour crosses axes and the
 frozen — the prototype's hard-learned rule, since after the freeze velocity stops meaning heading
 and *"anything steering off it swings the view."* Headroom lost at p50: **337 → 56**.
 
-**The first attempt overshot and the author caught it in one flight.** Removing the deadzone while
-coasting — which the prototype does, having none on this axis — took the craft to dead centre and
-read as *"WAY too fixed on the ship... the camera needs to be MUCH smoother."* **The band is the
-float.** It went back, and the lead alone carries the headroom: the camera is still perfectly still
-on **36.2%** of ticks against 39.3% before, and the tick-to-tick change in its movement is
-unchanged at p50. Only 0.5% of ticks move further than the old maximum, none of them at the freeze.
+**It took two corrections, both flown.**
+
+*First*, removing the deadzone while coasting — which the prototype does, having none on this axis —
+took the craft to dead centre and read as *"WAY too fixed on the ship... the camera needs to be MUCH
+smoother."* **The band is the float**, and it went back.
+
+*Second*, the lead itself was **more than twice the prototype's**, and the reason is worth keeping:
+its `0.18` is a fraction of the design window's **width**, because its playfield is wider than its
+window. Applied to this repo's `DESIGN_HEIGHT` the same fraction gives **456** design units where
+the prototype reaches **210** (`0.18 × 390 × SCALE`). A fraction does not survive being moved
+between axes of different lengths; the **distance** is what was carried from. Flown at 456 it read as
+*"the camera is really aggressively locked on the ship"* — a lead that large turns every change in
+vertical speed into a large movement of the target, so the view is always chasing.
+
+Measured on the run the author flagged, as camera travel over craft travel where 1.0 is glued:
+
+| lead | lockedness | headroom lost, p50 |
+|---|---|---|
+| none (before this work) | 0.553 | 337 |
+| **210 — the prototype's** | **0.568** | **198** |
+| 456 — the mis-carried fraction | 0.618 | 56 |
+
+So the prototype's own extent costs 3% of lockedness over having no lead at all, against 12% for the
+fraction, and still returns 40% of the lost view. The camera is perfectly still on **37%** of ticks
+against 41% with no lead; its worst single-tick movement is **26.4** against 25.3 before, where the
+mis-carry reached 35.4; and the ticks moving further than the old maximum fall from 0.5% to
+**0.03%**.
 
 **The starfield was carried in the wrong unit.** *"Tiny specks of white with little to no
 variation, so it doesn't look very deep or immersive."* The prototype sizes stars in **device
