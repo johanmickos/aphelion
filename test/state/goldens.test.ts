@@ -59,6 +59,42 @@ function shippedRun(): PresentationState[] {
 
 const RUN = shippedRun();
 
+/**
+ * A second run, flown by the author, for the **arrival** alone.
+ *
+ * `RUN` above is the headless pilot's and every other golden in this file rides
+ * on it, which is right: it is the same recipe `pnpm replay` ships and the same
+ * one the version fingerprint is taken over. It cannot carry these tests, and the
+ * reason is a finding rather than an inconvenience — **the pilot never makes a
+ * tight arrival.** Thirty-two captures in `pilot-60s.json` and not one of them
+ * earns the word: it either falls straight at a body and reaches the floor for
+ * free, or grazes one from 200 units out and never comes down. `test/sim/run.ts`
+ * says so about itself in its own prose — *aim* is the one input it cannot
+ * reproduce — and an accolade that a bot pressing on distance alone can farm
+ * would be the wrong accolade.
+ *
+ * So the fixture is real play, and it is deliberately **the run that ruled this
+ * word**: fifteen captures, of which the first build of the test paid ten, flown
+ * by the author on 2026-08-30 with the verdict *"some of the captures were too
+ * easily giving away the word."* Three of the fifteen earn it now, and that count
+ * is pinned below.
+ */
+function flownArrivals(): PresentationState[] {
+  const text = readFileSync(new URL('../recipes/arrival-flown.json', import.meta.url), 'utf8');
+  const { recipe } = parseDispatch(JSON.parse(text));
+  let view = createPresentation(openRun(recipe));
+  const views = [view];
+  replayRun(recipe, {
+    onTick: (state) => {
+      view = derive(view, state);
+      views.push(view);
+    },
+  });
+  return views;
+}
+
+const FLOWN = flownArrivals();
+
 /** The picture on a named tick. Indices are ticks, because tick zero is index zero. */
 const at = (tick: number): PresentationState => {
   const view = RUN[tick]!;
@@ -550,24 +586,40 @@ describe('the arrival · a word for the capture', () => {
    * **how close the closest approach came to the body's floor**, on one rung
    * rather than a ladder, in its own slot beside the release's.
    */
+  /**
+   * **The count is the test**, because the failure this word had was never a
+   * crash: it was a word said too often to mean anything. Fifteen captures, three
+   * words. Loosening either half of `arrivedTight` moves this number and fails
+   * here, which is the only thing standing between the author's verdict and a
+   * quiet regression back to ten.
+   */
+  it('is said three times in fifteen captures, and not ten', () => {
+    const captures = FLOWN.filter(
+      (view, i) => i > 0 && view.compass?.hand != null && FLOWN[i - 1]!.compass?.hand == null,
+    ).length;
+    const said = FLOWN.filter((view) => view.arrival?.life.age === 0).length;
+    expect(captures).toBe(15);
+    expect(said).toBe(3);
+  });
+
   it('is struck at the freeze and nowhere else', () => {
-    for (let i = 1; i < RUN.length; i++) {
-      const word = RUN[i]!.arrival;
+    for (let i = 1; i < FLOWN.length; i++) {
+      const word = FLOWN[i]!.arrival;
       if (word === null || word.life.age !== 0) continue;
       // The freeze is the tick the closest approach becomes a fact: the compass
       // has a hand from that tick and had none on the one before.
-      expect(RUN[i]!.compass?.hand).not.toBeNull();
-      expect(RUN[i - 1]!.compass?.hand ?? null).toBeNull();
+      expect(FLOWN[i]!.compass?.hand).not.toBeNull();
+      expect(FLOWN[i - 1]!.compass?.hand ?? null).toBeNull();
     }
   });
 
   /** And placed at the closest approach itself — the place that earned it. */
   it('is born where the craft was when it froze', () => {
-    for (let i = 0; i < RUN.length; i++) {
-      const word = RUN[i]!.arrival;
+    for (let i = 0; i < FLOWN.length; i++) {
+      const word = FLOWN[i]!.arrival;
       if (word === null || word.life.age !== 0) continue;
-      expect(word.bornX).toBe(RUN[i]!.craft.x);
-      expect(word.bornY).toBe(RUN[i]!.craft.y);
+      expect(word.bornX).toBe(FLOWN[i]!.craft.x);
+      expect(word.bornY).toBe(FLOWN[i]!.craft.y);
       expect(word.y).toBe(word.bornY);
     }
   });
@@ -579,7 +631,7 @@ describe('the arrival · a word for the capture', () => {
    */
   it('says one of its three words, and the body decides which', () => {
     let said = 0;
-    for (const view of RUN) {
+    for (const view of FLOWN) {
       const word = view.arrival;
       if (word === null) continue;
       expect(ARRIVAL_WORDS as readonly string[]).toContain(word.word);
@@ -595,22 +647,22 @@ describe('the arrival · a word for the capture', () => {
    * body you arrived at, versus the dot you left from.
    */
   it('never displaces the release word, and can be lit beside it', () => {
-    const together = RUN.filter((view) => view.arrival !== null && view.callout !== null);
+    const together = FLOWN.filter((view) => view.arrival !== null && view.callout !== null);
     expect(together.length).toBeGreaterThan(0);
   });
 
   /** It climbs and leaves on the callout's own curves, because they are one grammar. */
   it('climbs and fades like the release word does', () => {
-    const born = RUN.findIndex((v) => v.arrival?.life.age === 0);
+    const born = FLOWN.findIndex((v) => v.arrival?.life.age === 0);
     expect(born).toBeGreaterThan(0);
     const rise: number[] = [];
     for (let i = born; i < born + arrivalTicks(); i++) {
-      const word = RUN[i]!.arrival!;
+      const word = FLOWN[i]!.arrival!;
       rise.push(word.bornY - word.y);
     }
     for (let i = 1; i < rise.length; i++) expect(rise[i]!).toBeGreaterThanOrEqual(rise[i - 1]!);
-    expect(RUN[born + arrivalTicks() - 1]!.arrival!.strength).toBeLessThan(0.05);
-    expect(RUN[born + arrivalTicks()]!.arrival).toBeNull();
+    expect(FLOWN[born + arrivalTicks() - 1]!.arrival!.strength).toBeLessThan(0.05);
+    expect(FLOWN[born + arrivalTicks()]!.arrival).toBeNull();
   });
 });
 

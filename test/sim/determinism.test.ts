@@ -131,12 +131,14 @@ describe('the snapshot', () => {
       'y',
     ]);
     expect(Object.keys(fly(1, 100).dive!).sort()).toEqual([
+      'aim',
       'clearanceTicks',
       'grabRadius',
       'peakEnergy',
       'smallestRadius',
     ]);
     expect(Object.keys(fly(1, 300).orbit!).sort()).toEqual([
+      'aim',
       'depth',
       'direction',
       'eccentricity',

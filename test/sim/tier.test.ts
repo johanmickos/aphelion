@@ -11,7 +11,16 @@
  * recomputed from the formula it is checking has stopped being a check.
  */
 import { describe, expect, it } from 'vitest';
-import { alignmentOf, PERFECT_FLOOR, SHARP_ZONE, tierFor, TRUE_ZONE } from '../../src/sim/tier.ts';
+import {
+  alignmentOf,
+  ARRIVAL_BAND,
+  ARRIVAL_SIDEWAYS,
+  arrivedTight,
+  PERFECT_FLOOR,
+  SHARP_ZONE,
+  tierFor,
+  TRUE_ZONE,
+} from '../../src/sim/tier.ts';
 
 const deg = (x: number): number => (x * Math.PI) / 180;
 /** A hair, so a boundary can be probed from both sides without touching it. */
@@ -108,5 +117,56 @@ describe('the alignment ramp', () => {
 
   it('does not care which side of the dot the hand is on', () => {
     for (const d of [0.1, 0.4, 1.2]) expect(alignmentOf(d)).toBe(alignmentOf(-d));
+  });
+});
+
+describe('the arrival · both halves have to be true', () => {
+  const FLOOR = 159;
+
+  it('refuses a dive that got to the floor pointed straight at the body', () => {
+    // The bug the author flew on 2026-08-30: *"some of the captures were too
+    // easily giving away the word."* The floor is a guarantee, so a dive aimed
+    // at the body reaches it for free and must not be paid for arriving.
+    expect(arrivedTight(FLOOR, FLOOR, 0)).toBe(false);
+    expect(arrivedTight(FLOOR + 1, FLOOR, 0.23)).toBe(false);
+  });
+
+  it('refuses a sideways approach that never came down', () => {
+    // The author's own exclusion: *"far away grabs at closest approach don't
+    // count."* A graze is not an arrival however well it was aimed.
+    expect(arrivedTight(FLOOR + 200, FLOOR, 0.98)).toBe(false);
+  });
+
+  it('pays a sideways approach that did come down', () => {
+    expect(arrivedTight(FLOOR + 1, FLOOR, 0.75)).toBe(true);
+  });
+
+  it('grades the angle and not a distance, so a press with no room can still earn it', () => {
+    // The denominator bug, kept as a test because the reading is what broke and
+    // not the threshold. A press 16 units above a floor of 159 has an impact
+    // parameter of at most 175 — 1.10 floors — so a rule comparing that distance
+    // to the floor was unreachable for the most committed presses in the game.
+    // The author flew exactly this one and reported it: *"my last capture felt
+    // really tight and should've been awarded a word."*
+    const grabRadius = 175;
+    const sideways = 124;
+    expect(sideways / FLOOR).toBeLessThan(1); // what the broken rule asked for
+    expect(arrivedTight(FLOOR + 0.9, FLOOR, sideways / grabRadius)).toBe(true);
+  });
+
+  it('leaves the author their margin: 45 degrees was the derived line and is not the line', () => {
+    // 0.708 is the author's *"really tight"* capture. Exactly 45 degrees would
+    // have admitted it by one part in a thousand, which is a coin toss.
+    const SIN_45 = Math.sqrt(0.5);
+    expect(0.708).toBeGreaterThan(SIN_45);
+    expect(0.708 - SIN_45).toBeLessThan(0.002);
+    expect(ARRIVAL_SIDEWAYS).toBeLessThan(SIN_45);
+    expect(0.708 - ARRIVAL_SIDEWAYS).toBeGreaterThan(0.1);
+  });
+
+  it('is exactly the band and the angle at their edges, inclusive', () => {
+    expect(arrivedTight(FLOOR + ARRIVAL_BAND, FLOOR, ARRIVAL_SIDEWAYS)).toBe(true);
+    expect(arrivedTight(FLOOR + ARRIVAL_BAND + 0.001, FLOOR, ARRIVAL_SIDEWAYS)).toBe(false);
+    expect(arrivedTight(FLOOR, FLOOR, ARRIVAL_SIDEWAYS - 0.001)).toBe(false);
   });
 });

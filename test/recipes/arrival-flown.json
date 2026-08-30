@@ -1,0 +1,23 @@
+{
+  "kind": "run-dispatch",
+  "at": "2026-08-30T05:38:44.092Z",
+  "recipe": {
+    "version": 2,
+    "field": {
+      "generator": "fixture",
+      "version": 1
+    },
+    "sim": 6,
+    "seed": 1,
+    "ticks": 2979,
+    "log": [
+      55, 165, 187, 406, 443, 552, 573, 686, 715, 823, 843, 945, 966, 1174, 1215, 1324, 1350, 1446,
+      1475, 1527, 1534, 1712, 1743, 1862, 1881, 1903, 1919, 2038, 2055, 2202, 2230, 2334, 2358,
+      2452, 2480, 2856
+    ]
+  },
+  "observed": {
+    "ticks": [2888],
+    "note": "Flown by the author on a phone, 2026-08-30. This is the run that ruled the arrival's aim gate: of its fifteen captures the closeness-only test paid ten, and the author flew it and said \"some of the captures were too easily giving away the word\". Kept as the fixture for the arrival goldens because the headless pilot cannot produce one -- 32 captures in pilot-60s.json and not a single tight arrival among them, which is test/sim/run.ts's own admission that aim is the thing it cannot reproduce."
+  }
+}

@@ -126,7 +126,45 @@ release **defers** the carry rather than destroying it (ADR-0008), which amends 
 > **What is graded is a distance and not depth**, and that is measured: depth saturates at p50
 > exactly **1.00** over 493 captures, so more than half of everything would earn the top word.
 >
-> ## ⚠ And the band is provisional, because the distance saturates too
+> ## ⚠ Ruled and rebuilt, 2026-08-30 — closeness is half the test, and **aim** is the other half
+>
+> The band below shipped alone for a day and the author flew it: *"some of the captures were too
+> easily giving away the word."* The measurement under it is the reason, and it is a **finding
+> rather than a tuning problem**. At the freeze, over 374 captures, the closest approach lands p25
+> **0.3** design units above the floor, p50 **1.2**, p75 57. That is not a spread — it is nearly
+> **binary**, because **the floor is a guarantee, so a dive pointed at a body reaches it for
+> free**, and 68% do. No threshold selects a rare group: 4 units catches 68%, 25 catches 71%, 80
+> catches 77%.
+>
+> So a second reading was added rather than the first one tuned: **aim**, the sine of the angle the
+> press was made at. A coasting craft feels no gravity, so the path a press interrupts is a
+> straight line and this is that line's true angle. The word now needs both — *you got to the
+> surface*, and *the body had to be caught rather than hit*. On the author's own 71 captures that
+> is **13%**, the frequency this word was aimed at from the start, against 75% for the closeness
+> alone. The run that ruled it is kept as `test/recipes/arrival-flown.json`.
+>
+> **The denominator was got wrong once and the author found it in one run.** The first attempt
+> compared the undivided impact parameter to the floor — *"the line you were on would have missed
+> the surface, and you got to it anyway"* — which reads beautifully and is broken, because that
+> distance can never exceed the radius it is measured at. A press made 16 units above a floor of
+> 159 has a ceiling of 1.10 floors however perfectly it is flown, so the test became unreachable
+> for the most committed presses in the game. The author flew exactly that one: *"my last capture
+> felt really tight and should've been awarded a word."* Dividing by the radius as well as the
+> speed makes it an **angle**, which is scale-free, and fixes it at the root.
+>
+> **The threshold is ruled by an example rather than derived**, which is worth being plain about.
+> 0.7071 — exactly 45°, where a craft closes sideways as fast as inward — needs no constant and was
+> the candidate. It was rejected because the author's *"really tight"* capture measures **0.708**,
+> and a line their own example clears by one part in a thousand is a coin toss. It sits at 0.6, 8°
+> inside, and ADR-0004 is the authority: the author is the feel gate.
+>
+> **`SIM_VERSION` did not move**, and that was checked rather than assumed. The dive and the orbit
+> both gained a recorded number, so the snapshot grew and its fingerprint moved — but no tick flew
+> differently, which was proved by adding the fields with the snapshot untouched and watching
+> `test/sim/version.test.ts` go on passing. The author's whole dispatch corpus still replays. See
+> that test's own comment for the rule.
+>
+> ## ⚠ Superseded — the band alone, as first shipped
 >
 > Measured at the freeze over **374 captures on the current physics**, the closest approach lands
 > p25 **0.3** design units above the floor, p50 **1.2**, p75 57, p95 250. That is not a spread —
@@ -135,12 +173,10 @@ release **defers** the carry rather than destroying it (ADR-0008), which amends 
 > axes saturate the same way — the speed at the freeze is at its clamp on **51%** of captures, and
 > *close **and** fast* is still 33%.
 >
-> **So closeness alone cannot make this rare.** What ships is the author's own *"short distance"* at
-> 25 units, which currently says *you reached the floor* on about seven captures in ten — more often
-> than §1 would like a word to be said. It is flagged in `src/sim/tier.ts` rather than tuned,
-> because tuning it cannot fix it. The two paths out are a **streak** — §3's grammar already
-> exists, and 68% per capture makes five in a row 15% — or a different axis, the dive's **aim**
-> being the one thing the player controls that the floor does not clamp.
+> **So closeness alone cannot make this rare.** The two paths recorded here were a **streak** and
+> *"a different axis, the dive's **aim** being the one thing the player controls that the floor does
+> not clamp."* The author chose the second and it is built, above. The streak is unspent and §3's
+> grammar still exists for it.
 
 ## 1 · The law
 

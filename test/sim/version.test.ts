@@ -19,6 +19,24 @@
  * `SIM_VERSION` and the fingerprint together and know that every recipe recorded
  * before now stops replaying. If you meant to change nothing — a refactor that
  * should have been bit-identical — the fingerprint has just told you it was not.
+ *
+ * ## And there is a third case, which is why this comment grew
+ *
+ * The fingerprint is taken over [`snapshot`](../../src/sim/snapshot.ts), so it
+ * moves when the **picture** grows as well as when the **flight** changes — and
+ * those want opposite answers. A run that flies the same route and merely
+ * records one more number about itself must **not** refuse the recipes recorded
+ * before it, because nothing about them was flown differently.
+ *
+ * So when this fails, the question to answer is *did a tick move?* rather than
+ * *did the bytes move?*, and there is a way to answer it that is not a judgement
+ * call: **add the field to the record but not to the snapshot, and run this.**
+ * If it still passes, the flight is provably untouched and what is owed is this
+ * fingerprint and `SNAPSHOT_VERSION` — not `SIM_VERSION`. That is exactly how
+ * `Dive.aim` and `Orbit.aim` were landed on 2026-08-30 with the author's whole
+ * dispatch corpus still replaying. Note that `SNAPSHOT_VERSION` is the first
+ * `u32` in the bytes, so bumping it moves this on its own — which is the same
+ * *picture, not flight* case a second time and wants the same answer.
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
@@ -45,11 +63,16 @@ describe('the simulation behaviour version', () => {
       replayRun(recipeOf(recorder), { onTick: (state) => digest.update(snapshot(state)) });
     }
 
+    // Unmoved on 2026-08-30 while the fingerprint below moved, and deliberately:
+    // the snapshot gained the dive's **aim**, which is recorded and never read by
+    // the physics. Checked the way the comment above prescribes — the field was
+    // added to `Dive` and `Orbit` with the snapshot untouched, and this test went
+    // on passing at `5d8fb46a1c605645`.
     expect(SIM_VERSION).toBe(6);
     expect(
       digest.digest('hex').slice(0, 16),
       'the swing changed: bump SIM_VERSION and this fingerprint together, and every recipe ' +
         'recorded before now stops replaying',
-    ).toBe('5d8fb46a1c605645');
+    ).toBe('6d63575f6e477356');
   });
 });

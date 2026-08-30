@@ -28,16 +28,16 @@ import type { SimState } from './types.ts';
  * generator for the same reason — so a stored one has to be able to say it was
  * written by a different game.
  */
-export const SNAPSHOT_VERSION = 4;
+export const SNAPSHOT_VERSION = 5;
 
 // The craft's four numbers, then the three the release's burst rides on.
 const HEADER_BYTES = 4 + 4 + 4 + 4 + (4 + 3) * 8 + 4 * 4 + 1 + 1 + 8;
 /** The corridor's centreline, half-width and foot. */
 const CORRIDOR_BYTES = 3 * 8;
-/** A presence byte, then a dive's four numbers. */
-const DIVE_BYTES = 1 + 4 * 8;
-/** A presence byte, then the seven numbers of an orbit and its tick count. */
-const ORBIT_BYTES = 1 + 7 * 8 + 4;
+/** A presence byte, then a dive's five numbers. */
+const DIVE_BYTES = 1 + 5 * 8;
+/** A presence byte, then the eight numbers of an orbit and its tick count. */
+const ORBIT_BYTES = 1 + 8 * 8 + 4;
 const BODY_BYTES = 4 * 8 + 1;
 
 /** The type ordinals, fixed by position. Appending is safe; reordering is not. */
@@ -115,6 +115,7 @@ export function snapshot(state: SimState): Uint8Array {
   const dive = state.dive;
   flag(dive !== null);
   f64(dive ? dive.grabRadius : 0);
+  f64(dive ? dive.aim : 0);
   f64(dive ? dive.smallestRadius : 0);
   f64(dive ? dive.peakEnergy : 0);
   f64(dive ? dive.clearanceTicks : 0);
@@ -127,6 +128,7 @@ export function snapshot(state: SimState): Uint8Array {
   f64(orbit ? orbit.periapsisAngle : 0);
   f64(orbit ? orbit.direction : 0);
   f64(orbit ? orbit.depth : 0);
+  f64(orbit ? orbit.aim : 0);
   f64(orbit ? orbit.phase : 0);
   u32(orbit ? orbit.ticksSinceFreeze : 0);
 

@@ -85,6 +85,18 @@ export interface Orbit {
    */
   readonly depth: number;
   /**
+   * Where the press that began this swing was pointed, as the sine of its
+   * approach angle (`CONTEXT.md`: **aim**) — [`Dive.aim`](./dive.ts), carried
+   * across the freeze.
+   *
+   * The second thing the orbit keeps from the dive that is not geometry, and it
+   * is kept for the same reason **depth** is: the dive is discarded on the tick
+   * the orbit is made ([`step.ts`](./step.ts)), and both of these are read after
+   * that. Depth says how hard the dive committed; this says where it was
+   * pointed, and the glossary keeps them apart on purpose.
+   */
+  readonly aim: number;
+  /**
    * How far round from periapsis the craft has swept, in radians.
    *
    * Accumulated through the settle and then left alone: once the shape and the
@@ -267,7 +279,11 @@ export function predictOrbit(craft: Craft, body: Body): Orbit | null {
     momentum,
     periapsisAngle,
     direction: momentum < 0 ? -1 : 1,
+    // A prediction is a shape and not a swing: nothing reads either of these off
+    // one, and a plausible-looking number here would be a reading of a dive that
+    // has not happened.
     depth: 0,
+    aim: 0,
     phase: 0,
     ticksSinceFreeze: 0,
   };
@@ -334,6 +350,7 @@ export function freeze(craft: Craft, body: Body, dive: Dive): Orbit {
     // the same tie-break for the one that somehow did not.
     direction: momentum < 0 ? -1 : 1,
     depth: reach > 0 ? Math.min(Math.max((dive.grabRadius - periapsis) / reach, 0), 1) : 1,
+    aim: dive.aim,
     phase: 0,
     ticksSinceFreeze: 0,
   };

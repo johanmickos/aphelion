@@ -294,14 +294,26 @@ where it was born, world-anchored, so the craft leaves it behind rather than car
 _Avoid_: award (that is the grading, and a callout is how it is said), banner, toast, popup,
 score text
 
+**Aim**:
+Where a **press** was pointed: the sine of the angle between the craft's velocity and the line to
+the body, 0 straight at it and 1 exactly past it. Because a coasting craft feels no gravity the
+path a press interrupts is a straight line, so this is that line's true angle and not an estimate
+of one. An **angle** and never the distance it subtends — the distance cannot exceed the radius it
+was measured at, so it is unreachable for the closest presses, which is the bug the author flew on
+2026-08-30. Half of what an **arrival** is graded on; **depth** is not aim, and neither is
+**alignment**, which is a release's reading of the same word.
+_Avoid_: impact parameter (the undivided distance, and the thing that broke), approach angle,
+attack angle, sidewaysness
+
 **Arrival**:
-How close a **dive**'s closest approach came to the body's **floor**, and the word a tight one
-earns. It is graded as a **distance** and not as a ratio — **depth** is the ratio and it
-saturates — on one rung rather than a ladder, so a **capture** either says something or says
-nothing. There is no instrument for it and that is deliberate: the cue is the body's own light,
+The word a **dive** earns for being hard, and the two readings that decide it: how close its
+closest approach came to the body's **floor**, and how sideways its **aim** was. Both are needed
+and neither works alone — the floor is a guarantee, so a dive pointed at a body reaches it for
+free, and a dive aimed perfectly may never come down. Graded on one rung rather than a ladder, so
+a **capture** either says something or says nothing. There is no instrument for it and that is deliberate: the cue is the body's own light,
 which already grows with **grip** and swells with **closing** as the craft comes in.
 _Avoid_: capture quality (a **capture** is the event and this is the reading of it), tightness
-(that is on **depth**'s avoid line), approach
+(that is on **depth**'s avoid line), approach, capture grade
 
 **Farewell ring**:
 **Refused** (author, 2026-08-29). It named the orbit detaching from the body and expanding away at

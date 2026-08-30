@@ -31,7 +31,7 @@ import { speedOf } from './craft.ts';
 import { easeClearance } from './clearance.ts';
 import { bounce, bounceOffOthers, inContact } from './contact.ts';
 import { integrate } from './integrate.ts';
-import { specificEnergy } from './kepler.ts';
+import { angularMomentum, specificEnergy } from './kepler.ts';
 import { distance } from './math.ts';
 import type { Field } from './types.ts';
 import { FLOOR_GAP, SECONDS_PER_TICK, SUBSTEPS } from './units.ts';
@@ -46,6 +46,36 @@ export interface Dive {
    * the craft is a long way from where it was pressed.
    */
   readonly grabRadius: number;
+  /**
+   * Where the press was pointed: the **sine of the approach angle**, from 0 for
+   * a craft aimed dead at the body's centre to 1 for one going exactly sideways
+   * past it (`CONTEXT.md`: **aim**).
+   *
+   * `|r x v| / (|r| |v|)`. The numerator over `|v|` alone is the impact
+   * parameter — the perpendicular distance from the body's centre to the line
+   * the craft was flying — and dividing by `|r|` as well turns that distance
+   * into the angle it subtends, which is the reading that survives being close.
+   *
+   * **Exact rather than an estimate, and gravity is why.** A coasting craft
+   * feels no force from anything ([`gravity.ts`](./gravity.ts)), so the path a
+   * press interrupts is a *straight line*, and this is that line's own angle. It
+   * is not a proxy for where the craft was headed. It is where the craft was
+   * headed.
+   *
+   * **Bounded by construction**, which is the point of the second division: the
+   * impact parameter can never exceed the radius it was measured at, so this
+   * never exceeds 1 — and a press made a hair above the floor is graded on the
+   * same 0-to-1 scale as one made half a screen out. The undivided distance is
+   * not: it is capped by the grab radius, so a very close press could not have
+   * reached a fixed distance threshold however perfectly it was aimed. That is
+   * not a hypothetical. It is what the author flew on 2026-08-30 — see
+   * [`arrivedTight`](./tier.ts).
+   *
+   * Kept from the press for the same reason `grabRadius` is: by the time the
+   * freeze wants it the craft is at the bottom of the dive, where the velocity
+   * is perpendicular to the radius, this is 1, and it says nothing.
+   */
+  readonly aim: number;
   /** The closest the craft has come so far — how the closest approach is found. */
   smallestRadius: number;
   /**
@@ -71,8 +101,17 @@ export interface Dive {
 
 export function beginDive(craft: Craft, body: Body, clearanceTicks: number): Dive {
   const radius = distance(craft.x, craft.y, body.x, body.y);
+  const speed = speedOf(craft);
+  const sideways = Math.abs(
+    angularMomentum(craft.x - body.x, craft.y - body.y, craft.vx, craft.vy),
+  );
+  const spread = radius * speed;
   return {
     grabRadius: radius,
+    // A craft standing still, or somehow pressed at the body's own centre, was
+    // pointed nowhere — and nowhere is dead centre, because what this is asked is
+    // whether the approach was *sideways*, and a line that does not exist is not.
+    aim: spread > 0 ? sideways / spread : 0,
     smallestRadius: radius,
     peakEnergy: specificEnergy(body.mass, radius, speedOf(craft)),
     clearanceTicks,
