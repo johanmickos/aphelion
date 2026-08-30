@@ -34,7 +34,8 @@ Write these from the boards: `00-tokens`, `02-release`, `03-hud`, `04-bodies`, `
   boards 01–03 are retired.
 - The **"NEXT, IN ORDER" footers on boards 02 and 05 use obsolete numbering.** The design
   index is authoritative. Direction 13 is referenced by three boards and does not exist.
-- **Parallax star layers are refused** (Direction 05). Dust varies in brightness, never in
+- ⚠ **Overturned 2026-08-30 — the sky has parallax** ([05 · §2](../spec/05-field.md)).
+  Was: **parallax star layers are refused** (Direction 05). Dust varies in brightness, never in
   velocity, no matter what `VISION.md`'s prose suggests.
 - **Carpet dots pay flat and unmultiplied.** This violates the constitution's axioms and is
   a deliberate, argued exception (Direction 12). Record it as an exception so nobody later

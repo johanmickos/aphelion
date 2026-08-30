@@ -55,6 +55,7 @@ import type {
 import { fade } from '../state/decay.ts';
 import { SPEAKS } from '../state/callout.ts';
 import { letterbox, visible } from './letterbox.ts';
+import { drawStarfield, starfield } from './starfield.ts';
 import {
   BODY_FILL,
   CORE,
@@ -67,6 +68,18 @@ import {
   SOLAR,
   VOID,
 } from './palette.ts';
+
+/**
+ * The sky, laid out once for the life of the module.
+ *
+ * **A constant seed**, so every player and every replay of a run sees the same
+ * sky. It could as easily be a per-session number and is not, for the same reason
+ * `pnpm replay` exists: a screenshot of a bug should be reproducible from the
+ * recipe alone, and a sky that differed between two runs of the same recipe would
+ * be one more thing to rule out. It is a **render** seed and touches nothing the
+ * simulation can see.
+ */
+const SKY = starfield(0x5eed);
 
 /**
  * How far above a body's surface its floor sits, in design units.
@@ -1138,6 +1151,12 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   context.beginPath();
   context.rect(seen.left, seen.top, seen.right - seen.left, seen.bottom - seen.top);
   context.clip();
+
+  // **The sky, first and outside the world transform.** It is drawn here rather
+  // than translated with everything else because the whole point of it is that it
+  // does *not* move at world speed — see [`starfield.ts`](./starfield.ts), which
+  // also carries the author's ruling against spec 05 §2 and why it was made.
+  drawStarfield(context, SKY, view.camera, seen.top, seen.bottom);
 
   context.save();
   context.translate(DESIGN_WIDTH / 2 - view.camera.x, DESIGN_HEIGHT / 2 - view.camera.y);

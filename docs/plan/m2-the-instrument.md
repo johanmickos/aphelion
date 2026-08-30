@@ -11,6 +11,25 @@ feel is read.
 
 ---
 
+## Queued · the arrival's word becomes a number
+
+Ruled by the author on 2026-08-30, on the same day the word was built and flown:
+
+> *"I think that once we have the points system in place we'll remove the word for a good arrival
+> and just use +N points popup."*
+
+So `TIGHT · NERVE · BRAZEN` are **provisional by the author's own intent**, and what is permanent is
+the grading under them — [`arrivedTight`](../../src/sim/tier.ts)'s two halves, the closeness band
+and the aim angle, which is where all the measurement went. When spec
+[08](../spec/08-economy.md)'s economy lands, `src/state/arrival.ts` keeps its life, its throw, its
+slot and its placement, and what changes is only what the mark says.
+
+**Two things should survive that swap and are worth naming now.** The arrival's slot is separate
+from the release's, so a `+N` here would not fight a `+N` there. And the **knock** stays a word —
+it is not an award, it is the world telling the player what just happened, and there is no number
+to put in its place.
+
+
 ## M2.1 · The presentation-state layer
 
 Build the middle layer of ADR-0006 for real: a pure function from simulation state to

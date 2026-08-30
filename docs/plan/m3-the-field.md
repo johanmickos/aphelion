@@ -73,8 +73,12 @@ frame budget still holds with rungs on. **Verify**: `pnpm test` plus the M3.6 ha
 
 VOID that warms almost imperceptibly toward AURORA as an anomaly approaches — weather on the
 horizon, never spent early, tint ≤6% outside the anomaly. Sparse dust motes falling in strict
-parallel at world speed, brightness varied α .1–.3, density rising gently with chain. **No
+parallel at world speed, brightness varied α .1–.3, density rising gently with chain. ⚠ **No
 parallax layers** — layers at different speeds are implied depth, and this world has none.
+*Overturned by the author on 2026-08-30 for the **sky** only: it has three tiers of parallax and
+is built ([05 · §2](../spec/05-field.md)'s notice). Everything in the list above is unaffected and
+still moves at world speed — and when the rungs land, whether the sky still earns its place beside
+them is the author's question to reopen.*
 
 The anomaly is the only event permitted to repaint the sky: purple curtains over true black
 cloud gaps, planets reading through the tint. The baseline's restraint is what keeps it rare.

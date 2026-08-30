@@ -2,8 +2,9 @@
 
 **Board**: [Direction 05 — Living Field](../design/Aphelion%2005%20-%20Living%20Field.dc.html).
 
-**Rulings applied**: **parallax star layers are refused entirely.** Dust varies in brightness,
-never in velocity, no matter what `VISION.md`'s prose suggests. The board's "NEXT, IN ORDER"
+**Rulings applied**: **parallax star layers are refused entirely** — ⚠ *overturned by the author
+on 2026-08-30; see the notice in §2.* Dust varies in brightness, never in velocity, no matter what
+`VISION.md`'s prose suggests. The board's "NEXT, IN ORDER"
 footer uses obsolete numbering and is void.
 
 **Depends on**: [00 · Tokens](./00-tokens.md), [04 · Bodies](./04-bodies.md),
@@ -21,6 +22,31 @@ speed, gravity and the craft's own passage are all visible in one system.
 A rung is not a grid line and not a floor. **Rungs are level sets of progress, perpendicular to
 intended travel** — horizontal in a vertical field, radial ticks on a ring course. Authored
 corridors of any shape inherit the whole field grammar unchanged.
+
+> ## ⚠ Overturned by the author, 2026-08-30 — the sky has parallax
+>
+> **The refusal below is no longer in force.** The author asked for a parallax starfield having
+> read the ruling: *"I know we have a rule about this, but I really think the depth/parallax helps
+> convey speed."* It is built in `src/render/starfield.ts` — three tiers at 0.045, 0.12 and 0.195 of
+> the camera's motion, one colour at three brightnesses, DUSK to INK and never CORE.
+>
+> **What the ruling was protecting is worth keeping in view.** §1's idea is that *"the player climbs
+> through a medium, not past a backdrop"*, and the **rungs** were to carry speed, gravity and the
+> craft's own passage in one system. A second system saying *speed* in a different visual language
+> is two answers to one question, and that objection still stands.
+>
+> **What changed is that the medium is not built.** Every layer in §2's stack is M3's: today SKY is
+> empty VOID, there is no DUST and there are no rungs, so nothing in the field expresses speed at
+> all. The author has flown that across many sittings on a phone and reports the absence.
+>
+> The author expects the two to coexist — *"it'll look even better once we install the line
+> markers/rungs with gravity bubbly effects"* — so this is not a placeholder to be deleted when M3
+> lands. **When the rungs are in, whether the sky still earns its place is a question to ask again**,
+> and it is the author's to answer.
+>
+> The rest of §2 is untouched: DUST, STRATA, BODIES and PLAYER all still move at world speed, and
+> scale drift, blur-by-distance and vanishing points are all still refused. What was overturned is
+> the star layer and nothing else.
 
 ## 2 · The stack — five layers, all at world speed
 

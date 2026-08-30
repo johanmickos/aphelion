@@ -126,6 +126,8 @@ Do not re-litigate them.
 - The **"NEXT, IN ORDER" footers on boards 02 and 05 use obsolete numbering.** The design index is
   authoritative. Direction 13 does not exist.
 - **Parallax star layers are refused.** Dust varies in brightness, never in velocity.
+  ⚠ **Overturned by the author, 2026-08-30** — the sky has parallax and the rest of the layer
+  stack does not; see [05 · §2](./05-field.md)'s notice.
 - **Carpet dots pay flat and unmultiplied** — a deliberate, argued exception, recorded in
   [12 · The finish line](./12-finish.md) §4 so nobody later "fixes" it.
 - **ION is monopolised in the world, not on the craft.** Fuel, the deadline track and the save

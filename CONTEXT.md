@@ -325,6 +325,16 @@ because it is about what the floor had to do and not about the body.
 _Avoid_: bounce (the **floor** does that on every dive and mostly for free), crash (a run ends on
 one; this does not), impact (that is an **ending**), collision
 
+**Starfield**:
+The sky: three tiers of stars sliding against the camera at a twentieth, an eighth and a fifth of
+its motion, so the world reads as having distance behind it. **The one thing in the game that does
+not move at world speed**, and the one depth cue — spec 05 §2 refuses all of them and was
+overturned by the author on 2026-08-30, on the grounds that parallax conveys speed and nothing else
+in the field does yet. One colour at three brightnesses, DUSK to INK, never **CORE**. It lives
+wholly in the renderer and the simulation cannot see it.
+_Avoid_: background (it is a layer of the world, not behind it), stars (the tier, not the thing),
+parallax layers (that names the mechanism; this names the thing)
+
 **Farewell ring**:
 **Refused** (author, 2026-08-29). It named the orbit detaching from the body and expanding away at
 a release, in AURORA, and it was built and flown: *"when I release mid-circularisation, the oval of

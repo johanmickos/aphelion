@@ -130,6 +130,32 @@ const TIDE_LIGHTNESS = 0.92;
  * colour out of another: the token is unchanged and only its strength moves, so
  * the frame still resolves to eight names and greyscale still ranks it.
  */
+/**
+ * One token part of the way to another, as a hex token.
+ *
+ * For the **starfield**, which needs one colour at three brightnesses rather than
+ * three colours ([`starfield.ts`](./starfield.ts)) — and returns a token rather
+ * than a paint string so the result can still be passed to [`dim`](#).
+ *
+ * Straight sRGB channel interpolation, which is not how the identity ramps mix
+ * and does not want to be: those interpolate in oklch because a *hue* travelling
+ * between two lightnesses has to stay the same colour. This travels between two
+ * greys along one line, which sRGB gets right and which the eye reads as
+ * distance rather than as hue.
+ */
+export function mix(from: string, to: string, at: number): string {
+  const t = Math.max(0, Math.min(1, at));
+  let out = '#';
+  for (let channel = 1; channel < 7; channel += 2) {
+    const a = parseInt(from.slice(channel, channel + 2), 16);
+    const b = parseInt(to.slice(channel, channel + 2), 16);
+    out += Math.round(a + (b - a) * t)
+      .toString(16)
+      .padStart(2, '0');
+  }
+  return out;
+}
+
 export function dim(token: string, strength: number): string {
   const clamped = Math.max(0, Math.min(1, strength));
   const alpha = Math.round(clamped * 255).toString(16);
