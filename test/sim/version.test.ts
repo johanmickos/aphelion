@@ -63,6 +63,11 @@ describe('the simulation behaviour version', () => {
       replayRun(recipeOf(recorder), { onTick: (state) => digest.update(snapshot(state)) });
     }
 
+    // **9 as of 2026-08-31: the transient loses its good-release extension.** The
+    // third bump in a day, and all three are the same conversation about the same
+    // curve — see `TRANSIENT_STRETCH`. A tick moved, so every recipe before it is
+    // refused.
+    //
     // **8 as of 2026-08-31: the release kick becomes a square.** A tick moved —
     // `burstOf` spends the transient on the square of what is left of its span
     // rather than on a line, at a peak of 0.8 and a shorter reach — so a recipe
@@ -89,11 +94,11 @@ describe('the simulation behaviour version', () => {
     // The bump before it was 6, where the snapshot gained the dive's **aim** and
     // this number did *not* move — the picture-not-flight case, checked the way
     // the comment above prescribes and recorded here so the two are told apart.
-    expect(SIM_VERSION).toBe(8);
+    expect(SIM_VERSION).toBe(9);
     expect(
       digest.digest('hex').slice(0, 16),
       'the swing changed: bump SIM_VERSION and this fingerprint together, and every recipe ' +
         'recorded before now stops replaying',
-    ).toBe('e31958d0b214f048');
+    ).toBe('d4b4f9416a802048');
   });
 });

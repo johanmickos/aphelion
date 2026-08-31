@@ -578,6 +578,30 @@ separately, by the compass.
 
 ---
 
+> ## ⚠ Scaled back again, 2026-08-31 — the extension is gone
+>
+> **`TRANSIENT_STRETCH` is 0.** *"The release speed boost effect is a bit too fast right now. Can we
+> scale it back a bit more?"* — the third message about this curve and the second asking for less of
+> it while the peak stays where the first one put it. So the peak does not move: a release still hits
+> 78% harder than it did before the square. What goes is the extension a good release earned.
+>
+> | | Peak | Span at full quality | Distance it adds |
+> |---|---|---|---|
+> | stretch 0.25 | 0.800 | 1.63s | 0.434 |
+> | **stretch 0** | **0.800** | **1.30s** | **0.347**, −20% |
+>
+> Measured on the run they sent, the burst runs on **69% of ticks against 85%**. That is what *"too
+> fast"* was describing: a span of 98 ticks against release gaps of 57 – 143 meant consecutive
+> releases overlapped, so the craft was almost never *between* kicks. At 78 ticks most of them no
+> longer do.
+>
+> **What it costs is a real idea.** ADR-0012's transient was *"half again as long at full quality"*,
+> so a good release was paid in both amplitude and duration; it is now paid in amplitude alone. That
+> is the cleaner of the two — a punch is a hit, and a hit that lasts longer is a push — and the
+> **stretch** keeps the other reading, where length costs no speed.
+>
+> `SIM_VERSION` is 9.
+
 > ## ⚠ The kick is a kick, 2026-08-31 — the transient is a square now
 >
 > **`burstOf` spends the transient on the square of what is left of its span rather than on a

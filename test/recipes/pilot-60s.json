@@ -7,18 +7,18 @@
       "generator": "fixture",
       "version": 1
     },
-    "sim": 8,
-    "seed": 3394,
-    "ticks": 3276,
+    "sim": 9,
+    "seed": 3197,
+    "ticks": 2506,
     "log": [
-      100, 279, 295, 317, 334, 357, 377, 392, 402, 435, 447, 748, 749, 854, 866, 899, 909, 939, 940,
-      970, 971, 1004, 1005, 1256, 1258, 1590, 1591, 1783, 1784, 1974, 1975, 2165, 2177, 2219, 2233,
-      2271, 2272, 2375, 2388, 2419, 2434, 2453, 2471, 2611, 2623, 2660, 2671, 2748, 2761, 2878,
-      2879, 3144, 3169, 3202, 3225
+      112, 285, 310, 319, 329, 361, 383, 392, 415, 436, 456, 472, 490, 649, 681, 954, 984, 1006,
+      1036, 1043, 1064, 1092, 1114, 1129, 1143, 1174, 1183, 1200, 1219, 1246, 1255, 1278, 1291,
+      1309, 1327, 1353, 1365, 1430, 1447, 1506, 1519, 1562, 1574, 1604, 1621, 1714, 1731, 1773,
+      1783, 2084, 2085, 2244, 2257, 2361, 2367, 2411, 2423
     ]
   },
   "observed": {
     "ticks": [],
-    "note": "Flown by the headless pilot in test/sim/run.ts, not by a person. Re-flown for SIM_VERSION 8 (the release kick becomes a square, 2026-08-31), which every recipe recorded before it stops replaying against. The seed is chosen on coverage rather than length: of six thousand searched, only four still give the goldens everything they pin in one flight -- all four release tiers, a knock, a tight arrival, and a swing held past its own settle. 3394 is the richest of the four."
+    "note": "Flown by the headless pilot in test/sim/run.ts, not by a person. Re-flown for SIM_VERSION 9 (the release transient loses its good-release extension, 2026-08-31). The seed is chosen on coverage rather than length -- the goldens pin all four release tiers, a knock, a tight arrival and a swing held past its own settle, and of six thousand seeds searched exactly ONE still carries all of them in a single flight. That is down from five and then four across two earlier tunings the same day, and it is a sign the goldens are pinned to a fixture that a physics change can exhaust: see docs/plan/m3-the-field.md."
   }
 }

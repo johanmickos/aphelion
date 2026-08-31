@@ -60,4 +60,4 @@
  * world equations need to be bent, because at the end of the day we're chasing
  * something that feels really good."*
  */
-export const SIM_VERSION = 8;
+export const SIM_VERSION = 9;

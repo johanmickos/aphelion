@@ -714,6 +714,45 @@ export const TRANSIENT_SHARE = 0.8;
 export const TRANSIENT_SECONDS = 1.3;
 
 /**
+ * How much longer than [`TRANSIENT_SECONDS`](#transient_seconds) a release at full
+ * quality carries its burst for — **none, since 2026-08-31.**
+ *
+ * ## Quality buys the hit, not the length of it
+ *
+ * *"The release speed boost effect is a bit too fast right now. Can we scale it
+ * back a bit more?"* (author) — the third message in a row about this curve, and
+ * the second asking for less of it while the **peak** stays where the first one
+ * put it.
+ *
+ * So the peak does not move: [`TRANSIENT_SHARE`](#transient_share) is still 0.8
+ * and a release still hits 78% harder than it did before the square. What goes is
+ * the extension, which is the half of the curve the author has now named twice —
+ * *"when I release well I feel like the kick lasts too long, so I go REALLY
+ * fast."* It was 0.5, then 0.25, and now nothing.
+ *
+ * | | Peak | Span at full quality | Distance it adds |
+ * |---|---|---|---|
+ * | 0.25 | 0.800 | 1.63s | 0.434 |
+ * | **0** | **0.800** | **1.30s** | **0.347**, −20% |
+ *
+ * Measured on the run they sent, the burst is running on **69% of ticks against
+ * 85%** — it was very nearly always on, because a span of 98 ticks against release
+ * gaps of 57 – 143 meant consecutive releases overlapped. At 78 ticks most of them
+ * no longer do, which is what *"too fast"* was describing: not one kick being too
+ * big, but never being between them.
+ *
+ * **What it costs is a real idea, and it is worth naming.** ADR-0012's transient
+ * was *"half again as long at full quality"*, so a good release used to be paid in
+ * both amplitude and duration. It is now paid in amplitude alone, which is the
+ * cleaner statement of the two — the punch is a *hit*, and a hit that lasts longer
+ * is a push. The **stretch** keeps the other reading: `PUNCH_STRETCH` still gives a
+ * good release half again as long a recovery, on the craft's own silhouette, where
+ * length costs no speed.
+ *
+ * Zero rather than deleted, and on the bench: this is the third value it has had
+ * in two days, and the next flight may want a fourth.
+ */
+/**
  * How much longer the burst carries at full quality, as a fraction of the span
  * above — spec 01 §8's parenthetical **×1.5**, and ADR-0012's *"half again as
  * long"*.
@@ -724,7 +763,7 @@ export const TRANSIENT_SECONDS = 1.3;
  * ([`punch.ts`](../state/punch.ts)), so the thing seen and the thing felt are one
  * reading of one number.
  */
-export const TRANSIENT_STRETCH = 0.25;
+export const TRANSIENT_STRETCH = 0;
 
 /**
  * How close to a body's surface counts as contact for a coasting craft — spec

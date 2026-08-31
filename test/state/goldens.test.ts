@@ -146,34 +146,34 @@ describe('the numbers the choreography is built from', () => {
 
 describe('the shape of the run', () => {
   /**
-   * Twenty-eight grabs and twenty-seven releases — the run ends holding, which is
+   * Twenty-nine grabs and twenty-eight releases — the run ends holding, which is
    * why they differ by one. If this fails
    * and `test/sim/version.test.ts` did not, the *picture* has started disagreeing
    * with the simulation about when a swing began or ended — which is the one
    * thing the middle layer must never do.
    */
   it('grabs and releases on the ticks pnpm replay prints', () => {
-    expect(RUN.length - 1).toBe(3276);
+    expect(RUN.length - 1).toBe(2506);
     expect(edges('grab')).toEqual([
-      101, 296, 335, 378, 403, 448, 750, 867, 910, 941, 972, 1006, 1259, 1592, 1785, 1976, 2178,
-      2234, 2273, 2389, 2435, 2472, 2624, 2672, 2762, 2880, 3170, 3226,
+      113, 311, 330, 384, 416, 457, 491, 682, 985, 1037, 1065, 1115, 1144, 1184, 1220, 1256, 1292,
+      1328, 1366, 1448, 1520, 1575, 1622, 1732, 1784, 2086, 2258, 2368, 2424,
     ]);
     expect(edges('release')).toEqual([
-      280, 318, 358, 393, 436, 749, 855, 900, 940, 971, 1005, 1257, 1591, 1784, 1975, 2166, 2220,
-      2272, 2376, 2420, 2454, 2612, 2661, 2749, 2879, 3145, 3203,
+      286, 320, 362, 393, 437, 473, 650, 955, 1007, 1044, 1093, 1130, 1175, 1201, 1247, 1279, 1310,
+      1354, 1431, 1507, 1563, 1605, 1715, 1774, 2085, 2245, 2362, 2412,
     ]);
   });
 });
 
 /**
- * **The best swing in the run.** Grabbed on 101, frozen on 216, released on 280 —
+ * **The best swing in the run.** Grabbed on 113, frozen on 222, released on 286 —
  * sixty-four ticks past the freeze, which is inside the plateau, so the envelope
  * is exactly 1 and the punch is at its full extent.
  */
-const FREEZE = 216;
-const RELEASE = 280;
+const FREEZE = 222;
+const RELEASE = 286;
 
-describe('the release at 280 · a swing let go at full boost', () => {
+describe('the release at 286 · a swing let go at full boost', () => {
   it('is at the top of its envelope on the tick before', () => {
     expect(at(RELEASE - 1).compass!.envelope).toBe(1);
   });
@@ -193,7 +193,7 @@ describe('the release at 280 · a swing let go at full boost', () => {
 
   /** Spec 06 §4's word, born at the dot and lit through its climb and linger. */
   it('says its word at the dot, climbs it, and holds it lit', () => {
-    expect(at(RELEASE).callout!.tier).toBe('TRUE');
+    expect(at(RELEASE).callout!.tier).toBe('SHARP');
     expect(at(RELEASE).callout!.life.age).toBe(0);
     expect(at(RELEASE).callout!.y).toBe(at(RELEASE).callout!.bornY);
     // The climb is a **throw**: fastest at birth, and asserted as a distance
@@ -224,18 +224,18 @@ describe('the release at 280 · a swing let go at full boost', () => {
 });
 
 /**
- * **The release at 366, which is the whole game in one tick.**
+ * **The release at 320, which is the whole game in one tick.**
  *
- * Frozen on 365 and let go on 366 — one tick later. The aim is **PERFECT** and
+ * Frozen on 319 and let go on 320 — one tick later. The aim is **PERFECT** and
  * the envelope is **exactly zero**: the best word in the game, and not one unit
  * of boost to go with it. Spec [01 · §11](../../docs/spec/01-swing.md)'s tension
  * is that the two wanted different moments, and this is a release that took one
  * and paid the whole price of the other.
  */
-describe('the release at 318 · perfect aim, no boost at all', () => {
+describe('the release at 320 · perfect aim, no boost at all', () => {
   it('earns the top word on an envelope of zero', () => {
-    expect(at(317).compass!.envelope).toBe(0);
-    expect(at(318).callout!.tier).toBe('PERFECT');
+    expect(at(319).compass!.envelope).toBe(0);
+    expect(at(320).callout!.tier).toBe('PERFECT');
   });
 
   /**
@@ -244,8 +244,8 @@ describe('the release at 318 · perfect aim, no boost at all', () => {
    * pays nothing of is the **boost**, which is a different channel (ADR-0012).
    */
   it('earns only the floor of the punch, because there was no quality', () => {
-    expect(at(318).craft.deformation.amount).toBe(PUNCH_FLOOR);
-    expect(at(318).craft.deformation.recovery!.span).toBe(PUNCH_TICKS);
+    expect(at(320).craft.deformation.amount).toBe(PUNCH_FLOOR);
+    expect(at(320).craft.deformation.recovery!.span).toBe(PUNCH_TICKS);
   });
 
   /**
@@ -254,13 +254,13 @@ describe('the release at 318 · perfect aim, no boost at all', () => {
    * from the economy."*
    */
   it('says the top word, and strikes no flash under it', () => {
-    expect(at(318).callout!.tier).toBe('PERFECT');
+    expect(at(320).callout!.tier).toBe('PERFECT');
     // No glow of any kind behind it. The CORE-white E3 went first, then spec 06
     // §4's own per-tier bloom — *"the blur circle behind the popup text isn't
     // doing us any favours, it's blurring the legibility."* What keeps the word
     // legible is a rim, which is the renderer's and is paint.
-    expect(at(318).flash).toBeNull();
-    expect(at(318).callout!.bloom).toBe(6);
+    expect(at(320).flash).toBeNull();
+    expect(at(320).callout!.bloom).toBe(6);
   });
 });
 
@@ -276,21 +276,21 @@ describe('the flown arc · the boost envelope, drawn', () => {
     expect(at(FREEZE).compass!.arming).toHaveLength(1);
 
     // Three ticks in: the ramp is 3/27 of the way up and one stretch wide.
-    expect(at(219).compass!.envelope).toBeCloseTo(3 / 27, 9);
-    expect(at(219).compass!.flown).toHaveLength(1);
-    expect(at(219).compass!.arming).toHaveLength(4);
+    expect(at(225).compass!.envelope).toBeCloseTo(3 / 27, 9);
+    expect(at(225).compass!.flown).toHaveLength(1);
+    expect(at(225).compass!.arming).toHaveLength(4);
   });
 
   /**
    * **The ramp's stretches are not equal, and that is the measurement the latch
    * exists for.** The craft leaves periapsis at its fastest and slows on the way
    * out, so equal slices of *time* are unequal slices of *arc* — here they shrink
-   * from 0.551 to 0.171 radians, a factor of **3.2** across one ramp. Shading the
+   * from 0.550 to 0.177 radians, a factor of **3.1** across one ramp. Shading the
    * ramp evenly along the arc instead is wrong by 0.19 of the envelope's range,
    * and wrong in the direction that says the boost armed sooner than it did.
    */
   it('cuts the ramp on the clock and not on the arc', () => {
-    const flown = at(244).compass!.flown;
+    const flown = at(250).compass!.flown;
     expect(flown).toHaveLength(7);
 
     const ramp = flown.slice(0, 6);
@@ -301,8 +301,8 @@ describe('the flown arc · the boost envelope, drawn', () => {
     expect(ramp[0]!.at).toBe(0);
     // …across steadily shorter arcs, because the craft is slowing.
     const spans = ramp.map((run) => Math.abs(run.span));
-    expect(spans[0]!).toBeCloseTo(0.5513, 3);
-    expect(spans[5]!).toBeCloseTo(0.1708, 3);
+    expect(spans[0]!).toBeCloseTo(0.5496, 3);
+    expect(spans[5]!).toBeCloseTo(0.1765, 3);
     expect(spans[0]! / spans[5]!).toBeGreaterThan(2.5);
     for (let i = 1; i < spans.length; i++) expect(spans[i]!).toBeLessThan(spans[0]!);
 
@@ -327,9 +327,9 @@ describe('the flown arc · the boost envelope, drawn', () => {
   });
 
   it('grows through the settle', () => {
-    const swept = [219, 230, 244, 258, RELEASE - 1].map((tick) => at(tick).compass!.swept);
+    const swept = [225, 236, 250, 264, RELEASE - 1].map((tick) => at(tick).compass!.swept);
     for (let i = 1; i < swept.length; i++) expect(swept[i]!).toBeGreaterThan(swept[i - 1]!);
-    expect(swept[swept.length - 1]!).toBeCloseTo(4.178, 3);
+    expect(swept[swept.length - 1]!).toBeCloseTo(4.2522, 3);
   });
 
   /**
@@ -339,22 +339,23 @@ describe('the flown arc · the boost envelope, drawn', () => {
    * kept going round it.
    *
    * It has to be asserted **here** and not on the first swing: that one freezes on
-   * 216 and is let go on 280, which is inside its own 72-tick settle, so every
-   * tick of it grows either way. The swing frozen on **2499** is held for 113,
+   * 222 and is let go on 286, which is inside its own 72-tick settle, so every
+   * tick of it grows either way. The swing frozen on **2127** is held for 118,
    * well past its settle, and is where the bug is visible at all. That is worth
    * knowing: a golden written on the most convenient swing would have passed with
    * the fault back in — and of six thousand pilot seeds searched for this fixture,
-   * only four still contain a swing held that long.
+   * exactly **one** still contains a swing held that long alongside everything
+   * else this file pins.
    */
   it('keeps growing past the settle', () => {
-    // 2499 + 72 = 2571, so these three ticks are all in closed-form territory.
-    const swept = [2575, 2590, 2605].map((tick) => at(tick).compass!.swept);
+    // 2127 + 72 = 2199, so these three ticks are all in closed-form territory.
+    const swept = [2205, 2220, 2235].map((tick) => at(tick).compass!.swept);
     for (let i = 1; i < swept.length; i++) expect(swept[i]!).toBeGreaterThan(swept[i - 1]!);
     // And the envelope is decaying by then, which is the other half of the same
     // fact: past the settle there is a stretch of arc the boost is dying along.
-    expect(at(2605).compass!.envelope).toBeLessThan(1);
-    expect(at(2605).compass!.envelope).toBeGreaterThan(0);
-    expect(at(2605).compass!.flown.length).toBeGreaterThan(7);
+    expect(at(2235).compass!.envelope).toBeLessThan(1);
+    expect(at(2235).compass!.envelope).toBeGreaterThan(0);
+    expect(at(2220).compass!.flown.length).toBeGreaterThan(7);
   });
 });
 
@@ -446,16 +447,16 @@ describe('the ring count, ruled to three on 2026-08-29', () => {
 
 describe('which word is alive when', () => {
   /**
-   * **One slot, and a new release takes it.** The TRUE struck on 280 is 37 ticks
-   * into its 96 when the PERFECT lands on 318, so the two overlap — and there is
+   * **One slot, and a new release takes it.** The SHARP struck on 286 is 33 ticks
+   * into its 96 when the PERFECT lands on 320, so the two overlap — and there is
    * still exactly one word, because spec 06 §4 makes queueing structural: *"one
    * release, one word."*
    */
   it('is one word, and a later release replaces an earlier one still lit', () => {
-    expect(at(317).callout!.tier).toBe('TRUE');
-    expect(at(317).callout!.life.age).toBe(37);
-    expect(at(318).callout!.tier).toBe('PERFECT');
-    expect(at(318).callout!.life.age).toBe(0);
+    expect(at(319).callout!.tier).toBe('SHARP');
+    expect(at(319).callout!.life.age).toBe(33);
+    expect(at(320).callout!.tier).toBe('PERFECT');
+    expect(at(320).callout!.life.age).toBe(0);
   });
 
   /**
@@ -475,8 +476,8 @@ describe('which word is alive when', () => {
 
   /** A make is carried and speaks nothing — spec 06 §2's *"points only"*. */
   it('carries a make without spending a word on it', () => {
-    expect(at(358).callout!.tier).toBe('MAKE');
-    expect(at(358).flash).toBeNull();
+    expect(at(955).callout!.tier).toBe('MAKE');
+    expect(at(955).flash).toBeNull();
   });
 
   /** And it outlives the rest of the sequence, world-anchored, being left behind. */
@@ -490,20 +491,20 @@ describe('which word is alive when', () => {
   });
 
   /**
-   * And it ends on its own clock — asserted on the release at **1591**, one of the
-   * few in this run with no other *word* inside its lifetime: the next is 193
+   * And it ends on its own clock — asserted on the release at **1715**, one of the
+   * few in this run with no other *word* inside its lifetime: the next is 647
    * ticks later, against a word that lives 96. Most of the run's swings overlap,
    * which is spec 06 §3's merge rule waiting for the streaks that will need it.
    */
   it('ends 1 600ms after the release that earned it', () => {
-    expect(at(1591).callout!.life.age).toBe(0);
-    expect(at(1591 + 95).callout).not.toBeNull();
-    expect(at(1591 + 95).callout!.strength).toBeLessThan(0.05);
-    expect(at(1591 + 96).callout).toBeNull();
+    expect(at(1715).callout!.life.age).toBe(0);
+    expect(at(1715 + 95).callout).not.toBeNull();
+    expect(at(1715 + 95).callout!.strength).toBeLessThan(0.05);
+    expect(at(1715 + 96).callout).toBeNull();
   });
 
   /**
-   * Over the whole run: twenty-seven releases, two of them PERFECT — and the E3
+   * Over the whole run: twenty-eight releases, two of them PERFECT — and the E3
    * is struck **not once**. Spec 00 §3's *"at most one E3 alive"* is a shape
    * rather than a check, and what the shape now holds is nothing: the author has
    * taken the release, the grab and the award off the list in turn, and what is
@@ -516,7 +517,7 @@ describe('which word is alive when', () => {
     const perfects = edges('release').filter(
       (tick) => at(tick).callout?.life.age === 0 && at(tick).callout?.tier === 'PERFECT',
     );
-    expect(perfects).toEqual([318, 393]);
+    expect(perfects).toEqual([320, 1507]);
     expect(RUN.filter((view) => view.flash !== null)).toHaveLength(0);
   });
 });
@@ -578,8 +579,8 @@ describe('the arrival · a word for the capture', () => {
    */
   /**
    * **The count is the test**, because the failure this word had was never a
-   * crash: it was a word said too often to mean anything. Twenty-six captures, one
-   * word. Loosening either half of `arrivedTight` moves this number and fails
+   * crash: it was a word said too often to mean anything. Twenty-seven captures,
+   * two words. Loosening either half of `arrivedTight` moves this number and fails
    * here, which is the only thing standing between the author's verdict and a
    * quiet regression back to the two-in-three it was refused at.
    *
@@ -588,13 +589,13 @@ describe('the arrival · a word for the capture', () => {
    * captures against 4% here. `test/sim/run.ts` says why in its own prose: aim is
    * the one input it cannot reproduce, and aim is half of what this grades.
    */
-  it('is said once in twenty-six captures, and the pilot cannot do better', () => {
+  it('is said twice in twenty-seven captures, and the pilot cannot do better', () => {
     const captures = RUN.filter(
       (view, i) => i > 0 && view.compass?.hand != null && RUN[i - 1]!.compass?.hand == null,
     ).length;
     const said = RUN.filter((view) => view.arrival?.life.age === 0).length;
-    expect(captures).toBe(26);
-    expect(said).toBe(1);
+    expect(captures).toBe(27);
+    expect(said).toBe(2);
   });
 
   it('is struck at the freeze and nowhere else', () => {
@@ -706,7 +707,7 @@ describe('the knock · a word for the collision', () => {
    */
   it('is struck on the tick the floor takes the speed', () => {
     const born = RUN.filter((view) => view.knock?.life.age === 0);
-    expect(born.map((view) => view.tick)).toEqual([851]);
+    expect(born.map((view) => view.tick)).toEqual([387]);
   });
 
   /** At the point of contact, which is the place that earned it. */

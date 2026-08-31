@@ -346,6 +346,31 @@ gone: no tick in the new run lights both. Neither threshold was touched, so what
 approach geometry moving again — which is a reason to **re-measure `KNOCK_BAND`** rather than to
 relax about it, and the golden is back to asserting the invariant outright.
 
+### Scaled back once more, and a cost worth naming
+
+*"The release speed boost effect is a bit too fast right now. Can we scale it back a bit more?"* —
+the third message about this curve in a day, and the second asking for less of it while the peak
+stays where the first put it. So the peak holds at 0.800 and `TRANSIENT_STRETCH` goes to **0**: the
+span at full quality is 1.63s → **1.30s** and the distance falls **20%**.
+
+The number that explains the complaint is not the peak. Measured on the run they sent, the burst was
+running on **85% of ticks** — a span of 98 ticks against release gaps of 57 – 143, so consecutive
+releases overlapped and the craft was almost never *between* kicks. At 78 ticks it runs on 69%.
+
+**The goldens are becoming the expensive part of a tuning session, and that is now measurable.** The
+pilot fixture is chosen on coverage — all four release tiers, a knock, a tight arrival and a swing
+held past its own settle, in one flight — and of six thousand seeds searched, the number that still
+carry all of it has gone **five → four → one** across three physics tunings in two days. Each tuning
+also costs a full re-pin of every named tick in `goldens.test.ts` and `presentation.test.ts`, and it
+moved `replay.test.ts`'s three seeds as well.
+
+That is not an argument against tuning; it is an argument that the goldens are pinned to the wrong
+thing. They name ticks of a recipe the physics regenerates, when what they are really asserting is
+*the picture at the first full-boost release*, *at the one perfect release with no envelope*, *at a
+swing held past its settle*. **Finding those moments rather than naming them** would make a physics
+tune cost one re-record instead of thirty edits, and would stop the fixture search from being the
+thing that constrains the tuning. It is worth doing before the next one.
+
 ### Still the author's, and asked rather than assumed
 
 1. **What an addressed rung says** — spec 05's own open question, now flyable both ways on the bench.
