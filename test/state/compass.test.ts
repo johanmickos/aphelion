@@ -292,10 +292,30 @@ describe('the window is the quality band', () => {
     const late = shape(armed.at(-1)!);
     expect(early).toBeGreaterThan(1.5);
     expect(late).toBeCloseTo(1, 3);
-    // And it never stops being the simulation's own ellipse: the craft is on it.
-    const view = armed[3]!;
-    const c = view.compass!;
-    const r = Math.hypot(view.craft.x - c.x, view.craft.y - c.y);
+    // ⚠ **The craft is no longer always on the drawn line, and that is the
+    // 2026-08-31 ruling rather than a regression.**
+    //
+    // `predictOrbit` used to re-size its ellipse to pass through the craft, so
+    // the compass was drawn *on* the path being flown. What that cost was a
+    // periapsis that depended on the craft's current radius, so the oval slid the
+    // whole way down every long dive — and the author flew it three times:
+    // *"I saw another initial grab oval... and once I started circularizing it
+    // swapped to a different one"*, *"a LARGE oval stretching downwards, which
+    // then is replaced by a much tighter orbital oval."*
+    //
+    // The prediction is now of the orbit the **freeze** will hand out, which does
+    // not move: over the author's dispatches the oval's far end slides **0%** at
+    // p50 and p95 across a dive and snaps **0% / 1%** at the freeze, against
+    // 12% / 38% and 1% / 22% before. The price is that during a dive the craft is
+    // above the orbit it is falling into — on the line for **65%** of drawn
+    // ticks, and beyond its far end by 16% at p50 where it is not.
+    //
+    // So what is asserted is the settled half, where the two must agree exactly:
+    // once the orbit is real, the craft is on it.
+    const settled = held().filter((v) => v.compass?.hand != null && v.compass.path.length);
+    const last = settled.at(-1)!;
+    const c = last.compass!;
+    const r = Math.hypot(last.craft.x - c.x, last.craft.y - c.y);
     expect(r).toBeGreaterThanOrEqual(Math.min(...c.path) - 1);
     expect(r).toBeLessThanOrEqual(Math.max(...c.path) + 1);
   });

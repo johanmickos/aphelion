@@ -365,7 +365,7 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     // with the one stretch where it was not firming up but being replaced taken
     // out of it.
     const owed = sim.dive !== null && sim.dive.clearanceTicks > 0;
-    const guess = owed ? null : predictOrbit(sim.craft, body);
+    const guess = owed ? null : predictOrbit(sim.craft, body, sim.dive);
     // How much of this body's hold is left — `closing`, floored below so the
     // thread survives a miss. It was written out here once; it is named now,
     // because the tide wanted the same reading and two copies of a formula are

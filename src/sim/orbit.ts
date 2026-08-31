@@ -237,7 +237,7 @@ export function sweptSince(orbit: Orbit, mass: number, ticks: number): number {
  * oval that dived inside it would be a prediction of something that cannot
  * happen.
  */
-export function predictOrbit(craft: Craft, body: Body): Orbit | null {
+export function predictOrbit(craft: Craft, body: Body, dive: Dive | null): Orbit | null {
   const dx = craft.x - body.x;
   const dy = craft.y - body.y;
   const r = magnitude(dx, dy);
@@ -258,63 +258,53 @@ export function predictOrbit(craft: Craft, body: Body): Orbit | null {
   // approximated, and `pnpm portable` bans it in this directory (ADR-0014).
   const ex = (craft.vy * momentum) / body.mass - dx / r;
   const ey = (-craft.vx * momentum) / body.mass - dy / r;
-  // **Uncapped, and it was capped here for a year of evenings before that was
-  // measured as the fault rather than the fix.**
-  //
-  // `freeze` clamps the eccentricity at [`ECCENTRICITY_CAP`](./units.ts), and
-  // this clamped it too, so that a prediction would not draw a shape the freeze
-  // would never hand out — against a snap measured at **84% of a radius on one
-  // tick**, on one capture in thirteen (author, 2026-08-30: *"I see one, and once
-  // I am deeper in the capture it switches to a different oval"*).
-  //
-  // **What the cap actually bought was a slow slide instead of a fast snap.** The
-  // true eccentricity is a constant of the motion — under gravity alone the conic
-  // the craft is on does not change, and measured through one dive it held at
-  // **0.726** from the grab to the freeze. Clamping it to 0.6 and then re-sizing
-  // the ellipse through the craft (below) makes the drawn periapsis a function of
-  // the craft's *current radius* — so as the dive falls from 878 to 314 design
-  // units the oval slid from **244 down to 182**, and on to the floor by the
-  // freeze. Every long dive, continuously, where the snap was one capture in
-  // thirteen.
-  //
-  // The author flew both and named the difference: *"I saw another initial grab
-  // oval at the last blue planet, and once I started circularizing it swapped to
-  // a different one... I don't see this issue with the original prototype"*
-  // (2026-08-31). The prototype draws the conic it is on and says why it is
-  // stable — *"recomputed every frame from the live state, this converges on the
-  // real orbit as the dive proceeds"* — and it caps nothing.
-  //
-  // Measured over the dispatches that replay at `SIM_VERSION` 9, uncapping costs
-  // nothing it was bought for: the slide across a dive goes **p95 14% → 0%** and
-  // the snap on the freeze tick is **1% either way**. The snap it was added
-  // against is gone on its own — the floor clamp and the re-size below are what
-  // were doing that work — and three physics tunings have landed since.
-  const shape = magnitude(ex, ey);
+  const trueShape = magnitude(ex, ey);
 
   const periapsisAngle = angleOf(ex, ey);
 
-  // **The craft has to stay on the drawn line, and capping the shape moves the
-  // line off it.** So the ellipse is re-sized to pass through where the craft
-  // actually is: at a true anomaly `v` from periapsis, `r = a(1+e) / (1 + e·cos
-  // v)`, and solving that for the periapsis is one expression. Without it a capped
-  // prediction draws an oval the craft is outside of, which is worse than the jump
-  // it was fixing — the compass is drawn **on** the path the craft is flying.
+  // ## It predicts the orbit the **freeze** will hand out, not the one the craft
+  // is momentarily on — and that is the 2026-08-31 correction.
   //
-  // It is the same trick this function already plays on the floor below, and both
-  // are the same idea: keep the ellipse's *shape* honest about what the freeze
-  // will hand out, and its *size* honest about where the craft is.
-  const anomaly = angleOf(dx, dy) - periapsisAngle;
-  let periapsis = (r * (1 + shape * cos(anomaly))) / (1 + shape);
-  if (periapsis <= 0) return null;
-
-  // The floor is never crossed, so neither is it drawn crossed.
+  // Two earlier answers to *"I see one, and once I am deeper in the capture it
+  // switches to a different oval"* both drew something other than what was
+  // coming. Capping the shape here and re-sizing the ellipse through the craft
+  // made the drawn periapsis a function of the craft's **current radius**, so the
+  // oval slid the whole way down a long dive — 244 to 182 design units on one.
+  // Uncapping it drew the true conic instead: stable, and **87% wider at p95**
+  // than the orbit the freeze then produced, which is *"a LARGE oval stretching
+  // downwards, which then is replaced by a much tighter orbital oval"* (author).
+  //
+  // Neither is a prediction, because [`freeze`](#freeze) does not clamp the conic
+  // the craft is on. It **re-derives** one: from the dive's *peak* energy, at the
+  // periapsis the craft reaches, with the speed capped at `FREEZE_ESCAPE_FRACTION`
+  // of escape at the floor and the shape at `ECCENTRICITY_CAP`. So this asks those
+  // same questions of the periapsis the craft is going to reach — the true conic's
+  // own, floored, which gravity conserves and which therefore does not slide.
+  //
+  // The arithmetic below is `freeze`'s, on a predicted periapsis instead of a
+  // measured one. Two copies of it is one too many: if it grows a fourth step,
+  // this and `freeze` want one shared function rather than a second reading.
   const floor = floorRadius(body);
+  let periapsis = semiLatus / (1 + trueShape);
+  if (periapsis <= 0) return null;
   if (periapsis < floor) periapsis = floor;
+
+  // The energy the freeze will read is the dive's **peak**, a running maximum —
+  // not the live value, once the floor has taken speed.
+  const peak = dive === null ? energy : dive.peakEnergy;
+  const sweep = Math.min(
+    Math.sqrt(Math.max(0, 2 * (peak + body.mass / periapsis))),
+    FREEZE_ESCAPE_FRACTION * escapeSpeed(body.mass, floor),
+  );
+  const shape = Math.min(
+    Math.max(eccentricityFor(body.mass, peak, periapsis), 0),
+    ECCENTRICITY_CAP,
+  );
 
   return {
     periapsis,
     eccentricity: shape,
-    momentum,
+    momentum: sweep * periapsis,
     periapsisAngle,
     direction: momentum < 0 ? -1 : 1,
     // A prediction is a shape and not a swing: nothing reads either of these off

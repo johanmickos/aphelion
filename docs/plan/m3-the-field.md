@@ -554,7 +554,51 @@ recorded baseline on the author's phone. **Verify**: run it on the phone.
 The field looks like Aphelion for the whole run rather than a quarter of it. Next:
 [M4](./m4-the-economy.md).
 
-### ⚠ The predicted oval stops sliding, 2026-08-31 — and the cap was the cause, not the cure
+### ⚠ The predicted oval, 2026-08-31 — three builds, and the first two were both wrong
+
+**Superseded twice in one evening; this section is the record of all three because the two failures
+are the useful part.**
+
+The author, three times: *"I saw another initial grab oval at the last blue planet, and once I
+started circularizing it swapped to a different one"*, then *"I don't see this issue with the
+original prototype"*, then *"I grab the second, blue planet and see a LARGE oval stretching
+downwards, which then is replaced by a much tighter orbital oval."*
+
+| what was drawn | the far end slides across a dive | and snaps at the freeze |
+|---|---|---|
+| capped shape, re-sized through the craft (2026-08-30) | 12% / 38% / 75% | 1% / 22% / 148% |
+| the true conic, uncapped (the first attempt tonight) | 16% / 61% / 79% | 17% / 87% / 148% |
+| **the orbit `freeze` will hand out** | **0% / 0% / 1%** | **0% / 1% / 1%** |
+
+**The first build made the periapsis depend on the craft's own radius.** Capping the eccentricity at
+`ECCENTRICITY_CAP` and then re-sizing the ellipse to pass through the craft — so the compass is
+drawn *on* the path being flown — means the drawn periapsis is a function of `r`. The true
+eccentricity is a constant of the motion (measured: **0.726**, held from grab to freeze), so as one
+dive fell from 878 to 314 design units the oval slid **244 → 182** and on to the floor.
+
+**The second build drew the true conic and was measured on the wrong end of it.** Uncapping made the
+periapsis invariant — and the *periapsis* was what the first measurement looked at, so it read as
+fixed. What the player sees as large or tight is the **far end**, and at e 0.726 against the freeze's
+0.6 that is 1052 against 668. The snap got four times worse and the author flew it within the hour.
+
+**The third is a prediction rather than a clamp.** [`freeze`](../../src/sim/orbit.ts) does not cap
+the conic the craft is on: it re-derives an orbit from the dive's **peak energy** at the periapsis
+the craft reaches, with the speed capped at `FREEZE_ESCAPE_FRACTION` of escape at the floor and the
+shape at `ECCENTRICITY_CAP`. `predictOrbit` now asks those same three questions of the periapsis the
+craft is *going* to reach — the true conic's own, floored, which gravity conserves. Both the slide
+and the snap go to nothing.
+
+**Stated cost, because it reverses a rule this file argued for.** The oval no longer passes through
+the craft during a dive: it is the orbit you are falling *into*, so the craft is above it — on the
+line for **65%** of drawn ticks and beyond its far end by 16% at p50 where it is not. The
+alternative was an oval that is always under the craft and never the same shape twice, which is what
+was flown and refused three times.
+
+**And the lesson worth more than the fix**: two of the three builds were measured, green, and wrong,
+because the measurement was of the periapsis while the complaint was about the far end. *Measure the
+thing the sentence is about.*
+
+#### The second build's own note, kept for the record — its conclusion was wrong
 
 *"I saw another initial grab oval at the last blue planet, and once I started circularizing it
 swapped to a different one... I don't see this issue with the original prototype."*
