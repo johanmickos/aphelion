@@ -19,6 +19,6 @@
   },
   "observed": {
     "ticks": [],
-    "note": "Flown by the headless pilot in test/sim/run.ts, not by a person. Re-flown for SIM_VERSION 9 (the release transient loses its good-release extension, 2026-08-31). The seed is chosen on coverage rather than length -- the goldens pin all four release tiers, a knock, a tight arrival and a swing held past its own settle, and of six thousand seeds searched exactly ONE still carries all of them in a single flight. That is down from five and then four across two earlier tunings the same day, and it is a sign the goldens are pinned to a fixture that a physics change can exhaust: see docs/plan/m3-the-field.md."
+    "note": "Flown by the headless pilot in test/sim/run.ts, not by a person. Re-flown for SIM_VERSION 9 (the release transient loses its good-release extension, 2026-08-31). The seed is chosen on coverage rather than length, and the criteria are no longer this sentence: they are COVERAGE in test/moments.ts, and `node tools/fixture.ts` is the search. Of six thousand seeds swept, exactly ONE carries every moment the goldens are written about -- unchanged from the hand-run hunt this replaces, and the reason the tool exists rather than a reason to relax: the same sweep found NONE under a trial tuning on 2026-08-31 and needed thirty thousand to find four. Whether that stays one fixture or becomes several is the open question in docs/plan/m3-the-field.md, and it is the author's."
   }
 }

@@ -444,6 +444,18 @@ keeps it, and nowhere else (ADR-0003).
 _Avoid_: report, diagnostics, telemetry (Direction 04 retires the telemetry voice), bug
 report
 
+**Moment**:
+A kind of instant in a run, named by the sentence that describes it — _a swing let go at
+the very top of its boost envelope_, _a release at PERFECT aim with no boost at all_ — and
+found in a **recipe** rather than pointed at by tick number. It is what a golden is a claim
+_about_: the tick a moment lands on is a coordinate the physics regenerates, and the
+sentence is the thing a deliberate change has to be argued against. A moment that a run
+holds more than one of is asserted over every one of them, so there is no selection to go
+wrong; one it holds none of fails, naming itself. Development's word, like **recipe** and
+**dispatch**, and it belongs to `test/moments.ts`.
+_Avoid_: golden (a golden is the assertion, a moment is what it is about), named tick,
+checkpoint, marker
+
 **Ghost**:
 A recipe played back alongside a live run.
 _Avoid_: using it for the compass's mark where the hand cuts a ring — that is a **crossing**

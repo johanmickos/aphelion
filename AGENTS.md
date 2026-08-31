@@ -150,6 +150,14 @@ The stated deliverable is **a technical architecture that is easy to maintain an
   terminal computes the percentiles, and grouping frames by how many ticks each ran recovers
   what a tick costs and what a frame costs to a tenth of a millisecond out of a clock that
   cannot tell them apart. Read its header before changing what it carries.
+- **`tools/fixture.ts`** answers _which pilot seed still carries everything the goldens are
+  written about_. The goldens address their subjects by sentence rather than by tick number
+  (`test/moments.ts`), so a physics change no longer re-pins them — but the fixture still has
+  to **contain** every moment, and this is that search as a command instead of as a hand-run
+  script and a paragraph in a JSON note. Its criteria are `COVERAGE` in `test/moments.ts`,
+  beside the finders that spend them. **It proposes and `pnpm check` disposes**: a moment
+  nobody put in `COVERAGE` still fails at its own finder and names itself, which is why the
+  two are allowed to be a heuristic and a gate rather than two copies of one list.
 - **`pnpm bench`** builds the desktop bench: this game, bundled for the browser, with the open
   questions on sliders — one self-contained page in `bench/`. It runs **the repo's own
   simulation**, which is what makes a verdict reached on it a verdict about the game. The

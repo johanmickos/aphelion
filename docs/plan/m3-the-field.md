@@ -371,6 +371,90 @@ swing held past its settle*. **Finding those moments rather than naming them** w
 tune cost one re-record instead of thirty edits, and would stop the fixture search from being the
 thing that constrains the tuning. It is worth doing before the next one.
 
+### Done, 2026-08-31 — and the cost is now six lines
+
+[`test/moments.ts`](../../test/moments.ts) carries the vocabulary and the argument, and both
+`goldens.test.ts` and `presentation.test.ts` address their subjects by sentence. The distinction
+that made it work is that a tick was two things at once: *"the release at 286"* is a **coordinate**
+and *"twenty-nine grabs on these ticks"* is a **claim**, and only the second was ever worth writing
+down. `the shape of the run` keeps its wall of numbers, which is what it is for.
+
+**The trap is that a finder which always finds something cannot fail**, and three rules answer it.
+A moment says how often it happens — `once` refuses a run holding two as loudly as one holding
+none. A moment happening more than once is **asserted over every one of them**, so there is no
+selection left to go wrong. And the tick goes in the `describe` block's name, reported and never
+compared, so a red test still says where to point `pnpm replay`.
+
+**Asking a claim of the class rather than of one swing restated four of them**, and this is the
+part that was not a mechanical edit:
+
+| The old sentence | Why it was false of the run |
+|---|---|
+| *the full-boost release says SHARP* | a fact about **aim**, under a moment defined by **boost** — spec 01 §11 is about their independence, and the third full-boost release earns no word at all |
+| *the ramp shrinks by a factor of 3.1* | one swing's number; the seven ramps in this run run **2.0 – 3.8** |
+| *a grab finds the craft at rest* | **eight of twenty-nine** land while the last punch is still coming home. What a grab must not do is *strike* one |
+| *a spent body is E0* | the lamp goes out over 210ms, so for thirteen ticks it is still burning at the E2 it was held at |
+
+**Nineteen mutations, before and after: fourteen red both times, five green both times.** The
+refactor takes nothing away. Four of the five standing gaps are now closed — the arrival, the knock
+and the spend were each watched out to `arrivalTicks()`, `knockTicks()` and `SPEND_TICKS`, which is
+a golden indexing by the constant under test and is the exact fault M2.5's own block was written to
+close, left open on three elements; and no tier **zone boundary** was asserted at all, so widening
+SHARP from 0.15 to 0.28 of a window passed.
+
+**The fifth cannot be closed on this fixture and now says so in place.** Measured over its own
+dives, the share the floor takes is **0.1548** once and then falls straight to **0.0008** — so no
+`KNOCK_BAND` anywhere between 0.001 and 0.155 changes what this run says, and dropping it to 0.04
+passes. That is a property of the pilot's captures being bimodal where real play's are a tail, and
+it is a second reason the re-measurement below has to run on the author's dispatches.
+
+**The acceptance test was flown rather than claimed.** `SETTLE_RETURN` 0.3 → 0.34, `SIM_VERSION`
+10, re-recorded with the new tool: **six lines** needed editing by hand, against 169, 89 and 72 for
+the three tunings before it. Three were `the shape of the run` and three were the arrival's and
+knock's counts, which are claims with arguments attached. Two of the eight failures were not
+re-pins at all — a spec tolerance in `shape.test.ts` that the constant genuinely broke, and **the
+knock-beside-arrival collision reopening**, which is the goldens catching the regression they exist
+for. It also caught a tolerance of *this* change's own, set at 2.0 to fit one fixture where the
+same ramps run 1.30 – 2.59 under the trial physics; it is 1.15 now.
+
+### The seed sweep, which nobody had taken
+
+[`tools/fixture.ts`](../../tools/fixture.ts) is the search as a committed command, on `COVERAGE` in
+`test/moments.ts` rather than on a sentence in the recipe's JSON note. Over **thirty thousand**
+pilot seeds at `SIM_VERSION` 9:
+
+| Wanted | Seeds carrying it | First found at |
+|---|---|---|
+| **all of it, in one flight** | **9** in 30 000 (0.03%) | seed **3 197** |
+| the release group — four tiers, both envelope extremes, a word left alone, both sides of the dot | 225 (0.75%) | seed **70** |
+| the arc group — three rings, the gap sample, the predicted path, a swing held past its settle | 166 (0.55%) | seed **13** |
+| the capture group — a knock, two tight arrivals, an arrival beside a word | 275 (0.92%) | seed **70** |
+
+Individually the moments are common — the rarest, *a swing held well past its own settle*, is 1.1%,
+and most run 5 – 66%. **It is the conjunction that is expensive**, and it is not length in
+disguise: of the 117 seeds flying past 2 500 ticks, seven carry everything. A longer run does not
+help, because the pilot lets go as soon as the aim arrives and a swing held for twice its settle
+stays rare however long it flies.
+
+**And the cliff is real rather than theoretical.** The trial tuning above found **zero** in six
+thousand and needed thirty thousand to find four.
+
+### One fixture or several — the author's, with the numbers under it
+
+**Recommendation: keep one fixture.** The expensive half of this problem was the thirty hand edits
+and that half is gone; what is left is a 23-second sweep nobody has to watch. `pnpm replay` with no
+argument keeping one meaning is worth real money to someone flying on a phone, five other test
+files read the same recipe and pin nothing, and *"a number here and a number in that terminal
+output are the same number"* survives for `the shape of the run`, which is the only wall of numbers
+left. Splitting would buy compute and cost the one thing the fixture is *for*.
+
+**The trigger for splitting is now measurable, and the tool prints it**: a sweep of thirty thousand
+that finds none. At that point the moments have outgrown one flight, and the three groups above are
+the natural cut — each about **forty times** easier to find than the conjunction, first hit at seed
+70 rather than 3 197. What it would cost is stated so it is not discovered later: three recipes to
+re-record, each group's sample-size floors re-derived against a shorter run, and a decision about
+which of the three `pnpm replay` flies bare.
+
 ### Still the author's, and asked rather than assumed
 
 1. **What an addressed rung says** — spec 05's own open question, now flyable both ways on the bench.

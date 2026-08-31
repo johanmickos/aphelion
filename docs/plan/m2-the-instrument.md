@@ -1468,6 +1468,22 @@ either way, so the assertion passed with the fault put back. The swing frozen on
 only one in the run held past its settle (81 ticks) and the only place the bug is visible at all.
 Reinstating it now fails.
 
+### ⚠ Re-addressed, 2026-08-31: the ticks are found rather than named
+
+Every tick number in this section is now a coordinate the file no longer writes down — **258**,
+**310** and **2221** included, and they are 286, 320 and 2127 today. What the goldens assert is
+unchanged and the argument above is unchanged; what moved is only *how a moment is addressed*, and
+the reasoning is in [`test/moments.ts`](../../test/moments.ts) with its cost measured in
+[M3.2's own notes](./m3-the-field.md). Read the two paragraphs above as what they are — the
+argument for values written out rather than snapshotted, which still stands and is why a digest was
+refused — and not as a promise that any particular tick still exists.
+
+The one thing that section got wrong is worth keeping visible: *"a golden written on the most
+convenient swing can miss the bug it was written for"* was the right diagnosis and **naming a
+second swing was the wrong cure**, because it fixed one instance of a class. A moment described as
+*a swing held well past the end of its own settle* cannot be written on the convenient one, since
+the convenient one does not match the sentence.
+
 ---
 
 ## Gate
