@@ -29,7 +29,7 @@
  */
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { PATCHES } from './patches.ts';
@@ -49,7 +49,16 @@ mkdirSync(WORK, { recursive: true });
 // comes because the rule that turns devices into the one boolean is the real
 // one, focus loss and all.
 cpSync(join(ROOT, 'src'), join(WORK, 'src'), { recursive: true });
-cpSync(join(ROOT, 'tools'), join(WORK, 'tools'), { recursive: true });
+// …but not `fixture.ts`, which is a sweep over the **test** corpus rather than
+// anything the game runs: it drives the headless pilot in `test/sim/run.ts` and
+// reads its criteria from `test/moments.ts`, neither of which is copied here and
+// neither of which should be. Left in, the work tree fails to typecheck against
+// imports that are not there — which is the copy telling the truth, so what is
+// fixed is the copy rather than the tool.
+cpSync(join(ROOT, 'tools'), join(WORK, 'tools'), {
+  recursive: true,
+  filter: (from) => basename(from) !== 'fixture.ts',
+});
 mkdirSync(join(WORK, 'app'));
 cpSync(join(ROOT, 'app', 'input.ts'), join(WORK, 'app', 'input.ts'));
 cpSync(join(HERE, 'entry.ts'), join(WORK, 'entry.ts'));
