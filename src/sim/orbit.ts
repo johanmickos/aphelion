@@ -258,14 +258,38 @@ export function predictOrbit(craft: Craft, body: Body): Orbit | null {
   // approximated, and `pnpm portable` bans it in this directory (ADR-0014).
   const ex = (craft.vy * momentum) / body.mass - dx / r;
   const ey = (-craft.vx * momentum) / body.mass - dy / r;
-  // **Capped where the freeze caps it**, because a prediction that draws a shape
-  // the freeze will never hand out is not a prediction. `freeze` clamps the
-  // eccentricity at [`ECCENTRICITY_CAP`](./units.ts) and this did not, so a dive
-  // whose natural ellipse is longer than the cap drew a thin oval right up to the
-  // freeze and then snapped to a fat one — measured on the shipped run, **84% of
-  // a radius on one tick**, on one capture in thirteen. *"I see one, and once I am
-  // deeper in the capture it switches to a different oval"* (author, 2026-08-30).
-  const shape = Math.min(magnitude(ex, ey), ECCENTRICITY_CAP);
+  // **Uncapped, and it was capped here for a year of evenings before that was
+  // measured as the fault rather than the fix.**
+  //
+  // `freeze` clamps the eccentricity at [`ECCENTRICITY_CAP`](./units.ts), and
+  // this clamped it too, so that a prediction would not draw a shape the freeze
+  // would never hand out — against a snap measured at **84% of a radius on one
+  // tick**, on one capture in thirteen (author, 2026-08-30: *"I see one, and once
+  // I am deeper in the capture it switches to a different oval"*).
+  //
+  // **What the cap actually bought was a slow slide instead of a fast snap.** The
+  // true eccentricity is a constant of the motion — under gravity alone the conic
+  // the craft is on does not change, and measured through one dive it held at
+  // **0.726** from the grab to the freeze. Clamping it to 0.6 and then re-sizing
+  // the ellipse through the craft (below) makes the drawn periapsis a function of
+  // the craft's *current radius* — so as the dive falls from 878 to 314 design
+  // units the oval slid from **244 down to 182**, and on to the floor by the
+  // freeze. Every long dive, continuously, where the snap was one capture in
+  // thirteen.
+  //
+  // The author flew both and named the difference: *"I saw another initial grab
+  // oval at the last blue planet, and once I started circularizing it swapped to
+  // a different one... I don't see this issue with the original prototype"*
+  // (2026-08-31). The prototype draws the conic it is on and says why it is
+  // stable — *"recomputed every frame from the live state, this converges on the
+  // real orbit as the dive proceeds"* — and it caps nothing.
+  //
+  // Measured over the dispatches that replay at `SIM_VERSION` 9, uncapping costs
+  // nothing it was bought for: the slide across a dive goes **p95 14% → 0%** and
+  // the snap on the freeze tick is **1% either way**. The snap it was added
+  // against is gone on its own — the floor clamp and the re-size below are what
+  // were doing that work — and three physics tunings have landed since.
+  const shape = magnitude(ex, ey);
 
   const periapsisAngle = angleOf(ex, ey);
 

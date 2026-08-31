@@ -553,3 +553,39 @@ recorded baseline on the author's phone. **Verify**: run it on the phone.
 
 The field looks like Aphelion for the whole run rather than a quarter of it. Next:
 [M4](./m4-the-economy.md).
+
+### ⚠ The predicted oval stops sliding, 2026-08-31 — and the cap was the cause, not the cure
+
+*"I saw another initial grab oval at the last blue planet, and once I started circularizing it
+swapped to a different one... I don't see this issue with the original prototype."*
+
+**The eccentricity cap in [`predictOrbit`](../../src/sim/orbit.ts) was added on 2026-08-30 against a
+snap and it bought a slide instead.** `freeze` clamps eccentricity at `ECCENTRICITY_CAP`, so the
+prediction clamped it too, on the reasoning that a prediction must not draw a shape the freeze will
+never hand out — against a measured snap of 84% of a radius on one tick, one capture in thirteen.
+
+What was missed is that **the true eccentricity is a constant of the motion.** Under gravity alone
+the conic the craft is on does not change: measured through one dive it held at **0.726** from the
+grab to the freeze, and the uncapped periapsis sat at **167 design units for the whole of it**.
+Clamping the shape to 0.6 and then re-sizing the ellipse to pass through the craft — which the same
+change added, and which is right — makes the drawn periapsis a function of the craft's *current
+radius*. So as the dive fell from 878 to 314 the oval slid **244 → 182**, and on to the floor by the
+freeze. Every long dive, continuously, where the snap was one capture in thirteen.
+
+The prototype has no such cap and says why its own version is steady: *"recomputed every frame from
+the live state, this converges on the real orbit as the dive proceeds."* Its predictor takes the
+floor as an argument and clamps the drawn radius to it — which is what this file's floor clamp and
+re-size already do, and they are what was actually fixing the snap.
+
+| over the dispatches that replay at `SIM_VERSION` 9 | capped | uncapped |
+|---|---|---|
+| the oval's slide across a dive, p50 / p95 / worst | 1% / 14% / 15% | **0% / 0% / 1%** |
+| its snap on the freeze tick, p50 / p95 / worst | 0% / 1% / 1% | 0% / 1% / 1% |
+
+**The snap it was added against does not happen any more and uncapping does not bring it back** —
+three physics tunings have landed since, and the floor clamp and the re-size carry that job. Traced
+on the author's own run the oval now holds one size from the moment it appears to the freeze on
+every capture but two, where the residual is the floor clamp releasing.
+
+`ECCENTRICITY_CAP` is untouched in [`freeze`](../../src/sim/orbit.ts), where it is a physics ruling
+about what orbits the game hands out rather than a statement about what to draw.
