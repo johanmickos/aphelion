@@ -7,16 +7,18 @@
       "generator": "fixture",
       "version": 1
     },
-    "sim": 7,
-    "seed": 3797,
-    "ticks": 2359,
+    "sim": 8,
+    "seed": 3394,
+    "ticks": 3276,
     "log": [
-      70, 253, 277, 291, 318, 333, 356, 367, 387, 407, 431, 444, 466, 616, 656, 682, 712, 774, 780,
-      1001, 1008, 1271, 1279, 1314, 1326, 1627, 1630, 1946, 1958, 2230, 2242
+      100, 279, 295, 317, 334, 357, 377, 392, 402, 435, 447, 748, 749, 854, 866, 899, 909, 939, 940,
+      970, 971, 1004, 1005, 1256, 1258, 1590, 1591, 1783, 1784, 1974, 1975, 2165, 2177, 2219, 2233,
+      2271, 2272, 2375, 2388, 2419, 2434, 2453, 2471, 2611, 2623, 2660, 2671, 2748, 2761, 2878,
+      2879, 3144, 3169, 3202, 3225
     ]
   },
   "observed": {
     "ticks": [],
-    "note": "Flown by the headless pilot in test/sim/run.ts, not by a person. Re-flown for SIM_VERSION 7 (the dive payback, 2026-08-30), which every recipe recorded before it stops replaying against. The seed was chosen on coverage rather than length: of 6000 searched, only five still give the goldens everything they pin in one flight -- all four release tiers, a knock, a tight arrival, and a swing held past its own settle. 3797 is the richest of the five. Note that the pilot can now produce a tight arrival at all, which under the physics before this it could not."
+    "note": "Flown by the headless pilot in test/sim/run.ts, not by a person. Re-flown for SIM_VERSION 8 (the release kick becomes a square, 2026-08-31), which every recipe recorded before it stops replaying against. The seed is chosen on coverage rather than length: of six thousand searched, only four still give the goldens everything they pin in one flight -- all four release tiers, a knock, a tight arrival, and a swing held past its own settle. 3394 is the richest of the four."
   }
 }

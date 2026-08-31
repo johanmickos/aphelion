@@ -578,6 +578,40 @@ separately, by the compass.
 
 ---
 
+> ## ⚠ The kick is a kick, 2026-08-31 — the transient is a square now
+>
+> **`burstOf` spends the transient on the square of what is left of its span rather than on a
+> line**, at a share of **0.8** and with the good-release extension halved to 0.25. The author,
+> having flown a deeper *stretch* and found it was the wrong half of the punch: *"I felt the kick
+> upon release still isn't noticeable enough. When I release well I feel like the kick lasts too
+> long, so I go REALLY fast. Let's scale that part back just a hair. More generally, though, I'd
+> like for there to be more of an initial **kick** to the boost, that then fades away into the
+> current feel."*
+>
+> Harder, shorter, and less of it on the release they said it about — three things no straight line
+> can do at once, because raising a line's start raises everything under it. At full quality:
+>
+> | | Peak | Span | Distance it adds |
+> |---|---|---|---|
+> | 0.45, linear | 0.450 | 1.95s | 0.439 |
+> | **0.8, squared** | **0.800** | **1.63s** | **0.434**, −1.2% |
+>
+> The two curves cross at **0.65s** — above the old line for the first two thirds of a second and
+> below it after, which is *"an initial kick that then fades away into the current feel"* as
+> literally as a curve can put it. A **poorer** release gains a few percent of distance instead of
+> losing it, because its peak rises by the same 78% from a much lower start; that is the *"more
+> generally"* half of the same sentence.
+>
+> **0.8 is this section's own measured number**, not a new one — and this does not reverse the
+> ruling of 2026-08-29 that took the share from 0.8 to 0.45. That one was *"all of the velocity
+> kicks are a bit too intense"*, a complaint about how much speed a release hands out, and the
+> amount handed out is **lower** here than at 0.45. What went up is the peak, which is what was
+> asked for both times: down when it was a long push, up now that it is a short hit.
+>
+> **What §8's tolerance still holds**: exit speed is the orbital speed plus the boost's permanent
+> share, within 5%. The transient never enters `vx`/`vy` and is invisible to it. `SIM_VERSION` is 8
+> and every recipe recorded before it is refused.
+
 ## 8 · The release
 
 | Property | Value | Kind |

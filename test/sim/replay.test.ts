@@ -48,8 +48,16 @@ function everyTick(recipe: Recipe, ticks: number): Uint8Array[] {
   return states;
 }
 
-/** Three whole runs, long enough that a divergence has room to appear. */
-const SEEDS = [28, 71, 139];
+/**
+ * Three whole runs, long enough that a divergence has room to appear.
+ *
+ * **They move whenever the physics does**, and that is not a wart: the pilot flies
+ * from the geometry, so the same seed takes a different route under a different
+ * swing and one of them ends sooner. They were `[28, 71, 139]` until SIM_VERSION
+ * 8, where two of the three fell under the thousand ticks the guard below asks
+ * for. What is fixed is the guard, not the seeds.
+ */
+const SEEDS = [75, 340, 73];
 
 describe('a recorded run', () => {
   it('replays to a bit-identical final state, four times its own length', () => {
@@ -103,7 +111,7 @@ describe('a recorded run', () => {
    * that kept flying would be inventing the part nobody flew.
    */
   it('stops at its ending, whatever is left in the log', () => {
-    const { recipe } = pilotRecipe(28);
+    const { recipe } = pilotRecipe(75);
     const ended = replayRun(recipe);
     expect(ended.ending).not.toBeNull();
 
@@ -139,7 +147,7 @@ describe('the picture beside the run', () => {
   }
 
   it('replays identically too', () => {
-    const { recipe } = pilotRecipe(71);
+    const { recipe } = pilotRecipe(340);
     const first = present(recipe);
     expect(first.length).toBeGreaterThan(1000);
     expect(present(recipe)).toEqual(first);
@@ -152,7 +160,7 @@ describe('the picture beside the run', () => {
    * final state what it looked like would be reporting a frame nobody saw.
    */
   it('is not the same as asking the final state what it looks like', () => {
-    const { recipe } = pilotRecipe(1875);
+    const { recipe } = pilotRecipe(203);
     const arrived = present(recipe).at(-1)!;
     const onDemand = createPresentation(replayRun(recipe));
     expect(onDemand.tick).toBe(arrived.tick);

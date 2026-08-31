@@ -63,6 +63,12 @@ describe('the simulation behaviour version', () => {
       replayRun(recipeOf(recorder), { onTick: (state) => digest.update(snapshot(state)) });
     }
 
+    // **8 as of 2026-08-31: the release kick becomes a square.** A tick moved —
+    // `burstOf` spends the transient on the square of what is left of its span
+    // rather than on a line, at a peak of 0.8 and a shorter reach — so a recipe
+    // replayed under this build flies a different run than it was recorded as.
+    // `TRANSIENT_SHARE` carries the measurement.
+    //
     // **Unmoved on 2026-08-31 while the fingerprint below moved**, and it is the
     // third time this file's *picture, not flight* case has been exercised: the
     // orbit gained `entrySpeed`, carried across the freeze so that
@@ -83,11 +89,11 @@ describe('the simulation behaviour version', () => {
     // The bump before it was 6, where the snapshot gained the dive's **aim** and
     // this number did *not* move — the picture-not-flight case, checked the way
     // the comment above prescribes and recorded here so the two are told apart.
-    expect(SIM_VERSION).toBe(7);
+    expect(SIM_VERSION).toBe(8);
     expect(
       digest.digest('hex').slice(0, 16),
       'the swing changed: bump SIM_VERSION and this fingerprint together, and every recipe ' +
         'recorded before now stops replaying',
-    ).toBe('e7d969f78afb81dd');
+    ).toBe('e31958d0b214f048');
   });
 });

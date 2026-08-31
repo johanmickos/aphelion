@@ -625,6 +625,54 @@ export const PERMANENT_SHARE = 0.22;
  * on the bench where spec 01 §13.5 already put it.
  */
 /**
+ * ## ⚠ The kick is a kick again, 2026-08-31
+ *
+ * `TRANSIENT_SHARE` is **0.8** and [`TRANSIENT_STRETCH`](#transient_stretch) is
+ * **0.25**, and [`burstOf`](./craft.ts) spends them on a **square** rather than a
+ * line. The three moved together and only make sense together; the prose below is
+ * as it was written, for the value it explains.
+ *
+ * The author: *"I felt the kick upon release still isn't noticeable enough. When
+ * I release well I feel like the kick lasts too long, so I go REALLY fast. Let's
+ * scale that part back just a hair. More generally, though, I'd like for there to
+ * be more of an initial **kick** to the boost, that then fades away into the
+ * current feel."*
+ *
+ * Harder, shorter, and — **on the release they said it about** — less of it in
+ * total. Three requirements that no straight line can satisfy at once, because
+ * raising a line's start raises everything under it. On the square they are one
+ * change:
+ *
+ * | Quality | Peak, was → is | Span, was → is | Distance it adds, was → is |
+ * |---|---|---|---|
+ * | 0.25 | 0.225 → **0.400** | 1.63s → 1.46s | 0.183 → 0.195, **+6.7%** |
+ * | 0.50 | 0.318 → **0.566** | 1.76s → 1.53s | 0.280 → 0.289, +3.1% |
+ * | **1.00** | 0.450 → **0.800** | 1.95s → **1.63s** | 0.439 → **0.434**, **−1.2%** |
+ *
+ * **The bottom row is the one the author was describing** — *"when I release well
+ * I feel like the kick lasts too long, so I go REALLY fast"* — and it is the row
+ * that comes down. The others go up a few percent, which is the *"more generally,
+ * more of an initial kick"* half of the same sentence: a poor release now gets a
+ * real hit where it used to get a long nudge. Every row's peak is up by 78%.
+ *
+ * **0.8 is not a new number.** It is the prototype's own measured share, which
+ * this file's prose below already names, and `docs/plan/m2-the-instrument.md`
+ * filed it on 2026-08-30 as the third of three candidates for exactly this
+ * request. What made it too much at 0.45's shape was the *line* carrying it for
+ * two seconds; on the square it is spent in two thirds of one.
+ *
+ * **This is not the 2026-08-29 ruling reversed.** That one was *"all of the
+ * velocity kicks are a bit too intense"* and it took the share from 0.8 to 0.45 —
+ * a complaint about how much speed a release hands out. The total handed out is
+ * **lower** here than at 0.45, by 1.2%. What went up is the peak, which is the
+ * thing that was asked for both times: down when it was a long push, up now that
+ * it is a short hit.
+ *
+ * `TRANSIENT_STRETCH` halved for the sentence that names it: *"when I release
+ * well I feel like the kick lasts too long"* — it is the extension that only a
+ * good release earns, so it is the one that was making a good release long.
+ */
+/**
  * How much faster the craft rides a frozen orbit than the orbit itself implies.
  *
  * **The prototype's `phaseRate`, carried**, and its own config calls it *"sweep
@@ -652,7 +700,7 @@ export const PHASE_RATE = 1;
 
 export const SETTLE_RETURN = 0.3;
 
-export const TRANSIENT_SHARE = 0.45;
+export const TRANSIENT_SHARE = 0.8;
 
 /**
  * How long the burst takes to spend itself, in seconds — spec 01 §8's **1.3s**,
@@ -676,7 +724,7 @@ export const TRANSIENT_SECONDS = 1.3;
  * ([`punch.ts`](../state/punch.ts)), so the thing seen and the thing felt are one
  * reading of one number.
  */
-export const TRANSIENT_STRETCH = 0.5;
+export const TRANSIENT_STRETCH = 0.25;
 
 /**
  * How close to a body's surface counts as contact for a coasting craft — spec

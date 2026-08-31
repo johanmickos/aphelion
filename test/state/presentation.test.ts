@@ -57,12 +57,12 @@ const at = (tick: number): PresentationState => {
  * The first swing of the shipped run: the grab lands on tick 118 and the
  * release on 286. `pnpm replay` prints both.
  */
-const GRAB = 71;
-const RELEASE = 254;
+const GRAB = 101;
+const RELEASE = 280;
 
 describe('the run pnpm replay ships', () => {
   it('is the run the trail prints', () => {
-    expect(RUN.length - 1).toBe(2359);
+    expect(RUN.length - 1).toBe(3276);
   });
 });
 
@@ -138,7 +138,7 @@ describe('the craft', () => {
   it('is stretched by the release and not by the grab', () => {
     expect(at(GRAB).craft.deformation).toEqual({ along: 1, across: 1, amount: 0, recovery: null });
 
-    // The swing released on 254 is let go at the top of its envelope, so it earns
+    // The swing released on 280 is let go at the top of its envelope, so it earns
     // the whole of spec 02 §4's stretch and holds it half again as long — which
     // is where the **punch** lives since the camera's share of it was withdrawn.
     const struck = at(RELEASE).craft.deformation;

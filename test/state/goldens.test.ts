@@ -146,32 +146,34 @@ describe('the numbers the choreography is built from', () => {
 
 describe('the shape of the run', () => {
   /**
-   * Sixteen grabs and fifteen releases — the run ends holding, which is why they
-   * differ by one. If this fails
+   * Twenty-eight grabs and twenty-seven releases — the run ends holding, which is
+   * why they differ by one. If this fails
    * and `test/sim/version.test.ts` did not, the *picture* has started disagreeing
    * with the simulation about when a swing began or ended — which is the one
    * thing the middle layer must never do.
    */
   it('grabs and releases on the ticks pnpm replay prints', () => {
-    expect(RUN.length - 1).toBe(2359);
+    expect(RUN.length - 1).toBe(3276);
     expect(edges('grab')).toEqual([
-      71, 278, 319, 357, 388, 432, 467, 657, 713, 781, 1009, 1280, 1327, 1631, 1959, 2243,
+      101, 296, 335, 378, 403, 448, 750, 867, 910, 941, 972, 1006, 1259, 1592, 1785, 1976, 2178,
+      2234, 2273, 2389, 2435, 2472, 2624, 2672, 2762, 2880, 3170, 3226,
     ]);
     expect(edges('release')).toEqual([
-      254, 292, 334, 368, 408, 445, 617, 683, 775, 1002, 1272, 1315, 1628, 1947, 2231,
+      280, 318, 358, 393, 436, 749, 855, 900, 940, 971, 1005, 1257, 1591, 1784, 1975, 2166, 2220,
+      2272, 2376, 2420, 2454, 2612, 2661, 2749, 2879, 3145, 3203,
     ]);
   });
 });
 
 /**
- * **The best swing in the run.** Grabbed on 71, frozen on 186, released on 254 —
- * sixty-eight ticks past the freeze, which is inside the plateau, so the envelope
+ * **The best swing in the run.** Grabbed on 101, frozen on 216, released on 280 —
+ * sixty-four ticks past the freeze, which is inside the plateau, so the envelope
  * is exactly 1 and the punch is at its full extent.
  */
-const FREEZE = 186;
-const RELEASE = 254;
+const FREEZE = 216;
+const RELEASE = 280;
 
-describe('the release at 254 · a swing let go at full boost', () => {
+describe('the release at 280 · a swing let go at full boost', () => {
   it('is at the top of its envelope on the tick before', () => {
     expect(at(RELEASE - 1).compass!.envelope).toBe(1);
   });
@@ -230,10 +232,10 @@ describe('the release at 254 · a swing let go at full boost', () => {
  * is that the two wanted different moments, and this is a release that took one
  * and paid the whole price of the other.
  */
-describe('the release at 292 · perfect aim, no boost at all', () => {
+describe('the release at 318 · perfect aim, no boost at all', () => {
   it('earns the top word on an envelope of zero', () => {
-    expect(at(291).compass!.envelope).toBe(0);
-    expect(at(292).callout!.tier).toBe('PERFECT');
+    expect(at(317).compass!.envelope).toBe(0);
+    expect(at(318).callout!.tier).toBe('PERFECT');
   });
 
   /**
@@ -242,8 +244,8 @@ describe('the release at 292 · perfect aim, no boost at all', () => {
    * pays nothing of is the **boost**, which is a different channel (ADR-0012).
    */
   it('earns only the floor of the punch, because there was no quality', () => {
-    expect(at(292).craft.deformation.amount).toBe(PUNCH_FLOOR);
-    expect(at(292).craft.deformation.recovery!.span).toBe(PUNCH_TICKS);
+    expect(at(318).craft.deformation.amount).toBe(PUNCH_FLOOR);
+    expect(at(318).craft.deformation.recovery!.span).toBe(PUNCH_TICKS);
   });
 
   /**
@@ -252,13 +254,13 @@ describe('the release at 292 · perfect aim, no boost at all', () => {
    * from the economy."*
    */
   it('says the top word, and strikes no flash under it', () => {
-    expect(at(292).callout!.tier).toBe('PERFECT');
+    expect(at(318).callout!.tier).toBe('PERFECT');
     // No glow of any kind behind it. The CORE-white E3 went first, then spec 06
     // §4's own per-tier bloom — *"the blur circle behind the popup text isn't
     // doing us any favours, it's blurring the legibility."* What keeps the word
     // legible is a rim, which is the renderer's and is paint.
-    expect(at(292).flash).toBeNull();
-    expect(at(292).callout!.bloom).toBe(6);
+    expect(at(318).flash).toBeNull();
+    expect(at(318).callout!.bloom).toBe(6);
   });
 });
 
@@ -274,21 +276,21 @@ describe('the flown arc · the boost envelope, drawn', () => {
     expect(at(FREEZE).compass!.arming).toHaveLength(1);
 
     // Three ticks in: the ramp is 3/27 of the way up and one stretch wide.
-    expect(at(189).compass!.envelope).toBeCloseTo(3 / 27, 9);
-    expect(at(189).compass!.flown).toHaveLength(1);
-    expect(at(189).compass!.arming).toHaveLength(4);
+    expect(at(219).compass!.envelope).toBeCloseTo(3 / 27, 9);
+    expect(at(219).compass!.flown).toHaveLength(1);
+    expect(at(219).compass!.arming).toHaveLength(4);
   });
 
   /**
    * **The ramp's stretches are not equal, and that is the measurement the latch
    * exists for.** The craft leaves periapsis at its fastest and slows on the way
    * out, so equal slices of *time* are unequal slices of *arc* — here they shrink
-   * from 0.565 to 0.163 radians, a factor of **3.5** across one ramp. Shading the
+   * from 0.551 to 0.171 radians, a factor of **3.2** across one ramp. Shading the
    * ramp evenly along the arc instead is wrong by 0.19 of the envelope's range,
    * and wrong in the direction that says the boost armed sooner than it did.
    */
   it('cuts the ramp on the clock and not on the arc', () => {
-    const flown = at(214).compass!.flown;
+    const flown = at(244).compass!.flown;
     expect(flown).toHaveLength(7);
 
     const ramp = flown.slice(0, 6);
@@ -299,8 +301,8 @@ describe('the flown arc · the boost envelope, drawn', () => {
     expect(ramp[0]!.at).toBe(0);
     // …across steadily shorter arcs, because the craft is slowing.
     const spans = ramp.map((run) => Math.abs(run.span));
-    expect(spans[0]!).toBeCloseTo(0.5647, 3);
-    expect(spans[5]!).toBeCloseTo(0.1627, 3);
+    expect(spans[0]!).toBeCloseTo(0.5513, 3);
+    expect(spans[5]!).toBeCloseTo(0.1708, 3);
     expect(spans[0]! / spans[5]!).toBeGreaterThan(2.5);
     for (let i = 1; i < spans.length; i++) expect(spans[i]!).toBeLessThan(spans[0]!);
 
@@ -325,9 +327,9 @@ describe('the flown arc · the boost envelope, drawn', () => {
   });
 
   it('grows through the settle', () => {
-    const swept = [189, 200, 214, 229, RELEASE - 1].map((tick) => at(tick).compass!.swept);
+    const swept = [219, 230, 244, 258, RELEASE - 1].map((tick) => at(tick).compass!.swept);
     for (let i = 1; i < swept.length; i++) expect(swept[i]!).toBeGreaterThan(swept[i - 1]!);
-    expect(swept[swept.length - 1]!).toBeCloseTo(4.5046, 3);
+    expect(swept[swept.length - 1]!).toBeCloseTo(4.178, 3);
   });
 
   /**
@@ -337,22 +339,22 @@ describe('the flown arc · the boost envelope, drawn', () => {
    * kept going round it.
    *
    * It has to be asserted **here** and not on the first swing: that one freezes on
-   * 186 and is let go on 254, which is inside its own 72-tick settle, so every
-   * tick of it grows either way. The swing frozen on **482** is held for 135, well
-   * past its settle, and is where the bug is visible at all. That is worth
+   * 216 and is let go on 280, which is inside its own 72-tick settle, so every
+   * tick of it grows either way. The swing frozen on **2499** is held for 113,
+   * well past its settle, and is where the bug is visible at all. That is worth
    * knowing: a golden written on the most convenient swing would have passed with
    * the fault back in — and of six thousand pilot seeds searched for this fixture,
-   * only five still contain a swing held that long.
+   * only four still contain a swing held that long.
    */
   it('keeps growing past the settle', () => {
-    // 482 + 72 = 554, so these three ticks are all in closed-form territory.
-    const swept = [560, 580, 600].map((tick) => at(tick).compass!.swept);
+    // 2499 + 72 = 2571, so these three ticks are all in closed-form territory.
+    const swept = [2575, 2590, 2605].map((tick) => at(tick).compass!.swept);
     for (let i = 1; i < swept.length; i++) expect(swept[i]!).toBeGreaterThan(swept[i - 1]!);
     // And the envelope is decaying by then, which is the other half of the same
     // fact: past the settle there is a stretch of arc the boost is dying along.
-    expect(at(600).compass!.envelope).toBeLessThan(1);
-    expect(at(600).compass!.envelope).toBeGreaterThan(0);
-    expect(at(600).compass!.flown.length).toBeGreaterThan(7);
+    expect(at(2605).compass!.envelope).toBeLessThan(1);
+    expect(at(2605).compass!.envelope).toBeGreaterThan(0);
+    expect(at(2605).compass!.flown.length).toBeGreaterThan(7);
   });
 });
 
@@ -444,16 +446,16 @@ describe('the ring count, ruled to three on 2026-08-29', () => {
 
 describe('which word is alive when', () => {
   /**
-   * **One slot, and a new release takes it.** The TRUE struck on 254 is 37 ticks
-   * into its 96 when the PERFECT lands on 292, so the two overlap — and there is
+   * **One slot, and a new release takes it.** The TRUE struck on 280 is 37 ticks
+   * into its 96 when the PERFECT lands on 318, so the two overlap — and there is
    * still exactly one word, because spec 06 §4 makes queueing structural: *"one
    * release, one word."*
    */
   it('is one word, and a later release replaces an earlier one still lit', () => {
-    expect(at(291).callout!.tier).toBe('TRUE');
-    expect(at(291).callout!.life.age).toBe(37);
-    expect(at(292).callout!.tier).toBe('PERFECT');
-    expect(at(292).callout!.life.age).toBe(0);
+    expect(at(317).callout!.tier).toBe('TRUE');
+    expect(at(317).callout!.life.age).toBe(37);
+    expect(at(318).callout!.tier).toBe('PERFECT');
+    expect(at(318).callout!.life.age).toBe(0);
   });
 
   /**
@@ -473,8 +475,8 @@ describe('which word is alive when', () => {
 
   /** A make is carried and speaks nothing — spec 06 §2's *"points only"*. */
   it('carries a make without spending a word on it', () => {
-    expect(at(408).callout!.tier).toBe('MAKE');
-    expect(at(408).flash).toBeNull();
+    expect(at(358).callout!.tier).toBe('MAKE');
+    expect(at(358).flash).toBeNull();
   });
 
   /** And it outlives the rest of the sequence, world-anchored, being left behind. */
@@ -488,20 +490,20 @@ describe('which word is alive when', () => {
   });
 
   /**
-   * And it ends on its own clock — asserted on the release at **683**, one of the
-   * few in this run with no other *word* inside its lifetime: the next is 589
+   * And it ends on its own clock — asserted on the release at **1591**, one of the
+   * few in this run with no other *word* inside its lifetime: the next is 193
    * ticks later, against a word that lives 96. Most of the run's swings overlap,
    * which is spec 06 §3's merge rule waiting for the streaks that will need it.
    */
   it('ends 1 600ms after the release that earned it', () => {
-    expect(at(683).callout!.life.age).toBe(0);
-    expect(at(683 + 95).callout).not.toBeNull();
-    expect(at(683 + 95).callout!.strength).toBeLessThan(0.05);
-    expect(at(683 + 96).callout).toBeNull();
+    expect(at(1591).callout!.life.age).toBe(0);
+    expect(at(1591 + 95).callout).not.toBeNull();
+    expect(at(1591 + 95).callout!.strength).toBeLessThan(0.05);
+    expect(at(1591 + 96).callout).toBeNull();
   });
 
   /**
-   * Over the whole run: fifteen releases, three of them PERFECT — and the E3
+   * Over the whole run: twenty-seven releases, two of them PERFECT — and the E3
    * is struck **not once**. Spec 00 §3's *"at most one E3 alive"* is a shape
    * rather than a check, and what the shape now holds is nothing: the author has
    * taken the release, the grab and the award off the list in turn, and what is
@@ -514,7 +516,7 @@ describe('which word is alive when', () => {
     const perfects = edges('release').filter(
       (tick) => at(tick).callout?.life.age === 0 && at(tick).callout?.tier === 'PERFECT',
     );
-    expect(perfects).toEqual([292, 368, 683]);
+    expect(perfects).toEqual([318, 393]);
     expect(RUN.filter((view) => view.flash !== null)).toHaveLength(0);
   });
 });
@@ -576,18 +578,23 @@ describe('the arrival · a word for the capture', () => {
    */
   /**
    * **The count is the test**, because the failure this word had was never a
-   * crash: it was a word said too often to mean anything. Fourteen captures, three
-   * words. Loosening either half of `arrivedTight` moves this number and fails
+   * crash: it was a word said too often to mean anything. Twenty-six captures, one
+   * word. Loosening either half of `arrivedTight` moves this number and fails
    * here, which is the only thing standing between the author's verdict and a
    * quiet regression back to the two-in-three it was refused at.
+   *
+   * ⚠ **The pilot under-produces this word and always will**, which is why the
+   * rate that matters is real play's — measured at 15% over the author's own 105
+   * captures against 4% here. `test/sim/run.ts` says why in its own prose: aim is
+   * the one input it cannot reproduce, and aim is half of what this grades.
    */
-  it('is said three times in fourteen captures, and not ten', () => {
+  it('is said once in twenty-six captures, and the pilot cannot do better', () => {
     const captures = RUN.filter(
       (view, i) => i > 0 && view.compass?.hand != null && RUN[i - 1]!.compass?.hand == null,
     ).length;
     const said = RUN.filter((view) => view.arrival?.life.age === 0).length;
-    expect(captures).toBe(14);
-    expect(said).toBe(3);
+    expect(captures).toBe(26);
+    expect(said).toBe(1);
   });
 
   it('is struck at the freeze and nowhere else', () => {
@@ -699,7 +706,7 @@ describe('the knock · a word for the collision', () => {
    */
   it('is struck on the tick the floor takes the speed', () => {
     const born = RUN.filter((view) => view.knock?.life.age === 0);
-    expect(born.map((view) => view.tick)).toEqual([325, 1893]);
+    expect(born.map((view) => view.tick)).toEqual([851]);
   });
 
   /** At the point of contact, which is the place that earned it. */
@@ -716,29 +723,21 @@ describe('the knock · a word for the collision', () => {
   });
 
   /**
-   * ## ⚠ This invariant is currently breached, and the breach is the point of the test
+   * **Never at the same time as an arrival**, and this is the test that keeps it
+   * true end to end rather than only at the threshold.
    *
-   * [`knock.ts`](../../src/state/knock.ts) states that the two words *"must never
-   * contradict each other"*, and [`KNOCK_BAND`](../../src/sim/tier.ts) is set
-   * above the hardest knock any tight arrival takes so that one capture cannot
-   * earn both. That held over the author's dispatch corpus when both thresholds
-   * were ruled (2026-08-30) and it **does not hold under SIM_VERSION 7**: the
-   * dive payback changed what a capture arrives at, and in this run the swing
-   * frozen on **1896** takes a hard enough knock on 1893 to say BONK and still
-   * lands tight enough to say NERVE. They are lit together for **45 ticks**.
-   *
-   * Both thresholds are the author's, ruled on measured play, so retuning them is
-   * theirs and not this change's — `docs/plan/m3-the-field.md` asks it. What this
-   * test does in the meantime is **pin the breach exactly**: one capture, 45
-   * ticks. It fails if a second capture starts doing it, and it fails when the
-   * thresholds are fixed, which is the point — neither should happen quietly.
+   * It was **breached under SIM_VERSION 7** and is not any more. The dive payback
+   * changed what a capture arrives at, and for one build a capture frozen on 1896
+   * took a hard enough knock to say BONK three ticks earlier and still landed
+   * tight enough to say NERVE — lit together for 45 ticks. The release kick
+   * becoming a square (SIM_VERSION 8) moved approach geometry again and closed it
+   * without either threshold being touched. That it healed by itself is worth
+   * knowing rather than celebrating: `KNOCK_BAND` sits where it does on a
+   * measurement, and a measurement that has drifted twice in two days is one to
+   * re-take rather than to trust.
    */
-  it('is lit beside the arrival on exactly the one capture that breaches the band', () => {
-    const both = RUN.filter((v) => v.knock !== null && v.arrival !== null);
-    expect(both).toHaveLength(45);
-    expect(both[0]!.tick).toBe(1896);
-    // One capture, not a spread of them: every overlapping tick is the same word.
-    expect(new Set(both.map((v) => v.knock!.bornY)).size).toBe(1);
+  it('is never lit beside the arrival', () => {
+    expect(RUN.filter((v) => v.knock !== null && v.arrival !== null)).toHaveLength(0);
   });
 
   /** It climbs and leaves on the callout's own curves, because they are one grammar. */

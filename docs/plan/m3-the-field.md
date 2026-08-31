@@ -308,6 +308,44 @@ flight* case for the third time, checked the way that file prescribes: the field
 the snapshot untouched and the fingerprint did not move. `SNAPSHOT_VERSION` is 8, `SIM_VERSION` stays
 7, and every recipe goes on replaying.
 
+### The kick, in two passes, 2026-08-31
+
+**The first pass was the wrong half.** *"More punchy at the start… not really changing the overall
+trajectory/velocity"* was answered on the **stretch** — 1.5 / 0.7 to 1.75 / 0.55 — because that is
+the channel with no trajectory in it. Flown: *"I felt the kick upon release still isn't noticeable
+enough."* The stretch is what a release **looks** like, and what was missing was what it **feels**
+like.
+
+**The second pass is the transient, and the same message named all three of its terms.** *"When I
+release well I feel like the kick lasts too long, so I go REALLY fast. Let's scale that part back
+just a hair. More generally, though, I'd like for there to be more of an initial kick to the boost,
+that then fades away into the current feel."* Harder, shorter, less of it — and no straight line can
+do all three, because raising a line's start raises everything under it. So `burstOf` spends the
+transient on the **square** of what is left of its span, which is `decay.ts`'s own grammar and the
+one place in the release it had not reached.
+
+| Quality | Peak, was → is | Span, was → is | Distance, was → is |
+|---|---|---|---|
+| 0.25 | 0.225 → **0.400** | 1.63s → 1.46s | +6.7% |
+| 0.50 | 0.318 → **0.566** | 1.76s → 1.53s | +3.1% |
+| **1.00** | 0.450 → **0.800** | 1.95s → **1.63s** | **−1.2%** |
+
+The bottom row is the release the complaint was about and it is the row that comes down; the curves
+cross at 0.65s, above the old line for two thirds of a second and below it after. **0.8 is spec 01
+§8's own measured share**, filed as a candidate for exactly this on 2026-08-30 — not a new number,
+and not the 2026-08-29 ruling reversed, because the amount of speed handed out is lower than at 0.45.
+
+**It cost the corpus again.** `SIM_VERSION` 8, so the three dispatches sent today are refused as
+replays. The pilot fixture is re-flown at seed **3394** — of six thousand searched, four still carry
+all four tiers, a knock, a tight arrival and a swing held past its settle — and `replay.test.ts`'s
+three seeds moved with it, since two of the old three now end under the thousand ticks its guard asks
+for. That guard is fixed; the seeds are not, and the file now says so.
+
+**One thing healed on its own.** The knock-beside-arrival breach opened under `SIM_VERSION` 7 is
+gone: no tick in the new run lights both. Neither threshold was touched, so what closed it was the
+approach geometry moving again — which is a reason to **re-measure `KNOCK_BAND`** rather than to
+relax about it, and the golden is back to asserting the invariant outright.
+
 ### Still the author's, and asked rather than assumed
 
 1. **What an addressed rung says** — spec 05's own open question, now flyable both ways on the bench.
