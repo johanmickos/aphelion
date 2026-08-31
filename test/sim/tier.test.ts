@@ -14,7 +14,9 @@ import { describe, expect, it } from 'vitest';
 import {
   alignmentOf,
   ARRIVAL_BAND,
+  ARRIVAL_REF_SPEED,
   ARRIVAL_SIDEWAYS,
+  ARRIVAL_SPEED_RELIEF,
   arrivedTight,
   KNOCK_BAND,
   struckHard,
@@ -129,18 +131,18 @@ describe('the arrival · both halves have to be true', () => {
     // The bug the author flew on 2026-08-30: *"some of the captures were too
     // easily giving away the word."* The floor is a guarantee, so a dive aimed
     // at the body reaches it for free and must not be paid for arriving.
-    expect(arrivedTight(FLOOR, FLOOR, 0)).toBe(false);
-    expect(arrivedTight(FLOOR + 1, FLOOR, 0.23)).toBe(false);
+    expect(arrivedTight(FLOOR, FLOOR, 0, ARRIVAL_REF_SPEED)).toBe(false);
+    expect(arrivedTight(FLOOR + 1, FLOOR, 0.23, ARRIVAL_REF_SPEED)).toBe(false);
   });
 
   it('refuses a sideways approach that never came down', () => {
     // The author's own exclusion: *"far away grabs at closest approach don't
     // count."* A graze is not an arrival however well it was aimed.
-    expect(arrivedTight(FLOOR + 200, FLOOR, 0.98)).toBe(false);
+    expect(arrivedTight(FLOOR + 200, FLOOR, 0.98, ARRIVAL_REF_SPEED)).toBe(false);
   });
 
   it('pays a sideways approach that did come down', () => {
-    expect(arrivedTight(FLOOR + 1, FLOOR, 0.75)).toBe(true);
+    expect(arrivedTight(FLOOR + 1, FLOOR, 0.75, ARRIVAL_REF_SPEED)).toBe(true);
   });
 
   it('grades the angle and not a distance, so a press with no room can still earn it', () => {
@@ -153,7 +155,7 @@ describe('the arrival · both halves have to be true', () => {
     const grabRadius = 175;
     const sideways = 124;
     expect(sideways / FLOOR).toBeLessThan(1); // what the broken rule asked for
-    expect(arrivedTight(FLOOR + 0.9, FLOOR, sideways / grabRadius)).toBe(true);
+    expect(arrivedTight(FLOOR + 0.9, FLOOR, sideways / grabRadius, ARRIVAL_REF_SPEED)).toBe(true);
   });
 
   it('leaves the author their margin: 45 degrees was the derived line and is not the line', () => {
@@ -167,9 +169,10 @@ describe('the arrival · both halves have to be true', () => {
   });
 
   it('is exactly the band and the angle at their edges, inclusive', () => {
-    expect(arrivedTight(FLOOR + ARRIVAL_BAND, FLOOR, ARRIVAL_SIDEWAYS)).toBe(true);
-    expect(arrivedTight(FLOOR + ARRIVAL_BAND + 0.001, FLOOR, ARRIVAL_SIDEWAYS)).toBe(false);
-    expect(arrivedTight(FLOOR, FLOOR, ARRIVAL_SIDEWAYS - 0.001)).toBe(false);
+    const REF = ARRIVAL_REF_SPEED;
+    expect(arrivedTight(FLOOR + ARRIVAL_BAND, FLOOR, ARRIVAL_SIDEWAYS, REF)).toBe(true);
+    expect(arrivedTight(FLOOR + ARRIVAL_BAND + 0.001, FLOOR, ARRIVAL_SIDEWAYS, REF)).toBe(false);
+    expect(arrivedTight(FLOOR, FLOOR, ARRIVAL_SIDEWAYS - 0.001, REF)).toBe(false);
   });
 });
 
@@ -198,8 +201,70 @@ describe('the knock · the price the floor charges', () => {
   it('can never fire on a capture that earned an arrival', () => {
     const FLOOR = 159;
     const hardestTight = 0.129;
-    expect(arrivedTight(FLOOR + 0.9, FLOOR, 0.708)).toBe(true);
+    expect(arrivedTight(FLOOR + 0.9, FLOOR, 0.708, ARRIVAL_REF_SPEED)).toBe(true);
     expect(struckHard(hardestTight)).toBe(false);
     expect(KNOCK_BAND).toBeGreaterThan(hardestTight);
+  });
+});
+
+/**
+ * **Speed buys aim** — the author's own idea, 2026-08-31, after a capture they
+ * felt had earned a word and did not get one: *"maybe we can incorporate the
+ * velocity into the evaluation logic, since coming in fast makes it harder to
+ * capture the lowest approach?"*
+ *
+ * The measurement agrees. Over the 105 captures in their dispatches, the slower
+ * half lands a median **1.3** units above the floor and the faster half **25.0**;
+ * ranked, room against entry speed is **rho 0.31**, and against aim the same speed
+ * is rho −0.07 — so it is a third axis rather than a second reading of the first.
+ * (Pearson misses it at 0.07, because room runs p05 0, p50 3, p95 543 and a few
+ * fly-pasts swamp the mean. That is why it is measured on ranks.)
+ */
+describe('the arrival · what a fast approach is forgiven', () => {
+  const FLOOR = 159;
+  const tightAt = (aim: number, speed: number): boolean =>
+    arrivedTight(FLOOR + 0.9, FLOOR, aim, speed);
+
+  /**
+   * **The ruled threshold does not move**, which is the whole shape of this
+   * change: the author set `ARRIVAL_SIDEWAYS` after refusing a looser gate, so
+   * relief is added on top of it and nothing can ever lose the word to it.
+   */
+  it('asks the full sideways requirement of anything not going faster than typical', () => {
+    expect(tightAt(ARRIVAL_SIDEWAYS, ARRIVAL_REF_SPEED)).toBe(true);
+    expect(tightAt(ARRIVAL_SIDEWAYS - 0.001, ARRIVAL_REF_SPEED)).toBe(false);
+    // And a slow approach is forgiven nothing at all — being slower than typical
+    // is not a difficulty, it is time to get sideways in.
+    expect(tightAt(ARRIVAL_SIDEWAYS - 0.001, ARRIVAL_REF_SPEED / 2)).toBe(false);
+    expect(tightAt(ARRIVAL_SIDEWAYS - 0.001, 0)).toBe(false);
+  });
+
+  /** And it eases from there, in proportion to how far over the reference it came. */
+  it('forgives a fast approach in proportion to its speed', () => {
+    expect(tightAt(ARRIVAL_SIDEWAYS - 0.001, ARRIVAL_REF_SPEED * 1.5)).toBe(true);
+    const doubled = ARRIVAL_SIDEWAYS - ARRIVAL_SPEED_RELIEF;
+    expect(tightAt(doubled, ARRIVAL_REF_SPEED * 2)).toBe(true);
+    expect(tightAt(doubled - 0.001, ARRIVAL_REF_SPEED * 2)).toBe(false);
+  });
+
+  /**
+   * **The relief never reaches the room**, which is the half of the gate that is
+   * about commitment rather than about difficulty. A fast approach that stops a
+   * long way short of the floor did not arrive tight; it flew past.
+   */
+  it('forgives no amount of room, however fast the approach', () => {
+    for (const speed of [ARRIVAL_REF_SPEED, ARRIVAL_REF_SPEED * 4, 1e5]) {
+      expect(arrivedTight(FLOOR + ARRIVAL_BAND + 0.001, FLOOR, 1, speed)).toBe(false);
+    }
+  });
+
+  /**
+   * The capture the author flagged, and the one that was already earning it a
+   * hair below the same aim. Both are close; what separates them is that one
+   * arrived at nearly twice the speed.
+   */
+  it('awards the capture the author flagged, at the aim that was refusing it', () => {
+    expect(tightAt(0.57, 1367)).toBe(true);
+    expect(tightAt(0.57, ARRIVAL_REF_SPEED)).toBe(false);
   });
 });

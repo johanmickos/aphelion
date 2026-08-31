@@ -338,7 +338,11 @@ free, and a dive aimed perfectly may never come down. Graded on one rung rather 
 a **capture** either says something or says nothing. There is no instrument for it and that is deliberate: the cue is the body's own light,
 which already grows with **grip** and swells with **closing** as the craft comes in.
 _Avoid_: capture quality (a **capture** is the event and this is the reading of it), tightness
-(that is on **depth**'s avoid line), approach, capture grade
+(that is on **depth**'s avoid line), approach, capture grade **What counts as tight now reads the speed it
+arrived at** (author, 2026-08-31): a capture coming in faster than real play's median is forgiven
+some of how sideways it had to be, because *"coming in fast makes it harder to capture the lowest
+approach"* — measured, the faster half of the author's captures land twenty times further from the
+floor than the slower half.
 
 **Knock**:
 How much of its speed the **floor** took from the craft in one tick, as a share of what it had —

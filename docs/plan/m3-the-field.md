@@ -273,6 +273,41 @@ change. Speed oscillates between 635 and 1 217 across the run rather than climbi
 seven of seventeen swings hand back speed rather than adding it. The tap is no longer the engine, and
 holding is.
 
+### The arrival learns to read speed, 2026-08-31
+
+*"I felt like my capture of the planet towards the end should've received a verbal accolade like
+'Tight!'. Maybe we can incorporate the velocity into the evaluation logic, since coming in fast makes
+it harder to capture the lowest approach?"*
+
+**The idea is theirs and the measurement backs it.** Spec 01 §5a says the opposite in its own words —
+*"the dive normalises speed"*, periapsis pinned within 5% of the floor across a four-fold range of
+approach speed — but that sweep ran over 60 – 260 prototype units and the game is now flown at two to
+four times it. Over the 105 captures in the author's dispatches:
+
+| | Slower half | Faster half |
+|---|---|---|
+| Entry speed, p50 | 646 | 1 029 |
+| Room above the floor, p50 | **1.3** | **25.0** |
+| Earned the word | 19% | 8% |
+
+Ranked, room against entry speed is **rho 0.31**; against aim the same speed is rho −0.07, so it is a
+third axis and not a second reading of the first. Pearson misses it entirely at 0.07 — room runs p05
+0, p50 3, p95 543, and a handful of fly-pasts swamp the mean — which is why it is measured on ranks.
+
+**Built so that nothing can lose the word.** `ARRIVAL_SIDEWAYS` stays exactly where the author put it
+when they refused a looser gate; what is added is relief above the median approach speed. A raised
+base would have held the count perfectly still by taking the word off a slow capture, and it is not
+taken: at 0.70 the gate would sit 0.008 under the author's own benchmark tight capture, against the
+0.1 of margin `test/sim/tier.test.ts` holds it to. The price is **two captures in 105**, 13% → 15%,
+both fast and both within three units of the floor — one of them the capture that prompted the note,
+at entry 1 367, room 2.9, aim 0.57.
+
+**It cost no recipes.** The orbit carries the entry speed across the freeze the way it already
+carries aim, and nothing in `src/sim/` steers on it — so this is `version.test.ts`'s *picture, not
+flight* case for the third time, checked the way that file prescribes: the field went on `Orbit` with
+the snapshot untouched and the fingerprint did not move. `SNAPSHOT_VERSION` is 8, `SIM_VERSION` stays
+7, and every recipe goes on replaying.
+
 ### Still the author's, and asked rather than assumed
 
 1. **What an addressed rung says** — spec 05's own open question, now flyable both ways on the bench.

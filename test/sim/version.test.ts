@@ -63,6 +63,16 @@ describe('the simulation behaviour version', () => {
       replayRun(recipeOf(recorder), { onTick: (state) => digest.update(snapshot(state)) });
     }
 
+    // **Unmoved on 2026-08-31 while the fingerprint below moved**, and it is the
+    // third time this file's *picture, not flight* case has been exercised: the
+    // orbit gained `entrySpeed`, carried across the freeze so that
+    // [`arrivedTight`](../../src/sim/tier.ts) can forgive a fast approach some of
+    // its aim. Nothing in `src/sim/` steers on it. Checked the way the comment
+    // above prescribes — the field was put on `Orbit` with the snapshot left
+    // alone, and this test went on passing at `432e7fe36db0a2d7`. So what was
+    // owed is `SNAPSHOT_VERSION` and this digest, and every recipe goes on
+    // replaying.
+    //
     // **7 as of 2026-08-30: the dive payback.** This is the other case the header
     // describes — a tick genuinely moved. `release.ts` now returns an unfinished
     // swing toward the speed the press found it at, so a recipe replayed under
@@ -78,6 +88,6 @@ describe('the simulation behaviour version', () => {
       digest.digest('hex').slice(0, 16),
       'the swing changed: bump SIM_VERSION and this fingerprint together, and every recipe ' +
         'recorded before now stops replaying',
-    ).toBe('432e7fe36db0a2d7');
+    ).toBe('e7d969f78afb81dd');
   });
 });

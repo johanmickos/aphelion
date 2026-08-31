@@ -97,6 +97,20 @@ export interface Orbit {
    */
   readonly aim: number;
   /**
+   * How fast the craft was flying when the press that began this swing landed —
+   * [`Dive.entrySpeed`](./dive.ts), carried across the freeze the way `aim` above
+   * is, and for the same reason: the dive is gone by the time the arrival is
+   * graded.
+   *
+   * **Recorded and never read by the physics.** Nothing in this file or any other
+   * in `src/sim/` steers on it; what wants it is
+   * [`arrivedTight`](./tier.ts), which is a grade the picture says out loud. That
+   * makes it `test/sim/version.test.ts`'s *picture, not flight* case — the
+   * snapshot moves and `SIM_VERSION` does not, so every recipe recorded before it
+   * goes on replaying.
+   */
+  readonly entrySpeed: number;
+  /**
    * How far round from periapsis the craft has swept, in radians.
    *
    * Accumulated through the settle and then left alone: once the shape and the
@@ -284,6 +298,11 @@ export function predictOrbit(craft: Craft, body: Body): Orbit | null {
     // has not happened.
     depth: 0,
     aim: 0,
+    // A prediction is never graded — [`arrivedTight`](./tier.ts) is the only
+    // reader of this and it is asked at the freeze, of a real orbit. Zero is the
+    // value that forgives nothing, so a prediction that somehow reached a grade
+    // would understate it rather than hand out a word.
+    entrySpeed: 0,
     phase: 0,
     ticksSinceFreeze: 0,
   };
@@ -351,6 +370,7 @@ export function freeze(craft: Craft, body: Body, dive: Dive): Orbit {
     direction: momentum < 0 ? -1 : 1,
     depth: reach > 0 ? Math.min(Math.max((dive.grabRadius - periapsis) / reach, 0), 1) : 1,
     aim: dive.aim,
+    entrySpeed: dive.entrySpeed,
     phase: 0,
     ticksSinceFreeze: 0,
   };

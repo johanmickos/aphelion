@@ -28,7 +28,7 @@ import type { SimState } from './types.ts';
  * generator for the same reason — so a stored one has to be able to say it was
  * written by a different game.
  */
-export const SNAPSHOT_VERSION = 7;
+export const SNAPSHOT_VERSION = 8;
 
 // The craft's four numbers, then the three the release's burst rides on.
 const HEADER_BYTES = 4 + 4 + 4 + 4 + (4 + 3) * 8 + 4 * 4 + 1 + 1 + 8;
@@ -37,7 +37,7 @@ const CORRIDOR_BYTES = 3 * 8;
 /** A presence byte, then a dive's seven numbers. */
 const DIVE_BYTES = 1 + 7 * 8;
 /** A presence byte, then the eight numbers of an orbit and its tick count. */
-const ORBIT_BYTES = 1 + 8 * 8 + 4;
+const ORBIT_BYTES = 1 + 9 * 8 + 4;
 const BODY_BYTES = 4 * 8 + 1;
 
 /** The type ordinals, fixed by position. Appending is safe; reordering is not. */
@@ -131,6 +131,7 @@ export function snapshot(state: SimState): Uint8Array {
   f64(orbit ? orbit.direction : 0);
   f64(orbit ? orbit.depth : 0);
   f64(orbit ? orbit.aim : 0);
+  f64(orbit ? orbit.entrySpeed : 0);
   f64(orbit ? orbit.phase : 0);
   u32(orbit ? orbit.ticksSinceFreeze : 0);
 

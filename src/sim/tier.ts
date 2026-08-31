@@ -91,6 +91,29 @@ export const ARRIVAL_BAND = 25;
 export const ARRIVAL_SIDEWAYS = 0.6;
 
 /**
+ * The approach speed the sideways requirement is stated at, in design units per
+ * second — **the median of real play**, and it is a measurement rather than a
+ * round number.
+ *
+ * Over the 105 captures in the author's dispatches the entry speed's p50 is 737.
+ * A capture arriving at exactly that is asked for [`ARRIVAL_SIDEWAYS`](#) and
+ * nothing is forgiven; below it nothing is forgiven either, because a slow
+ * approach has all the time in the world to get sideways and being *slower* than
+ * typical is not a difficulty.
+ */
+export const ARRIVAL_REF_SPEED = 737;
+
+/**
+ * How much of the sideways requirement a doubled approach speed forgives.
+ *
+ * At 0.25 a craft arriving at twice [`ARRIVAL_REF_SPEED`](#) is asked for 0.45
+ * instead of 0.70. The slope is what holds the rate still while the *set* moves —
+ * see [`sidewaysNeeded`](#) for the pair it was chosen with, and note that moving
+ * either number alone changes how many words are said and not only which.
+ */
+export const ARRIVAL_SPEED_RELIEF = 0.25;
+
+/**
  * Whether a dive earned a word — `CONTEXT.md`'s **arrival**.
  *
  * One rung and no ladder, which is the author's ruling and spec 06 §1's law kept
@@ -148,8 +171,73 @@ export const ARRIVAL_SIDEWAYS = 0.6;
  * [`tierFor`](#tierfor) is — spec 06's acceptance asks grading to import nothing,
  * and the smallest signature is the strongest form of that.
  */
-export function arrivedTight(periapsis: number, floor: number, aim: number): boolean {
-  return periapsis - floor <= ARRIVAL_BAND && aim >= ARRIVAL_SIDEWAYS;
+export function arrivedTight(
+  periapsis: number,
+  floor: number,
+  aim: number,
+  entrySpeed: number,
+): boolean {
+  return periapsis - floor <= ARRIVAL_BAND && aim >= sidewaysNeeded(entrySpeed);
+}
+
+/**
+ * How sideways an approach has to be to count as tight, at the speed it came in
+ * at — **the faster it arrived, the less is asked of it.**
+ *
+ * ## The author's idea, and the measurement agrees with it
+ *
+ * *"Maybe we can incorporate the velocity into the evaluation logic, since coming
+ * in fast makes it harder to capture the lowest approach?"* (author, 2026-08-31,
+ * after a capture they felt had earned a word and did not get one).
+ *
+ * Spec [01 · §5a](../../docs/spec/01-swing.md) appears to say otherwise — *"the
+ * dive normalises speed"*, with periapsis pinned within 5% of the floor across a
+ * four-fold range of approach speed — but that sweep ran over 60 – 260 prototype
+ * units and this game is now flown at two to four times it. Measured over the
+ * **105 captures** in the author's own dispatches:
+ *
+ * | | Slower half | Faster half |
+ * |---|---|---|
+ * | Entry speed, p50 | 646 | 1 029 |
+ * | Room above the floor, p50 | **1.3** | **25.0** |
+ * | Earned the word | 19% | 8% |
+ *
+ * Rank-correlated, room against entry speed: **rho 0.31** — real and positive.
+ * Pearson misses it at 0.07 because the distribution is skewed (room runs p05 0,
+ * p50 3, p95 543) and a handful of fly-pasts swamp the mean, which is why this is
+ * measured on ranks. And against **aim** the same speed is rho −0.07, so it is
+ * genuinely a third axis rather than a second reading of the first.
+ *
+ * ## The ruled threshold is not touched, and the relief only ever adds
+ *
+ * The author refused a looser gate once already — *"some of the captures were too
+ * easily giving away the word"* — and [`ARRIVAL_SIDEWAYS`](#) is where that ruling
+ * left it. **It does not move here.** What this adds is relief on top of it, so a
+ * capture that would have earned the word still earns it and nothing can lose it.
+ *
+ * Over the same 105 captures that costs **two**, 14 → 16, 13% → 15%. Both are
+ * fast, both are within three units of the floor, and both missed the gate by
+ * 0.03 of aim:
+ *
+ * | Entry speed | Room above the floor | Aim |
+ * |---|---|---|
+ * | 1 051 | 1.7 | 0.57 |
+ * | **1 367** | **2.9** | **0.57** — the capture the author flagged |
+ *
+ * The median entry speed of a capture that earns the word goes **584 → 635**. A
+ * raised base would have held the count exactly still by taking the word off a
+ * slow capture, and it is not taken: at 0.70 the gate would sit 0.008 below the
+ * author's own benchmark tight capture at aim 0.708, against the 0.1 of margin
+ * `test/sim/tier.test.ts` holds it to. Two words in a hundred captures is the
+ * cheaper price.
+ *
+ * ⚠ **105 captures is still a thin cohort**, and it is the same thinness
+ * [`ARRIVAL_SIDEWAYS`](#) records: the headless pilot cannot widen it, because aim
+ * is the one input it cannot reproduce. Both numbers below are on the bench.
+ */
+function sidewaysNeeded(entrySpeed: number): number {
+  const over = entrySpeed / ARRIVAL_REF_SPEED - 1;
+  return ARRIVAL_SIDEWAYS - ARRIVAL_SPEED_RELIEF * Math.max(0, over);
 }
 
 /**

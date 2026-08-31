@@ -348,7 +348,7 @@ function arrivalOf(previous: PresentationState, sim: SimState): ArrivalView | nu
   const orbit = sim.orbit;
   if (orbit !== null && orbit.ticksSinceFreeze === 0 && sim.heldBody !== null) {
     const body = sim.field.bodies[sim.heldBody]!;
-    if (arrivedTight(orbit.periapsis, floorRadius(body), orbit.aim))
+    if (arrivedTight(orbit.periapsis, floorRadius(body), orbit.aim, orbit.entrySpeed))
       return arrived(sim.heldBody, sim.craft.x, sim.craft.y);
   }
   return fadeArrival(previous.arrival);

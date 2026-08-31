@@ -51,6 +51,16 @@ export const PATCHES: readonly Patch[] = [
   settable('src/sim/units.ts', 'GRAZE_RATIO', 'spec 01 §10 — how head-on a contact has to be'),
   settable('src/sim/units.ts', 'GRAZE_RESTITUTION', 'spec 01 §10 leaves it unstated'),
   settable('src/sim/units.ts', 'BOUNCE_RESTITUTION', 'moved at the M1 gate, 0.6 → 0.2'),
+  settable(
+    'src/sim/tier.ts',
+    'ARRIVAL_SPEED_RELIEF',
+    'how much aim a fast approach is forgiven — 0 is the gate before 2026-08-31',
+  ),
+  settable(
+    'src/sim/tier.ts',
+    'ARRIVAL_REF_SPEED',
+    'the speed the sideways requirement is stated at — real play’s own p50',
+  ),
   settable('src/sim/units.ts', 'CLIMB_BIAS', 'how much a press prefers a body up the climb'),
   settable(
     'src/sim/units.ts',

@@ -147,6 +147,7 @@ describe('the snapshot', () => {
       'depth',
       'direction',
       'eccentricity',
+      'entrySpeed',
       'momentum',
       'periapsis',
       'periapsisAngle',
