@@ -80,6 +80,49 @@ Stated cost: the lock's arrival ramp travels **12.6** design units where it trav
 the view now ends the settle wherever the craft took it. Spread over the ramp that is 0.6 units a
 tick, against the **49** of visible movement the ramp was built to remove.
 
+### ⚠ The fifth correction, 2026-08-31: that stated cost was the next complaint
+
+*"When I capture a planet and circularize, the camera eventually settles downwards a little bit. Can
+we instead just have the camera more smoothly lock into place on the planet?"* — flagged at tick 931
+of the run sent that evening, the only dispatch that still replays at `SIM_VERSION` 9.
+
+The cost recorded above was measured as a **distance** and the fault is a **velocity**. `OVAL_BAND`
+at zero leaves the view glued to the craft for the whole settle; on the tick the settle ended the
+band went from nothing to a whole `DEADZONE`, which absorbs any excursion under 168 units outright.
+So a view travelling several units a tick stopped **on one tick**. Traced on the flagged capture, it
+ran `… 1.4, 0.7, −0.1, −0.9, −1.7, −2.5, 0.0` — swinging one way through the oval, back the other,
+and then a corner. That is the same discontinuity `PARKED` was introduced to remove from the band's
+own edge, reappearing at the boundary nobody was watching.
+
+**Two halves, and neither works alone** — which is the measurement worth keeping:
+
+| | jerk across the handover, p50 / worst | ramp travel, the two flown swings | oval swing flown, p50 |
+|---|---|---|---|
+| before | 3.12 / 7.48 | 12.6 / 15.0 | 0.80 |
+| the band closes early, alone | 0.65 / 0.88 | **19.7 / 25.0** — worse | 0.73 |
+| the lock completes its own move, alone | 1.19 / 4.03 | 0.0 / 0.0 | 0.80 |
+| **both** | **0.65 / 0.88** | **0.0 / 0.0** | 0.73 |
+
+`bandOf` shuts the band over the settle's last `LOCK_TICKS` so the view decelerates out of following
+rather than being stopped; `closing` then takes it to its anchor on the lock's own smootherstep,
+because the lock named a third of a second and handed the actual movement to a 5%-a-tick ease that
+approaches without arriving. Closing the band alone spends the same distance faster and made the
+ramp worse; completing the move alone still starts from a moving view. The pair is the correction.
+
+Measured over the author's dispatches **re-flown at `SIM_VERSION` 9 — a different run, and it is
+said plainly**, since everything before 9 refuses to replay: 11 captures held on one unbroken orbit,
+jerk p50 3.12 → 0.65 and worst 7.48 → 0.88, view travel after the settle ends p50 0.71 → 0.15. On
+the flagged capture itself the view reaches rest seven ticks *before* the lock and holds it exactly.
+
+**Stated cost, in the same currency as the last one.** The oval's swing the view flies falls from
+0.80 to **0.73** on a path-length reading — the author's own ruling, given a little back in the last
+third of a second of a settle, where the orbit is nearly round and the swing is smallest. And the
+corner is **smaller rather than gone**: the band shuts before the settle ends, the craft keeps going
+round, and the view drifts back out of the band and follows it at a unit or two a tick before the
+lock stops it. A shorter window leaves less room to drift and measures worse on both counts, so the
+window is `LOCK_TICKS` rather than a number fitted to the two swings the tests fly. `LOCK_TICKS` is
+already on the bench, and at 0 it restores the old snap.
+
 **The starfield was carried in the wrong unit.** *"Tiny specks of white with little to no
 variation, so it doesn't look very deep or immersive."* The prototype sizes stars in **device
 pixels after its own scale** — `max(1, tier.size * cam.scale)`, so 3 to 5.4 on the phone it was
