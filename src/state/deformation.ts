@@ -39,11 +39,44 @@ import { advance, home, place } from './decay.ts';
 import { punchSize, punchSpan } from './punch.ts';
 import type { DeformationView } from './types.ts';
 
-/** How far the craft stretches along its velocity at a release — spec 02 §4. */
-export const STRETCH_ALONG = 1.5;
+/**
+ * How far the craft stretches along its velocity at a release.
+ *
+ * ## Half again as deep as spec 02 §4's, 2026-08-30
+ *
+ * *"Let's make the kick boost a bit more punchy at the start. So not really
+ * changing the overall trajectory/velocity, but making it feel more rewarding"*
+ * (author) — the second half of a note they filed on 2026-08-30 and asked to be
+ * kept for later: *"the 'kick' after release should be punchier, more like the
+ * original prototype."*
+ *
+ * **The constraint picks the channel.** ADR-0012 spends the punch in two places:
+ * this, which is how a release *looks*, and spec 01 §8's transient, which is how
+ * it *flies*. *"Not really changing the overall trajectory/velocity"* rules the
+ * transient out — and it rules it out twice over, because the transient lives in
+ * `Craft` and moving it would move every trajectory in the game, cost a
+ * `SIM_VERSION` bump and refuse every recipe recorded so far, including the
+ * session sent the same day. `docs/plan/m2-the-instrument.md` records that lever
+ * and what it would cost.
+ *
+ * **So the amplitude moves and nothing else does.** This is a scale on the
+ * craft's own silhouette, applied in the renderer inside its own rotate — it
+ * touches no position, no velocity and no tick. The attack was never the problem:
+ * [`home`](./decay.ts) already sheds **41%** of the displacement in the first
+ * tenth of its span, which is as sharp a start as the shape has. What there was
+ * not enough of was **depth**, and the repo has never flown this above the board's
+ * own 1.5.
+ *
+ * **1.75 and 0.55 are the board's shape, half again as deep.** The displacement
+ * from rest goes 0.5 → 0.75 along and 0.3 → 0.45 across, so the **5 : 3 ratio
+ * between the two axes is exactly the board's** and what changed is one factor
+ * rather than two numbers. Spec 02 §4's own values are overturned in place, with
+ * a notice; both are on the bench, where they have sat unmoved since M2.1.
+ */
+export const STRETCH_ALONG = 1.75;
 
-/** And how far it narrows across it, the same instant — spec 02 §4. */
-export const STRETCH_ACROSS = 0.7;
+/** And how far it narrows across it, the same instant — see above. */
+export const STRETCH_ACROSS = 0.55;
 
 /** A craft that is not recovering from anything. */
 export const UNDEFORMED: DeformationView = { along: 1, across: 1, amount: 0, recovery: null };

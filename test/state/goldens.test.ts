@@ -120,8 +120,14 @@ describe('the numbers the choreography is built from', () => {
     expect(PUNCH_STRETCH).toBe(0.5); // ADR-0012's "half again as long"
     expect(PUNCH_FLOOR).toBe(0.45); // what a release of no quality still earns
     expect(punchSpan(1)).toBe(17);
-    expect(STRETCH_ALONG).toBe(1.5);
-    expect(STRETCH_ACROSS).toBe(0.7);
+    // Spec 02 §4 draws 1.5 / 0.7 and the author deepened both by half on
+    // 2026-08-30 — *"a bit more punchy at the start"*. What is pinned is the
+    // board's own **ratio between the axes**, which is what survived the change:
+    // the displacements are 0.75 and 0.45, which is 5 : 3, exactly as the board's
+    // 0.5 and 0.3 were.
+    expect(STRETCH_ALONG).toBe(1.75);
+    expect(STRETCH_ACROSS).toBe(0.55);
+    expect((STRETCH_ALONG - 1) / (1 - STRETCH_ACROSS)).toBeCloseTo(5 / 3, 9);
     // Spec 06 §4.
     expect(POP_RISE).toBe(150); // its curve carried, its amplitude ruled up for the bump
     expect(LINGER_TICKS).toBe(72); // 1.2s — the one two specs disagree about
@@ -177,8 +183,8 @@ describe('the release at 254 · a swing let go at full boost', () => {
    */
   it('stretches the craft the whole way, for seventeen ticks', () => {
     expect(at(RELEASE).craft.deformation.amount).toBe(1);
-    expect(at(RELEASE).craft.deformation.along).toBeCloseTo(1.5, 9);
-    expect(at(RELEASE).craft.deformation.across).toBeCloseTo(0.7, 9);
+    expect(at(RELEASE).craft.deformation.along).toBeCloseTo(STRETCH_ALONG, 9);
+    expect(at(RELEASE).craft.deformation.across).toBeCloseTo(STRETCH_ACROSS, 9);
     expect(at(RELEASE + 16).craft.deformation.recovery).not.toBeNull();
     expect(at(RELEASE + 17).craft.deformation.recovery).toBeNull();
   });

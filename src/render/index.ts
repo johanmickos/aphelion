@@ -305,8 +305,8 @@ const FLOOR_WIDTH = 1.5;
  * as it was; what moved is the alpha, which spec 00 §1 makes this layer's own.
  * They are opening positions and they are on the bench.
  */
-const E1_STRENGTH = 0.18;
-const E2_STRENGTH = 0.3;
+export const E1_STRENGTH = 0.18;
+export const E2_STRENGTH = 0.3;
 const STRENGTH: Readonly<Record<Energy, number>> = { 0: 0, 1: E1_STRENGTH, 2: E2_STRENGTH, 3: 1 };
 
 /**
@@ -745,8 +745,50 @@ function drawFlown(context: CanvasRenderingContext2D, compass: CompassView): voi
  */
 const FLOWN_FLOOR = 0.22;
 
-/** How faint the whole orbit path is drawn, against the arc already flown. */
-const PATH_STRENGTH = 0.16;
+/**
+ * How faint the whole orbit path is drawn, against the arc already flown.
+ *
+ * ## It was fainter than the rings, and that is what read as two ovals
+ *
+ * The author, 2026-08-30: *"At the last orbit I saw one oval when initially
+ * capturing, and then my orbit line jumped over to a different one. Any orbit
+ * rings we should show be smooth. Either we remove the first one, or we blend
+ * them."*
+ *
+ * **The path does not jump.** Measured on that exact run, the drawn line moves at
+ * most **0.10 of a body radius** on the freeze tick and less than 0.15 on every
+ * other tick of the run — the prediction converges on the frozen orbit and hands
+ * over cleanly, which is what `predictOrbit`'s eccentricity cap already fixed on
+ * the same day.
+ *
+ * What arrives on that tick is the **rings**, and they arrive on top of it. On the
+ * flagged capture the outermost ring landed at 648 against an oval reaching 647 —
+ * the same line to within one unit — and then the settle rounded the oval inward
+ * to 397 and left the ring behind. On a capture that freezes at the eccentricity
+ * cap, which is the p50, the oval starts *outside* the whole stack and sweeps
+ * through all three of them.
+ *
+ * **They cannot be moved apart.** Placing the rings clear of the freeze apoapsis
+ * instead of the periapsis is the obvious fix and the measurement refuses it: over
+ * 91 freezes it puts the outermost ring beyond half the design width on **93%** of
+ * them against 30% today, at a p50 of 1 069 design units — the instrument off
+ * screen on almost every capture.
+ *
+ * So what is left is **rank**, and the rank was inverted. The rings are structure
+ * at E1 (0.18) and this was **0.16** — the line the craft is actually flying drawn
+ * fainter than the scale marks around it, so when the two separate the eye keeps
+ * the brighter one and reads the real orbit as a new arrival. Spec
+ * [00 · §3](../../docs/spec/00-tokens.md) makes brightness the only ordinal
+ * channel; this is it saying the wrong order.
+ *
+ * **0.24 sits between the rings' E1 and the flown arc's E2**, so the path now
+ * outranks the instrument drawn on it and is still outranked by the stretch of it
+ * already ridden — which is the hierarchy `FLOWN_FLOOR` above exists to state.
+ * `test/render/hand.test.ts` pins the ordering so it cannot invert again.
+ *
+ * The value is an opening position and it is on the bench; the **ordering** is not.
+ */
+export const PATH_STRENGTH = 0.24;
 const PATH_WIDTH = 1 * BOARD_PIXEL;
 
 /**

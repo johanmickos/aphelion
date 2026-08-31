@@ -154,11 +154,15 @@ describe('the craft', () => {
       shapes.push(at(tick).craft.deformation);
     }
 
-    // Spec 02 §4's own rebound: 0.95 against a 1.5 stretch, a tenth of the way
-    // past rest. The board puts it at 83% of the return and this curve puts it
-    // at 58%; the depth is the number, and the plan records the difference.
+    // Spec 02 §4's own rebound is **a tenth of the displacement** past rest —
+    // the board draws 0.95 against a 1.5 stretch, and `OVERSHOOT_FROM` is chosen
+    // to reproduce that fraction rather than that number. So what is asserted is
+    // the fraction, which is what survived the stretch being deepened on
+    // 2026-08-30: at 1.75 the same tenth lands at 0.925. The board puts the
+    // deepest point at 83% of the return and this curve puts it at 58%; the depth
+    // is the number, and the plan records the difference.
     const deepest = Math.min(...shapes.map((shape) => shape.along));
-    expect(deepest).toBeCloseTo(0.95, 2);
+    expect(1 - deepest).toBeCloseTo((STRETCH_ALONG - 1) / 10, 2);
     expect(shapes.filter((shape) => shape.along < 1).length).toBeGreaterThan(1);
 
     expect(at(RELEASE + punchSpan(1)).craft.deformation).toEqual({

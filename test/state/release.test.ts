@@ -20,6 +20,7 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import type { SimState } from '../../src/sim/types.ts';
 import { BOOST_ARM_TICKS, BOOST_PLATEAU_TICKS, SETTLE_TICKS } from '../../src/sim/units.ts';
 import { calloutTicks, POP_RISE } from '../../src/state/callout.ts';
+import { STRETCH_ACROSS, STRETCH_ALONG } from '../../src/state/deformation.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
 import { PUNCH_FLOOR, PUNCH_TICKS, punchSize, punchSpan } from '../../src/state/punch.ts';
@@ -119,7 +120,7 @@ describe('the punch', () => {
     const at = AT_PEAK.views[AT_PEAK.released]!;
     expect(quality(AT_PEAK)).toBe(1);
     expect(at.craft.deformation.amount).toBe(1);
-    expect(at.craft.deformation.along).toBeCloseTo(1.5, 9);
+    expect(at.craft.deformation.along).toBeCloseTo(STRETCH_ALONG, 9);
     expect(at.craft.deformation.recovery!.span).toBe(punchSpan(1));
   });
 
@@ -230,8 +231,8 @@ describe('the craft, leaving', () => {
    */
   it('is stretched on the release tick and recovered 180ms later', () => {
     const at = AT_PEAK.views[AT_PEAK.released]!;
-    expect(at.craft.deformation.along).toBeCloseTo(1.5, 6);
-    expect(at.craft.deformation.across).toBeCloseTo(0.7, 6);
+    expect(at.craft.deformation.along).toBeCloseTo(STRETCH_ALONG, 6);
+    expect(at.craft.deformation.across).toBeCloseTo(STRETCH_ACROSS, 6);
     const home = AT_PEAK.views[AT_PEAK.released + punchSpan(quality(AT_PEAK))]!;
     expect(home.craft.deformation.along).toBe(1);
     expect(home.craft.deformation.across).toBe(1);

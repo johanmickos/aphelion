@@ -226,6 +226,53 @@ retuning them is theirs. `test/state/goldens.test.ts` pins the breach exactly �
   2026-08-30 (`goldens.test.ts` still holds that one): it is a second transition, dive → settle,
   where the predicted path hands over to the frozen one.
 
+### Two more from the same sitting, 2026-08-30
+
+**The double oval, and the path was not the culprit.** *"At the last orbit I saw one oval when
+initially capturing, and then my orbit line jumped over to a different one. Any orbit rings we should
+show be smooth."* Measured on that exact run under the build it was flown on: the drawn path moves at
+most **0.10 of a body radius** on the freeze tick and under 0.15 on every other tick of the run —
+`predictOrbit`'s eccentricity cap already made that handover clean earlier the same day.
+
+What arrives on the freeze tick is the **rings**, on top of it. On the flagged capture the outermost
+landed at **648 against an oval reaching 647** — the same line to within a unit — and the settle then
+rounded the oval inward to 397 and left the ring behind. On a capture that freezes at the
+eccentricity cap, which is the p50, the oval starts *outside* the whole stack and sweeps through all
+three.
+
+**They cannot be separated**, and the measurement is what says so: placing the rings clear of the
+freeze **apoapsis** rather than the periapsis — which is what `RING_INNER`'s own note claims to do —
+puts the outermost beyond half the design width on **93% of 91 freezes** against 30% today, at a p50
+of 1 069 design units. The instrument would be off screen on almost every capture.
+
+So the fix is **rank**, and the rank was inverted: rings are structure at E1 (0.18) and the path was
+drawn at **0.16** — the line the craft is actually flying, fainter than the scale marks over it. Spec
+00 §3 makes brightness the only ordinal channel; it was saying the wrong order. `PATH_STRENGTH` is
+0.24, between the rings' E1 and the flown arc's E2, and `test/render/hand.test.ts` pins the
+**ordering** rather than the values so it cannot invert again.
+
+**The punch got deeper.** *"Not really changing the overall trajectory/velocity, but making it feel
+more rewarding."* That constraint picks the channel on its own: ADR-0012 spends the punch on the
+craft's stretch and on spec 01 §8's transient, and the transient is velocity — and lives in the
+simulation, so moving it costs a `SIM_VERSION` bump and every recipe with it. The stretch is a scale
+on the silhouette and costs nothing. It goes to **1.75 / 0.55**, which is the board's own 5 : 3 ratio
+half again as deep; the attack was never the problem, since the recovery curve already sheds 41% of
+the displacement in the first tenth of its span.
+
+**The transient is the other half of that lever and is not taken.** It sits at `TRANSIENT_SHARE` 0.45
+against the prototype's measured 0.8, and a front-loaded decay — the same integral at a higher peak,
+so the same displacement with a harder hit — would be punchier without changing where the craft ends
+up. It is a physics change and therefore the author's, with the corpus cost stated.
+
+### What the payback did, measured on the author's own play
+
+The first clean sim-7 session (`2026-08-31T20-32-07`, 17 swings) says the behaviour moved the way it
+was aimed to. Median hold went from **37 ticks to 59**, and the boost is being *earned* — it pays up
+to **39.5** design units/s on these swings against **≤ 14.6** on the flythrough that prompted the
+change. Speed oscillates between 635 and 1 217 across the run rather than climbing monotonically, and
+seven of seventeen swings hand back speed rather than adding it. The tap is no longer the engine, and
+holding is.
+
 ### Still the author's, and asked rather than assumed
 
 1. **What an addressed rung says** — spec 05's own open question, now flyable both ways on the bench.

@@ -124,6 +124,14 @@ export const PATCHES: readonly Patch[] = [
   ),
   {
     file: 'src/render/index.ts',
+    find: 'export const PATH_STRENGTH = 0.24;',
+    replace: 'export let PATH_STRENGTH = 0.24;',
+    append:
+      '\nexport function set_PATH_STRENGTH(value: number): void {\n  PATH_STRENGTH = value;\n}\n',
+    why: 'the orbit line’s rank against the rings crossed over it, 2026-08-30',
+  },
+  {
+    file: 'src/render/index.ts',
     find: 'const FLOWN_FLOOR = 0.22;',
     replace: 'export let FLOWN_FLOOR = 0.22;',
     append: '\nexport function set_FLOWN_FLOOR(value: number): void {\n  FLOWN_FLOOR = value;\n}\n',
@@ -305,14 +313,14 @@ export function lockOf(sim: SimState): number {
   },
   {
     file: 'src/render/index.ts',
-    find: 'const E1_STRENGTH = 0.18;',
+    find: 'export const E1_STRENGTH = 0.18;',
     replace: 'export let E1_STRENGTH = 0.18;',
     append: '\nexport function set_E1_STRENGTH(value: number): void {\n  E1_STRENGTH = value;\n}\n',
     why: 'spec 00 §3 says 35%; flown, all of it was too much',
   },
   {
     file: 'src/render/index.ts',
-    find: 'const E2_STRENGTH = 0.3;',
+    find: 'export const E2_STRENGTH = 0.3;',
     replace: 'export let E2_STRENGTH = 0.3;',
     append: '\nexport function set_E2_STRENGTH(value: number): void {\n  E2_STRENGTH = value;\n}\n',
     why: 'the same for the craft and a held body — spec 00 §3 says 60%',

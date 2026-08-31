@@ -14,7 +14,7 @@ import type { SimState } from '../../src/sim/types.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import type { PresentationState } from '../../src/state/types.ts';
-import { draw } from '../../src/render/index.ts';
+import { draw, E1_STRENGTH, E2_STRENGTH, PATH_STRENGTH } from '../../src/render/index.ts';
 
 const PRESS = { pressed: true };
 
@@ -150,5 +150,41 @@ describe('the filament starts there too', () => {
       (from.y - compass.y) * (compass.craftX - compass.x);
     expect(cross).toBeCloseTo(0, 6);
     expect(compass.rim).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * **The orbit line outranks the instrument drawn on it.**
+ *
+ * The author, 2026-08-30: *"At the last orbit I saw one oval when initially
+ * capturing, and then my orbit line jumped over to a different one."* The path
+ * does not jump — measured on that run it moves at most 0.10 of a body radius on
+ * the freeze tick. What happens is that the **rings** arrive on top of it, and
+ * they were drawn *brighter* than it: structure at E1 (0.18) over a path at 0.16.
+ * So when the settle rounds the oval inward and the two separate, the eye keeps
+ * the brighter line and reads the real orbit as a new one.
+ *
+ * The rings cannot be moved clear of the oval — placing them outside the freeze
+ * apoapsis puts the outermost beyond half the design width on 93% of freezes — so
+ * what fixes it is the **order**, and spec [00 · §3](../../docs/spec/00-tokens.md)
+ * makes brightness the only ordinal channel there is.
+ *
+ * This pins the order rather than the values, because the values are taste and
+ * the order is not: whatever the bench does to either, **the line the craft is on
+ * may never be fainter than the scale marks around it.**
+ */
+describe('what outranks what, among the circles round a body', () => {
+  it('draws the orbit path brighter than the rings it is crossed by', () => {
+    expect(PATH_STRENGTH).toBeGreaterThan(E1_STRENGTH);
+  });
+
+  /**
+   * And the stretch already ridden still outranks the whole path, which is the
+   * hierarchy `FLOWN_FLOOR`'s own note states: the arc is lit by what a release
+   * along it would have paid, so at full worth it has to be the brightest of the
+   * three.
+   */
+  it('keeps the flown arc above the path at the top of the envelope', () => {
+    expect(E2_STRENGTH).toBeGreaterThan(PATH_STRENGTH);
   });
 });

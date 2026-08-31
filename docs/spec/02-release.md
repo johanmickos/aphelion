@@ -266,12 +266,39 @@ this file and spec [06](./06-awards.md) could not both be right:
 | Frame | What is true |
 |---|---|
 | **T−80 · MATCHED** | The hand lies on the dot; the window is E2. The player already knows the tier. Peak tension |
-| **T0 · IMPULSE** | The craft leaves along its nose, deformed by what the swing was worth — 1.5 / 0.7 at full quality — and **faster than it will be a moment later** (spec [01 · §8](./01-swing.md)'s transient). Unused rings die instantly; the taken window stays lit. **The camera does not move** |
+| **T0 · IMPULSE** | The craft leaves along its nose, deformed by what the swing was worth — 1.5 / 0.7 ⚠ **1.75 / 0.55** at full quality — and **faster than it will be a moment later** (spec [01 · §8](./01-swing.md)'s transient). Unused rings die instantly; the taken window stays lit. **The camera does not move** |
 | **T+20 · CONFIRM** | The word blooms at the dot that earned it, in its own tier colour |
 | **T+180 · RIDE** | The word rides its pop out on the dot while the craft runs. The stretch arrives home, past rest once. The trail is a solid luminous line — no breadcrumbs |
 | **T+400 · SETTLED** | Quiet. The body is DUSK, the ring is gone, the compass has left. The word is still lit and being left behind. The only permanent change is chain +1, so the craft's bloom is 4px wider than an orbit ago |
 
 ## 4 · Craft deformation
+
+> ## ⚠ Half again as deep, 2026-08-30 — the punch wanted more punch
+>
+> **T0 is now 1.75 / 0.55**, and the overshoot with it. The author: *"let's make the kick boost a
+> bit more punchy at the start. So not really changing the overall trajectory/velocity, but making
+> it feel more rewarding"* — the second half of a note they filed the same day and asked to be kept
+> (*"the 'kick' after release should be punchier, more like the original prototype"*).
+>
+> **The constraint chose the channel.** ADR-0012 spends the punch in two places: this, which is how
+> a release looks, and spec [01 · §8](./01-swing.md)'s transient, which is how it flies.
+> *"Not really changing the overall trajectory/velocity"* rules the transient out — and rules it out
+> twice, because the transient lives in the simulation and moving it would cost a `SIM_VERSION` bump
+> and refuse every recipe recorded so far.
+>
+> **What moved is depth, not attack.** The recovery curve already sheds 41% of the displacement in
+> the first tenth of its span, so the start was already sharp; what there was not enough of was
+> amplitude, and the repo had never flown this above the 1.5 below. The displacement from rest goes
+> 0.5 → 0.75 along and 0.3 → 0.45 across, so the **5 : 3 ratio between the two axes is exactly the
+> one the board drew** and one factor moved rather than two numbers.
+>
+> **The overshoot follows it** rather than being restated: the row below reads 0.95 against a 1.5
+> stretch, which is *a tenth of the displacement*, and a tenth of 0.75 is 0.925. The fraction is the
+> rule and the number was its reading at the old amplitude — `test/state/presentation.test.ts`
+> asserts the fraction now, so the two can never disagree again.
+>
+> **When to reopen**: it is a taste number on the bench and has moved once. What it must keep is the
+> ratio and the fraction above, both of which are the board's.
 
 Stretch is always along the velocity vector. Never along a screen axis, never around a centre.
 
@@ -281,8 +308,8 @@ envelope earns; a release that earned nothing takes 0.45 of them, and never none
 | Time | Scale (along velocity / across) |
 |---|---|
 | Rest | 1.0 / 1.0 |
-| T0 | 1.5 / 0.7 |
-| T+150 | 0.95 / 1.03 (the overshoot, deepest 58% of the way home) |
+| T0 | 1.5 / 0.7 ⚠ **now 1.75 / 0.55** |
+| T+150 | 0.95 / 1.03 (the overshoot, deepest 58% of the way home) ⚠ **0.925 / 1.045** — a tenth of the displacement, which is the rule the 0.95 was a reading of |
 | T+180 | 1.0 / 1.0 |
 
 The craft silhouette is a dart and is a stand-in. A signature craft shape is its own exploration,
