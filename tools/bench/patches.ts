@@ -86,6 +86,11 @@ export const PATCHES: readonly Patch[] = [
   settable('src/state/camera.ts', 'FOLLOW_RATE', 'moved at the M1 gate, 8 → 3'),
   settable('src/state/camera.ts', 'LOCK_TICKS', 'the prototype’s third of a second, carried'),
   settable('src/state/camera.ts', 'OVAL_BAND', 'ruled to 0 on 2026-08-30 and back to 1 on 08-31'),
+  settable(
+    'src/state/camera.ts',
+    'SINK_SHARE',
+    'an opening position; the give a settling view has',
+  ),
 
   // Spec 00 §3's ordinal channel, read into design units. The radii are the
   // board's own numbers times three (ADR-0010) and the reading is the thing to

@@ -271,15 +271,17 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   const anchor = lock > 0 ? stillPoint(previous.y, sim.field.bodies[sim.heldBody!]!.y) : 0;
   const offset = lock > 0 ? (anchor - craftY) * lock : 0;
 
-  // **Look where you are going.** Off entirely once the dive has frozen, which is
-  // the prototype's own hard-learned gate rather than a precaution: after the
+  // **Look where you are going.** Off once the dive has frozen — **over twelve
+  // ticks rather than on one**, which is `leadOut` and is the 2026-08-31
+  // correction. The gate itself is the prototype's own hard-learned one rather
+  // than a precaution: after the
   // freeze the craft rides a phase clock and its velocity reverses every half
   // orbit — *"measured at +397 -> -285 -> +137 -> -207 across one settle. Anything
   // steering off it swings the view"* — so what the velocity means stops being a
   // heading. It stays **on through the dive**, where the craft is on real physics
   // with a real heading and where suppressing it *"put a 110px lurch into the
   // dive"*. `sim.orbit` is exactly that distinction and needs no second flag.
-  const lead = sim.orbit === null ? leadOf(sim.craft.vy) : 0;
+  const lead = leadOf(sim.craft.vy) * (1 - leadOut(sim));
 
   const subjectY = craftY + offset + lead;
   return {
@@ -288,8 +290,7 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
       lock > 0 && previous.lock < 1
         ? previous.y + (anchor - previous.y) * closing(previous.lock, lock)
         : previous.y +
-          (settling(previous.y, targetY(previous.y, subjectY, bandOf(sim)), sim) - previous.y) *
-            easeStep(FOLLOW_RATE),
+          (framed(previous.y, subjectY, sim) - previous.y) * sinkRate(previous.y, subjectY, sim),
     lock,
     offset,
   };
@@ -312,54 +313,6 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
 function closing(was: number, now: number): number {
   if (was >= 1) return 1;
   return (now - was) / (1 - was);
-}
-
-/**
- * The target, with the view forbidden to **descend** while a dive is settling
- * into its orbit.
- *
- * ## The author flew this three times in one evening
- *
- * *"When I capture a planet and circularize, the camera eventually settles
- * downwards a little bit"* (2026-08-31, 21:55). Then, after two attempts at the
- * *smoothness* of that movement: *"I capture a planet, swing around the top of it
- * to start circularizing, and when the ship travels to below the planet as part
- * of circularization the camera moves downwards to follow it. I'd rather have the
- * camera fixed a bit higher up, where it was when I first started circularizing"*
- * (22:55).
- *
- * The second message is the one that names the mechanism, and it is not about
- * smoothness at all. The craft goes **round** — over the top of the body and then
- * under it — and a view that tracks it vertically must come back down by the
- * orbit's own diameter. Nothing about how that descent is eased makes it stop
- * being a descent.
- *
- * ## Up is where the run is going and down is not
- *
- * So the rule is asymmetric, and the field is what justifies it: a run is a
- * **climb**. Following the craft up is the direction of travel — it is the same
- * thing [`leadOf`](#leadof) spends a look-ahead on. Following it back down is the
- * view undoing progress to chase half an orbit, and it is the half the author has
- * now objected to twice.
- *
- * **The thumb line still wins**, and it is the one thing that can make the view
- * descend anyway: spec [00 · §7](../../docs/spec/00-tokens.md) keeps the craft
- * above it, and a ratchet that let the craft slide under would be trading one
- * complaint for a worse one. Measured over the author's dispatches that override
- * fires on almost nothing — p95 **0** design units, worst 43.
- *
- * ## What it is worth, measured
- *
- * Over 20 settles from their own dispatches, how far the view comes back down
- * after reaching its highest point: **p50 151 → 0, p95 246 → 8, worst 343 → 20.**
- */
-function settling(cameraY: number, target: number, sim: SimState): number {
-  const orbit = sim.orbit;
-  if (orbit === null || orbit.ticksSinceFreeze >= SETTLE_TICKS) return target;
-  if (sim.heldBody === null) return target;
-  // Never below the thumb line, whatever else — spec 00 §7, and it outranks this.
-  const forced = sim.craft.y - THUMB_BUDGET;
-  return Math.max(Math.min(target, cameraY), Math.min(forced, target));
 }
 
 /**
@@ -563,3 +516,129 @@ function held(offset: number, band: number): number {
  * them to it over real swings rather than by arithmetic.
  */
 export const THUMB_BUDGET = THUMB_LINE - DESIGN_HEIGHT / 2;
+
+/**
+ * How fast the view may **sink** while a dive is settling, as a share of
+ * [`FOLLOW_RATE`](#follow_rate).
+ *
+ * **An opening position**: what is derived is that it must not be zero — a hard
+ * clamp produces exact zeros, and a view that is exactly still and then exactly
+ * moving is the shape of a machine — and only the gate can say whether a tenth is
+ * the right amount of give. It is on the bench. See [`sinkRate`](#sinkrate).
+ */
+export const SINK_SHARE = 0.1;
+
+/**
+ * Where the view would like to be, always framing the orbit it is watching.
+ *
+ * ## Applied every tick, which is what stopped it being an event
+ *
+ * [`stillPoint`](#stillpoint) is the rule that the view has to be within a
+ * [`DEADZONE`](#deadzone) of the body for the orbit to be framed at all, and it
+ * used to be consulted **once**, when the lock arrived. That made it a thing that
+ * *happened*: the view stopped wherever the settle left it, sat there, and then a
+ * timer fired and moved it. Traced on the capture the author flagged at 23:15,
+ * the view was exactly still for fourteen ticks, then travelled 79 design units
+ * in a symmetric twenty-tick curve, then was exactly still again — *"locked in
+ * when I captured, then moved up a bit and paused, and then back down to where it
+ * should be... very mechanical/robotic"* (2026-08-31).
+ *
+ * Consulted every tick it stops being an event at all: the clamp is part of where
+ * the view is heading, the ordinary follow ease carries it there along with
+ * everything else, and by the time the lock arrives there is nothing to move.
+ * Over 16 captures in the author's dispatches the peak speed of that
+ * after-the-orbit move goes from **7.4 design units a tick to exactly zero**.
+ */
+function framed(cameraY: number, subjectY: number, sim: SimState): number {
+  const target = targetY(cameraY, subjectY, bandOf(sim));
+  if (sim.orbit === null || sim.heldBody === null) return target;
+  return stillPoint(target, sim.field.bodies[sim.heldBody]!.y);
+}
+
+/**
+ * The follow rate, cut to [`SINK_SHARE`](#sink_share) while a settling view would
+ * be descending.
+ *
+ * ## A hard rule reads as a machine, so this is the softer form of one
+ *
+ * The first answer to *"the camera moves downwards to follow it"* was a ratchet:
+ * while a dive settles, the view may rise and may not fall. It removed the
+ * descent — 151 design units at p50 down to nothing — and the author flew it and
+ * reported the next thing: *"very mechanical/robotic. I'd like for the camera to
+ * have a bit more flexibility or something."*
+ *
+ * A hard clamp produces **exact zeros**, and the ratchet left the view frozen for
+ * a stretch of **47 ticks at p95** immediately before the lock took over — three
+ * quarters of a second of a still picture, ending in a move. So the rule keeps
+ * its direction and loses its edge: sinking is *resisted* rather than forbidden,
+ * and at a tenth of the follow rate the view gives way slowly instead of not at
+ * all. The frozen stretch falls to **12 ticks at p95**, and the descent stays
+ * small — p50 2, p95 10 design units, against the 151 and 246 complained about.
+ *
+ * **Rising is untouched**, because a run is a **climb** and following the craft
+ * up is the direction of travel — the same thing [`leadOf`](#leadof) spends a
+ * look-ahead on. And spec [00 · §7](../../docs/spec/00-tokens.md)'s thumb line
+ * overrides it: a craft about to slide under is followed at full rate.
+ */
+function sinkRate(cameraY: number, subjectY: number, sim: SimState): number {
+  const orbit = sim.orbit;
+  const full = easeStep(FOLLOW_RATE);
+  if (orbit === null || orbit.ticksSinceFreeze >= SETTLE_TICKS || sim.heldBody === null)
+    return full;
+  if (framed(cameraY, subjectY, sim) <= cameraY) return full;
+  if (sim.craft.y - cameraY > THUMB_BUDGET) return full;
+  return easeStep(FOLLOW_RATE * SINK_SHARE);
+}
+
+/**
+ * How long the look-ahead takes to leave once a dive has frozen, in ticks.
+ *
+ * **Measured, and the shortest length that does the job.** Swept over the
+ * author's dispatches, the jerk at a freeze runs 2.8 at six ticks, **0.9 at
+ * twelve**, and 0.9 at twenty and at thirty — so twelve is where the curve
+ * flattens and anything longer is holding a lead nobody can use for no further
+ * gain. Two hundred milliseconds.
+ */
+export const LEAD_OUT_TICKS = 12;
+
+/**
+ * How far through leaving the look-ahead is, from 0 to 1.
+ *
+ * ## The gate was right and the step was not
+ *
+ * [`LOOK_AHEAD`](#look_ahead) is switched off at the freeze for a reason its own
+ * comment gives at length — past the freeze the craft rides a phase clock and its
+ * velocity reverses every half orbit, so *"what the velocity means stops being a
+ * heading"*. None of that is in question. What was wrong is that it went from its
+ * full 210 design units to nothing **between two ticks**.
+ *
+ * That is the largest discontinuity in the whole camera and it happens on **every
+ * capture**, at the freeze — the exact moment the player is watching the thing
+ * they just did. Measured over the author's dispatches, the view's speed changed
+ * by **10.2 design units in one tick** there, against 3.1 at a release, 0.9 when
+ * the orbit goes round and 0.1 at a grab. Traced, the view went from moving 18.3
+ * a tick to moving 8.1 on the next.
+ *
+ * It also explains why three separate corrections to the *lock* on 2026-08-31 did
+ * not stop the author reporting *"stuttering... the camera stops and moves
+ * abruptly"*: none of them was anywhere near the thing that was actually
+ * stepping, and it is present identically in the build before all three.
+ *
+ * Faded over [`LEAD_OUT_TICKS`](#lead_out_ticks) on the smootherstep the lock
+ * arrives on, the freeze's jerk falls to **0.9**, and the largest jerk anywhere
+ * in a run falls from 10.2 to 3.1 — which is then the **release**, where spec
+ * 02's own ruling forbids a delay: *"the slight delay is making it seem jagged
+ * and jumpy, let's remove any camera/speed delay there"* (author, 2026-08-29).
+ * That one is deliberate and stays.
+ *
+ * **The velocity is still read live while it fades**, which is safe for exactly
+ * as long as this is short: a half orbit is thirty-six ticks at the settle's own
+ * rate, so twelve ticks is over before the reversal the gate exists for can
+ * arrive.
+ */
+function leadOut(sim: SimState): number {
+  const orbit = sim.orbit;
+  if (orbit === null) return 0;
+  const x = Math.max(0, Math.min(1, orbit.ticksSinceFreeze / LEAD_OUT_TICKS));
+  return x * x * x * (x * (x * 6 - 15) + 10);
+}

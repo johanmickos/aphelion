@@ -20,6 +20,7 @@ import { FLOOR_GAP, MEDIAN_RADIUS, SETTLE_TICKS } from '../../src/sim/units.ts';
 import {
   DEADZONE,
   FOLLOW_RATE,
+  LEAD_OUT_TICKS,
   LOCK_TICKS,
   LOOK_AHEAD,
   LOOK_REF_SPEED,
@@ -213,16 +214,12 @@ describe('the camera', () => {
     }
     expect(worst).toBeLessThan(3);
 
-    // And the view really has slowed down into the handover rather than merely
-    // taking a smoother route at the same speed: it arrives at the lock at under
-    // half the speed it was flying the oval at.
-    let fastest = 0;
-    for (let i = firstLocked - SETTLE_TICKS; i < firstLocked - LOCK_TICKS; i++) {
-      fastest = Math.max(fastest, Math.abs(views[i]!.camera.y - views[i - 1]!.camera.y));
-    }
-    const arriving = Math.abs(views[firstLocked]!.camera.y - views[firstLocked - 1]!.camera.y);
-    expect(fastest).toBeGreaterThan(2);
-    expect(arriving).toBeLessThan(fastest * 0.5);
+    // And it is already at rest when the lock takes it, rather than being
+    // stopped by it: `framed` has been pulling the view toward the point the
+    // lock will hold on every tick of the settle, so there is nothing left.
+    expect(Math.abs(views[firstLocked]!.camera.y - views[firstLocked - 1]!.camera.y)).toBeLessThan(
+      0.5,
+    );
 
     // Once the lock has it, it is exactly still — the anchor is the point it is
     // standing on and `closing` has nothing left to cover.
@@ -293,12 +290,21 @@ describe('the camera', () => {
    * making that descent *smoother* preceded this one and both missed: the
    * objection is to the descent, not to its shape.
    *
-   * What is asserted is the rule and its one exception. The view may rise with
-   * the craft, because a run is a climb and that is the direction of travel; it
-   * may only fall when spec 00 §7's thumb line demands it, which over the
-   * author's dispatches is p95 **0** design units and worst 43.
+   * The rule is directional and it is **soft**, which is the 23:15 correction:
+   * *"very mechanical/robotic. I'd like for the camera to have a bit more
+   * flexibility or something."* A hard ratchet removed the descent and left the
+   * view frozen for 47 ticks at p95 before the lock took it — exact zeros read as
+   * a machine. Sinking is now resisted at [`SINK_SHARE`](../../src/state/camera.ts)
+   * of the follow rate rather than forbidden, so the view is never quite dead.
+   *
+   * So what is asserted is the **magnitude**, not a zero: rising is free, and
+   * over a whole settle the view gives back a handful of design units where it
+   * used to give back more than it had taken. On these two swings it rose 117.9
+   * and 115.9 and then **fell 207.2 and 212.3** — further than it had risen,
+   * because it followed the craft round the far side of the body. It now falls
+   * **4.8 and 6.7**.
    */
-  it.each(SWINGS.slice(0, 2))('does not descend while the orbit settles, in %s', (_n, g, l) => {
+  it.each(SWINGS.slice(0, 2))('barely descends while the orbit settles, in %s', (_n, g, l) => {
     const { views, frozen } = fly(g, l);
     const from = frozen.indexOf(true);
     expect(from).toBeGreaterThan(0);
@@ -309,19 +315,50 @@ describe('the camera', () => {
       const step = views[i]!.camera.y - views[i - 1]!.camera.y;
       // More negative is further up the field, which is where a run is going.
       if (step < 0) rose -= step;
-      else {
-        // Falling is allowed only to keep the craft off the thumb line.
-        expect(onScreen(views[i]!)).toBeLessThanOrEqual(THUMB_LINE + 1);
-        fell += step;
-      }
+      else fell += step;
+      // And the craft never goes under the thumb line, which is what may still
+      // pull the view down at the full rate whatever the sink says.
+      expect(onScreen(views[i]!)).toBeLessThanOrEqual(THUMB_LINE + 1);
     }
-    // It really does track the craft upward — this is not a still camera.
-    expect(rose).toBeGreaterThan(5);
-    // And it gives none of it back. On these two swings the camera before this
-    // ruling rose 117.9 and 115.9 and then **fell 207.2 and 212.3** — more than
-    // it had risen, because it followed the craft round the far side of the body
-    // and then back up the field with it.
-    expect(fell).toBeLessThan(1);
+    // A handful of design units over a whole settle, rather than all of it and
+    // more. `rose` is not asserted a floor: with `OVAL_BAND` back at 1 the band
+    // absorbs most of the oval on these two swings and the view barely moves at
+    // all through a settle, which is the point rather than a gap.
+    expect(fell).toBeLessThan(10);
+    expect(rose).toBeGreaterThanOrEqual(0);
+  });
+
+  /**
+   * **And the look-ahead leaves without a step, which was the biggest one there
+   * was.**
+   *
+   * [`LOOK_AHEAD`](../../src/state/camera.ts) is switched off at the freeze for a
+   * good reason — past it the craft's velocity reverses every half orbit and
+   * stops meaning a heading — but it used to go from 210 design units to nothing
+   * **between two ticks**. That is the largest discontinuity in the camera and it
+   * fires on every capture, at the moment the player is watching.
+   *
+   * Measured over the author's dispatches the view's speed changed by **10.2
+   * design units in one tick** there, against 3.1 at a release and 0.1 at a grab;
+   * traced, it went from moving 18.3 a tick to 8.1 on the next. It is faded over
+   * `LEAD_OUT_TICKS` now and the same figure is 0.9.
+   *
+   * On the two swings below the jerk in the sixteen ticks after a freeze was
+   * **3.94 and 6.28**, and is **1.94 and 1.93**. The bound is 2.5, which is a
+   * tolerance rather than a value to reproduce and still fails what it replaced.
+   */
+  it.each(SWINGS.slice(0, 2))('leaves the look-ahead behind smoothly, in %s', (_n, g, l) => {
+    const { views, frozen } = fly(g, l);
+    const at = frozen.indexOf(true);
+    expect(at).toBeGreaterThan(2);
+
+    let worst = 0;
+    for (let i = at; i < at + LEAD_OUT_TICKS + 4; i++) {
+      const now = views[i]!.camera.y - views[i - 1]!.camera.y;
+      const before = views[i - 1]!.camera.y - views[i - 2]!.camera.y;
+      worst = Math.max(worst, Math.abs(now - before));
+    }
+    expect(worst).toBeLessThan(2.5);
   });
 
   /**

@@ -1625,3 +1625,46 @@ arrival complete on the curve `LOCK_TICKS` already named instead of being handed
 that approaches without arriving. It takes the arrival ramp's travel to zero and costs nothing. The
 band-closing ramp and the in-settle homing are both gone: with the band restored there is no
 distance for them to manage.
+
+### ⚠ The eighth, and it is the one that was actually stepping
+
+*"There's definitely some stuttering or robotic camera transitions. I want them to be smooth, not
+for the camera to stop and move abruptly."*
+
+**Three corrections to the lock in one evening did not touch the largest discontinuity in the
+camera, and it is not in the lock at all.** [`LOOK_AHEAD`](../../src/state/camera.ts) is switched
+off at the freeze — for a good reason its own comment gives, since past the freeze the craft's
+velocity reverses every half orbit and stops meaning a heading — and it went from its full **210
+design units to nothing between two ticks.**
+
+Measured over the author's dispatches, the view's speed changed by **10.2 design units in one tick**
+at a freeze, against 3.1 at a release, 0.9 when the orbit goes round and 0.1 at a grab. Traced on
+one capture it went from moving 18.3 a tick to 8.1 on the next. It fires on **every capture**, at
+the moment the player is watching the thing they just did — and it is identical in the build before
+all three of the evening's earlier corrections, which is why none of them stopped the reports.
+
+Faded over `LEAD_OUT_TICKS` (**12**, measured: 2.8 of jerk at six ticks, 0.9 at twelve, 0.9 at
+twenty and thirty, so twelve is where the curve flattens) the freeze's jerk falls to **0.9**, and
+the worst jerk anywhere in a run falls from 10.2 to 3.1 — which is then the **release**, where spec
+02's ruling forbids a delay outright and it stays.
+
+Also in this change, and both from the 23:15 report — *"locked in when I captured, then moved up a
+bit and paused, and then back down to where it should be... very mechanical/robotic"*:
+
+- **`framed` consults the clamp every tick** rather than once when the lock arrives. Consulted once,
+  it made the framing a thing that *happened*: the view stopped where the settle left it, sat there
+  fourteen ticks, then a timer fired and moved it 79 design units in a symmetric twenty-tick curve.
+  Every tick, the ordinary ease carries it there along with everything else. The peak speed of that
+  after-the-orbit move goes **7.4 → 0.0**.
+- **The ratchet becomes a resistance** (`SINK_SHARE`, a tenth). A hard clamp produces exact zeros,
+  and a view that is exactly still and then exactly moving is the shape of a machine: it left the
+  picture frozen for **47 ticks at p95** before the lock took over. At a tenth of the follow rate the
+  view gives way slowly instead of not at all — frozen stretch p95 **12**, descent still p50 2 and
+  p95 10 against the 151 and 246 originally complained about.
+
+**What is still unresolved and is the author's**: with `OVAL_BAND` at 1 the view is exactly still on
+**48%** of a run's ticks against 11% before the day's changes, because a settled orbit is watched
+rather than followed. Most of that is the lock doing its job and is not new — but if *that*
+stillness is what reads as stuttering rather than the transitions into it, then the lock itself is
+the question, and it is a larger ruling than a constant. `OVAL_BAND` and `SINK_SHARE` are both on
+the bench.
