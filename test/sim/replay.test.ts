@@ -49,25 +49,75 @@ function everyTick(recipe: Recipe, ticks: number): Uint8Array[] {
 }
 
 /**
- * Three whole runs, long enough that a divergence has room to appear.
- *
- * **They move whenever the physics does**, and that is not a wart: the pilot flies
- * from the geometry, so the same seed takes a different route under a different
- * swing and one of them ends sooner. They were `[28, 71, 139]` until SIM_VERSION
- * 8, where two of the three fell under the thousand ticks the guard below asks
- * for. What is fixed is the guard, not the seeds.
+ * How long a run has to be to be worth replaying. A run of a handful of ticks
+ * proves nothing about a divergence that needs room to appear.
  */
-const SEEDS = [75, 340, 73];
+const LONG_ENOUGH = 1000;
+
+/**
+ * How far the sweep below is allowed to look before it gives up, and the band it
+ * is expected to land well inside.
+ *
+ * **This is where the guard lives now, and it is the falsifiable half.** A
+ * finder that swept for ever would always find something and could never fail;
+ * a cap turns *the pilot's runs have got too short to test determinism on* into
+ * a red test with a sentence, which is a real finding about the physics rather
+ * than three seeds to re-pin.
+ */
+const SEED_CAP = 500;
+const SEARCH_BAND = 100;
+
+/**
+ * Three whole runs, long enough that a divergence has room to appear — **found
+ * rather than named**, which is `test/moments.ts`'s argument applied to a seed.
+ *
+ * The seeds move whenever the physics does, and that was never a wart so much as
+ * a chore: the pilot flies from the geometry, so the same seed takes a different
+ * route under a different swing and one of them ends sooner. They were
+ * `[28, 71, 139]`, then `[75, 340, 73]` when two of the three fell under
+ * [`LONG_ENOUGH`](#) at SIM_VERSION 8. **What was ever fixed is the guard**, and
+ * the guard is all that is written down now.
+ */
+function longRuns(count: number): { seeds: number[]; searched: number } {
+  const found: number[] = [];
+  let searched = 0;
+  for (let seed = 1; seed <= SEED_CAP && found.length < count; seed++) {
+    searched = seed;
+    if (flyRun(fixtureField(), fixtureCraft(), seed, 20_000).tick > LONG_ENOUGH) found.push(seed);
+  }
+  if (found.length < count) {
+    throw new Error(
+      `Only ${found.length} of the first ${SEED_CAP} pilot seeds fly past ${LONG_ENOUGH} ticks,\n` +
+        `and this test needs ${count}. That is not a re-pin: the pilot's runs have got short\n` +
+        `enough that a replay has no room to diverge in, which is a fact about the physics\n` +
+        `or about \`test/sim/run.ts\`. Neither the seeds nor the cap is the thing to move.`,
+    );
+  }
+  return { seeds: found, searched };
+}
+
+const { seeds: SEEDS, searched: SEARCHED } = longRuns(3);
 
 describe('a recorded run', () => {
+  /**
+   * **How deep the sweep had to go is the measurement, and it is a band.**
+   * Three long runs were found in the first **13** seeds on 2026-08-31. A number
+   * climbing toward [`SEARCH_BAND`](#) says the pilot's runs are shortening —
+   * which is worth knowing and is what `test/sim/run.test.ts` measures properly —
+   * and a number at [`SEED_CAP`](#) is the finder failing outright. The band is a
+   * tolerance rather than a value to reproduce ([AGENTS.md](../../AGENTS.md) §4),
+   * so a tuning that moves it from 13 to 30 costs nothing and edits nothing.
+   */
+  it('is found in the first handful of pilot seeds', () => {
+    expect(SEEDS).toHaveLength(3);
+    expect(SEARCHED).toBeGreaterThan(0);
+    expect(SEARCHED).toBeLessThan(SEARCH_BAND);
+  });
+
   it('replays to a bit-identical final state, four times its own length', () => {
     for (const seed of SEEDS) {
       const { recipe } = pilotRecipe(seed);
-      // Long enough to be worth replaying. It was 2 000 until the press learned to
-      // prefer the climb (2026-08-29): the pilot takes different bodies now, so the
-      // same seeds fly different routes and one of them ends sooner. What the
-      // guard is for is unchanged — a run of a handful of ticks proves nothing.
-      expect(recipe.ticks).toBeGreaterThan(1000);
+      expect(recipe.ticks).toBeGreaterThan(LONG_ENOUGH);
 
       for (const ticks of [recipe.ticks, recipe.ticks * LENGTHS]) {
         const first = everyTick(recipe, ticks);
@@ -111,7 +161,7 @@ describe('a recorded run', () => {
    * that kept flying would be inventing the part nobody flew.
    */
   it('stops at its ending, whatever is left in the log', () => {
-    const { recipe } = pilotRecipe(75);
+    const { recipe } = pilotRecipe(SEEDS[0]!);
     const ended = replayRun(recipe);
     expect(ended.ending).not.toBeNull();
 
@@ -147,9 +197,9 @@ describe('the picture beside the run', () => {
   }
 
   it('replays identically too', () => {
-    const { recipe } = pilotRecipe(340);
+    const { recipe } = pilotRecipe(SEEDS[1]!);
     const first = present(recipe);
-    expect(first.length).toBeGreaterThan(1000);
+    expect(first.length).toBeGreaterThan(LONG_ENOUGH);
     expect(present(recipe)).toEqual(first);
   });
 
@@ -160,7 +210,7 @@ describe('the picture beside the run', () => {
    * final state what it looked like would be reporting a frame nobody saw.
    */
   it('is not the same as asking the final state what it looks like', () => {
-    const { recipe } = pilotRecipe(203);
+    const { recipe } = pilotRecipe(SEEDS[2]!);
     const arrived = present(recipe).at(-1)!;
     const onDemand = createPresentation(replayRun(recipe));
     expect(onDemand.tick).toBe(arrived.tick);
@@ -189,8 +239,9 @@ describe('the recipe pnpm replay ships with', () => {
     expect(shipped.device).toBeUndefined();
     expect(shipped.observed.note).toMatch(/pilot/);
     // And it really is a whole run rather than a fragment, which is what the
-    // goldens need of it. Length is no longer the property it is chosen on —
-    // coverage is, and the recipe's own note says which five seeds still have it.
+    // goldens need of it. Length is not the property it is chosen on — coverage
+    // is, and `tools/fixture.ts` is that search as code rather than as prose in
+    // the recipe's note.
     expect(shipped.recipe.ticks).toBeGreaterThan(2000);
   });
 });
