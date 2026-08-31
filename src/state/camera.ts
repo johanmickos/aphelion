@@ -289,6 +289,7 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   const lead = sim.orbit === null ? leadOf(sim.craft.vy) : 0;
 
   const subjectY = craftY + offset + lead;
+  const homing = homingShare(sim);
   // While the lock is arriving the view goes to its anchor on the lock's own
   // curve; every other tick it is the deadzone and the follow ease, untouched.
   // See `closing` for why the arrival is not left to the ease.
@@ -297,8 +298,11 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
     y:
       lock > 0 && previous.lock < 1
         ? previous.y + (anchor - previous.y) * closing(previous.lock, lock)
-        : previous.y +
-          (targetY(previous.y, subjectY, bandOf(sim)) - previous.y) * easeStep(FOLLOW_RATE),
+        : homing > 0 && outOfFrame(previous.y, sim) !== null
+          ? previous.y +
+            (outOfFrame(previous.y, sim)! - previous.y) * closing(homingShare(sim, 1), homing)
+          : previous.y +
+            (targetY(previous.y, subjectY, bandOf(sim)) - previous.y) * easeStep(FOLLOW_RATE),
     lock,
     offset,
   };
@@ -572,3 +576,68 @@ function held(offset: number, band: number): number {
  * them to it over real swings rather than by arithmetic.
  */
 export const THUMB_BUDGET = THUMB_LINE - DESIGN_HEIGHT / 2;
+
+/**
+ * The level the view has to be at for the orbit it is about to watch to be
+ * framed — or `null` when it is already framed, which is most of the time.
+ *
+ * ## The settle used to be paid for after the orbit was round
+ *
+ * *"I still see the camera settling in lower once the orbit is reached. I think
+ * it'd be nicer if the camera just stayed at the level it was at when I first
+ * started circularizing"* (author, 2026-08-31, flagged at tick 518).
+ *
+ * [`stillPoint`](#stillpoint) clamps the lock's anchor to within a
+ * [`DEADZONE`](#deadzone) of the body, and on a wide orbit that clamp **binds**.
+ * Measured on the flagged capture, the view ended the oval 247 units above the
+ * body against an anchor at 168, so it had **79 design units** to travel — and
+ * every one of them was spent *after* the orbit had become round, which is
+ * precisely the moment a player has stopped expecting the picture to move.
+ *
+ * So the travel happens over the settle's last [`LOCK_TICKS`](#lock_ticks)
+ * instead, the same window [`bandOf`](#bandof) closes the band across. The view
+ * is finishing its swing there anyway; the clamp's pull rides inside movement
+ * that is already happening, and by the time the orbit is round the view is
+ * where it is going to stay. **Nothing is removed and nothing is loosened** —
+ * the same distance is covered, at a moment when it does not read as the picture
+ * drifting on its own.
+ *
+ * ## `null` is the common case and is why this is cheap
+ *
+ * Nine of the thirteen captures in the author's dispatches are already framed
+ * when the settle ends: the clamp does not bind, this returns `null`, and the
+ * band and the follow ease do exactly what they did before. What changes is only
+ * **when** the other four pay.
+ */
+function outOfFrame(cameraY: number, sim: SimState): number | null {
+  if (sim.heldBody === null) return null;
+  const bound = stillPoint(cameraY, sim.field.bodies[sim.heldBody]!.y);
+  return bound === cameraY ? null : bound;
+}
+
+/**
+ * How far through coming to rest the view is, from 0 to 1 — zero for the whole
+ * dive and most of the settle, then over the settle's last
+ * [`LOCK_TICKS`](#lock_ticks), then one for as long as the orbit lasts.
+ *
+ * It is the same window [`bandOf`](#bandof) closes the band over, because it is
+ * the same movement: the band stops the view *following*, and this puts it where
+ * it is going to stay.
+ *
+ * **Smootherstep, the curve [`lockOf`](#lockof) arrives on.** Both ends have to
+ * be seamless, and it is what makes the pair below a true ease: a fixed
+ * destination with [`closing`](#closing)'s telescoping increment lands the view
+ * exactly on `lerp(where it started, where it is going, this)`, so the curve
+ * chosen here *is* the movement's shape. A linear share crosses at a constant
+ * speed that starts and stops with a step — measured at 27 units/tick² of jerk,
+ * four times what this exists to remove.
+ */
+function homingShare(sim: SimState, ago = 0): number {
+  const orbit = sim.orbit;
+  if (orbit === null) return 0;
+  const through = Math.max(
+    0,
+    Math.min(1, (orbit.ticksSinceFreeze - ago - (SETTLE_TICKS - LOCK_TICKS)) / LOCK_TICKS),
+  );
+  return through * through * through * (through * (through * 6 - 15) + 10);
+}

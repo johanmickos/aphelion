@@ -1533,3 +1533,47 @@ the convenient one does not match the sentence.
 
 **The author flies it. The question is whether the release lands.** Next:
 [M3](./m3-the-field.md).
+
+### ⚠ And the sixth, an hour later: the distance, not just the corner
+
+*"I still see the camera settling in lower once the orbit is reached. I think it'd be nicer if the
+camera just stayed at the level it was at when I first started circularizing"* — flagged at tick 518
+of the run sent at 22:37.
+
+The fifth correction took the **corner** out of the handover and left the **distance** where it was.
+`stillPoint` clamps the lock's anchor to within a `DEADZONE` of the body, and on a wide orbit that
+clamp *binds*: traced on the flagged capture, the view finished the oval **247** units above the
+body against an anchor at 168, so **79 design units** had to be travelled — and all of it was spent
+after the orbit had become round. That is the one moment a player has stopped expecting the picture
+to move, which is why 79 units there reads worse than 500 units during the dive.
+
+`outOfFrame` spends it over the settle's last `LOCK_TICKS` instead, inside movement that is already
+happening, on the smootherstep `lockOf` arrives with. It returns `null` — and changes nothing at all
+— on nine of the thirteen captures in the author's dispatches, because the clamp only binds on wide
+orbits.
+
+| over 11 captures on one unbroken orbit | before today | after the fifth | **after the sixth** |
+|---|---|---|---|
+| view travel after the settle ends, p50 / p95 / worst | 0.71 / 15.61 / 19.30 | 0.15 / 30.94 / — | **0.00 / 0.00 / 0.00** |
+| ticks until the view is still, p50 / p95 | 1 / 9 | 1 / — | **1 / 1** |
+| jerk across the handover, p50 / worst | 3.12 / 7.48 | 0.65 / 0.88 | **0.67 / 2.83** |
+| share of the oval's swing the view flies | 0.80 | 0.73 | 0.71 |
+
+On the flagged capture the view now ends the settle at exactly the level it holds for the rest of the
+orbit — **−978 and −978** — where it used to end at −1057 and drift down to −978.
+
+**Three things are worth writing down about how this was checked**, because the next agent will want
+to know why the test file is thinner than the evidence:
+
+1. **The fixture field cannot reproduce it.** Searched over 51 grab-and-release pairs, no swing puts
+   the view more than a `DEADZONE` from the body when its settle ends, so the clamp never binds and
+   `test/state/camera.test.ts` passes on both sides of this change. Displacing the camera by hand
+   does not help either — at any distance where the lock's clamp binds, the ordinary deadzone is
+   already pulling the view back. **The evidence for this correction is the dispatch corpus and
+   nothing else**, and the tests say so in place rather than implying coverage they do not have.
+2. **Two builds were measured and rejected before this one**, both recorded in the code: easing a
+   target that is itself easing lags twice and left 46 of the 79 units to be paid after the orbit was
+   round; and completing the trip on a *linear* share crosses at a constant speed that starts and
+   stops with a step, at 27 units/tick² of jerk — four times what the fifth correction had removed.
+3. **The dispatches were re-flown at `SIM_VERSION` 9 and that is a different run**, said plainly:
+   only the two sent this evening replay as recorded.

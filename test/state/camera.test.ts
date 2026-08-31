@@ -237,6 +237,54 @@ describe('the camera', () => {
   });
 
   /**
+   * **And it does not settle anywhere once the orbit is round.**
+   *
+   * *"I still see the camera settling in lower once the orbit is reached. I think
+   * it'd be nicer if the camera just stayed at the level it was at when I first
+   * started circularizing"* (author, 2026-08-31, flagged at tick 518).
+   *
+   * The first correction that day took the *corner* out of the handover and left
+   * the **distance** where it was. On a wide orbit `stillPoint`'s clamp binds —
+   * the view finishes the oval further from the body than the lock will hold it
+   * — and all of that travel was still being spent after the orbit had become
+   * round, which is the one moment the player has stopped expecting the picture
+   * to move. On the flagged capture it was 79 design units.
+   *
+   * [`outOfFrame`](../../src/state/camera.ts) spends it over the settle's last
+   * `LOCK_TICKS` instead, inside movement that is already happening. What is
+   * asserted is the author's sentence directly: **from the tick the orbit is
+   * round, the view does not move at all.** Over their own dispatches re-flown
+   * at `SIM_VERSION` 9 the travel in the forty ticks after the settle ends is
+   * 0.00 at p50, at p95 and at worst, against 0.71 / 15.61 / 19.30 before.
+   *
+   * ⚠ **This test cannot see the second correction, and that is worth saying
+   * rather than papering over.** No swing of the fixture field puts the view more
+   * than a `DEADZONE` from the body when its settle ends — searched over 51
+   * grab-and-release pairs — so the clamp never binds here, and this passes on
+   * both sides of `outOfFrame`. Displacing the camera by hand does not help
+   * either: at any distance large enough for the lock's clamp to bind, the
+   * ordinary deadzone is already pulling the view back, so both versions arrive.
+   *
+   * What it does earn its place for is failing the behaviour before **either**
+   * of the day's two corrections. The evidence for the second one is the
+   * author's own dispatches and nothing else — travel after the settle ends,
+   * p50/p95/worst, **0.71 / 15.61 / 19.30 → 0.00 / 0.00 / 0.00** — which is the
+   * cohort this project already treats as the authority on feel, and is a
+   * standing reason the fixture field is not a substitute for flying it.
+   */
+  it.each(SWINGS.slice(0, 2))('does not settle once the orbit is round, in %s', (_n, g, l) => {
+    const { views, settled } = fly(g, l);
+    const firstLocked = settled.indexOf(true);
+    expect(firstLocked).toBeGreaterThan(0);
+
+    let travelled = 0;
+    for (let i = firstLocked + 1; i < firstLocked + 40 && settled[i]; i++) {
+      travelled += Math.abs(views[i]!.camera.y - views[i - 1]!.camera.y);
+    }
+    expect(travelled).toBeLessThan(0.5);
+  });
+
+  /**
    * *"A bit less sensitive to my ship's up-and-down."* A craft that has not left
    * the band does not move the view at all — and the band is derived rather than
    * chosen, so a craft circling a typical body at its floor is inside it.
