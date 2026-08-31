@@ -28,7 +28,7 @@ import {
   THUMB_BUDGET,
 } from '../../src/state/camera.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
-import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../../src/state/design.ts';
+import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 
 const PRESS = { pressed: true };
@@ -147,13 +147,12 @@ describe('the camera', () => {
     // Exactly zero, not merely small, for every tick from the press to the end
     // of the settle: the dive and the oval are flown rather than watched.
     //
-    // ⚠ **The view is on the craft for all of it *but the last `LOCK_TICKS`***,
-    // since 2026-08-31: the band closes over that stretch so the view is at rest
-    // before the lock rather than stopping dead when it arrives. What that costs
-    // is measured — the share of the oval's swing the view flies falls from 0.80
-    // to 0.73 over the author's re-flown dispatches — and `bandOf` carries the
-    // argument. The **lock** is still exactly zero for the whole settle, which is
-    // the ruling this test is named for and is untouched.
+    // ⚠ **`OVAL_BAND` was ruled back to 1 on 2026-08-31** and the view is no
+    // longer glued to the craft through the settle — see the constant's own
+    // notice for the author's words and the numbers. The **lock** is still
+    // exactly zero for the whole settle, which is what this test is named for
+    // and what it asserts, and that is untouched: the oval is still not
+    // *anchored*, it is merely banded like everything else.
     for (let i = 0; i <= firstLocked; i++) {
       expect(views[i]!.camera.lock).toBe(0);
       expect(views[i]!.camera.offset).toBe(0);
@@ -173,16 +172,18 @@ describe('the camera', () => {
    * lock into place on the planet?"* (author, 2026-08-31, flagged at tick 931 of
    * that run.)
    *
-   * The handover was two mechanisms that did not know about each other: the band
-   * went from nothing to a whole `DEADZONE` on one tick, so a view following the
-   * oval at several units a tick stopped in a single tick, and the lock then
-   * eased in behind it. On the flagged capture the view ran
+   * The handover was two mechanisms that did not know about each other: with
+   * `OVAL_BAND` at zero the view was glued to the craft for the whole settle and
+   * then met a whole `DEADZONE` on one tick, so a view following the oval at
+   * several units a tick stopped in a single tick, and the lock eased in behind
+   * it. On the capture flagged at 21:55 the view ran
    * `… 1.4, 0.7, −0.1, −0.9, −1.7, −2.5, 0.0` — swinging one way, back the other,
-   * and then a corner.
+   * and then a corner. Restoring the band removed the glue, and `closing` below
+   * takes the lock to its anchor on its own curve.
    *
    * What is asserted is the **velocity**, because that is what was reported. Over
-   * the forty ticks the handover occupies the view's speed changes by at most
-   * **1.67 and 2.85** on these two swings, against **6.30 and 6.66** before — so
+   * the forty ticks the handover occupies the view's speed changes by at most a
+   * design unit or three on these two swings, against **6.30 and 6.66** before — so
    * the bound is 3, which is a tolerance rather than a value to reproduce
    * ([AGENTS.md](../../AGENTS.md) §4) and still fails the behaviour it replaced
    * by a factor of two. Over the author's own re-flown dispatches the same figure
@@ -191,14 +192,8 @@ describe('the camera', () => {
    * Distance is asserted next door in *arrives at the lock without moving*, which
    * the same pair took from 12.6 and 15.0 design units to **exactly zero**.
    *
-   * ⚠ **The corner is smaller and not gone**, and that is measured rather than
-   * hoped. The band shuts before the settle ends, so the view parks — and then
-   * the craft, which is still going round, drifts back out of the band and the
-   * view follows it again at a unit or two a tick before the lock stops it. What
-   * remains is the third of what was there. Closing the band later leaves less
-   * room to drift and more corner; over the author's own dispatches a window of
-   * twelve ticks measures worse than twenty on both counts, which is why the
-   * window is `LOCK_TICKS` rather than something fitted to these two swings.
+   * Over the author's own dispatches the same figure runs **p50 3.12 → 0.23 and
+   * worst 7.48 → 4.68**.
    */
   it.each(SWINGS.slice(0, 2))('comes to rest before the lock, in %s', (_n, grabAt, letGoAt) => {
     const { views, settled } = fly(grabAt, letGoAt);
@@ -282,6 +277,51 @@ describe('the camera', () => {
       travelled += Math.abs(views[i]!.camera.y - views[i - 1]!.camera.y);
     }
     expect(travelled).toBeLessThan(0.5);
+  });
+
+  /**
+   * **The view does not come back down while the orbit is still settling.**
+   *
+   * *"I capture a planet, swing around the top of it to start circularizing, and
+   * when the ship travels to below the planet as part of circularization the
+   * camera moves downwards to follow it. I'd rather have the camera fixed a bit
+   * higher up, where it was when I first started circularizing"* (author,
+   * 2026-08-31).
+   *
+   * A craft on an orbit goes round — over the body and then under it — so a view
+   * tracking it vertically must return by the orbit's diameter. Two attempts at
+   * making that descent *smoother* preceded this one and both missed: the
+   * objection is to the descent, not to its shape.
+   *
+   * What is asserted is the rule and its one exception. The view may rise with
+   * the craft, because a run is a climb and that is the direction of travel; it
+   * may only fall when spec 00 §7's thumb line demands it, which over the
+   * author's dispatches is p95 **0** design units and worst 43.
+   */
+  it.each(SWINGS.slice(0, 2))('does not descend while the orbit settles, in %s', (_n, g, l) => {
+    const { views, frozen } = fly(g, l);
+    const from = frozen.indexOf(true);
+    expect(from).toBeGreaterThan(0);
+
+    let rose = 0;
+    let fell = 0;
+    for (let i = from + 1; i < from + SETTLE_TICKS && frozen[i]; i++) {
+      const step = views[i]!.camera.y - views[i - 1]!.camera.y;
+      // More negative is further up the field, which is where a run is going.
+      if (step < 0) rose -= step;
+      else {
+        // Falling is allowed only to keep the craft off the thumb line.
+        expect(onScreen(views[i]!)).toBeLessThanOrEqual(THUMB_LINE + 1);
+        fell += step;
+      }
+    }
+    // It really does track the craft upward — this is not a still camera.
+    expect(rose).toBeGreaterThan(5);
+    // And it gives none of it back. On these two swings the camera before this
+    // ruling rose 117.9 and 115.9 and then **fell 207.2 and 212.3** — more than
+    // it had risen, because it followed the craft round the far side of the body
+    // and then back up the field with it.
+    expect(fell).toBeLessThan(1);
   });
 
   /**

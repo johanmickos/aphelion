@@ -1577,3 +1577,51 @@ to know why the test file is thinner than the evidence:
    stops with a step, at 27 units/tick² of jerk — four times what the fifth correction had removed.
 3. **The dispatches were re-flown at `SIM_VERSION` 9 and that is a different run**, said plainly:
    only the two sent this evening replay as recorded.
+
+### ⚠ The seventh, and it supersedes the fifth and the sixth
+
+*"I capture a planet, swing around the top of it to start circularizing, and when the ship travels to
+below the planet as part of circularization the camera moves downwards to follow it. I'd rather have
+the camera fixed a bit higher up, where it was when I first started circularizing."*
+
+**Both earlier corrections that evening were treating a symptom**, and this is the note that says so
+rather than leaving two builds in the history looking like progress. The fifth took the *corner* out
+of the handover and the sixth moved the *distance* from after the orbit to during it. Neither asked
+why there was a distance, and the answer is one line above them in this same file: `OVAL_BAND` at
+zero glues the view to the craft for the whole settle, and **a craft on an orbit goes round.** Over
+the top of the body, then under it. A view tracking that vertically must come back down by the
+orbit's diameter, every capture — measured over 20 settles in the author's dispatches, **151 design
+units at p50 and 343 at worst.** No amount of easing makes a descent stop being a descent.
+
+It also could not have been fixed downstream, which is worth keeping: glued to the craft, the view
+*ends* the settle wherever the oval left it, which on a wide orbit is outside what the lock is
+allowed to hold — so something has to travel, and the only choice is whether it travels after the
+orbit is round (the 21:55 complaint) or during it (the 22:55 one). **`OVAL_BAND` is where the
+distance is created, so it is the only place it can be not-created.**
+
+So `OVAL_BAND` goes back to **1** — the 2026-08-30 ruling reversed by the author two days later —
+and `settling` forbids the view to descend at all while a dive is settling. The rule is asymmetric
+and the field is what justifies it: a run is a **climb**, so following the craft up is the direction
+of travel and following it back down is the view undoing progress to chase half an orbit. Spec
+00 §7's thumb line is the one thing that can still force a descent, and over the author's dispatches
+it fires on p95 **0** design units and worst 43.
+
+| over 20 settles from the author's dispatches | before | after |
+|---|---|---|
+| the view's descent after its peak, p50 / p95 / worst | 151 / 246 / 343 | **0 / 8 / 20** |
+| view travel after the orbit is round, p50 / p95 | 0.71 / 15.61 | **0.00 / 0.00** |
+| jerk across the handover, p50 / worst | 3.12 / 7.48 | **0.23 / 4.68** |
+| the lock's arrival ramp, the two flown swings | 12.6 / 15.0 | **0.0 / 0.0** |
+| share of the craft's swing the view flies | 0.75 | **0.41** |
+
+**The last row is the cost and it is the row `OVAL_BAND` was ruled on**, so it is named rather than
+buried: the oval is followed about half as much as it was. On the two swings the tests fly, the
+camera used to rise 118 units through a settle and then **fall 207** — further than it had risen —
+and now rises 14 and falls none. `OVAL_BAND` is on the bench as of this change, so the two ends of
+that trade can be flown against each other rather than argued about.
+
+**What is kept from the two superseded builds** is one line: `closing`, which makes the lock's
+arrival complete on the curve `LOCK_TICKS` already named instead of being handed to a 5%-a-tick ease
+that approaches without arriving. It takes the arrival ramp's travel to zero and costs nothing. The
+band-closing ramp and the in-settle homing are both gone: with the band restored there is no
+distance for them to manage.

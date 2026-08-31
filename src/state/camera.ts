@@ -255,16 +255,9 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   // moves the view by whatever the two happen to be apart when the orbit
   // settles — measured at 49 design units over the ramp, reported as *"a slight
   // camera up/down movement right at the moment the ship settles into orbit"*.
-  // By then the deadzone has already brought the view to a stop, so the nearest
-  // still point is the one it is standing on, and arriving there costs nothing.
-  //
-  // **That last clause stopped being true and is true again.** It held while the
-  // band was full through the whole settle; once the oval was flown
-  // (`OVAL_BAND`, 2026-08-30) the view arrived at the ramp still moving, and the
-  // author flew the consequence on 2026-08-31 — *"the camera eventually settles
-  // downwards a little bit."* `bandOf` now closes the band over the settle's last
-  // `LOCK_TICKS` so the view is at rest before the lock, and `closing` takes it
-  // to the anchor on the lock's own curve rather than leaving it to the ease.
+  // By then the deadzone has already brought the view to a stop (measured: zero
+  // movement over the twenty ticks before the ramp), so the nearest still point
+  // is the one it is standing on, and arriving there costs nothing.
   //
   // Clamped to within a deadzone of the body, because "wherever it happens to
   // be" is only good enough while it is near: a shallow dive settles into a
@@ -289,20 +282,14 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   const lead = sim.orbit === null ? leadOf(sim.craft.vy) : 0;
 
   const subjectY = craftY + offset + lead;
-  const homing = homingShare(sim);
-  // While the lock is arriving the view goes to its anchor on the lock's own
-  // curve; every other tick it is the deadzone and the follow ease, untouched.
-  // See `closing` for why the arrival is not left to the ease.
   return {
     x: centreline(),
     y:
       lock > 0 && previous.lock < 1
         ? previous.y + (anchor - previous.y) * closing(previous.lock, lock)
-        : homing > 0 && outOfFrame(previous.y, sim) !== null
-          ? previous.y +
-            (outOfFrame(previous.y, sim)! - previous.y) * closing(homingShare(sim, 1), homing)
-          : previous.y +
-            (targetY(previous.y, subjectY, bandOf(sim)) - previous.y) * easeStep(FOLLOW_RATE),
+        : previous.y +
+          (settling(previous.y, targetY(previous.y, subjectY, bandOf(sim)), sim) - previous.y) *
+            easeStep(FOLLOW_RATE),
     lock,
     offset,
   };
@@ -312,42 +299,67 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
  * What share of the distance still to go the view covers this tick, so that all
  * of it is covered exactly when the lock finishes arriving.
  *
- * ## The lock named a duration it did not keep
- *
  * [`LOCK_TICKS`](#lock_ticks) is *"slow enough to read as the view settling with
  * the orbit and fast enough not to trail it"*, and that was a description of the
- * **weight** rather than of the movement. The weight ramped over twenty ticks;
- * what the view did with its new subject was hand it to the deadzone and the
- * follow ease, which spend 5% of what is left per tick and approach without
- * arriving. So the lock could be at full while the view was still walking.
- *
+ * **weight** rather than of the movement: the weight ramped over twenty ticks and
+ * the view was handed to a 5%-a-tick ease that approaches without arriving.
  * `(lock − lock_prev) / (1 − lock_prev)` is the share of the remainder which,
- * compounded across the ramp, telescopes to exactly one — the view is on its
+ * compounded across the ramp, telescopes to exactly one — so the view is on its
  * anchor when the weight reaches full, on the smootherstep the weight already
- * had, and not a tick later.
- *
- * ## It is half of one correction and the other half is in `bandOf`
- *
- * On its own this made things worse rather than better, and the measurement is
- * why it is written here beside the other half. With the band still snapping
- * shut at the settle's end the view is *moving* when the lock starts, so
- * completing the trip on a fixed clock only spends the same distance faster:
- * measured over the author's re-flown dispatches, the ramp's travel went **up**.
- *
- * With [`bandOf`](#bandof) closing first the view is already at rest, the anchor
- * is the point it is standing on, and the remainder is zero — so on the two
- * swings `test/state/camera.test.ts` flies the ramp now travels **0.0 design
- * units** against 12.6 and 15.0 before, and on the capture the author flagged it
- * travels 0.0 against 1.8. The pair does what neither does alone.
- *
- * **It remembers nothing new.** `previous.lock` was already carried in
- * [`CameraView`](./types.ts) for the renderer, so this is a second reader of a
- * number that was there rather than a second memory — which is the promise the
- * header makes and it is kept.
+ * had. It remembers nothing new: `previous.lock` was already carried in
+ * [`CameraView`](./types.ts) for the renderer.
  */
 function closing(was: number, now: number): number {
   if (was >= 1) return 1;
   return (now - was) / (1 - was);
+}
+
+/**
+ * The target, with the view forbidden to **descend** while a dive is settling
+ * into its orbit.
+ *
+ * ## The author flew this three times in one evening
+ *
+ * *"When I capture a planet and circularize, the camera eventually settles
+ * downwards a little bit"* (2026-08-31, 21:55). Then, after two attempts at the
+ * *smoothness* of that movement: *"I capture a planet, swing around the top of it
+ * to start circularizing, and when the ship travels to below the planet as part
+ * of circularization the camera moves downwards to follow it. I'd rather have the
+ * camera fixed a bit higher up, where it was when I first started circularizing"*
+ * (22:55).
+ *
+ * The second message is the one that names the mechanism, and it is not about
+ * smoothness at all. The craft goes **round** — over the top of the body and then
+ * under it — and a view that tracks it vertically must come back down by the
+ * orbit's own diameter. Nothing about how that descent is eased makes it stop
+ * being a descent.
+ *
+ * ## Up is where the run is going and down is not
+ *
+ * So the rule is asymmetric, and the field is what justifies it: a run is a
+ * **climb**. Following the craft up is the direction of travel — it is the same
+ * thing [`leadOf`](#leadof) spends a look-ahead on. Following it back down is the
+ * view undoing progress to chase half an orbit, and it is the half the author has
+ * now objected to twice.
+ *
+ * **The thumb line still wins**, and it is the one thing that can make the view
+ * descend anyway: spec [00 · §7](../../docs/spec/00-tokens.md) keeps the craft
+ * above it, and a ratchet that let the craft slide under would be trading one
+ * complaint for a worse one. Measured over the author's dispatches that override
+ * fires on almost nothing — p95 **0** design units, worst 43.
+ *
+ * ## What it is worth, measured
+ *
+ * Over 20 settles from their own dispatches, how far the view comes back down
+ * after reaching its highest point: **p50 151 → 0, p95 246 → 8, worst 343 → 20.**
+ */
+function settling(cameraY: number, target: number, sim: SimState): number {
+  const orbit = sim.orbit;
+  if (orbit === null || orbit.ticksSinceFreeze >= SETTLE_TICKS) return target;
+  if (sim.heldBody === null) return target;
+  // Never below the thumb line, whatever else — spec 00 §7, and it outranks this.
+  const forced = sim.craft.y - THUMB_BUDGET;
+  return Math.max(Math.min(target, cameraY), Math.min(forced, target));
 }
 
 /**
@@ -395,72 +407,11 @@ function targetY(cameraY: number, subjectY: number, band: number): number {
   return cameraY + offset - held(offset, band);
 }
 
-/**
- * How wide the band is right now — see [`OVAL_BAND`](#oval_band) for why it is
- * ever anything other than [`DEADZONE`](#deadzone).
- *
- * ## The band used to snap back, and that was the corner the author felt
- *
- * *"When I capture a planet and circularize, the camera eventually settles
- * downwards a little bit. Can we instead just have the camera more smoothly lock
- * into place on the planet?"* (author, 2026-08-31, the run flagged at tick 931).
- *
- * The handover at the settle's end was written as two mechanisms that did not
- * know about each other. `OVAL_BAND` is zero, so through the settle the view is
- * glued to the craft and flying the oval; on the tick the settle ended the band
- * went to `DEADZONE` **in one step**, which absorbs any excursion under 168 units
- * outright — so a view moving at several units a tick stopped dead on a single
- * tick, and [`lockOf`](#lockof) then began easing in behind it. Measured on the
- * capture the author flagged, the view was travelling **2.5 units a tick and
- * reached zero on the next one.**
- *
- * That is a discontinuity in *velocity*, which is exactly the fault
- * [`held`](#held) was written to remove from the band's own edge — *"the view
- * goes from parked to tracking at a single point, and every crossing is a start
- * or a stop with nothing in between"* — reappearing at the other boundary, where
- * nothing was watching for it.
- *
- * ## So the band closes **before** the lock rather than at the same instant
- *
- * It shuts over the last [`LOCK_TICKS`](#lock_ticks) of the settle, so the view
- * decelerates out of following the oval and is **already at rest when the lock
- * takes over**. The two halves of the handover share one duration deliberately:
- * the lock's third of a second is *"slow enough to read as the view settling
- * with the orbit and fast enough not to trail it"*, and coming to a stop is the
- * same movement seen from the other side. One number, already argued.
- *
- * Measured over 11 captures held on one unbroken orbit, from the author's own
- * dispatches re-flown at `SIM_VERSION` 9 — **a different run, and it is said
- * plainly** because everything before 9 refuses to replay:
- *
- * | | before | after |
- * |---|---|---|
- * | jerk across the handover, p50 | 3.12 | **0.65** |
- * | jerk across the handover, worst | 7.48 | **0.88** |
- * | view travel after the settle ends, p50 | 0.71 | **0.15** |
- * | ticks until the view is still, p50 | 1 | 1 |
- *
- * On the flagged capture itself the reversal disappears outright: the view used
- * to run `… 1.4, 0.7, −0.1, −0.9, −1.7, −2.5, 0.0` — swinging one way, back the
- * other, then stopping dead — and now reaches rest seven ticks before the lock
- * arrives and holds it.
- *
- * ## What it costs, which is the author's own ruling and so is stated
- *
- * `OVAL_BAND` at zero was ruled so the view flies **99%** of the oval's swing
- * rather than 70%. This gives a little of that back: over the same 11 captures
- * the share falls from **0.80 to 0.73** on a path-length reading. The last third
- * of a second of a settle is the part where the orbit is already nearly round and
- * the swing is at its smallest, which is why it is the cheapest place to spend
- * it — but it is a taste call on the author's own ruling, and `LOCK_TICKS` is on
- * the bench so it can be flown from 0 (the old snap) upward.
- */
+/** How wide the band is right now — see `OVAL_BAND`. */
 function bandOf(sim: SimState): number {
   const orbit = sim.orbit;
-  if (orbit === null) return DEADZONE;
-  const closed = (orbit.ticksSinceFreeze - (SETTLE_TICKS - LOCK_TICKS)) / LOCK_TICKS;
-  const open = OVAL_BAND + (1 - OVAL_BAND) * Math.max(0, Math.min(1, closed));
-  return DEADZONE * open;
+  const settling = orbit !== null && orbit.ticksSinceFreeze < SETTLE_TICKS;
+  return settling ? DEADZONE * OVAL_BAND : DEADZONE;
 }
 
 /**
@@ -485,7 +436,46 @@ function bandOf(sim: SimState): number {
  * choice is a taste one and the author flew it: a quarter of the band leaves 90%,
  * half leaves 82%.
  *
- * ## Why removing it here is safe when removing it everywhere was not
+ * ## ⚠ Reversed by the author, 2026-08-31 — it is **1** now
+ *
+ * Everything above is the argument that put it at zero and it is left standing,
+ * because what changed is not the reasoning but a consequence of it nobody had
+ * flown yet. *"I capture a planet, swing around the top of it to start
+ * circularizing, and when the ship travels to below the planet as part of
+ * circularization the camera moves downwards to follow it. I'd rather have the
+ * camera fixed a bit higher up, where it was when I first started
+ * circularizing."*
+ *
+ * At zero the view is **glued to the craft** vertically for the whole settle, and
+ * a craft on an orbit goes round: over the top of the body, then under it. So the
+ * view had to come back down by the orbit's own diameter, every capture. Measured
+ * over 20 settles in the author's dispatches it came back down **151 design units
+ * at p50 and 343 at worst**, and two earlier attempts that evening to make that
+ * descent *smoother* both missed the point — the objection is to the descent, not
+ * to its shape.
+ *
+ * It also could not be fixed anywhere downstream, and that is the finding worth
+ * keeping: with the view glued to the craft it **ends** the settle wherever the
+ * oval left it, which on a wide orbit is outside what
+ * [`stillPoint`](#stillpoint) will let the lock hold. Something then has to
+ * travel, and the only choices are when — after the orbit is round (the 21:55
+ * complaint) or during it (the 22:55 one). **`OVAL_BAND` is where that distance
+ * is created**, so it is the only place it can be not-created.
+ *
+ * | over 20 settles | at 0 | at 1, with [`settling`](#settling) |
+ * |---|---|---|
+ * | the view's descent after its peak, p50 / p95 / worst | 151 / 246 / 343 | **0 / 8 / 20** |
+ * | view travel after the orbit is round, p50 / p95 | 0.71 / 15.61 | **0.00 / 0.00** |
+ * | jerk across the handover, p50 / worst | 3.12 / 7.48 | **0.23 / 4.68** |
+ * | share of the craft's swing the view flies | 0.75 | **0.41** |
+ *
+ * The last row is the cost and it is the row this constant was ruled on, so it is
+ * stated first and not buried: **the oval is followed about half as much.** The
+ * band is what buys everything else, [`settling`](#settling) is what makes the
+ * remainder hold rather than drift, and `OVAL_BAND` is on the bench so the two
+ * can be flown against each other.
+ *
+ * ## Why removing it here was thought safe when removing it everywhere was not
  *
  * The author refused a bandless camera earlier the same day — *"WAY too fixed on
  * the ship"* — so this looks like the same move and is not. That one was during
@@ -495,13 +485,10 @@ function bandOf(sim: SimState): number {
  * started, and is the most dramatic thing in a capture. It is the one stretch of
  * a run where following closely is the point.
  *
- * It lasts until [`LOCK_TICKS`](#lock_ticks) before the end of
- * [`SETTLE_TICKS`](../sim/units.ts) — **not to the end of it, which is the
- * 2026-08-31 correction** — and then hands over to `lockOf`, which stops the
- * round orbit being chased at all. See [`bandOf`](#bandof) for why the last third
- * of a second is spent closing rather than following, and what it cost.
+ * It lasts exactly [`SETTLE_TICKS`](../sim/units.ts) and hands over to `lockOf`,
+ * which stops the round orbit being chased at all.
  */
-const OVAL_BAND = 0;
+export const OVAL_BAND = 1;
 
 /**
  * How far into the band the camera stays parked, as a fraction of it.
@@ -576,68 +563,3 @@ function held(offset: number, band: number): number {
  * them to it over real swings rather than by arithmetic.
  */
 export const THUMB_BUDGET = THUMB_LINE - DESIGN_HEIGHT / 2;
-
-/**
- * The level the view has to be at for the orbit it is about to watch to be
- * framed — or `null` when it is already framed, which is most of the time.
- *
- * ## The settle used to be paid for after the orbit was round
- *
- * *"I still see the camera settling in lower once the orbit is reached. I think
- * it'd be nicer if the camera just stayed at the level it was at when I first
- * started circularizing"* (author, 2026-08-31, flagged at tick 518).
- *
- * [`stillPoint`](#stillpoint) clamps the lock's anchor to within a
- * [`DEADZONE`](#deadzone) of the body, and on a wide orbit that clamp **binds**.
- * Measured on the flagged capture, the view ended the oval 247 units above the
- * body against an anchor at 168, so it had **79 design units** to travel — and
- * every one of them was spent *after* the orbit had become round, which is
- * precisely the moment a player has stopped expecting the picture to move.
- *
- * So the travel happens over the settle's last [`LOCK_TICKS`](#lock_ticks)
- * instead, the same window [`bandOf`](#bandof) closes the band across. The view
- * is finishing its swing there anyway; the clamp's pull rides inside movement
- * that is already happening, and by the time the orbit is round the view is
- * where it is going to stay. **Nothing is removed and nothing is loosened** —
- * the same distance is covered, at a moment when it does not read as the picture
- * drifting on its own.
- *
- * ## `null` is the common case and is why this is cheap
- *
- * Nine of the thirteen captures in the author's dispatches are already framed
- * when the settle ends: the clamp does not bind, this returns `null`, and the
- * band and the follow ease do exactly what they did before. What changes is only
- * **when** the other four pay.
- */
-function outOfFrame(cameraY: number, sim: SimState): number | null {
-  if (sim.heldBody === null) return null;
-  const bound = stillPoint(cameraY, sim.field.bodies[sim.heldBody]!.y);
-  return bound === cameraY ? null : bound;
-}
-
-/**
- * How far through coming to rest the view is, from 0 to 1 — zero for the whole
- * dive and most of the settle, then over the settle's last
- * [`LOCK_TICKS`](#lock_ticks), then one for as long as the orbit lasts.
- *
- * It is the same window [`bandOf`](#bandof) closes the band over, because it is
- * the same movement: the band stops the view *following*, and this puts it where
- * it is going to stay.
- *
- * **Smootherstep, the curve [`lockOf`](#lockof) arrives on.** Both ends have to
- * be seamless, and it is what makes the pair below a true ease: a fixed
- * destination with [`closing`](#closing)'s telescoping increment lands the view
- * exactly on `lerp(where it started, where it is going, this)`, so the curve
- * chosen here *is* the movement's shape. A linear share crosses at a constant
- * speed that starts and stops with a step — measured at 27 units/tick² of jerk,
- * four times what this exists to remove.
- */
-function homingShare(sim: SimState, ago = 0): number {
-  const orbit = sim.orbit;
-  if (orbit === null) return 0;
-  const through = Math.max(
-    0,
-    Math.min(1, (orbit.ticksSinceFreeze - ago - (SETTLE_TICKS - LOCK_TICKS)) / LOCK_TICKS),
-  );
-  return through * through * through * (through * (through * 6 - 15) + 10);
-}
