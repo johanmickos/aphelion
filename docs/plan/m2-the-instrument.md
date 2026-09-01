@@ -80,80 +80,56 @@ Stated cost: the lock's arrival ramp travels **12.6** design units where it trav
 the view now ends the settle wherever the craft took it. Spread over the ramp that is 0.6 units a
 tick, against the **49** of visible movement the ramp was built to remove.
 
-### ⚠ The fifth correction, 2026-08-31: that stated cost was the next complaint
+### ⚠ 2026-08-31: eight camera corrections were flown in one evening, and all of them were reverted
 
-*"When I capture a planet and circularize, the camera eventually settles downwards a little bit. Can
-we instead just have the camera more smoothly lock into place on the planet?"* — flagged at tick 931
-of the run sent that evening, the only dispatch that still replays at `SIM_VERSION` 9.
+**The code is back to where this section leaves it.** The author asked for the camera to be returned
+to its 2026-08-30 shape and revisited in a session of its own, so nothing below is in `camera.ts` any
+more. It is kept because the *measurements* cost the evening and re-deriving them would cost another
+one — and because two of the findings are about how to look at this camera rather than about what to
+do to it.
 
-The cost recorded above was measured as a **distance** and the fault is a **velocity**. `OVAL_BAND`
-at zero leaves the view glued to the craft for the whole settle; on the tick the settle ended the
-band went from nothing to a whole `DEADZONE`, which absorbs any excursion under 168 units outright.
-So a view travelling several units a tick stopped **on one tick**. Traced on the flagged capture, it
-ran `… 1.4, 0.7, −0.1, −0.9, −1.7, −2.5, 0.0` — swinging one way through the oval, back the other,
-and then a corner. That is the same discontinuity `PARKED` was introduced to remove from the band's
-own edge, reappearing at the boundary nobody was watching.
+**What was flown, in order, and what each was answering:**
 
-**Two halves, and neither works alone** — which is the measurement worth keeping:
+| the author, flying | what was built | what they said next |
+|---|---|---|
+| *"the camera eventually settles downwards a little bit"* | the lock arrives on its own curve rather than being left to a 5%-a-tick ease | *"I still see the camera settling in lower once the orbit is reached"* |
+| *"...just stayed at the level it was at when I first started circularizing"* | the framing clamp is paid during the settle instead of after | *"the camera moves downwards to follow it"* |
+| *"I'd rather have the camera fixed a bit higher up"* | `OVAL_BAND` back to 1, and a ratchet: the view may rise, not fall | *"very mechanical/robotic... a bit more flexibility"* |
+| *"stuttering or robotic camera transitions"* | the look-ahead faded out over 12 ticks; the ratchet became a resistance | *"settles and then moves UP a few units"* |
+| *"I want the camera **smooth**"* | the look-ahead carried and crossed at both ends; the sink lets go with the lock | reverted |
 
-| | jerk across the handover, p50 / worst | ramp travel, the two flown swings | oval swing flown, p50 |
-|---|---|---|---|
-| before | 3.12 / 7.48 | 12.6 / 15.0 | 0.80 |
-| the band closes early, alone | 0.65 / 0.88 | **19.7 / 25.0** — worse | 0.73 |
-| the lock completes its own move, alone | 1.19 / 4.03 | 0.0 / 0.0 | 0.80 |
-| **both** | **0.65 / 0.88** | **0.0 / 0.0** | 0.73 |
+**The three measurements worth keeping.**
 
-`bandOf` shuts the band over the settle's last `LOCK_TICKS` so the view decelerates out of following
-rather than being stopped; `closing` then takes it to its anchor on the lock's own smootherstep,
-because the lock named a third of a second and handed the actual movement to a 5%-a-tick ease that
-approaches without arriving. Closing the band alone spends the same distance faster and made the
-ramp worse; completing the move alone still starts from a moving view. The pair is the correction.
+1. **The largest discontinuity in the camera was never in the lock.** `LOOK_AHEAD` is switched off at
+   the freeze — rightly, since past it the craft's velocity reverses every half orbit — and it went
+   from 210 design units to nothing between two ticks. Measured over the author's dispatches, the
+   view's speed changed by **10.2 design units in one tick** at a freeze, against 3.1 at a release,
+   0.9 when the orbit goes round and 0.1 at a grab. Three corrections to the lock preceded anyone
+   looking at this. **Ask where the largest single-tick change is before reasoning about a mechanism.**
+2. **`OVAL_BAND` is the pivot and both of its ends have a complaint attached.** At 0 the view is glued
+   to the craft for the whole settle, and a craft on an orbit goes round — so the view must come back
+   down by the orbit's diameter, measured at **151 design units at p50 and 343 at worst**. At 1 the
+   view is exactly still on **48%** of a run's ticks against 11%, and that reads as stop-start. No
+   downstream mechanism fixes either, because `OVAL_BAND` is where the distance is created.
+3. **A hard rule reads as a machine.** The ratchet removed the descent completely and left the picture
+   frozen for **47 ticks at p95** before the lock took over; exactly-still-then-exactly-moving is the
+   shape the author called robotic. Softening it to a resistance took that to 12 ticks. Any fix here
+   wants to be continuous rather than gated.
 
-Measured over the author's dispatches **re-flown at `SIM_VERSION` 9 — a different run, and it is
-said plainly**, since everything before 9 refuses to replay: 11 captures held on one unbroken orbit,
-jerk p50 3.12 → 0.65 and worst 7.48 → 0.88, view travel after the settle ends p50 0.71 → 0.15. On
-the flagged capture itself the view reaches rest seven ticks *before* the lock and holds it exactly.
+**And two traps this evening fell into**, both worth more than the code was:
 
-**Stated cost, in the same currency as the last one.** The oval's swing the view flies falls from
-0.80 to **0.73** on a path-length reading — the author's own ruling, given a little back in the last
-third of a second of a settle, where the orbit is nearly round and the swing is smallest. And the
-corner is **smaller rather than gone**: the band shuts before the settle ends, the craft keeps going
-round, and the view drifts back out of the band and follows it at a unit or two a tick before the
-lock stops it. A shorter window leaves less room to drift and measures worse on both counts, so the
-window is `LOCK_TICKS` rather than a number fitted to the two swings the tests fly. `LOCK_TICKS` is
-already on the bench, and at 0 it restores the old snap.
+- **Measure the thing the sentence is about.** Two builds were green and wrong because the
+  measurement was of the oval's *periapsis* while the complaint was about its *far end*. The same
+  shape of error is available here: *distance* travelled is not what "abrupt" means — **jerk**, the
+  tick-to-tick change in the view's velocity, is.
+- **The fixture field cannot reproduce any of this.** Searched over 51 grab-and-release pairs, no
+  synthetic swing puts the view more than a `DEADZONE` from the body when its settle ends, so the
+  clamp never binds; and displacing the camera by hand does not help, because at any distance where
+  the lock's clamp binds the ordinary deadzone is already pulling the view back. **The evidence is
+  the dispatch corpus and nothing else** — and only the newest few dispatches replay, so the rest
+  have to be re-flown at the current `SIM_VERSION` and said plainly to be a different run.
 
-**The starfield was carried in the wrong unit.** *"Tiny specks of white with little to no
-variation, so it doesn't look very deep or immersive."* The prototype sizes stars in **device
-pixels after its own scale** — `max(1, tier.size * cam.scale)`, so 3 to 5.4 on the phone it was
-tuned on — and this draws in **design units**, which the letterbox puts one-to-one on that same
-phone. The numbers came across; the scale did not. A sub-pixel rectangle is not a small star, it is
-an antialiased smear of the background, which is why the brightness ramp stopped reading as depth
-too. Sizes now span 2.4 – 6.4, and the count doubled to 320, because the prototype's 160 is a
-density **per screen** and this field is two screens tall.
-
-**And a held body was the hardest thing on screen to find.** Spec 04 §3 put IN REACH at 85% against
-HELD's 100%. HELD did not move; the gap under it went from 1.18× to **1.82×**.
-
-
-## Queued · the arrival's word becomes a number
-
-Ruled by the author on 2026-08-30, on the same day the word was built and flown:
-
-> *"I think that once we have the points system in place we'll remove the word for a good arrival
-> and just use +N points popup."*
-
-So `TIGHT · NERVE · BRAZEN` are **provisional by the author's own intent**, and what is permanent is
-the grading under them — [`arrivedTight`](../../src/sim/tier.ts)'s two halves, the closeness band
-and the aim angle, which is where all the measurement went. When spec
-[08](../spec/08-economy.md)'s economy lands, `src/state/arrival.ts` keeps its life, its throw, its
-slot and its placement, and what changes is only what the mark says.
-
-**Two things should survive that swap and are worth naming now.** The arrival's slot is separate
-from the release's, so a `+N` here would not fight a `+N` there. And the **knock** stays a word —
-it is not an award, it is the world telling the player what just happened, and there is no number
-to put in its place.
-
+The dispatches the author flew that evening are in `diagnostics/`, from `21-55-29` to `23-54-40`.
 
 ## M2.1 · The presentation-state layer
 
@@ -1533,175 +1509,3 @@ the convenient one does not match the sentence.
 
 **The author flies it. The question is whether the release lands.** Next:
 [M3](./m3-the-field.md).
-
-### ⚠ And the sixth, an hour later: the distance, not just the corner
-
-*"I still see the camera settling in lower once the orbit is reached. I think it'd be nicer if the
-camera just stayed at the level it was at when I first started circularizing"* — flagged at tick 518
-of the run sent at 22:37.
-
-The fifth correction took the **corner** out of the handover and left the **distance** where it was.
-`stillPoint` clamps the lock's anchor to within a `DEADZONE` of the body, and on a wide orbit that
-clamp *binds*: traced on the flagged capture, the view finished the oval **247** units above the
-body against an anchor at 168, so **79 design units** had to be travelled — and all of it was spent
-after the orbit had become round. That is the one moment a player has stopped expecting the picture
-to move, which is why 79 units there reads worse than 500 units during the dive.
-
-`outOfFrame` spends it over the settle's last `LOCK_TICKS` instead, inside movement that is already
-happening, on the smootherstep `lockOf` arrives with. It returns `null` — and changes nothing at all
-— on nine of the thirteen captures in the author's dispatches, because the clamp only binds on wide
-orbits.
-
-| over 11 captures on one unbroken orbit | before today | after the fifth | **after the sixth** |
-|---|---|---|---|
-| view travel after the settle ends, p50 / p95 / worst | 0.71 / 15.61 / 19.30 | 0.15 / 30.94 / — | **0.00 / 0.00 / 0.00** |
-| ticks until the view is still, p50 / p95 | 1 / 9 | 1 / — | **1 / 1** |
-| jerk across the handover, p50 / worst | 3.12 / 7.48 | 0.65 / 0.88 | **0.67 / 2.83** |
-| share of the oval's swing the view flies | 0.80 | 0.73 | 0.71 |
-
-On the flagged capture the view now ends the settle at exactly the level it holds for the rest of the
-orbit — **−978 and −978** — where it used to end at −1057 and drift down to −978.
-
-**Three things are worth writing down about how this was checked**, because the next agent will want
-to know why the test file is thinner than the evidence:
-
-1. **The fixture field cannot reproduce it.** Searched over 51 grab-and-release pairs, no swing puts
-   the view more than a `DEADZONE` from the body when its settle ends, so the clamp never binds and
-   `test/state/camera.test.ts` passes on both sides of this change. Displacing the camera by hand
-   does not help either — at any distance where the lock's clamp binds, the ordinary deadzone is
-   already pulling the view back. **The evidence for this correction is the dispatch corpus and
-   nothing else**, and the tests say so in place rather than implying coverage they do not have.
-2. **Two builds were measured and rejected before this one**, both recorded in the code: easing a
-   target that is itself easing lags twice and left 46 of the 79 units to be paid after the orbit was
-   round; and completing the trip on a *linear* share crosses at a constant speed that starts and
-   stops with a step, at 27 units/tick² of jerk — four times what the fifth correction had removed.
-3. **The dispatches were re-flown at `SIM_VERSION` 9 and that is a different run**, said plainly:
-   only the two sent this evening replay as recorded.
-
-### ⚠ The seventh, and it supersedes the fifth and the sixth
-
-*"I capture a planet, swing around the top of it to start circularizing, and when the ship travels to
-below the planet as part of circularization the camera moves downwards to follow it. I'd rather have
-the camera fixed a bit higher up, where it was when I first started circularizing."*
-
-**Both earlier corrections that evening were treating a symptom**, and this is the note that says so
-rather than leaving two builds in the history looking like progress. The fifth took the *corner* out
-of the handover and the sixth moved the *distance* from after the orbit to during it. Neither asked
-why there was a distance, and the answer is one line above them in this same file: `OVAL_BAND` at
-zero glues the view to the craft for the whole settle, and **a craft on an orbit goes round.** Over
-the top of the body, then under it. A view tracking that vertically must come back down by the
-orbit's diameter, every capture — measured over 20 settles in the author's dispatches, **151 design
-units at p50 and 343 at worst.** No amount of easing makes a descent stop being a descent.
-
-It also could not have been fixed downstream, which is worth keeping: glued to the craft, the view
-*ends* the settle wherever the oval left it, which on a wide orbit is outside what the lock is
-allowed to hold — so something has to travel, and the only choice is whether it travels after the
-orbit is round (the 21:55 complaint) or during it (the 22:55 one). **`OVAL_BAND` is where the
-distance is created, so it is the only place it can be not-created.**
-
-So `OVAL_BAND` goes back to **1** — the 2026-08-30 ruling reversed by the author two days later —
-and `settling` forbids the view to descend at all while a dive is settling. The rule is asymmetric
-and the field is what justifies it: a run is a **climb**, so following the craft up is the direction
-of travel and following it back down is the view undoing progress to chase half an orbit. Spec
-00 §7's thumb line is the one thing that can still force a descent, and over the author's dispatches
-it fires on p95 **0** design units and worst 43.
-
-| over 20 settles from the author's dispatches | before | after |
-|---|---|---|
-| the view's descent after its peak, p50 / p95 / worst | 151 / 246 / 343 | **0 / 8 / 20** |
-| view travel after the orbit is round, p50 / p95 | 0.71 / 15.61 | **0.00 / 0.00** |
-| jerk across the handover, p50 / worst | 3.12 / 7.48 | **0.23 / 4.68** |
-| the lock's arrival ramp, the two flown swings | 12.6 / 15.0 | **0.0 / 0.0** |
-| share of the craft's swing the view flies | 0.75 | **0.41** |
-
-**The last row is the cost and it is the row `OVAL_BAND` was ruled on**, so it is named rather than
-buried: the oval is followed about half as much as it was. On the two swings the tests fly, the
-camera used to rise 118 units through a settle and then **fall 207** — further than it had risen —
-and now rises 14 and falls none. `OVAL_BAND` is on the bench as of this change, so the two ends of
-that trade can be flown against each other rather than argued about.
-
-**What is kept from the two superseded builds** is one line: `closing`, which makes the lock's
-arrival complete on the curve `LOCK_TICKS` already named instead of being handed to a 5%-a-tick ease
-that approaches without arriving. It takes the arrival ramp's travel to zero and costs nothing. The
-band-closing ramp and the in-settle homing are both gone: with the band restored there is no
-distance for them to manage.
-
-### ⚠ The eighth, and it is the one that was actually stepping
-
-*"There's definitely some stuttering or robotic camera transitions. I want them to be smooth, not
-for the camera to stop and move abruptly."*
-
-**Three corrections to the lock in one evening did not touch the largest discontinuity in the
-camera, and it is not in the lock at all.** [`LOOK_AHEAD`](../../src/state/camera.ts) is switched
-off at the freeze — for a good reason its own comment gives, since past the freeze the craft's
-velocity reverses every half orbit and stops meaning a heading — and it went from its full **210
-design units to nothing between two ticks.**
-
-Measured over the author's dispatches, the view's speed changed by **10.2 design units in one tick**
-at a freeze, against 3.1 at a release, 0.9 when the orbit goes round and 0.1 at a grab. Traced on
-one capture it went from moving 18.3 a tick to 8.1 on the next. It fires on **every capture**, at
-the moment the player is watching the thing they just did — and it is identical in the build before
-all three of the evening's earlier corrections, which is why none of them stopped the reports.
-
-Faded over `LEAD_OUT_TICKS` (**12**, measured: 2.8 of jerk at six ticks, 0.9 at twelve, 0.9 at
-twenty and thirty, so twelve is where the curve flattens) the freeze's jerk falls to **0.9**, and
-the worst jerk anywhere in a run falls from 10.2 to 3.1 — which is then the **release**, where spec
-02's ruling forbids a delay outright and it stays.
-
-Also in this change, and both from the 23:15 report — *"locked in when I captured, then moved up a
-bit and paused, and then back down to where it should be... very mechanical/robotic"*:
-
-- **`framed` consults the clamp every tick** rather than once when the lock arrives. Consulted once,
-  it made the framing a thing that *happened*: the view stopped where the settle left it, sat there
-  fourteen ticks, then a timer fired and moved it 79 design units in a symmetric twenty-tick curve.
-  Every tick, the ordinary ease carries it there along with everything else. The peak speed of that
-  after-the-orbit move goes **7.4 → 0.0**.
-- **The ratchet becomes a resistance** (`SINK_SHARE`, a tenth). A hard clamp produces exact zeros,
-  and a view that is exactly still and then exactly moving is the shape of a machine: it left the
-  picture frozen for **47 ticks at p95** before the lock took over. At a tenth of the follow rate the
-  view gives way slowly instead of not at all — frozen stretch p95 **12**, descent still p50 2 and
-  p95 10 against the 151 and 246 originally complained about.
-
-**What is still unresolved and is the author's**: with `OVAL_BAND` at 1 the view is exactly still on
-**48%** of a run's ticks against 11% before the day's changes, because a settled orbit is watched
-rather than followed. Most of that is the lock doing its job and is not new — but if *that*
-stillness is what reads as stuttering rather than the transitions into it, then the lock itself is
-the question, and it is a larger ruling than a constant. `OVAL_BAND` and `SINK_SHARE` are both on
-the bench.
-
-### ⚠ The ninth: the look-ahead crosses instead of switching, and the sink lets go with the lock
-
-Two more from the same evening, both found by asking *where is the largest single-tick change* rather
-than by reasoning about the lock.
-
-**The look-ahead was stepping at both ends, and the eighth correction only fixed one.** Fading it out
-on the freeze's own clock left the *return* untouched, because a release has no clock to hang a fade
-on. Measured on the run flagged at 23:54, switching the look-ahead off entirely took a release's jerk
-from p50 3.6 and worst 12.0 down to 0.6 and 7.4 — so most of a release's jerk was the lead snapping
-back on, the mirror of the freeze.
-
-So the weight is **carried** in [`CameraView`](../../src/state/types.ts) and crossed linearly over
-`LEAD_OUT_TICKS`, with the smootherstep applied to it: one mechanism, both ends, no clock. An
-exponential ease on the value was tried first and is worse — it starts at its fastest, so the
-position is continuous and the velocity is not, and the freeze's jerk measured **2.1** against 0.6
-for a scheduled fade and **1.0** for this.
-
-**And the sink had an edge of its own**, which is what the author saw: *"the camera settles and then
-moves UP a few units on the last orbit."* Written as *a tenth until the settle ends, the full rate
-after*, there was a tick or two where `lockOf` had not begun and the resistance had already gone —
-so whatever the sink was holding back moved ten times faster. Traced: the view crept 0.02, 0.04,
-0.05, 0.07, 0.08, 0.09 and then stepped **0.87** on the tick the orbit went round. It eases back on
-the lock's own smootherstep now, so the two never both let go.
-
-| on the run flagged at 23:54 | before | after |
-|---|---|---|
-| jerk at a freeze, p50 / worst | 0.6 / 0.7 | 1.0 / 1.0 |
-| jerk at a release, p50 / worst | 3.6 / 12.0 | **1.7 / 7.6** |
-| jerk when the orbit goes round, p50 / worst | 0.9 / 5.7 | **0.1 / 0.6** |
-| worst jerk anywhere in the run | 11.96 | **7.64** |
-
-**What is left is the release, at 7.6, and it is deliberate.** The lock and its displacement are
-dropped on the tick the body is let go, because spec 02's own ruling forbids a delay there — *"the
-slight delay is making it seem jagged and jumpy, let's remove any camera/speed delay there"* (author,
-2026-08-29). That is the next thing to look at if the release still reads as abrupt, and it is a
-ruling to overturn rather than a bug to fix.

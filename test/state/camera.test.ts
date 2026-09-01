@@ -20,8 +20,6 @@ import { FLOOR_GAP, MEDIAN_RADIUS, SETTLE_TICKS } from '../../src/sim/units.ts';
 import {
   DEADZONE,
   FOLLOW_RATE,
-  LEAD_OUT_TICKS,
-  LOCK_TICKS,
   LOOK_AHEAD,
   LOOK_REF_SPEED,
   lockOf,
@@ -29,7 +27,7 @@ import {
   THUMB_BUDGET,
 } from '../../src/state/camera.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
-import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
+import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../../src/state/design.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 
 const PRESS = { pressed: true };
@@ -146,14 +144,8 @@ describe('the camera', () => {
     expect(firstLocked).toBeGreaterThan(0);
 
     // Exactly zero, not merely small, for every tick from the press to the end
-    // of the settle: the dive and the oval are flown rather than watched.
-    //
-    // ⚠ **`OVAL_BAND` was ruled back to 1 on 2026-08-31** and the view is no
-    // longer glued to the craft through the settle — see the constant's own
-    // notice for the author's words and the numbers. The **lock** is still
-    // exactly zero for the whole settle, which is what this test is named for
-    // and what it asserts, and that is untouched: the oval is still not
-    // *anchored*, it is merely banded like everything else.
+    // of the settle: the dive and the oval are flown rather than watched, and
+    // the view is on the craft for all of it.
     for (let i = 0; i <= firstLocked; i++) {
       expect(views[i]!.camera.lock).toBe(0);
       expect(views[i]!.camera.offset).toBe(0);
@@ -163,202 +155,6 @@ describe('the camera', () => {
     for (let i = 0; i < views.length; i++) {
       if (!settled[i]) expect(views[i]!.camera.lock).toBe(0);
     }
-  });
-
-  /**
-   * **And it comes to rest before the lock arrives rather than stopping dead.**
-   *
-   * *"When I capture a planet and circularize, the camera eventually settles
-   * downwards a little bit. Can we instead just have the camera more smoothly
-   * lock into place on the planet?"* (author, 2026-08-31, flagged at tick 931 of
-   * that run.)
-   *
-   * The handover was two mechanisms that did not know about each other: with
-   * `OVAL_BAND` at zero the view was glued to the craft for the whole settle and
-   * then met a whole `DEADZONE` on one tick, so a view following the oval at
-   * several units a tick stopped in a single tick, and the lock eased in behind
-   * it. On the capture flagged at 21:55 the view ran
-   * `… 1.4, 0.7, −0.1, −0.9, −1.7, −2.5, 0.0` — swinging one way, back the other,
-   * and then a corner. Restoring the band removed the glue, and `closing` below
-   * takes the lock to its anchor on its own curve.
-   *
-   * What is asserted is the **velocity**, because that is what was reported. Over
-   * the forty ticks the handover occupies the view's speed changes by at most a
-   * design unit or three on these two swings, against **6.30 and 6.66** before — so
-   * the bound is 3, which is a tolerance rather than a value to reproduce
-   * ([AGENTS.md](../../AGENTS.md) §4) and still fails the behaviour it replaced
-   * by a factor of two. Over the author's own re-flown dispatches the same figure
-   * runs p50 3.12 → 0.65 and worst 7.48 → 0.88.
-   *
-   * Distance is asserted next door in *arrives at the lock without moving*, which
-   * the same pair took from 12.6 and 15.0 design units to **exactly zero**.
-   *
-   * Over the author's own dispatches the same figure runs **p50 3.12 → 0.23 and
-   * worst 7.48 → 4.68**.
-   */
-  it.each(SWINGS.slice(0, 2))('comes to rest before the lock, in %s', (_n, grabAt, letGoAt) => {
-    const { views, settled } = fly(grabAt, letGoAt);
-    const firstLocked = settled.indexOf(true);
-    expect(firstLocked).toBeGreaterThan(0);
-
-    // Across the handover itself — the band closing over the settle's last
-    // `LOCK_TICKS`, then the lock arriving over its own — and no wider: the
-    // stretch before that is the **oval being flown**, where the view is meant to
-    // be tracking a craft that is accelerating, and a bound on its jerk would be
-    // a bound on the thing `OVAL_BAND` exists to allow.
-    let worst = 0;
-    for (let i = firstLocked - LOCK_TICKS; i < firstLocked + LOCK_TICKS; i++) {
-      const step = views[i]!.camera.y - views[i - 1]!.camera.y;
-      const before = views[i - 1]!.camera.y - views[i - 2]!.camera.y;
-      worst = Math.max(worst, Math.abs(step - before));
-    }
-    expect(worst).toBeLessThan(3);
-
-    // And it is already at rest when the lock takes it, rather than being
-    // stopped by it: `framed` has been pulling the view toward the point the
-    // lock will hold on every tick of the settle, so there is nothing left.
-    expect(Math.abs(views[firstLocked]!.camera.y - views[firstLocked - 1]!.camera.y)).toBeLessThan(
-      0.5,
-    );
-
-    // Once the lock has it, it is exactly still — the anchor is the point it is
-    // standing on and `closing` has nothing left to cover.
-    for (let i = firstLocked + 1; i < firstLocked + 20; i++) {
-      expect(Math.abs(views[i]!.camera.y - views[i - 1]!.camera.y)).toBeLessThan(0.1);
-    }
-  });
-
-  /**
-   * **And it does not settle anywhere once the orbit is round.**
-   *
-   * *"I still see the camera settling in lower once the orbit is reached. I think
-   * it'd be nicer if the camera just stayed at the level it was at when I first
-   * started circularizing"* (author, 2026-08-31, flagged at tick 518).
-   *
-   * The first correction that day took the *corner* out of the handover and left
-   * the **distance** where it was. On a wide orbit `stillPoint`'s clamp binds —
-   * the view finishes the oval further from the body than the lock will hold it
-   * — and all of that travel was still being spent after the orbit had become
-   * round, which is the one moment the player has stopped expecting the picture
-   * to move. On the flagged capture it was 79 design units.
-   *
-   * [`outOfFrame`](../../src/state/camera.ts) spends it over the settle's last
-   * `LOCK_TICKS` instead, inside movement that is already happening. What is
-   * asserted is the author's sentence directly: **from the tick the orbit is
-   * round, the view does not move at all.** Over their own dispatches re-flown
-   * at `SIM_VERSION` 9 the travel in the forty ticks after the settle ends is
-   * 0.00 at p50, at p95 and at worst, against 0.71 / 15.61 / 19.30 before.
-   *
-   * ⚠ **This test cannot see the second correction, and that is worth saying
-   * rather than papering over.** No swing of the fixture field puts the view more
-   * than a `DEADZONE` from the body when its settle ends — searched over 51
-   * grab-and-release pairs — so the clamp never binds here, and this passes on
-   * both sides of `outOfFrame`. Displacing the camera by hand does not help
-   * either: at any distance large enough for the lock's clamp to bind, the
-   * ordinary deadzone is already pulling the view back, so both versions arrive.
-   *
-   * What it does earn its place for is failing the behaviour before **either**
-   * of the day's two corrections. The evidence for the second one is the
-   * author's own dispatches and nothing else — travel after the settle ends,
-   * p50/p95/worst, **0.71 / 15.61 / 19.30 → 0.00 / 0.00 / 0.00** — which is the
-   * cohort this project already treats as the authority on feel, and is a
-   * standing reason the fixture field is not a substitute for flying it.
-   */
-  it.each(SWINGS.slice(0, 2))('does not settle once the orbit is round, in %s', (_n, g, l) => {
-    const { views, settled } = fly(g, l);
-    const firstLocked = settled.indexOf(true);
-    expect(firstLocked).toBeGreaterThan(0);
-
-    let travelled = 0;
-    for (let i = firstLocked + 1; i < firstLocked + 40 && settled[i]; i++) {
-      travelled += Math.abs(views[i]!.camera.y - views[i - 1]!.camera.y);
-    }
-    expect(travelled).toBeLessThan(0.5);
-  });
-
-  /**
-   * **The view does not come back down while the orbit is still settling.**
-   *
-   * *"I capture a planet, swing around the top of it to start circularizing, and
-   * when the ship travels to below the planet as part of circularization the
-   * camera moves downwards to follow it. I'd rather have the camera fixed a bit
-   * higher up, where it was when I first started circularizing"* (author,
-   * 2026-08-31).
-   *
-   * A craft on an orbit goes round — over the body and then under it — so a view
-   * tracking it vertically must return by the orbit's diameter. Two attempts at
-   * making that descent *smoother* preceded this one and both missed: the
-   * objection is to the descent, not to its shape.
-   *
-   * The rule is directional and it is **soft**, which is the 23:15 correction:
-   * *"very mechanical/robotic. I'd like for the camera to have a bit more
-   * flexibility or something."* A hard ratchet removed the descent and left the
-   * view frozen for 47 ticks at p95 before the lock took it — exact zeros read as
-   * a machine. Sinking is now resisted at [`SINK_SHARE`](../../src/state/camera.ts)
-   * of the follow rate rather than forbidden, so the view is never quite dead.
-   *
-   * So what is asserted is the **magnitude**, not a zero: rising is free, and
-   * over a whole settle the view gives back a handful of design units where it
-   * used to give back more than it had taken. On these two swings it rose 117.9
-   * and 115.9 and then **fell 207.2 and 212.3** — further than it had risen,
-   * because it followed the craft round the far side of the body. It now falls
-   * **4.8 and 6.7**.
-   */
-  it.each(SWINGS.slice(0, 2))('barely descends while the orbit settles, in %s', (_n, g, l) => {
-    const { views, frozen } = fly(g, l);
-    const from = frozen.indexOf(true);
-    expect(from).toBeGreaterThan(0);
-
-    let rose = 0;
-    let fell = 0;
-    for (let i = from + 1; i < from + SETTLE_TICKS && frozen[i]; i++) {
-      const step = views[i]!.camera.y - views[i - 1]!.camera.y;
-      // More negative is further up the field, which is where a run is going.
-      if (step < 0) rose -= step;
-      else fell += step;
-      // And the craft never goes under the thumb line, which is what may still
-      // pull the view down at the full rate whatever the sink says.
-      expect(onScreen(views[i]!)).toBeLessThanOrEqual(THUMB_LINE + 1);
-    }
-    // A handful of design units over a whole settle, rather than all of it and
-    // more. `rose` is not asserted a floor: with `OVAL_BAND` back at 1 the band
-    // absorbs most of the oval on these two swings and the view barely moves at
-    // all through a settle, which is the point rather than a gap.
-    expect(fell).toBeLessThan(10);
-    expect(rose).toBeGreaterThanOrEqual(0);
-  });
-
-  /**
-   * **And the look-ahead leaves without a step, which was the biggest one there
-   * was.**
-   *
-   * [`LOOK_AHEAD`](../../src/state/camera.ts) is switched off at the freeze for a
-   * good reason — past it the craft's velocity reverses every half orbit and
-   * stops meaning a heading — but it used to go from 210 design units to nothing
-   * **between two ticks**. That is the largest discontinuity in the camera and it
-   * fires on every capture, at the moment the player is watching.
-   *
-   * Measured over the author's dispatches the view's speed changed by **10.2
-   * design units in one tick** there, against 3.1 at a release and 0.1 at a grab;
-   * traced, it went from moving 18.3 a tick to 8.1 on the next. It is faded over
-   * `LEAD_OUT_TICKS` now and the same figure is 0.9.
-   *
-   * On the two swings below the jerk in the sixteen ticks after a freeze was
-   * **3.94 and 6.28**, and is **1.94 and 1.93**. The bound is 2.5, which is a
-   * tolerance rather than a value to reproduce and still fails what it replaced.
-   */
-  it.each(SWINGS.slice(0, 2))('leaves the look-ahead behind smoothly, in %s', (_n, g, l) => {
-    const { views, frozen } = fly(g, l);
-    const at = frozen.indexOf(true);
-    expect(at).toBeGreaterThan(2);
-
-    let worst = 0;
-    for (let i = at; i < at + LEAD_OUT_TICKS + 4; i++) {
-      const now = views[i]!.camera.y - views[i - 1]!.camera.y;
-      const before = views[i - 1]!.camera.y - views[i - 2]!.camera.y;
-      worst = Math.max(worst, Math.abs(now - before));
-    }
-    expect(worst).toBeLessThan(2.5);
   });
 
   /**
@@ -692,26 +488,13 @@ describe('the look-ahead', () => {
     expect(sim.orbit).not.toBeNull();
     expect(lockOf(sim)).toBe(0);
 
-    // ⚠ **Derived over `LEAD_OUT_TICKS` rather than for one tick**, since
-    // 2026-08-31: the look-ahead is no longer switched, it is **crossed**. The
-    // gate still answers on the tick, and what changed is that the weight it
-    // answers takes twelve ticks to travel — so a single tick shows almost
-    // nothing either way, which is the whole point of the change and would make
-    // a one-tick test read as the gate having stopped working.
     const before = createPresentation(sim);
-    let frozen = before;
-    let diving = before;
-    for (let i = 0; i < LEAD_OUT_TICKS; i++) {
-      frozen = derive(frozen, sim);
-      diving = derive(diving, { ...sim, orbit: null });
-    }
+    const frozen = derive(before, sim);
+    const diving = derive(before, { ...sim, orbit: null });
     // Frozen, the view does not move at all: the craft is inside the band and
     // nothing is steering off its phase clock. Diving, the lead carries it out.
     expect(frozen.camera.y).toBe(before.camera.y);
     expect(Math.abs(diving.camera.y - before.camera.y)).toBeGreaterThan(1);
-    // And the weight is what separates them, at both ends of its travel.
-    expect(frozen.camera.leading).toBe(0);
-    expect(diving.camera.leading).toBe(1);
   });
 
   /** The craft may never be pushed below the thumb line by any of this. */
