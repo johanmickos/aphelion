@@ -423,6 +423,145 @@ anomaly. Outside that ramp the sky changes only by region, and v1 has one region
 > which is also where its blur comes from: **about 3.2 screens on the phone**. The census walks the
 > unbuffered path, because a node process has no document, so the number it prints is the ceiling.
 
+> ## ⚠ Scoped in full by the author, 2026-09-01 — the anomaly is a **body**, and the sky is its reward
+>
+> **The table below describes a third of the anomaly and the prose above it describes none.** Ruled
+> across eleven decisions in one sitting, after the sky landed and the author flew it: *"the anomaly
+> effect is good. What's missing is the actual anomaly planet, which is a purple planet that refuels
+> your ship and gives you a grab-and-boost effect when you depart it."*
+>
+> **Nothing below is wrong. It is incomplete**, and in one place — *"out of a single predicate"* — it
+> was making a promise the geometry it was given could not keep. A stretch of field with no body in
+> it is not a rest stop; it is the ordinary game with a tint over it.
+>
+> ### The body
+>
+> | Property | Value |
+> |---|---|
+> | Where | **Outside the corridor's line**, one a day, at the **foot of its own stretch** |
+> | Shelter | It projects a **shelter** (`CONTEXT.md`) that suspends the line — **and only the line** |
+> | Address | **None.** The day's 40 are unchanged; the anomaly is a 41st thing beside the ladder |
+> | Hue | AURORA, which spec [04 · §4](./04-bodies.md) already reserves for *the rules are different here* |
+> | Reached by | A release aimed sideways and out. There is no other way, and no obligation to take it |
+> | Missed by | Floating through. Leaving the far side of the shelter puts the craft outside the line on the next tick, and that is the death |
+>
+> **The shelter suspends the side boundary and nothing else** — not the top, not the **fell-behind
+> line**. The prototype states the reason and it is carried unchanged: *"a shelter that suspended the
+> others would open a hole with nothing on the far side of it: a ship exempted from every bound
+> drifts forever in a straight line. Leaving the far side must always be reachable and always be
+> fatal."* It reaches back **inside** the line, so the craft crosses already protected and the
+> transition is never a surprise.
+>
+> **It is a capability, not a body type.** Any body may project a shelter; today exactly one does.
+> The prototype renamed its own predicate away from `inAnomalyField` for this reason — the exemption
+> is a thing a body projects, not a property of what it is called.
+>
+> ### Finding it
+>
+> **A fourth compass ring, in AURORA, additional** — it never displaces one of the three spec
+> [00 · §6](./00-tokens.md) draws. The three-ring ruling (2026-08-29) was about choosing between
+> equivalent next steps; this is not one of those, and it says so by being violet.
+>
+> **Its reach needs no new number, which is the part worth checking twice.** `AIM_RANGE` is 2 400
+> design units; an anomaly ~900 units laterally from the bodies nearest it is inside that from **two
+> bodies past in either direction**. And `FELL_BEHIND_GAP` is 2 100 design units against bodies ~810
+> apart, so a craft may drop back **2.6 bodies** to return. The instrument shows it for exactly as
+> far as the rules allow coming back for it. Those two constants were ruled for unrelated reasons and
+> were not tuned to each other.
+>
+> ### Crossing the boundary
+>
+> Spec [07](./07-boundary.md)'s bands keep their geometry and their closing-speed law inside a
+> shelter and are drawn in **AURORA instead of ION**. One channel changes: the edge still says how
+> hard you are diving at it, and says *strange* where it would say *risk*. A boundary that flared
+> normally would be the game shouting *you are about to die* at the one moment the player is safe,
+> and one that went dark would ask them to read safety off an absence.
+>
+> **This is spec 07's to build** — it is M3.4 and it is next — and it is stated here because it is
+> the anomaly that creates the case.
+>
+> ### Arriving: the authored orbit
+>
+> The anomaly's orbit is **authored**: a fixed modest radius at a fixed unhurried pace, settling in
+> about a third the time spec [01 · §6](./01-swing.md)'s settle takes. *"The arrival is not the
+> point here"* — the prototype added it against a report of *"a wasted second spent waiting to
+> stabilise before the thing that was committed to actually arrives."*
+>
+> **This is the mechanism that makes the word *rest stop* true**, and without it the sentence at the
+> bottom of this section is decoration. Everything else about the anomaly is a consequence of having
+> somewhere unhurried to sit.
+>
+> ### Holding it: the tank
+>
+> Spec [13 · §4](./13-fuel.md)'s trickle moves from **the stretch** onto **the body**: holding the
+> authored orbit fills `f` toward 1.0, and the halo goes AURORA and breathes while it does. See that
+> spec's own notice.
+>
+> ### Leaving it: the charge
+>
+> The craft leaves **charged** (`CONTEXT.md`), and the charge runs **while the craft is inside the
+> anomaly's own stretch** — the one this section already places. No clock, no counter, no timer:
+> spec [16 · §4](./16-powerups.md) rules that *nothing in this game expires on a clock*, and one
+> predicate is what this section has always claimed. Climb out of the stretch and it ends.
+>
+> While it runs:
+>
+> | | |
+> |---|---|
+> | Every **grab** | **reels** the craft onto an identical orbit — same radius, same pace, on every body |
+> | The body just released | is excluded from targeting. Measured in the prototype: three presses in five inside one charge took the planet just left, *"because right after a release you are still well inside grab range of it and it is the nearest thing there is"* |
+> | An **arrival** | is never said. It grades a **dive**, and a reel has none |
+> | A **knock** | is never said. There is no floor contact to price |
+> | A **release** | is not graded either — see below |
+> | A **save** | costs what it costs. The boundary is still real |
+> | The **sky** | is repainted: the curtains, the cloud bed and the true-black gaps below |
+>
+> **Nothing is graded, and that is the ruling rather than an omission.** The prototype's own version
+> let aim decide the orbit and it was refused on a measurement — over 108 000 approach geometries
+> *"not a gradient, a lottery: 43% pin exactly at the floor and the top quartile sits 3.1× to 8.1×
+> above it"*, reported as *"I sometimes got high orbits and sometimes low"*. What replaced it is one
+> identical orbit every time, *"because a frenzy is a rhythm, and a rhythm needs every beat to be the
+> same."*
+>
+> And the author, having flown that: *"with the zip I found myself not caring where in the orbit I
+> was as long as I was on the upper half."* **That is the mechanism and not a taste.** A release is
+> graded on the window it leaves through, and that window is worth something because the next capture
+> is uncertain; a reel makes the next capture certain, so the release stops buying anything and only
+> decides *up or not up*. Both halves of spec 01 §11's tension go at once. So the grading is switched
+> off rather than left to say nothing: *"the player will want to use this to jump upwards quickly.
+> The timing comes down to when to grab, since that's what will reel them towards the planet"*
+> (author).
+>
+> **It still pays, and no new rule was needed to make it.** [ADR-0009](../adr/0009-fuel-tracks-skill-not-points.md)
+> has points scale with **metres climbed**, so a stretch flown fast banks more than one flown slowly.
+> *"The faster they work, the more quickly they'll be rewarded with points and exciting colours."*
+> The charge pays **tempo**, and the economy converts tempo into points on its own.
+>
+> ### And the sky is the reward, not the place
+>
+> **The curtains, the cloud and the true-black bed draw only while the craft is charged.** A stretch
+> flown without taking the anomaly is ordinary VOID with §4's ramp over it and nothing else.
+>
+> This reverses what M3.3 built and passed its gate on, and it is the author's, ruled with the build
+> in hand. What it costs: most runs never see the set piece at all. What it buys is that §4's own
+> sentence becomes literally true — *"weather on the horizon, never spent early"* is now a horizon
+> promising weather you have to go and fetch, and the ≤ 6% ramp is the whole of what the place says
+> on its own.
+>
+> ### What it does not change
+>
+> **Spec [17 · §6](./17-daily-field.md)'s *Geometry: None* survives literally.** The anomaly changes
+> no spacing, no radius and no corridor width; it is a body *outside* the corridor. The day's 40 stay
+> 40 and every invariant in spec 17 §5 is untouched.
+>
+> ### When it is built
+>
+> **Not yet, and the order is the point.** Placing the body bumps both `FIXTURE_FIELD_VERSION` and
+> `SIM_VERSION`, and the parked camera session records that the dispatch corpus is *"the evidence and
+> nothing else"* — the fixture field provably cannot reproduce its problem. So the anomaly must not
+> land before the camera session, or it deletes the only evidence that session has. The plan carries
+> the ordering: M3.4, M3.5, M3.6, the camera, M4's fuel, and then this in one deliberate bump.
+
 **The anomaly is the only event permitted to repaint the sky.** The baseline's restraint is what
 keeps it rare.
 

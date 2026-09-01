@@ -44,6 +44,7 @@ playing it, so a plan whose first playable moment is late is a plan that cannot 
 | [M5](./m5-audio.md) | Audio | The swing has a voice | **author** | not started |
 | [M6](./m6-the-run.md) | The run | Front door, finish, debrief, results, DRIFT | **author** | not started |
 | [M7](./m7-powerups.md) | Powerups | The field's generosity | — | not started |
+| [M8](./m8-the-anomaly.md) | The anomaly | The body, the shelter, the charge | **author** | not started — **scoped in full 2026-09-01** and deliberately last. It needs M3.4's boundary, **the camera session**, and M4's fuel, and placing its body bumps both the field's version and `SIM_VERSION` — which would delete the dispatch corpus the camera session records as *"the evidence and nothing else"* |
 
 ## Beside the milestones
 

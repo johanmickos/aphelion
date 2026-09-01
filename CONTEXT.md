@@ -122,8 +122,9 @@ sits under the craft (2026-08-29).
 **Sky**:
 The layer behind everything, and the only thing in the game whose colour is not fixed. It is VOID,
 and it warms almost imperceptibly toward AURORA as an **anomaly** approaches — at most a few per
-cent, and never for any other reason. Inside an anomaly it is repainted outright. The **starfield**
-and the **dust** are drawn in front of it and are not it.
+cent, and never for any other reason. It is repainted outright only by a **charge**, which is
+earned rather than arrived at. The **starfield** and the **dust** are drawn in front of it and are
+not it.
 _Avoid_: background, backdrop (spec 05 §1: the player climbs *through* a medium, not past one),
 space, void (VOID is the colour token, not the layer)
 
@@ -145,12 +146,38 @@ _Avoid_: scroll speed, climb rate (the climb is where it goes; this is how fast)
 (that names the mechanism), velocity (that is the **craft**'s)
 
 **Anomaly**:
-A stretch of field where the **sky** itself changes: purple aurora, cloud, different rules. The
-only event permitted to repaint the sky. It is a **place** rather than an event with a duration —
-it has edges, and it is climbed into and out of. Rare by design: the baseline's restraint is what
-keeps it worth arriving at.
+A **body** outside the **corridor**, and the stretch of field above it that its **charge** repaints.
+One a day. It is the only thing in the game that is optional: it is reached by leaving the corridor
+through its **shelter**, it must be captured or the craft is carried out the far side and dies, and
+a run that never looks for it is a complete run. It carries no **address** — there is one, so the
+definite article names it.
 _Avoid_: storm, event, zone, region (a region is a whole field's worth of rules; an anomaly is one
-stretch inside one)
+body and one stretch inside one), anomaly planet (it is a body, and no other body is called a planet
+in this glossary)
+
+**Shelter**:
+The region a body projects inside which the **line** is suspended — and only the line. The
+**fell-behind line** and the top of the field are untouched, because a craft exempt from every bound
+would drift forever in a straight line with nothing to catch it. Only the **anomaly** projects one.
+It is what lets a craft cross the line to reach it, and it is what makes missing it fatal: leaving
+the far side of a shelter puts the craft outside the line on the next tick, and that is the miss.
+_Avoid_: bubble, safe zone, sanctuary (the **carpet** is the only sanctuary), field
+
+**Charge**:
+What a craft carries after taking the **anomaly** and leaving it. While it lasts, every **grab**
+**reels** the craft onto an identical orbit, nothing about a **capture** or a **release** is graded,
+and the **sky** is repainted. It runs while the craft is inside the anomaly's own stretch and ends
+by being climbed out of — a place, not a clock. Nothing in this game expires on one.
+_Avoid_: window (a **window** is the compass's), buff, charged window, powerup (a **powerup** is
+something the field gives you; a charge is something you went and got), boost (the **boost** is the
+release envelope's)
+
+**Reel**:
+How a **grab** takes a body while the craft is **charged**: the craft is drawn straight onto a
+settled orbit instead of **diving** to one. The same orbit on every body, at the same radius and the
+same pace, because a rhythm needs every beat to be the same — measured in the prototype, letting aim
+decide the orbit made it a lottery rather than a gradient.
+_Avoid_: zip (the prototype's word for it), snap, pull, hook (a body is **grabbed**, never hooked)
 
 **Boundary**:
 The graded region at the edge of the field. A place with bands of increasing heat and

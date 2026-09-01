@@ -779,6 +779,23 @@ cannot re-open.
   black outline under pale text reads as a sticker."*
 - **The bow and the wake are still off**, and the dust does not change that argument either way.
 
+### ⚠ Gated 2026-09-01 — the sky passes, and the other half of the anomaly is [M8](./m8-the-anomaly.md)
+
+*"The anomaly effect is good. What's missing is the actual anomaly planet, which is a purple planet
+that refuels your ship and gives you a 'grab and boost' effect when you depart it."*
+
+**So M3.3's sky is accepted and the anomaly is not finished.** What this step built is one third of
+one of the prototype's three mechanics — the look. The body, its authored orbit, its shelter and the
+charge that follows it were scoped in full the same day and are [M8](./m8-the-anomaly.md), which is
+deliberately last: it needs M3.4's boundary and M4's fuel, and placing its body would delete the
+dispatch corpus the camera's parked session calls *"the evidence and nothing else"*.
+
+**One thing M8 reverses here, and it is worth knowing while reading the rest of this section.** The
+curtains, the cloud and the true-black bed will draw only while the craft is **charged** — so the
+sky becomes the reward for taking the anomaly rather than a property of the stretch. Everything
+measured above about what it costs still holds; what changes is how often it is seen. Spec 05 §4's
+≤ 6% ramp is untouched and becomes the whole of what the place says on its own.
+
 **What the gate is for.** The tests can only prove that nothing outside the anomaly repaints the sky
 and that the dust cannot have a speed of its own. Whether the anomaly reads as **a place worth
 arriving at**, and whether the baseline stays restrained enough to keep it rare, is the author's, and

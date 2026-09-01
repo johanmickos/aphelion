@@ -140,6 +140,26 @@ and regenerated from the next value of the seed stream.
 
 ## 6 · The anomaly
 
+> ## ⚠ Clarified, 2026-09-01 — the day places a **body** too, and *Geometry: None* still holds
+>
+> Spec [05 · §5](./05-field.md) now puts an anomaly **body** outside the corridor at the foot of this
+> stretch. The row below reads *"Geometry: **None.** The anomaly changes no spacing, no radius, no
+> corridor width"*, and every word of that survives: the body is outside the corridor, so it changes
+> none of them.
+>
+> **The day's 40 stay 40.** The anomaly is a 41st thing beside the ladder, carries **no address**,
+> and every invariant in §5 is untouched — it is not in the sequence they are stated over.
+>
+> **It sits at the foot of its own stretch**, and that is a placement rule this section owes. If it
+> sat anywhere else, taking it near the top would pay a few addresses of charge and taking it near
+> the bottom would pay all of them, for a reason the player cannot see. At the foot, the body is the
+> door and the stretch is the room, and the reward is the same size however it is flown.
+>
+> **Its lateral offset is the generator's**, and it is the one number this section will owe that it
+> does not yet have: far enough outside the line that reaching it is a decision, near enough that the
+> compass shows it from two bodies away. Spec 05 §5 records that `AIM_RANGE` and `FELL_BEHIND_GAP`
+> already bracket it.
+
 | Property | Value |
 |---|---|
 | Count | Exactly **one** per day |

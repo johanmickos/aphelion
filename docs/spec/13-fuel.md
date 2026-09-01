@@ -99,6 +99,27 @@ instruments agree.
 
 ### By anomaly
 
+> ## ⚠ It moves onto the **body**, 2026-09-01
+>
+> The rule below trickles fuel for orbiting *anywhere inside* the anomaly's stretch, which was
+> written when the anomaly was a stretch and nothing else. Spec [05 · §5](./05-field.md) now places a
+> **body** at the foot of it, and that body is what refuels — which is what makes the trip out to it
+> worth taking. Orbiting an ordinary body that happens to be inside the stretch pays nothing.
+>
+> **Holding the anomaly's authored orbit fills `f` toward 1.0.** The halo (spec
+> [03](./03-hud.md)) is drawn in AURORA and breathes while it does, which is the filling made
+> visible rather than a second signal.
+>
+> **And saves still cost while the craft is charged.** The author's first description was *"no fuel
+> is burned during this period"*, and this spec's §1 makes that a no-op: *"passive drain: none. Fuel
+> is not a clock."* Fuel does exactly one thing, which is limit the deadline window — so *no fuel
+> burned* would have meant **free saves**, and free saves plus the charge's reel would leave the
+> boundary unable to kill. Ruled the other way: the tank fills, and spending it is still a decision.
+> The charge removes the risk in a **capture**; it does not remove the risk in the **line**.
+>
+> The trickle's own value is untouched below and is still an opening position; what changed is what
+> it is paid for.
+
 **Orbiting inside an anomaly trickles fuel** (ADR-0009). Per tick of engaged orbit inside an
 anomaly:
 

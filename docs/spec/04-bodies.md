@@ -263,6 +263,29 @@ instrument before it is on screen.
 | PULSAR | Core beats; two beam ticks on the vertical axis | designed for, not built |
 | RINGED | Flat band across the disc — no tilt, no depth | designed for, not built |
 | BLACK HOLE | No core; disc filled true `#000000`; rim and dashed outer echo in **AURORA** | designed for, not built |
+| ANOMALY | Rim and strata in **AURORA**; projects a **shelter**; authors its own orbit | designed for, not built — see the notice below |
+
+> ## ⚠ The ANOMALY type, scoped 2026-09-01
+>
+> **The row above is the anomaly's body**, and it is the second exception to the identity-hue band
+> for the same reason as the first. §4 already argues it: *"violet means the rules are different
+> here. It belongs to the anomaly and to the bodies that should not exist, so the player learns one
+> association."* That sentence was written about the black hole and it names the anomaly by name;
+> what it lacked was a body to attach to.
+>
+> Three things make it the type rather than the placement, and each is a capability any body could in
+> principle carry:
+>
+> - **It projects a shelter** — a region inside which the corridor's **line** is suspended, and only
+>   the line (`CONTEXT.md`, spec [05 · §5](./05-field.md)).
+> - **It authors its own orbit** — a fixed radius at a fixed pace, settling in about a third of spec
+>   [01 · §6](./01-swing.md)'s time, so the arrival is an arrival rather than a test.
+> - **It fills the tank** while held (spec [13 · §4](./13-fuel.md)).
+>
+> **It carries no address** and is not one of the day's 40 (spec [17 · §6](./17-daily-field.md)).
+> §5's doctrine is unaffected: in the run it is named by its hue like everything else, and in the
+> retelling there is exactly one a day, so *the anomaly* names it without a number. It is the one
+> body in the game that a complete run may never touch.
 
 **Only STANDARD ships in v1** (ADR-0005, and plan/README: difficulty comes from geometry first,
 so that when types arrive there is something to measure them against). The type field exists in
