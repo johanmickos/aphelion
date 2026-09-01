@@ -366,13 +366,19 @@ function arrivalOf(previous: PresentationState, sim: SimState): ArrivalView | nu
  * Read off [`Dive.knock`](../sim/dive.ts), which the simulation writes fresh each
  * tick — so this is the same *true now and not last tick* reading every other
  * event in this file makes, and nothing is recorded for the picture's benefit.
+ * Its **aim** and **entry speed** go with it, because a knock is a hard landing
+ * *by a craft that was pointed at the body* and the share alone turned out not to
+ * say that ([`struckHard`](../sim/tier.ts), 2026-09-01). All three are already on
+ * the dive; none is recorded for this.
  *
  * Placed where the craft is, which is on the floor: the point of contact, and the
  * place that earned it.
  */
 function knockOf(previous: PresentationState, sim: SimState): KnockView | null {
   const dive = sim.dive;
-  if (dive !== null && struckHard(dive.knock)) return knocked(sim.tick, sim.craft.x, sim.craft.y);
+  if (dive !== null && struckHard(dive.knock, dive.aim, dive.entrySpeed)) {
+    return knocked(sim.tick, sim.craft.x, sim.craft.y);
+  }
   return fadeKnock(previous.knock);
 }
 

@@ -27,9 +27,13 @@
  * steal the arrival's word before it was graded on aim are exactly the ones that
  * get this one.
  *
- * That symmetry is load-bearing rather than decorative: it is why
- * [`KNOCK_BAND`](../sim/tier.ts) sits above the hardest knock any tight arrival
- * takes. **The two words must never contradict each other.**
+ * That symmetry is load-bearing rather than decorative. **The two words must
+ * never contradict each other**, and since 2026-09-01 that is a property of
+ * [`struckHard`](../sim/tier.ts) rather than of a threshold: it asks for an aim
+ * *below* the line the arrival asks it to be at or above, so the predicate
+ * granting one word denies the other. The correlation above is only −0.44, and a
+ * threshold resting on it turned out to rest on nothing — the hardest floor
+ * landing in the author's corpus is a capture at aim 0.994.
  *
  * ## Pink, and pink is already spoken for
  *

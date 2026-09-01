@@ -759,3 +759,76 @@ list's length is part of the run's determinism and the goldens pin the word a gi
 ⚠ And the one thing not to do is move `KNOCK_BAND` **down**: every band low enough to fire more often
 fires on the single capture in the corpus that earns the *arrival*, which is the contradiction
 `knock.ts` exists to prevent.
+
+### ⚠ Overturned by the author the same day, 2026-09-01: the word was never being said
+
+*"The last capture and orbit in `diagnostics/2026-09-01T02-29-53-120Z-run-dispatch.json` should've
+shown the knock effect. Can we tweak it?"*
+
+**The ruling above and this one are not in conflict, and the reason is what the ruling was made
+against.** *"It happens rarely"* was said about a band that had been measured, the same day, to fire
+**zero** times in the author's whole corpus. A word that is never said is not rare; it is absent —
+and the section above says so twice and then rules it good anyway. The dispatch below is what
+happens when the author flies expecting it.
+
+**The capture they flagged is the second-hardest floor landing in the corpus and the most head-on
+approach in it**: tick 478, aim **0.006**, and the floor takes **5.7%** of its speed. Under 0.15 it
+said nothing.
+
+#### What the measurement found, and it is not the threshold
+
+The one capture blocking every lower band — 14.1% of its speed to the floor, earning the arrival —
+is at aim **0.994**. As sideways as this game gets. It is a **slow** capture: entry speed 291 against
+a corpus median near 700, so a small absolute cut is a large *share* of a small speed. **The floor's
+share saturates at low speed**, which is the exact mirror of the failure `ARRIVAL_SPEED_RELIEF`
+already corrects on the arrival's side (2026-08-31), and it means the share is not the reading of
+**aim** that `knock.ts` and `CONTEXT.md` both say the knock is.
+
+So option 2 above — *re-grade it on something other than the floor's share* — is reopened and taken,
+in the one form the earlier attempt did not try. It was tried on the **turn**, which picked out the
+same single capture. **Aim itself was never tried**, because the share was believed to be a reading
+of it.
+
+`struckHard` now asks for the floor's share **and** an aim strictly below the line `arrivedTight`
+asks it to be at or above, at the same speed. The invariant stops being a fact about a corpus and
+becomes a property of the predicate: **the test that grants one word denies the other**, so no cohort
+can disagree with it. `test/sim/tier.test.ts` asserts it over the whole plane of aim and speed rather
+than over an example, and asserts the pair is *exhaustive* as well as exclusive — no aim earns
+neither word for being neither.
+
+| over 78 captures in 14 replayable dispatches | before | after |
+|---|---|---|
+| knocks said in the author's play | **0** | **1** |
+| share of captures | 0% | **1.3%** |
+| ticks lighting a knock and an arrival together | 0 | **0** |
+
+**It is rarer than the ruling that called it a hidden gem.** The original 0.15 was measured to select
+**4%** of captures; this selects 1.3%. What changed is that the 1.3% is a capture the author flew and
+expected, rather than a capture nobody has ever produced.
+
+#### Where 0.01 comes from
+
+With the aim gate on, the head-on captures — the only ones now eligible — sort into a tail and
+nothing else: **0.0572**, then 0.0024, 0.0010, 0.0009, 0.0009, 0.0009 and down, over 46 of them. The
+band sits inside a **24× gap**, four times clear of the next-hardest touch and 5.7 times clear of the
+author's own example. That is the margin 0.15 claimed and had lost — re-measured earlier the same day
+its own was **0.009**.
+
+**It does not go on the bench**, which is the 2026-09-01 rung-label precedent applied to itself: a
+knob invites the answer to be re-litigated, and this number is a gap rather than a taste. If the gap
+closes — a physics change that fills it — that is the trigger to look again, and
+`test/sim/tier.test.ts` asserts both of its ends so the session that closes it finds out.
+
+#### What it cost, and what it did not
+
+**`SIM_VERSION` does not move.** `struckHard` is read in exactly one place, `derive.ts`, and no tick
+reads it — this is `test/sim/version.test.ts`'s own *picture, not flight* case, and the answer to its
+question (*did a tick move?*) is no. Every dispatch that replayed still replays.
+
+**The shipped pilot fixture is unchanged**: it says one knock, on tick 386, at every band from 0.15
+down to 0.005, and its aim of 0.305 is head-on at its speed. The goldens did not move, which also
+means the gap named above the fixture — *nothing in the repo tests that the knock can still be
+earned* — is still open and still worth closing.
+
+**`KNOCK_WORDS` is untouched**, so the determinism note above still stands and extending the list is
+still wanted.

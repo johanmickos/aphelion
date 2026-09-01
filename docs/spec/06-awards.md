@@ -160,6 +160,30 @@ release **defers** the carry rather than destroying it (ADR-0008), which amends 
 > about the body: it is about what the floor had to do.
 >
 > `SIM_VERSION` did not move, checked the same way as the aim change below.
+>
+> ### ⚠ Re-ruled 2026-09-01 — the share was not a reading of aim, and the word was silent
+>
+> **`KNOCK_BAND` is 0.01, not 0.15, and `struckHard` asks about aim directly.** The paragraph above
+> is left as written because its *reasoning* still holds — the two words grade one geometry from
+> opposite ends and must never contradict — and only its *mechanism* was wrong.
+>
+> The author, with a run under it: *"the last capture and orbit in the 2026-09-01 02:29 dispatch
+> should've shown the knock effect."* It takes **5.7%** of its speed from the floor at an aim of
+> **0.006**, and at 0.15 it said nothing. Nothing did: over 78 captures in 14 replayable dispatches
+> the band selected **zero**.
+>
+> **The `r = −0.44` above is why.** It is a correlation, not an identity, and the residual is where
+> the two words met: the hardest floor landing in the corpus, **14.1%**, is a capture at aim
+> **0.994** — as sideways as the game gets — because it is *slow* (entry speed 291 against a corpus
+> median near 700), and a small absolute cut is a large share of a small speed. The share saturates
+> at low speed, the same failure `ARRIVAL_REF_SPEED` corrects on the arrival's side.
+>
+> So the invariant moved from a threshold to a predicate: a knock now asks for an aim strictly
+> **below** the line the arrival asks it to be at or above, at the same speed, and the two words
+> cannot contradict because the test granting one denies the other. It fires on **1 capture in 78 —
+> rarer than the 4%** the 0.15 was measured to select. `SIM_VERSION` did not move; `struckHard` is
+> read only by presentation state. The argument and the numbers are in
+> [M3 · the field](../plan/m3-the-field.md).
 
 > ## ⚠ Ruled and rebuilt, 2026-08-30 — closeness is half the test, and **aim** is the other half
 >

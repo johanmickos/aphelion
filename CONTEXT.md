@@ -345,11 +345,13 @@ approach"* — measured, the faster half of the author's captures land twenty ti
 floor than the slower half.
 
 **Knock**:
-How much of its speed the **floor** took from the craft in one tick, as a share of what it had —
-and the word a hard one earns. The floor keeps the tangential half of the velocity and removes the
-radial half, so this is a reading of **aim** from the other end: a craft that came in sideways
-loses almost nothing, one pointed at the body loses nearly all of it. The **arrival**'s opposite,
-and the two can never be said of the same **capture**. Spoken in ION, the world's reserved pink,
+A hard landing on the **floor** by a craft that was pointed at the body, and the word it earns. Two
+readings have to hold at once: the floor took a real share of the craft's speed in one tick, **and**
+the **aim** was head-on. The **arrival**'s opposite, and the two can never be said of the same
+**capture** — since 2026-09-01 that is a property of the test rather than of a threshold, because the
+aim a knock requires is the aim an arrival forbids. The share alone used to stand in for aim and does
+not: it saturates at low speed, so the hardest landing in the author's corpus belongs to a capture
+that came in almost perfectly sideways. Spoken in ION, the world's reserved pink,
 because it is about what the floor had to do and not about the body.
 _Avoid_: bounce (the **floor** does that on every dive and mostly for free), crash (a run ends on
 one; this does not), impact (that is an **ending**), collision

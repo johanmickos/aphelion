@@ -124,12 +124,29 @@ author's to close.
   approach geometry, and `test/state/goldens.test.ts` asserts the invariant outright again rather
   than pinning a breach. **That it healed by itself is a reason to re-measure `KNOCK_BAND`, not to
   relax about it** — a threshold that has drifted in and out of correctness twice in two days is one
-  whose margin nobody currently knows. The re-measurement is the author's, it wants real captures,
+  whose margin nobody currently knows. ⚠ **Closed for good on 2026-09-01**, and by neither of the
+  routes below: the two words are now separated by the **aim** predicate rather than by a margin, so
+  no cohort can put them back together. See *Rulings applied*.
+
+  The paragraph below is left as it was, and its own conclusion — that the margin was unknown — is
+  what turned out to matter. The re-measurement is the author's, it wants real captures,
   and it cannot be taken on the pilot: measured over the shipped run the floor's share is **0.1548
   once and then 0.0008**, so no band anywhere between 0.001 and 0.155 changes what that fixture says.
   Both thresholds remain the author's, ruled on measured play.
 
 ## Rulings applied
+
+- **A knock is a hard landing by a craft that was pointed at the body** (author, 2026-09-01), after
+  sending a capture that should have said the word and did not: *"the last capture and orbit in
+  `diagnostics/2026-09-01T02-29-53-120Z-run-dispatch.json` should've shown the knock effect."*
+  `KNOCK_BAND` moves 0.15 → **0.01** and `struckHard` gains the **aim** the floor's share was
+  standing in for. It overturns *the knock stays exactly as it is*, ruled hours earlier — and does
+  not contradict it, because that ruling's *"it happens rarely"* was said about a band measured the
+  same day to fire **zero** times in the author's whole corpus. It now fires on 1 capture in 78,
+  which is rarer than the 4% the old band was originally measured to select. The two words are now
+  mutually exclusive **by predicate** rather than by a margin that had drifted to 0.009, and
+  `SIM_VERSION` does not move: `struckHard` is read only by presentation state. See
+  [06 · Awards](./06-awards.md)'s notice and [M3](../plan/m3-the-field.md).
 
 - **An addressed rung prints metres** (author, 2026-09-01), after flying both readings on the bench:
   *"metres are good for the runs."* Reading (b) — the nearest body's address — is deleted from

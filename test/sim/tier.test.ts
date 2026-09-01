@@ -177,33 +177,80 @@ describe('the arrival · both halves have to be true', () => {
 });
 
 describe('the knock · the price the floor charges', () => {
+  /** Head-on enough to be eligible at all, at the speed the arrival is stated at. */
+  const PLUNGE = 0.1;
+
   it('says nothing for the floor merely being touched', () => {
     // The floor is reached on most dives and costs almost nothing on nearly all
-    // of them: over 77 real captures the share it takes is p25 0.00, p50 0.03.
-    // A word said then would be a word said constantly.
-    expect(struckHard(0)).toBe(false);
-    expect(struckHard(0.03)).toBe(false);
-  });
-
-  it('says something when the floor takes a fifth of the speed', () => {
-    expect(struckHard(0.21)).toBe(true);
+    // of them: over 78 real captures across 14 replayable dispatches the share it
+    // takes is p50 0.0001 and p95 0.0010. A word said then would be constant.
+    expect(struckHard(0, PLUNGE, ARRIVAL_REF_SPEED)).toBe(false);
+    expect(struckHard(0.003, PLUNGE, ARRIVAL_REF_SPEED)).toBe(false);
   });
 
   /**
-   * **The invariant, and the reason `KNOCK_BAND` is where it is.** The two words
-   * read the same geometry from opposite ends — a sideways dive earns an arrival,
-   * a dive pointed at the body slams into the floor — so congratulating a capture
-   * and calling it a crash in the same breath has to be impossible rather than
-   * merely unlikely. The hardest knock any tight arrival takes is measured at
-   * 12.9%: the author's own *"really tight"* capture, which loses 13% of its
-   * speed to the floor and keeps its word.
+   * **The band is a gap rather than a value.** Among the head-on captures — the
+   * only ones eligible at all — the corpus of 2026-09-01 runs 0.0572 and then
+   * 0.0024, 0.0010, 0.0009 and down. This is asserted rather than the constant's
+   * own number so that moving it on the bench past either end of that gap fails
+   * here and says which end.
    */
-  it('can never fire on a capture that earned an arrival', () => {
+  it('sits inside the gap the corpus leaves between a plunge and a touch', () => {
+    expect(KNOCK_BAND).toBeGreaterThan(0.0024);
+    expect(KNOCK_BAND).toBeLessThan(0.0572);
+  });
+
+  it('says something when a plunge loses real speed to the floor', () => {
+    // The author's own example, 2026-09-01: a capture at aim 0.006 that lost
+    // 5.7% of its speed to the floor and said nothing. See `KNOCK_BAND`.
+    expect(struckHard(0.0572, 0.006, 291)).toBe(true);
+  });
+
+  /**
+   * **The invariant, and since 2026-09-01 it is structural rather than
+   * measured.** The two words read the same geometry from opposite ends — a
+   * sideways dive earns an arrival, a dive pointed at the body slams into the
+   * floor — so congratulating a capture and calling it a crash in the same breath
+   * has to be impossible rather than merely unlikely.
+   *
+   * It used to be held by putting `KNOCK_BAND` above the hardest knock any tight
+   * arrival was measured to take, and that is a fact about a corpus: it drifted
+   * in and out of true twice in two days, and by 2026-09-01 the corpus contained
+   * a capture at aim **0.994** taking **14.1%** — as sideways as the game gets,
+   * earning the arrival, and above every band that fires at all.
+   * [`struckHard`](../../src/sim/tier.ts) now asks about aim directly, so the
+   * predicate granting one word denies the other and no cohort can disagree.
+   *
+   * Asserted over the plane rather than over an example, which is the whole
+   * difference: every combination of aim and speed either cannot earn an arrival
+   * or cannot earn a knock, whatever the floor took.
+   */
+  it('can never fire on a capture that earned an arrival, at any aim or speed', () => {
     const FLOOR = 159;
-    const hardestTight = 0.129;
-    expect(arrivedTight(FLOOR + 0.9, FLOOR, 0.708, ARRIVAL_REF_SPEED)).toBe(true);
-    expect(struckHard(hardestTight)).toBe(false);
-    expect(KNOCK_BAND).toBeGreaterThan(hardestTight);
+    for (let aim = 0; aim <= 1.0001; aim += 0.01) {
+      for (const speed of [200, 291, 500, ARRIVAL_REF_SPEED, 1000, 1500]) {
+        // The most generous arrival there is — right on the floor — so that
+        // anything this leaves un-arrived is un-arrived on aim alone.
+        const arrival = arrivedTight(FLOOR, FLOOR, aim, speed);
+        // And the hardest knock there is, so a false here is about aim too.
+        const knock = struckHard(1, aim, speed);
+        expect(arrival && knock).toBe(false);
+      }
+    }
+  });
+
+  /**
+   * And the pair is exhaustive as well as exclusive at the same speed: every aim
+   * is on one side of the line or the other, so the two words divide the captures
+   * rather than leaving a band that can earn neither for being neither.
+   */
+  it('leaves no aim that is neither sideways enough nor head-on enough', () => {
+    const FLOOR = 159;
+    for (let aim = 0; aim <= 1.0001; aim += 0.01) {
+      const arrival = arrivedTight(FLOOR, FLOOR, aim, ARRIVAL_REF_SPEED);
+      const knock = struckHard(1, aim, ARRIVAL_REF_SPEED);
+      expect(arrival || knock).toBe(true);
+    }
   });
 });
 

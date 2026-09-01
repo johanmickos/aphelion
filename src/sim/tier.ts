@@ -286,35 +286,79 @@ export function alignmentOf(offset: number): number {
  * How much of its speed the floor has to take before the collision is worth
  * saying out loud — `CONTEXT.md`'s **knock**, as a share.
  *
- * **0.15 is derived from the arrival and not chosen for its own sake.** The two
- * words read the same geometry from opposite ends: a dive that comes in sideways
- * and commits earns [`arrivedTight`](#arrivedtight), and a dive pointed at the
- * body slams into the floor, because the floor keeps the tangential half of the
- * velocity and removes the radial half. Measured over 77 real captures, the
- * share the floor takes runs against the aim at **r = −0.44**.
+ * ## ⚠ 0.15 → 0.01, 2026-09-01, and the word was never being said
  *
- * That relationship is what fixes this number. **The two words must never
- * contradict each other** — congratulating a capture and calling it a crash in
- * the same breath is worse than saying nothing — so the line goes above the
- * hardest knock any *tight* arrival takes, which is measured at **12.9%** (the
- * author's own *"really tight"* capture, which loses 13% of its speed to the
- * floor and still earns its word). 0.15 clears that with margin and selects
- * **4% of captures**, all of them plunges: the three that qualify came in at aim
- * 0.02, 0.05 and 0.36.
+ * The author, with a dispatch under it: *"the last capture and orbit in
+ * `diagnostics/2026-09-01T02-29-53-120Z-run-dispatch.json` should've shown the
+ * knock effect."* That capture takes **5.7%** of its speed from the floor at an
+ * aim of **0.006** — dead head-on, the most pointed-at-the-body approach in the
+ * whole corpus — and at 0.15 it said nothing. Nothing else in the author's play
+ * said anything either: over **78 captures across 14 replayable dispatches**,
+ * 0.15 selects **zero**.
  *
- * The floor is touched at all on only 14% of captures, and most of those cost
- * nothing — the share is p25 0.00, p50 0.03, and then jumps to 0.13 and above
- * for the four hardest. It is a tail, not a spread, which is what a word about
- * collisions wants.
+ * **This moves a number ruled on 2026-09-01, and the ruling is why it moves.**
+ * That ruling was *"the knock stays exactly as it is… one of the best hidden
+ * gems, it happens rarely"* — made against a band that, measured the same day,
+ * *never fires*. A word that is never said is not rare; it is absent, and the
+ * author has now flown the case that says so. What is preserved is the thing the
+ * ruling was actually about: at 0.01 with the gate below, the knock fires on
+ * **1 capture in 78 — 1.3%**, which is *rarer* than the 4% the original 0.15 was
+ * measured to select. The hidden gem stays hidden.
+ *
+ * ## Where 0.01 comes from, and it is a gap rather than a value
+ *
+ * Once [`struckHard`](#struckhard) asks about aim as well, the head-on captures
+ * — the only ones that can earn this word — sort into a tail and nothing else:
+ *
+ * | the hardest floor landings among head-on captures (n = 46) |
+ * |---|
+ * | **0.0572**, then 0.0024, 0.0010, 0.0009, 0.0009, 0.0009, … |
+ *
+ * There is a **24× gap** between the author's capture and the next hardest
+ * thing in the corpus, and 0.01 sits inside it with a factor of four clear
+ * below and 5.7 clear above. That is the margin the old 0.15 claimed and had
+ * lost: re-measured on 2026-09-01 its own was **0.009**, not 2.1 points
+ * (`docs/plan/m3-the-field.md`).
+ *
+ * ## What the old number was defending, and why a threshold could not do it
+ *
+ * 0.15 sat above *"the hardest knock any tight arrival takes"* so that the two
+ * words could never contradict each other. That defence is now
+ * [`struckHard`](#struckhard)'s, structurally, and it had to move because **the
+ * share is not a reading of aim after all.** The hardest floor landing in the
+ * corpus, 14.1%, belongs to a capture at aim **0.994** — as sideways as the game
+ * gets — which earns the arrival word. It is a *slow* capture: entry speed 291
+ * against a corpus median near 700, so the small absolute cut the floor takes is
+ * a large share of a small speed. **The share saturates at low speed**, which is
+ * the mirror of the failure [`ARRIVAL_SPEED_RELIEF`](#arrival_speed_relief)
+ * already corrects on the other side, and it means no threshold on this number
+ * alone can separate the two words: every band below 0.141 lights both on that
+ * one capture.
  */
-export const KNOCK_BAND = 0.15;
+export const KNOCK_BAND = 0.01;
 
 /**
- * Whether the floor caught the craft hard enough to say so.
+ * Whether the floor caught the craft hard enough to say so — **and whether the
+ * craft was pointed at the body when it did.**
  *
- * A pure function of one number, and the same acceptance as everything else in
- * this file: grading imports nothing from the economy.
+ * `CONTEXT.md` already says this is what a knock is: *"the floor keeps the
+ * tangential half of the velocity and removes the radial half, so this is a
+ * reading of **aim** from the other end."* Until 2026-09-01 the aim was left
+ * implicit and the floor's share stood in for it. It does not stand in for it —
+ * see [`KNOCK_BAND`](#knock_band) — so the question is now asked directly.
+ *
+ * **The invariant is structural rather than measured.** `knock.ts` states that a
+ * knock and an arrival *"must never contradict each other"*, and this asks for
+ * an aim strictly **below** the line [`arrivedTight`](#arrivedtight) asks it to
+ * be at or above, at the same speed. So the two words cannot both be true of one
+ * capture — not because a threshold was placed above a measured maximum, which
+ * is a fact about a corpus and drifted twice in two days, but because the
+ * predicate granting one denies the other. `test/sim/tier.test.ts` proves it
+ * over the whole plane rather than over a cohort.
+ *
+ * Still a pure function of three numbers, and the same acceptance as everything
+ * else in this file: grading imports nothing from the economy.
  */
-export function struckHard(knock: number): boolean {
-  return knock >= KNOCK_BAND;
+export function struckHard(knock: number, aim: number, entrySpeed: number): boolean {
+  return knock >= KNOCK_BAND && aim < sidewaysNeeded(entrySpeed);
 }
