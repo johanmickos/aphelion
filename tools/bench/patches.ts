@@ -411,18 +411,6 @@ export function lockOf(sim: SimState): number {
     why: 'how finely a bow is drawn, and the first number to move if the budget fails',
   },
   {
-    // **Spec 05's one open question**, which this milestone deliberately does not
-    // answer: what an addressed rung says. The spec records that the evidence
-    // leans to metres and declines to rule, so both readings ship and the author
-    // flies them against each other.
-    file: 'src/state/rung.ts',
-    find: "export const RUNG_LABEL: 'METRES' | 'ADDRESS' = 'METRES';",
-    replace: "export let RUNG_LABEL: 'METRES' | 'ADDRESS' = 'METRES';",
-    append:
-      "\nexport function set_RUNG_LABEL(value: boolean): void {\n  RUNG_LABEL = value ? 'ADDRESS' : 'METRES';\n}\n",
-    why: 'spec 05 §3 records two readings and rules neither',
-  },
-  {
     // The author's answer to the question `starfield.ts` said to ask once the
     // rungs landed: it keeps its place and comes down. How far down is taste.
     file: 'src/render/starfield.ts',

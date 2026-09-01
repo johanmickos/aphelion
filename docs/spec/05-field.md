@@ -211,20 +211,31 @@ an emitted ring.
 > numbers are deferred** to when there is a swing to measure them against — they are not blocking,
 > and the shape of the system is not in question.
 >
-> **Open — what an addressed rung says.** The board's prose reads *"every 5th carrying its
+> **⚠ Ruled 2026-09-01 — an addressed rung prints metres.** *"Metres are good for the runs"*
+> (author), after flying both readings against each other on the bench. Reading (b) is **deleted**
+> rather than switched off, and so is the toggle: a knob whose question has been answered invites
+> the answer to be re-litigated by whoever finds it next. The paragraphs below are the argument that
+> was put to them and are kept because the tension in the boards is real and will come back when the
+> results sheet is designed.
+>
+> What is **not** settled by this is where altitude zero sits — the fixture's foot is a backstop
+> rather than a line anyone meets, so a run opens reading 1 250 rather than near zero. That is spec
+> 17 §3's datum and its generator's business.
+>
+> **What was open — what an addressed rung says.** The board's prose reads *"every 5th carrying its
 > address (the same numbers the planets wear)"* and *"'died at 23' has a place"*, which puts
 > body addresses (1–40) on the rungs. The board's own live component, run in a browser, prints
 > **metres** — `125`, `250`, `375`, one label every 5th rung at 25 m spacing. At 25 m spacing these
 > cannot both be true, and boards 09, 10 and 11 all report altitude on the 0–40 address scale. Two
-> readings survive: (a) an addressed rung prints its altitude in metres and the address scale lives
+> readings survived: (a) an addressed rung prints its altitude in metres and the address scale lives
 > only on cards; (b) the rung nearest each body is the addressed one and prints that body's
-> address. This spec fixes the spacing and the alphas and leaves the **label content unresolved**.
-> It needs the author.
+> address.
 >
-> **The evidence leans to (a).** The live component is the only place the board actually draws a
-> rung label, and it draws metres. Against that, three later boards report altitude on the address
-> scale. A reading that satisfies both — rungs print metres, the address scale belongs to the cards
-> — is available and cheap, but it is still a ruling, and not one this spec makes.
+> **The evidence leaned to (a)**, which is what was ruled. The live component is the only place the
+> board actually draws a rung label, and it draws metres. Against that, three later boards report
+> altitude on the address scale — so the reading that satisfies both is that rungs print metres and
+> **the address scale belongs to the cards**, which is now the standing position for spec 10.
+
 
 ## 4 · The sky
 

@@ -89,9 +89,11 @@ fingerprint — `test/sim/version.test.ts`'s own *picture, not flight* case.
 - **What a metre is.** Ruled — a prototype unit, so `SCALE` design units — with the arithmetic in
   `src/sim/units.ts` and the summary in the spec README. The check that decided it is spec 07 §2's
   bands: at the only competing reading the outer band is deeper than this field's whole corridor.
-- **What an addressed rung says.** **Not settled, deliberately.** Spec 05 §3 records two readings and
-  declines to rule; both are built and the bench toggles them, with metres the default because that
-  is where the spec says the evidence leans. A default is not a ruling.
+- **What an addressed rung says.** Not settled at the time, deliberately: spec 05 §3 recorded two
+  readings and declined to rule, both were built, and the bench toggled them with metres the default
+  because that is where the evidence leaned. ⚠ **Ruled 2026-09-01 — metres**, after the author flew
+  them against each other: *"metres are good for the runs."* The address reading and its toggle are
+  now deleted rather than left switched off.
 
 **The author flew it the same day and moved three numbers.**
 
@@ -468,7 +470,8 @@ which of the three `pnpm replay` flies bare.
 
 ### Still the author's, and asked rather than assumed
 
-1. **What an addressed rung says** — spec 05's own open question, now flyable both ways on the bench.
+1. ~~**What an addressed rung says**~~ — **ruled 2026-09-01: metres.** *"Metres are good for the
+   runs."* Reading (b) and its bench toggle are deleted; spec 05 §3 carries the notice.
 2. **Where altitude is zero.** Rungs count from the field's **foot**, which is spec 17 §3's datum,
    but the fixture's foot is a backstop *"rather than a line anyone meets"* — so a run opens reading
    1 250 rather than near zero. An artefact of a hand-made field; spec 17's generator places its own.

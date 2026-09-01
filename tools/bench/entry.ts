@@ -1084,7 +1084,6 @@ function offDefaults(): string[] {
   );
   if (!cameraKnobs.LOCK_ON) off.push('camera lock OFF');
   if (fit.FIT_WHOLE) off.push('fitted whole rather than to the width');
-  if (rung.RUNG_LABEL === 'ADDRESS') off.push('rungs print addresses rather than metres');
   return off;
 }
 
@@ -1278,8 +1277,6 @@ byId('defaults').addEventListener('click', (event) => {
   cameraKnobs.set_LOCK_ON(true);
   byId<HTMLInputElement>('fitwidth').checked = false;
   fit.set_FIT_WHOLE(false);
-  byId<HTMLInputElement>('rungaddress').checked = false;
-  rung.set_RUNG_LABEL(false);
   showDefaults();
   start();
   (event.currentTarget as HTMLElement).blur();
@@ -1294,11 +1291,6 @@ byId<HTMLInputElement>('fitwidth').addEventListener('change', (event) => {
 });
 // **Spec 05 §3's open question**, and the reason it is a checkbox rather than a
 // slider: the two readings are not two ends of a range, they are two answers.
-byId<HTMLInputElement>('rungaddress').addEventListener('change', (event) => {
-  rung.set_RUNG_LABEL((event.currentTarget as HTMLInputElement).checked);
-  showDefaults();
-  redrawTrail();
-});
 byId<HTMLInputElement>('lock').addEventListener('change', (event) => {
   cameraKnobs.set_LOCK_ON((event.currentTarget as HTMLInputElement).checked);
   showDefaults();

@@ -98,7 +98,7 @@ export const RUNG_SPACING = 50 * METRE;
  * Every 5th rung is **addressed** — spec 05 §3, and the board's own `k % 5`.
  *
  * What an addressed rung *says* is spec 05's one open question and it is **not
- * settled here**. See [`RUNG_LABEL`](#rung_label).
+ * settled: **metres**, ruled by the author on 2026-09-01. See [`rungReads`](#rungreads).
  */
 export const ADDRESSED_EVERY = 5;
 
@@ -506,58 +506,31 @@ export function rungPointAt(
 }
 
 /**
- * What an addressed rung says, and **this is spec 05's one open question**.
- *
- * Spec [05 · §3](../../docs/spec/05-field.md) records two surviving readings and
- * declines to choose: *(a)* an addressed rung prints its altitude in metres and
- * the address scale lives only on cards, or *(b)* the rung nearest each body is
- * the addressed one and prints that body's address. It records that *"the
- * evidence leans to (a)"* — Direction 05's live component is the only place the
- * board actually draws a rung label and it draws metres, `125`, `250`, `375` —
- * against three later boards that report altitude on the 0–40 address scale. **It
- * is still a ruling and this file does not make it.**
- *
- * So the default is the spec's own lean rather than a decision, and the
- * alternative is **on the bench beside it** so the author can fly both and say
- * which. That is the whole of what `pnpm bench` is for.
- *
- * `METRES` prints the rung's own altitude. `ADDRESS` prints the address of the
- * nearest body, which is reading (b) drawn on every addressed rung rather than on
- * a chosen one — the spec's *"the rung nearest each body"* would light one rung in
- * five hundred metres of field and leave the rest unlabelled, and what the author
- * has to judge is the two labels against each other rather than one against
- * nothing.
- */
-export const RUNG_LABEL: 'METRES' | 'ADDRESS' = 'METRES';
-
-/**
  * What one addressed rung reads, given the field it hangs in.
  *
- * Under `METRES` it is the rung's altitude above the field's **foot**, which is
- * the datum spec [17 · §3](../../docs/spec/17-daily-field.md)'s day description
- * measures every body from — *"altitude : metres, bottom to top"* — so two players
- * flying one day read the same number off the same rung, which is what §6's *"the
- * field is a ruler the player climbs"* is for.
+ * ## Metres, ruled 2026-09-01 — and the alternative is gone rather than off
  *
- * **The fixture's foot is a backstop rather than a line anyone meets**
+ * Spec [05 · §3](../../docs/spec/05-field.md) recorded two readings and declined
+ * to choose: *(a)* an addressed rung prints its altitude in metres, or *(b)* the
+ * rung nearest each body prints that body's address. Both were built, the bench
+ * toggled between them, and the author flew them: *"metres are good for the
+ * runs."* So (a) is the ruling, (b) is **deleted**, and the toggle is off the
+ * bench — a knob whose question has been answered is a knob that invites the
+ * answer to be re-litigated by whoever finds it next.
+ *
+ * The number is the rung's altitude above the field's **foot**, which is the
+ * datum spec [17 · §3](../../docs/spec/17-daily-field.md)'s day description
+ * measures every body from — *"altitude : metres, bottom to top"* — so two
+ * players flying one day read the same number off the same rung, which is what
+ * §6's *"the field is a ruler the player climbs"* is for.
+ *
+ * ⚠ **The fixture's foot is a backstop rather than a line anyone meets**
  * (`fixture-field.ts`: one screen height plus 400 below the spawn), so a run here
  * opens reading 1 250 rather than near zero. That is an artefact of a hand-made
- * field and not of the datum; spec 17's generator places its own foot. It is
- * named here because it is the first thing the author will see and the second
- * thing to ask them about.
+ * field and not of the datum — spec 17's generator places its own foot — and it
+ * is **still open**, which the ruling above does not touch: what was ruled is
+ * what the label says, not where zero is.
  */
-export function rungReads(rung: number, bodies: readonly BodyView[], foot: number): string {
-  if (RUNG_LABEL === 'METRES') return String(Math.round((rung * RUNG_SPACING) / METRE));
-  const y = altitudeOf(foot, rung);
-  let nearest = 0;
-  let best = Infinity;
-  for (let address = 0; address < bodies.length; address++) {
-    const gap = Math.abs(bodies[address]!.y - y);
-    if (gap < best) {
-      best = gap;
-      nearest = address;
-    }
-  }
-  // Addresses are 1 – 40 (spec 17 §1) and the field indexes them from zero.
-  return String(nearest + 1);
+export function rungReads(rung: number): string {
+  return String(Math.round((rung * RUNG_SPACING) / METRE));
 }

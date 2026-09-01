@@ -98,7 +98,6 @@ author's to close.
 
 | Where | Question |
 |---|---|
-| [05 · The field](./05-field.md) §3 | What an addressed rung's label says — metres, or the address of the nearest body. **Still open after M3.2**: both readings are built and the bench toggles them, with metres the default because that is where §3 says the evidence leans. The **spacing** half of this row is now closed — see the rulings below |
 | [05 · The field](./05-field.md) §3 | **Whether a rung label may cross the thumb line.** Spec 00 §7 forbids anything readable below it, ever, and a rung's number is the first readable thing in the game that *scrolls* — everything else down there is world-attached and exempt in practice. Built as the conservative reading (it fades out as it crosses) |
 | [08 · The economy](./08-economy.md) §3 | How a swing that crosses boundary bands is priced. Derived here as deepest-band-reached; not ruled |
 | [08 · The economy](./08-economy.md) §4 | Whether the chain has a ceiling, and the bank-spark behaviour if it does. `VISION.md` says measure first |
@@ -131,6 +130,12 @@ author's to close.
   Both thresholds remain the author's, ruled on measured play.
 
 ## Rulings applied
+
+- **An addressed rung prints metres** (author, 2026-09-01), after flying both readings on the bench:
+  *"metres are good for the runs."* Reading (b) — the nearest body's address — is deleted from
+  `src/state/rung.ts` and its toggle removed from the bench, because a knob whose question has been
+  answered invites the answer to be re-opened. The corollary the boards were in tension about is now
+  the standing position: **the address scale belongs to the cards**, not to the field.
 
 - **One fixture, not several** (author, 2026-09-01). The goldens ride on the single recipe `pnpm
   replay` flies with no argument, so a number in a golden and a number in that terminal output stay

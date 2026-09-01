@@ -164,7 +164,7 @@ export function drawRungs(
     const addressed = rung % ADDRESSED_EVERY === 0;
     context.globalAlpha = addressed ? RUNG_ADDRESSED : RUNG_AT_REST;
     strokeRung(context, y, left, right, near(bodies, y, bowReach), pressing(wake, rung));
-    if (addressed) label(context, rung, y, bodies, corridor, camera);
+    if (addressed) label(context, rung, y, camera);
   }
   context.restore();
 }
@@ -253,15 +253,13 @@ function pressing(wake: readonly WakeView[], rung: number): WakeView | undefined
  * where it can be read. See [`LABEL_INSET`](#label_inset) and
  * [`LABEL_FADE`](#label_fade).
  *
- * **What it says is spec 05's open question** and
- * [`rungReads`](../state/rung.ts) is where that is recorded, not decided.
+ * **What it says is metres** — spec 05's open question, ruled by the author on
+ * 2026-09-01, and [`rungReads`](../state/rung.ts) carries the ruling.
  */
 function label(
   context: CanvasRenderingContext2D,
   rung: number,
   y: number,
-  bodies: readonly BodyView[],
-  corridor: CorridorView,
   camera: CameraView,
 ): void {
   const onScreen = y - camera.y + DESIGN_HEIGHT / 2;
@@ -273,10 +271,6 @@ function label(
   context.font = `600 ${LABEL_SIZE}px ${LABEL_FACE}`;
   context.textAlign = 'left';
   context.textBaseline = 'alphabetic';
-  context.fillText(
-    rungReads(rung, bodies, corridor.foot),
-    camera.x - DESIGN_WIDTH / 2 + LABEL_INSET,
-    y - LABEL_LIFT,
-  );
+  context.fillText(rungReads(rung), camera.x - DESIGN_WIDTH / 2 + LABEL_INSET, y - LABEL_LIFT);
   context.restore();
 }
