@@ -686,6 +686,64 @@ and that the dust cannot have a speed of its own. Whether the anomaly reads as *
 arriving at**, and whether the baseline stays restrained enough to keep it rare, is the author's, and
 the anomaly slider is there so it can be reached without a five-minute climb.
 
+### ⚠ Flown 2026-09-01 — the lag was the bench's, and the game page said so
+
+The author reported *"noticeable lag when playing"* on the **bench page** in Firefox on a MacBook,
+then flew the **game page** in the same browser and reported it played fine. Both dispatches are in
+`diagnostics/`, and the second one is what settled it, because the game page carries the meter and
+the bench does not.
+
+**What the meter says about the game page** (`2026-09-01T05-34-49`, a 1 141-tick run that cleared the
+field): **a tick costs 0.04ms and the rest of a frame costs 0.28ms.** The worst single frame in the
+whole run was **1ms**, and there were no jumps.
+
+**And it locates the anomaly exactly**, which is what a timeline is for. Correlating the meter's
+sixteen segments against where the storm was on screen:
+
+| segment | mean cpu | storm on screen | altitude |
+|---|---|---|---|
+| to 639 | 0.20ms | 0% | 3 200 – 3 724 m |
+| **to 767** | **0.84ms** | **88%** | 3 730 – 4 791 m |
+| **to 895** | **0.58ms** | **58%** | 4 800 – 5 864 m |
+| to 1023 | 0.11ms | 0% | 5 872 – 6 836 m |
+
+So **the anomaly costs about four times a clear frame and is still a tenth of a 120Hz budget.** The
+buffer is doing its job. That is the first measurement of this layer on a real browser and it is
+recorded here rather than in a comment because it is the baseline M3.6's harness will be compared
+against.
+
+#### The bench's own defect, which is older than this step
+
+`tools/bench/entry.ts` rebuilds the trail table on **every release, inside the frame callback** —
+`if (released) redrawTrail()` — and `redrawTrail` calls `walkRun`, which re-flies the recipe from
+tick zero. Measured on the author's own run:
+
+| walkRun over | 200 ticks | 500 | 800 | 1 141 |
+|---|---|---|---|---|
+| before | 1.27ms | 2.52ms | 6.06ms | **8.96ms** |
+| after | 0.23ms | 0.20ms | 0.31ms | **0.37ms** |
+
+**Nine milliseconds on the frame the player just let go on**, growing with the run, twenty-two times
+in nineteen seconds — more than a whole frame at 120Hz, landing on the one frame they are watching.
+That is the lag, and it has been there since the bench existed; M3.3 only made a slow thing slower by
+adding one more field to `derive`.
+
+**The fix is that `walkRun` derives the picture only as far as something asks.** Presentation state
+is a recurrence (ADR-0015) so a flagged tick's camera needs the whole run up to it — but past the
+last flagged tick it is dead work, and with nothing flagged it is dead for the whole run, which is
+the bench's case. `test/trail.test.ts` holds the edge that matters: the guard runs to the **last**
+flag and not the first, so a second flag deep in a run still reads the camera the phone drew.
+
+**And the anomaly's placement is memoised.** It is a pure function of the field and the field is one
+object for a run, so re-deriving it sixty times a second walked every body in the field to reach an
+answer that cannot have moved. A memo rather than a state: nothing about replay or ADR-0015's
+convergence touches it.
+
+**What this does not answer** is whether the bench still lags with the stall gone. The bench carries
+no meter — it builds a dispatch but not a timing report — so the author's answer to *bench or game
+page* is **the game page**, which already reports. Wiring the meter into the bench is worth doing and
+is [M3.6](#m36--the-frame-budget-harness)'s, beside the phone baseline it already owes.
+
 ---
 
 ## M3.4 · The boundary
@@ -738,6 +796,15 @@ calls that mostly return early.
 
 **Acceptance**: a command that reports p99 and max frame time for a replayed recipe, and a
 recorded baseline on the author's phone. **Verify**: run it on the phone.
+
+⚠ **And the bench owes a meter**, found on 2026-09-01 when the author reported lag on the bench page
+and asked whether to use it or the game page for reports. The answer today is **the game page**:
+`app/main.ts` builds a dispatch carrying `tools/meter.ts`'s histogram, its worst frames and its
+sixteen-segment timeline, and `tools/bench/entry.ts` builds a dispatch with none of it. So the one
+page with every open question on a slider is the one page that cannot say what a slider costs, which
+is the wrong way round — moving `RUNG_STEP` or the anomaly's span is exactly the kind of decision a
+frame time should be attached to. The meter is already written to be handed its timestamps rather
+than to read a clock, so wiring it in is a shell change and not a design one.
 
 ---
 

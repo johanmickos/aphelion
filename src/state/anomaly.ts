@@ -41,6 +41,12 @@ import { METRE } from '../sim/units.ts';
 import { DESIGN_HEIGHT } from './design.ts';
 import type { AnomalyView } from './types.ts';
 
+/** Where an anomaly hangs, in design `y`. */
+interface Stretch {
+  readonly top: number;
+  readonly bottom: number;
+}
+
 /**
  * How tall an anomaly is, in design units — **800 m, and it is the prototype's
  * own magnitude rather than a shape chosen here**.
@@ -211,7 +217,32 @@ function placeable(field: Field): boolean {
  * backstop rather than a line anyone meets. The bodies are where the field
  * actually is.
  */
-export function anomalyAt(field: Field): { top: number; bottom: number } | null {
+export function anomalyAt(field: Field): Stretch | null {
+  const remembered = placed.get(field);
+  if (remembered !== undefined) return remembered;
+  const found = placeIn(field);
+  placed.set(field, found);
+  return found;
+}
+
+/**
+ * The one thing on presentation state that does not change between ticks, and
+ * the reason this cache exists.
+ *
+ * `derive` runs sixty times a second and the field it is handed is the same
+ * object for the whole of a run, so without this the anomaly's placement walks
+ * every body in the field on every tick to re-derive an answer that cannot have
+ * moved. It is a **memo and not a state**: the value is a pure function of the
+ * key, so nothing about determinism, replay or ADR-0015's convergence rule
+ * touches it — two runs of the same field get the same answer whether it was
+ * computed or remembered.
+ *
+ * Weak, so a field a test built and dropped is not held alive by having once
+ * been asked where its weather is.
+ */
+const placed = new WeakMap<Field, Stretch | null>();
+
+function placeIn(field: Field): Stretch | null {
   if (!placeable(field)) return null;
   let lowest = -Infinity;
   let highest = Infinity;

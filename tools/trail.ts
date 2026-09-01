@@ -210,11 +210,26 @@ export function walkRun(recipe: Recipe, describe: readonly Tick[] = []): Trail {
     };
   };
 
+  // **The last tick anything actually asks the picture about.** Presentation
+  // state is a recurrence (ADR-0015), so tick 412's camera can only be had by
+  // arriving there from zero — but past the last tick anybody wants, deriving is
+  // dead work. With nothing flagged, which is the common case and the bench's,
+  // it is dead work for the whole run.
+  //
+  // It is worth a guard rather than a shrug because of **who calls this in a
+  // loop**: `tools/bench/entry.ts` rebuilds the trail on every release, inside
+  // the frame callback. Measured over a 1 141-tick run, that is 9.0ms of work
+  // on the frame the player just let go on — more than a whole frame at 120Hz,
+  // growing with the run, and landing on the one frame they are looking at.
+  // Without the derive the same walk is **0.37ms**, and nearly flat in the run's
+  // length rather than linear in it.
+  const lastDescribed = wanted.size === 0 ? -1 : Math.max(...wanted);
+
   const final = replayRun(recipe, {
     onTick: (state, tick) => {
       // Once per tick, in the replay's own loop — ADR-0015's first rule, and the
       // reason the camera below is the camera the phone drew.
-      view = derive(view, state);
+      if (tick <= lastDescribed) view = derive(view, state);
 
       const pressed = pressAt(recipe.log, tick);
       if (pressed && !pressedBefore) {

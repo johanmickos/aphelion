@@ -177,4 +177,51 @@ describe('a moment the author flagged', () => {
     });
     expect(moment.camera).toEqual({ x: expected.camera.x, y: expected.camera.y });
   });
+
+  /**
+   * **And the picture is derived only as far as something asks**, which is a
+   * performance guard with a correctness edge on it.
+   *
+   * Presentation state is a recurrence (ADR-0015), so a flagged tick's camera can
+   * only be had by arriving from zero — but past the last flagged tick, deriving
+   * is dead work, and with nothing flagged it is dead for the whole run. That
+   * matters because of who calls this in a loop: the bench rebuilds the trail on
+   * every release, inside the frame callback, and measured over a 1 141-tick run
+   * the derive was **9.0ms** of it against **0.37ms** without.
+   *
+   * The edge is that the guard must run to the **last** flagged tick and not the
+   * first, or a second flag deep in a run reads a camera that stopped early. So
+   * two are asked for, far apart, and both are checked against a picture derived
+   * the long way.
+   */
+  it('derives the picture as far as the last flag and no further', () => {
+    // Both inside the run — it ends before its log does, which the block above
+    // already relies on.
+    const early = 40;
+    const late = walkRun(oneSwing).ticks - 1;
+    expect(late).toBeGreaterThan(early + 100);
+    const moments = walkRun(oneSwing, [early, late]).moments;
+    expect(moments.map((moment) => moment.tick)).toEqual([early, late]);
+
+    const cameras = new Map<number, { x: number; y: number }>();
+    let view = createPresentation(openRun(oneSwing));
+    replayRun(oneSwing, {
+      ticks: late + 1,
+      onTick: (state, tick) => {
+        view = derive(view, state);
+        if (tick === early || tick === late) {
+          cameras.set(tick, { x: view.camera.x, y: view.camera.y });
+        }
+      },
+    });
+    for (const moment of moments) expect(moment.camera).toEqual(cameras.get(moment.tick));
+
+    // And everything that is not the picture is the same walk either way.
+    const flagged = walkRun(oneSwing, [early, late]);
+    const plain = walkRun(oneSwing);
+    expect(plain.swings).toEqual(flagged.swings);
+    expect(plain.ending).toBe(flagged.ending);
+    expect(plain.ticks).toBe(flagged.ticks);
+    expect(plain.fingerprint).toBe(flagged.fingerprint);
+  });
 });
