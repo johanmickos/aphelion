@@ -969,7 +969,7 @@ function cost(): string {
   const fit = frameCost(timing);
   const drawn = fit === null ? '' : ` · ${fit.perFrame.toFixed(2)}ms a frame`;
   return (
-    ` · cpu p99 ${bucketAt(timing.cpu, 0.99)}ms, worst ${timing.cpu.max}ms` +
+    `cpu p99 ${bucketAt(timing.cpu, 0.99)}ms · worst ${timing.cpu.max}ms` +
     drawn +
     // `byTicks` is indexed *by* how many ticks the frame ran, so a jump is any
     // frame at index two or above: it advanced the simulation further than it
@@ -992,8 +992,12 @@ function hud(): void {
   byId('hud').textContent =
     `tick ${current.tick} · ${fmt(current.craft.speed)}/s · ${phase}` +
     (held === null ? '' : ` #${held + 1} · +${sinceGrab} in`) +
-    (sinceFreeze === null ? '' : ` · +${sinceFreeze} since freeze${band}`) +
-    cost();
+    (sinceFreeze === null ? '' : ` · +${sinceFreeze} since freeze${band}`);
+
+  // **On its own line**, and not appended to the one above. `.run` is a flex
+  // column and the stage takes what is left over, so a readout that grows moves
+  // the game — which is what this did on the day it was added, on every press.
+  byId('cost').textContent = cost();
 
   const ending = byId('ending');
   ending.textContent = sim.ending === null ? '' : sim.ending.replace(/_/g, ' ');

@@ -186,9 +186,40 @@
     margin-top: 12px;
     font-size: 12px;
     font-variant-numeric: tabular-nums;
+    /* One line, always — see the note under `#hud`. */
+    min-height: 1.35em;
   }
+  /* ---- the readouts must not resize the run ----
+     `.run` is a flex column of a fixed height and `#stage` takes whatever is
+     left over, so **anything below the stage that changes height moves the
+     game**. Reported on 2026-09-01, the day the frame cost was added to the HUD:
+     "when clicking the demo it shrinks quite a bit each time I press/hold, and
+     then grows back". Holding adds `#3 · +12 in · +40 since freeze decaying` to
+     the line, the line wrapped, the runbar grew and the stage gave up the room —
+     a game that changes size on its own verb.
+
+     Two rules, and between them the leftover is a constant: neither readout may
+     **wrap**, and each keeps its line whether or not it has anything to say. The
+     cost is on a line of its own rather than appended to the HUD because it is
+     the longest thing here and the one that arrives late in a run — appended, it
+     is what pushes the line over. */
   #hud {
     color: var(--core);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .cost {
+    /* Its own line, reserved whether or not the meter has enough frames yet. */
+    min-height: 1.35em;
+    margin-top: 2px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--dusk);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .ending {
     font-weight: 800;
@@ -378,6 +409,13 @@
   .fit-cost {
     margin-top: 10px;
     color: var(--dusk);
+    /* **Two lines, reserved**, for the reason under `#hud` and one turn further
+       round: this line is written by `sayFit`, which reads the canvas the stage
+       ended up with — so a line that changed height would resize the stage,
+       which would rewrite the line. Its optional third clause (`… are cut off
+       the top and the bottom`) appears exactly when the fit changes, which is
+       exactly when that loop would close. */
+    min-height: 2.9em;
   }
   .fit-cost b {
     color: var(--core);
@@ -549,6 +587,7 @@
     <section class="run">
       <div id="stage"></div>
       <div class="runbar"><span id="hud"></span><span id="ending" class="ending"></span></div>
+      <div id="cost" class="cost"></div>
       <p id="fit-cost" class="fine fit-cost"></p>
       <div class="controls">
         <button id="reset" type="button">Reset</button>
