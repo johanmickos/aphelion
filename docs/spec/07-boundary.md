@@ -98,6 +98,21 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 > more tightly than the criterion it replaces. `bandAt` is kept as spec 08's multiplier and is spent
 > by nothing.
 
+> ### ⚠ §2's dashed band edges are refused (author, 2026-09-01)
+>
+> > *"Let's remove the dashed vertical ion lines indicating the hot zones. The colour glow and border
+> > are enough."*
+>
+> §2 states all four of their numbers — 1px, dash 4/6, α 0.25 at `line − 220 m` and 0.40 at
+> `line − 90 m` — and Direction 07's live component draws them. **Their stated reason went with the
+> labels**: §2 justifies them as *"what makes the bands read as three named regions rather than one
+> smooth ramp — which the ruling in the header requires"*, and that ruling is the one that put the
+> `×2` / `×3` caption in, refused the same day. A region with no caption in it needs no outline.
+>
+> The bands are unchanged as **geometry and as price** — `bandAt` still steps at 90 m and 220 m, and
+> the motes still change density and brightness there. What is gone is the line drawn on them. The
+> boundary is now the gradient and the line, and nothing in it has a hard edge.
+
 > ### ⚠ The view stops at the line (author, 2026-09-01)
 >
 > > *"The boundary of the hot zone should be the end of the camera. I.e. when the player approaches an

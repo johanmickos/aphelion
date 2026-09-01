@@ -164,19 +164,27 @@ const WASH_AT_FIRE = 0.22;
 const WASH_AT_LINE = 0.6;
 
 /**
- * The band edges, drawn as dashed lines — spec 07 §2 states all four numbers and
- * the board draws them: 1px, dash 4/6, α 0.25 at `line − 220 m` and 0.40 at
- * `line − 90 m`.
+ * ## ⚠ The dashed band edges are gone (author, 2026-09-01)
  *
- * **They do not scale with `heat`**, which the spec says outright, and it is
- * what makes the bands read as three named regions rather than one smooth ramp —
- * the ruling in spec 07's own header requires that, because it is what a price
- * step needs to be legible at all.
+ * Spec 07 §2 states all four numbers for them — 1px, dash 4/6, ION, α 0.25 at
+ * `line − 220 m` and 0.40 at `line − 90 m` — and Direction 07's live component
+ * draws them. They were built, and flown:
+ *
+ * > *"Let's remove the dashed vertical ion lines indicating the hot zones. The
+ * > colour glow and border are enough."*
+ *
+ * **Their stated reason had already been withdrawn.** §2 justifies them as *"what
+ * makes the bands read as three named regions rather than one smooth ramp — which
+ * the ruling in the header requires"*, and that ruling is the one that put the
+ * `×2` / `×3` labels in. The author refused those the same day, so a *region* no
+ * longer needs an edge for a caption to sit inside: what says what a band pays is
+ * the mote density, which is a ramp and wants no boundary drawn on it.
+ *
+ * So the boundary is now the gradient and the line, and nothing else has a hard
+ * edge in it. The bands still exist — [`bandAt`](../state/boundary.ts) still
+ * prices them and the motes still step at the fire band — they are simply not
+ * outlined.
  */
-const EDGE_WIDTH = 1 * BOARD_PIXEL;
-const EDGE_DASH = [4 * BOARD_PIXEL, 6 * BOARD_PIXEL];
-const EDGE_AT_OUTER = 0.25;
-const EDGE_AT_FIRE = 0.4;
 
 /**
  * The line itself — spec 07 §3's **2.5px stroke whose α and bloom also rise with
@@ -319,7 +327,6 @@ export function drawBoundary(
     const token = side.sheltered ? AURORA : ION;
 
     wash(context, side, token, top, bottom, left, right);
-    edges(context, side, token, top, bottom);
     stroke(context, side, token, top, bottom);
     scatter(context, motes, side, token, top, bottom, left, right);
   }
@@ -365,38 +372,6 @@ function wash(
   const near = Math.max(left, Math.min(from, side.line));
   const far = Math.min(right, Math.max(from, side.line));
   if (far > near) context.fillRect(near, top, far - near, bottom - top);
-  context.restore();
-}
-
-/**
- * The two band edges, dashed — spec 07 §2, and they do not move with `heat`.
- *
- * They are what makes the boundary read as three named regions rather than one
- * ramp, which the ruling that put the labels back requires: a price step nobody
- * can see is a price nobody can read.
- */
-function edges(
-  context: CanvasRenderingContext2D,
-  side: BoundarySideView,
-  token: string,
-  top: number,
-  bottom: number,
-): void {
-  context.save();
-  context.lineWidth = EDGE_WIDTH;
-  context.setLineDash(EDGE_DASH);
-  for (const [depth, alpha] of [
-    [OUTER_BAND, EDGE_AT_OUTER],
-    [FIRE_BAND, EDGE_AT_FIRE],
-  ] as const) {
-    const x = side.line + depth * side.inward;
-    context.strokeStyle = dim(token, alpha * side.presence);
-    context.beginPath();
-    context.moveTo(x, top);
-    context.lineTo(x, bottom);
-    context.stroke();
-  }
-  context.setLineDash([]);
   context.restore();
 }
 

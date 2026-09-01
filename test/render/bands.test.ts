@@ -266,29 +266,40 @@ describe('the gradient', () => {
 });
 
 describe('the band edges', () => {
-  /** Spec 07 §2 states all four numbers: 1px, dash 4/6, α 0.25 and α 0.40. */
-  it('are dashed, at the two stated distances and alphas', () => {
-    const line = CENTRELINE + HALF_WIDTH;
-    const dashed = drawn([side()]).lines.filter((l) => l.dash.length > 0);
-    expect(dashed).toHaveLength(2);
-    const outer = dashed.find((l) => Math.abs(l.from.x - (line - OUTER_BAND)) < 1e-6);
-    const fire = dashed.find((l) => Math.abs(l.from.x - (line - FIRE_BAND)) < 1e-6);
-    expect(outer).toBeDefined();
-    expect(fire).toBeDefined();
-    expect(alphaOf(outer!.stroke)).toBeCloseTo(0.25, 2);
-    expect(alphaOf(fire!.stroke)).toBeCloseTo(0.4, 2);
-    expect(outer!.dash).toEqual([4 * 3, 6 * 3]);
+  /**
+   * ⚠ **They are gone** (author, 2026-09-01): *"let's remove the dashed vertical
+   * ion lines indicating the hot zones. The colour glow and border are enough."*
+   *
+   * Spec 07 §2 states all four of their numbers and Direction 07 draws them, so
+   * this is a refusal rather than an omission — and their stated reason had
+   * already gone with the `×2` / `×3` labels the same day. §2 justifies them as
+   * *"what makes the bands read as three named regions"*, which was there so a
+   * caption had a region to sit in.
+   *
+   * Asserted as **no dashed stroke anywhere**, at any heat, so the layer cannot
+   * quietly grow one back.
+   */
+  it('draws no dashed line at any heat', () => {
+    for (const closing of [0, 200 * METRE, 600 * METRE]) {
+      const it = drawn([side({ closing }), leftSide({ closing })]);
+      expect(it.lines.filter((l) => l.dash.length > 0)).toHaveLength(0);
+      // The line itself is still there — one solid stroke per side.
+      expect(it.lines.filter((l) => l.dash.length === 0)).toHaveLength(2);
+    }
   });
 
-  /** Spec 07 §2 says so outright: *"they do not scale with `heat`."* */
-  it('do not move or brighten with heat', () => {
-    const calm = drawn([side({ closing: 0 })]).lines.filter((l) => l.dash.length > 0);
-    const hot = drawn([side({ closing: 400 * METRE })]).lines.filter((l) => l.dash.length > 0);
-    expect(hot).toHaveLength(calm.length);
-    for (let i = 0; i < calm.length; i++) {
-      expect(hot[i]!.stroke).toBe(calm[i]!.stroke);
-      expect(hot[i]!.from.x).toBeCloseTo(calm[i]!.from.x, 6);
-    }
+  /**
+   * And the bands themselves survive being un-outlined: the motes still step at
+   * the fire band, which is what actually says a price now.
+   */
+  it('still steps the motes where the price steps', () => {
+    const line = CENTRELINE + HALF_WIDTH;
+    const dots = drawn([side()]).dots;
+    const inFire = dots.filter((d) => line - d.x <= FIRE_BAND);
+    const inOuter = dots.filter((d) => line - d.x > FIRE_BAND && line - d.x <= OUTER_BAND);
+    expect(Math.max(...inFire.map((d) => d.alpha))).toBeGreaterThan(
+      Math.max(...inOuter.map((d) => d.alpha)),
+    );
   });
 });
 
@@ -407,9 +418,10 @@ describe('what the bands say', () => {
   it('says it in motes and in nothing else', () => {
     const it = drawn([side({ closing: 300 * METRE })]);
     expect(it.words).toHaveLength(0);
-    // Lines are the two band edges and the line itself, and nothing more.
-    expect(it.lines.filter((l) => l.dash.length > 0)).toHaveLength(2);
-    expect(it.lines.filter((l) => l.dash.length === 0)).toHaveLength(1);
+    // One stroke, and it is the line. No captions, and since 2026-09-01 no band
+    // edges either — the gradient and the line are the whole of the drawn edge.
+    expect(it.lines).toHaveLength(1);
+    expect(it.lines[0]!.dash).toHaveLength(0);
   });
 });
 
@@ -509,32 +521,16 @@ describe('presence — what normal play actually shows', () => {
   });
 
   /**
-   * ⚠ **The dashed band edge is what was actually signalling**, and it is the
-   * reason this gate had to reach the whole layer rather than the glow alone.
+   * Everything the boundary draws comes up together — the wash, the line and the
+   * motes.
    *
-   * Spec 07 §2 fixes the dashes at α 0.25 and 0.40 and says they *"do not scale
-   * with heat"* — so before the ruling they drew a pink dashed line down both
-   * sides of the screen for the whole of every run, at full strength, while the
-   * gradient beside them was down at α 0.0095 and invisible. Presence is a
-   * different channel from heat and it reaches them.
+   * ⚠ This used to lead with the **dashed band edge**, which was the thing
+   * actually signalling danger during normal play: the gradient at the picture's
+   * edge is down at α 0.0095 and invisible, while the dash sat 133 units inside
+   * the picture at α 0.25 and did not scale with heat by spec 07 §2's own rule.
+   * The dashes were then refused outright (2026-09-01), so what is left to check
+   * is that presence reaches everything that remains.
    */
-  it('brings the dashes up with presence, though heat never touches them', () => {
-    const at = (presence: number) =>
-      drawn([side({ presence })]).lines.filter((l) => l.dash.length > 0);
-    expect(at(0)).toHaveLength(0);
-    const half = at(0.5);
-    const full = at(1);
-    expect(half).toHaveLength(2);
-    expect(full).toHaveLength(2);
-    for (let i = 0; i < 2; i++) {
-      expect(alphaOf(half[i]!.stroke)).toBeGreaterThan(0);
-      expect(alphaOf(half[i]!.stroke)).toBeLessThan(alphaOf(full[i]!.stroke));
-      // And they still do not move.
-      expect(half[i]!.from.x).toBeCloseTo(full[i]!.from.x, 6);
-    }
-  });
-
-  /** Everything else comes up with it too: the wash, the line, the motes, the label. */
   it('brings the whole layer up together', () => {
     const half = drawn([side({ closing: 300 * METRE, presence: 0.5 })]);
     const full = drawn([side({ closing: 300 * METRE, presence: 1 })]);
