@@ -712,6 +712,43 @@ buffer is doing its job. That is the first measurement of this layer on a real b
 recorded here rather than in a comment because it is the baseline M3.6's harness will be compared
 against.
 
+#### ⚠ And then the phone, which is the number that counts
+
+`2026-09-01T06-00-36`, **iPhone, Firefox iOS, 393×651 at dpr 3** — the gate device, over a 40-second
+run that flew right through the anomaly (754 of 2 422 ticks, with two whole segments at 100%).
+
+| | p50 | p95 | p99 | max |
+|---|---|---|---|---|
+| cpu | **1ms** | 2ms | 2ms | **3ms** |
+| interval | 17ms | 17ms | 19ms | 30ms |
+
+**A tick costs 0.26ms and the rest of a frame costs 0.81ms**, fitted from the frames themselves —
+against ADR-0011's 8ms drawn budget, and against M0.5's own measurement that the budget was written
+on. And the anomaly, segment by segment:
+
+| segment | mean cpu | storm on screen |
+|---|---|---|
+| to 1022 | 1.14ms | 0% |
+| to 1278 | 1.18ms | 63% |
+| **to 1533** | **1.25ms** | **100%** |
+| **to 1789** | **1.27ms** | **100%** |
+| to 2045 | 1.08ms | 32% |
+| to 2300 | 0.93ms | 0% |
+
+**A quarter of a millisecond, which is a quarter of a frame's own cost and a thirtieth of the
+budget.** On the laptop the same layer read as *four times* a clear frame; on the phone it is 1.26×,
+because the phone's baseline is five times higher and the storm's extra is close to fixed. That is
+the whole reason `pnpm profile` prints ratios and says *not a phone* on every line — and it is why
+this table is here rather than a laptop's.
+
+**One thing this run says that nothing was looking for.** Eleven of the twelve worst frames are the
+tick a dive begins — *"diving at #N, 0 ticks in"* — at a **26ms interval with 1ms of cpu**. The
+stretch is not in our draw: it is 25ms of somebody else's, on the frame a grab allocates the compass
+for the first time. A garbage collection at the grab is the obvious read and it is a guess; what is
+not a guess is that the interval stretches at grabs and the cpu does not. It belongs to
+[M3.6](#m36--the-frame-budget-harness) and is recorded so that whoever takes it starts with the
+correlation rather than looking for one.
+
 #### The bench's own defect, which is older than this step
 
 `tools/bench/entry.ts` rebuilds the trail table on **every release, inside the frame callback** —
@@ -814,6 +851,37 @@ what an average of frames that mostly return early hides.
 
 **What is still M3.6's**: a *command* that reports p99 and max for a replayed recipe without a
 browser, and the recorded phone baseline. What this closes is only that the bench can now be asked.
+
+### ⚠ The bench lost a third of its sliders, 2026-09-01
+
+*"There are a LOT of knobs on the bench page right now. Can you clean it up? Some are stale, and
+others are kind of poorly explained."* **74 → 50**, against one rule, which the rung label's own
+ruling established the day before: **a knob whose question has been answered comes off the bench.**
+
+What earns a slider is now written at the top of `tools/bench/patches.ts` and is three things —
+an open question the spec names, a taste the author is **still moving**, or a switch that turns a
+parked feature off. What loses one:
+
+| gone | why |
+|---|---|
+| `BOUNCE_RESTITUTION`, `RINGS`, `MIN_HALF_WIDTH`, `TIDE_LAG_RATE_MAX`, `STRETCH_ALONG`, `STRETCH_ACROSS`, `PATH_FADE_RATE`, `FILAMENT_SPAN`, `FILAMENT_FLOOR` | ruled by the author on a dated flight, with a measurement behind it |
+| `DEADZONE`, `FOLLOW_RATE`, `LOCK_TICKS` | **the camera is parked**, so its numbers are not the bench's to move. The whole card is gone; the lock *switch* stays, because it turns a mechanism off rather than tuning it |
+| `E1_BLOOM`, `E2_BLOOM`, `E3_BLOOM`, `E3_TICKS`, `ENTER_TICKS`, `EXIT_TICKS`, `PUNCH_TICKS`, `PUNCH_STRETCH`, `TRANSIENT_SECONDS`, `POP_RISE`, `SIGHTING_RADIUS`, `RING_SPREAD` | the design states the number outright and nobody has ever questioned it. Two of them are sharper than that: **nothing strikes an E3 today**, so its radius and its length were sliders on a thing that never draws |
+
+**A taste that keeps moving is not an answered question**, which is the one place the rule needed a
+distinction. `TIDE_HALF_WIDTH_MAX` was ruled *today* and stays, because it has now moved twice in
+three days and the next flight may move it again; `RINGS` was ruled once against a measurement over
+342 releases and goes. The test is whether moving it can still change a decision.
+
+**And six patches drove nothing at all** — `ARRIVAL_REF_SPEED`, `ARRIVAL_SPEED_RELIEF`,
+`PATH_STRENGTH`, `RIM_IN_REACH`, `SPEND_TICKS`, `TIDE_SWELL` were made settable with no slider
+anywhere, which `test/bench.test.ts` could not see because it only asked whether the patch's text
+still matched. It now asserts the pairing in both directions: every patch has a slider and every
+slider has a patch. The other direction was never possible by accident and is the worse failure — a
+slider whose constant is still `const` answers a question confidently and wrongly.
+
+**Nothing in the game moved.** A patch is applied at bench-build time only, so removing one leaves
+the constant exactly where its ruling left it.
 
 ---
 

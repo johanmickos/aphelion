@@ -143,7 +143,7 @@ The tide is the gravity vector drawn on the thing that owns it.
 | Property | Value |
 |---|---|
 | Position | Centred on the bearing from the body to the craft |
-| Angular half-width | **±0.3 rad** (≈17°) at reference mass; scales with mass — see below |
+| Angular half-width | **±0.3 rad** (≈17°) at reference mass; scales with mass — see below — ⚠ **ruled to ±0.65 rad** on 2026-09-01, see the notice below |
 | Tracking | Follows the craft's bearing with a first-order lag, coefficient **k ≈ 6 /s** — ⚠ **ruled to 30** on 2026-08-29, see the notice above |
 | Inner ripple | One stratum ring tracks the tide at **0.6 × k**, at α 0.3 |
 | Range | Present on every body within grab range; absent beyond it |
@@ -197,6 +197,38 @@ rim underneath it.
 > step is still 1.6×.
 >
 > Tide, strata, core and every width are untouched.
+
+> ## ⚠ Ruled by the author on 2026-09-01 — the tide reaches twice as far
+>
+> *"Tide reach at 1.3 makes it feel really groovy."* Flown on the bench, which is
+> the only kind of evidence a width like this can have.
+>
+> **1.3 is the ceiling and ±0.65 rad is the median**, because the law puts the
+> median body at exactly half of whatever a body of unbounded mass approaches —
+> that relationship is what §2 actually fixes and it is untouched. What moved is
+> the ceiling, and with it every body together, so §2's *"heavier bodies reach
+> with a longer tide"* is unchanged in ordering.
+>
+> **The table above was always half an opening position.** §2 states a number at
+> the median and says nothing about the law between the median and the ceiling;
+> 0.6 was the value that made the median draw precisely §2's figure, which is the
+> most defensible place to start and not a ruling.
+>
+> **What is actually drawn**, measured over the 13 661 tides in the author's
+> replayable dispatches — the drawn width sits well under the ceiling because
+> `TIDE_GROWTH` gates it on grip as well as on mass:
+>
+> | half-width drawn | p05 | p50 | p95 | widest |
+> |---|---|---|---|---|
+> | at 0.6 | 5.6° | 8.7° | 20.8° | 21.3° |
+> | **at 1.3** | **12.2°** | **18.9°** | **45.0°** | **46.1°** |
+>
+> **Three things it does not break.** The widest arc in the corpus spans **92°**,
+> a quarter of the circumference — still a limb segment, which is what the ceiling
+> exists to guarantee. The **lag** is untouched, so the 2026-08-29 ruling below
+> survives and in fact gets easier: a wider bright core covers the craft more
+> often, not less. And nothing about **brightness** moved, so §2's three
+> behaviours still move together.
 
 ## 3 · The four states
 

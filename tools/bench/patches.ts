@@ -12,6 +12,36 @@
  * not that argument — it is an argument for a bench. The prototype's
  * seventy-eight-key config is the thing this rewrite exists to not become.
  *
+ * ## What earns a slider, and what loses one
+ *
+ * **Cut from 74 to 50 on 2026-09-01**, at the author's request — *"there are a
+ * LOT of knobs right now, some are stale"* — against one rule, which the rung
+ * label's own ruling established the day before: **a knob whose question has
+ * been answered comes off the bench**, because it invites the answer to be
+ * re-litigated by whoever finds it next.
+ *
+ * A constant earns a slider if moving it can still change a decision:
+ *
+ *   - it is a question `docs/spec/README.md` lists as **open**, or the spec
+ *     states no number and none has been ruled;
+ *   - the author is **still moving it** — a taste that has moved twice is a
+ *     taste the next flight may move again, which is a different thing from a
+ *     question that has been closed once;
+ *   - it switches a built thing **off**, where zero is a real off and the
+ *     feature is parked rather than settled (the bow, the wake, the lock).
+ *
+ * It loses one when the author has ruled it on a dated flight with a measurement
+ * behind it, when the design states the number outright and nobody has ever
+ * questioned it, or when the system it belongs to is **parked** — the camera's
+ * three went for that reason and the plan's camera note is where they come back
+ * from.
+ *
+ * **And a patch with no slider is worse than no patch**: six constants were
+ * settable here that nothing in `entry.ts` ever drove, which the test below
+ * could not see because it only asks whether the text still matches. They are
+ * gone, and the pair is now exactly balanced — every patch has a slider and
+ * every slider has a patch.
+ *
  * ## Every patch is an assertion
  *
  * Each `find` below must appear in the real source **exactly once**, and
@@ -50,17 +80,6 @@ export const PATCHES: readonly Patch[] = [
   settable('src/sim/units.ts', 'ECCENTRICITY_CAP', 'spec 01 §13.5, deferred by the author'),
   settable('src/sim/units.ts', 'GRAZE_RATIO', 'spec 01 §10 — how head-on a contact has to be'),
   settable('src/sim/units.ts', 'GRAZE_RESTITUTION', 'spec 01 §10 leaves it unstated'),
-  settable('src/sim/units.ts', 'BOUNCE_RESTITUTION', 'moved at the M1 gate, 0.6 → 0.2'),
-  settable(
-    'src/sim/tier.ts',
-    'ARRIVAL_SPEED_RELIEF',
-    'how much aim a fast approach is forgiven — 0 is the gate before 2026-08-31',
-  ),
-  settable(
-    'src/sim/tier.ts',
-    'ARRIVAL_REF_SPEED',
-    'the speed the sideways requirement is stated at — real play’s own p50',
-  ),
   settable('src/sim/units.ts', 'CLIMB_BIAS', 'how much a press prefers a body up the climb'),
   settable(
     'src/sim/units.ts',
@@ -78,28 +97,10 @@ export const PATCHES: readonly Patch[] = [
     'spec 01 §8 measured ×1.8; 0.45 is what was flown',
   ),
   settable(
-    'src/sim/units.ts',
-    'TRANSIENT_SECONDS',
-    'spec 01 §8’s 1.3s, decaying linearly to nothing',
-  ),
-  settable('src/state/camera.ts', 'DEADZONE', 'an opening position; only the gate can judge it'),
-  settable('src/state/camera.ts', 'FOLLOW_RATE', 'moved at the M1 gate, 8 → 3'),
-  settable('src/state/camera.ts', 'LOCK_TICKS', 'the prototype’s third of a second, carried'),
-
-  // Spec 00 §3's ordinal channel, read into design units. The radii are the
-  // board's own numbers times three (ADR-0010) and the reading is the thing to
-  // fly: a bloom the author cannot see moving is a bloom nobody can rule on.
-  settable('src/state/energy.ts', 'E1_BLOOM', 'spec 00 §3 · body rims, labels, a window at rest'),
-  settable('src/state/energy.ts', 'E2_BLOOM', 'spec 00 §3 · the craft, and a held body'),
-  settable('src/state/energy.ts', 'E3_BLOOM', 'spec 00 §3 · the release and the grab'),
-  settable('src/state/energy.ts', 'E3_TICKS', 'spec 00 §3’s 400ms, and the only one it states'),
-  settable(
     'src/state/decay.ts',
     'OVERSHOOT_FROM',
     'the rebound shape everything that homes shares',
   ),
-  settable('src/state/deformation.ts', 'STRETCH_ALONG', 'spec 02 §4, still to be flown'),
-  settable('src/state/deformation.ts', 'STRETCH_ACROSS', 'the other half of the same stretch'),
 
   // Spec 02's release, rebased on ADR-0012 and then moved again: the camera's
   // share of the punch was flown and refused (2026-08-29), so quality is spent on
@@ -111,12 +112,6 @@ export const PATCHES: readonly Patch[] = [
     'PUNCH_FLOOR',
     'what a release of no quality still earns of the stretch',
   ),
-  settable('src/state/punch.ts', 'PUNCH_TICKS', 'spec 02 §4’s 180ms home, with one overshoot'),
-  settable(
-    'src/state/punch.ts',
-    'PUNCH_STRETCH',
-    'ADR-0012’s “half again as long” at full quality',
-  ),
 
   // The callout. `LINGER_TICKS` is the one number in this milestone two specs
   // disagree about — spec 02 §2 ends the word at T+510ms and spec 06 §4's own
@@ -127,19 +122,6 @@ export const PATCHES: readonly Patch[] = [
     'LINGER_TICKS',
     'spec 06 §4 says 1.2s and spec 02 §2 implies 0.4s',
   ),
-  settable(
-    'src/state/callout.ts',
-    'POP_RISE',
-    'how far the word climbs over its life — the prototype’s 34, converted',
-  ),
-  {
-    file: 'src/render/index.ts',
-    find: 'export const PATH_STRENGTH = 0.24;',
-    replace: 'export let PATH_STRENGTH = 0.24;',
-    append:
-      '\nexport function set_PATH_STRENGTH(value: number): void {\n  PATH_STRENGTH = value;\n}\n',
-    why: 'the orbit line’s rank against the rings crossed over it, 2026-08-30',
-  },
   {
     file: 'src/render/index.ts',
     find: 'const FLOWN_FLOOR = 0.22;',
@@ -149,9 +131,12 @@ export const PATCHES: readonly Patch[] = [
   },
 
   {
-    // The lock is the one camera mechanism with no number that turns it off:
-    // `LOCK_TICKS` of 0 makes it arrive instantly rather than not at all, and
-    // what the author needs to judge is what it buys.
+    // **The one camera control the bench keeps**, and the three that were beside
+    // it are gone: the camera is parked at the author's request
+    // (`docs/plan/m2-the-instrument.md`), so its numbers are not the bench's to
+    // move. This is not a number — it turns a mechanism off, which is how the
+    // parked question gets *demonstrated* rather than tuned, and the lock has no
+    // off switch of its own.
     file: 'src/state/camera.ts',
     find: `export function lockOf(sim: SimState): number {
   const orbit = sim.orbit;`,
@@ -163,7 +148,7 @@ export function set_LOCK_ON(value: boolean): void {
 export function lockOf(sim: SimState): number {
   if (!LOCK_ON) return 0;
   const orbit = sim.orbit;`,
-    why: 'the lock has no off switch of its own',
+    why: 'the lock has no off switch of its own, and the camera is parked',
   },
 
   // Spec 04's body language. The rim's weight stopped being one number when
@@ -173,16 +158,6 @@ export function lockOf(sim: SimState): number {
     'src/state/body.ts',
     'TIDE_HALF_WIDTH_MAX',
     'spec 04 §2 states ±0.3 rad at the median and not the law',
-  ),
-  settable(
-    'src/state/body.ts',
-    'TIDE_LAG_RATE_MAX',
-    'spec 04 §2’s k ≈ 6/s, and the lag is the behaviour',
-  ),
-  settable(
-    'src/state/sighting.ts',
-    'SIGHTING_RADIUS',
-    'Direction 03 draws a dot and states no size',
   ),
   {
     // Brightness is the only ordinal channel (spec 00 §3) and the rim's strength
@@ -195,29 +170,11 @@ export function lockOf(sim: SimState): number {
     why: 'how legible a body at rest is, which the author asked to be able to move',
   },
   {
-    // The distance a held body stands above one merely in reach, which is what
-    // the author actually asked to be able to see — see `RIM_AT_REST`'s note in
-    // the renderer. HELD stays at 1 and is not a knob: this is the gap under it.
-    file: 'src/render/index.ts',
-    find: 'const RIM_IN_REACH = 0.55;',
-    replace: 'export let RIM_IN_REACH = 0.55;',
-    append:
-      '\nexport function set_RIM_IN_REACH(value: number): void {\n  RIM_IN_REACH = value;\n}\n',
-    why: 'how far a held body stands out from one merely in reach',
-  },
-  {
     file: 'src/render/index.ts',
     find: 'const TIDE_WIDTH = 4 * BOARD_PIXEL;',
     replace: 'export let TIDE_WIDTH = 4 * BOARD_PIXEL;',
     append: '\nexport function set_TIDE_WIDTH(value: number): void {\n  TIDE_WIDTH = value;\n}\n',
     why: 'the other half of the same legibility question, now that §1 owns the rim',
-  },
-  {
-    file: 'src/render/index.ts',
-    find: 'const TIDE_SWELL = 1;',
-    replace: 'export let TIDE_SWELL = 1;',
-    append: '\nexport function set_TIDE_SWELL(value: number): void {\n  TIDE_SWELL = value;\n}\n',
-    why: 'how much thicker the tide draws as the craft closes — zero is the old behaviour',
   },
   {
     file: 'src/render/index.ts',
@@ -241,13 +198,7 @@ export function lockOf(sim: SimState): number {
     append: '\nexport function set_TIDE_FLOOR(value: number): void {\n  TIDE_FLOOR = value;\n}\n',
     why: 'spec 04 §2 says brighter with mass and states neither end',
   },
-
-  // Spec 00 §6's compass. Every one of these is a number the spec leaves to the
-  // picture, except the ring count — which is measured, and worth flying to see
-  // whether four reads as four.
-  settable('src/sim/compass.ts', 'RINGS', 'measured at four over 342 conversions, not chosen'),
   settable('src/state/compass.ts', 'RING_INNER', 'how far the instrument clears the orbit'),
-  settable('src/state/compass.ts', 'RING_SPREAD', 'how much of the stack the furthest body gets'),
   settable(
     'src/state/compass.ts',
     'RING_MIN_GAP',
@@ -257,11 +208,6 @@ export function lockOf(sim: SimState): number {
     'src/sim/compass.ts',
     'AIM_RANGE',
     'spec 00 §6 leaves “reachable” open; the prototype had a number',
-  ),
-  settable(
-    'src/sim/compass.ts',
-    'MIN_HALF_WIDTH',
-    'the narrowest arc worth aiming at, ruled 2026-08-29',
   ),
   settable('src/state/body.ts', 'EMIT_AT', 'how much grip it takes before a body lights up at all'),
   settable(
@@ -274,30 +220,12 @@ export function lockOf(sim: SimState): number {
     'TIDE_LIFT',
     'how far proximity lifts the tide’s brightness toward full',
   ),
-  settable(
-    'src/state/compass.ts',
-    'FILAMENT_FLOOR',
-    'how faint the tether goes once the craft is outside the body’s hold',
-  ),
-  settable(
-    'src/state/compass.ts',
-    'FILAMENT_SPAN',
-    'how much of the reach the tether spends its whole fade across',
-  ),
-  settable(
-    'src/state/compass.ts',
-    'PATH_FADE_RATE',
-    'how fast the oval fades in once it is possible',
-  ),
-  settable('src/state/body.ts', 'SPEND_TICKS', 'how long a body takes to go out after a release'),
   settable('src/state/compass.ts', 'ENTER_FROM', 'spec 00 §5’s ENTER: how small it starts'),
-  settable('src/state/compass.ts', 'ENTER_TICKS', 'and how long it takes to come online'),
   settable(
     'src/state/compass.ts',
     'EXIT_BY',
     'how far in the instrument draws as it leaves — the mirror of ENTER_FROM',
   ),
-  settable('src/state/compass.ts', 'EXIT_TICKS', 'and how long it takes to go'),
   {
     file: 'src/render/index.ts',
     find: 'const BODY_BLOOM = 0.35;',

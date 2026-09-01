@@ -343,7 +343,9 @@ describe('the tide', () => {
   });
 
   /**
-   * The median body is where the spec's own reference numbers land.
+   * The median body is where the spec's own reference numbers land — **and both
+   * of them have now been ruled away from what §2 wrote**, in the same direction
+   * and for the same kind of reason.
    *
    * The tracking is **30** and not §2's stated 6, and the size of that gap is
    * the taper's doing. The arc peaks on the bearing and fades to nothing at both
@@ -351,14 +353,37 @@ describe('the tide', () => {
    * that, halving the lag was not enough: *"it seems like we moved the wrong way.
    * I want the tide to be more directly under the ship"* (author, 2026-08-29).
    * Measured, the craft is inside the bright core 11% of the time at 12 and
-   * **91%** at 30, where the lag is still a readable p50 2.1°. Ruled by the
-   * author and carried in §2's notice.
+   * **91%** at 30, where the lag is still a readable p50 2.1°.
+   *
+   * The half-width is **0.65** and not §2's stated 0.3, ruled on the bench on
+   * 2026-09-01 — *"tide reach at 1.3 makes it feel really groovy."* The ceiling
+   * moved; the median follows it, because `pullOf` puts the median at exactly a
+   * half and that relationship is the thing §2 actually fixes.
+   *
+   * So what this asserts is **the relationship and not the spec's figures**: the
+   * median is half the ceiling, in both properties, whatever the ceilings are.
+   * The figures themselves live beside the constants, where the flight that
+   * moved them is written down.
    */
-  it('reads spec 04 §2 at the median body', () => {
+  it('puts the median body at half of every ceiling', () => {
     const median = createBody(0, 0, MEDIAN_RADIUS);
     expect(pullOf(median)).toBeCloseTo(0.5, 12);
-    expect(TIDE_HALF_WIDTH_MAX * pullOf(median)).toBeCloseTo(0.3, 12);
-    expect(TIDE_LAG_RATE_MAX * pullOf(median)).toBeCloseTo(30, 12);
+    expect(TIDE_HALF_WIDTH_MAX * pullOf(median)).toBeCloseTo(TIDE_HALF_WIDTH_MAX / 2, 12);
+    expect(TIDE_LAG_RATE_MAX * pullOf(median)).toBeCloseTo(TIDE_LAG_RATE_MAX / 2, 12);
+    // And the ruled values, so a change to either says which one moved.
+    expect(TIDE_HALF_WIDTH_MAX).toBeCloseTo(1.3, 12);
+    expect(TIDE_LAG_RATE_MAX).toBeCloseTo(60, 12);
+  });
+
+  /**
+   * **And the ceiling still stops the arc becoming a ring**, which is the whole
+   * of what it is for. Measured over the author's own play the widest tide spans
+   * 92° of the limb at 1.3 — a quarter of the circumference — and the ceiling
+   * itself, which a body of unbounded mass approaches and never reaches, spans
+   * 149°. Half the limb is where a segment stops being one.
+   */
+  it('keeps even an unbounded body to less than half a limb', () => {
+    expect(TIDE_HALF_WIDTH_MAX).toBeLessThan(Math.PI / 2);
   });
 
   /**

@@ -119,13 +119,45 @@ export function pullOf(body: Body): number {
 }
 
 /**
- * The tide's angular half-width at the **median** body — spec 04 §2's ±0.3 rad.
+ * The tide's angular half-width at a body of unbounded mass — the ceiling that
+ * stops the arc becoming a ring, which [`pullOf`](#) puts the **median** body at
+ * half of.
  *
- * The constant below is twice that, because [`pullOf`](#) puts the median at a
- * half: it is the width a body of unbounded mass would approach and never reach,
- * which is the ceiling that stops the arc becoming a ring.
+ * ## ⚠ 1.3, ruled by the author on 2026-09-01 — *"it feels really groovy"*
+ *
+ * Flown on the bench and reported in those words, which is the only kind of
+ * evidence this number can have: spec [04 · §2](../../docs/spec/04-bodies.md)
+ * states ±0.3 rad **at the median** and the law between the median and the
+ * ceiling was always an opening position (`docs/spec/README.md`'s third kind).
+ * 0.6 was that opening position — exactly twice the spec's median figure, so
+ * that the median body drew precisely what §2 wrote.
+ *
+ * **What it does to what is actually drawn**, measured over the 13 661 tides the
+ * author's replayable dispatches draw:
+ *
+ * | half-width drawn | p05 | p50 | p95 | widest |
+ * |---|---|---|---|---|
+ * | at 0.6 | 5.6° | 8.7° | 20.8° | 21.3° |
+ * | **at 1.3** | **12.2°** | **18.9°** | **45.0°** | **46.1°** |
+ *
+ * The drawn width sits well under the ceiling because [`TIDE_GROWTH`](#) gates it
+ * on grip as well as mass, so this moves the whole range rather than pinning
+ * anything to it.
+ *
+ * **Three things it does not break, checked rather than assumed.** The widest arc
+ * in the corpus now spans **92°** — a quarter of the circumference, still a limb
+ * segment and not a ring, which is what this ceiling exists for. The tide's
+ * **lag** is [`TIDE_LAG_RATE_MAX`](#)'s and is untouched, so §2's ruling of
+ * 2026-08-29 — p50 2.1°, and the bright core over the craft 91% of the time —
+ * survives: a wider core covers the craft *more* often, so that criterion gets
+ * looser rather than tighter. And §2's *"heavier bodies reach with a longer
+ * tide"* is a proportion, so raising the ceiling raises every body together and
+ * the ordering is unchanged.
+ *
+ * It stays on the bench, because a width is a judgement about a moving picture
+ * and this is the second time it has moved.
  */
-export const TIDE_HALF_WIDTH_MAX = 0.6;
+export const TIDE_HALF_WIDTH_MAX = 1.3;
 
 /**
  * How fast the tide follows the craft's bearing, in 1/seconds, at the median
