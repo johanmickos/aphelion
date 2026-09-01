@@ -132,6 +132,14 @@ author's to close.
 
 ## Rulings applied
 
+- **One fixture, not several** (author, 2026-09-01). The goldens ride on the single recipe `pnpm
+  replay` flies with no argument, so a number in a golden and a number in that terminal output stay
+  the same number. Measured first: over 30 000 pilot seeds, 9 carry every moment the goldens are
+  written about and the first is 3 197, where splitting three ways would find one at seed 70, 13 and
+  70 — about forty times easier each. The expensive half of a re-record was the thirty hand edits and
+  `test/moments.ts` removed those, so what splitting would buy is compute nobody watches. The trigger
+  for revisiting is a sweep of thirty thousand that finds none, and `tools/fixture.ts` prints it.
+
 - **An unbound grab draws no predicted path** (author, 2026-09-01). The craft is on a hyperbola
   until the dive closes it, which is **31% of dive ticks** in the author's own play — up to 1.4s of
   no oval at the moment of commitment. The prototype draws both conics and its note argues at length

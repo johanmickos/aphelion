@@ -439,9 +439,20 @@ stays rare however long it flies.
 **And the cliff is real rather than theoretical.** The trial tuning above found **zero** in six
 thousand and needed thirty thousand to find four.
 
-### One fixture or several — the author's, with the numbers under it
+### ⚠ Ruled by the author, 2026-09-01: **one fixture**
 
-**Recommendation: keep one fixture.** The expensive half of this problem was the thirty hand edits
+*"Yes, one. Make it so."* — so the question below is closed and the recommendation under it is now
+the position. Nothing in the code changes, because one fixture is what the repo already ships; what
+changes is that a future session does not have to re-open this, and `tools/fixture.ts` is the search
+that keeps it viable rather than a hand-run hunt.
+
+**The trigger stays measurable and the tool prints it**: a sweep of thirty thousand seeds that finds
+none. That is the point at which the moments have outgrown one flight and this ruling would need
+revisiting — not before, and not on the strength of a single hard search.
+
+---
+
+**The recommendation this ruling adopted: keep one fixture.** The expensive half of this problem was the thirty hand edits
 and that half is gone; what is left is a 23-second sweep nobody has to watch. `pnpm replay` with no
 argument keeping one meaning is worth real money to someone flying on a phone, five other test
 files read the same recipe and pin nothing, and *"a number here and a number in that terminal
