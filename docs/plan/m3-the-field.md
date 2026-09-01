@@ -51,6 +51,92 @@ band is shown whole on every supported viewport; nothing readable in the bottom 
 extra a tall device sees is capped. **Verify**: `pnpm test` on the projection, plus screenshots at
 three aspects.
 
+### ⚠ The sideways axis is built, 2026-09-01 — and it is not the parked camera session
+
+This step has owed the axis since M1.4 retired `camera.ts`'s *"it does not pan sideways"*. The
+author called it due once the boundary landed:
+
+> *"I think we need to add the sideways camera movements at this point to properly test the
+> off-screen boundaries."*
+
+**It is the same two mechanisms on a second axis**, which is what `camera.ts`'s own note predicted —
+*"in a field that panned, the same blend would carry `x` too."* The deadzone, its rounded edge, the
+follow ease and the lock are all shared, and **there is no sideways constant**: a deadzone that is a
+body's floor radius has no axis, and a follow rate is a rate. The clamp and the backstop the
+prototype needed are not built either, because [`visible`](../../src/render/letterbox.ts) already
+bounds the drawn world by the corridor and was written against `camera.x` for this day.
+
+**What it is worth.** M1.4 measured that the craft can be **538 design units outside the picture and
+still alive**. Over the 18 dispatches that replay at `SIM_VERSION` 9, the craft is outside the
+picture on **3.4% of ticks** without this and on **0.00%** with it. The M1.4 defect, closed — and the
+line lands on screen on 0.78% of ticks, which is *"only when the ship is along the edge."*
+
+**And it is calmer than the axis already flown**, measured the way the parked session says *abrupt*
+has to be measured:
+
+| jerk, design units | p50 | p90 | p95 | p99 | max |
+|---|---|---|---|---|---|
+| sideways | 0.01 | 0.44 | 0.55 | 0.77 | 12.35 |
+| vertical | 0.11 | 0.62 | 0.73 | 2.38 | 20.66 |
+
+Lower at every percentile. `test/state/camera.test.ts` holds that as a standing comparison rather
+than as a recorded number, so the sideways axis can never become the jerkier of the two. It is
+exactly still on **49%** of ticks against the vertical's 31% — the craft weaves rather than climbing
+sideways, so the stillness is the run's rather than the mechanism's.
+
+#### What it does not reopen
+
+The camera was parked on 2026-08-31 after eight corrections in one evening
+([M2](./m2-the-instrument.md)). **Every one of them was about the vertical axis** — the lock
+arriving, `OVAL_BAND`, the settle's descent, the framing clamp — and **not one line of the `y`
+computation is touched here**, so that evidence and those complaints are exactly where they were.
+
+**The look-ahead is deliberately not carried to `x`**, and that is the parked session's own first
+measurement doing its job: `LOOK_AHEAD` is where the largest single-tick change in the view was found
+(10.2 design units at a freeze against 3.1 at a release) and three corrections were made to the lock
+before anyone looked at it. Adding a second one on an axis the author has not yet flown would be the
+same mistake with the order reversed. It is the obvious next lever if the view feels late going out
+to a wall, and it is the prototype's own axis for it.
+
+#### Four assertions were proxies, and they have been re-aimed rather than deleted
+
+Each was asserting something real *through* `camera.x === centreline`, which stopped being available:
+
+- **`test/state/release.test.ts`** carried ADR-0012's refused punch — *"6px along the exit
+  tangent"*. A kick is an **impulse**, so it now asserts the release tick puts no **step** in the
+  view, measured as jerk against the largest jerk elsewhere in the same swing. That is the claim; the
+  old one was a proxy that a panning camera happened to make unavailable.
+- **`test/state/goldens.test.ts`** now asserts **the craft is on screen on every tick of the run** —
+  the property the pan was built for, over a run that goes to a wall and dies there.
+- **`test/state/camera.test.ts`** asserts the axis itself: it follows, it holds still inside the
+  band, it opens on the craft, and it is no jerkier than the vertical.
+- **`test/sim/fixture-field.test.ts`** was asserting a property of the **field** — that its bodies
+  fit inside the design space — through the camera. It says that against the centreline now.
+
+#### The opening frame moved, and it had to
+
+`openCamera` places rather than eases, *"because a run that opened by gliding from wherever the last
+one ended would begin with a lurch."* That rule had only one axis to be true of before. The fixture
+spawns the craft **270 design units left of the centreline**, so opening at the centreline would put
+the craft outside the deadzone on tick zero and start every run with the view already sliding. It
+opens on the craft.
+
+#### The dust had a seam in it, and the pan would have shown it
+
+`dust.ts` laid its tile out across `DESIGN_WIDTH` and hung it on the centreline, on its own recorded
+reasoning: *"the two are the same place today — the camera never pans sideways."* Inside a corridor
+**1.9 pictures** wide that tile has an edge, and at the wall the player would have watched the dust
+stop 315 design units before the line. It is laid out across the **corridor** now, in normalised `x`,
+with the count scaled by the corridor's own width so `DUST_PER_SCREEN` keeps meaning *motes in a
+picture* — and culled sideways, which a tile one picture wide never needed. Two things fell out of
+that worth naming: the array is sized for the **widest** corridor spec 17 §4 describes and the
+**ceiling** is scaled to the actual one, because letting the array length do the capping is what
+`DUST_CEILING`'s own note warns against.
+
+[`anomaly.ts`](../../src/render/anomaly.ts) needed nothing: it already walked its columns in world
+coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
+that ever changes."* It did.
+
 ---
 
 ## M3.2 · Rungs

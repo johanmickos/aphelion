@@ -88,12 +88,37 @@ describe('the punch', () => {
    * [02 · §5](../../docs/spec/02-release.md) put it on the camera — 6px along the
    * exit tangent — and the author flew it and refused it: *"we don't really want
    * shake effects or pauses like that, it turns out that really disrupts the
-   * flow"* (2026-08-29). This is the assertion the refusal is worth having: over
-   * a whole swing, at every quality, the view never leaves the centreline.
+   * flow"* (2026-08-29).
+   *
+   * ⚠ This used to assert *the view never leaves the centreline*, which stopped
+   * being available when the camera gained a sideways axis (2026-09-01). **That
+   * was a proxy and this is the claim**: a kick is an **impulse**, so what the
+   * refusal is worth having asserted is that the release tick is not a step —
+   * measured as **jerk**, which `docs/plan/m2-the-instrument.md` rules is what
+   * *abrupt* means. Six design units along the exit tangent, arriving in one
+   * tick, is a jerk no ordinary tick of the same swing produces.
    */
-  it('never moves the world, at any quality', () => {
+  it('puts no step in the view at a release, at any quality', () => {
     for (const flight of [AT_PEAK, AT_FREEZE]) {
-      for (const view of flight.views) expect(view.camera.x).toBe(DESIGN_WIDTH / 2);
+      const jerk = (at: number, of: (v: PresentationState) => number): number => {
+        const [a, b, c] = [flight.views[at - 1]!, flight.views[at]!, flight.views[at + 1]!];
+        return Math.abs(of(c) - 2 * of(b) + of(a));
+      };
+      const at = flight.released;
+      expect(at).toBeGreaterThan(1);
+      for (const axis of [
+        (v: PresentationState) => v.camera.x,
+        (v: PresentationState) => v.camera.y,
+      ]) {
+        // The largest jerk anywhere else in the swing, which is the bar a kick
+        // would have to clear to be a kick.
+        let worst = 0;
+        for (let i = 1; i < flight.views.length - 1; i++) {
+          if (Math.abs(i - at) <= 1) continue;
+          worst = Math.max(worst, jerk(i, axis));
+        }
+        expect(jerk(at, axis)).toBeLessThanOrEqual(worst);
+      }
     }
   });
 

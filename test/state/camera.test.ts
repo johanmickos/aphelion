@@ -93,19 +93,87 @@ const SWINGS: ReadonlyArray<readonly [name: string, grabAt: number, letGoAt: num
 
 describe('the camera', () => {
   /**
-   * **Nothing ever takes this camera off the centreline**, and that is a stronger
-   * statement than it was a day ago. Spec [02 · §5](../../docs/spec/02-release.md)
-   * put ADR-0012's punch here — a displacement along the exit tangent, which has a
-   * horizontal component — and the author flew it and refused it: *"we don't
-   * really want shake effects or pauses like that, it turns out that really
-   * disrupts the flow"* (2026-08-29). So the exception this test briefly carried
-   * is gone, and the rule is exact again.
+   * ⚠ **It moves sideways now** (author, 2026-09-01), and this test used to assert
+   * the opposite. What replaces it is the behaviour rather than the prohibition:
+   * the same deadzone and the same ease, on the second axis.
+   *
+   * The refusal that assertion was also carrying — ADR-0012's punch, *"6px along
+   * the exit tangent"*, refused by the author on 2026-08-29 — has moved to
+   * `test/state/release.test.ts`, where it is asserted as what it is: a release
+   * puts no **step** in the view. A prohibition on movement could no longer say
+   * that, because the view is allowed to move.
    */
-  it('does not move sideways, whatever the craft does', () => {
+  it('follows the craft sideways, through a deadzone', () => {
     const { views } = fly(20, 300);
     const travelled = Math.max(...views.map((v) => Math.abs(v.craft.x - views[0]!.craft.x)));
     expect(travelled).toBeGreaterThan(100);
-    for (const view of views) expect(view.camera.x).toBe(DESIGN_WIDTH / 2);
+    // It moved — the old assertion's negation, and it has to be true or the axis
+    // is not built.
+    const panned = Math.max(...views.map((v) => Math.abs(v.camera.x - views[0]!.camera.x)));
+    expect(panned).toBeGreaterThan(0);
+    // And it followed rather than being dragged: the view is never further from
+    // the craft than the deadzone plus what the ease can lag by.
+    for (const view of views) {
+      expect(Math.abs(view.craft.x - view.camera.x)).toBeLessThan(DESIGN_WIDTH / 2);
+    }
+  });
+
+  /**
+   * **The deadzone is real on this axis too**: a craft moving less than the band
+   * does not move the view at all.
+   *
+   * Asserted as the thing that would break if `x` were merely eased at the craft
+   * — the *"WAY too fixed on the ship"* the author refused on the other axis
+   * (2026-08-30), which arrives on a new axis for free if nobody checks.
+   */
+  it('holds still while the craft moves inside the band', () => {
+    const { views } = fly(20, 300);
+    let held = 0;
+    for (let i = 1; i < views.length; i++) {
+      const moved = Math.abs(views[i]!.craft.x - views[i - 1]!.craft.x);
+      const panned = Math.abs(views[i]!.camera.x - views[i - 1]!.camera.x);
+      if (moved > 0 && panned === 0) held++;
+    }
+    expect(held).toBeGreaterThan(0);
+  });
+
+  /**
+   * **Jerk, not distance** — `docs/plan/m2-the-instrument.md`'s own trap, and the
+   * measure the parked camera session says *abrupt* actually means.
+   *
+   * The bar is the axis the author has already flown: the sideways view may not
+   * be jerkier than the vertical one over the same swing. Measured over the
+   * dispatch corpus when this landed it was lower at every percentile — p95 0.55
+   * against 0.73, p99 0.77 against 2.38.
+   */
+  it('is no jerkier sideways than it already is vertically', () => {
+    const { views } = fly(20, 300);
+    const jerks = (of: (v: (typeof views)[number]) => number): number[] => {
+      const out: number[] = [];
+      for (let i = 1; i < views.length - 1; i++) {
+        out.push(Math.abs(of(views[i + 1]!) - 2 * of(views[i]!) + of(views[i - 1]!)));
+      }
+      return out.sort((a, b) => a - b);
+    };
+    const at = (xs: number[], p: number): number => xs[Math.floor((p / 100) * xs.length)]!;
+    const sideways = jerks((v) => v.camera.x);
+    const vertical = jerks((v) => v.camera.y);
+    for (const p of [50, 90, 95, 99]) {
+      expect(at(sideways, p)).toBeLessThanOrEqual(at(vertical, p));
+    }
+  });
+
+  /**
+   * **The view opens on the craft, on both axes** — `openCamera`'s own rule that a
+   * run is *"placed, not eased into place"*, which had only one axis to be true of
+   * before. The fixture spawns the craft 270 design units left of the centreline,
+   * so opening at the centreline instead would start every run with the view
+   * already sliding.
+   */
+  it('opens on the craft rather than easing onto it', () => {
+    const { views } = fly(20, 300);
+    expect(views[0]!.camera.x).toBe(views[0]!.craft.x);
+    expect(views[0]!.camera.y).toBe(views[0]!.craft.y);
   });
 
   /**

@@ -29,7 +29,10 @@ import type { BoundarySideView, CameraView } from '../../src/state/types.ts';
 import { AURORA, ION } from '../../src/render/palette.ts';
 import { boundaryMotes, drawBoundary } from '../../src/render/boundary.ts';
 import { boundaryOf } from '../../src/state/boundary.ts';
+import { followCamera, openCamera } from '../../src/state/camera.ts';
+import { visible } from '../../src/render/letterbox.ts';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
+import { createInitialState } from '../../src/sim/step.ts';
 
 const CENTRELINE = 585;
 const HALF_WIDTH = 1111.5;
@@ -585,6 +588,45 @@ describe('presence — what normal play actually shows', () => {
       }
     }
     expect(absent / total).toBeGreaterThan(0.7);
+  });
+});
+
+describe('the sideways camera brings it into view', () => {
+  /**
+   * **The whole point of the axis**, and the author's reason for calling it due:
+   * *"I think we need to add the sideways camera movements at this point to
+   * properly test the off-screen boundaries."*
+   *
+   * So this is the loop closed end to end — a craft flown out to a wall, the
+   * camera following it, `visible` deciding what the device can show, and the
+   * line actually landing inside that. Without the pan it cannot: the picture is
+   * pinned to the centreline and the line sits 527 design units outside it.
+   */
+  it('puts the line on screen once the craft is out at the wall', () => {
+    const field = fixtureField();
+    const craft = fixtureCraft();
+    const { centreline, halfWidth } = field.corridor;
+    const line = centreline + halfWidth;
+
+    // A phone's buffer, so this is the device the question was asked about.
+    const buffer = { width: 1170, height: 2532 };
+
+    // Parked on the centreline, as the camera was until 2026-09-01.
+    craft.x = centreline;
+    const pinned = visible(buffer.width, buffer.height, field.corridor, centreline);
+    expect(pinned.right + centreline - DESIGN_WIDTH / 2).toBeLessThan(line);
+
+    // And flown out to the fire band, with the camera where the follow puts it.
+    craft.x = line - FIRE_BAND / 2;
+    const sim = createInitialState(field, craft, 1);
+    let view = openCamera(sim);
+    for (let tick = 0; tick < 240; tick++) view = followCamera(view, sim);
+    const panned = visible(buffer.width, buffer.height, field.corridor, view.x);
+    expect(panned.right + view.x - DESIGN_WIDTH / 2).toBeGreaterThanOrEqual(line);
+
+    // And the boundary is fully present there, so it is drawn rather than absent.
+    const sides = boundaryOf(field, craft);
+    expect(sides[1]!.presence).toBe(1);
   });
 });
 

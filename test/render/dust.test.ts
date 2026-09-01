@@ -25,6 +25,7 @@ import {
   DUST_FIELD,
   DUST_PER_SCREEN,
   DUST_TILES,
+  DUST_WIDEST,
   DUST_WIDTH,
   drawDust,
   dust,
@@ -34,6 +35,8 @@ import {
 const CENTRELINE = 585;
 const AT = (y: number): CameraView => ({ x: CENTRELINE, y, lock: 0, offset: 0 });
 const CORRIDOR: CorridorView = { centreline: CENTRELINE, halfWidth: 1111, foot: 4795 };
+/** How wide that corridor is — what the field is now laid out across. */
+const ACROSS = CORRIDOR.halfWidth * 2;
 const SEEN = { left: 0, top: 0, right: DESIGN_WIDTH, bottom: DESIGN_HEIGHT };
 
 /** One drawn streak: where it starts, where it ends, and what it was drawn in. */
@@ -190,8 +193,8 @@ describe('the dust', () => {
    * count and changes no dust velocity."*
    */
   it('gets denser with chain and no faster', () => {
-    const quiet = moteCount(field, 2);
-    const hot = moteCount(field, 4);
+    const quiet = moteCount(field, 2, ACROSS);
+    const hot = moteCount(field, 4, ACROSS);
     expect(hot).toBeGreaterThan(quiet);
     expect(drawn(field, 0, 8, 4).marks.length).toBeGreaterThan(drawn(field, 0, 8, 2).marks.length);
 
@@ -241,8 +244,13 @@ describe('the dust', () => {
   it('stops at twice the resting field, however long the chain runs', () => {
     // As many links as there are motes in a picture, whatever that has been
     // ruled to — the ceiling is stated as a multiple of the base, not beside it.
-    expect(moteCount(field, DUST_PER_SCREEN)).toBe(DUST_CEILING * DUST_TILES);
-    expect(moteCount(field, 1000)).toBe(DUST_CEILING * DUST_TILES);
+    // The ceiling is a count per **picture**, so over a corridor 1.9 pictures
+    // wide the field tops out at 1.9× it — the constant keeps meaning motes in a
+    // picture, which is the whole reason the count scales with the corridor.
+    const pictures = ACROSS / DESIGN_WIDTH;
+    const ceiling = Math.round(DUST_CEILING * DUST_TILES * pictures);
+    expect(moteCount(field, DUST_PER_SCREEN, ACROSS)).toBe(ceiling);
+    expect(moteCount(field, 1000, ACROSS)).toBe(ceiling);
     expect(DUST_CEILING).toBe(DUST_PER_SCREEN * 2);
   });
 
@@ -401,8 +409,8 @@ describe('the dust', () => {
   it('draws about as many motes as a picture is ruled to hold', () => {
     expect(DUST_PER_SCREEN).toBe(40);
     // Laid out to the ceiling, drawn to the chain — see `DUST_CEILING`.
-    expect(field.length).toBe(DUST_CEILING * DUST_TILES);
-    expect(moteCount(field, 0)).toBe(DUST_PER_SCREEN * DUST_TILES);
+    expect(field.length).toBe(DUST_CEILING * DUST_TILES * DUST_WIDEST);
+    expect(moteCount(field, 0, DESIGN_WIDTH)).toBe(DUST_PER_SCREEN * DUST_TILES);
     const marks = drawn(field, 0, 0).marks;
     expect(marks.length).toBeGreaterThan(DUST_PER_SCREEN * 0.6);
     expect(marks.length).toBeLessThan(DUST_PER_SCREEN * 1.6);
@@ -447,23 +455,41 @@ describe('the dust', () => {
   });
 
   /**
-   * It hangs on the **corridor's centreline**, not on the camera — which is what
-   * keeps a camera term out of a mote's position. The two are the same place
-   * today because the camera never pans; this is the assertion that notices if
-   * one of them ever moves without the other.
+   * It hangs on the **corridor**, not on the camera — which is what keeps a
+   * camera term out of a mote's position.
+   *
+   * ⚠ This used to assert that panning the camera changed nothing at all, which
+   * was safe only while the camera could not pan. It pans since 2026-09-01 and
+   * the field spans the corridor, so what a frame draws is now a *window* on the
+   * field: panning changes **which** motes are drawn and must still change **where
+   * each one is**. That is the claim, and it is the stronger of the two.
    */
   it('hangs on the corridor rather than on the camera', () => {
-    const here = drawn(field, 0, 0).marks.map((mark) => mark.x);
-    const recording = recorder();
-    drawDust(
-      recording.context,
-      field,
-      { x: CENTRELINE + 400, y: 0, lock: 0, offset: 0 },
-      CORRIDOR,
-      0,
-      0,
-      SEEN,
-    );
-    expect(recording.marks.map((mark) => mark.x)).toEqual(here);
+    // Every place the corridor puts a mote, computed without a camera at all.
+    const places = new Set(field.map((mote) => CORRIDOR.centreline - ACROSS / 2 + mote.x * ACROSS));
+    const at = (cameraX: number): number[] => {
+      const recording = recorder();
+      drawDust(
+        recording.context,
+        field,
+        { x: cameraX, y: 0, lock: 0, offset: 0 },
+        CORRIDOR,
+        0,
+        0,
+        SEEN,
+      );
+      return recording.marks.map((mark) => mark.x);
+    };
+    const here = at(CENTRELINE);
+    const panned = at(CENTRELINE + 400);
+    expect(here.length).toBeGreaterThan(0);
+    expect(panned.length).toBeGreaterThan(0);
+    // No mote is anywhere the corridor did not put it, at either camera.
+    for (const x of [...here, ...panned]) expect(places.has(x)).toBe(true);
+    // And the pan is a window rather than a shift: the motes both frames show
+    // are at exactly the same places, and the frames are not the same frame.
+    const shared = here.filter((x) => panned.includes(x));
+    expect(shared.length).toBeGreaterThan(0);
+    expect(new Set(panned)).not.toEqual(new Set(here));
   });
 });

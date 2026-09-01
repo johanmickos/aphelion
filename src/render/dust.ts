@@ -393,9 +393,41 @@ const DUST_PER_CHAIN = 1;
  */
 export const DUST_STRENGTH = 2;
 
+/**
+ * How many pictures wide a corridor the field is laid out to cover — **two**.
+ *
+ * ## ⚠ The tile used to be one picture wide, and the camera pans now
+ *
+ * Until 2026-09-01 the field was laid out across `DESIGN_WIDTH` and hung on the
+ * corridor's centreline, on the reasoning this file recorded: *"the two are the
+ * same place today — the camera never pans sideways."* The camera pans since,
+ * and a tile a picture wide inside a corridor **1.9 pictures** wide has an edge
+ * in it: at the wall the player would see the dust simply stop, 315 design units
+ * before the line.
+ *
+ * So the field is laid out across the **corridor**, in normalised `x`, and the
+ * count scales with the corridor's own width so that
+ * [`DUST_PER_SCREEN`](#dust_per_screen) keeps meaning *motes in a picture*
+ * rather than becoming motes in a corridor.
+ *
+ * **Two, because spec [17 · §4](../../docs/spec/17-daily-field.md)'s corridor
+ * only narrows.** It runs the half-width 480 → 300 m with altitude, and the one
+ * this field is flown in is 370.5 m — 1.9 pictures — so two is above every
+ * corridor the design describes. It costs its objects once at construction and
+ * nothing per frame; a corridor wider than this would draw a sparser field
+ * rather than a broken one.
+ */
+export const DUST_WIDEST = 2;
+
 /** One mote, in the tile's own coordinates. It has no velocity, by construction. */
 export interface Mote {
-  /** Across the design space, 0 to `DESIGN_WIDTH`. */
+  /**
+   * Across the **corridor**, 0 to 1.
+   *
+   * A fraction rather than a length because the corridor's width is a property
+   * of the field and this field is laid out once, at module load, before any
+   * field exists — see [`DUST_WIDEST`](#dust_widest).
+   */
   readonly x: number;
   /** Down the tile, 0 to `DUST_FIELD`. */
   readonly y: number;
@@ -422,8 +454,8 @@ export type Dust = readonly Mote[];
 export function dust(seed: number): Dust {
   const next = rng(seed);
   const motes: Mote[] = [];
-  for (let i = 0; i < DUST_CEILING * DUST_TILES; i++) {
-    motes.push({ x: next() * DESIGN_WIDTH, y: next() * DUST_FIELD });
+  for (let i = 0; i < DUST_CEILING * DUST_TILES * DUST_WIDEST; i++) {
+    motes.push({ x: next(), y: next() * DUST_FIELD });
   }
   return motes;
 }
@@ -435,8 +467,22 @@ export function dust(seed: number): Dust {
  * array, so the cap is a stated rule about the layer and not an accident of how
  * many motes happened to be laid out.
  */
-export function moteCount(dust: Dust, chain: number): number {
-  return Math.min(dust.length, (DUST_PER_SCREEN + chain * DUST_PER_CHAIN) * DUST_TILES);
+export function moteCount(dust: Dust, chain: number, across: number): number {
+  // **Scaled by how many pictures wide the corridor is**, so the constant keeps
+  // meaning *motes in a picture*: a field laid out over 1.9 pictures of width at
+  // the same count would be 1.9× sparser than the number says.
+  const pictures = across / DESIGN_WIDTH;
+  const wanted = (DUST_PER_SCREEN + chain * DUST_PER_CHAIN) * DUST_TILES * pictures;
+  // **The ceiling scales with the corridor and the array does not**, and the two
+  // must not be confused: the array is laid out for the *widest* corridor
+  // ([`DUST_WIDEST`](#dust_widest)) so that a knob has somewhere to go, and the
+  // ceiling is a stated rule about *this* field. Leaving the array length to do
+  // the capping is what `DUST_CEILING`'s own note warns against — *"the cap is a
+  // stated rule about the layer and not an accident of how many motes happened
+  // to be laid out"* — and in a corridor narrower than the widest it caps at the
+  // wrong number.
+  const ceiling = DUST_CEILING * DUST_TILES * pictures;
+  return Math.min(dust.length, Math.round(Math.min(wanted, ceiling)));
 }
 
 /**
@@ -464,12 +510,25 @@ export function drawDust(
   const top = seen.top + camera.y - DESIGN_HEIGHT / 2;
   const bottom = seen.bottom + camera.y - DESIGN_HEIGHT / 2;
 
-  // The tile hangs on the **corridor's centreline** rather than on the camera,
-  // which is what keeps a mote's position free of any camera term. The two are
-  // the same place today — the camera never pans sideways, measured over the
-  // 12 973 ticks of the author's dispatches — and if it ever does, this is the
-  // line that already answers correctly.
-  const left = corridor.centreline - DESIGN_WIDTH / 2;
+  // The tile hangs on the **corridor** rather than on the camera, which is what
+  // keeps a mote's position free of any camera term — and it spans the corridor
+  // rather than a picture, which is what the camera panning made necessary
+  // ([`DUST_WIDEST`](#dust_widest)).
+  //
+  // A field with no sides falls back to the design space: `check-portability`
+  // builds a corridor of infinite half-width on purpose, and an infinite tile
+  // puts every mote at `NaN`. It is the same guard [`hasRungs`](../state/rung.ts)
+  // exists for and the same field that found it.
+  const across = Number.isFinite(corridor.halfWidth) ? corridor.halfWidth * 2 : DESIGN_WIDTH;
+  const from = corridor.centreline - across / 2;
+
+  // **And culled sideways**, which the field being one picture wide used to make
+  // unnecessary. It spans the corridor now — 1.9 pictures — so without this a
+  // frame pays for nearly twice the motes it can show and the clip throws the
+  // rest away. The same conversion as the vertical bounds above: `seen` is in
+  // design coordinates and this draws in world ones.
+  const left = seen.left + camera.x - DESIGN_WIDTH / 2;
+  const right = seen.right + camera.x - DESIGN_WIDTH / 2;
 
   // A long exposure, and the trail points back the way the world came from: up
   // the picture while the craft climbs, down it while the craft falls.
@@ -486,7 +545,7 @@ export function drawDust(
   // subpaths rather than about speed.
   const stretched = Math.max(DUST_STREAK_FLOOR, 1 - Math.abs(capped) / DUST_STREAK_FADE);
 
-  const shown = moteCount(dust, chain);
+  const shown = moteCount(dust, chain, across);
 
   context.save();
   context.lineWidth = DUST_WIDTH;
@@ -509,7 +568,8 @@ export function drawDust(
       // chooses **which** repeat of the tile is the one in front of the picture.
       const y = top + wrap(mote.y - top, DUST_FIELD);
       if (y > bottom) continue;
-      const x = left + mote.x;
+      const x = from + mote.x * across;
+      if (x < left || x > right) continue;
       context.moveTo(x, y - streak);
       context.lineTo(x, y);
     }

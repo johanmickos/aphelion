@@ -222,7 +222,9 @@ The hottest, best-paid, most dangerous band of the boundary.
 **Corridor**:
 The field's sides and its foot — the region a run is flown inside. Today it is a constant
 half-width about a centreline; spec 17 narrows it with altitude. It has no top, because
-leaving through the top is the win rather than the loss.
+leaving through the top is the win rather than the loss. It is **wider than the picture**,
+and deliberately: what a player gives up by racing one side is sight of the other, which is
+where a **powerup** or the **anomaly** may be.
 _Avoid_: playfield, bounds, walls
 
 **Line**:

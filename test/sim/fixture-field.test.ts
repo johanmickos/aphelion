@@ -25,15 +25,23 @@ const bodies = field.bodies;
 
 describe('the fixture field', () => {
   /**
-   * The **bodies** are no wider than the design space, so the camera has nothing
-   * to pan toward to keep them framed. The two live in different layers and
-   * cannot import each other, so this is where they are held in agreement.
+   * The **bodies** are no wider than the design space about the centreline, so a
+   * camera parked there frames every one of them. The two live in different
+   * layers and cannot import each other, so this is where they are held in
+   * agreement.
    *
    * **The corridor is not**, and that is M1.4's, below.
+   *
+   * ⚠ It used to assert this through `camera.x`, on the reasoning that the camera
+   * *"has nothing to pan toward"*. The camera pans sideways since 2026-09-01, so
+   * the proxy is gone and the claim is made directly against the centreline —
+   * which is what it was always about. What the camera does open on is the
+   * **craft**, and the run opens 270 units left of the centreline because that is
+   * where the field spawns it.
    */
-  it('puts its bodies inside the design space, where the camera is looking', () => {
+  it('puts its bodies inside the design space about the centreline', () => {
     const camera = createPresentation(createInitialState(field, fixtureCraft(), 1)).camera;
-    expect(camera.x).toBe(DESIGN_WIDTH / 2);
+    expect(camera.x).toBe(fixtureCraft().x);
     for (const body of bodies) {
       expect(body.x - body.radius).toBeGreaterThanOrEqual(0);
       expect(body.x + body.radius).toBeLessThanOrEqual(DESIGN_WIDTH);

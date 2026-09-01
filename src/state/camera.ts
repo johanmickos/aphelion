@@ -8,19 +8,66 @@
  * the camera and the design space properly. This is the smallest one that can be
  * flown, and the plan records where the lines were drawn.
  *
- * ## It does not move sideways
+ * ## ⚠ It moves sideways now (author, 2026-09-01)
  *
- * The field is a corridor whose bodies fit inside the design space's width, so
- * the whole corridor is on screen at all times and there is nothing to pan
- * toward. That is not a small saving: the prototype's playfield is wider than
- * its window, and the four mechanisms it needs as a consequence — a horizontal
- * deadzone, a velocity look-ahead, a clamp to the field, and a backstop for the
- * frames the ease has not caught up on — all answer a question this field does
- * not ask. **The decision expires when the field outgrows the design space**,
- * which is M1.4's boundary and M3's corridor (spec 17 §4).
+ * It did not, and this file's own note said the decision *"expires when the
+ * field outgrows the design space, which is M1.4's boundary and M3's corridor"*.
+ * It had — the corridor is 1.9× the design width — and
+ * [M3.1](../../docs/plan/m3-the-field.md) has owed the axis since. The author
+ * called it due once the boundary was built:
  *
- * Everything below is therefore vertical, and the lock in particular is a
- * vertical lock. In a field that panned, the same blend would carry x too.
+ * > *"I think we need to add the sideways camera movements at this point to
+ * > properly test the off-screen boundaries."*
+ *
+ * **It is the same two mechanisms on a second axis, which is what the old note
+ * predicted**: *"in a field that panned, the same blend would carry x too."* The
+ * deadzone, its rounded edge, the follow ease and the lock are all shared —
+ * there is no sideways constant in this file, because there is no sideways
+ * question the vertical answers differently. What the prototype needed and this
+ * does not is a **clamp to the field** and a **backstop**: the corridor's line is
+ * enforced by [`visible`](../render/letterbox.ts), which already bounds the drawn
+ * world and was written against `camera.x` for this day.
+ *
+ * ## What it is worth, and what it costs
+ *
+ * M1.4 measured that the craft can be **538 design units outside the picture and
+ * still alive**. Measured over the 18 dispatches that replay at `SIM_VERSION` 9:
+ * the craft is outside the picture on **3.4% of ticks** without this and on
+ * **0.00%** with it. The whole of the M1.4 defect, closed.
+ *
+ * **And it is calmer than the axis that is already flown.** The parked camera
+ * session's second trap is that *"distance travelled is not what abrupt means —
+ * **jerk**, the tick-to-tick change in the view's velocity, is."* Measured that
+ * way over the same corpus, sideways against the shipped vertical:
+ *
+ * | jerk, design units | p50 | p90 | p95 | p99 | max |
+ * |---|---|---|---|---|---|
+ * | sideways | 0.01 | 0.44 | 0.55 | 0.77 | 12.35 |
+ * | vertical | 0.11 | 0.62 | 0.73 | 2.38 | 20.66 |
+ *
+ * Lower at every percentile, which is the measurement that says this will not
+ * read as the thing that evening was about. It is exactly still on 49% of ticks
+ * against the vertical's 31% — the craft weaves rather than climbing sideways, so
+ * the stillness is the run's and not the mechanism's, and the rounded edge is
+ * what keeps it from arriving with a step.
+ *
+ * ## ⚠ What this does **not** reopen
+ *
+ * The camera was parked on 2026-08-31 after eight corrections in one evening, and
+ * `docs/plan/m2-the-instrument.md` holds what they cost. **Every one of them was
+ * about the vertical axis** — the lock arriving, `OVAL_BAND`, the settle's
+ * descent, the framing clamp. Not one line of the `y` computation is touched
+ * here, so that evidence and those complaints are exactly where they were. What
+ * is added is an axis that never existed.
+ *
+ * **The look-ahead is deliberately not carried to `x`**, and that is the parked
+ * session's first measurement doing its job: `LOOK_AHEAD` is where the largest
+ * single-tick change in the view was found — 10.2 design units at a freeze
+ * against 3.1 at a release — and three corrections were made to the lock before
+ * anyone looked at it. Adding a second one on a new axis, before the author has
+ * flown the axis at all, is the same mistake with the order reversed. It is the
+ * obvious next lever if the view feels late going out to a wall, and it is the
+ * prototype's own axis for it (see [`LOOK_AHEAD`](#look_ahead)).
  *
  * ## The two mechanisms, and why they are two
  *
@@ -47,7 +94,7 @@
 import type { SimState } from '../sim/types.ts';
 import { FLOOR_GAP, MEDIAN_RADIUS, SCALE, SETTLE_TICKS } from '../sim/units.ts';
 import { easeStep } from './decay.ts';
-import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from './design.ts';
+import { DESIGN_HEIGHT, THUMB_LINE } from './design.ts';
 import type { CameraView } from './types.ts';
 
 /**
@@ -198,9 +245,17 @@ export const LOCK_TICKS = 20;
  * that never reached the picture.
  */
 
-/** Where the camera sits sideways: the corridor's centreline, always. */ /** Where the camera sits sideways: the corridor's centreline, always. */
-function centreline(): number {
-  return DESIGN_WIDTH / 2;
+/**
+ * Where the camera opens sideways: on the craft, exactly as it opens on the
+ * craft vertically.
+ *
+ * *"Placed, not eased into place"* — [`openCamera`](#opencamera)'s own rule, now
+ * that there is a second axis for it to be true of. The spawn stands 18 design
+ * units off the centreline, so this is a difference of 18 in the opening frame
+ * and a difference of principle: a run opens looking at the craft.
+ */
+function openX(sim: SimState): number {
+  return sim.craft.x;
 }
 
 /**
@@ -211,7 +266,7 @@ function centreline(): number {
  * that as the reason its own reset is a placement.
  */
 export function openCamera(sim: SimState): CameraView {
-  return { x: centreline(), y: sim.craft.y, lock: 0, offset: 0 };
+  return { x: openX(sim), y: sim.craft.y, lock: 0, offset: 0 };
 }
 
 /**
@@ -268,8 +323,17 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   // of the view on the same tick it lets go of the body. See the note above
   // `centreline`: what this drops is the *subject*, and the deadzone and the
   // follow ease are what turn that into a movement.
-  const offset =
-    lock > 0 ? (stillPoint(previous.y, sim.field.bodies[sim.heldBody!]!.y) - craftY) * lock : 0;
+  const body = sim.heldBody === null ? null : sim.field.bodies[sim.heldBody]!;
+  const offset = lock > 0 && body !== null ? (stillPoint(previous.y, body.y) - craftY) * lock : 0;
+
+  // **The same displacement on the second axis.** An orbit goes round in `x` as
+  // well as in `y` — the craft's excursion sideways through a settled orbit is
+  // the same diameter — so the lock that stops the world sliding vertically has
+  // to stop it sliding sideways too, or a locked view holds one axis still and
+  // lets the other swing by the orbit's width. It is the same `lock`, the same
+  // still point and the same clamp; only the coordinate differs.
+  const offsetX =
+    lock > 0 && body !== null ? (stillPoint(previous.x, body.x) - sim.craft.x) * lock : 0;
 
   // **Look where you are going.** Off entirely once the dive has frozen, which is
   // the prototype's own hard-learned gate rather than a precaution: after the
@@ -282,11 +346,16 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   const lead = sim.orbit === null ? leadOf(sim.craft.vy) : 0;
 
   const subjectY = craftY + offset + lead;
+  const subjectX = sim.craft.x + offsetX;
+  const band = bandOf(sim);
+  const step = easeStep(FOLLOW_RATE);
   return {
-    x: centreline(),
-    y:
-      previous.y +
-      (targetY(previous.y, subjectY, bandOf(sim)) - previous.y) * easeStep(FOLLOW_RATE),
+    // **The same blend, on both axes**, which is what the note this file used to
+    // carry predicted it would be. There is deliberately no sideways constant:
+    // the deadzone is a body's floor radius and a floor radius has no axis, and
+    // the follow rate is a rate. See the header.
+    x: previous.x + (toward(previous.x, subjectX, band) - previous.x) * step,
+    y: previous.y + (toward(previous.y, subjectY, band) - previous.y) * step,
     lock,
     offset,
   };
@@ -304,15 +373,24 @@ function leadOf(vy: number): number {
 }
 
 /**
- * The point a locked view holds on: where it already is, unless that is too far
- * from the body to keep the orbit framed.
+ * The point a locked view holds on, on one axis: where it already is, unless
+ * that is too far from the body to keep the orbit framed.
+ *
+ * Axis-free, and called once per axis — the clamp is a distance from the body
+ * and [`DEADZONE`](#deadzone) is a floor radius, neither of which has a
+ * direction.
  */
-function stillPoint(cameraY: number, bodyY: number): number {
-  return Math.min(Math.max(cameraY, bodyY - DEADZONE), bodyY + DEADZONE);
+function stillPoint(camera: number, body: number): number {
+  return Math.min(Math.max(camera, body - DEADZONE), body + DEADZONE);
 }
 
 /**
- * Where the camera would like to be: the deadzone, and nothing else.
+ * Where the camera would like to be on one axis: the deadzone, and nothing else.
+ *
+ * **One function, both axes** since the sideways axis landed — it was `targetY`
+ * and nothing in it was ever vertical. The warning below is the reason it is
+ * worth keeping one copy: a second one is a second thing that can be given a
+ * centred default.
  *
  * The camera stays exactly where it is unless the subject leaves the band, and
  * then moves only enough to bring it back to the band's edge — never toward the
@@ -332,9 +410,9 @@ function stillPoint(cameraY: number, bodyY: number): number {
  * is the 46 design units the ramp still travelled after the anchor was fixed,
  * and it is what this comment exists to stop being reintroduced.
  */
-function targetY(cameraY: number, subjectY: number, band: number): number {
-  const offset = subjectY - cameraY;
-  return cameraY + offset - held(offset, band);
+function toward(camera: number, subject: number, band: number): number {
+  const offset = subject - camera;
+  return camera + offset - held(offset, band);
 }
 
 /** How wide the band is right now — see `OVAL_BAND`. */
