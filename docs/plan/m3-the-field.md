@@ -1292,9 +1292,14 @@ reads it — this is `test/sim/version.test.ts`'s own *picture, not flight* case
 question (*did a tick move?*) is no. Every dispatch that replayed still replays.
 
 **The shipped pilot fixture is unchanged**: it says one knock, on tick 386, at every band from 0.15
-down to 0.005, and its aim of 0.305 is head-on at its speed. The goldens did not move, which also
-means the gap named above the fixture — *nothing in the repo tests that the knock can still be
-earned* — is still open and still worth closing.
+down to 0.005, and its aim of 0.305 is head-on at its speed. The goldens did not move.
+
+⚠ **And the gap named above the fixture — *nothing in the repo tests that the knock can still be
+earned* — was already closed and the note was stale.** It was written before `test/moments.ts`, whose
+`each()` throws when a moment it is asked for happened *fewer than once*: `KNOCKS` is found rather
+than named, so a dive or clearance change that silenced the word fails the golden by name instead of
+passing vacuously. Checked rather than assumed — that is the whole point of finding moments rather
+than pinning ticks, and this plan had not caught up with it. **There is nothing to do here.**
 
 **`KNOCK_WORDS` is untouched**, so the determinism note above still stands and extending the list is
 still wanted.
