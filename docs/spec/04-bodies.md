@@ -131,6 +131,32 @@ terminator, no implied depth. The world is side-on and has no light source to sh
 | Strata | Concentric internal rings at 0.68r and 0.39r | Identity hue at α 0.22 and 0.14 | Structure without texture |
 | Core | Filled dot at centre, r = 0.08 × body radius | Identity hue at α 0.55–0.8 by state | The **type slot** |
 
+> ## ⚠ A **held** body's disc carries its own light (author, 2026-09-01)
+>
+> The Disc row above is `#100C20` for every state, and it is overruled for HELD only:
+>
+> > *"I think grabbed planets should have their color fill their bodies a bit, rather than the nearly
+> > pure black. Especially when I go through the anomaly field the contrast is really odd: the planet
+> > is active and glowing, but its body is nearly black, while the anomaly lies behind it. It makes
+> > the planet feel like a hole going to something below/deeper than the anomaly, which messes with
+> > the depth perception."*
+>
+> **The hole is arithmetic, not an impression.** The disc is (16, 12, 32). The anomaly's cloud bed
+> stacks four puffs to about α 0.40, which over spec [05 · §5](./05-field.md)'s true-black gaps is
+> **(102, 38, 65)** in ION and **(63, 43, 102)** in AURORA — so what is drawn *behind* the body is two
+> to six times brighter than the body in every channel, and a darker shape over a lighter ground reads
+> as a hole through it. The depth cue was inverted.
+>
+> The disc is therefore washed with its own identity at **α 0.30** while held, which lands it between
+> (11, 64, 85) and (74, 48, 83) across the hues this field places — level with the bed, so the body
+> sits *on* the weather instead of behind it. **The row's own second rule survives by construction**:
+> identity's lightness is fixed at `oklch(0.72 …)` (spec 00 §2) and the craft's CORE is
+> (255, 244, 224), so a disc washed at any alpha at all stays *never brighter than the craft*, and
+> this one is under a third of it.
+>
+> **HELD only**, which is what was asked. The same argument would extend to IN_REACH; it is left at
+> zero until the author says. `HELD_FILL` is on the bench.
+
 **Scale rule**: rim 2.5px and tide 4px are constant in design px **regardless of body radius**.
 Small bodies read as bright rings; giants as thin luminous horizons.
 

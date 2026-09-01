@@ -391,6 +391,14 @@ export function lockOf(sim: SimState): number {
   // so this is the one constant on the boundary the spec itself sends to a bench.
   // 640 m/s is derived from Direction 07's own ratio of `K` to its fastest dive,
   // and the acceptance criterion caps it independently at 807.
+  // The author overruled spec 04 §1's flat `#100C20` disc for a held body on
+  // 2026-09-01. 0.30 is derived against the anomaly's own cloud bed rather than
+  // chosen, and how much of it a body wants is still a moving picture.
+  settable(
+    'src/render/index.ts',
+    'HELD_FILL',
+    'how much of its own light a held body\u2019s disc carries \u2014 0 is spec 04\u2019s flat black',
+  ),
   settable(
     'src/state/boundary.ts',
     'CLOSING_CONSTANT',

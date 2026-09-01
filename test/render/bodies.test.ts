@@ -20,7 +20,10 @@ import { createPresentation } from '../../src/state/derive.ts';
 import { BOARD_PIXEL, DESIGN_WIDTH } from '../../src/state/design.ts';
 import { grabRange } from '../../src/sim/grab.ts';
 import { draw } from '../../src/render/index.ts';
-import { openField } from '../sim/fixtures.ts';
+import { openField, holdWithoutGrabbing } from '../sim/fixtures.ts';
+import { BODY_FILL } from '../../src/render/palette.ts';
+import { HELD_FILL } from '../../src/render/index.ts';
+import { hueOf } from '../../src/state/identity.ts';
 
 interface Stroke {
   readonly radius: number;
@@ -40,10 +43,10 @@ interface Stroke {
 function recorder(): {
   context: CanvasRenderingContext2D;
   strokes: Stroke[];
-  fills: Array<{ radius: number }>;
+  fills: Array<{ radius: number; style: string }>;
 } {
   const strokes: Stroke[] = [];
-  const fills: Array<{ radius: number }> = [];
+  const fills: Array<{ radius: number; style: string }> = [];
   let pending: { radius: number; sweep: number | null } | null = null;
   const context = {
     canvas: { width: 1170, height: 2532 },
@@ -78,7 +81,11 @@ function recorder(): {
       // is filled rather than stroked — and since 2026-08-30 it is the only
       // thing left inside a body besides its one stratum, so a test that could
       // not see it could not tell a body with a type slot from one without.
-      if (pending !== null) fills.push({ radius: pending.radius });
+      // The **style** as well as the radius since 2026-09-01: a held body's disc
+      // is filled twice — `#100C20` and then its own identity over it — and a
+      // recorder that could not see the colour could not tell the two apart.
+      if (pending !== null)
+        fills.push({ radius: pending.radius, style: String(context.fillStyle) });
     },
     arc: (_x: number, _y: number, radius: number, from: number, to: number) => {
       const sweep = to - from;
@@ -120,7 +127,7 @@ function strokesFor(radius: number, closing = FAR): Stroke[] {
 }
 
 /** The same body, and what the renderer *filled* rather than stroked. */
-function fillsFor(radius: number, closing = FAR): Array<{ radius: number }> {
+function fillsFor(radius: number, closing = FAR): Array<{ radius: number; style: string }> {
   const body = createBody(DESIGN_WIDTH / 2, 0, radius);
   const craft = createCraft(DESIGN_WIDTH / 2, grabRange(body) * (1 - closing), 0, 0);
   const { context, fills } = recorder();
@@ -387,5 +394,66 @@ describe('a body’s anatomy', () => {
   it('keeps the core dot the body types are drawn from', () => {
     const filled = fillsFor(large, 0.7).filter((f) => f.radius > 0);
     expect(filled.some((f) => Math.abs(f.radius / large - 0.08) < 1e-9)).toBe(true);
+  });
+});
+
+/**
+ * The disc, and the author's ruling that a held body carries a little of its own
+ * light (2026-09-01).
+ *
+ * > *"The planet is active and glowing, but its body is nearly black, while the
+ * > anomaly lies behind it. It makes the planet feel like a hole going to
+ * > something below/deeper than the anomaly, which messes with the depth
+ * > perception."*
+ *
+ * ⚠ Spec [04 · §1](../../docs/spec/04-bodies.md)'s table fixes the disc at
+ * `#100C20` for every state; this overrules it for **HELD** and leaves the other
+ * three exactly as the spec has them, which is what the two halves below assert.
+ */
+describe('a held body carries a little of its own light', () => {
+  /** One body, held, drawn — the state a grab puts the game in. */
+  function discOf(held: boolean): Array<{ radius: number; style: string }> {
+    const body = createBody(DESIGN_WIDTH / 2, 0, MEDIAN_RADIUS);
+    const craft = createCraft(DESIGN_WIDTH / 2, grabRange(body) * 0.6, 0, 0);
+    const state = createInitialState(openField([body]), craft, 1);
+    if (held) holdWithoutGrabbing(state);
+    const { context, fills } = recorder();
+    draw(createPresentation(state), context);
+    // The disc is the fill at the body's own radius; the core is a smaller one
+    // and the bloom is a gradient rather than a flat style.
+    return fills.filter((fill) => Math.abs(fill.radius - MEDIAN_RADIUS) < 1e-9);
+  }
+
+  it('washes the disc in its identity when held, and only when held', () => {
+    const loose = discOf(false);
+    const held = discOf(true);
+
+    // Not held: one fill, and it is spec 04 §1's `#100C20` exactly.
+    expect(loose).toHaveLength(1);
+    expect(loose[0]!.style).toBe(BODY_FILL);
+
+    // Held: the same disc, and its own identity over it.
+    expect(held).toHaveLength(2);
+    expect(held[0]!.style).toBe(BODY_FILL);
+    expect(held[1]!.style).toBe(`oklch(0.72 0.13 ${hueOf(0)} / ${HELD_FILL})`);
+  });
+
+  /**
+   * **The number is derived against the anomaly rather than chosen**, and this is
+   * the constraint it was derived to clear: the anomaly's cloud bed stacks to
+   * about α 0.40 in ION, which over the true-black gaps is (102, 38, 65) —
+   * brighter in every channel than the disc's own (16, 12, 32). A darker shape
+   * over a lighter ground reads as a hole through it, which is the report.
+   *
+   * Asserted as the two rules the wash sits between rather than as its value: it
+   * has to be enough to leave the bed, and spec 04 §1's *"never brighter than the
+   * craft"* has to survive. The craft's CORE is (255, 244, 224) and identity's
+   * lightness is fixed at 0.72 by spec 00 §2, so the upper rule holds for any
+   * wash at all — which is worth stating, because it is what makes this safe to
+   * move on the bench.
+   */
+  it('is washed enough to leave the anomaly behind it, and never near the craft', () => {
+    expect(HELD_FILL).toBeGreaterThan(0.24);
+    expect(HELD_FILL).toBeLessThan(1);
   });
 });

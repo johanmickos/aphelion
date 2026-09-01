@@ -167,13 +167,58 @@ interface Look {
   /** The outer stratum's alpha; the inner takes §1's ratio of it. */
   readonly strata: number;
   readonly core: number;
+  /**
+   * How much of the body's own identity is washed over its disc, 0 to 1 — and
+   * **zero for every state but HELD**, which is the author's ruling of
+   * 2026-09-01. See [`HELD_FILL`](#held_fill).
+   */
+  readonly fill: number;
 }
 
+/**
+ * How much of its own identity a **held** body's disc is washed with — **0.30,
+ * and it is derived against the anomaly rather than chosen.**
+ *
+ * ## ⚠ Spec 04 §1 fixes the disc at `#100C20` for every state, and the author
+ * overruled it, 2026-09-01
+ *
+ * > *"I think grabbed planets should have their color fill their bodies a bit,
+ * > rather than the nearly pure black. Especially when I go through the anomaly
+ * > field the contrast is really odd: the planet is active and glowing, but its
+ * > body is nearly black, while the anomaly lies behind it. It makes the planet
+ * > feel like a hole going to something below/deeper than the anomaly, which
+ * > messes with the depth perception."*
+ *
+ * **The hole is literal, and it is arithmetic.** Spec 04 §1's disc is
+ * `#100C20` = (16, 12, 32). The anomaly's cloud bed stacks four puffs at
+ * [`CLOUD_ALPHA`](./anomaly.ts) to about 0.40, which over the true-black gaps is
+ * **(102, 38, 65)** in ION and **(63, 43, 102)** in AURORA. So the thing drawn
+ * *behind* the body is between two and six times brighter than the body in every
+ * channel, and a darker shape over a lighter ground reads as a hole through it.
+ * Nothing about that is a taste; the depth cue is inverted.
+ *
+ * **0.30 is where it stops being one.** Washed at that alpha the disc lands
+ * between (11, 64, 85) and (74, 48, 83) across the hues this field places —
+ * summed brightness 160 to 205 against the cloud bed's 205. Level with the bed,
+ * so the body sits *on* the weather instead of behind it, and no further: the
+ * disc is still far darker than its own rim, so §1's structure survives.
+ *
+ * **Spec 04 §1's other rule is untouched, by construction.** *"Never brighter
+ * than the craft"*: identity's lightness is fixed at `oklch(0.72 …)` (spec 00 §2)
+ * and the craft's CORE is (255, 244, 224), summed 723 — so a disc washed at *any*
+ * alpha up to 1 stays below it, and this one is under a third of it.
+ *
+ * **HELD only, which is what was asked.** The same argument would extend to
+ * `IN_REACH` — it is lit too — and that is one number in the table below rather
+ * than a change of shape. It is left at zero until the author says.
+ */
+export const HELD_FILL = 0.3;
+
 const LOOK: Readonly<Record<BodyState, Look>> = {
-  AHEAD: { rim: 2.5, rimStrength: RIM_AT_REST, strata: 0.1, core: 0.3 },
-  IN_REACH: { rim: 2.25, rimStrength: RIM_IN_REACH, strata: 0.18, core: 0.5 },
-  HELD: { rim: 2.5, rimStrength: 1, strata: 0.3, core: 0.8 },
-  SPENT: { rim: 1.5, rimStrength: 0.5, strata: 0.14, core: 0.5 },
+  AHEAD: { rim: 2.5, rimStrength: RIM_AT_REST, strata: 0.1, core: 0.3, fill: 0 },
+  IN_REACH: { rim: 2.25, rimStrength: RIM_IN_REACH, strata: 0.18, core: 0.5, fill: 0 },
+  HELD: { rim: 2.5, rimStrength: 1, strata: 0.3, core: 0.8, fill: HELD_FILL },
+  SPENT: { rim: 1.5, rimStrength: 0.5, strata: 0.14, core: 0.5, fill: 0 },
 };
 
 /**
@@ -489,6 +534,21 @@ function drawBody(context: CanvasRenderingContext2D, body: BodyView): void {
   context.arc(body.x, body.y, body.radius, 0, Math.PI * 2);
   context.fillStyle = BODY_FILL;
   context.fill();
+
+  // **A held body's disc carries a little of its own light** — the author's
+  // ruling of 2026-09-01, and [`HELD_FILL`](#held_fill) carries the arithmetic.
+  // Washed over the disc rather than mixed into it because `identity` is an
+  // oklch colour and `BODY_FILL` a hex one, and because this is spec 00 §1's own
+  // alpha rule: the colour is unchanged and only its strength moves, so the
+  // frame still resolves to eight names and hue still means only identity.
+  //
+  // Skipped entirely at zero, which is every state but HELD and therefore almost
+  // every body in the picture — one extra fill on the one body being flown, not
+  // on the field.
+  if (look.fill > 0) {
+    context.fillStyle = paint(look.fill);
+    context.fill();
+  }
 
   // Strata — concentric internal rings, "structure without texture" (§1). The
   // outer takes the state's own alpha and the inner is the ratio §1 states
