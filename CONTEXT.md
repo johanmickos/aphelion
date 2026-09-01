@@ -185,6 +185,29 @@ reward, not a line — intensity tracks how fast the craft is closing on it, not
 it is.
 _Avoid_: wall, edge, barrier
 
+**Heat**:
+How hard the **boundary** is answering, in one number. A function of **closing speed**
+first and of distance only as a sharpener, which is the whole of the boundary's first law —
+*a barrier reacts to where you are; a risk reacts to what you are doing*. Everything the
+edge draws is drawn at it: the gradient, the **boundary motes**, the label and the
+**line**'s own stroke. There is one per side, so diving at one **line** flares it and calms
+the other in the same frame.
+_Avoid_: intensity, alarm, danger, proximity (that is the thing it is deliberately not),
+threat level
+
+**Closing speed**:
+How fast the craft is closing on one **line**, and zero when it is receding. Not the
+**craft**'s speed and not **world speed** — a third quantity, and the three are nowhere near
+each other: a craft skimming a **line** flat out is closing on it at nothing.
+_Avoid_: approach rate, wall speed, closure
+
+**Boundary mote**:
+The drifting specks that say what a band pays. Denser and brighter deeper in, absent past
+the **line**, and one of them in each band carries that band's multiplier as a label. They
+are **dust** at a different density and alpha, and they drift at **world speed** like it.
+The glimmer is the signpost and the label is the price; neither is an instruction.
+_Avoid_: particle, spark, pickup (nothing is collected — a mote is a sign, not a thing)
+
 **Fire band**:
 The hottest, best-paid, most dangerous band of the boundary.
 
@@ -437,6 +460,10 @@ than forgotten. What marks a release instead is the **callout** and the craft's 
 punch"* — and flown, even 30ms read as the game buffering. The punch is bought with speed
 instead: see **Punch**. The word is kept here so that a reader who meets it in an older
 document knows it was decided against rather than forgotten.
+⚠ **And the refusal covers death too** (2026-09-01). Spec 07 §6 puts a 70ms hitstop at the
+**line**, which this entry did not name — but the ADR's reason is not about which event the
+freeze follows: 30ms was refused at *every length tried*, 70 is longer, and stopping the step
+breaks the fixed timestep either way. So the loss opens at T0 like the release does.
 
 **Coasting**:
 Flying without being engaged with a body. Earns nothing and costs nothing.

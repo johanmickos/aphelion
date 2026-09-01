@@ -227,6 +227,33 @@ retuning them is theirs. `test/state/goldens.test.ts` pins the breach exactly �
   circularizing it jumps to show a different one."* This is **not** the grab-time case fixed on
   2026-08-30 (`goldens.test.ts` still holds that one): it is a second transition, dive → settle,
   where the predicted path hands over to the frozen one.
+- ⚠ **The predicted oval is not the line the craft flies** — reported 2026-09-01, *"the last planet
+  I was capturing showed a large oval orbit. My ship was travelling OUTSIDE of that oval, and
+  deviating further. I think that we should not show the oval orbit like this when it's not the true
+  ship trajectory. It is confusing."*
+
+  **Measured over the 18 replayable dispatches, and it reproduces.** Comparing the craft's own radius
+  against the drawn path's radius at the craft's own bearing, over the 3 002 ticks that draw a
+  **predicted** path: the craft is **outside its own drawn oval on 78.6% of them**, median 1.11×, p95
+  1.48×, worst **402 design units** — a third of the design space's width. The 11 112 ticks that draw
+  the **frozen** orbit are exact by construction, so this is entirely the `predictOrbit` case.
+
+  **One correction to the description, and it points at the fix.** The error does not grow: in **0 of
+  62 episodes** does it end wider than it started. Every one converges — 1.64 → 1.05, 1.59 → 1.01 —
+  because the prediction firms up as the dive proceeds, which is what spec 00 §5's fade is drawn to
+  show. What the author is seeing is the **oval shrinking onto the craft** while the craft flies
+  outward past it, and relative motion in a picture reads as divergence whichever half is moving.
+
+  **So the worst frame is the first one drawn**, and the existing guard is aimed one step too early:
+  `compassOf` suppresses the path only while a clearance is owed (the 2026-08-30 fix for *"a large
+  oval… then it switches"*), and the path then switches on at 1.4 – 1.6× and shrinks. The levers are
+  to hold the path until the prediction is within a stated tolerance of the craft, or to fade it in on
+  that error rather than on a clock. **Both change what the instrument promises, so the ruling is the
+  author's**; nothing was changed here, because this is M3.4's step and the compass is not in it.
+
+  ⚠ The dispatch named in the report (`2026-09-01T18-24-19-712Z`) is **timing-only** — 108 ticks, an
+  empty input log, no grab in it at all — so it cannot be the run described. The measurement above is
+  over the whole corpus instead.
 
 ### Two more from the same sitting, 2026-08-30
 
@@ -967,6 +994,132 @@ field.
 
 **Acceptance**: skimming parallel keeps the edge calm; a dive flares it; the deadline dot is
 the last tick a save is possible. **Verify**: `pnpm test` plus eyes.
+
+### ⚠ Built, 2026-09-01 — and it needs the author on one thing
+
+The bands are built: the three laws, the two bands and their dashed edges, the gradient, the motes,
+the labels, the line, and the AURORA a shelter paints them in. `src/state/boundary.ts` holds the
+geometry and the law and `src/render/boundary.ts` the paint, split the way `rung.ts` and `rungs.ts`
+are — so the whole first law is asserted in `test/state/boundary.test.ts` without a canvas, and
+everything the canvas is actually asked for is asserted in `test/render/bands.test.ts`.
+
+**Nothing here moved `SIM_VERSION` or `FIXTURE_FIELD_VERSION`.** The line has killed since M1.4;
+this is the picture of it.
+
+#### **The one that needs the author: on a phone the boundary is nearly all off screen**
+
+Spec [00 · §7](../spec/00-tokens.md) rules that **the width is the contract** — 1170 design units
+across, always — so a phone in portrait gets the design space's exact width and no horizontal bleed.
+The corridor is 1.9× that. Measured against the fixture field, off the centreline:
+
+| | design units | metres |
+|---|---|---|
+| picture edge | **585** | 195 |
+| outer band starts (line − 220 m) | 452 | 150 |
+| fire band starts (line − 90 m) | 842 | 281 |
+| **the line** | **1112** | 370 |
+
+So **34% of the outer band is visible, 0% of the fire band is, and the line sits 527 design units —
+176 m — outside the picture**, on every tick of every run, because the camera does not pan sideways.
+A desktop window at 1440 × 900 shows all of it, **which is why the bench has never shown this.**
+
+**Nothing was moved to compensate**, because every candidate answer spends something that belongs to
+somebody else: widening the bands is spec 07 §2's geometry and spec 17 §4's corridor against a metre
+spec 05 §3's notice settled by argument; panning the camera is parked and is M8's dependency;
+narrowing the corridor has a written argument for why it is the narrowest this field can be flown in;
+and drawing at the screen edge is what §2 refuses in the same sentence it states the bands.
+
+What a phone *does* get is the outer band's inner edge and the first third of its gradient — which is
+the *"warning that there is more"* reading, delivered for free by building at the spec's own
+geometry. **Whether that is the whole answer is the author's**, and building it unchanged is the only
+answer that leaves every door open. `test/render/bands.test.ts` holds the table, so whatever is ruled
+fails there first.
+
+#### `K` is 640 m/s, and the board's own 120 could not cross
+
+Spec 07 §3 says only *"tuned on the phone"*. Direction 07's live component — the only place the
+boundary has ever been drawn — runs this exact formula at `closing / 120`, with `closing` in board
+pixels per second, and board pixels are metres here. **Carried at face value that makes the edge a
+switch**: the closing term alone reaches 1.75 at the median dive this game flies, past the cap before
+proximity is applied, so every dive would be identical and maximal. It is exactly `DUST_EXPOSURE`'s
+recorded failure — a number carried without the regime it was measured in.
+
+What crosses is the board's **ratio**. Re-run headlessly at its authored default (`aggression` 1, on
+a 0.3 – 2 slider) its demo craft dives at up to **83** against a `K` of 120, so its fastest dive
+lands at **0.69 K**. The fastest closing ever flown at this boundary is **442 m/s**, over the 18
+dispatches that replay at `SIM_VERSION` 9 — 21 012 ticks, 1 935 of them inside the bands. That is
+`442 × 120 / 83 = 639`.
+
+**And spec 07's own acceptance caps it independently at 807**, from its weakest case: the median dive
+the corpus flies into the fire band (210 m/s) clearing 0.6 at the fire band's shallowest point, where
+proximity is only 1.67. A value derived from the board and a ceiling argued from the spec agree from
+opposite directions with nothing in common.
+
+What it does, over the corpus:
+
+| | heat p50 | heat p95 | ≥ 0.6 | at the cap |
+|---|---|---|---|---|
+| Holding a body, inside the bands (n = 1 464) | 0.16 | 0.70 | 8.7% | 1.5% |
+| Coasting, inside the bands (n = 471) | 0.51 | 0.85 | 28.5% | 11.9% |
+| Inside the fire band (n = 81) | 0.85 | — | 98.8% | 58.0% |
+
+The band the player *lives* in idles at 0.16 and the fire band flares. And the spec's *"within
+500 ms"*: over the corpus, **95.8% of rises from ≤ 0.25 to > 0.6 happen inside 500 ms**, at a median
+of 67 ms.
+
+#### The acceptance's first criterion is unsatisfiable inside 40 m, and `K` is not why
+
+*"Flying parallel inside the fire band produces `heat ≤ 0.25` sustained."* At zero closing the
+formula is `0.10 × (1 + 60/d)`, which passes 0.25 at **d = 40 m** — with no closing at all and
+whatever `K` is. The fire band starts at 90 m, so the criterion holds over its outer 56% and is false
+over its inner 40 m from the proximity term alone. Asserted where it holds, recorded where it does
+not; **the ruling is the author's.**
+
+#### What is not built, and why it is an ordering rather than an omission
+
+- **The save and the burn** (§5). A save is a press that carves the craft back into the field, so it
+  changes what a tick does with a press — `SIM_VERSION` moves, and the parked camera session's only
+  evidence is the corpus that a bump deletes. Spec 05 §5's ordering already covers it.
+- **The deadline track** (§4). Its dot is *"the last press that can still save the run"*, and there
+  are no saves to be last among. **But the projection question is settled and free**: a craft leaving
+  the field is coasting, a coasting craft feels no gravity at all, so its projected line is a
+  **straight ray** — exact, one intersection, no integration. Measured: all 81 fire-band ticks and
+  both out-of-bounds deaths in the corpus happened while coasting, and the closest a craft holding a
+  body has ever come to the line is **91 m**, outside the fire band entirely. The conic case does not
+  arise.
+- **Fuel** is M4's, and it is what §4's convergence prices the save by.
+- **The debrief card** is M6's.
+
+#### The hitstop is refused, and the refusal now names death
+
+§6 puts a **70ms hitstop** at the line. [ADR-0012](../adr/0012-the-punch-is-bought-with-speed-not-with-stopped-time.md)
+rejected the hitstop and `CONTEXT.md` scopes that refusal to *"a brief world freeze at grab and
+release"*, which does not name death — so it was not covered. It is now, on the ADR's own argument
+rather than by extension: the ADR's ruling is *"even a 30ms stop made it feel like the game was
+buffering"*, at **every length tried**, and 70 ms is longer than the 30 that was refused. The ADR
+also records that stopping the step breaks the fixed timestep. Neither of those reasons is about
+*which event* the freeze follows. And it cannot be built here anyway: a time scale is a simulation
+change and `SIM_VERSION` may not move. **§6's `70ms hitstop` row is therefore refused**, and the
+death sequence's remaining beats are dated from T0.
+
+#### What it cost, through the census
+
+Per frame, over the shipped run, at the design space's own size — which is a phone's share of the
+bands:
+
+| | before | after |
+|---|---|---|
+| gradients | 4.43 | 6.43 |
+| arcs | 31.4 | 37.1 |
+| strokes | 46.7 | 54.4 |
+| path points | 173.0 | 190.7 |
+| blended, screens | 1.96 | 2.19 |
+
+**Two costs were found by measuring rather than by looking**, and both are the same mistake: the
+motes and the gradient were drawn across the whole band and left to the clip. On the one device where
+the band is mostly off screen that is the whole point — the wash alone was **1.13 screens a frame**
+against the 0.23 actually visible. Culled sideways, it is 0.23. `test/census.test.ts` holds the
+ceiling that fails if the clip is ever dropped.
 
 ---
 

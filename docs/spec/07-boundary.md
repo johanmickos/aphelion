@@ -15,6 +15,72 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 
 ---
 
+> ## ⚠ Built, 2026-09-01 — the bands, and only the bands
+>
+> **§1, §2, §3 and §7 are built** ([M3.4](../plan/m3-the-field.md)): the three laws, the two bands
+> and their dashed edges, the gradient, the motes, the labels, the line, and the AURORA a shelter
+> paints them in. `src/state/boundary.ts` holds the geometry and the law and
+> `src/render/boundary.ts` the paint, split the way `rung.ts` and `rungs.ts` are.
+>
+> **§4, §5 and §6 are not, and the reason is an ordering rather than an omission.** The **save** is a
+> press that carves the craft back into the field, so it changes what a tick does with a press — it
+> moves `SIM_VERSION`, and the parked camera session's only evidence is the dispatch corpus that a
+> bump deletes. Spec [05 · §5](./05-field.md) already carries the ordering this obeys: M3.4, M3.5,
+> M3.6, the camera, M4's fuel, and then the anomaly in one deliberate bump. The **deadline track**'s
+> dot is *"the last press that can still save the run"* and there are no saves to be last among, so
+> it waits on the same bump. The **debrief card** is M6's.
+>
+> **What the projection turns out to be, settled and free.** §4's track is drawn on the craft's own
+> projected line, and `predictOrbit` draws a conic for a bound craft. A craft leaving the field is
+> **coasting**, and a coasting craft *"feels nothing, from anything, at any distance"*
+> (`CONTEXT.md`) — so its projected line is a **straight ray**, exactly, and the track costs one
+> intersection with no integration at all. Measured over the 18 replayable dispatches: **all 81
+> fire-band ticks and both out-of-bounds deaths happened while coasting**, and the closest a craft
+> holding a body has ever come to the line is 91 m — outside the fire band entirely. The conic case
+> does not arise.
+>
+> ### `K` is 640 m/s, and the board's own 120 could not cross
+>
+> §3 says only *"tuned on the phone"*. Direction 07's live component runs this exact formula at
+> `closing / 120` with `closing` in board pixels per second, and board pixels are metres here — but
+> carried at face value the closing term reaches 1.75 at the **median dive this game flies**, past
+> the cap before proximity applies. Every dive would be identical and maximal. What crosses instead
+> is the board's **ratio**: re-run headlessly at its authored default its demo craft dives at up to
+> 83 against a `K` of 120, so its fastest dive lands at **0.69 K**. Applied to the fastest closing
+> ever flown at this boundary — **442 m/s** — that is 639.
+>
+> The acceptance below caps it independently at **807**, from its weakest case: a median flown dive
+> (210 m/s) clearing 0.6 at the fire band's shallowest point. A value derived from the board and a
+> ceiling argued from this spec agree from opposite directions, and 640 sits inside it with margin.
+>
+> ### ⚠ The first acceptance criterion is unsatisfiable inside 40 m, and `K` is not why
+>
+> *"Flying parallel to the line inside the fire band produces `heat ≤ 0.25` sustained."* At zero
+> closing the formula returns `0.10 × (1 + 60/d)`, which passes 0.25 at **d = 40 m** — with no
+> closing speed at all and whatever `K` is. The fire band starts at 90 m, so the criterion holds over
+> its outer 56% and is false over its inner 40 m by the proximity term alone. That is a property of
+> the formula this section states, not of anything tuned. It is asserted where it can hold and
+> recorded where it cannot; **the ruling is the author's.**
+>
+> ### ⚠ Two wordings taken a particular way
+>
+> - §2's label anchor says *"~14 **design** px"* where the row above says the type is *"9px"*. Read
+>   literally the offset is 4.7 board pixels — half the height of the type it offsets — so the label
+>   would sit on the mote it captions. It is carried at `BOARD_PIXEL` like every other board number.
+> - §2's label row says the label *"rises with `heat` exactly as the gradient and the motes do"*, and
+>   the gradient rises from **nothing** — so read literally the motes go out whenever the edge is
+>   calm, which is the one moment a **price tag** most needs to be readable. Direction 07's own motes
+>   do not scale with heat at all. They rise from a floor instead (`MOTE_AT_REST`, an opening
+>   position on the bench), which is neither reading and is where the author settles it.
+>
+> ### ⚠ And §5's debrief line says `SKIMMED THE RIGHT WALL`
+>
+> `CONTEXT.md` lists **wall** under *_Avoid_* for both **boundary** and **line**. The line is spec
+> [06 · §8](./06-awards.md)'s to assemble and M6's to build; it is flagged here so it is decided
+> rather than copied.
+
+---
+
 ## 1 · The three laws of the boundary
 
 1. **Intensity = closing speed, not proximity.** Coast along the outer band and the boundary glows

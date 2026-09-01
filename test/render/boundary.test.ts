@@ -14,6 +14,12 @@
  * The fix, when this fails, is never to relax it: what the renderer needs is a
  * field on [`PresentationState`](../../src/state/types.ts), derived in
  * `derive.ts`, and assertable without a canvas.
+ *
+ * ⚠ **This file is about the layer boundary and not about the game's**, and the
+ * two have shared a name since M3.4 built the second one. The game's boundary —
+ * spec 07's bands, their heat and what a canvas is asked to draw of them — is
+ * `test/state/boundary.test.ts` and `test/render/bands.test.ts`. This file is
+ * older than the game having an edge of its own.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
