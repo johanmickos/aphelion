@@ -4,9 +4,13 @@
  * Canvas2D is settled ([ADR-0011](../../docs/adr/0011-canvas2d-carries-the-design.md)):
  * it was measured on the author's phone at the full design size against the
  * scene spec [05](../../docs/spec/05-field.md) asks for, and it held on the
- * first rung with five of the eight-millisecond budget unspent. The bloom chain
- * that decision also settles is [M3](../../docs/plan/m3-the-field.md)'s; there
- * is no glow in M1.6 and this file has no offscreen buffers yet.
+ * first rung with five of the eight-millisecond budget unspent.
+ *
+ * **It has one offscreen buffer now**, and exactly one — see
+ * [`offscreen`](#offscreen). It arrived with the anomaly in M3.3 and it is here
+ * rather than in [`anomaly.ts`](./anomaly.ts) because this is the file that owns
+ * surfaces: a second module reaching for `document.createElement` would be a
+ * second place the game's relationship with the DOM is decided.
  */
 
 /**
@@ -50,4 +54,24 @@ export function sizeToDisplay(context: CanvasRenderingContext2D): void {
   const height = Math.round(canvas.clientHeight * ratio);
   if (canvas.width !== width) canvas.width = width;
   if (canvas.height !== height) canvas.height = height;
+}
+
+/**
+ * A canvas the renderer can draw into and then draw *from*, or `null` where
+ * there is no document to make one.
+ *
+ * **The `null` is the contract, not a failure mode.** `pnpm profile`'s draw
+ * census and `test/census.test.ts` drive the real renderer under plain node with
+ * a hand-written stand-in for a canvas, and `tools/check-portability.ts` runs the
+ * layers below this one with no DOM at all. A renderer that threw here would make
+ * the one instrument that can answer *what did this cost* unable to run, so
+ * anything that wants a buffer has to be able to draw without one — see
+ * [`anomaly.ts`](./anomaly.ts), whose fallback is the same picture at full
+ * resolution and full cost.
+ *
+ * Asked for by the caller and held by the caller, so this file keeps no state and
+ * the module that needs a buffer is the module that decides when to resize it.
+ */
+export function offscreen(): HTMLCanvasElement | null {
+  return typeof document === 'undefined' ? null : document.createElement('canvas');
 }

@@ -789,6 +789,44 @@ export interface WakeView {
 }
 
 /**
+ * The **anomaly** (`CONTEXT.md`): the stretch of field where the sky changes,
+ * and how much of it has reached the sky yet.
+ *
+ * `null` in a field that places none, which is a real case rather than a
+ * hypothetical — `tools/check-portability.ts` builds a field with no bodies and
+ * no foot. Spec [05 · §5](../../docs/spec/05-field.md) allows one contiguous
+ * stretch and this carries one; where it comes from, and the fact that today's
+ * placement is a stand-in for spec 17's generator, is
+ * [`anomaly.ts`](./anomaly.ts)'s header.
+ */
+export interface AnomalyView {
+  /** Its high-altitude edge in design `y`, so **smaller** than `bottom`. */
+  readonly top: number;
+  /** Its low-altitude edge, the one a climbing craft meets first. */
+  readonly bottom: number;
+  /**
+   * How far the sky has warmed toward it, 0 to 1 — spec 05 §4's altitude ramp.
+   *
+   * What the number is *spent on* is the renderer's and is capped at spec 05's
+   * ≤ 6% ([`SKY_TINT`](./anomaly.ts)); what is here is how far along the
+   * approach the craft is, which is a fact about the world and assertable
+   * without a canvas.
+   */
+  readonly warmth: number;
+  /**
+   * Whether the craft is inside the stretch.
+   *
+   * Nothing draws this — the sky's own bed is world-anchored at the edges above,
+   * so the picture needs no per-craft predicate. It is here because it is the
+   * one row of spec 05 §5's table that will change a run: *"orbiting inside an
+   * anomaly trickles fuel"* (spec [13](../../docs/spec/13-fuel.md), ADR-0009),
+   * which is M4's. Naming it now is the same move `bloomOf`'s chain argument is
+   * — the term is built and only its consumer is missing.
+   */
+  readonly inside: boolean;
+}
+
+/**
  * One tick's worth of everything the renderer is allowed to know.
  *
  * M1.6 carried the world's shape and where it is being watched from, and nothing
@@ -800,6 +838,46 @@ export interface WakeView {
 export interface PresentationState {
   readonly tick: Tick;
   readonly camera: CameraView;
+  /**
+   * How far the world moves across the picture in one tick, in design units,
+   * **positive while the craft is climbing** — spec
+   * [05 · §2](../../docs/spec/05-field.md)'s *world speed*, as a number.
+   *
+   * Every layer of the field except the [starfield](../render/starfield.ts)
+   * moves at exactly this, so it is what the **dust** streaks along and what the
+   * rungs cross at. It is here rather than computed where it is drawn because a
+   * frame is one tick and a rate needs two: the renderer has no previous camera
+   * and must not keep one (ADR-0006 — a frame is a pure function of
+   * `(recipe, tick)`).
+   *
+   * **It is not the craft's speed**, and the difference is not small. Measured
+   * over the 12 973 ticks of the author's replayable dispatches, the two agree
+   * at p75 (ratio 0.92) and are **a tenth of each other at p25** — through an
+   * orbit the craft is at its fastest while the camera holds nearly still, so
+   * dust streaked by the craft's own speed would streak while standing still.
+   *
+   * Read off the camera rather than the craft for the same reason: what the
+   * player sees pass is what the *picture* moved over, and the camera is the
+   * picture. `camera.ts` is untouched by this — the subtraction is
+   * [`derive.ts`](./derive.ts)'s.
+   */
+  readonly worldSpeed: number;
+  /**
+   * How long the chain is — **zero, and it is a named zero rather than an
+   * absence**.
+   *
+   * The exact shape [`bloomOf`](./energy.ts) already uses for the same quantity:
+   * the term is built and only its value is missing. `CONTEXT.md` defines the
+   * chain as consecutive engaged swings and spec
+   * [08](../../docs/spec/08-economy.md) owns it, which is M4's — so nothing can
+   * count it yet, and spec 05 §2's *"dust density rises gently with chain level"*
+   * needs somewhere to read it from that is not the renderer inventing one.
+   *
+   * It is on the state rather than passed to `bloomOf`'s caller alone because
+   * two things now spend it — the craft's bloom radius and the dust's density —
+   * and M4 should wire it in one place rather than two.
+   */
+  readonly chain: number;
   readonly craft: CraftView;
   readonly bodies: readonly BodyView[];
   readonly corridor: CorridorView;
@@ -862,4 +940,15 @@ export interface PresentationState {
    * answer. See [`rung.ts`](./rung.ts).
    */
   readonly wake: readonly WakeView[];
+  /**
+   * The **anomaly** this field places, and how near the craft has come to it —
+   * or `null` in a field that places none.
+   *
+   * The one thing on this state that is a property of the *field* rather than of
+   * the tick, which is why it looks out of place beside the decays: the extent
+   * does not move and only `warmth` does. It is derived every tick anyway, from
+   * the field, because a picture assembled from two sources of truth about where
+   * the weather is would eventually have two answers.
+   */
+  readonly anomaly: AnomalyView | null;
 }

@@ -9,8 +9,8 @@ leaving the reader to apply the design index's "higher-numbered revision wins" c
 
 **Where a spec has been flown and moved, it opens with a ⚠ notice saying what moved and what
 still stands** — and the prose below the notice is left as it was, deliberately. Specs
-[00](./00-tokens.md), [02](./02-release.md), [03](./03-hud.md), [04](./04-bodies.md) and
-[06](./06-awards.md) carry one. A notice is not a rewrite: it is the record of a decision made
+[00](./00-tokens.md), [02](./02-release.md), [03](./03-hud.md), [04](./04-bodies.md),
+[05](./05-field.md) and [06](./06-awards.md) carry one. A notice is not a rewrite: it is the record of a decision made
 with the build in the author's hands, and the rebase it implies is its own careful edit.
 
 ## How these specs treat numbers
@@ -106,6 +106,8 @@ author's to close.
 | [00 · Tokens](./00-tokens.md) §2a | **The colour-vision sweep** — flagged, not scheduled. It has authority over every hue value and separation number, and none over the grammar |
 | [10 · The results sheet](./10-results.md) §5 | The recipe line's length — 12 today, revisited when the codec and store exist |
 | [17 · The daily field](./17-daily-field.md) | Every number in the difficulty curve is an opening position, not a measurement |
+| [05 · The field](./05-field.md) §5 | **Where an anomaly sits and how much field it covers.** §5 says the day recipe places it and spec 17's generator does not exist, so M3.3 built a stand-in from the prototype's own placement rule and its own shelter magnitude — 4 140 – 4 940 m, reached by 3 of the author's 13 replayable runs. Both on the bench; both deleted when the generator lands |
+| [05 · The field](./05-field.md) §4 | **How far ahead of an anomaly the sky starts to warm.** §4 states the ≤ 6% and no distance. Derived rather than ruled — one picture, between a floor (the tint must read before the anomaly's foot can appear at the top of the frame) and a ceiling (a sky that is always warming is not warming) |
 | [17 · The daily field](./17-daily-field.md) §4 | Its difficulty curve is written in **prototype magnitudes wearing design-space labels** — radii 55 → 32 against spec 01's measured 34.3 – 55.5, in a space three times as wide. Every number in it is an opening position and M3 re-measures them, so this is a note rather than a contradiction: apply the ×3 once, when they are measured. ⚠ **Read the other way round, this note is what a metre *is*** — see the ruling of 2026-08-30 below, which turns the ×3 from a fix into a conversion. What stays open in §4 is its **gap** endpoints, which are narrower than the 275-unit gaps this field is actually built with |
 | [17 · The daily field](./17-daily-field.md) §4 and §5 | **§4's opening geometry violates §5's own invariant 3.** At address 1 the curve gives a 110 m gap and a 55 m radius, so two consecutive bodies have **0 m** between their rims where invariant 3 requires 40. Both are opening positions and M3 re-measures them; recorded so that the pair is fixed together rather than one at a time |
 | [08 · The economy](./08-economy.md) §3 | **Pricing distance.** Window width falls with distance, and spec 00 §6 makes a narrow window *"automatically a better-paid one"* — so the furthest body is always the best-paid release on the instrument, which pulls play away from the near ones the author wants it guided toward (2026-08-29). Grading imports nothing from the economy by spec 06's own acceptance, so this is arithmetic and M4's |
@@ -185,7 +187,10 @@ Do not re-litigate them.
   authoritative. Direction 13 does not exist.
 - **Parallax star layers are refused.** Dust varies in brightness, never in velocity.
   ⚠ **Overturned by the author, 2026-08-30** — the sky has parallax and the rest of the layer
-  stack does not; see [05 · §2](./05-field.md)'s notice.
+  stack does not; see [05 · §2](./05-field.md)'s notice. **The second half of that sentence is
+  built and holds** (M3.3): the dust is drawn in world space, so it cannot have a velocity of its
+  own, and `test/render/dust.test.ts` is `test/render/starfield.test.ts` with its first assertion
+  turned back the right way up.
 - **Carpet dots pay flat and unmultiplied** — a deliberate, argued exception, recorded in
   [12 · The finish line](./12-finish.md) §4 so nobody later "fixes" it.
 - **ION is monopolised in the world, not on the craft.** Fuel, the deadline track and the save

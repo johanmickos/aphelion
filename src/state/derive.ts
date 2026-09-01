@@ -80,6 +80,7 @@ import { bloomOf, E3_BLOOM } from './energy.ts';
 import { hueOf } from './identity.ts';
 import { sightingsOf } from './sighting.ts';
 import { bowOf, wakeOf } from './rung.ts';
+import { anomalyOf } from './anomaly.ts';
 import type {
   ArrivalView,
   BodyState,
@@ -104,6 +105,11 @@ import type {
  * economy to spend it, which is spec 08's and M4's. Written as a named zero
  * rather than left out, because the term it multiplies is built and only its
  * value is missing.
+ *
+ * **Two things spend it now**, since M3.3: the craft's bloom radius, and the
+ * **dust**'s density — spec 05 §2's *"density rises gently with chain level, a
+ * hot run flies through a livelier field."* So it goes onto the state as well as
+ * into `bloomOf`, and M4 wires it in one place rather than in two.
  */
 const CHAIN_UNBUILT = 0;
 
@@ -227,6 +233,7 @@ function bodiesOf(sim: SimState, previous: readonly BodyView[] | null): BodyView
 function present(
   sim: SimState,
   camera: CameraView,
+  worldSpeed: number,
   flash: FlashView | null,
   deformation: DeformationView,
   previousBodies: readonly BodyView[] | null,
@@ -243,6 +250,8 @@ function present(
   return {
     tick: sim.tick,
     camera,
+    worldSpeed,
+    chain: CHAIN_UNBUILT,
     craft: {
       x: sim.craft.x,
       y: sim.craft.y,
@@ -265,6 +274,7 @@ function present(
     arrival,
     knock,
     wake,
+    anomaly: anomalyOf(sim.field, sim.craft.y),
   };
 }
 
@@ -282,7 +292,10 @@ export function createPresentation(sim: SimState): PresentationState {
   // that began with the rungs already parted would be showing a passage that has
   // not happened. ADR-0015's second rule, and the same reason nothing here is
   // mid-decay.
-  return present(sim, openCamera(sim), null, UNDEFORMED, null, null, null, null, null, []);
+  // And **world speed opens at zero**, for the same reason: a rate needs two
+  // ticks and there has only been one, so the first picture shows a world that
+  // has not moved yet rather than one already sliding.
+  return present(sim, openCamera(sim), 0, null, UNDEFORMED, null, null, null, null, null, []);
 }
 
 /**
@@ -394,6 +407,11 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
   return present(
     sim,
     camera,
+    // **World speed is the camera's own step, not the craft's** — see
+    // [`PresentationState.worldSpeed`](./types.ts), which carries the
+    // measurement saying the two are a tenth of each other through an orbit.
+    // Positive while climbing, because design `y` falls as altitude rises.
+    previous.camera.y - camera.y,
     flashOf(previous.flash),
     // The **punch**, and it is the craft that carries it: quality decides how far
     // the stretch goes and how long it takes coming home. See

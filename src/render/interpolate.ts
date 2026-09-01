@@ -15,6 +15,7 @@
  * shows a position the simulation did not reach.
  */
 import type {
+  AnomalyView,
   ArrivalView,
   CalloutView,
   DeformationView,
@@ -182,6 +183,25 @@ function wakeBetween(
 }
 
 /**
+ * The anomaly between two ticks: its edges taken, its **warmth** crossed.
+ *
+ * The stretch itself does not move — it is a property of the field — so
+ * interpolating its edges would be a promise this function should not make.
+ * `warmth` does move, continuously, with the craft's own altitude, and it is
+ * spent on an alpha over the whole sky: stepped at the tick rate under a picture
+ * gliding at the frame rate, that is a 60Hz shimmer across the largest flat area
+ * on the screen, which is the one place a step is most visible.
+ */
+function anomalyBetween(
+  previous: AnomalyView | null,
+  current: AnomalyView | null,
+  alpha: number,
+): AnomalyView | null {
+  if (current === null || previous === null) return current;
+  return { ...current, warmth: between(previous.warmth, current.warmth, alpha) };
+}
+
+/**
  * A view `alpha` of the way from one tick to the next.
  *
  * Bodies are taken from the later tick whole rather than interpolated: they do
@@ -204,6 +224,13 @@ export function interpolate(
 ): PresentationState {
   return {
     tick: current.tick,
+    // A rate belongs to the tick that measured it, so it is taken whole — the
+    // same reading `tick` itself gets one line up, and for the same reason: half
+    // a tick is not a tick. What it is *spent* on (the dust's streak) is a length
+    // and is already crossed by the camera being crossed underneath it.
+    worldSpeed: current.worldSpeed,
+    // The chain is a count and counts do not interpolate.
+    chain: current.chain,
     camera: {
       ...current.camera,
       x: between(previous.camera.x, current.camera.x, alpha),
@@ -243,5 +270,6 @@ export function interpolate(
     arrival: arrivalBetween(previous.arrival, current.arrival, alpha),
     knock: knockBetween(previous.knock, current.knock, alpha),
     wake: wakeBetween(previous.wake, current.wake, alpha),
+    anomaly: anomalyBetween(previous.anomaly, current.anomaly, alpha),
   };
 }

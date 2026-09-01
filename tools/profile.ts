@@ -55,6 +55,7 @@ import { MAX_CATCH_UP_TICKS, SCALE, SECONDS_PER_TICK } from '../src/sim/units.ts
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../src/state/design.ts';
 import { compassOf } from '../src/state/compass.ts';
 import { createPresentation, derive } from '../src/state/derive.ts';
+import { ANOMALY_SPAN } from '../src/state/anomaly.ts';
 import { sightingsOf } from '../src/state/sighting.ts';
 import type { PresentationState } from '../src/state/types.ts';
 import { draw } from '../src/render/index.ts';
@@ -144,10 +145,34 @@ export interface Census {
   filled: number;
   /** The part of `filled` painted through a gradient. */
   gradientFilled: number;
+  /**
+   * Area painted by `fillRect` and by the storm's composite, in design units².
+   *
+   * **Added for the anomaly**, which is the first thing in the game whose cost is
+   * a rectangle rather than a disc: a cloud is a radial gradient poured into a
+   * `fillRect` the size of its own bounding box, and `filled` above only ever saw
+   * arcs. Without this the most expensive layer in the game reports as four
+   * gradients and no paint.
+   *
+   * It counts the whole-buffer VOID fill too — one screen, every frame, on every
+   * machine — which the old comment on `filled` gave as the reason for leaving
+   * `fillRect` alone. That reason held while a screen a frame was the whole of it
+   * and stops holding the moment something else uses the call.
+   */
+  blended: number;
 }
 
 function census(): Census {
-  return { gradients: 0, arcs: 0, fills: 0, strokes: 0, points: 0, filled: 0, gradientFilled: 0 };
+  return {
+    gradients: 0,
+    arcs: 0,
+    fills: 0,
+    strokes: 0,
+    points: 0,
+    filled: 0,
+    gradientFilled: 0,
+    blended: 0,
+  };
 }
 
 /**
@@ -227,7 +252,20 @@ export function counter(into: Census): CanvasRenderingContext2D {
     stroke: () => {
       into.strokes += 1;
     },
-    fillRect: () => {},
+    fillRect: (_x: number, _y: number, w: number, h: number) => {
+      into.blended += Math.abs(w * h);
+    },
+    // The storm's composite: one copy of the buffer over the picture, and it is
+    // counted as paint because that is what it is. It is unreachable under node,
+    // where there is no document to make a buffer from — see `anomaly.ts` — so
+    // what the census actually walks is the unbuffered path, at 64× this cost.
+    drawImage: (_source: unknown, _x: number, _y: number, w: number, h: number) => {
+      into.blended += Math.abs(w * h);
+    },
+    imageSmoothingEnabled: false,
+    imageSmoothingQuality: 'low',
+    lineCap: 'butt',
+    lineJoin: 'miter',
     createRadialGradient: () => {
       into.gradients += 1;
       return gradient;
@@ -611,7 +649,11 @@ console.log('');
  * of a frame is what is being counted here and it does not depend on how often
  * the frame happens.
  */
-function drawCensus(recipe: Recipe, field: Field | null): Record<string, number[]> {
+function drawCensus(
+  recipe: Recipe,
+  field: Field | null,
+  weather = false,
+): Record<string, number[]> {
   const sim = openRun(recipe);
   const state: SimState = field === null ? sim : { ...sim, field };
   let view: PresentationState = createPresentation(state);
@@ -623,12 +665,15 @@ function drawCensus(recipe: Recipe, field: Field | null): Record<string, number[
     'path points': [],
     'overdraw, screens': [],
     '  of it gradient': [],
+    'blended, screens': [],
   };
   for (let tick = 0; tick < recipe.ticks; tick++) {
     const previous = view;
     stepSim(state, { pressed: pressAt(recipe.log, tick) });
     view = derive(previous, state);
-    const frame = interpolate(previous, view, 0.5);
+    const frame = weather
+      ? inWeather(interpolate(previous, view, 0.5))
+      : interpolate(previous, view, 0.5);
     // One frame's worth, counted on its own, because the whole discipline of
     // this session is that a mean hides the frame that hurt.
     const one = census();
@@ -640,9 +685,38 @@ function drawCensus(recipe: Recipe, field: Field | null): Record<string, number[
     per['path points']!.push(one.points);
     per['overdraw, screens']!.push(one.filled / SCREEN);
     per['  of it gradient']!.push(one.gradientFilled / SCREEN);
+    per['blended, screens']!.push(one.blended / SCREEN);
     if (state.ending !== null) break;
   }
   return per;
+}
+
+/**
+ * The same frame, with an anomaly overhead.
+ *
+ * **The shipped run does fly through one** — it peaks at 7 175 m and the stretch
+ * is 4 140 – 4 940 — but only **5% of its ticks** are inside it and 18% see any
+ * warmth at all. So the census above has the anomaly in its tail and nothing in
+ * its median, which is the right shape for a rare event and the wrong shape for
+ * answering *what does this layer cost*. A p95 that is one layer's whole cost is
+ * a p95 that moves when the run's route moves.
+ *
+ * So the run is walked a second time with the stretch moved onto the craft, and
+ * the two are printed side by side. It is a **synthetic frame and says so**: no
+ * run flies like this, because one that did would be inside an anomaly for the
+ * whole of it. What it answers is *what does a frame inside one cost*, which is
+ * the question the phone asks and the one the baseline's median cannot.
+ */
+function inWeather(frame: PresentationState): PresentationState {
+  return {
+    ...frame,
+    anomaly: {
+      top: frame.camera.y - ANOMALY_SPAN / 2,
+      bottom: frame.camera.y + ANOMALY_SPAN / 2,
+      warmth: 1,
+      inside: true,
+    },
+  };
 }
 
 /**
@@ -702,6 +776,18 @@ console.log(
   `  \x1b[2mSo the figure M3 multiplies is per **visible** body: ` +
     `${perBody.toFixed(2)} screens of paint each.\x1b[0m`,
 );
+const weathered = drawCensus(recipe, null, true);
+console.log('');
+console.log('  \x1b[1mthe same frames, inside an anomaly\x1b[0m');
+console.log(
+  '  \x1b[2mSynthetic: the run is only 5% inside one, so the storm is moved onto the craft ' +
+    'for every frame. Unbuffered — a node process has no document, and the phone pays 1/64th.\x1b[0m',
+);
+console.log('');
+for (const [label, samples] of Object.entries(weathered)) {
+  console.log(formatSpread(label, spread(samples), 18));
+}
+console.log('');
 const paintDrift = drift(drawnPerFrame['overdraw, screens']!);
 console.log(
   `  \x1b[2mdrift, overdraw p99 over the first third → the last: ` +

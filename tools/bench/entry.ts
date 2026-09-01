@@ -40,6 +40,8 @@ import * as mark from './src/state/sighting.ts';
 import * as view from './src/render/index.ts';
 import * as rung from './src/state/rung.ts';
 import * as sky from './src/render/starfield.ts';
+import * as motes from './src/render/dust.ts';
+import * as weather from './src/state/anomaly.ts';
 import * as strata from './src/render/rungs.ts';
 import * as fit from './src/render/letterbox.ts';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from './src/state/design.ts';
@@ -957,6 +959,84 @@ const KNOBS: Knob[] = [
     restarts: false,
     group: 'field',
     places: 2,
+  },
+  {
+    id: 'duststrength',
+    label: 'Dust · how loud',
+    what: 'spec 05 §2 states α .1–.3 and this multiplies it. Dust is a THIRD system saying speed, beside the rungs (a crossing rate) and the sky (a parallax ratio) — it says it as a streak length. 1 is the spec’s own alphas; the sky needed this same knob within a day of landing',
+    min: 0,
+    max: 2,
+    step: 0.05,
+    base: motes.DUST_STRENGTH,
+    apply: motes.set_DUST_STRENGTH,
+    restarts: false,
+    group: 'field',
+    places: 2,
+  },
+  {
+    id: 'dustexposure',
+    label: 'Dust · streak length',
+    what: 'how long the shutter is open, in ticks. **Flown and refused at 5.4** — the board’s own 90 ms, which was authored against a climb this game passes at its median: “I don’t like the star streaks at speed. With the rungs they look like bricks.” At 1 the streak is exactly one frame’s motion blur and reaches a fifth of a rung gap at the fastest tick anyone has flown. 0 is a pure stipple',
+    min: 0,
+    max: 6,
+    step: 0.25,
+    base: motes.DUST_EXPOSURE,
+    apply: motes.set_DUST_EXPOSURE,
+    restarts: false,
+    group: 'field',
+    places: 2,
+  },
+  {
+    id: 'dustdensity',
+    label: 'Dust · how many',
+    what: 'motes in a picture. 21 is Direction 05’s own density corrected for the frame it was drawn in — its live component scatters 16 over a frame 0.77 the area of this one. It is capped at twice this however long the chain runs, because sparse is the first word the spec uses about dust',
+    min: 0,
+    max: 42,
+    step: 1,
+    base: motes.DUST_PER_SCREEN,
+    apply: motes.set_DUST_PER_SCREEN,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'anomalyat',
+    label: 'Anomaly · where it sits',
+    what: 'a fraction of the span between the lowest body and the highest. 0.5625 is the prototype’s own rule for a single anomaly — evenly spread with the bottom eighth skipped — and puts it at 4 140 m, which 3 of the author’s 13 replayable runs reach. **Drag it to 0 to fly straight into one**: that is what the prototype’s dev shell does with its own anomalyAtSpawn flag, and spec 17’s generator is what replaces this',
+    min: 0,
+    max: 1,
+    step: 0.0125,
+    base: weather.ANOMALY_AT,
+    apply: weather.set_ANOMALY_AT,
+    restarts: false,
+    group: 'field',
+    places: 4,
+  },
+  {
+    id: 'anomalyspan',
+    label: 'Anomaly · how much field',
+    what: 'in design units. 2 400 is 800 m, which is the prototype’s own shelter carried across as a magnitude — three bodies, and just under one picture, so you cannot see both edges at once',
+    min: 300,
+    max: 9000,
+    step: 150,
+    base: weather.ANOMALY_SPAN,
+    apply: weather.set_ANOMALY_SPAN,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'skylead',
+    label: 'Sky · how far ahead it warms',
+    what: 'in design units, spent on a squared ramp capped at spec 05 §2’s 6%. 2 532 is one picture: derived rather than ruled, from a floor (the tint must be visible before the anomaly’s foot can appear at the top of the frame) and a ceiling (a sky that is always warming is not warming)',
+    min: 0,
+    max: 10_000,
+    step: 100,
+    base: weather.SKY_LEAD,
+    apply: weather.set_SKY_LEAD,
+    restarts: false,
+    group: 'field',
+    places: 0,
   },
 ];
 

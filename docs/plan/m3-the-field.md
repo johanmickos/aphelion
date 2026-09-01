@@ -508,6 +508,184 @@ cloud gaps, planets reading through the tint. The baseline's restraint is what k
 **Acceptance**: the anomaly reads as the reference standard; nothing outside it repaints the
 sky; dust velocity is uniform. **Verify**: eyes, plus a test that no layer has its own speed.
 
+### Built, 2026-09-01 — three layers, and one of them is a set piece
+
+**The field is weather now.** `src/state/anomaly.ts` places it and reads the sky off it,
+`src/render/dust.ts` and `src/render/anomaly.ts` draw the two new layers, and
+`src/render/seed.ts` is the render seed the sky had privately and the dust now shares.
+
+**Presentation state gained three fields**, and each is a fact the renderer cannot work out and must
+not guess:
+
+| field | what it is | why it is not in the renderer |
+|---|---|---|
+| `worldSpeed` | how far the world moves across the picture in a tick | a frame is one tick and a rate needs two |
+| `chain` | a **named zero** until M4 | two things spend it now — the craft's bloom and the dust's density — and M4 should wire it once |
+| `anomaly` | where the weather is, and how far the sky has warmed toward it | a pure function of the field, and the renderer may not see the field |
+
+#### `worldSpeed`, and the measurement that made it necessary
+
+The dust streaks along the motion the player sees, and the obvious source for that is the craft's
+own speed. **It is not the same number.** Measured over the 12 973 ticks of the author's replayable
+dispatches, world speed against craft speed runs
+
+| p05 | p25 | p50 | p75 | p95 |
+|---|---|---|---|---|
+| 0.00 | **0.09** | 0.64 | 0.92 | 1.12 |
+
+— through an orbit the craft is at its fastest while the camera holds nearly still, so dust streaked
+by the craft's speed would smear while standing still for a quarter of every run. It is read off the
+camera's own step in `derive.ts`; **`camera.ts` is untouched**, which the parked camera note asks
+for.
+
+It also gives the parked *"the rungs travel by too quickly"* complaint a number at last. Over the
+whole cohort a rung crosses every **254 ms at p50** and **121 ms at p05** — the plan's earlier
+88 – 107 ms was the escalated tail, not the median.
+
+#### Where the dust ranks, decided before its alpha was
+
+**Three systems now say *speed*, in three different currencies**, and that is what makes a third
+safe. The rungs say it as a **rate** (a crossing every 254 ms), the sky as a **ratio** (the same
+motion at a fifth and a twenty-fifth), and the dust as a **length** — a mote is a long exposure, so
+how far it smears *is* how fast the world is going, read off one frame.
+
+So the answer to *does this make the crossing-rate complaint worse* is **no, and it may help**. At 21
+motes a picture a mote crosses the top edge every **383 ms** at the author's median world speed
+against the rungs' 254 — half again as slow, scattered across the width instead of arriving as one
+line, and three design units wide against a rung's 1 170. A second thing ticking at the rate that was
+complained about would have been the wrong build.
+
+**Rank is spent in ink, not in alpha**, because ink is what the eye ranks: over a picture the rungs
+lay down about 45 000 design units² at α 0.16 and 0.28, the dust about 1 300 at α 0.1 – 0.3, and the
+sky about 2 400 at α 0.12 – 0.32. The alphas overlap and the loudness does not, which is how spec 05
+could state a dust range straddling the rungs' two values without contradicting its own stack. A
+`DUST_STRENGTH` multiplier ships at 1 — the spec's own alphas, unmodified — and is on the bench,
+because the sky needed exactly that knob within a day of landing.
+
+**Two of the board's numbers turned out to be something else once converted.** Its 16 motes sit in a
+frame 0.772 the area of this picture, so the density is **21** and not 16 — the same correction
+`STAR_COUNT` records making, in the same direction. And its `len = min(64, speed * 0.09)` is an
+**exposure**: a number turning a speed into a length is a time, and 90 ms is how long the shutter is
+open. Read that way the streak is guaranteed to agree with the motion it is drawn beside instead of
+being a second opinion about it.
+
+#### ⚠ The exposure flew as brickwork, the same day
+
+> *"I don't like the star streaks you've added at speed. With the rungs they look like bricks."*
+> — author, 2026-09-01
+
+**The reading was right and the value was not**, and it is the same failure the starfield's star
+sizes record: a number carried without the regime it was measured in. Direction 05's `climbSpeed`
+runs 10 – 140 board pixels a second and sits at **46**; this game's world speed is **138 at p50, 403
+at p95 and 568 at the fastest tick anyone has flown**. The game's *median* is the board's slider
+maximum and its fast ticks are four times past it, so 90 ms drew a streak three to twelve times
+longer than anything Direction 05 has ever shown.
+
+**And the complaint is a geometry, not a taste.** The field is parallel lines every 150 design units,
+and a long perpendicular mark spanning the gap between two of them is a mortar joint. At 90 ms the
+streak reached **101 units at p95 and 142 at the fastest tick** — two thirds to nearly all of a gap,
+drawn square across it.
+
+| | at p50 | at p95 | fastest flown | as a share of a rung gap |
+|---|---|---|---|---|
+| the board's 90 ms | 35 | 101 | 142 | 23% → **95%** |
+| **one tick** | **7** | **20** | **28** | 5% → **19%** |
+
+**One tick is what a shutter open for the whole frame records** — the mote's own displacement between
+two ticks, the smallest exposure that is still an exposure and the only one that needs no number at
+all. The cap moves with it, and it is now stated **against the rungs** rather than in board pixels:
+a fifth of a spacing, because the relationship between the two layers is the thing that matters and
+the board's own cap permits 1.4 whole gaps (it never reaches it, because it never climbs this fast).
+`test/render/dust.test.ts` holds it at any speed, including ones the game does not yet reach — which
+is what the number it replaces did not have.
+
+The exposure is on the bench, from a pure stipple at 0 up past the board's own 90 ms.
+
+#### The anomaly's extent is a stand-in, and says so in three places
+
+Spec 05 §5 places it *"by the day recipe (spec 17)"* and spec 17's generator is after this step, so
+`anomaly.ts` carries a hand-made placement standing where a generated one will go — the same status
+`fixture-field.ts` has, said the same way. Both of its numbers are the prototype's own **magnitudes**
+rather than its mechanism (ADR-0013), because the mechanism is already gone: its anomaly is a body
+outside the corridor with a circular `shelter`, and §5 has replaced that with a stretch of field.
+
+- **800 m**, its shelter's diameter. Two readings of this field agree: it holds three bodies and no
+  more, and it is just under one picture tall, so a craft inside cannot see both edges at once.
+- **0.5625 of the span between the lowest body and the highest**, its own rule for a single anomaly
+  — *"evenly over the rows it built, with the bottom eighth skipped."* The behaviour that carries is
+  that an anomaly is somewhere you have to **climb to reach**.
+
+Measured, that is **4 140 – 4 940 m**, and over the 13 dispatches replaying at `SIM_VERSION` 9 —
+which peak at 1 978 – 7 469 m, median 2 583 — **three reach it and two fly through it.** A fifth to a
+quarter of runs, which is the rarity §5's restraint exists to protect, and rare enough to be awkward
+at a gate. The prototype hit the same wall and its dev shell drags the first anomaly down to the
+opening body *"for testing… without climbing to reach one"*; the bench slider does the same.
+
+**`SIM_VERSION` did not move.** The one row of §5's table that would change a run is *orbiting inside
+an anomaly trickles fuel*, and fuel is M4's — so the anomaly is entirely a picture, and
+`version.test.ts`'s question (*did a tick move?*) answers no. `AnomalyView.inside` is the predicate
+that row will read, named now and spent by nothing.
+
+#### The sky's lead is derived, not ruled
+
+Spec 05 §4 states the ≤ 6% and no distance. `SKY_LEAD` is **one picture, 844 m**, between a floor and
+a ceiling that leave one obvious value between them — the derivation is in §4's own notice. Two
+things are worth repeating here because they are numbers:
+
+- **6% is quieter than it sounds.** VOID a full 6% toward AURORA is `#130E22`, nine, six and fourteen
+  levels above VOID — **dimmer than the faintest star in the sky above it**, which sits fourteen,
+  thirteen and nineteen levels up. The ceiling the spec sets is below the quietest thing already
+  drawn on it.
+- **The ramp is a square, and that is where *never spent early* lives.** A quarter of the way along
+  the lead the tint is 0.4%, which moves no 8-bit channel by more than one level out of 255. The
+  full 6% is reached at exactly one place, the anomaly's edge.
+
+Over the fixture field the sky is at rest for **64%** of the climb and *perceptibly* at rest for
+**74%**.
+
+#### What the storm costs, and the buffer that is also its blur
+
+The prototype's own record is that this effect is where its frame budget died: soft clouds at full
+size measured **5× the window's area in alpha-blended pixels per frame**, *"reported as the whole
+game lagging the moment the storm came up."* Its fix is to draw the storm at 1/8 into an offscreen
+buffer and composite it back — which is also where the softness comes from, because a curtain drawn
+as a stack of strokes draws N terraces however many passes it uses. Both crossed, marked as evidence
+for the behaviour rather than as an instruction (AGENTS.md §3).
+
+Measured here through `pnpm profile`'s census, over the shipped run — which **does** fly through the
+stretch, 5% of its ticks inside one:
+
+| per frame | outside | inside, unbuffered |
+|---|---|---|
+| rect-blended area, screens | **1.0** | **13.0** |
+| gradients | 4.4 | 12.3 |
+| strokes | 46.7 | 51.0 |
+| path points | 137 | 186 |
+
+The buffer takes the clouds and curtains to a sixty-fourth, so the phone pays about **3.2 screens**:
+the VOID clear, the bed, the sky wash and one composite. The census walks the **unbuffered** path,
+because a node process has no document — so what it prints is the ceiling, which is the right way
+round for an instrument.
+
+**The census could not previously have seen any of this.** `fillRect` was deliberately uncounted, on
+the reasoning that the one use of it was a screen a frame — so a layer blending twelve screens would
+have reported as four gradients and no paint. `Census.blended` closes that, and `test/census.test.ts`
+compares the frames inside the anomaly against the frames outside it over the same run so the hole
+cannot re-open.
+
+#### Two things this step did not do
+
+- **The HUD row of §5's table has nothing to bite on.** *Chip backgrounds go true black* is spec 03
+  §5's too and the HUD is not built. The one dark ground behind a readable that exists today — the
+  callout's rim — is **not** a chip and does not change: it is VOID by an argued ruling, *"a heavy
+  black outline under pale text reads as a sticker."*
+- **The bow and the wake are still off**, and the dust does not change that argument either way.
+
+**What the gate is for.** The tests can only prove that nothing outside the anomaly repaints the sky
+and that the dust cannot have a speed of its own. Whether the anomaly reads as **a place worth
+arriving at**, and whether the baseline stays restrained enough to keep it rare, is the author's, and
+the anomaly slider is there so it can be reached without a five-minute climb.
+
 ---
 
 ## M3.4 · The boundary

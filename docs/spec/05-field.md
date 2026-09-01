@@ -76,6 +76,47 @@ Dust **density** rises gently with chain level — a hot run flies through a liv
 Dust streak length grows with speed and its α falls as it stretches, so a fast field streaks and
 a slow one stipples. Streaks fall strictly parallel to velocity; nothing radiates.
 
+> ## ⚠ The dust is built, 2026-09-01 — and its streak flew as brickwork on the first pass
+>
+> **Everything above still stands.** What moved is *how long* a streak is, and the correction is
+> worth reading because the number that was wrong was arrived at correctly.
+>
+> Direction 05's live component is the only place dust has ever been drawn, and its
+> `len = min(64, speed * 0.09)` is an **exposure** — a number turning a speed into a length is a
+> time. That reading is right and it is what the build carries. Its **value** could not cross: the
+> board's own `climbSpeed` runs 10 – 140 board pixels a second and sits at 46, where this game's
+> world speed is **138 at p50, 403 at p95 and 568 at the fastest tick anyone has flown**. The game's
+> median is the board's slider maximum. So 90 ms drew a streak three to twelve times longer than
+> anything Direction 05 has ever shown — the same failure `starfield.ts` records for its star sizes,
+> a number carried without the regime it was measured in.
+>
+> Flown: *"I don't like the star streaks you've added at speed. With the rungs they look like
+> bricks"* (author). **That is a geometry rather than a taste**: this field is parallel lines every
+> 150 design units, and a long perpendicular mark spanning the gap between two of them is a mortar
+> joint. At 90 ms the streak reached 101 units at p95 and 142 at the fastest tick — two thirds to
+> nearly all of a gap, square across it.
+>
+> **The exposure is one tick**, which is what a shutter open for the whole of a frame records: the
+> mote's own displacement between two ticks, and the only exposure that needs no number. It draws 7
+> design units at the median, 20 at p95 and 28 at the fastest tick — 5% to 19% of a gap. And the cap
+> is now stated **against the rungs** (a fifth of a spacing) rather than in board pixels, because the
+> relationship between the two layers is the thing that matters; the board's own cap permits 1.4
+> whole gaps and never reaches it, because it never climbs this fast.
+>
+> **The density is 21 a picture, not 16.** The board's frame is 0.772 of this one's area, so its
+> count is a density and converts — the same correction `STAR_COUNT` records making in the same
+> direction.
+>
+> **Colour: DUSK.** The board draws its motes lifted about half way toward INK and its rungs at DUSK
+> exactly, separating the two layers by lightness. This separates them by ink and by shape: §2 puts
+> dust at E0, and E0 · STRUCTURE is DUSK. Spec [00 · §1](./00-tokens.md) allows the renderer no
+> colour of its own, and a ninth grey would want an argument a flat layer does not have.
+>
+> **And the caps are round**, where the board's are butt — which is what makes *"a slow one
+> stipples"* true rather than a field that disappears as the climb slows.
+>
+> The exposure, the density and an overall strength are all on the bench.
+
 ## 3 · Rungs
 
 > ## ⚠ Built and flown, 2026-08-30 — three of these numbers moved
@@ -239,11 +280,106 @@ an emitted ring.
 
 ## 4 · The sky
 
+> ## ⚠ Built, 2026-09-01 — the ramp has a distance, and it is derived
+>
+> **The ≤ 6% is untouched** and everything below still stands. What the prose does not say is *how
+> far ahead* the sky starts to warm, and that is a number a build has to have, so it was derived
+> rather than chosen — `SKY_LEAD` in `src/state/anomaly.ts` carries the argument and this is its
+> summary.
+>
+> **One picture: 2 532 design units, 844 m.** Between a floor and a ceiling that leave one obvious
+> value between them.
+>
+> - **The floor is the horizon.** The design space shows 1 266 design units above the craft, so the
+>   anomaly's own foot appears at the top of the frame when the craft is 422 m below it. A ramp
+>   whose *visible* part is shorter than that starts warming after the curtains are already on
+>   screen — a warning delivered late. This one is a level above VOID for its last **498 m**, so
+>   the tint reads while the foot is still 76 m off the top of the picture. *Weather on the
+>   horizon*, as literally as the sentence can be taken.
+> - **The ceiling is that it must not become the baseline.** Over the fixture field's 6 828 m the
+>   sky is at rest for **64%** of the climb and *perceptibly* at rest for **74%**.
+>
+> **The ramp is a square, and that is where "never spent early" lives.** The tint is 6% × u², so a
+> quarter of the way along the lead it is 0.4% — which moves no 8-bit channel by more than one
+> level out of 255 — and the full 6% is reached at exactly one place, the anomaly's edge. A linear
+> ramp would have spent a quarter of the budget a quarter of the way out.
+>
+> **And 6% is quieter than it sounds**, measured: VOID a full 6% of the way to AURORA is `#130E22`,
+> 9, 6 and 14 levels above VOID — **dimmer than the faintest star in the sky above it**, which sits
+> 14, 13 and 19 levels up. The ceiling the spec sets is below the quietest thing already drawn on
+> it, which is what *almost imperceptibly* has to mean.
+>
+> **The ramp is symmetric**, which the prose does not ask for and does not forbid: the sky is off
+> VOID exactly while the anomaly is within a picture of being visible, on either side. A front has
+> two edges, and cutting the tint at the moment the craft leaves would be a 6% pop across the whole
+> sky at the one moment the player is looking behind them.
+>
+> Measured against the author's own play, the visible part of the ramp lasts **3.6 s** at their
+> median world speed, **1.24 s** at p95 and **0.88 s** at the fastest tick anyone has flown. It is
+> on the bench.
+
 VOID, with a slow altitude ramp: the violet-black warms almost imperceptibly toward AURORA as an
 anomaly approaches — weather on the horizon, never spent early. The tint stays **≤ 6%** outside an
 anomaly. Outside that ramp the sky changes only by region, and v1 has one region.
 
 ## 5 · The anomaly
+
+> ## ⚠ Built, 2026-09-01 — and its extent is a stand-in for spec 17
+>
+> **Every row of the table below is built except one, and the exception is where it comes from.**
+> §5 says the extent is *"placed by the day recipe (spec 17)"* and **spec 17's generator does not
+> exist** — it is after this step. So `src/state/anomaly.ts` carries a hand-made placement standing
+> where a generated one will go, exactly as `fixture-field.ts` stands in for a generated field. When
+> spec 17 lands, the placement is **deleted** and the extent arrives on the day's data; what survives
+> is the sky's reading of it, which is §4's.
+>
+> The property that matters more than the numbers is that it is a **pure function of the field** —
+> no clock and no random stream (ADR-0004, ADR-0014) — so two players flying one day meet the same
+> weather at the same rung and a replay shows what was flown.
+>
+> **The two numbers, and both are the prototype's own magnitudes rather than its mechanisms**
+> (ADR-0013). Its anomaly is a *body* outside the corridor carrying a circular `shelter` of radius
+> 400 of its units; §5 has already replaced that with a stretch of field, so what crosses is only
+> how much field it covers — **800 m**. Two readings of this field agree with it: 800 m holds three
+> bodies and no more, and it is just under one picture tall, so a craft inside cannot see both edges
+> at once. And it sits at **0.5625 of the span between the lowest body and the highest**, which is
+> the prototype's own rule for a single anomaly (*"evenly over the rows it built, with the bottom
+> eighth skipped — an anomaly beside the opening bodies would ask for the commit before the player
+> has a corridor rhythm to break away from"*). The behaviour that carries is: **an anomaly is
+> somewhere you have to climb to reach.**
+>
+> **Measured, that is 4 140 – 4 940 m, and three of the author's 13 replayable dispatches reach it
+> and two fly through it** — a fifth to a quarter of runs, which is the rarity this section's own
+> restraint exists to protect. That is also rare enough to be awkward at a gate, and the prototype
+> hit the same wall: its dev shell drags the first one down to the opening body *"for testing…
+> without climbing to reach one."* The bench slider does the same and for the same reason.
+>
+> **What is drawn, row by row.** Bed, gaps and curtains are all built and world-anchored, so the
+> stretch *sweeps down past the craft as it climbs* rather than washing over the picture — the
+> prototype tried both and recorded why: *"a screen-space wash is a filter laid over the picture and
+> reads as the game changing its mind about the palette."* The gaps are the bed: inside an anomaly
+> the sky's floor **is** true black, faded in over a quarter of a picture at each edge so that
+> neither is a line across the screen, and the clouds are the light on it. **Bodies read through
+> with no mechanism at all** — the anomaly is drawn behind the whole world, so nothing can repaint a
+> hue that is drawn later.
+>
+> **The HUD row has nothing to bite on yet.** Spec [03 · §5](./03-hud.md) already carries the same
+> rule and the HUD is not built, so *chip backgrounds go true black* is owed by whoever builds it.
+> The one thing in the picture today that is a dark ground behind a readable — the callout's rim —
+> is **not** a chip and does not change: it is VOID by an argued ruling (*"a heavy black outline
+> under pale text reads as a sticker"*), and §5's exception is about chips.
+>
+> **Fuel is not built and this is why `SIM_VERSION` did not move.** *"Orbiting inside an anomaly
+> trickles fuel"* is the one row that would change a run, and fuel is M4's — so the anomaly is
+> entirely a picture today, and `test/sim/version.test.ts`'s question (*did a tick move?*) answers
+> no. `AnomalyView.inside` is the predicate that row will read, named now and spent by nothing.
+>
+> **What it costs, measured through `pnpm profile`'s census.** The shipped run flies through the
+> stretch — 5% of its ticks are inside one — and a frame inside blends **13 screens** against a
+> baseline of 1. That is the prototype's own measured disaster (*"reported as the whole game lagging
+> the moment the storm came up"*), so the storm is drawn into a buffer at 1/8 and composited back,
+> which is also where its blur comes from: **about 3.2 screens on the phone**. The census walks the
+> unbuffered path, because a node process has no document, so the number it prints is the ceiling.
 
 **The anomaly is the only event permitted to repaint the sky.** The baseline's restraint is what
 keeps it rare.
@@ -289,21 +425,46 @@ Three jobs, one system:
   inside that range. `test/state/rungs.test.ts` holds both, and holds the turnover clear of the
   largest body spec 17 §4 authors.
 - Every dust mote's velocity equals every other dust mote's velocity, at every tick, at every
-  chain level. A test that computes the variance of dust velocity returns zero.
-- Doubling chain level increases dust count and changes no dust velocity.
-- Entering and leaving an anomaly changes the sky and nothing about any body's hue.
+  chain level. A test that computes the variance of dust velocity returns zero. ⚠ **Held, and by
+  construction rather than by measurement**: the dust is drawn in world space and a mote's position
+  has no camera term in it, so there is no rate in the layer for a variance to be taken of.
+  `test/render/dust.test.ts` asserts the stronger form — the one value every mote's shift can take
+  is the camera's own step.
+- Doubling chain level increases dust count and changes no dust velocity. ⚠ **Held.** The chain is
+  a **named zero** until M4 (`PresentationState.chain`, the shape `bloomOf` already uses), and the
+  term it multiplies is built: one more mote per picture per link, capped at twice the resting
+  field because *sparse* is the first word §2 uses about dust. Growing it draws a longer prefix of
+  one field, so the motes already on screen do not move.
+- Entering and leaving an anomaly changes the sky and nothing about any body's hue. ⚠ **Held with
+  no mechanism**: the anomaly is drawn behind the whole world, so nothing in it can repaint a hue
+  drawn later. `test/render/anomaly.test.ts`.
+- ⚠ **And the criterion M3.3 is actually accepted on, which §5 states and this list did not**:
+  *nothing outside an anomaly repaints the sky.* Held twice — `test/state/anomaly.test.ts` sweeps
+  the whole field and finds the ramp never over §2's 6%, and `test/render/anomaly.test.ts` finds
+  that beyond the lead the sky is asked for **nothing at all**, not a faint fill and not a
+  zero-alpha one.
 - Rendered at any altitude, the field contains no element whose scale or blur depends on a depth
-  coordinate — there is no depth coordinate.
+  coordinate — there is no depth coordinate. ⚠ **Still held.** The anomaly is drawn through a
+  downscaled buffer and composited back, which is a blur — and it is uniform across the frame and
+  answers to nothing, least of all to a distance. The **starfield** remains the one exemption, and
+  it is the author's (§2's notice).
 
 ## Open
 
-- The content of an addressed rung's label (§3). **Still open after M3.2, deliberately.** Both
-  readings are built and the bench toggles between them (`tools/bench/patches.ts`), with metres the
-  default because that is where this spec says the evidence leans — a default is not a ruling. A
-  second question rides with it: metres are counted from the field's **foot**, which is spec 17
-  §3's own datum, and the fixture's foot is a backstop *"rather than a line anyone meets"*, so a run
-  opens reading 1 250 rather than near zero. That is an artefact of a hand-made field; spec 17's
-  generator places its own foot.
+- ~~The content of an addressed rung's label (§3).~~ ⚠ **Closed by the author on 2026-09-01 —
+  metres**, after flying both readings on the bench (§3's notice). The alternative and its toggle
+  are deleted rather than switched off. **What is still open is the second question that rode with
+  it**: metres are counted from the field's **foot**, which is spec 17 §3's own datum, and the
+  fixture's foot is a backstop *"rather than a line anyone meets"*, so a run opens reading 1 250
+  rather than near zero. That is an artefact of a hand-made field; spec 17's generator places its
+  own foot.
+- **Where an anomaly sits, and how much field it covers** (§5). The extent is spec 17's by §5's own
+  sentence and spec 17's generator does not exist, so M3.3 built a stand-in — the prototype's own
+  placement rule and its own shelter magnitude, both on the bench, both deleted when the generator
+  lands. Recorded here so that the stand-in is not mistaken for a ruling.
+- **How far ahead of an anomaly the sky starts to warm** (§4). Derived rather than ruled — a floor
+  and a ceiling, in §4's notice — and the author's eyes are the gate on whether one picture is the
+  right distance.
 - **Whether a rung label may cross the thumb line.** Spec [00 · §7](./00-tokens.md) says nothing
   readable may live below it, ever, and a rung's number is the first readable thing in the game
   that *scrolls* — everything else below that line (the craft, the compass, a callout at the dot)

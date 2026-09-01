@@ -76,11 +76,14 @@
  *
  * That makes the seed a *render* seed, exactly as the prototype's own report
  * calls it: *"does not affect the simulation; reproduces the starfield."* A run's
- * determinism is untouched, because the sky is not in the run.
+ * determinism is untouched, because the sky is not in the run. It moved out to
+ * [`seed.ts`](./seed.ts) in M3.3, when the **dust** turned out to want the same
+ * thing and for the same reason.
  */
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
 import type { CameraView } from '../state/types.ts';
 import { DUSK, INK, mix } from './palette.ts';
+import { rng } from './seed.ts';
 
 /**
  * How many stars there are.
@@ -301,26 +304,4 @@ export function drawStarfield(
 /** Positive remainder, so a sky that has slid a long way still wraps forwards. */
 function wrap(value: number, span: number): number {
   return ((value % span) + span) % span;
-}
-
-/**
- * A small seeded generator, and it is **deliberately not the simulation's**.
- *
- * `test/render/boundary.test.ts` proves the renderer imports nothing from
- * `src/sim/`, which is ADR-0006's wall and worth more than the nine lines this
- * saves. The sky must never be able to draw from the run's own stream — that
- * would make a decoration capable of changing the game — and a generator it
- * cannot reach is the strongest possible statement of that.
- *
- * Mulberry32, the same algorithm the prototype seeds its own sky with.
- */
-function rng(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }

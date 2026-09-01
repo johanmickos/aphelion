@@ -119,9 +119,38 @@ tapers back into the rim at both ends of its arc, so it reads as reaching rather
 band laid on top. The lag stays visible — p50 2.1° — and small enough that the bright core
 sits under the craft (2026-08-29).
 
+**Sky**:
+The layer behind everything, and the only thing in the game whose colour is not fixed. It is VOID,
+and it warms almost imperceptibly toward AURORA as an **anomaly** approaches — at most a few per
+cent, and never for any other reason. Inside an anomaly it is repainted outright. The **starfield**
+and the **dust** are drawn in front of it and are not it.
+_Avoid_: background, backdrop (spec 05 §1: the player climbs *through* a medium, not past one),
+space, void (VOID is the colour token, not the layer)
+
+**Dust**:
+Sparse motes hanging in the field. They vary in brightness and never in velocity, and because they
+are fixed in the world what they show is **world speed** itself: a long exposure, streaking as the
+world passes and stippling when it stands still. Density rises with the **chain** and nothing else
+about them changes.
+_Avoid_: particles, snow, debris, stars (a star is the **starfield**'s, and it is the one thing in
+the field that does *not* move at world speed)
+
+**World speed**:
+How fast the world passes the picture — one number, and the rate every layer of the field except
+the **starfield** moves at. It is not the **craft**'s speed and the two must not be confused:
+through an orbit the craft is at its fastest while the picture is nearly still. What the **rungs**
+cross at, what the **dust** streaks by, and what the complaint *"the rungs travel by too quickly"*
+is about.
+_Avoid_: scroll speed, climb rate (the climb is where it goes; this is how fast), camera speed
+(that names the mechanism), velocity (that is the **craft**'s)
+
 **Anomaly**:
-A stretch of field where the sky itself changes: purple aurora, cloud, different rules.
-The only event permitted to repaint the sky.
+A stretch of field where the **sky** itself changes: purple aurora, cloud, different rules. The
+only event permitted to repaint the sky. It is a **place** rather than an event with a duration —
+it has edges, and it is climbed into and out of. Rare by design: the baseline's restraint is what
+keeps it worth arriving at.
+_Avoid_: storm, event, zone, region (a region is a whole field's worth of rules; an anomaly is one
+stretch inside one)
 
 **Boundary**:
 The graded region at the edge of the field. A place with bands of increasing heat and
@@ -357,16 +386,17 @@ _Avoid_: bounce (the **floor** does that on every dive and mostly for free), cra
 one; this does not), impact (that is an **ending**), collision
 
 **Starfield**:
-The sky: three tiers of stars sliding against the camera at a twentieth, an eighth and a fifth of
-its motion, so the world reads as having distance behind it. **The one thing in the game that does
-not move at world speed**, and the one depth cue — spec 05 §2 refuses all of them and was
+The stars in the **sky**: three tiers sliding against the camera at a twentieth, an eighth and a
+fifth of its motion, so the world reads as having distance behind it. **The one thing in the game
+that does not move at world speed**, and the one depth cue — spec 05 §2 refuses all of them and was
 overturned by the author on 2026-08-30, on the grounds that parallax conveys speed and nothing else
 in the field does yet. One colour at three brightnesses, DUSK to INK, never **CORE**. It lives
 wholly in the renderer and the simulation cannot see it. **It keeps its place beside the rungs and
 comes down to meet them** (author, 2026-08-30, once they landed): *"I still want it there, but only
 as background noise."*
-_Avoid_: background (it is a layer of the world, not behind it), stars (the tier, not the thing),
-parallax layers (that names the mechanism; this names the thing)
+_Avoid_: sky (the **sky** is the layer; this is what is in it), background (it is a layer of the
+world, not behind it), stars (the tier, not the thing), parallax layers (that names the mechanism;
+this names the thing)
 
 **Farewell ring**:
 **Refused** (author, 2026-08-29). It named the orbit detaching from the body and expanding away at

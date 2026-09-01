@@ -56,6 +56,8 @@ import { fade } from '../state/decay.ts';
 import { SPEAKS } from '../state/callout.ts';
 import { letterbox, visible } from './letterbox.ts';
 import { drawStarfield, starfield } from './starfield.ts';
+import { drawDust, dust } from './dust.ts';
+import { drawAnomaly } from './anomaly.ts';
 import { drawRungs } from './rungs.ts';
 import {
   BODY_FILL,
@@ -81,6 +83,16 @@ import {
  * simulation can see.
  */
 const SKY = starfield(0x5eed);
+
+/**
+ * And the **dust** in front of it, from the same render seed and for the same
+ * reason ([`dust.ts`](./dust.ts)): nothing about a mote is derived from the
+ * simulation, nothing about it decays, and the field is fixed at construction.
+ *
+ * A *different* seed from the sky's, so that the two layers cannot correlate — one
+ * generator run twice from one seed would put a mote wherever the 321st star was.
+ */
+const DUST = dust(0xd057);
 
 /**
  * How far above a body's surface its floor sits, in design units.
@@ -1243,10 +1255,23 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   // than translated with everything else because the whole point of it is that it
   // does *not* move at world speed — see [`starfield.ts`](./starfield.ts), which
   // also carries the author's ruling against spec 05 §2 and why it was made.
+  // **The sky's own colour, under the stars.** Spec 05 §4's altitude ramp and, if
+  // the craft is in one, the anomaly's black bed and its curtains — the only
+  // event permitted to repaint the sky (§5). Before the starfield, which is the
+  // prototype's own order: the stars stay in front of the weather, so an anomaly
+  // is a sky rather than a sheet hung over one.
+  drawAnomaly(context, view.anomaly, view.camera, view.tick, seen);
+
   drawStarfield(context, SKY, view.camera, seen.top, seen.bottom);
 
   context.save();
   context.translate(DESIGN_WIDTH / 2 - view.camera.x, DESIGN_HEIGHT / 2 - view.camera.y);
+
+  // **The dust, in front of the sky and behind everything else.** Spec 05 §2's
+  // stack is SKY, DUST, STRATA, BODIES, PLAYER. Unlike the sky it is inside this
+  // transform, which is the whole of why it moves at world speed: a mote's
+  // position has no camera term in it at all.
+  drawDust(context, DUST, view.camera, view.corridor, view.worldSpeed, view.chain, seen);
 
   // **The rungs, under everything else in the world.** Spec 05 §2's stack is SKY,
   // DUST, STRATA, BODIES, PLAYER, and this is STRATA — the medium the rest of the

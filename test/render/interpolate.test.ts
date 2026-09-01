@@ -18,6 +18,9 @@ function view(x: number, y: number, heading: number): PresentationState {
   return {
     tick: x,
     camera: { x: 585, y, lock: 0, offset: 0 },
+    worldSpeed: 0,
+    chain: 0,
+    anomaly: null,
     craft: {
       x,
       y,

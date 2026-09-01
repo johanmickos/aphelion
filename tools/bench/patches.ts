@@ -410,6 +410,56 @@ export function lockOf(sim: SimState): number {
     append: '\nexport function set_RUNG_STEP(value: number): void {\n  RUNG_STEP = value;\n}\n',
     why: 'how finely a bow is drawn, and the first number to move if the budget fails',
   },
+  // Spec 05 §4 and §5's sky, dust and anomaly. Two of these are open questions
+  // the spec names — where an anomaly sits is spec 17's and does not exist yet,
+  // and how far ahead the sky reads it is derived rather than ruled — and the
+  // third is the loudness of a layer that has never been flown.
+  settable(
+    'src/state/anomaly.ts',
+    'ANOMALY_AT',
+    'where the anomaly sits, as a fraction of the field — spec 17’s, and 0 drags it to the foot',
+  ),
+  settable(
+    'src/state/anomaly.ts',
+    'ANOMALY_SPAN',
+    'how much field an anomaly covers — the prototype’s shelter, 800 m',
+  ),
+  settable(
+    'src/state/anomaly.ts',
+    'SKY_LEAD',
+    'how far ahead the sky warms — derived from the picture, not ruled',
+  ),
+  {
+    // Flown and refused on the first build: the board's 90 ms was authored
+    // against a climb this game passes at its own median, and against the rungs
+    // the streaks read as brickwork. Zero is a pure stipple.
+    file: 'src/render/dust.ts',
+    find: 'export const DUST_EXPOSURE = 1;',
+    replace: 'export let DUST_EXPOSURE = 1;',
+    append:
+      '\nexport function set_DUST_EXPOSURE(value: number): void {\n  DUST_EXPOSURE = value;\n}\n',
+    why: 'how long the shutter is open — the board’s own 90 ms is 5.4, and it flew as bricks',
+  },
+  {
+    file: 'src/render/dust.ts',
+    find: 'export const DUST_PER_SCREEN = 21;',
+    replace: 'export let DUST_PER_SCREEN = 21;',
+    append:
+      '\nexport function set_DUST_PER_SCREEN(value: number): void {\n  DUST_PER_SCREEN = value;\n}\n',
+    why: 'Direction 05’s own density, and the first thing to move if the field reads busy',
+  },
+  {
+    // The sky needed exactly this knob within a day of landing, and for exactly
+    // this reason. Dust is a third system saying *speed* and how loud it should
+    // be against the rungs is a judgement about a moving picture.
+    file: 'src/render/dust.ts',
+    find: 'export const DUST_STRENGTH = 1;',
+    replace: 'export let DUST_STRENGTH = 1;',
+    append:
+      '\nexport function set_DUST_STRENGTH(value: number): void {\n  DUST_STRENGTH = value;\n}\n',
+    why: 'how loud the dust is against the rungs — the sky’s own knob, one layer forward',
+  },
+
   {
     // The author's answer to the question `starfield.ts` said to ask once the
     // rungs landed: it keeps its place and comes down. How far down is taste.
