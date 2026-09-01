@@ -569,6 +569,35 @@ frame 0.772 the area of this picture, so the density is **21** and not 16 — th
 open. Read that way the streak is guaranteed to agree with the motion it is drawn beside instead of
 being a second opinion about it.
 
+#### ⚠ And then it could not be seen at all — *"I don't really notice the dust"* (2026-09-01)
+
+Reported after the exposure was cut, and it is a **size** rather than an alpha. Measured against the
+author's own phone geometry — 393 css wide at dpr 3, so one design unit is very nearly one device
+pixel:
+
+| | design units | on the phone |
+|---|---|---|
+| a mote's width | 3 | **1.0 css px** |
+| its streak at p50 world speed | 6.9 | 2.3 css px |
+| its streak at the fastest tick flown | 28.4 | 9.5 css px |
+
+So a mote is a mark of about **one CSS pixel by two, at α 0.1 – 0.3**. Two comparisons say that is
+too small rather than merely small:
+
+- **The starfield was already refused at this size.** Its first build drew stars 0.7 – 2.7 design
+  units across and came back as *"tiny specks of white with little to no variation"*; what replaced
+  it was 2.4 – 6.4. Three is the bottom of that range.
+- **The layer is behind the one it is meant to be in front of.** Counting ink — area × alpha over a
+  picture at the median world speed — the rungs lay down about **8 300** design units², the sky
+  **680**, and the dust **125**. Spec 05 §2's stack is SKY, DUST, STRATA; at a fifth of the sky's ink
+  the middle one is not where the stack says it is.
+
+**The width goes on the bench and the alpha does not**, which is the ordering the sky's own lesson
+gives backwards. `STAR_STRENGTH`'s note argues *"it is an alpha and not a size"* because the sky was
+too **loud** and shrinking it would have walked back into the specks. A layer that is too **quiet**
+is the same argument in reverse — and the alpha here is a number spec 05 §2 states in two places and
+the board a third, which makes it the last thing to argue with, not the first.
+
 #### ⚠ The exposure flew as brickwork, the same day
 
 > *"I don't like the star streaks you've added at speed. With the rungs they look like bricks."*
@@ -741,13 +770,43 @@ because the phone's baseline is five times higher and the storm's extra is close
 the whole reason `pnpm profile` prints ratios and says *not a phone* on every line — and it is why
 this table is here rather than a laptop's.
 
-**One thing this run says that nothing was looking for.** Eleven of the twelve worst frames are the
-tick a dive begins — *"diving at #N, 0 ticks in"* — at a **26ms interval with 1ms of cpu**. The
-stretch is not in our draw: it is 25ms of somebody else's, on the frame a grab allocates the compass
-for the first time. A garbage collection at the grab is the obvious read and it is a guess; what is
-not a guess is that the interval stretches at grabs and the cpu does not. It belongs to
-[M3.6](#m36--the-frame-budget-harness) and is recorded so that whoever takes it starts with the
-correlation rather than looking for one.
+### ⚠ The grab drops a frame on the phone, 2026-09-01 — and it is the touch, not the game
+
+Eleven of the twelve worst frames in that run are the tick a dive begins, at a **26ms interval with
+1ms of cpu**. Taken across every dispatch that carries timing, the pattern is old, exact and
+one-sided:
+
+| | frames | intervals ≥ 25ms | press-downs | worst 12 landing on a press-down |
+|---|---|---|---|---|
+| **MacBook, Firefox** | 2 546 | **2** | 22 | **0** |
+| iPhone, 09-01 06:00 | 2 452 | 24 | 23 | 11 |
+| iPhone, 09-01 01:37 | 2 517 | 21 | 24 | 10 |
+| iPhone, 09-01 01:25 | 1 912 | 23 | 23 | 12 |
+| iPhone, 08-31 22:55 | 1 218 | 6 | 9 | 9 |
+
+**One dropped frame per press, on the phone, and none at all on the laptop with the same twenty-two
+grabs.** It predates this milestone — two of those traces are from before the anomaly existed.
+
+**And it is never a release.** Every stall lands on a press-**down** edge; not one lands on a
+press-up. That is what takes the game's own drawing out of the suspect list, because a release draws
+strictly *more* than a grab does: the callout word arrives with its rim, the compass begins its exit,
+the craft takes its punch. If the picture were the cost, letting go would cost more than grabbing.
+It costs nothing.
+
+So what is left is the **touch-down path itself** — `app/input.ts` refuses the touch defaults
+non-passively, which is what it must do (the *Search with Firefox* callout and the selection loupe
+were reported twice from this phone and that refusal is what stops them), and iOS Firefox appears to
+spend a frame resolving what the touch means. **That is a localisation and not a diagnosis**, and the
+difference matters: the next step is to time our own handlers, not to start deleting
+`preventDefault` calls whose reasons are written down and were paid for.
+
+**What is not a guess** is now printed rather than scripted: `pnpm replay` marks every worst frame
+that falls on a press edge, and states the stall count against the run's own press and release
+counts, so the next dispatch answers this question on sight. Whoever takes it starts with the
+correlation instead of looking for one.
+
+**Nobody has reported feeling it**, which is its own datum. It is one frame held half again as long,
+at the moment of commitment, and it has been there for every phone session on record.
 
 #### The bench's own defect, which is older than this step
 

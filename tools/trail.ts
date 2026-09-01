@@ -463,6 +463,16 @@ export function frameCost(timing: DispatchTiming): { perFrame: number; perTick: 
  * evidence supports `11ms` is the difference between a measurement and a
  * decoration.
  */
+/**
+ * How long a frame has to run before it is worth counting as a stall.
+ *
+ * **25ms**, which is a dropped frame at 60Hz and not much else: the interval
+ * distribution on the author's phone is a spike at 16 – 17ms and then nothing
+ * until 25, so the gap in the middle is where the line goes and there is no
+ * judgement in it.
+ */
+const LONG_FRAME_MS = 25;
+
 export function formatTiming(timing: DispatchTiming, recipe: Recipe): string[] {
   const frames = timing.frames;
   const mean = (bucketed: Bucketed): number =>
@@ -540,6 +550,14 @@ export function formatTiming(timing: DispatchTiming, recipe: Recipe): string[] {
     out.push('');
     out.push('  \x1b[2mthe worst frames, and what the run was doing on them\x1b[0m');
     out.push('     tick     cpu  interval  ticks');
+    // **The press edges the run's own log carries**, so a frame that is bad
+    // *because the button moved* says so without anybody writing a script.
+    // Measured on 2026-09-01, this is the whole of an old finding: on the phone
+    // every press-DOWN costs a frame and no press-UP ever does, which is what
+    // takes the game's own drawing out of the suspect list — a release draws
+    // strictly more than a grab. See `docs/plan/m3-the-field.md`.
+    const pressedDown = new Set(recipe.log.filter((_, edge) => edge % 2 === 0));
+    const letGo = new Set(recipe.log.filter((_, edge) => edge % 2 === 1));
     for (const frame of timing.worst) {
       const moment = byTick.get(frame.tick);
       const where =
@@ -550,9 +568,28 @@ export function formatTiming(timing: DispatchTiming, recipe: Recipe): string[] {
             : moment.phase === 'diving'
               ? `diving at #${moment.address}, ${moment.sinceGrab} ticks in`
               : `orbiting #${moment.address}, +${moment.sinceFreeze} since the freeze (${moment.envelope})`;
+      const edge = pressedDown.has(frame.tick)
+        ? ' \x1b[33m· button down\x1b[0m'
+        : letGo.has(frame.tick)
+          ? ' \x1b[33m· button up\x1b[0m'
+          : '';
       out.push(
         `  ${String(frame.tick).padStart(7)}  ${frame.cpu.toFixed(0).padStart(4)}ms  ` +
-          `${frame.interval.toFixed(0).padStart(6)}ms  ${String(frame.ticks).padStart(5)}  ${where}`,
+          `${frame.interval.toFixed(0).padStart(6)}ms  ${String(frame.ticks).padStart(5)}  ${where}${edge}`,
+      );
+    }
+
+    // And the same question of the whole distribution rather than of twelve
+    // frames, because twelve is a tail and this is a rate.
+    let stalled = 0;
+    for (let ms = LONG_FRAME_MS; ms < timing.interval.buckets.length; ms++) {
+      stalled += timing.interval.buckets[ms] ?? 0;
+    }
+    if (stalled > 0) {
+      out.push('');
+      out.push(
+        `  \x1b[2m${stalled} frames ran ${LONG_FRAME_MS}ms or longer, against ` +
+          `${pressedDown.size} presses and ${letGo.size} releases.\x1b[0m`,
       );
     }
   }

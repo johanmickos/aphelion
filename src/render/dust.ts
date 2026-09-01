@@ -229,10 +229,38 @@ const DUST_STREAK_FLOOR = 0.45;
  * every other board number in this repo is carried at.
  *
  * With a round cap this is also the diameter of a mote at rest, so *"a slow one
- * stipples"* is a three-unit dot: the same size as the smallest star in the sky
- * behind it, which is where a layer at the front of the sky should sit.
+ * stipples"* is a three-unit dot.
+ *
+ * ## ⚠ It is the suspect, 2026-09-01 — *"I don't really notice the dust"*
+ *
+ * Measured on the author's own phone geometry (393 css wide at dpr 3, so one
+ * design unit is very nearly one device pixel), **three design units is one CSS
+ * pixel**, and a mote at the median world speed is a mark about **1 × 2 CSS
+ * pixels at α 0.1 – 0.3**.
+ *
+ * Two comparisons say that is too small rather than merely small:
+ *
+ * - **The starfield was already refused at this size.** Its first build drew
+ *   stars 0.7 – 2.7 design units across and came back as *"tiny specks of white
+ *   with little to no variation"*; the fix was 2.4 – 6.4
+ *   ([`starfield.ts`](./starfield.ts)). Three sits at the bottom of the range
+ *   that replaced it.
+ * - **The layer is behind the one it is supposed to be in front of.** Counting
+ *   ink — area × alpha over a picture, at the median world speed — the rungs lay
+ *   down about 8 300 design units², the sky about 680, and the dust about
+ *   **125**. Spec 05 §2's stack puts DUST in *front* of SKY, and at a fifth of
+ *   the sky's ink it is not.
+ *
+ * **The alpha is not the thing to move**, which is why this is on the bench and
+ * not a quiet edit: spec 05 §2 states α 0.1 – 0.3 in two places and the board
+ * says it a third time, so the number the design fixed is the one number that
+ * should be argued with last. A width the design never states is the honest
+ * place to look first, and it is [`STAR_STRENGTH`](./starfield.ts)'s own lesson
+ * one layer forward — *"it is an alpha and not a size"* was right there because
+ * the sky was too **loud**, and the same argument run backwards says a layer
+ * that is too quiet wants its size.
  */
-const DUST_WIDTH = 1 * BOARD_PIXEL;
+export const DUST_WIDTH = 1 * BOARD_PIXEL;
 
 /**
  * The most motes a picture may hold, however long the chain runs — **twice the

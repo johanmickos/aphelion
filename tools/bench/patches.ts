@@ -369,6 +369,16 @@ export function lockOf(sim: SimState): number {
     why: 'how long the shutter is open — the board’s own 90 ms is 5.4, and it flew as bricks',
   },
   {
+    // Added the day the sliders were cut, and it earns its place by a
+    // measurement: a mote is one CSS pixel on the author's phone, which is the
+    // size the starfield was already refused at once.
+    file: 'src/render/dust.ts',
+    find: 'export const DUST_WIDTH = 1 * BOARD_PIXEL;',
+    replace: 'export let DUST_WIDTH = 1 * BOARD_PIXEL;',
+    append: '\nexport function set_DUST_WIDTH(value: number): void {\n  DUST_WIDTH = value;\n}\n',
+    why: 'a mote is one CSS pixel on the phone — the size the sky was refused at',
+  },
+  {
     file: 'src/render/dust.ts',
     find: 'export const DUST_PER_SCREEN = 21;',
     replace: 'export let DUST_PER_SCREEN = 21;',
