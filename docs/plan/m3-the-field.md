@@ -633,3 +633,57 @@ every capture but two, where the residual is the floor clamp releasing.
 
 `ECCENTRICITY_CAP` is untouched in [`freeze`](../../src/sim/orbit.ts), where it is a physics ruling
 about what orbits the game hands out rather than a statement about what to draw.
+
+### `KNOCK_BAND` re-measured, 2026-09-01 — the word is not being said at all
+
+The plan has asked for this since 2026-08-30 and it was blocked on a cohort: everything recorded
+before `SIM_VERSION` 9 refuses to replay, and the thresholds were ruled on 77 real captures under
+older physics. Two playthroughs on 2026-09-01 took the replayable corpus to **13 dispatches and 75
+captures**, which is the size the original ruling was made on. So it is taken, and the numbers say
+something the plan did not expect.
+
+**The floor is barely being touched.** Over the 75 captures the share of speed it takes runs
+
+| p25 | p50 | p75 | p90 | p95 | max |
+|---|---|---|---|---|---|
+| 0.000 | 0.000 | 0.000 | 0.001 | 0.001 | **0.141** |
+
+— half of all captures touch it at all, and of those almost every one costs a rounding error. There
+is no tail any more. When the band was ruled the same reading was *"p25 0.00, p50 0.03, and then
+jumps to 0.13 and above for the four hardest… a tail, not a spread"*, and the tail is gone.
+
+**So `KNOCK_BAND` at 0.15 selects nothing.** The knock is never said in the author's play under
+`SIM_VERSION` 9. That is invisible to every test in the repo, because a word that is never said
+fails nothing — the shipped pilot fixture still produces exactly one knock, at **0.1548**, harder
+than anything the author has flown, which is `test/sim/run.ts`'s own admission working as documented:
+aim is the input it cannot reproduce, so it plunges straight in more often than a person does.
+
+| band | knocks selected | contradicts an arrival |
+|---|---|---|
+| 0.15 **today** | **0 (0%)** | 0 |
+| 0.12 | 1 (1%) | **1** |
+| 0.10 | 1 (1%) | **1** |
+| 0.05 | 1 (1%) | **1** |
+
+**And the margin the constant claims is gone.** `tier.ts` says 0.15 *"clears with margin"* the
+hardest knock any tight arrival takes, *"which is measured at 12.9%"*. On this cohort that number is
+**14.1%** — and it belongs to a capture that earns the arrival word. The margin is **0.009**, not
+2.1 points, and every band low enough to fire at all fires on exactly that capture. So the two words
+cannot currently be separated by moving this threshold alone: the hardest landing in the corpus is
+also a tight arrival.
+
+**This is the author's, and it is a choice between three things rather than a number to nudge:**
+
+1. **Leave it.** The knock is reserved for a collision harder than anything the current physics
+   produces in their play. It costs a built word that is never heard.
+2. **Re-grade it on something other than the floor's share.** The share collapsed because the dive
+   changed, not because landings got gentler — `knock.ts` derives the word from *"the radial speed
+   the floor removes"*, and three tunings have moved what arrives at the floor. The turn the craft
+   makes, which `knock.ts` also measured at the time (**45.7°** on the flagged capture), has not
+   been re-read and may have survived where the share did not.
+3. **Accept the overlap.** Lower the band and let one capture in seventy-five say both, against
+   `knock.ts`'s own rule that the two *"must never contradict each other."*
+
+⚠ **75 captures is a thin cohort and it is one player.** It is the same thinness `ARRIVAL_SIDEWAYS`
+records, and it is the cohort the original ruling used — so this is comparable evidence rather than
+better evidence.
