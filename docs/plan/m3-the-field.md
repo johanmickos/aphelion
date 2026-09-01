@@ -137,6 +137,60 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
+#### The deadline, re-based on the **grab** — a design conversation, 2026-09-01, not built
+
+The author asked whether it was time to discuss spec 07 §6's `SOS`, and described it as *"flash SOS
+next to the ship when it's on an out-of-bounds path while grabbing... there's no turning back
+anymore."* Measured, that predicate is wrong three times in four: over 954 held swings in the new
+field, **47 leave the corridor and only 12 of those (26%) are unsaveable** — the rest could still be
+escaped by releasing. A signal that fires four times as often as it is true teaches people to ignore
+it.
+
+Put back to the author, they reframed it, and the reframing is the useful part:
+
+> *"I think the 'coasting past the last save' is the same idea here — I want to have something visual
+> **on the field** that tells me **where** I need to save myself by. If I grab after, or just don't
+> grab, I'm heading for extinction... the player could release and re-grab if there's another planet
+> ahead that will save them. I don't really know how to bake in that fact, though, or whether we need
+> to. Maybe a best effort warning is enough?"*
+
+**That is spec [03 · §5](../spec/03-hud.md)'s deadline with its save changed.** §5's dot is *"the last
+press that can still save the run"* where the save is spec 07 §5's fuel-priced **burn** — which needs
+fuel, which is M4's, which is why the deadline was scoped out of M3.4. **Re-based on the grab it needs
+none of that**: the last point on the craft's projected line from which a press still takes a body
+whose orbit keeps it inside the corridor is a question about geometry the simulation can already
+answer. And it is a mark **in the world**, which is what the author asked for and what a strobe beside
+the ship is not.
+
+Measured over 966 synthetic coasting paths that leave the corridor:
+
+| | |
+|---|---|
+| paths where a grab could have saved it at some point | **639 (66%)** |
+| from the last saving grab to the line | p10 217 ms · **p50 333 ms** · p90 717 ms |
+
+**The short window is not the warning, and reading it as one is the trap.** 333 ms is how much *doomed
+path* lies past the mark, not how long the player has to react: the mark is drawn on the projected
+line ahead of them, so it is visible for as long as they are heading at it. What it says is *this is
+where the rescue in front of you stops working*.
+
+**Two findings that shape it:**
+
+- **The other 34% never had a rescue at all**, so there is no mark to draw — and an absent mark
+  meaning *you were never savable* is reading safety off an absence, which spec 05 §5 refuses by name
+  for the shelter. That is what §6's `SOS` is for: **the mark says where, the strobe says never.** One
+  instrument, two states, and it unifies the author's SOS with §6's rather than adding a second.
+- **The re-grab tree does not need modelling.** The mark is a fact about the *nearest* rescue, not a
+  prophecy about the run — which is the compass's own grammar (*a release here lands in this window*,
+  never *and then you will survive*). What is further up the climb is already drawn, by the
+  **sightings** and the compass. Best effort is not a compromise here; modelling the whole tree would
+  make the mark a verdict, and spec 07 §7 refuses verdicts: *"the boundary never issues a command. It
+  states four facts."*
+
+⚠ The 66% and the window are measured over a **synthetic** spread of coasting craft rather than over
+real play, and say so. The author's dispatches contain two out-of-bounds deaths, which is not a
+cohort.
+
 #### ⚠ The demo flies a **seeded** field now, 2026-09-01 — and the fixture is frozen beside it
 
 > *"Can we change the planet generation in our demo to have a bit more left/right stretch? Not fully
