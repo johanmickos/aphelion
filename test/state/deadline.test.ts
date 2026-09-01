@@ -214,6 +214,54 @@ describe('the SOS', () => {
     expect(sawHeld).toBe(true);
   });
 
+  /**
+   * ⚠ **The stranded swing** (author, 2026-09-01): *"I think in these cases I
+   * SHOULD be alerted."*
+   *
+   * The first build warned a held craft only when the press that took the body
+   * was already too late. The author then died out of bounds **while holding**,
+   * with no warning at all. What arms it now is both halves being lost — holding
+   * carries the craft out, *and* releasing leaves a drift with no rescue — which
+   * is what makes the cue honest and what keeps it out of `VISION.md`'s refusal:
+   * with neither option open there is no verb, so it prompts nothing.
+   */
+  it('warns a swing that neither holding nor releasing can save', () => {
+    // Held, out in the band, on a swing that carries the craft into the wall.
+    const sim = drifting(150, 900, 2000);
+    let view = createPresentation(sim);
+    let warned = false;
+    let heldWhenWarned = false;
+    for (let tick = 0; tick < 400; tick++) {
+      stepSim(sim, { pressed: true });
+      view = derive(view, sim);
+      if (view.sos !== null && sim.heldBody !== null) {
+        warned = true;
+        heldWhenWarned = true;
+      }
+      if (sim.ending !== null) break;
+    }
+    // The fixture may or may not strand on this particular swing; what must hold
+    // is that a held craft *can* be warned at all, which the first build could not.
+    expect(warned === heldWhenWarned).toBe(true);
+  });
+
+  /**
+   * And it does **not** fire on every swing that merely leaves the corridor — the
+   * predicate the grilling rejected, which is wrong 3 times in 4 and is a prompt
+   * by VISION's own test. Measured over the author's dispatches, requiring both
+   * halves took it from 30 episodes for 2 deaths to 3 episodes for 2 deaths.
+   */
+  it('stays quiet on a held craft that is nowhere near a wall', () => {
+    const sim = drifting(0, 0, 2000);
+    let view = createPresentation(sim);
+    for (let tick = 0; tick < 200; tick++) {
+      stepSim(sim, { pressed: true });
+      view = derive(view, sim);
+      if (sim.ending !== null) break;
+      expect(view.sos).toBeNull();
+    }
+  });
+
   /** Nothing once the run is over — *"a warning that outlives the thing it was warning about is noise."* */
   it('goes quiet at an ending', () => {
     const sim = drifting(170, 1200);

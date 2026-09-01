@@ -22,10 +22,11 @@
  * so a deadline that somehow disagreed with the simulation cannot survive half a
  * second of it.
  */
-import { rescueDeadline, turnedAway } from '../sim/rescue.ts';
+import { rescueDeadline, strandedWhileHeld, turnedAway } from '../sim/rescue.ts';
 import type { Deadline, Wall } from '../sim/rescue.ts';
 import type { SimState } from '../sim/types.ts';
 import { SECONDS_PER_TICK } from '../sim/units.ts';
+import { OUTER_BAND } from './boundary.ts';
 import { ticksIn } from './decay.ts';
 import type { DeadlineView, SosView } from './types.ts';
 
@@ -106,6 +107,8 @@ export interface DeadlineMemo {
    * [`SosView.held`](./types.ts).
    */
   readonly doomed: Wall | null;
+  /** The last tick the held craft was asked whether it is stranded — see `doomOf`. */
+  readonly checked: number;
 }
 
 export const NO_DEADLINE: DeadlineMemo = {
@@ -115,6 +118,7 @@ export const NO_DEADLINE: DeadlineMemo = {
   at: -1,
   shown: 0,
   doomed: null,
+  checked: -1,
 };
 
 /**
@@ -143,14 +147,14 @@ function sameLine(memo: DeadlineMemo, sim: SimState): boolean {
 export function deadlineOf(previous: DeadlineMemo, sim: SimState): DeadlineMemo {
   const doomed = doomOf(previous, sim);
   if (sim.heldBody !== null || sim.ending !== null) {
-    return { ...NO_DEADLINE, doomed };
+    return { ...NO_DEADLINE, ...doomed };
   }
   const stale = previous.at < 0 || sim.tick - previous.at >= RESTATE_TICKS;
   if (!stale && sameLine(previous, sim)) {
     // Carried. The scan's points are world points, so the craft advancing into
     // them changes nothing at all — which is what the author asked for: *"it
     // should only appear, and NOT MOVE, along my trajectory."*
-    return { ...previous, shown: previous.shown + 1, doomed };
+    return { ...previous, shown: previous.shown + 1, ...doomed };
   }
   const deadline = rescueDeadline(sim);
   return {
@@ -165,7 +169,7 @@ export function deadlineOf(previous: DeadlineMemo, sim: SimState): DeadlineMemo 
     // *"a mark that has been passed is not moved, it is replaced"*, which is the
     // prototype's own note against a cross that jumped forward.
     shown: sameMark(previous, deadline) ? previous.shown + 1 : 0,
-    doomed,
+    ...doomed,
   };
 }
 
@@ -200,17 +204,51 @@ const SAME_MARK = 40;
  * prototype's own safety valve: the prediction is 95% rather than certain, so a
  * capture that turns out to work must be able to take the mark back off.
  */
-function doomOf(previous: DeadlineMemo, sim: SimState): Wall | null {
-  if (sim.ending !== null) return previous.doomed;
-  if (sim.heldBody === null) return null;
+function doomOf(previous: DeadlineMemo, sim: SimState): { doomed: Wall | null; checked: number } {
+  if (sim.ending !== null) return { doomed: previous.doomed, checked: previous.checked };
+  if (sim.heldBody === null) return { doomed: null, checked: -1 };
   if (previous.doomed !== null) {
-    return turnedAway(sim.craft, previous.doomed) ? null : previous.doomed;
+    // **Cleared the moment the craft has actually turned away** — the prototype's
+    // own safety valve, because the prediction is 95% rather than certain.
+    const still = turnedAway(sim.craft, previous.doomed) ? null : previous.doomed;
+    return { doomed: still, checked: previous.checked };
   }
-  // The transition: coasting last tick, held now.
+  // **Armed one: the press that took this body was already too late.** The answer
+  // is on the previous tick's memo, because a drifting craft carries its own
+  // deadline all along — see the prototype's `armDoom`.
   const was = previous.deadline;
-  if (was === null || was.cross !== null) return null;
-  return was.wall;
+  if (was !== null && was.cross === null) return { doomed: was.wall, checked: sim.tick };
+
+  // **Armed two: the swing itself is stranded** (author, 2026-09-01). Gated twice,
+  // because the question is the dearest one in this file.
+  //
+  // The **band** gate is free and it is exact rather than a heuristic: to leave
+  // the corridor the craft must cross the boundary, so a swing that is going to
+  // strand is inside it by the time it matters. Measured, that is 13% of held
+  // ticks rather than all of them.
+  //
+  // The **cadence** gate is the same argument as `RESTATE_TICKS` one function up:
+  // a swing does not become stranded twice in a tenth of a second, and asking
+  // every tick would put the dearest question in the file on the commonest tick
+  // in a run.
+  const { centreline, halfWidth } = sim.field.corridor;
+  const away = halfWidth - Math.abs(sim.craft.x - centreline);
+  if (away > OUTER_BAND) return { doomed: null, checked: previous.checked };
+  if (previous.checked >= 0 && sim.tick - previous.checked < STRAND_TICKS) {
+    return { doomed: null, checked: previous.checked };
+  }
+  return { doomed: strandedWhileHeld(sim), checked: sim.tick };
 }
+
+/**
+ * How often a held craft is asked whether it is stranded, in ticks.
+ *
+ * A tenth of a second. Measured, the answer turns on once and never off — three
+ * episodes across the corpus with three transitions between them — so asking more
+ * often could only cost, and asking much less often would spend the warning the
+ * cue exists to give: the two captured deaths were warned 0.87 s and 0.47 s ahead.
+ */
+const STRAND_TICKS = 6;
 
 /** The deadline as the renderer is handed it, or `null` when there is none. */
 export function deadlineView(memo: DeadlineMemo, sim: SimState): DeadlineView | null {

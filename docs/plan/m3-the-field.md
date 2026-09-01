@@ -137,6 +137,39 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
+#### ⚠ A stranded swing is warned, 2026-09-01 — the author overruled the grilling, and was right
+
+The grilling settled that a held craft gets the SOS only when *the press that took the body was
+already too late* — the prototype's own `armDoom` — because the obvious predicate (*the orbit will
+leave*) fires on 74% of exiting swings a release could still escape, and `VISION.md` refuses a cue
+whose *"answer is to let go"*. Then the author died out of bounds **while holding a body, with no
+warning at all**, and ruled: *"I think in these cases I SHOULD be alerted."*
+
+**Measured, that death was genuinely unsaveable.** Over the final held stretch of 53 ticks, releasing
+would have been lost on **every one of them** — from 0.87 s before the end. So the grilling's
+objection does not apply to it: there was no verb to prompt.
+
+**What arms it is both halves being lost**: holding carries the craft out of the corridor, *and* the
+drift a release would leave has no rescue on it. With neither open the cue prompts nothing, which is
+the one shape of it VISION's open call does not refuse.
+
+The second condition alone is not enough, and the measurement is the argument:
+
+| | episodes | on/off transitions | captured deaths warned |
+|---|---|---|---|
+| releasing is lost | 30 | 57 | 2 of 2 |
+| **holding *and* releasing are lost** | **3** | **3** | **2 of 2** |
+
+Three transitions across three episodes means it **fires once and never turns off** — there is no
+flicker to fix. On the author's own run it now warns for **52 ticks (0.87 s)**, on screen for 50 of
+them, against **zero** before.
+
+**Gated twice**, because it is the dearest question in the file. The **band** gate is exact rather
+than a heuristic — to leave the corridor a craft must cross the boundary, so a swing that will strand
+is inside it by the time it matters, which is 13% of held ticks rather than all of them. The
+**cadence** gate asks at most every 6 ticks, on the same argument `RESTATE_TICKS` is written under.
+Cost: tick mean 0.013 → 0.015 ms, and no new worst case.
+
 #### ⚠ The camera leads sideways now, 2026-09-01 — and the view still never gets in front
 
 Three dispatches in one sitting, and two of them have one cause:

@@ -106,8 +106,13 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 > commonest death and the biggest hole in pillar 3: *"of 199 out-of-bounds deaths, 95 were captured
 > on the final tick... the rescue cue is silent while captured."*
 >
-> **One meaning in two states**: drifting past the dot, and held when the press that took the body was
-> already too late. They cannot both be true, so it is not a priority between two opinions.
+> **One meaning in three states**: drifting past the dot; held when the press that took the body was
+> already too late; and ⚠ held on a swing that is **stranded** — where holding carries the craft out
+> *and* releasing leaves a drift with no rescue (author, 2026-09-01, after dying out of bounds while
+> held with no warning: *"I think in these cases I SHOULD be alerted"*). Requiring **both** halves is
+> what keeps it out of pillar 4's refusal: with neither option open there is no verb, so it prompts
+> nothing. Measured, the second condition alone fires on 30 episodes for 2 deaths and both together
+> on 3.
 >
 > **And it answers VISION's open call rather than stepping past it.** That call warns that a cue in
 > the captured case *"would have to say keep holding and you die — whose answer is to let go. That is

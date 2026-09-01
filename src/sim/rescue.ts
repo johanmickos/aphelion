@@ -250,6 +250,66 @@ function clone(state: SimState): SimState {
 }
 
 /**
+ * Which wall a **held** craft is stranded against — or `null`, which is almost
+ * always.
+ *
+ * ## ⚠ The case the first build did not cover, and the author ruled it in
+ *
+ * The grilling settled that a held craft gets the SOS only when *the press that
+ * took the body was already too late*, which is the prototype's own `armDoom`.
+ * The author then died out of bounds while holding a body, with no warning at
+ * all, and ruled: *"I think in these cases I SHOULD be alerted."*
+ *
+ * **Both halves have to be lost, and that is what makes it honest.** The
+ * grilling's objection to the obvious predicate stands — *the orbit will leave*
+ * fires on 74% of exiting swings that a release could still escape, and
+ * `VISION.md` refuses a cue whose *"answer is to let go"* because that is a
+ * prompt. So this asks both questions:
+ *
+ * 1. **Holding is lost** — the swing itself carries the craft out.
+ * 2. **Releasing is lost** — the drift a release would leave has no rescue on it.
+ *
+ * When both are true there is **no verb**: holding does not save, letting go does
+ * not save, and the cue prompts nothing because there is nothing to prompt. That
+ * is the one shape of this cue VISION's open call does not refuse.
+ *
+ * Measured over the author's dispatches: the second condition alone fires on 30
+ * episodes for 2 deaths; **both together fire on 3 episodes, turn off never, and
+ * warned both of the captured out-of-bounds deaths** — 0.87 s and 0.47 s ahead,
+ * which is all the time there was, because before that a release still worked.
+ */
+export function strandedWhileHeld(state: SimState): Wall | null {
+  if (state.heldBody === null || state.ending !== null) return null;
+  const { centreline, halfWidth } = state.field.corridor;
+  if (!Number.isFinite(halfWidth)) return null;
+
+  // Holding is lost: fly the swing on, held, and see it leave.
+  const holding = clone(state);
+  let wall: Wall | null = null;
+  for (let tick = 0; tick < RESCUE_BUDGET; tick++) {
+    stepSim(holding, { pressed: true });
+    const across = holding.craft.x - centreline;
+    if (Math.abs(across) > halfWidth) {
+      wall = across > 0 ? 'right' : 'left';
+      break;
+    }
+    if (holding.ending !== null) return null;
+  }
+  if (wall === null) return null;
+
+  // And releasing is lost: the drift a release leaves has no rescue on it. This
+  // is [`rescueDeadline`](#rescuedeadline) asked about a craft that has let go —
+  // one call, not a search over future release points.
+  const drifting = clone(state);
+  drifting.heldBody = null;
+  drifting.dive = null;
+  drifting.orbit = null;
+  const escape = rescueDeadline(drifting);
+  if (escape === null || escape.cross !== null) return null;
+  return wall;
+}
+
+/**
  * Where a press still saves this drift, and where it stops — or `null` when there
  * is nothing to mark.
  *
