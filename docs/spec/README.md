@@ -114,13 +114,21 @@ author's to close.
 
 ### Open, and opened by a change rather than by a spec
 
-- **[04 · Bodies](./04-bodies.md) / [06 · Awards](./06-awards.md): a knock and an arrival can now be
+- **[04 · Bodies](./04-bodies.md) / [06 · Awards](./06-awards.md): a knock and an arrival could be
   lit together.** `knock.ts` states that the two *"must never contradict each other"* and sets
   `KNOCK_BAND` above the hardest knock any tight arrival takes. That held over the corpus both
-  thresholds were ruled on (2026-08-30) and does not hold under `SIM_VERSION` 7: in the shipped pilot
-  run one capture — frozen on 1896, knocked on 1893 — earns both and lights them together for 45
-  ticks. Both thresholds are the author's, ruled on measured play, so retuning them is theirs.
-  `test/state/goldens.test.ts` pins the breach exactly so it cannot spread or be fixed quietly.
+  thresholds were ruled on (2026-08-30) and did not hold under `SIM_VERSION` 7: in the shipped pilot
+  run one capture — frozen on 1896, knocked on 1893 — earned both and lit them together for 45 ticks.
+
+  ⚠ **Closed by a physics change rather than by a ruling, 2026-08-31.** The breach is gone under
+  `SIM_VERSION` 8 and 9 and neither threshold was touched: the release kick becoming a square moved
+  approach geometry, and `test/state/goldens.test.ts` asserts the invariant outright again rather
+  than pinning a breach. **That it healed by itself is a reason to re-measure `KNOCK_BAND`, not to
+  relax about it** — a threshold that has drifted in and out of correctness twice in two days is one
+  whose margin nobody currently knows. The re-measurement is the author's, it wants real captures,
+  and it cannot be taken on the pilot: measured over the shipped run the floor's share is **0.1548
+  once and then 0.0008**, so no band anywhere between 0.001 and 0.155 changes what that fixture says.
+  Both thresholds remain the author's, ruled on measured play.
 
 ## Rulings applied
 
