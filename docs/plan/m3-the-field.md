@@ -687,3 +687,50 @@ also a tight arrival.
 ⚠ **75 captures is a thin cohort and it is one player.** It is the same thinness `ARRIVAL_SIDEWAYS`
 records, and it is the cohort the original ruling used — so this is comparable evidence rather than
 better evidence.
+
+#### Option 2 is closed: the turn does not separate them either, and the clearance is why
+
+Re-grading the knock on the **turn** rather than the floor's share was the option worth trying, since
+`knock.ts` measured 45.7° on the capture that prompted the word and that reading had not been
+re-taken. Taken now, over the same 75 captures:
+
+| sharpest single-tick turn in the dive | p50 | p90 | max |
+|---|---|---|---|
+| all 75 captures | 3.6° | 5.0° | **26.5°** |
+| the 9 tight arrivals | 3.8° | — | **26.5°** |
+| the other 66 | 3.5° | — | 6.6° |
+
+**All three readings pick out the same one capture.** The floor's share (0.141), the sharpest turn
+(26.5°) and the biggest single-tick speed drop (111 design units) are the same event, and it earns
+the arrival word. Everything else in the corpus turns at most 6.6° and loses nothing measurable. So
+there is no threshold on any of the three that names a collision without also calling a good capture
+a crash — **not because the line is in the wrong place, but because there is only one candidate.**
+
+**The clearance is what ate the population**, and it is doing exactly its job:
+
+- **68%** of captures needed a clearance — the dive was aimed *under* the floor and was lifted onto
+  it, over 4 ticks at p50.
+- **69%** land on the floor within a design unit of it.
+- And the floor takes **no speed**: p50 0.000 of it.
+
+`clearance.ts` turns the velocity until it is tangential *before* contact, so by the time the craft
+reaches the floor there is no radial component left for the floor to remove — and the radial
+component **is** the knock (`knock.ts`: *"the radial speed it removes is the kink"*). The craft
+arrives at the floor rather than into it. Two thirds of the dives that would have slammed are lifted
+first, by a mechanism built to stop exactly that.
+
+**So this is not a threshold question and no number will fix it.** What is left for the author:
+
+1. **Retire the knock.** It is a word for an event the physics no longer produces. Spec 06 §1's law
+   is that *"a word that never repeats never becomes a signal"*; one in seventy-five, contradicting
+   an arrival, is past that line in the other direction.
+2. **Keep it as a rarity** and accept that it will fire roughly never, and that when it does it may
+   fire on a good capture.
+3. **Give it a different event.** Collisions do still happen — `dive.ts` bounces off bodies that were
+   *not* grabbed (`bounceOffOthers`), and spec 01 §10 has a graze. Neither has been measured for
+   this, and *"a knock is a property of the moment"* (`knock.ts`) fits an unintended collision at
+   least as well as it fits a landing. **This is a new mechanism and is the author's**, not a
+   re-tune.
+
+⚠ The one thing not to do is move `KNOCK_BAND` down: every band low enough to fire at all fires on
+the single capture that earns the arrival, which is the contradiction `knock.ts` exists to prevent.

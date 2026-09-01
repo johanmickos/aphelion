@@ -245,6 +245,27 @@ export function predictOrbit(craft: Craft, body: Body, dive: Dive | null): Orbit
 
   const speed = magnitude(craft.vx, craft.vy);
   const energy = specificEnergy(body.mass, r, speed);
+  // **An unbound grab draws nothing, and that is a ruling rather than a gap.**
+  //
+  // No ellipse exists yet: the craft is on a hyperbola and will only close onto
+  // an orbit once the dive has taken enough speed out of it. Measured over the
+  // author's dispatches at `SIM_VERSION` 9, that is **31% of dive ticks past the
+  // clearance** — 38 spells, p50 16 ticks and up to 84, so a third of a second of
+  // no oval at the moment of commitment, more on a fast one.
+  //
+  // ⚠ **The prototype drew it anyway and this repo deliberately does not.** Its
+  // own note calls giving up here *"the wrong conclusion — the first stretch of a
+  // fast grab is exactly when the player most wants to know where they are being
+  // taken, and it showed them nothing"*, and it draws both conics from the polar
+  // form with the semi-latus rectum, since `p` does not go infinite at escape
+  // speed where `a` does. That is a real option and it is **refused**: *"we only
+  // want to draw orbits when they're actually viable. For wide fly-bys, the user
+  // is flying a bit more blindly on purpose. They're rewarded for quick fly-bys
+  // and speed"* (author, 2026-09-01).
+  //
+  // So the blindness is the design. Carrying the prototype's behaviour here would
+  // undo a ruling, which is the one case [AGENTS.md](../../AGENTS.md) §3's
+  // *carry the behaviour* does not apply to.
   if (energy >= 0) return null;
 
   const momentum = angularMomentum(dx, dy, craft.vx, craft.vy);

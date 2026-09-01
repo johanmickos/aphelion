@@ -132,6 +132,14 @@ author's to close.
 
 ## Rulings applied
 
+- **An unbound grab draws no predicted path** (author, 2026-09-01). The craft is on a hyperbola
+  until the dive closes it, which is **31% of dive ticks** in the author's own play — up to 1.4s of
+  no oval at the moment of commitment. The prototype draws both conics and its note argues at length
+  that not doing so is *"the wrong conclusion"*; that is refused here. *"We only want to draw orbits
+  when they're actually viable. For wide fly-bys, the user is flying a bit more blindly on purpose.
+  They're rewarded for quick fly-bys and speed."* Recorded because it is a deliberate divergence from
+  the prototype, and `predictOrbit` says so at the `null`.
+
 These were made by the author and recorded in [M0.1](../plan/m0-foundations.md). They are closed.
 Do not re-litigate them.
 
