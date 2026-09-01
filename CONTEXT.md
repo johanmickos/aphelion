@@ -210,11 +210,13 @@ each other: a craft skimming a **line** flat out is closing on it at nothing.
 _Avoid_: approach rate, wall speed, closure
 
 **Boundary mote**:
-The drifting specks that say what a band pays. Denser and brighter deeper in, absent past
-the **line**, and one of them in each band carries that band's multiplier as a label. They
-are **dust** at a different density and alpha, and they drift at **world speed** like it.
-The glimmer is the signpost and the label is the price; neither is an instruction.
-_Avoid_: particle, spark, pickup (nothing is collected — a mote is a sign, not a thing)
+The drifting specks that say what a band pays. Denser and brighter deeper in, and absent
+past the **line**. They are **dust** at a different density and alpha, and they drift at
+**world speed** like it. **The glimmer is the whole signpost** — the `×2` / `×3` caption was
+built and refused (2026-09-01, *"let the user discover that themselves"*), so what a band
+pays is something the player learns by going there.
+_Avoid_: particle, spark, pickup (nothing is collected — a mote is a sign, not a thing),
+band label (built and refused)
 
 **Fire band**:
 The hottest, best-paid, most dangerous band of the boundary.

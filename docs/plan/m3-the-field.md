@@ -137,6 +137,79 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
+#### ⚠ Flown, 2026-09-01 — three corrections, and the prototype had all three
+
+The author flew the first build of the axis and sent three:
+
+> *"The camera follows the ship laterally a bit too much. I'd like to have it be a bit more
+> lazy/slow, again mimicking the original prototype a bit more."*
+>
+> *"I don't want the 2x 3x text in the hot zone. Let the user discover that themselves."*
+>
+> *"The boundary of the hot zone should be the end of the camera. I.e. when the player approaches an
+> edge, the edge should kind of lock at the screen edge, and not expose stuff 'past' it with the
+> exception of anomalies and other safe havens."*
+
+**1 · The band was the vertical's and should never have been.** The first build claimed *"there is no
+sideways constant, because there is no sideways question the vertical answers differently."* The
+prototype answers it differently and this repo had not looked: `cameraMarginFrac` **0.22** of the
+window width, keeping the ship between the margins — a half-band of `0.28 × W`, which is **328
+design units** here against the 168 it shipped sharing. Its follow rate is **3**, the one this repo
+already uses, so the laziness was never in the rate.
+
+**And the fraction is safe to carry here for the reason `LOOK_AHEAD`'s is not.** That note records a
+fraction that broke because the axis changed under it — 0.18 of a *width* applied to a *height*.
+This is horizontal to horizontal, so nothing has to be re-derived.
+
+Measured over the 18 replayable dispatches, and it is lazier **and** smoother:
+
+| | camera still | jerk p95 | jerk p99 |
+|---|---|---|---|
+| shared vertical band (168) | 49% | 0.55 | 0.77 |
+| the prototype's band (328) | **69%** | **0.41** | **0.58** |
+
+It deliberately does **not** collapse through the settle the way `OVAL_BAND` does. That ruling's
+measurement — *"the craft swings 436 design units at p50 through the oval and the view was flying
+only 70% of it"* — is a vertical one, and applying it sideways would glue the view to the craft
+during a capture, which is the moment the author called *too much*.
+
+**2 · The `×2` / `×3` labels are gone.** Spec 07's header carries a ruling of 2026-08-27 that put
+them *in*, overturning the board's own second law (*"reward is shown, never spoken"*). This
+overturns it back, so the board's law stands and the glimmer is the whole signpost.
+`test/render/bands.test.ts` now asserts **no text at all**, which is stronger than the criterion it
+replaces: §7's *fact, not instruction* line held at zero remove rather than one. `bandAt` stays — it
+is the boundary's half of spec 08's multiplier — and is now spent by nothing, like `bloomOf`'s chain.
+
+**3 · The view stops at the line**, which is the prototype's *"the view may not show dead space
+beyond a barrier"* and turns out to be two rules rather than one:
+
+- **The field**: the picture's own edge may reach the line and no further. `visible` was not enough —
+  it clips the *drawing*, so a camera panned past the line showed bare VOID rather than world.
+- **Framing**: the craft may not leave the picture. This is the prototype's *"backstop for the frames
+  the ease has not caught up on"*, and it is load-bearing rather than defensive: the band is 328
+  units and the ease lags a fast dive by 340 more, so without it a craft crossing the corridor at
+  speed left the frame **in open field with no wall anywhere near** — measured on the shipped run at
+  ten ticks, worst 668 units out.
+- **Where they disagree the field wins**, which is the prototype's ruling (*"a rule about what the
+  player may SEE"*) and the author's. They can only disagree with the craft already past the line, so
+  what it costs is that a craft dying in spec 01 §10's four units of grace leaves the picture.
+
+Applied **twice** — to the target and again to the eased result — which is the prototype's own
+emphatic note: *"the same rule, applied to the place the camera is aiming and then to the place it
+actually reached. Writing the backstop its own weaker version is what let ordinary play see past the
+dashed line."* Clamping only the target is not enough, because the ease lags it.
+
+Measured after, over the corpus: **the picture shows past a line on 0.00% of ticks**, the craft
+leaves it on **0.01%**, and every one of those is a tick where the camera is pinned at the line.
+
+**The author's exception is a named zero.** *"With the exception of anomalies and other safe havens"*
+is `SHELTER_RELAX`, which opens the field bound where a **shelter** holds the line suspended — and
+only the anomaly projects one, which is M8's. The prototype's is 150 of its units and its mechanism
+is recorded rather than built, because its value is in what it cost to go without: *"without it the
+view held still, then had to match the ship's speed in one tick: measured at 1137px/s of camera
+jerk, reported as a jagged crossing"*, and a boolean handover *"threw the camera 158px."* Ramped, not
+switched, at both ends. Building the ramp now would be inventing where M8's shelter goes.
+
 ---
 
 ## M3.2 · Rungs

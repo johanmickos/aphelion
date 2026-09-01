@@ -328,6 +328,14 @@ export function lockOf(sim: SimState): number {
     'BOW_CAP',
     'spec 05 says 30px; 30 broke its own monotonic acceptance',
   ),
+  // The author flew the sideways camera and asked for it lazier on the first
+  // flight, which is a taste that has moved once and may move again — the bench's
+  // own rule for what earns a slider. 328 is the prototype's own margin.
+  settable(
+    'src/state/camera.ts',
+    'SIDEWAYS_BAND',
+    'how far the craft drifts sideways before the view follows \u2014 the prototype\u2019s 0.28\u00d7W',
+  ),
   settable('src/state/rung.ts', 'BOW_FALLOFF', 'how wide a patch of field a body bends'),
   settable('src/state/rung.ts', 'WAKE_AMPLITUDE', 'the board’s wake, whose own slider runs 0 – 34'),
   settable('src/state/rung.ts', 'WAKE_FALLOFF', 'how much of the field the craft parts as it goes'),

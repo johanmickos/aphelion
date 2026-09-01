@@ -56,13 +56,19 @@ export const FIRE_BAND = 90 * METRE;
  * What a swing flown in each band pays, as a multiplier on its cash — spec 07
  * §2's ×1, ×2 and ×3, and `CONTEXT.md`'s **band**.
  *
- * Printed by the renderer as the label spec 07 §2 puts on a mote, and spent by
- * nothing: the cash it multiplies is spec [08](../../docs/spec/08-economy.md)'s
- * and arrives with the economy in M4. It is named now for the same reason
- * [`bloomOf`](./energy.ts)'s chain argument is — **the term is built and only
- * its consumer is missing** — and because the label has to print *something*,
- * and a renderer inventing the number would be the picture and the economy
- * disagreeing about what the edge pays.
+ * **Spent by nothing, and drawn by nothing either.** The cash it multiplies is
+ * spec [08](../../docs/spec/08-economy.md)'s and arrives with the economy in M4.
+ * It briefly had a second consumer — spec 07 §2's `×2` / `×3` label on a mote —
+ * and the author refused that on 2026-09-01 (*"I don't want the 2x 3x text in the
+ * hot zone. Let the user discover that themselves."*), so what is left is the
+ * same shape [`bloomOf`](./energy.ts)'s chain and
+ * [`AnomalyView.inside`](./types.ts) are in: **the term is built and only its
+ * consumer is missing.**
+ *
+ * It is kept rather than deleted because it is the boundary's half of a rule the
+ * economy owns — `CONTEXT.md`'s **band** is *"the boundary heat a swing was flown
+ * in, as a multiplier on the cash"* — and the alternative is M4 re-deriving where
+ * the price steps from two constants in another file.
  */
 export function bandAt(away: number): 1 | 2 | 3 {
   if (away <= FIRE_BAND) return 3;

@@ -41,11 +41,11 @@
  * shown this: at 1440 × 900 the whole corridor is on screen.
  */
 import { BOARD_PIXEL, DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
-import { FIRE_BAND, HEAT_CAP, OUTER_BAND, bandAt } from '../state/boundary.ts';
+import { FIRE_BAND, HEAT_CAP, OUTER_BAND } from '../state/boundary.ts';
 import type { BoundarySideView, CameraView } from '../state/types.ts';
 import { DUST_FIELD } from './dust.ts';
 import type { Seen } from './letterbox.ts';
-import { AURORA, ION, VOID, dim } from './palette.ts';
+import { AURORA, ION, dim } from './palette.ts';
 import { rng } from './seed.ts';
 
 /**
@@ -195,41 +195,26 @@ const LINE_AT_REST = 0.6;
 const LINE_AT_HEAT = 0.4;
 
 /**
- * The band's price, printed on a mote — spec 07 §2's label, and the ruling in
- * spec 07's header that put it back.
+ * ## ⚠ The `×2` and `×3` labels are gone (author, 2026-09-01)
  *
- * *"This board's second law said reward is shown, never spoken and refused
- * Direction 03's in-world `×3` band label. **That refusal is overturned**"* —
- * author, 2026-08-27. Direction 03's type: Archivo **700**, 9px, tracked 0.1em.
+ * They were built, because spec 07's header carries a ruling of 2026-08-27 that
+ * put them back: the board's second law said *"reward is shown, never spoken"*
+ * and refused Direction 03's in-world band label, and the author overturned that
+ * refusal. Flown, they overturned it again the other way:
  *
- * **Rimmed rather than bloomed**, which is spec 06 §4's ruling applied where it
- * belongs rather than an exception to spec 00 §3's *labels are E1*. The author,
- * 2026-08-29: *"the blur circle behind the popup text isn't doing us any
- * favours, it's blurring the legibility."* Spec 07's own acceptance asks this
- * label to be *"legible against the gradient at maximum heat"*, which is the
- * brightest ground in the game, so a 6px glow behind it is the one thing that
- * would break the criterion it is drawn under. In **VOID** and not black, for
- * the reason `drawWord` gives: a heavy black outline under pale text reads as a
- * sticker.
+ * > *"I don't want the 2x 3x text in the hot zone. Let the user discover that
+ * > themselves."*
+ *
+ * So **the board's original second law stands after all** — the glimmer is the
+ * signpost and there is no caption. What is left saying what a band pays is what
+ * spec 07 §1 always had: motes *"denser and brighter deeper in"*, which is a
+ * thing the player reads by going there.
+ *
+ * Nothing in this file draws text now, and `test/render/bands.test.ts` asserts
+ * that outright rather than asserting the text says a price — which is the
+ * stronger form of §7's *"no arrows, no RISK ZONE, nothing that says turn"*, and
+ * the one that cannot drift.
  */
-const LABEL_FACE = "'Archivo', system-ui, sans-serif";
-const LABEL_SIZE = 9 * BOARD_PIXEL;
-const LABEL_TRACKING = 0.1;
-const LABEL_RIM = 2 * BOARD_PIXEL;
-const LABEL_RIM_STRENGTH = 0.38;
-
-/**
- * How far above its mote a label sits, in design units — spec 07 §2's **14**.
- *
- * The spec's table says *"~14 design px"* where the row above it says the type
- * is *"9px"*, and the two cannot both be read the same way: 14 design units is
- * 4.7 board pixels, which is **half the height of the type it is offsetting**,
- * so the label would sit on top of the mote it captions. Carried at
- * `BOARD_PIXEL` like every other board number in this repo it is 42 design
- * units, which clears a 9px cap-height with a little air. That is the reading
- * taken, and the wording is worth a ⚠ in the spec rather than a silent choice.
- */
-const LABEL_LIFT = 14 * BOARD_PIXEL;
 
 /** One mote, in its band's own coordinates. It has no velocity, by construction. */
 interface Mote {
@@ -470,10 +455,6 @@ function scatter(
     const from = band === 3 ? FIRE_BAND : OUTER_BAND;
     const to = band === 3 ? 0 : FIRE_BAND;
 
-    // The topmost mote of this band that is on screen, which is the one the
-    // label captions — see [`label`](#label).
-    let highest: { x: number; y: number } | null = null;
-
     for (let step = 0; step < MOTE_STEPS; step++) {
       // The step's own place in the band, taken at its middle so the three read
       // as samples of the board's ramp rather than as its two ends and a gap.
@@ -506,7 +487,6 @@ function scatter(
         context.moveTo(x + radius, y);
         context.arc(x, y, radius, 0, TWO_PI);
         drew = true;
-        if (highest === null || y < highest.y) highest = { x, y };
       }
       if (!drew) continue;
       context.fill();
@@ -527,8 +507,6 @@ function scatter(
       }
       context.fill();
     }
-
-    if (highest !== null) label(context, band, highest.x, highest.y, token, lit);
   }
   context.restore();
 }
@@ -545,50 +523,7 @@ const BLOOM_STRENGTH = 0.2;
 
 const TWO_PI = Math.PI * 2;
 
-/**
- * The band's price, on the topmost mote of it in frame.
- *
- * **One label per band in frame, and it captions a mote rather than labelling a
- * region** — spec 07 §2, which is VISION pillar 6's rule that every good cue is
- * drawn on the thing it describes. Which mote is decided fresh from this frame's
- * own geometry, so the transfer spec 07's acceptance asks for (*"scrolling the
- * band past the viewport transfers the label rather than duplicating or dropping
- * it"*) needs nothing remembered: the topmost mote on screen is a pure function
- * of where the world is, and when a new one comes over the top edge it is the
- * new topmost.
- *
- * The label says `×2` or `×3` — [`bandAt`](../state/boundary.ts) — and nothing
- * else. Spec 07 §7: *"`×3` is a fact. An arrow, a `RISK ZONE` banner, or
- * anything that says turn is an instruction, and those stay refused."*
- */
-function label(
-  context: CanvasRenderingContext2D,
-  band: 2 | 3,
-  x: number,
-  y: number,
-  token: string,
-  lit: number,
-): void {
-  context.save();
-  context.globalAlpha = lit;
-  context.font = `700 ${LABEL_SIZE}px ${LABEL_FACE}`;
-  context.textAlign = 'center';
-  context.textBaseline = 'alphabetic';
-  context.letterSpacing = `${LABEL_SIZE * LABEL_TRACKING}px`;
-  const says = `×${band}`;
-  context.lineWidth = LABEL_RIM;
-  context.lineJoin = 'round';
-  context.strokeStyle = dim(VOID, LABEL_RIM_STRENGTH);
-  context.strokeText(says, x, y - LABEL_LIFT);
-  context.fillStyle = token;
-  context.fillText(says, x, y - LABEL_LIFT);
-  context.restore();
-}
-
 /** Positive remainder, so a field a long way up the world still wraps forwards. */
 function wrap(value: number, span: number): number {
   return ((value % span) + span) % span;
 }
-
-/** Re-exported so a test can name the band a label is drawn for. */
-export { bandAt };

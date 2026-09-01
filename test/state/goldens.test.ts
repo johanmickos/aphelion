@@ -976,9 +976,48 @@ describe('the camera, over the whole run', () => {
    * goes to a wall and dies there, so it exercises the case rather than avoiding
    * it.
    */
-  it('keeps the craft on screen on every tick of the run', () => {
+  it('keeps the craft on screen except where the view has run out of room', () => {
+    let pinned = 0;
     for (const view of RUN) {
-      expect(Math.abs(view.craft.x - view.camera.x)).toBeLessThan(DESIGN_WIDTH / 2);
+      const { centreline, halfWidth } = view.corridor;
+      // ⚠ **The one exemption, and it is the author's ruling of 2026-09-01**: the
+      // view stops at the line, so once the picture's edge is *on* the line the
+      // camera has nowhere left to go and a craft still diving at the wall leaves
+      // the frame. The field rule beats framing — the prototype's own words,
+      // *"a rule about what the player may SEE"*.
+      //
+      // Everywhere the camera still has room, the craft is on screen. That is the
+      // invariant; the exemption is not a tolerance but a place the bound binds.
+      const atBound =
+        view.camera.x + DESIGN_WIDTH / 2 >= centreline + halfWidth - 1e-6 ||
+        view.camera.x - DESIGN_WIDTH / 2 <= centreline - halfWidth + 1e-6;
+      if (atBound) {
+        pinned++;
+        continue;
+      }
+      // At most exactly the edge: the backstop is a bound the view is held *at*,
+      // so a craft the ease could not keep up with sits on the frame's own line
+      // rather than inside it.
+      expect(Math.abs(view.craft.x - view.camera.x)).toBeLessThanOrEqual(DESIGN_WIDTH / 2 + 1e-6);
+    }
+    // And the bound binds rarely — a run spends its time in the field, not at a
+    // wall. Measured over the author's dispatches it is the last handful of ticks
+    // of the runs that die out of bounds.
+    expect(pinned).toBeLessThan(RUN.length * 0.05);
+  });
+
+  /**
+   * The other half of the same ruling: *"not expose stuff past it."* The picture's
+   * own edge never passes the line, on any tick of the run — which is what makes
+   * the exemption above the honest trade rather than a bug.
+   */
+  it('never shows past the line', () => {
+    for (const view of RUN) {
+      const { centreline, halfWidth } = view.corridor;
+      expect(view.camera.x + DESIGN_WIDTH / 2).toBeLessThanOrEqual(centreline + halfWidth + 1e-6);
+      expect(view.camera.x - DESIGN_WIDTH / 2).toBeGreaterThanOrEqual(
+        centreline - halfWidth - 1e-6,
+      );
     }
   });
 

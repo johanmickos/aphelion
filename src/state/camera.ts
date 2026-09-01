@@ -21,12 +21,37 @@
  *
  * **It is the same two mechanisms on a second axis, which is what the old note
  * predicted**: *"in a field that panned, the same blend would carry x too."* The
- * deadzone, its rounded edge, the follow ease and the lock are all shared —
- * there is no sideways constant in this file, because there is no sideways
- * question the vertical answers differently. What the prototype needed and this
- * does not is a **clamp to the field** and a **backstop**: the corridor's line is
- * enforced by [`visible`](../render/letterbox.ts), which already bounds the drawn
- * world and was written against `camera.x` for this day.
+ * rounded edge, the follow ease and the lock are all shared.
+ *
+ * ## ⚠ It shipped sharing the vertical band, and the author flew that and refused it
+ *
+ * This file claimed, for one build, that *"there is no sideways constant, because
+ * there is no sideways question the vertical answers differently."* That was
+ * wrong, and the author found it on the first flight:
+ *
+ * > *"The camera follows the ship laterally a bit too much. I'd like to have it
+ * > be a bit more lazy/slow, again mimicking the original prototype a bit more."*
+ *
+ * The prototype has a horizontal band of its own and this repo had not looked at
+ * it: `cameraMarginFrac` **0.22** of the window width, keeping the ship between
+ * the margins, which is a half-band of `0.28 × W`. See
+ * [`SIDEWAYS_BAND`](#sideways_band). Its follow rate is 3 — the one this file
+ * already uses — so the laziness was never in the rate.
+ *
+ * ## ⚠ And the view stops at the line (author, 2026-09-01)
+ *
+ * > *"The boundary of the hot zone should be the end of the camera. I.e. when the
+ * > player approaches an edge, the edge should kind of lock at the screen edge,
+ * > and not expose stuff 'past' it with the exception of anomalies and other safe
+ * > havens."*
+ *
+ * The prototype states the same rule and this file had assumed
+ * [`visible`](../render/letterbox.ts) was enough. It is not: that clips the
+ * *drawing* to the corridor, so a camera panned past the line showed a strip of
+ * bare VOID rather than showing world it should not. What the author asked for is
+ * the camera stopping, which is [`panBounds`](#panbounds) — the prototype's own
+ * *"the view may not show dead space beyond a barrier"*, and its exception with
+ * it.
  *
  * ## What it is worth, and what it costs
  *
@@ -42,14 +67,19 @@
  *
  * | jerk, design units | p50 | p90 | p95 | p99 | max |
  * |---|---|---|---|---|---|
- * | sideways | 0.01 | 0.44 | 0.55 | 0.77 | 12.35 |
+ * | sideways | 0.00 | 0.30 | 0.41 | 0.58 | 13.81 |
  * | vertical | 0.11 | 0.62 | 0.73 | 2.38 | 20.66 |
  *
  * Lower at every percentile, which is the measurement that says this will not
- * read as the thing that evening was about. It is exactly still on 49% of ticks
- * against the vertical's 31% — the craft weaves rather than climbing sideways, so
- * the stillness is the run's and not the mechanism's, and the rounded edge is
- * what keeps it from arriving with a step.
+ * read as the thing that evening was about. It is exactly still on **69%** of
+ * ticks against the vertical's 31% — the craft weaves rather than climbing
+ * sideways, so the stillness is the run's and not the mechanism's, and the
+ * rounded edge is what keeps it from arriving with a step.
+ *
+ * The one number that is *not* better is the max, and it is
+ * [`panBounds`](#panbounds): a bound that starts binding is the largest single
+ * change this axis can make. It is still under the vertical's, which is the
+ * comparison `test/state/camera.test.ts` holds as a standing rule.
  *
  * ## ⚠ What this does **not** reopen
  *
@@ -94,7 +124,8 @@
 import type { SimState } from '../sim/types.ts';
 import { FLOOR_GAP, MEDIAN_RADIUS, SCALE, SETTLE_TICKS } from '../sim/units.ts';
 import { easeStep } from './decay.ts';
-import { DESIGN_HEIGHT, THUMB_LINE } from './design.ts';
+import { SHELTERS, shelters } from './boundary.ts';
+import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from './design.ts';
 import type { CameraView } from './types.ts';
 
 /**
@@ -137,6 +168,79 @@ export const DEADZONE = MEDIAN_RADIUS + FLOOR_GAP;
  * convenient. Three is the slowest rate that keeps it.
  */
 export const FOLLOW_RATE = 3;
+
+/**
+ * How far the craft may drift sideways before the camera follows, in design
+ * units either side — **the prototype's own horizontal band.**
+ *
+ * ## Why this is a fraction where [`LOOK_AHEAD`](#look_ahead) is a distance
+ *
+ * `LOOK_AHEAD`'s note records a fraction that did not survive being carried: the
+ * prototype writes its look-ahead as `0.18` of the **window width** and this repo
+ * put it on the *vertical* axis, where 0.18 of the long side is more than twice
+ * the reach the prototype actually has. The lesson was *the axis a fraction was
+ * written against is part of the fraction.*
+ *
+ * **This is the same fraction rule pointing the other way**, and that is why it
+ * is safe: the prototype's `cameraMarginFrac` is a fraction of its window width
+ * and it is being carried onto **this repo's window width**, horizontal to
+ * horizontal. Nothing about the axis changes, so nothing has to be re-derived —
+ * and a deadzone that is a fraction of the picture is the right shape anyway,
+ * because what it is protecting is a share of the frame.
+ *
+ * ## The arithmetic
+ *
+ * The prototype keeps the ship between `margin` and `W − margin` of its window,
+ * at `margin = 0.22 × W`. That is a band `W − 2 × margin` wide, so a **half-band
+ * of `(0.5 − 0.22) × W = 0.28 × W`** — 109 of its units against a 390-unit
+ * window, and **328 design units** here.
+ *
+ * That is **1.95× the vertical band** this shipped sharing, which is the whole of
+ * what the author felt. Measured over the 18 replayable dispatches, against the
+ * shared band it replaces:
+ *
+ * | | camera still | jerk p95 | jerk max |
+ * |---|---|---|---|
+ * | shared vertical band (168) | 49% | 0.55 | 12.35 |
+ * | the prototype's band (328) | **69%** | **0.41** | **3.48** |
+ *
+ * So it is lazier *and* smoother — the wider band absorbs the excursions that
+ * were driving the view, rather than trading stillness for a harder arrival.
+ *
+ * **It does not collapse through the settle**, which is the one place it
+ * deliberately parts company with the vertical. [`OVAL_BAND`](#oval_band) is zero
+ * so that the oval keeps its swing, and the measurement behind that — *"the craft
+ * swings 436 design units at p50 through the oval and the view was flying only
+ * 70% of it"* — is a **vertical** measurement. Applying it sideways would glue
+ * the view to the craft during a capture, which is exactly the moment the author
+ * called *too much*.
+ */
+export const SIDEWAYS_BAND = 0.28 * DESIGN_WIDTH;
+
+/**
+ * How far past the line the view may reach, in design units — **zero, and it is a
+ * named zero rather than an absence.**
+ *
+ * The author's ruling has an exception in it: *"not expose stuff past it **with
+ * the exception of anomalies and other safe havens**."* A **shelter**
+ * (`CONTEXT.md`) is what holds the line open, and only the **anomaly** projects
+ * one, which is [M8](../../docs/plan/m8-the-anomaly.md)'s and is deliberately
+ * last. So [`SHELTERS`](./boundary.ts) is empty, this is spent by nothing, and the
+ * term is built.
+ *
+ * **The prototype's is 150 of its units and the mechanism is worth carrying with
+ * it when M8 lands**, because it records what going without cost: its relax opens
+ * over the 150px *before* the wall, *"which is what lets the camera be already
+ * moving when the ship crosses instead of pinned against a line it is about to
+ * pass. Without it the view held still, then had to match the ship's speed in one
+ * tick: measured at 1137px/s of camera jerk, reported as a jagged crossing."* And
+ * it is **ramped rather than switched** at both ends — a boolean *"threw the
+ * camera 158px, reported as a jagged jump returning to the field."*
+ *
+ * None of that ramp is built here, because building it would be inventing where
+ * M8's shelter goes and how deep it reaches. What is built is the bound it opens.
+ */
+export const SHELTER_RELAX = 0;
 
 /**
  * How far ahead of the craft the view sits at [`LOOK_REF_SPEED`](#) and above, in
@@ -347,18 +451,99 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
 
   const subjectY = craftY + offset + lead;
   const subjectX = sim.craft.x + offsetX;
-  const band = bandOf(sim);
   const step = easeStep(FOLLOW_RATE);
+
+  // **The target is clamped, not the result**, so the ease decelerates into the
+  // bound instead of being stopped at it. A clamp applied after the step would
+  // hold the view against the line at whatever speed it arrived with, and let go
+  // at that speed too — which is a step in the view's velocity at exactly the
+  // moment the boundary is loudest.
+  const bounds = panBounds(sim);
+  const wanted = toward(previous.x, subjectX, SIDEWAYS_BAND);
+  const aimed = Math.min(Math.max(wanted, bounds.lo), bounds.hi);
+  // **And again on the result, which is the backstop.** The prototype is emphatic
+  // that these are one rule and not two: *"the same rule, applied to the place
+  // the camera is aiming and then to the place it actually reached. Writing the
+  // backstop its own weaker version is what let ordinary play see past the dashed
+  // line."* Clamping only the target is not enough because the ease lags it — the
+  // aim can be legal while the view has not arrived, which is exactly the case a
+  // fast dive produces.
+  const eased = previous.x + (aimed - previous.x) * step;
+
   return {
-    // **The same blend, on both axes**, which is what the note this file used to
-    // carry predicted it would be. There is deliberately no sideways constant:
-    // the deadzone is a body's floor radius and a floor radius has no axis, and
-    // the follow rate is a rate. See the header.
-    x: previous.x + (toward(previous.x, subjectX, band) - previous.x) * step,
-    y: previous.y + (toward(previous.y, subjectY, band) - previous.y) * step,
+    // **The same blend on both axes, and a band of its own on each.** The rounded
+    // edge, the ease and the lock are shared; what differs is how wide the band
+    // is and whether the view may pass the line. See [`SIDEWAYS_BAND`](#sideways_band).
+    x: Math.min(Math.max(eased, bounds.lo), bounds.hi),
+    y: previous.y + (toward(previous.y, subjectY, bandOf(sim)) - previous.y) * step,
     lock,
     offset,
   };
+}
+
+/**
+ * How far sideways the view is allowed to sit — the prototype's *"the view may
+ * not show dead space beyond a barrier"*, and the author's ruling of 2026-09-01
+ * that *"the edge should kind of lock at the screen edge."*
+ *
+ * The bound is on the **picture**, not on the craft: the design space's own edge
+ * may reach the line and no further, so the last thing at the side of the screen
+ * is the line itself. Spec [00 · §7](../../docs/spec/00-tokens.md) makes that
+ * width a contract — 1170 design units, always — so this is the same bound on
+ * every device.
+ *
+ * **Framing loses to it, deliberately.** A craft past the line is inside spec
+ * 01 §10's four units of grace and is about to die there, and the prototype's own
+ * ruling is that *"a view with the ship missing is worse than a view with some
+ * black in it"* — except that the field rule wins anyway, *"because it is a rule
+ * about what the player may SEE."* Measured over the 18 replayable dispatches:
+ * the craft leaves the picture on **0.10% of ticks**, and every one of them is in
+ * the last eleven ticks of the two runs that die out of bounds, inside the final
+ * 46 m before the line. A fifth of a second, while dying at a wall.
+ *
+ * **A corridor no wider than the picture cannot pan at all**, which is the
+ * prototype's own guard and not a hypothetical: spec 17 §4 narrows the corridor
+ * with altitude, and a day that narrows it to the design width has one framing
+ * and no choice about it. The bounds collapse to the centreline rather than
+ * crossing.
+ */
+function panBounds(sim: SimState): { lo: number; hi: number } {
+  const { centreline, halfWidth } = sim.field.corridor;
+  const half = DESIGN_WIDTH / 2;
+  // **Framing**: the craft may not leave the picture. This is the prototype's
+  // *"backstop for the frames the ease has not caught up on"*, and it is not
+  // belt-and-braces — the band is 328 units wide and the ease lags a fast dive by
+  // 340 more, so without it a craft crossing the corridor at speed leaves the
+  // frame in the middle of the field with no wall anywhere near. Measured on the
+  // shipped run before this was added: ten ticks, worst 668 units from the view.
+  const frameLo = sim.craft.x - half;
+  const frameHi = sim.craft.x + half;
+
+  // A field with no sides has no line to stop at — `check-portability` builds
+  // exactly that one, which is the same field [`hasRungs`](./rung.ts) exists for.
+  if (!Number.isFinite(halfWidth)) return { lo: frameLo, hi: frameHi };
+
+  // **The field**: the view may not show dead space beyond the line. The author's
+  // exception rides on it as a named zero — see [`SHELTER_RELAX`](#shelter_relax).
+  const relax = shelters(SHELTERS, sim.craft.x, sim.craft.y) ? SHELTER_RELAX : 0;
+  const fieldLo = centreline - halfWidth + half - relax;
+  const fieldHi = centreline + halfWidth - half + relax;
+  // A corridor no wider than the picture has one framing and no choice about it —
+  // spec 17 §4 narrows the corridor with altitude, so this is a real case.
+  if (fieldHi < fieldLo) return { lo: centreline, hi: centreline };
+
+  const lo = Math.max(fieldLo, frameLo);
+  const hi = Math.min(fieldHi, frameHi);
+  // **Where they disagree, the field wins**, which is the prototype's own ruling
+  // and the author's: *"not expose stuff past it."* They can only disagree with
+  // the craft outside the line — inside it, framing is satisfied everywhere the
+  // field allows. What is returned is the nearest legal point to what framing
+  // wanted, which is continuous in the craft's position and so cannot step.
+  if (lo > hi) {
+    const nearest = Math.min(Math.max(sim.craft.x, fieldLo), fieldHi);
+    return { lo: nearest, hi: nearest };
+  }
+  return { lo, hi };
 }
 
 /**

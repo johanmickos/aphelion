@@ -84,6 +84,35 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 > for the whole of every run. Measured after: the boundary draws on **3.4% of frames** across the
 > author's replayable dispatches.
 
+> ### ⚠ The `×2` / `×3` label is refused after all (author, 2026-09-01)
+>
+> The header's ruling of 2026-08-27 overturned this board's own second law — *"reward is shown, never
+> spoken"* — and put Direction 03's in-world band label back in. **Flown, it is refused again**, and
+> the board's law stands:
+>
+> > *"I don't want the 2x 3x text in the hot zone. Let the user discover that themselves."*
+>
+> So §2's *The band label* table is not built, §1's second law reverts to *"reward is shown, never
+> spoken"*, and what says what a band pays is the mote density §1 always had. `test/render/bands.test.ts`
+> asserts **no text is drawn in the bands at all**, which is §7's *fact, not instruction* line held
+> more tightly than the criterion it replaces. `bandAt` is kept as spec 08's multiplier and is spent
+> by nothing.
+
+> ### ⚠ The view stops at the line (author, 2026-09-01)
+>
+> > *"The boundary of the hot zone should be the end of the camera. I.e. when the player approaches an
+> > edge, the edge should kind of lock at the screen edge, and not expose stuff 'past' it with the
+> > exception of anomalies and other safe havens."*
+>
+> The camera's own concern rather than this spec's, and recorded here because it decides what §2's
+> geometry is ever **seen**: the picture's edge may reach the line and no further, so the line is the
+> last thing at the side of the screen and §2's GONE is not a place the player is shown. The
+> exception is a **shelter**, which is M8's and is a named zero today.
+>
+> With it, the whole of §2's geometry is visible when the craft is out at a wall: the picture is 1170
+> design units wide and the boundary is 660 deep, so a camera pinned at the line frames both bands
+> and the line together.
+
 > ### ⚠ Two wordings taken a particular way
 >
 > - §2's label anchor says *"~14 **design** px"* where the row above says the type is *"9px"*. Read

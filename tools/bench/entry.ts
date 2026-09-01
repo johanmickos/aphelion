@@ -722,6 +722,19 @@ const KNOBS: Knob[] = [
     places: 2,
   },
   {
+    id: 'sidewaysband',
+    label: 'Camera \u00b7 sideways laziness',
+    what: 'how far the craft drifts sideways before the view follows, in design units either side. **328 is the prototype\u2019s own**: its cameraMarginFrac is 0.22 of the window width and it keeps the ship between the margins, which is a half-band of 0.28\u00d7W. The first build shared the vertical band (168) and flew as \u201cfollows the ship laterally a bit too much\u201d. Wider is lazier AND smoother \u2014 at 328 the view is still on 69% of ticks against 49%, and its jerk p95 falls from 0.55 to 0.41. The follow RATE is not the lever: the prototype\u2019s is 3, which this already uses',
+    min: 60,
+    max: 520,
+    step: 4,
+    base: cameraKnobs.SIDEWAYS_BAND,
+    apply: cameraKnobs.set_SIDEWAYS_BAND,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
     id: 'closingconstant',
     label: 'Boundary · what counts as a dive',
     what: 'K in heat = min(.85, (.10 + closing/K) × (1 + 60/d)), in design units per second. Spec 07 §3 states the law and says only “tuned on the phone”, so this is the number the FIRST LAW lives in — intensity is closing speed, not proximity. **The board’s own 120 could not cross**: board pixels are metres here, and at 120 m/s every dive this game flies is already past the cap before proximity is applied, so the edge becomes a switch. 640 carries the board’s RATIO instead — its fastest dive lands at 0.69 K — applied to the fastest closing ever flown here (442 m/s). Lower is louder. Above 807 the spec’s own acceptance stops holding',
@@ -737,7 +750,7 @@ const KNOBS: Knob[] = [
   {
     id: 'moteatrest',
     label: 'Boundary · price tag when calm',
-    what: 'how lit a band’s motes are at zero heat, as a fraction of their own alpha. Spec 07 §2 says the motes “rise with heat exactly as the gradient does”, and the gradient rises from NOTHING — so read literally the price tag goes out whenever the edge is calm, which is the one moment the player is deciding whether to come in. Direction 07’s own motes do not scale with heat at all. **0 is the spec read literally and 1 is the board**; 0.55 is the opening position between them',
+    what: 'how lit a band’s motes are at zero heat, as a fraction of their own alpha. Spec 07 §2 says the motes “rise with heat exactly as the gradient does”, and the gradient rises from NOTHING — so read literally the signpost goes out whenever the edge is calm, which is the one moment the player is deciding whether to come in. Direction 07’s own motes do not scale with heat at all. **This matters more since the ×2/×3 caption was refused (2026-09-01)**: the glimmer is now the whole of what says what a band pays. **0 is the spec read literally and 1 is the board**; 0.55 is the opening position between them',
     min: 0,
     max: 1,
     step: 0.05,

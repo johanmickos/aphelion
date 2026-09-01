@@ -372,65 +372,44 @@ describe('the motes', () => {
   });
 });
 
-describe('the label', () => {
+describe('what the bands say', () => {
   /**
-   * Spec 07 §2: *"one label per band in frame, on the band's topmost mote."* Two
-   * bands are in frame on a wide window, so two labels — never four, and never
-   * none.
-   */
-  it('is one per band in frame, on the topmost mote of it', () => {
-    const it = drawn([side()]);
-    expect(it.words.map((w) => w.says).sort()).toEqual(['×2', '×3']);
-    const line = CENTRELINE + HALF_WIDTH;
-    for (const word of it.words) {
-      const band = line - word.x <= FIRE_BAND ? FIRE_BAND : OUTER_BAND;
-      const of = it.dots.filter((d) =>
-        band === FIRE_BAND ? line - d.x <= FIRE_BAND : line - d.x > FIRE_BAND,
-      );
-      // It captions the highest mote its band has on screen — `y` falls upward.
-      const top = Math.min(...of.map((d) => d.y));
-      expect(word.y).toBeLessThan(top);
-      expect(of.some((d) => Math.abs(d.x - word.x) < 1e-6)).toBe(true);
-    }
-  });
-
-  /**
-   * Spec 07's acceptance: *"scrolling the band past the viewport transfers the
-   * label rather than duplicating or dropping it."* Walked over a whole tile's
-   * worth of climb, the count never changes.
-   */
-  it('transfers rather than duplicating or dropping, all the way up', () => {
-    for (let y = 0; y > -DESIGN_HEIGHT * 9; y -= DESIGN_HEIGHT / 8) {
-      const words = drawn([side()], WIDE, { ...AT, y }).words;
-      expect(words.map((w) => w.says).sort()).toEqual(['×2', '×3']);
-    }
-  });
-
-  /** Direction 03's type, and rimmed rather than bloomed so it survives the gradient. */
-  it('is Archivo 700 at 9px, rimmed', () => {
-    for (const word of drawn([side({ closing: 400 * METRE })]).words) {
-      expect(word.font).toContain('700');
-      expect(word.font).toContain(`${9 * 3}px`);
-      expect(word.font).toContain('Archivo');
-      expect(word.rimmed).toBe(true);
-    }
-  });
-
-  /**
-   * **Spec 07 §7, and it is the line the whole design holds**: *"`×3` is a fact.
-   * An arrow, a `RISK ZONE` banner, or anything that says turn is an
-   * instruction, and those stay refused."*
+   * ⚠ **The `×2` and `×3` labels are gone** (author, 2026-09-01): *"I don't want
+   * the 2x 3x text in the hot zone. Let the user discover that themselves."*
    *
-   * Asserted over the whole boundary at every heat there is, because a refusal
-   * that only holds while the edge is calm is not a refusal.
+   * Spec 07's header carries a ruling of 2026-08-27 that put those labels *in*,
+   * overturning the board's own second law — *"reward is shown, never spoken"*.
+   * This overturns it back, so the board's law stands.
+   *
+   * **Asserted as no text at all**, which is stronger than what it replaces. The
+   * old test checked that every drawn word matched `×2` or `×3`, which is spec
+   * 07 §7's *fact, not instruction* line held at one remove; this holds it at
+   * zero. There is nothing to drift.
    */
-  it('says a price and never an instruction', () => {
+  it('draws no text anywhere, at any heat or depth', () => {
     for (const closing of [0, 100, 200, 400, 800].map((m) => m * METRE)) {
       for (const away of [OUTER_BAND, FIRE_BAND, 20 * METRE, -10]) {
-        const words = drawn([side({ closing, away }), leftSide({ closing, away })]).words;
-        for (const word of words) expect(word.says).toMatch(/^×[23]$/);
+        const it = drawn([side({ closing, away }), leftSide({ closing, away })]);
+        expect(it.words).toHaveLength(0);
+        // And it did draw the band, so this is a refusal rather than an empty
+        // frame passing for one.
+        expect(it.dots.length).toBeGreaterThan(0);
       }
     }
+  });
+
+  /**
+   * What is left saying what a band pays is spec 07 §1's own second law —
+   * *"denser and brighter deeper in"* — which the player reads by going there.
+   * That is asserted above under `the motes`; this is the promise that nothing
+   * else crept in to say it instead.
+   */
+  it('says it in motes and in nothing else', () => {
+    const it = drawn([side({ closing: 300 * METRE })]);
+    expect(it.words).toHaveLength(0);
+    // Lines are the two band edges and the line itself, and nothing more.
+    expect(it.lines.filter((l) => l.dash.length > 0)).toHaveLength(2);
+    expect(it.lines.filter((l) => l.dash.length === 0)).toHaveLength(1);
   });
 });
 
@@ -564,7 +543,6 @@ describe('presence — what normal play actually shows', () => {
     expect(Math.max(...half.dots.map((d) => d.alpha))).toBeLessThan(
       Math.max(...full.dots.map((d) => d.alpha)),
     );
-    expect(half.words[0]!.alpha).toBeLessThan(full.words[0]!.alpha);
     const lit = (it: typeof half) => alphaOf(it.gradients[0]!.stops[2]!.colour);
     expect(lit(half)).toBeLessThan(lit(full));
   });

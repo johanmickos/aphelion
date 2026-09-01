@@ -22,7 +22,10 @@ import {
   FOLLOW_RATE,
   LOOK_AHEAD,
   LOOK_REF_SPEED,
+  SIDEWAYS_BAND,
+  followCamera,
   lockOf,
+  openCamera,
   PARKED,
   THUMB_BUDGET,
 } from '../../src/state/camera.ts';
@@ -161,6 +164,92 @@ describe('the camera', () => {
     for (const p of [50, 90, 95, 99]) {
       expect(at(sideways, p)).toBeLessThanOrEqual(at(vertical, p));
     }
+  });
+
+  /**
+   * ⚠ **The view stops at the line** (author, 2026-09-01): *"the edge should kind
+   * of lock at the screen edge, and not expose stuff 'past' it."*
+   *
+   * The bound is on the **picture**, not on the craft — spec 00 §7 makes the
+   * design space's width a contract, so the same bound holds on every device.
+   * Flown out to the wall in the real field, the picture's edge reaches the line
+   * and stops.
+   */
+  it('never lets the picture show past the line', () => {
+    const field = fixtureField();
+    const craft = fixtureCraft();
+    const { centreline, halfWidth } = field.corridor;
+    // Out past the line, which is where the run ends — the hardest case for the
+    // bound, because framing wants to follow and is not allowed to.
+    craft.x = centreline + halfWidth + 10;
+    const sim = createInitialState(field, craft, 1);
+    let view = openCamera(sim);
+    for (let tick = 0; tick < 600; tick++) view = followCamera(view, sim);
+    expect(view.x + DESIGN_WIDTH / 2).toBeLessThanOrEqual(centreline + halfWidth + 1e-6);
+
+    craft.x = centreline - halfWidth - 10;
+    const other = createInitialState(field, craft, 1);
+    let back = openCamera(other);
+    for (let tick = 0; tick < 600; tick++) back = followCamera(back, other);
+    expect(back.x - DESIGN_WIDTH / 2).toBeGreaterThanOrEqual(centreline - halfWidth - 1e-6);
+  });
+
+  /**
+   * **And the field beats framing where they disagree**, which is the prototype's
+   * ruling and the author's: a craft inside spec 01 §10's four units of grace is
+   * about to die there, and *"a rule about what the player may SEE"* wins. So the
+   * craft leaves the picture rather than dragging it into the void.
+   */
+  it('lets the craft leave rather than showing dead space', () => {
+    const field = fixtureField();
+    const craft = fixtureCraft();
+    const { centreline, halfWidth } = field.corridor;
+    craft.x = centreline + halfWidth + 10;
+    const sim = createInitialState(field, craft, 1);
+    let view = openCamera(sim);
+    for (let tick = 0; tick < 600; tick++) view = followCamera(view, sim);
+    expect(Math.abs(craft.x - view.x)).toBeGreaterThan(DESIGN_WIDTH / 2);
+  });
+
+  /**
+   * **The backstop**, which is the half of the prototype's `panBounds` that is not
+   * about the field: the craft may not leave the picture while the view still has
+   * room. It is not belt-and-braces — [`SIDEWAYS_BAND`](../../src/state/camera.ts)
+   * is 328 units wide and the ease lags a fast dive by 340 more, so without it a
+   * craft crossing the corridor at speed left the frame in open field. Measured
+   * on the shipped run before it was added: ten ticks, worst 668 units out.
+   */
+  it('keeps the craft in the picture while it still has room to', () => {
+    const field = fixtureField();
+    const craft = fixtureCraft();
+    // Starting at the left line and crossing fast, stopping short of the right
+    // one — so the field bound never binds and the backstop is the only thing
+    // that can keep the craft in frame.
+    craft.x = field.corridor.centreline - field.corridor.halfWidth;
+    const sim = createInitialState(field, craft, 1);
+    let view = openCamera(sim);
+    for (let tick = 0; tick < 90; tick++) {
+      // Flown by hand rather than by the simulation: what is under test is the
+      // camera's answer to a craft moving faster sideways than the ease can
+      // follow, and the fixture field's own swings do not reliably produce one.
+      sim.craft.x += 1400 / 60;
+      view = followCamera(view, sim);
+      expect(Math.abs(sim.craft.x - view.x)).toBeLessThanOrEqual(DESIGN_WIDTH / 2 + 1e-6);
+    }
+  });
+
+  /**
+   * ⚠ **The sideways band is the prototype's own, and it is wider than the
+   * vertical** (author, 2026-09-01: *"the camera follows the ship laterally a bit
+   * too much... more lazy/slow, mimicking the original prototype"*).
+   *
+   * `cameraMarginFrac` is 0.22 of the window width and keeps the ship between the
+   * margins, which is a half-band of `0.28 × W`. Asserted as the relationship
+   * rather than the number, because the number is the fraction's consequence.
+   */
+  it('is lazier sideways than vertically, at the prototype fraction', () => {
+    expect(SIDEWAYS_BAND).toBeCloseTo(0.28 * DESIGN_WIDTH, 6);
+    expect(SIDEWAYS_BAND).toBeGreaterThan(DEADZONE);
   });
 
   /**
