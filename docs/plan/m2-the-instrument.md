@@ -1668,3 +1668,40 @@ rather than followed. Most of that is the lock doing its job and is not new — 
 stillness is what reads as stuttering rather than the transitions into it, then the lock itself is
 the question, and it is a larger ruling than a constant. `OVAL_BAND` and `SINK_SHARE` are both on
 the bench.
+
+### ⚠ The ninth: the look-ahead crosses instead of switching, and the sink lets go with the lock
+
+Two more from the same evening, both found by asking *where is the largest single-tick change* rather
+than by reasoning about the lock.
+
+**The look-ahead was stepping at both ends, and the eighth correction only fixed one.** Fading it out
+on the freeze's own clock left the *return* untouched, because a release has no clock to hang a fade
+on. Measured on the run flagged at 23:54, switching the look-ahead off entirely took a release's jerk
+from p50 3.6 and worst 12.0 down to 0.6 and 7.4 — so most of a release's jerk was the lead snapping
+back on, the mirror of the freeze.
+
+So the weight is **carried** in [`CameraView`](../../src/state/types.ts) and crossed linearly over
+`LEAD_OUT_TICKS`, with the smootherstep applied to it: one mechanism, both ends, no clock. An
+exponential ease on the value was tried first and is worse — it starts at its fastest, so the
+position is continuous and the velocity is not, and the freeze's jerk measured **2.1** against 0.6
+for a scheduled fade and **1.0** for this.
+
+**And the sink had an edge of its own**, which is what the author saw: *"the camera settles and then
+moves UP a few units on the last orbit."* Written as *a tenth until the settle ends, the full rate
+after*, there was a tick or two where `lockOf` had not begun and the resistance had already gone —
+so whatever the sink was holding back moved ten times faster. Traced: the view crept 0.02, 0.04,
+0.05, 0.07, 0.08, 0.09 and then stepped **0.87** on the tick the orbit went round. It eases back on
+the lock's own smootherstep now, so the two never both let go.
+
+| on the run flagged at 23:54 | before | after |
+|---|---|---|
+| jerk at a freeze, p50 / worst | 0.6 / 0.7 | 1.0 / 1.0 |
+| jerk at a release, p50 / worst | 3.6 / 12.0 | **1.7 / 7.6** |
+| jerk when the orbit goes round, p50 / worst | 0.9 / 5.7 | **0.1 / 0.6** |
+| worst jerk anywhere in the run | 11.96 | **7.64** |
+
+**What is left is the release, at 7.6, and it is deliberate.** The lock and its displacement are
+dropped on the tick the body is let go, because spec 02's own ruling forbids a delay there — *"the
+slight delay is making it seem jagged and jumpy, let's remove any camera/speed delay there"* (author,
+2026-08-29). That is the next thing to look at if the release still reads as abrupt, and it is a
+ruling to overturn rather than a bug to fix.

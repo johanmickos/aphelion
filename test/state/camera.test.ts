@@ -692,13 +692,26 @@ describe('the look-ahead', () => {
     expect(sim.orbit).not.toBeNull();
     expect(lockOf(sim)).toBe(0);
 
+    // ⚠ **Derived over `LEAD_OUT_TICKS` rather than for one tick**, since
+    // 2026-08-31: the look-ahead is no longer switched, it is **crossed**. The
+    // gate still answers on the tick, and what changed is that the weight it
+    // answers takes twelve ticks to travel — so a single tick shows almost
+    // nothing either way, which is the whole point of the change and would make
+    // a one-tick test read as the gate having stopped working.
     const before = createPresentation(sim);
-    const frozen = derive(before, sim);
-    const diving = derive(before, { ...sim, orbit: null });
+    let frozen = before;
+    let diving = before;
+    for (let i = 0; i < LEAD_OUT_TICKS; i++) {
+      frozen = derive(frozen, sim);
+      diving = derive(diving, { ...sim, orbit: null });
+    }
     // Frozen, the view does not move at all: the craft is inside the band and
     // nothing is steering off its phase clock. Diving, the lead carries it out.
     expect(frozen.camera.y).toBe(before.camera.y);
     expect(Math.abs(diving.camera.y - before.camera.y)).toBeGreaterThan(1);
+    // And the weight is what separates them, at both ends of its travel.
+    expect(frozen.camera.leading).toBe(0);
+    expect(diving.camera.leading).toBe(1);
   });
 
   /** The craft may never be pushed below the thumb line by any of this. */

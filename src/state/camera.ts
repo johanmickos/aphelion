@@ -211,7 +211,7 @@ function centreline(): number {
  * that as the reason its own reset is a placement.
  */
 export function openCamera(sim: SimState): CameraView {
-  return { x: centreline(), y: sim.craft.y, lock: 0, offset: 0 };
+  return { x: centreline(), y: sim.craft.y, lock: 0, offset: 0, leading: 0 };
 }
 
 /**
@@ -281,7 +281,16 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   // heading. It stays **on through the dive**, where the craft is on real physics
   // with a real heading and where suppressing it *"put a 110px lurch into the
   // dive"*. `sim.orbit` is exactly that distinction and needs no second flag.
-  const lead = leadOf(sim.craft.vy) * (1 - leadOut(sim));
+  // Crossed rather than switched — see `LEAD_OUT_TICKS`. The weight moves a
+  // twelfth of the way each tick and the curve is applied to it, so both the
+  // leaving and the returning are smootherstep and neither is a step.
+  const wanted = sim.orbit === null ? 1 : 0;
+  const step = 1 / LEAD_OUT_TICKS;
+  const leading = Math.max(
+    0,
+    Math.min(1, previous.leading + Math.sign(wanted - previous.leading) * step),
+  );
+  const lead = leadOf(sim.craft.vy) * smootherstep(leading);
 
   const subjectY = craftY + offset + lead;
   return {
@@ -293,6 +302,7 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
           (framed(previous.y, subjectY, sim) - previous.y) * sinkRate(previous.y, subjectY, sim),
     lock,
     offset,
+    leading,
   };
 }
 
@@ -581,13 +591,27 @@ function framed(cameraY: number, subjectY: number, sim: SimState): number {
  * overrides it: a craft about to slide under is followed at full rate.
  */
 function sinkRate(cameraY: number, subjectY: number, sim: SimState): number {
-  const orbit = sim.orbit;
   const full = easeStep(FOLLOW_RATE);
-  if (orbit === null || orbit.ticksSinceFreeze >= SETTLE_TICKS || sim.heldBody === null)
-    return full;
+  if (sim.orbit === null || sim.heldBody === null) return full;
+  // Rising, or about to lose the craft under the thumb line: the ordinary rate.
   if (framed(cameraY, subjectY, sim) <= cameraY) return full;
   if (sim.craft.y - cameraY > THUMB_BUDGET) return full;
-  return easeStep(FOLLOW_RATE * SINK_SHARE);
+  // **The resistance lets go as the lock takes hold**, which is why this reads
+  // `lockOf` rather than the settle's own clock.
+  //
+  // Written as *"a tenth until the settle ends, the full rate after"* it had a
+  // one-tick edge of its own: `lockOf` does not begin until the settle is over,
+  // so for a tick or two there was neither a resistance nor an anchor, and
+  // whatever the sink had been holding back moved at ten times the speed it had
+  // been moving. Traced on the run the author flagged, the view crept 0.02, 0.04,
+  // 0.05, 0.07, 0.08, 0.09 and then stepped **0.87** on the tick the orbit went
+  // round — *"the camera settles and then moves UP a few units on the last
+  // orbit"* (2026-08-31).
+  //
+  // Easing back on the lock's own smootherstep closes it: a tenth while the lock
+  // is nothing, full by the time the lock is full, and the two never both let go.
+  const share = SINK_SHARE + (1 - SINK_SHARE) * lockOf(sim);
+  return easeStep(FOLLOW_RATE * share);
 }
 
 /**
@@ -599,46 +623,50 @@ function sinkRate(cameraY: number, subjectY: number, sim: SimState): number {
  * flattens and anything longer is holding a lead nobody can use for no further
  * gain. Two hundred milliseconds.
  */
-export const LEAD_OUT_TICKS = 12;
 
 /**
- * How far through leaving the look-ahead is, from 0 to 1.
+ * How long the look-ahead takes to leave, and to come back, in ticks.
  *
- * ## The gate was right and the step was not
+ * ## The gate was right and the step was not — at **both** ends
  *
- * [`LOOK_AHEAD`](#look_ahead) is switched off at the freeze for a reason its own
- * comment gives at length — past the freeze the craft rides a phase clock and its
- * velocity reverses every half orbit, so *"what the velocity means stops being a
- * heading"*. None of that is in question. What was wrong is that it went from its
- * full 210 design units to nothing **between two ticks**.
+ * [`LOOK_AHEAD`](#look_ahead) is on through a dive and off once the orbit has
+ * frozen, for a reason its own comment gives at length: past the freeze the craft
+ * rides a phase clock and its velocity reverses every half orbit, so *"what the
+ * velocity means stops being a heading"*. None of that is in question. What was
+ * wrong is that the gate was applied to the value directly, so the subject moved
+ * by up to its whole 210 design units **between two ticks** — twice a capture,
+ * once at the freeze and once again at the release.
  *
- * That is the largest discontinuity in the whole camera and it happens on **every
- * capture**, at the freeze — the exact moment the player is watching the thing
- * they just did. Measured over the author's dispatches, the view's speed changed
- * by **10.2 design units in one tick** there, against 3.1 at a release, 0.9 when
- * the orbit goes round and 0.1 at a grab. Traced, the view went from moving 18.3
- * a tick to moving 8.1 on the next.
+ * Those were the two largest discontinuities in the camera and both fire on every
+ * swing, at the moments the player is most attentive. Measured over the author's
+ * dispatches: the view's speed changed by **10.2 design units in one tick** at a
+ * freeze, and switching the look-ahead off entirely takes a release's jerk from
+ * p50 3.6 and worst 12.0 down to 0.6 and 7.4 — so most of a release's was this
+ * too. It is present identically in the build before every camera correction of
+ * 2026-08-31, which is why none of them stopped the author reporting
+ * *"stuttering... the camera stops and moves abruptly"*.
  *
- * It also explains why three separate corrections to the *lock* on 2026-08-31 did
- * not stop the author reporting *"stuttering... the camera stops and moves
- * abruptly"*: none of them was anywhere near the thing that was actually
- * stepping, and it is present identically in the build before all three.
+ * ## A carried value rather than a scheduled fade
  *
- * Faded over [`LEAD_OUT_TICKS`](#lead_out_ticks) on the smootherstep the lock
- * arrives on, the freeze's jerk falls to **0.9**, and the largest jerk anywhere
- * in a run falls from 10.2 to 3.1 — which is then the **release**, where spec
- * 02's own ruling forbids a delay: *"the slight delay is making it seem jagged
- * and jumpy, let's remove any camera/speed delay there"* (author, 2026-08-29).
- * That one is deliberate and stays.
+ * A fade on the freeze's own clock fixed one end and had nothing to say about the
+ * other, because a release has no clock to hang one on. Easing a **carried** lead
+ * toward whatever the gate currently answers is one mechanism for both, with no
+ * special case at either end — and it is the same shape everything else in this
+ * file uses.
  *
- * **The velocity is still read live while it fades**, which is safe for exactly
- * as long as this is short: a half orbit is thirty-six ticks at the settle's own
- * rate, so twelve ticks is over before the reversal the gate exists for can
- * arrive.
+ * **Twelve, measured.** Swept at the freeze, the jerk runs 2.8 at six ticks, 0.9
+ * at twelve, and 0.9 at twenty and at thirty — so twelve is where the curve
+ * flattens and anything longer holds a lead nobody can use for no further gain.
+ * Two hundred milliseconds.
+ *
+ * The weight crosses **linearly** and the smootherstep is applied to it, rather
+ * than the weight being eased exponentially: an exponential starts at its fastest,
+ * which is a step in the velocity even though the position is continuous, and
+ * measured that way the freeze's jerk was 2.1 against **0.6** for this.
  */
-function leadOut(sim: SimState): number {
-  const orbit = sim.orbit;
-  if (orbit === null) return 0;
-  const x = Math.max(0, Math.min(1, orbit.ticksSinceFreeze / LEAD_OUT_TICKS));
+export const LEAD_OUT_TICKS = 12;
+
+/** Smootherstep — the curve `lockOf` arrives on, so the camera has one. */
+function smootherstep(x: number): number {
   return x * x * x * (x * (x * 6 - 15) + 10);
 }

@@ -19,7 +19,7 @@ import type { CameraView } from '../../src/state/types.ts';
 import { CORE, DUSK, INK, mix } from '../../src/render/palette.ts';
 import { drawStarfield, FIELD_HEIGHT, STAR_COUNT, starfield } from '../../src/render/starfield.ts';
 
-const AT = (y: number): CameraView => ({ x: DESIGN_WIDTH / 2, y, lock: 0, offset: 0 });
+const AT = (y: number): CameraView => ({ x: DESIGN_WIDTH / 2, y, lock: 0, offset: 0, leading: 0 });
 
 /** A context that writes down every rectangle it is asked to fill. */
 function recorder(): {

@@ -158,6 +158,19 @@ export interface CameraView {
    * how far the craft has since travelled away from a remembered point.
    */
   readonly offset: number;
+  /**
+   * How much of the look-ahead is currently being applied, from 0 to 1.
+   *
+   * **Carried, because both ends of it have to be smooth.** The look-ahead is on
+   * through a dive and off once the orbit is frozen, and applying that gate
+   * directly stepped the subject by up to 210 design units in one tick — twice a
+   * capture, at the freeze and again at the release, and they were the two largest
+   * discontinuities in the camera. What is carried is the **weight** rather than
+   * the distance, so that the shape of the crossing is a curve this file chooses
+   * rather than whatever the craft's speed happened to be doing
+   * ([`camera.ts`](./camera.ts): `LEAD_OUT_TICKS`).
+   */
+  readonly leading: number;
 }
 
 /**
