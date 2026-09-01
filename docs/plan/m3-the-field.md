@@ -770,6 +770,17 @@ because the phone's baseline is five times higher and the storm's extra is close
 the whole reason `pnpm profile` prints ratios and says *not a phone* on every line — and it is why
 this table is here rather than a laptop's.
 
+> ⚠ **The 1.26× is one run's reading and the pooled one is smaller.** Over all **16 phone traces**
+> in `diagnostics/`, segments fully inside an anomaly mean **1.100ms** against **0.914ms** for
+> segments with none on screen — **0.186ms, or 20%**. And the honest caveat is that the clear
+> segments *alone* span 0.39 – 1.28ms, so **the baseline drifts by more than the storm costs**: where
+> you are in the field moves a frame further than the weather does. The conclusion that matters
+> survives either reading — it is a fifth of a millisecond against an eight-millisecond budget — but
+> the single-run ratio was reading a difference smaller than its own noise, which is the failure this
+> plan already has a name for.
+
+
+
 ### ⚠ The grab drops a frame on the phone, 2026-09-01 — and it is the touch, not the game
 
 Eleven of the twelve worst frames in that run are the tick a dive begins, at a **26ms interval with
@@ -786,6 +797,11 @@ one-sided:
 
 **One dropped frame per press, on the phone, and none at all on the laptop with the same twenty-two
 grabs.** It predates this milestone — two of those traces are from before the anomaly existed.
+
+**Pooled over all 16 phone traces: 148 frames of 25ms or longer against 142 presses — 1.04 each.**
+The trace flown while this was being written reported it of itself, which is what the annotation
+below is for: *"22 frames ran 25ms or longer, against 22 presses and 22 releases"*, with eleven of
+its twelve worst frames marked `button down`.
 
 **And it is never a release.** Every stall lands on a press-**down** edge; not one lands on a
 press-up. That is what takes the game's own drawing out of the suspect list, because a release draws
