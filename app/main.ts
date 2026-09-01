@@ -38,7 +38,7 @@
  */
 import { createClock, ticksDue } from '../src/sim/clock.ts';
 import {
-  FIXTURE_FIELD,
+  SCATTER_FIELD,
   createRecorder,
   fieldFor,
   recipeOf,
@@ -111,7 +111,7 @@ if (target) {
   // [17 · §2](../docs/spec/17-daily-field.md) makes that the date's job, in M3.
   const SEED = 1;
   const start = (): ReturnType<typeof createInitialState> => {
-    const { field, craft } = fieldFor(FIXTURE_FIELD);
+    const { field, craft } = fieldFor(SCATTER_FIELD);
     return createInitialState(field, craft, SEED);
   };
 
@@ -120,7 +120,7 @@ if (target) {
   let previous = current;
   // Opened beside the run and thrown away with it. What it holds is the run's
   // own description, so it is as long-lived as the run and no longer.
-  let recorder = createRecorder(FIXTURE_FIELD, SEED);
+  let recorder = createRecorder(SCATTER_FIELD, SEED);
   let flagged: number[] = [];
   let sent = '';
   const clock = createClock();
@@ -175,7 +175,7 @@ if (target) {
     // A new run is a new recipe. Nothing is carried across, for the same reason
     // `createPresentation` places rather than eases (ADR-0015): a recorder that
     // survived a restart would describe a run nobody flew.
-    recorder = createRecorder(FIXTURE_FIELD, SEED);
+    recorder = createRecorder(SCATTER_FIELD, SEED);
     // And a new meter, for the same reason and a sharper one: every frame it
     // names carries the tick it happened on, and a tick number from a run that
     // has been thrown away points at a moment in a different flight. The

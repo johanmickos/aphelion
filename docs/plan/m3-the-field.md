@@ -137,6 +137,79 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
+#### ⚠ The demo flies a **seeded** field now, 2026-09-01 — and the fixture is frozen beside it
+
+> *"Can we change the planet generation in our demo to have a bit more left/right stretch? Not fully
+> to the boundary, but I want to have more options for traveling near it."*
+>
+> *"Can't we switch to a deterministic generator instead, based on some seed? Would that help?"*
+
+**It helps, and the help is in the generator's name rather than in the seed.** A recipe names its
+field as a `{ generator, version }` pair and `fieldFor` resolves the generator first. Editing the
+fixture's placements bumps `FIXTURE_FIELD_VERSION` and **refuses every recipe flown in it** — the 18
+dispatches that still replay, which are the parked camera session's *"evidence and nothing else"* and
+what `CLOSING_CONSTANT` was derived from. Behind a **new generator**, `fixture` stays frozen and they
+go on resolving. Verified after: **19 dispatches replay, exactly as before.**
+
+`src/sim/scatter-field.ts` is therefore a second generator rather than a second version, and its
+ladder is a **copy** of the fixture's altitudes and radii rather than an import — sharing the table
+would couple a frozen replay target to a field meant to keep changing, and one edit would delete the
+corpus through the back door.
+
+**It is not spec 17's generator.** It takes one rule — §4's *"lateral placement is seeded"*,
+alternating sides — and leaves the difficulty curve alone, because the corridor narrowing with
+altitude is what spec 07's bands, the camera's pan bound and the rungs are all measured against.
+
+**The spread is 195 prototype units, and the ceiling is measured rather than ruled.** Spec 17 §4
+would allow 255 – 277 at this corridor. What binds first is whether a swing out there is *flyable*:
+over 800 corpus swings the craft reaches, sideways from the body's centre and **after the freeze**,
+
+| | p50 | p90 | p95 | p99 |
+|---|---|---|---|---|
+| reach from the body's centre | 88 | 196 | 225 | 298 |
+| so a body may sit at | 282 | 175 | 146 | 72 |
+
+against a corridor of 370.5 — so **the fixture's own 150 is almost exactly the p95-safe value**. 195
+is the p90 one, chosen by the author from that table. It stops short of spec 17's ceiling because
+spec 07 §5's **save** is what makes a boundary excursion recoverable and it is not built.
+
+What it buys and what it costs, measured:
+
+| | fixture | scatter |
+|---|---|---|
+| mean `|dx|` | 67 | **104** |
+| max `|dx|` | 150 | **187** |
+| bodies whose centre is inside the outer ×2 band | **0** | **8** of 24 |
+| swings that leave the corridor, averaged over its bodies | 1.1% | **3.7%** |
+| worst body | 6% | **12%** |
+
+A third of the field now pays ×2 to orbit, which is the *option* the author asked for; the field is
+about four times harsher in the one sense that matters, and the save is what is meant to answer that.
+
+**Two things a hand-typed field never needed and a draw does.**
+
+- **Spec 17 §5's invariant 3 caught a real defect on the first seed.** A **fork** is two bodies at one
+  altitude, so nothing but their lateral placement holds them apart — and the first draw put the pair
+  at 1 100 m **eight units through each other**. A person placing by hand sees that; a draw does not.
+- **And how it is fixed changes the picture.** Rejecting the whole field and regenerating is spec 17
+  §5's own mechanism, but a fork conflict throws away all twenty-four placements, so the surviving
+  seeds are the ones where *everything* landed wide: measured, that pushed the mean `|dx|` from 97 to
+  119 and put nine bodies in the outer band instead of six. The bias was an artefact of the mechanism
+  rather than anything chosen. Constraining the one draw that is actually constrained — the second
+  body of a fork — leaves the other twenty-two uniform. The whole-field rejection stays as a guard.
+
+**⚠ Spec 17 contradicts itself on the clearance, and it is recorded rather than resolved.** §4's
+formula clears **60 m** and its prose immediately claims *"no body is ever inside a boundary band"*,
+which 60 m cannot deliver against a 220 m outer band; §5's invariant 2 asks for `|lateral| + radius ≤
+corridorHalfWidth − 90 m`, a third figure. Nothing here depends on which is right — the measured cap
+of 195 is inside both — but whoever builds spec 17 has to choose. **And §5's invariant 1,
+*"addresses are strictly increasing in altitude"*, forbids the forks this field is built on**, which
+is the same kind of tension one section along.
+
+**What did not move**: the goldens and `pnpm replay` still fly the fixture, deliberately. They are
+claims about the **swing**, and pinning them to a field that is meant to keep changing would make
+every placement tweak a re-record.
+
 #### ⚠ Flown, 2026-09-01 — three corrections, and the prototype had all three
 
 The author flew the first build of the axis and sent three:

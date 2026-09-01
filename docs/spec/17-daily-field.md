@@ -119,6 +119,34 @@ unflyable when the swing exists (M1), the exponent is the knob, not the endpoint
 > issue."* The endpoints above are an opening position, and the first thing M3 does with them is
 > measure where runs actually end.
 
+> ## ⚠ One rule of §4 is built, and three tensions were found building it (2026-09-01)
+>
+> `src/sim/scatter-field.ts` takes **§4's lateral placement rule only** — seeded, alternating sides —
+> and leaves the difficulty curve alone, because the corridor narrowing with altitude is what spec 07's
+> bands, the camera's pan bound and the rungs are all measured against. It is a demo field and this
+> generator replaces it. Three things it ran into:
+>
+> - **§4's clearance and §5's invariant 2 disagree.** §4 asks `|lateral| ≤ corridorHalfWidth − radius
+>   − 60 m` and says in the next breath that *"no body is ever inside a boundary band"* — which 60 m
+>   cannot deliver against a 220 m outer band. §5 asks `|lateral| + radius ≤ corridorHalfWidth − 90 m`,
+>   a third figure, which clears the fire band but not the outer one. **Which is meant is unruled.**
+> - **§5's invariant 1 forbids a fork.** *"Addresses are strictly increasing in altitude"* — but a
+>   **fork** is two bodies at one altitude, which the prototype's field has at two altitudes in five
+>   and which spec 04 and `fixture-field.ts` both treat as a feature (*"the same climb with two
+>   answers"*). Strictly increasing rules it out. Presumably the invariant means *non-decreasing*, or
+>   addresses are per-altitude rather than per-body; either way it is unstated.
+> - **§5's invariant 3 is the one a seeded generator most needs**, and it earns its place: nothing but
+>   lateral placement holds a fork's two bodies apart, and the first seed drawn put a pair **eight
+>   units through each other**. Its own rejection mechanism has a cost worth knowing — rejecting a
+>   whole field for one fork conflict biases every other placement outward, measured at a mean
+>   `|lateral|` of 119 against 97. Constraining the constrained draw is better than rejecting the field.
+>
+> **And §4's lateral ceiling is not what binds in practice.** Whether a swing around a body out there
+> is *flyable* binds first: measured over 800 corpus swings, the craft reaches p90 **196** and p95
+> **225** units sideways from a body's centre after the freeze, so against a 370.5 corridor a body may
+> sit at 175 (p90) or 146 (p95) — well inside §4's own 255 – 277. `docs/plan/m3-the-field.md` carries
+> the table.
+
 ## 5 · Generator invariants
 
 The generator produces a day only if all of these hold. A day that fails any of them is rejected

@@ -60,6 +60,7 @@
  */
 import type { Craft } from './craft.ts';
 import { FIXTURE_FIELD_VERSION, fixtureCraft, fixtureField } from './fixture-field.ts';
+import { SCATTER_FIELD_VERSION, scatterCraft, scatterField } from './scatter-field.ts';
 import type { Field, Tick } from './types.ts';
 import { SIM_VERSION } from './version.ts';
 
@@ -105,6 +106,21 @@ export const FIXTURE_FIELD: FieldIdentity = {
 };
 
 /**
+ * The field the demo is flown in since 2026-09-01 — the same ladder, placed
+ * sideways from a seed ([`scatter-field.ts`](./scatter-field.ts)).
+ *
+ * **A second generator rather than a second version of the first**, and that is
+ * the whole reason it exists: `fieldFor` resolves the generator before the
+ * version, so every recipe naming `fixture` goes on resolving to the field it was
+ * actually flown in. Editing the fixture instead would have refused all 18
+ * dispatches that still replay — the parked camera session's only evidence.
+ */
+export const SCATTER_FIELD: FieldIdentity = {
+  generator: 'scatter',
+  version: SCATTER_FIELD_VERSION,
+};
+
+/**
  * The complete description of a run.
  *
  * Four things, and there is deliberately nothing here about what *happened* —
@@ -128,6 +144,9 @@ export interface Recipe {
 
 /** The field and the craft a recipe's identity resolves to. */
 export function fieldFor(identity: FieldIdentity): { field: Field; craft: Craft } {
+  // **The fixture is resolved first and is frozen**, so a recipe flown in it
+  // replays whatever the demo is flying today. That is the point of adding a
+  // generator rather than a version — see [`SCATTER_FIELD`](#scatter_field).
   if (identity.generator === FIXTURE_FIELD.generator) {
     if (identity.version !== FIXTURE_FIELD.version) {
       throw new Error(
@@ -136,6 +155,15 @@ export function fieldFor(identity: FieldIdentity): { field: Field; craft: Craft 
       );
     }
     return { field: fixtureField(), craft: fixtureCraft() };
+  }
+  if (identity.generator === SCATTER_FIELD.generator) {
+    if (identity.version !== SCATTER_FIELD.version) {
+      throw new Error(
+        `recipe was flown in scatter field v${identity.version}, and this build has ` +
+          `v${SCATTER_FIELD.version} — the field has changed underneath it`,
+      );
+    }
+    return { field: scatterField(), craft: scatterCraft() };
   }
   throw new Error(`unknown field generator "${identity.generator}"`);
 }

@@ -20,9 +20,9 @@
 import { bindPress, suppressBrowserGestures } from './app/input.ts';
 import { createPress, isPressed } from './src/input/press.ts';
 import { createClock, ticksDue } from './src/sim/clock.ts';
-import { fixtureCraft, fixtureField } from './src/sim/fixture-field.ts';
+import { scatterCraft, scatterField } from './src/sim/scatter-field.ts';
 import type { Recipe } from './src/sim/recipe.ts';
-import { FIXTURE_FIELD, createRecorder, recipeOf, recordPress } from './src/sim/recipe.ts';
+import { SCATTER_FIELD, createRecorder, recipeOf, recordPress } from './src/sim/recipe.ts';
 import { createInitialState, stepSim } from './src/sim/step.ts';
 import type { SimState } from './src/sim/types.ts';
 import * as units from './src/sim/units.ts';
@@ -859,7 +859,7 @@ suppressBrowserGestures(stage);
 let sim: SimState;
 let current: PresentationState;
 let previous: PresentationState;
-let recorder = createRecorder(FIXTURE_FIELD, SEED);
+let recorder = createRecorder(SCATTER_FIELD, SEED);
 let flagged: number[] = [];
 const clock = createClock();
 let observed = performance.now();
@@ -890,10 +890,10 @@ let sinceFreeze: number | null = null;
 let heldBefore: number | null = null;
 
 function start(): void {
-  sim = createInitialState(fixtureField(), fixtureCraft(), SEED);
+  sim = createInitialState(scatterField(), scatterCraft(), SEED);
   current = createPresentation(sim);
   previous = current;
-  recorder = createRecorder(FIXTURE_FIELD, SEED);
+  recorder = createRecorder(SCATTER_FIELD, SEED);
   flagged = [];
   sinceGrab = 0;
   sinceFreeze = null;
