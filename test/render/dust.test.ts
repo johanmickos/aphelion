@@ -25,6 +25,7 @@ import {
   DUST_FIELD,
   DUST_PER_SCREEN,
   DUST_TILES,
+  DUST_WIDTH,
   drawDust,
   dust,
   moteCount,
@@ -261,9 +262,6 @@ describe('the dust', () => {
    * motion the mote is drawn moving at, rather than a second opinion about it.
    */
   it('streaks by exactly the distance the world moves in the exposure', () => {
-    const still = drawn(field, 0, 0).marks;
-    for (const mark of still) expect(mark.from).toBe(mark.to);
-
     const slow = drawn(field, 0, 4).marks[0]!;
     const fast = drawn(field, 0, 8).marks[0]!;
     const slowLength = slow.to - slow.from;
@@ -274,6 +272,49 @@ describe('the dust', () => {
       -(fast.to - fast.from),
       10,
     );
+  });
+
+  /**
+   * **The regression that made the layer vanish**, 2026-09-01: *"some of the
+   * dust disappears when I finally circularize my orbit."*
+   *
+   * A settled orbit is the one place the world stops — the camera locks on a
+   * still point and world speed goes to 0.00 at p50 of every orbiting tick — and
+   * at zero the streak was `moveTo(x, y); lineTo(x, y)`. A canvas will not paint
+   * a degenerate subpath however round its caps are, so 34% of that run's ticks
+   * drew every mote as nothing.
+   *
+   * This asserts the **claim** rather than the intent, which is exactly what was
+   * missing: `DUST_WIDTH`'s note said a slow field stipples into three-unit dots,
+   * and nothing had ever checked that a canvas would draw one.
+   */
+  it('never asks a canvas to paint nothing, however still the world is', () => {
+    for (const speed of [0, 0.0001, -0.0001, 0.2, -0.2]) {
+      const marks = drawn(field, 0, speed).marks;
+      expect(marks.length).toBeGreaterThan(10);
+      for (const mark of marks) {
+        expect(Math.abs(mark.to - mark.from)).toBeGreaterThanOrEqual(DUST_WIDTH / 4);
+        // And it is still a dot rather than a dash: far under the mote's width.
+        expect(Math.abs(mark.to - mark.from)).toBeLessThan(DUST_WIDTH);
+      }
+    }
+  });
+
+  /**
+   * And a still field keeps its **full** brightness — spec 05 §2 asks a slow one
+   * to stipple, not to go out, and the fade is spent on *stretching*.
+   *
+   * The distinction this pins is that the fade answers to how far a mote
+   * **travelled**, not to the length it is drawn at: the drawn length has a floor
+   * under it so a canvas paints something, and reading that floor as motion would
+   * make a stationary field 2% dimmer for a reason about subpaths.
+   */
+  it('is at full brightness when the world is still, and dims only as it stretches', () => {
+    const still = drawn(field, 0, 0).marks[0]!;
+    expect(still.alpha).toBeCloseTo(0.1 * DUST_STRENGTH, 10);
+    for (const speed of [2, 8, 20]) {
+      expect(drawn(field, 0, speed).marks[0]!.alpha).toBeLessThan(still.alpha);
+    }
   });
 
   /** Strictly parallel — spec 05 §2 — which for a field with no sideways motion is vertical. */

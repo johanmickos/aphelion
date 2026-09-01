@@ -251,7 +251,8 @@ const DUST_STREAK_FLOOR = 0.45;
  * every other board number in this repo is carried at.
  *
  * With a round cap this is also the diameter of a mote at rest, so *"a slow one
- * stipples"* is a three-unit dot.
+ * stipples"* is a three-unit dot — see [`DUST_STILL`](#dust_still), without
+ * which it is nothing at all.
  *
  * ## ⚠ It is the suspect, 2026-09-01 — *"I don't really notice the dust"*
  *
@@ -283,6 +284,41 @@ const DUST_STREAK_FLOOR = 0.45;
  * that is too quiet wants its size.
  */
 export const DUST_WIDTH = 1 * BOARD_PIXEL;
+
+/**
+ * The shortest a streak may draw, in design units — **a quarter of a mote's
+ * width, and it exists because a canvas will not paint nothing.**
+ *
+ * ## ⚠ The layer vanished at rest, 2026-09-01, and this file claimed it did not
+ *
+ * Reported: *"some of the dust disappears when I finally circularize my
+ * orbit."* The author guessed at the bottom third of the screen; it is not that
+ * — measured over their run, the **count of motes drawn never drops** (33 to 50
+ * every tick, which is only which of them are in the band). What drops is the
+ * **length**.
+ *
+ * A settled orbit is the one place in the game where the world stops: the camera
+ * locks on a still point and `worldSpeed` goes to **0.00 at p25 and at p50** of
+ * every orbiting tick. At zero the streak is `moveTo(x, y); lineTo(x, y)` — a
+ * degenerate subpath — and although the canvas specification says a zero-length
+ * subpath under a round cap paints a circle, browsers in practice skip it,
+ * especially as one subpath among forty in a single stroked path. Over that run
+ * **34% of ticks drew every mote as nothing.**
+ *
+ * [`DUST_WIDTH`](#dust_width)'s own note claimed the opposite — *"a slow one
+ * stipples is a three-unit dot"* — and was a claim about what a canvas does that
+ * had never been checked on one. `test/render/dust.test.ts` now asserts no drawn
+ * segment is ever zero-length, which is the shape of the thing that was missing:
+ * a test of the claim rather than of the intent.
+ *
+ * **A quarter of the width** is the smallest length that is unambiguously not
+ * zero at any scale the letterbox produces, and it is far under the width, so
+ * what it draws is a capsule three units across and three and three-quarters
+ * long. That is a dot. It is not a floor on the *fade* — a mote at rest keeps its
+ * full alpha, because spec 05 §2 asks a slow field to stipple rather than to go
+ * out.
+ */
+const DUST_STILL = DUST_WIDTH / 4;
 
 /**
  * The most motes a picture may hold, however long the chain runs — **twice the
@@ -438,8 +474,17 @@ export function drawDust(
   // A long exposure, and the trail points back the way the world came from: up
   // the picture while the craft climbs, down it while the craft falls.
   const travel = worldSpeed * DUST_EXPOSURE;
-  const streak = Math.max(-DUST_STREAK_CAP, Math.min(DUST_STREAK_CAP, travel));
-  const stretched = Math.max(DUST_STREAK_FLOOR, 1 - Math.abs(streak) / DUST_STREAK_FADE);
+  const capped = Math.max(-DUST_STREAK_CAP, Math.min(DUST_STREAK_CAP, travel));
+  // Never exactly zero, and never shorter than a dot — see [`DUST_STILL`](#).
+  // The sign is the world's while it is moving and arbitrary while it is not,
+  // which is the one case where the direction cannot be read off anything.
+  const streak = Math.abs(capped) >= DUST_STILL ? capped : capped < 0 ? -DUST_STILL : DUST_STILL;
+  // Dimmed by what the mote actually **travelled**, not by the length it is
+  // drawn at: the floor below exists so a canvas paints a still mote at all, and
+  // a drawing minimum must not be read as motion. Without this a stationary
+  // field is 2% dimmer than a barely-moving one, for a reason that is about
+  // subpaths rather than about speed.
+  const stretched = Math.max(DUST_STREAK_FLOOR, 1 - Math.abs(capped) / DUST_STREAK_FADE);
 
   const shown = moteCount(dust, chain);
 

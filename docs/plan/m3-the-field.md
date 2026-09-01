@@ -569,6 +569,36 @@ frame 0.772 the area of this picture, so the density is **21** and not 16 — th
 open. Read that way the streak is guaranteed to agree with the motion it is drawn beside instead of
 being a second opinion about it.
 
+#### ⚠ And then it vanished at rest — a claim about a canvas that had never been checked
+
+*"Some of the dust disappears when I finally circularize my orbit. This might be due to them being
+in the bottom 1/3 of the screen or something else."*
+
+**Not the bottom third**, and the count says so: measured over that run the number of motes drawn
+never drops — 33 to 50 every tick, which is only which of them fall in the band. What drops is the
+**length**.
+
+A settled orbit is the one place in this game where the world stops. The camera locks on a still
+point and `worldSpeed` reads **0.00 at p25 and at p50** of every orbiting tick, so the streak became
+`moveTo(x, y); lineTo(x, y)` — a degenerate subpath. The canvas specification says a zero-length
+subpath under a round cap paints a circle; browsers in practice skip it, the more so as one subpath
+among forty in a single stroked path. **34% of that run's ticks drew every mote as nothing.**
+
+**The comment above it claimed the opposite.** `DUST_WIDTH`'s note said *"a slow one stipples is a
+three-unit dot"* — a statement about what a canvas does, written without ever asking one. The test
+beside it asserted `from === to` at rest, which is the *intent* faithfully recorded and the *claim*
+never checked. That is the shape of the miss worth keeping: a test can pin what the code computes
+and still say nothing about what the browser draws from it.
+
+So the shortest a streak may draw is now **a quarter of a mote's width** — unambiguously not zero at
+any scale the letterbox produces, and far under the width, so what it draws is a dot. And the
+**fade answers to how far the mote travelled** rather than to the length it is drawn at, because a
+drawing minimum must not be read as motion; without that split a stationary field is 2% dimmer than
+a barely-moving one for a reason about subpaths.
+
+**Nothing fades out, which is more than was asked for.** The report asked for a fade rather than a
+pop; spec 05 §2 asks a slow field to *stipple*, so what it does now is stay.
+
 #### ⚠ Ruled on the bench, 2026-09-01 — the sky halves and the dust doubles
 
 Four numbers in one sitting, and they are one decision rather than four:

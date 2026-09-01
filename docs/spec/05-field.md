@@ -113,7 +113,14 @@ a slow one stipples. Streaks fall strictly parallel to velocity; nothing radiate
 > colour of its own, and a ninth grey would want an argument a flat layer does not have.
 >
 > **And the caps are round**, where the board's are butt — which is what makes *"a slow one
-> stipples"* true rather than a field that disappears as the climb slows.
+> stipples"* true rather than a field that disappears as the climb slows. ⚠ **Round caps alone did
+> not do it**: reported on 2026-09-01 as *"some of the dust disappears when I finally circularize my
+> orbit"*, and a settled orbit is the one place the world stops — the camera locks and world speed is
+> **0.00 at p50** of every orbiting tick. At zero the streak is a degenerate subpath, which a canvas
+> will not paint however round its caps are, so **34% of that run's ticks drew every mote as
+> nothing**. The shortest a streak may draw is now a quarter of a mote's width, which is a dot, and
+> the *fade* answers to how far a mote travelled rather than to the length it is drawn at — a
+> drawing minimum must not be read as motion.
 >
 > The exposure, the density and an overall strength are all on the bench.
 >
