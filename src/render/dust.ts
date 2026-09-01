@@ -98,8 +98,20 @@ import { rng } from './seed.ts';
  * This is the same correction [`STAR_COUNT`](./starfield.ts) records making the
  * other way round, and the same trap: a count carried across two frames of
  * different sizes is a density silently changed.
+ *
+ * ## ⚠ 40, ruled on the bench on 2026-09-01
+ *
+ * **The board's density was the opening position and the author has now measured
+ * against the running game instead**, which is the whole point of a bench: 21 is
+ * what Direction 05 draws in a still frame, and this field moves. Nearly twice
+ * it, flown alongside a doubled alpha and a halved sky in one sitting.
+ *
+ * The layer's ceiling follows it, because [`DUST_CEILING`](#dust_ceiling) is
+ * stated as a multiple of this rather than beside it — so a hot run still tops
+ * out at twice the field at rest, and it now takes 40 links of chain to get
+ * there rather than 21.
  */
-export const DUST_PER_SCREEN = 21;
+export const DUST_PER_SCREEN = 40;
 
 /**
  * How many pictures tall the field is before it repeats.
@@ -112,8 +124,8 @@ export const DUST_PER_SCREEN = 21;
  * fixture field's 6 828 m foot-to-top-body, so a mote a player has seen once does
  * not come back inside a run.
  *
- * It costs 336 objects at construction and nothing per frame: the draw walks only
- * what a picture can hold.
+ * It costs `DUST_CEILING × DUST_TILES` objects at construction and nothing per
+ * frame: the draw walks only what a picture can hold.
  */
 export const DUST_TILES = 8;
 
@@ -179,8 +191,18 @@ const DUST_ALPHAS = [0.1, 0.15, 0.2, 0.25, 0.3] as const;
  * It is on the bench, at **zero to a stipple and up to the board's own 90 ms**,
  * because where between those two the field should sit is a judgement about a
  * moving picture and the author has now made it once.
+ *
+ * ## ⚠ 1.25, ruled on the bench on 2026-09-01
+ *
+ * A quarter more than one frame's motion blur, which is small in itself and
+ * moves one thing that matters: **the brick cap now binds.** At 1.25 a streak
+ * reaches [`DUST_STREAK_CAP`](#dust_streak_cap) — a fifth of a rung's spacing —
+ * once world speed passes 24 design units a tick, which is about the top 2% of
+ * the author's own ticks. So the guard has stopped being theoretical and is
+ * doing the job it was written for on the fastest dives, where the brickwork was
+ * reported in the first place.
  */
-export const DUST_EXPOSURE = 1;
+export const DUST_EXPOSURE = 1.25;
 
 /**
  * The longest a streak may draw, in design units — **a fifth of a rung's
@@ -270,11 +292,13 @@ export const DUST_WIDTH = 1 * BOARD_PIXEL;
  * the chain has a ceiling*, and it is unanswered, so this layer needs one of its
  * own: at one mote a link an uncapped chain eventually stops being **sparse**,
  * which is the first word spec 05 §2 uses about dust. Doubling is where it
- * stops, and the number falls out of the base rather than being chosen beside it
- * — a chain of 21 doubles the field and a chain of 40 does the same.
+ * stops, and the number falls out of the base rather than being chosen beside
+ * it: reaching twice the resting field takes as many links as there are motes in
+ * a picture, whatever that number has been ruled to.
  *
  * It is also what the layout is sized for: the draw walks a prefix of a field
- * built to this, so the ceiling costs 336 objects once and nothing per frame.
+ * built to this, so the ceiling costs its objects once at construction and
+ * nothing per frame.
  */
 export const DUST_CEILING = DUST_PER_SCREEN * 2;
 
@@ -310,13 +334,28 @@ const DUST_PER_CHAIN = 1;
  * which is [AGENTS.md](../../AGENTS.md) §6's argument for a bench rather than for
  * a setting.
  *
- * It ships at 1 and not at a guess, because the two numbers it would otherwise
- * override are the spec's own and stated in three places. **One multiplier and
- * not five alphas**, which is `STAR_STRENGTH`'s own argument: the five are a
- * ramp, and editing them individually lets the ramp drift while nobody is looking
- * at it.
+ * **One multiplier and not five alphas**, which is `STAR_STRENGTH`'s own
+ * argument: the five are a ramp, and editing them individually lets the ramp
+ * drift while nobody is looking at it.
+ *
+ * ## ⚠ 2, ruled on the bench on 2026-09-01 — and it overruns the spec's own range
+ *
+ * It shipped at 1 — spec 05 §2's α 0.1 – 0.3 exactly, because that is a number
+ * the design states in two places and the board a third, and the last thing to
+ * argue with. The author flew it and doubled it: **the drawn range is now α 0.2 –
+ * 0.6.** The spec's row is overrun rather than reinterpreted, which is why it
+ * carries a ⚠ in §2 rather than a quiet edit.
+ *
+ * **What was actually wrong was the presence of the layer, not the opacity of a
+ * mote**, and the author reached it by a different lever than the measurement
+ * suggested. *"I don't really notice the dust"* — measured, a mote is one CSS
+ * pixel by two on their phone, and this file's own argument was that the honest
+ * fix is [`DUST_WIDTH`](#dust_width), a number the design never states. The width
+ * is untouched at 3 and the alpha doubled instead. **It is still the cheaper
+ * lever if this ever needs to come back under the spec's range**, and it is on
+ * the bench for that.
  */
-export const DUST_STRENGTH = 1;
+export const DUST_STRENGTH = 2;
 
 /** One mote, in the tile's own coordinates. It has no velocity, by construction. */
 export interface Mote {

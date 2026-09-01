@@ -569,6 +569,45 @@ frame 0.772 the area of this picture, so the density is **21** and not 16 — th
 open. Read that way the streak is guaranteed to agree with the motion it is drawn beside instead of
 being a second opinion about it.
 
+#### ⚠ Ruled on the bench, 2026-09-01 — the sky halves and the dust doubles
+
+Four numbers in one sitting, and they are one decision rather than four:
+
+| | was | ruled |
+|---|---|---|
+| `DUST_STRENGTH` (multiplies spec 05 §2's α) | 1 | **2** |
+| `DUST_PER_SCREEN` | 21 | **40** |
+| `DUST_EXPOSURE` | 1 | **1.25** |
+| `STAR_STRENGTH` | 0.4 | **0.2** |
+
+**The 2026-08-30 sky ruling was made with nothing in front of it.** *"Only as
+background noise"* ranked the sky against the rungs when those were the only two
+things saying speed. Dust landed between them, and the author re-ranked all three
+at once — the sky halves, the dust doubles, and §2's stack becomes true in **ink**
+and not only in draw order: the dust now lays down about **560** design units² a
+picture against the sky's **340**, where before it was 125 against 680.
+
+**The α row of §2 is overrun, not reinterpreted** — what is drawn runs 0.2 – 0.6
+against a stated 0.1 – 0.3, and spec 05 carries a ⚠ saying so. The number was not
+wrong about what it wanted; at this design space's scale it bought a mark of about
+one CSS pixel by two, which is not *sparse and quiet*, it is absent.
+
+**And the cheaper lever was not taken.** The measurement pointed at `DUST_WIDTH` —
+a number no spec states, where going up from three design units buys presence
+without leaving §2's range. The author doubled the alpha instead and the width is
+untouched. Recorded because it is the way back under the spec's row if this is
+reopened, and because the diagnosis and the fix disagreeing is worth noticing.
+
+**The exposure's quarter matters more than it looks**: at 1.25 the brick cap
+**binds** once world speed passes 24 design units a tick — the top 2% of the
+author's own ticks — so the guard has stopped being theoretical and is working on
+exactly the dives the brickwork was reported on.
+
+**What it costs**, from `pnpm profile`'s census over the shipped run: path points
+**137 → 173** a frame, and **strokes unchanged at 46.7**. Nearly twice the motes
+for 38 more points and not one more state change, which is what the five-batch
+arrangement was for.
+
 #### ⚠ And then it could not be seen at all — *"I don't really notice the dust"* (2026-09-01)
 
 Reported after the exposure was cut, and it is a **size** rather than an alpha. Measured against the

@@ -214,8 +214,22 @@ const TIERS = [
  * spec 05 §2's own floor for **dust** (α 0.1 – 0.3) at the near end — so the sky
  * is now quieter than the layer in front of it is specified to be, which is what
  * *behind* means. It is on the bench.
+ *
+ * ## ⚠ 0.2, ruled on the bench on 2026-09-01 — halved again, once dust arrived
+ *
+ * The question of 2026-08-30 was *how loud is the sky against the rungs*, and it
+ * was answered with nothing else in front of it. **Dust landed between them**,
+ * and the author re-ranked all three in one sitting: the sky halves, the dust
+ * doubles.
+ *
+ * The nearest tier now draws at **0.16** and the furthest at **0.06**. What that
+ * buys is the stack in §2's own order, in ink rather than in draw calls —
+ * counting area × alpha over a picture at the median world speed, the dust lays
+ * down about **560** design units² against the sky's **340**, where before this
+ * pair of rulings it was 125 against 680. **SKY, DUST, STRATA was the drawing
+ * order and is now the reading order too.**
  */
-export const STAR_STRENGTH = 0.4;
+export const STAR_STRENGTH = 0.2;
 
 interface Star {
   readonly x: number;

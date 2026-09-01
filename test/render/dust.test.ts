@@ -21,6 +21,7 @@ import type { CameraView, CorridorView } from '../../src/state/types.ts';
 import { DUSK } from '../../src/render/palette.ts';
 import {
   DUST_CEILING,
+  DUST_STRENGTH,
   DUST_FIELD,
   DUST_PER_SCREEN,
   DUST_TILES,
@@ -237,8 +238,11 @@ describe('the dust', () => {
    * word spec 05 §2 uses about dust.
    */
   it('stops at twice the resting field, however long the chain runs', () => {
-    expect(moteCount(field, 21)).toBe(DUST_CEILING * DUST_TILES);
+    // As many links as there are motes in a picture, whatever that has been
+    // ruled to — the ceiling is stated as a multiple of the base, not beside it.
+    expect(moteCount(field, DUST_PER_SCREEN)).toBe(DUST_CEILING * DUST_TILES);
     expect(moteCount(field, 1000)).toBe(DUST_CEILING * DUST_TILES);
+    expect(DUST_CEILING).toBe(DUST_PER_SCREEN * 2);
   });
 
   it('adds motes without moving the ones already there', () => {
@@ -294,10 +298,13 @@ describe('the dust', () => {
    * can never draw more whatever the world does.
    */
   it('never draws a streak that could be a mortar joint between two rungs', () => {
-    // The fastest tick in the author's whole replayable corpus.
+    // The fastest tick in the author's whole replayable corpus. Since the
+    // exposure was ruled to 1.25 the cap **binds** here rather than merely
+    // existing — which is the guard doing its job on exactly the dives the
+    // brickwork was reported on, so it is asserted inclusively.
     const FASTEST = 28.4;
     const flown = drawn(field, 0, FASTEST).marks[0]!;
-    expect(flown.to - flown.from).toBeLessThan(RUNG_SPACING / 5);
+    expect(flown.to - flown.from).toBeLessThanOrEqual(RUNG_SPACING / 5);
 
     // And at any speed at all, including ones the game does not yet reach.
     for (const speed of [FASTEST, 60, 200, 10_000]) {
@@ -314,11 +321,21 @@ describe('the dust', () => {
     expect(fast.alpha).toBeLessThan(still.alpha);
   });
 
-  /** Spec 05 §2's stack table: α **0.1 – 0.3**, and E0 · STRUCTURE is DUSK. */
-  it('is drawn in DUSK, between the two alphas the spec states', () => {
+  /**
+   * Spec 05 §2's stack table gives dust **α 0.1 – 0.3** in five steps, and E0 ·
+   * STRUCTURE is DUSK.
+   *
+   * ⚠ **The range is the spec's, scaled by a strength the author ruled**, and
+   * since 2026-09-01 that strength is 2 — so what is actually drawn runs 0.2 to
+   * 0.6 and overruns the spec's row. Asserted as *the spec's five steps times the
+   * strength* rather than as five numbers, so the departure stays visible: a
+   * reader can see both what the design said and what was flown.
+   */
+  it('is drawn in DUSK, on the spec\u2019s five steps times the ruled strength', () => {
     const marks = drawn(field, 0, 0).marks;
     const alphas = [...new Set(marks.map((mark) => mark.alpha))].sort((a, b) => a - b);
-    expect(alphas).toEqual([0.1, 0.15, 0.2, 0.25, 0.3]);
+    const spec = [0.1, 0.15, 0.2, 0.25, 0.3];
+    expect(alphas.map((a) => Math.round((a / DUST_STRENGTH) * 100) / 100)).toEqual(spec);
     for (const mark of marks) {
       expect(mark.stroke).toBe(DUSK);
       expect(mark.cap).toBe('round');
@@ -335,9 +352,13 @@ describe('the dust', () => {
     expect(drawn(field, 0, 10).strokes).toBe(5);
   });
 
-  /** Direction 05's own density, corrected for the frame it was drawn in. */
-  it('is as dense as the frame it was carried from', () => {
-    expect(DUST_PER_SCREEN).toBe(21);
+  /**
+   * Direction 05's own density, corrected for the frame it was drawn in, was the
+   * **opening position**; ⚠ the author ruled 40 on the bench on 2026-09-01,
+   * having measured against the running game rather than a still frame.
+   */
+  it('draws about as many motes as a picture is ruled to hold', () => {
+    expect(DUST_PER_SCREEN).toBe(40);
     // Laid out to the ceiling, drawn to the chain — see `DUST_CEILING`.
     expect(field.length).toBe(DUST_CEILING * DUST_TILES);
     expect(moteCount(field, 0)).toBe(DUST_PER_SCREEN * DUST_TILES);

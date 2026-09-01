@@ -357,57 +357,45 @@ export function lockOf(sim: SimState): number {
     'SKY_LEAD',
     'how far ahead the sky warms — derived from the picture, not ruled',
   ),
-  {
-    // Flown and refused on the first build: the board's 90 ms was authored
-    // against a climb this game passes at its own median, and against the rungs
-    // the streaks read as brickwork. Zero is a pure stipple.
-    file: 'src/render/dust.ts',
-    find: 'export const DUST_EXPOSURE = 1;',
-    replace: 'export let DUST_EXPOSURE = 1;',
-    append:
-      '\nexport function set_DUST_EXPOSURE(value: number): void {\n  DUST_EXPOSURE = value;\n}\n',
-    why: 'how long the shutter is open — the board’s own 90 ms is 5.4, and it flew as bricks',
-  },
-  {
-    // Added the day the sliders were cut, and it earns its place by a
-    // measurement: a mote is one CSS pixel on the author's phone, which is the
-    // size the starfield was already refused at once.
-    file: 'src/render/dust.ts',
-    find: 'export const DUST_WIDTH = 1 * BOARD_PIXEL;',
-    replace: 'export let DUST_WIDTH = 1 * BOARD_PIXEL;',
-    append: '\nexport function set_DUST_WIDTH(value: number): void {\n  DUST_WIDTH = value;\n}\n',
-    why: 'a mote is one CSS pixel on the phone — the size the sky was refused at',
-  },
-  {
-    file: 'src/render/dust.ts',
-    find: 'export const DUST_PER_SCREEN = 21;',
-    replace: 'export let DUST_PER_SCREEN = 21;',
-    append:
-      '\nexport function set_DUST_PER_SCREEN(value: number): void {\n  DUST_PER_SCREEN = value;\n}\n',
-    why: 'Direction 05’s own density, and the first thing to move if the field reads busy',
-  },
-  {
-    // The sky needed exactly this knob within a day of landing, and for exactly
-    // this reason. Dust is a third system saying *speed* and how loud it should
-    // be against the rungs is a judgement about a moving picture.
-    file: 'src/render/dust.ts',
-    find: 'export const DUST_STRENGTH = 1;',
-    replace: 'export let DUST_STRENGTH = 1;',
-    append:
-      '\nexport function set_DUST_STRENGTH(value: number): void {\n  DUST_STRENGTH = value;\n}\n',
-    why: 'how loud the dust is against the rungs — the sky’s own knob, one layer forward',
-  },
+  // Flown and refused on the first build: the board's 90 ms was authored
+  // against a climb this game passes at its own median, and against the rungs
+  // the streaks read as brickwork. Zero is a pure stipple.
+  settable(
+    'src/render/dust.ts',
+    'DUST_EXPOSURE',
+    'how long the shutter is open — the board’s own 90 ms is 5.4, and it flew as bricks',
+  ),
+  // Added the day the sliders were cut, and it earns its place by a
+  // measurement: a mote is one CSS pixel on the author's phone, which is the
+  // size the starfield was already refused at once.
+  settable(
+    'src/render/dust.ts',
+    'DUST_WIDTH',
+    'a mote is one CSS pixel on the phone — the size the sky was refused at',
+  ),
+  settable(
+    'src/render/dust.ts',
+    'DUST_PER_SCREEN',
+    'Direction 05’s own density was the opening position; the author ruled 40',
+  ),
+  // The sky needed exactly this knob within a day of landing, and for exactly
+  // this reason. Dust is a third system saying *speed* and how loud it should
+  // be against the rungs is a judgement about a moving picture.
+  settable(
+    'src/render/dust.ts',
+    'DUST_STRENGTH',
+    'how loud the dust is against the rungs — the sky’s own knob, one layer forward',
+  ),
 
-  {
-    // The author's answer to the question `starfield.ts` said to ask once the
-    // rungs landed: it keeps its place and comes down. How far down is taste.
-    file: 'src/render/starfield.ts',
-    find: 'export const STAR_STRENGTH = 0.4;',
-    replace: 'export let STAR_STRENGTH = 0.4;',
-    append:
-      '\nexport function set_STAR_STRENGTH(value: number): void {\n  STAR_STRENGTH = value;\n}\n',
-    why: '“much less noticeable… only as background noise” is a judgement about a moving picture',
-  },
+  // The author's answer to the question `starfield.ts` said to ask once the
+  // rungs landed: it keeps its place and comes down. How far down is taste, and
+  // it came down twice — again on 2026-09-01, once dust arrived between the sky
+  // and the rungs and all three were re-ranked in one sitting.
+  settable(
+    'src/render/starfield.ts',
+    'STAR_STRENGTH',
+    '“much less noticeable… only as background noise”, and halved again once dust arrived',
+  ),
 
   {
     // The trail reader is the same one `pnpm replay` prints, which is the point

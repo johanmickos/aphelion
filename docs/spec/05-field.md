@@ -116,6 +116,41 @@ a slow one stipples. Streaks fall strictly parallel to velocity; nothing radiate
 > stipples"* true rather than a field that disappears as the climb slows.
 >
 > The exposure, the density and an overall strength are all on the bench.
+>
+> ### ⚠ Ruled on the bench the same day — and the α row is overrun
+>
+> *"I don't really notice the dust."* Measured, a mote is about **one CSS pixel by
+> two at α 0.1 – 0.3** on the author's phone — the size the starfield was already
+> refused at once — and counting ink the layer laid down a **fifth** of what the
+> sky above it does, where this section's own stack puts it in front.
+>
+> Four numbers moved in one sitting, and three of them are this layer's:
+>
+> | | was | ruled |
+> |---|---|---|
+> | dust · strength (multiplies §2's α) | 1 | **2** |
+> | dust · motes in a picture | 21 | **40** |
+> | dust · exposure, in ticks | 1 | **1.25** |
+> | sky · `STAR_STRENGTH` | 0.4 | **0.2** |
+>
+> **The α row above is overrun rather than reinterpreted.** What is drawn now runs
+> **0.2 – 0.6**, twice what §2's table, §2's prose and the board all say. It is
+> recorded here rather than edited into the table because the number is not wrong
+> about what it wanted — it is a *sparse, quiet* layer — and what was wrong is
+> that at the design space's scale that alpha bought a mark too small to be any of
+> those things.
+>
+> **The cheaper lever was not taken and is still there.** A mote's *width* is a
+> number no spec states, and going up from three design units would have bought
+> presence without leaving §2's range; the author doubled the alpha instead and
+> the width is untouched. It is on the bench, and it is the way back under the
+> spec's row if this is ever reopened.
+>
+> **What the pair of rulings buys is this section's own stack, in ink.** Counting
+> area × alpha over a picture at the median world speed: the dust now lays down
+> about **560** design units² against the sky's **340**, where before it was 125
+> against 680. SKY, DUST, STRATA was the drawing order and is now the reading
+> order too.
 
 ## 3 · Rungs
 
