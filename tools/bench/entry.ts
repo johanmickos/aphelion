@@ -1104,6 +1104,11 @@ function shapeStage(): void {
   const chosen =
     VIEWPORTS.find((v) => v.id === byId<HTMLSelectElement>('viewport').value) ?? VIEWPORTS[0]!;
   stage.style.aspectRatio = `${chosen.w} / ${chosen.h}`;
+  // The same ratio as a number, for the sticky layout: CSS can derive a width
+  // from `aspect-ratio` but not a height, and the stage has to be told how tall
+  // it is allowed to grow before it outruns the column it sits in. See the
+  // `@media (min-width: 901px)` block in `page.html`.
+  stage.style.setProperty('--stage-ratio', String(chosen.w / chosen.h));
 }
 
 /**

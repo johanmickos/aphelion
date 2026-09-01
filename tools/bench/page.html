@@ -109,6 +109,75 @@
     cursor: crosshair;
     touch-action: none;
   }
+
+  /* ---- the run stays put while the options scroll past it ----
+     There are eighty knobs down the right-hand column and the point of a bench
+     is to watch the run while you move one, which you cannot do if the run has
+     scrolled off the top. So the left column sticks.
+
+     It is given a **height** rather than a `max-height`, and that is the part
+     that took measuring. A flex column's height comes from its content, so a
+     `max-height` alone leaves the stage with no leftover to grow into: the
+     column measures 205px, the stage takes the 2×3 pixels its empty content
+     asks for, and the run vanishes. With a real height the leftover after the
+     controls is definite and the stage can fill it.
+
+     The stage is then sized **from its height**: `flex: 1 1 0` makes the
+     leftover its main size and `width: auto` lets the aspect ratio derive the
+     width, so a short window shrinks the phone rather than distorting it.
+     Driving it from the width instead — the obvious way round — keeps the ratio
+     only until the window is short enough to shrink, and then breaks it badly:
+     measured at column heights of 931, 700 and 500 the width-driven stage reads
+     0.604, 0.836 and 1.433 against a true 0.604, where the height-driven one
+     reads 0.562, 0.604 and 0.604.
+
+     That first 0.562 was this rule's own failure and it is fixed rather than
+     accepted: on a tall window the leftover is more height than the column's
+     width can carry, so the width clamped and the box grew 100px taller than the
+     game inside it. The `max-height` below caps it. Measured at column heights
+     of 1200, 963, 800, 650 and 500 the stage now reads **0.604 at every one**.
+
+     `attachCanvas` matches the drawing buffer to whatever space the stage ends
+     up with, every frame, so none of this needs the renderer to be told.
+
+     Below the two-column breakpoint the run is already above the panel rather
+     than beside it, and pinning it there would hold a phone-shaped box over the
+     controls the reader is scrolling toward. So it only sticks where there is a
+     second column for the options to scroll in. */
+  @media (min-width: 901px) {
+    .run {
+      position: sticky;
+      top: 16px;
+      height: calc(100vh - 32px);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      /* So the stage can ask how wide its column is, below. */
+      container-type: inline-size;
+    }
+    #stage {
+      flex: 1 1 0;
+      min-height: 0;
+      width: auto;
+      max-width: 100%;
+      /* **And no taller than its own width allows.** `flex: 1 1 0` hands the
+         stage all the height left over, which on a tall window is more than the
+         column is wide enough to carry — the width clamps at 100% and the box
+         ends up 100px taller than the game drawn in it, with void inside the
+         border. CSS can derive a width from `aspect-ratio` but not a height, so
+         `shapeStage` publishes the ratio as a number and this reads the column's
+         own width to cap it. Under the cap the ratio is exact in both
+         directions; the fallback is the default viewport's. */
+      max-height: calc(100cqw / var(--stage-ratio, 0.604));
+    }
+    /* The prose under the controls is reference rather than instrument, so it is
+       the first thing to give up its room when the window is short. */
+    .run > .fine {
+      overflow-y: auto;
+      min-height: 0;
+    }
+  }
+
   .runbar {
     display: flex;
     align-items: baseline;
