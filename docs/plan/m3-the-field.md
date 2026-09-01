@@ -137,6 +137,64 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
+#### ⚠ The camera leads sideways now, 2026-09-01 — and the view still never gets in front
+
+Three dispatches in one sitting, and two of them have one cause:
+
+> *"I died because I couldn't see the warning strip to save myself in time. Can we update the camera
+> to be a touch less lazy and a bit more predictive when traveling fast?"*
+
+**The diagnosis is right and it measures.** Over that run the deadline's dot was on screen for **12 of
+the 58 ticks** the cue was up — 21% — and over the second dispatch, 56 of 261. The player was being
+shown a track whose decision point was outside the picture.
+
+Two levers, measured separately over the author's own run:
+
+| | dot on screen | jerk p95 | jerk p99 |
+|---|---|---|---|
+| band 328, no lead (as shipped) | 21% | 0.48 | 0.65 |
+| band 234, no lead | 29% | 0.50 | 0.76 |
+| **band 234, lead 210** | **48%** | 0.59 | 1.89 |
+
+So the band is the small half of *"less lazy"* and **the lead is the whole of *"more predictive"***.
+Both are the prototype's own numbers on the prototype's own axis: `0.20 × W` for the band and
+`0.18 × W` for the lead — and the lead's fraction is finally where it was written, which is the
+failure `LOOK_AHEAD`'s note records the other way round.
+
+**The lead is faded rather than gated at the freeze**, over 12 ticks. The parked session measured the
+hard gate as the largest single-tick change in the whole camera; carried to `x` it takes this axis's
+jerk p99 from 0.65 to **2.72**, and the fade brings it to 1.89 with nothing lost. ⚠ This is **not**
+one of the eight reverted corrections returning: that one was the *vertical* look-ahead, reverted in a
+package, and nothing about `y` is touched.
+
+##### ⚠ The structural finding: the view never actually gets ahead of the craft
+
+Swept over both dispatches, *how far ahead of the craft the view sits while coasting fast*:
+
+| band / lead | ahead by | dot on screen | jerk p95 |
+|---|---|---|---|
+| 328 / 0 | **−340** | 21% | 0.48 |
+| 234 / 210 | **−261** | 48% | 0.59 |
+| 176 / 320 | **−158** | 59% | 0.78 |
+| 120 / 420 | **−54** | 69% | 0.81 |
+
+**Every one is negative.** A lead smaller than the band cannot put the view in front, and the
+deadzone plus the ease lag always exceed it — so *"predictive"* here means **lagging less**, not
+leading. The prototype is the same: its band is 0.28 × W and its lead 0.18 × W, so its view also sits
+behind. Worth knowing before anyone asks for the view to be ahead of the craft, because that is a
+band decision and not a lead one.
+
+##### The third dispatch is a different failure, and half of it is parked
+
+> *"I died because I couldn't see the planet I was heading towards."*
+
+That run ends in **IMPACT**, not at a wall. Measured against the author's own phone geometry, the body
+it hit was **off screen until 0.33 s before impact** — and it was off the **top** first (design y
+−148 against a visible top edge of 291) and off the **left** second (design x −341). So it is
+half a vertical framing problem, and **the vertical camera is parked at the author's own request**.
+The sideways half is improved by the lead above; the vertical half is the parked session's, and it is
+recorded here rather than fixed.
+
 #### ⚠ Flown and corrected the same day — the drawing was invented and should not have been
 
 The author flew the first build and sent three:

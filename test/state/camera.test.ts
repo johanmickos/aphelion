@@ -23,6 +23,7 @@ import {
   LOOK_AHEAD,
   LOOK_REF_SPEED,
   SIDEWAYS_BAND,
+  SIDEWAYS_LOOK,
   followCamera,
   lockOf,
   openCamera,
@@ -247,9 +248,39 @@ describe('the camera', () => {
    * margins, which is a half-band of `0.28 × W`. Asserted as the relationship
    * rather than the number, because the number is the fraction's consequence.
    */
-  it('is lazier sideways than vertically, at the prototype fraction', () => {
-    expect(SIDEWAYS_BAND).toBeCloseTo(0.28 * DESIGN_WIDTH, 6);
+  it('is lazier sideways than vertically, and leads with speed', () => {
+    // ⚠ The band came in at 0.28×W — the prototype's own margin — and the author
+    // flew it and asked for *"a touch less lazy and a bit more predictive when
+    // traveling fast"*, with a run where the deadline's dot was on screen for 12
+    // of the 58 ticks it was up. It is 0.20×W now, and the lead is the other half.
+    expect(SIDEWAYS_BAND).toBeCloseTo(0.2 * DESIGN_WIDTH, 6);
     expect(SIDEWAYS_BAND).toBeGreaterThan(DEADZONE);
+    // The lead is on its own native axis: the prototype writes 0.18 of the window
+    // WIDTH, which is where this puts it.
+    expect(SIDEWAYS_LOOK).toBeCloseTo(0.18 * DESIGN_WIDTH, 6);
+  });
+
+  /**
+   * **It looks where you are going**, which is what *"more predictive when
+   * traveling fast"* asks for: at speed the view sits ahead of the craft, and the
+   * direction it leads is the direction of travel.
+   */
+  it('sits ahead of a craft moving fast and behind nothing at rest', () => {
+    const field = fixtureField();
+    const craft = fixtureCraft();
+    craft.x = field.corridor.centreline;
+    const settle = (vx: number): number => {
+      const sim = createInitialState(field, { ...craft, vx }, 1);
+      let view = openCamera(sim);
+      for (let tick = 0; tick < 400; tick++) view = followCamera(view, sim);
+      return view.x - sim.craft.x;
+    };
+    expect(settle(0)).toBeCloseTo(0, 0);
+    expect(settle(2000)).toBeGreaterThan(0);
+    expect(settle(-2000)).toBeLessThan(0);
+    // Clamped rather than growing without bound — the fastest run and a merely
+    // fast one lead alike.
+    expect(settle(20000)).toBeCloseTo(settle(2000), 0);
   });
 
   /**

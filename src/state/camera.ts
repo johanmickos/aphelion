@@ -215,7 +215,77 @@ export const FOLLOW_RATE = 3;
  * the view to the craft during a capture, which is exactly the moment the author
  * called *too much*.
  */
-export const SIDEWAYS_BAND = 0.28 * DESIGN_WIDTH;
+export const SIDEWAYS_BAND = 0.2 * DESIGN_WIDTH;
+
+/**
+ * How far ahead of the craft the view sits **sideways** at
+ * [`LOOK_REF_SPEED`](#look_ref_speed) and above, in design units.
+ *
+ * ## ⚠ Flown and asked for, 2026-09-01 — and it is the prototype's own axis
+ *
+ * The first sideways build deliberately left this out, on the parked session's
+ * first measurement: `LOOK_AHEAD` is where the largest single-tick change in the
+ * view was found, and adding a second one on an axis nobody had flown would be
+ * that evening's mistake with the order reversed. The author flew it and asked
+ * for it by name, with a dispatch under it:
+ *
+ * > *"I died because I couldn't see the warning strip to save myself in time. Can
+ * > we update the camera to be a touch less lazy and a bit more predictive when
+ * > traveling fast?"*
+ *
+ * **The diagnosis is right and it is measurable.** Over that run the deadline's
+ * dot was on screen for **12 of the 58 ticks** the cue was up — 21%. The player
+ * was being shown a track whose decision point was outside the picture.
+ *
+ * **And this is the fraction's native axis.** `LOOK_AHEAD`'s own note records the
+ * fraction failing when it was carried across axes: the prototype writes its
+ * look-ahead as `0.18` of the design window's **width**, *"because its playfield
+ * is wider than its window and sideways is where its interesting movement is"*,
+ * and this repo applied it to the long side. Here it goes back where it was
+ * written — `0.18 × DESIGN_WIDTH`, which is the same 210 design units the
+ * vertical carries as a distance, arrived at from the other direction.
+ *
+ * Measured over the author's dispatch, against the band alone:
+ *
+ * | | dot on screen | jerk p95 | jerk p99 |
+ * |---|---|---|---|
+ * | band 328, no lead | 21% | 0.49 | 0.65 |
+ * | band 234, no lead | 29% | 0.50 | 0.76 |
+ * | band 234, lead 210 | **47%** | 0.55 | 1.79 |
+ *
+ * So the band is the small half of *"less lazy"* and the lead is the whole of
+ * *"more predictive"*. The jerk it costs is the parked session's own
+ * discontinuity arriving on a second axis, and [`LOOK_FADE_TICKS`](#look_fade_ticks)
+ * is what keeps it under the vertical's.
+ */
+export const SIDEWAYS_LOOK = 0.18 * DESIGN_WIDTH;
+
+/**
+ * How long the sideways lead takes to let go once an orbit freezes, in ticks.
+ *
+ * **The gate is the discontinuity, so it is not a gate.** The vertical lead is
+ * switched off outright at the freeze — rightly, because past it the craft rides
+ * a phase clock and its velocity reverses every half orbit — and the parked
+ * session measured exactly what that costs: *"it went from 210 design units to
+ * nothing between two ticks... the view's speed changed by 10.2 design units in
+ * one tick at a freeze, against 3.1 at a release."* Carried to `x` as a hard
+ * gate it takes this axis's jerk p99 from 0.65 to **2.72**; faded over twelve
+ * ticks it is **1.90**, and over thirty **1.79**, with no visibility lost either
+ * way.
+ *
+ * **Twelve, not thirty**, and the reason is the thing the gate exists for rather
+ * than the jerk: an orbit's `vx` reverses within half a period, which is 30 – 60
+ * ticks here, so a lead still worth half its value at fifteen ticks would begin
+ * to swing the view with the orbit — the fault the gate was written against. A
+ * fifth of a second is gone long before that.
+ *
+ * ⚠ **This is not one of the eight reverted corrections coming back.** One of
+ * them was *"the look-ahead faded out over 12 ticks"*, on the **vertical** axis,
+ * reverted as part of a package when the author parked that camera. Nothing about
+ * `y` is touched here; this is a new axis the author has since unparked and asked
+ * for by name.
+ */
+export const LOOK_FADE_TICKS = 12;
 
 /**
  * How far past the line the view may reach, in design units — **zero, and it is a
@@ -447,10 +517,15 @@ export function followCamera(previous: CameraView, sim: SimState): CameraView {
   // heading. It stays **on through the dive**, where the craft is on real physics
   // with a real heading and where suppressing it *"put a 110px lurch into the
   // dive"*. `sim.orbit` is exactly that distinction and needs no second flag.
-  const lead = sim.orbit === null ? leadOf(sim.craft.vy) : 0;
+  const lead = sim.orbit === null ? leadOf(sim.craft.vy, LOOK_AHEAD) : 0;
 
   const subjectY = craftY + offset + lead;
-  const subjectX = sim.craft.x + offsetX;
+  // **Look where you are going, sideways.** Faded rather than gated at the freeze
+  // — see [`LOOK_FADE_TICKS`](#look_fade_ticks). `sim.orbit` carries the ticks
+  // since the freeze already, so this needs nothing remembered.
+  const across =
+    sim.orbit === null ? 1 : Math.max(0, 1 - sim.orbit.ticksSinceFreeze / LOOK_FADE_TICKS);
+  const subjectX = sim.craft.x + offsetX + leadOf(sim.craft.vx, SIDEWAYS_LOOK) * across;
   const step = easeStep(FOLLOW_RATE);
 
   // **The target is clamped, not the result**, so the ease decelerates into the
@@ -547,14 +622,18 @@ function panBounds(sim: SimState): { lo: number; hi: number } {
 }
 
 /**
- * How far ahead of the craft to look, in design units, from its vertical speed.
+ * How far ahead of the craft to look, in design units, from its speed along one
+ * axis.
+ *
+ * One function, both axes, and they differ only in how far they reach — the
+ * clamp, the reference speed and the symmetry are the same question twice.
  *
  * Clamped rather than ramped without bound, so that the fastest run in the game
  * and a merely fast one frame alike — the prototype's `clamp(v / ref, -1, 1)`.
  */
-function leadOf(vy: number): number {
-  const share = Math.max(-1, Math.min(1, vy / LOOK_REF_SPEED));
-  return share * LOOK_AHEAD;
+function leadOf(speed: number, reach: number): number {
+  const share = Math.max(-1, Math.min(1, speed / LOOK_REF_SPEED));
+  return share * reach;
 }
 
 /**
