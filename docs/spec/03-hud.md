@@ -127,6 +127,30 @@ that the press is steering, before the first orbit ever forms.
 | Past the dot | The projected line goes **dashed** — the future thins out |
 | Fuel coupling | **By luminance, never geometry.** Only the fraction of the window the tank can afford stays lit. Half a tank lights the early half; an empty tank shows the whole window in DUSK. A moment exists, and you cannot buy it |
 
+> ## ⚠ Built, 2026-09-01 — on the **grab**, and three rows are not as written
+>
+> This section writes the deadline against spec [07 · §5](./07-boundary.md)'s **burn**, which is
+> priced by fuel — so it waited on M4. **The author re-based it on the grab**: *"I want to have
+> something visual on the field that tells me where I need to save myself by. If I grab after, or
+> just don't grab, I'm heading for extinction."* A grab needs no fuel, so the instrument comes
+> forward, and what M4.4 adds is the **luminance** and nothing else — which is what the Fuel coupling
+> row already promises.
+>
+> - **The window is plural.** The saveable stretch has gaps in it: measured over 966 doomed drifts,
+>   58% hold one window, **8% hold more than one** as a second body comes into range, and 34% hold
+>   none. Every one is drawn (author) — drawing only the last would tell a player who *can* save that
+>   the chance is still ahead of them.
+> - **Past the dot is not dashed.** Refused with the dashes that were on spec 07's bands. The track
+>   goes out and the SOS takes over: one predicate, two presentations. The spent part of the line is
+>   history, and spec 05 §6 rules there are no breadcrumbs anywhere in this game.
+> - **Fuel is a named zero in the shape of a full tank** — `affordable` is 1, so the whole window is
+>   lit. Unlike a chain of zero, a constraint that does not exist yet is one that does not bind.
+>
+> **What it is worth is a prediction and not a fact**, and the word carries that: the condition is
+> *no single press-and-hold from here turns the craft away*, and it does not consider releasing and
+> grabbing a different body. The prototype measured its own at **95%** and named it `SOS` rather than
+> `DOOMED` for exactly that reason.
+
 Nothing on the track tells the player what to do. It states four facts and lets the player price
 the trade.
 

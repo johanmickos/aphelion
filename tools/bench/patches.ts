@@ -336,6 +336,15 @@ export function lockOf(sim: SimState): number {
     'SIDEWAYS_BAND',
     'how far the craft drifts sideways before the view follows \u2014 the prototype\u2019s 0.28\u00d7W',
   ),
+  // The horizon is an open question the author can judge by eye — at 6 s the mark
+  // misses the longest approaches. `MAX_SAMPLES` is open too and is deliberately
+  // NOT here: it is a cost knob, nobody can see it, and the bench is capped at
+  // sixty at the author's own request.
+  settable(
+    'src/sim/rescue.ts',
+    'HORIZON_SECONDS',
+    'how far ahead the deadline looks \u2014 6 s finds about 85% of this game\u2019s drifts',
+  ),
   settable('src/state/rung.ts', 'BOW_FALLOFF', 'how wide a patch of field a body bends'),
   settable('src/state/rung.ts', 'WAKE_AMPLITUDE', 'the board’s wake, whose own slider runs 0 – 34'),
   settable('src/state/rung.ts', 'WAKE_FALLOFF', 'how much of the field the craft parts as it goes'),

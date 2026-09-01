@@ -9,6 +9,7 @@
 import type { Tick } from '../sim/types.ts';
 import type { Tier } from '../sim/tier.ts';
 import type { Decay } from './decay.ts';
+import type { DeadlineMemo } from './deadline.ts';
 
 /**
  * The grade of a release, re-exported because it is part of what the renderer
@@ -961,6 +962,28 @@ export interface PresentationState {
    * See [`boundaryOf`](./boundary.ts).
    */
   readonly boundary: readonly BoundarySideView[];
+  /**
+   * Where a press still saves a drift that is leaving the field, or `null`.
+   *
+   * Recomputed when the drift changes rather than every tick — a coasting craft's
+   * heading is constant on 99.92% of ticks (measured over the author's
+   * dispatches), so the whole scan is a property of the coast rather than of the
+   * frame. See [`deadlineOf`](./deadline.ts).
+   */
+  readonly deadline: DeadlineView | null;
+  /** The strobe that says no press is going to change it, or `null`. */
+  readonly sos: SosView | null;
+  /**
+   * What the deadline worked out last tick, so this one can decide whether to
+   * work again — **the recurrence's memory, and not the renderer's business.**
+   *
+   * The same shape [`CameraView.offset`](#cameraview) is in: it is the *input to
+   * the next tick's derivation* rather than something drawn, and it is on the
+   * state because [`derive`](./derive.ts) is a pure function of `(previous, sim)`
+   * and has nowhere else to keep it (ADR-0015). What is drawn is
+   * [`deadline`](#deadlineview) and [`sos`](#sosview), which are derived from it.
+   */
+  readonly rescue: DeadlineMemo;
 }
 
 /**
@@ -1042,4 +1065,73 @@ export interface BoundarySideView {
    * [`SHELTERS`](./boundary.ts) is where it stops being one.
    */
   readonly sheltered: boolean;
+}
+
+/**
+ * The **deadline** (`CONTEXT.md`): where a press still saves a craft drifting out
+ * of the field, and where it stops.
+ *
+ * `null` while a body is held and whenever the drift is not heading out — see
+ * [`rescueDeadline`](../sim/rescue.ts), which also carries what the prediction is
+ * worth (95% over the prototype's corpus) and why the word beside it is `SOS`.
+ *
+ * Everything on it is a **world point**, so the picture is a place rather than a
+ * countdown: the craft advances into it and it does not move.
+ */
+export interface DeadlineView {
+  /**
+   * The scan along the drift, in order.
+   *
+   * Kept whole rather than reduced to a span, because the author ruled that
+   * **every** saveable window is drawn (2026-09-01) and the saveable stretch has
+   * gaps in it — measured, 8% of doomed drifts hold more than one window as a
+   * second body comes into range.
+   */
+  readonly path: readonly { readonly x: number; readonly y: number; readonly saves: boolean }[];
+  /** The **dot**: the last place a press still saves, or `null` when none does. */
+  readonly cross: { readonly x: number; readonly y: number } | null;
+  /** How far in, 0 to 1 — spec [03 · §5](../../docs/spec/03-hud.md)'s 300ms fade. */
+  readonly presence: number;
+  /**
+   * How much of the window the tank can afford — **1, and it is a named zero in
+   * the shape of a full tank.**
+   *
+   * Spec 03 §5 couples fuel to the deadline *"by luminance, never geometry"*, so
+   * what M4.4 changes is this number and nothing else about the picture. Its
+   * neutral value is **1** rather than 0: unlike [`chain`](#presentationstate),
+   * where nothing-yet means none, a fuel constraint that does not exist yet is
+   * one that does not bind.
+   */
+  readonly affordable: number;
+}
+
+/**
+ * The **SOS**: the craft is in trouble and no press is going to change it.
+ *
+ * Spec [07 · §6](../../docs/spec/07-boundary.md) strobes it *"in ION at the craft
+ * at 2Hz... It is a signal, not a scream."* One meaning in two states, which is
+ * the author's ruling of 2026-09-01 and the prototype's own resolution:
+ *
+ * - **Drifting**, past the dot — no press left that saves.
+ * - **Held**, when the press that took this body was already too late.
+ *
+ * The word is `SOS` and not `DOOMED` because the prediction is 95% rather than
+ * certain, and *"SOS asserts nothing except that the ship is in trouble, which is
+ * exactly what is known."*
+ */
+export interface SosView {
+  /** Which way the wall it is about lies from the craft: `1` right, `-1` left. */
+  readonly toward: 1 | -1;
+  /** The strobe, 0 to 1 — spec 07 §6's 2Hz. */
+  readonly strength: number;
+  /**
+   * Whether it was armed by a **grab** rather than by a drift.
+   *
+   * Carried because it is the one half that has to be remembered: a drift
+   * re-derives its own answer every tick, and a capture's was settled on the tick
+   * the press landed. Dropping it would make the mark vanish on the very press
+   * that sealed the run — the prototype records exactly that, *"the player panics,
+   * presses, and the death mark disappears, which reads as a save."*
+   */
+  readonly held: boolean;
 }

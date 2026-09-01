@@ -13,6 +13,7 @@ import { bloomOf, E3_BLOOM, E3_TICKS } from '../../src/state/energy.ts';
 import { hueOf } from '../../src/state/identity.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import { interpolate } from '../../src/render/interpolate.ts';
+import { NO_DEADLINE } from '../../src/state/deadline.ts';
 
 function view(x: number, y: number, heading: number): PresentationState {
   return {
@@ -22,6 +23,9 @@ function view(x: number, y: number, heading: number): PresentationState {
     chain: 0,
     anomaly: null,
     boundary: [],
+    deadline: null,
+    sos: null,
+    rescue: NO_DEADLINE,
     craft: {
       x,
       y,

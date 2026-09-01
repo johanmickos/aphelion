@@ -82,6 +82,8 @@ import { sightingsOf } from './sighting.ts';
 import { bowOf, wakeOf } from './rung.ts';
 import { anomalyOf } from './anomaly.ts';
 import { boundaryOf } from './boundary.ts';
+import { NO_DEADLINE, deadlineOf, deadlineView, sosOf } from './deadline.ts';
+import type { DeadlineMemo } from './deadline.ts';
 import type {
   ArrivalView,
   BodyState,
@@ -243,6 +245,7 @@ function present(
   arrival: ArrivalView | null,
   knock: KnockView | null,
   wake: readonly WakeView[],
+  rescue: DeadlineMemo,
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
@@ -280,6 +283,12 @@ function present(
     // field and this tick's craft — nothing about it decays — so it is derived
     // here beside the anomaly rather than remembered.
     boundary: boundaryOf(sim.field, sim.craft),
+    // The **deadline**, re-scanned only when the drift changes — a coasting
+    // craft's heading is constant on 99.92% of ticks, so the scan belongs to the
+    // coast rather than to the frame ([`deadline.ts`](./deadline.ts)).
+    deadline: deadlineView(rescue),
+    sos: sosOf(rescue, sim),
+    rescue,
   };
 }
 
@@ -300,7 +309,23 @@ export function createPresentation(sim: SimState): PresentationState {
   // And **world speed opens at zero**, for the same reason: a rate needs two
   // ticks and there has only been one, so the first picture shows a world that
   // has not moved yet rather than one already sliding.
-  return present(sim, openCamera(sim), 0, null, UNDEFORMED, null, null, null, null, null, []);
+  // The deadline opens **unscanned**, not empty: a run's first tick has no
+  // previous drift to have carried one, and `deadlineOf` will scan on the tick
+  // after this one if there is anything to find.
+  return present(
+    sim,
+    openCamera(sim),
+    0,
+    null,
+    UNDEFORMED,
+    null,
+    null,
+    null,
+    null,
+    null,
+    [],
+    NO_DEADLINE,
+  );
 }
 
 /**
@@ -428,5 +453,6 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
     arrivalOf(previous, sim),
     knockOf(previous, sim),
     wakeOf(previous.wake, sim),
+    deadlineOf(previous.rescue, sim),
   );
 }

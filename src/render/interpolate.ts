@@ -308,5 +308,14 @@ export function interpolate(
     wake: wakeBetween(previous.wake, current.wake, alpha),
     anomaly: anomalyBetween(previous.anomaly, current.anomaly, alpha),
     boundary: boundaryBetween(previous.boundary, current.boundary, alpha),
+    // **All three taken from the later tick whole.** The deadline's points are
+    // world points that do not move — the craft advances into them — so there is
+    // nothing for a fraction of a tick to cross; the SOS's strobe is a phase on
+    // the tick clock and half a tick is not a tick; and the memo is the *input to
+    // the next derivation* rather than anything drawn (ADR-0015), which is the
+    // same reading the camera's own carried state gets above.
+    deadline: current.deadline,
+    sos: current.sos,
+    rescue: current.rescue,
   };
 }

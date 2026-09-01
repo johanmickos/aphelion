@@ -26,6 +26,7 @@ import { SCATTER_FIELD, createRecorder, recipeOf, recordPress } from './src/sim/
 import { createInitialState, stepSim } from './src/sim/step.ts';
 import type { SimState } from './src/sim/types.ts';
 import * as units from './src/sim/units.ts';
+import * as rescue from './src/sim/rescue.ts';
 import { SECONDS_PER_TICK } from './src/sim/units.ts';
 import * as cameraKnobs from './src/state/camera.ts';
 import * as curve from './src/state/decay.ts';
@@ -733,6 +734,19 @@ const KNOBS: Knob[] = [
     restarts: false,
     group: 'field',
     places: 0,
+  },
+  {
+    id: 'deadlinehorizon',
+    label: 'Deadline \u00b7 how far ahead',
+    what: 'how far ahead the deadline projects the drift, in seconds. 6 is the prototype\u2019s. **Measured over the author\u2019s dispatches this game\u2019s drifts run p50 1.6 s but p90 7.2 s and 9.0 s at the longest**, so 6 finds about the first 85% and the longest approaches arrive unmarked until they are inside it. Raising it costs only the projection \u2014 the scan is bounded by the sample budget whatever the horizon is',
+    min: 2,
+    max: 12,
+    step: 0.5,
+    base: rescue.HORIZON_SECONDS,
+    apply: rescue.set_HORIZON_SECONDS,
+    restarts: false,
+    group: 'field',
+    places: 1,
   },
   {
     id: 'closingconstant',

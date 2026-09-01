@@ -60,6 +60,7 @@ import { drawDust, dust } from './dust.ts';
 import { drawAnomaly } from './anomaly.ts';
 import { drawRungs } from './rungs.ts';
 import { boundaryMotes, drawBoundary } from './boundary.ts';
+import { drawDeadline, drawSos } from './deadline.ts';
 import {
   BODY_FILL,
   CORE,
@@ -1390,6 +1391,11 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
     context.restore();
   }
 
+  // **The deadline, with the compass and in the same grammar** — spec 03 §5's
+  // *"the compass inverted"*. They are never both drawn: the compass needs a held
+  // body and the deadline is null while one is held.
+  if (view.deadline !== null) drawDeadline(context, view.deadline);
+
   if (view.compass !== null) drawCompass(context, view.compass);
 
   if (view.flash !== null) drawFlash(context, view.flash);
@@ -1401,6 +1407,11 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   // under another. They cannot both be a capture's, but a knock and the previous
   // swing's release word can overlap.
   if (view.knock !== null) drawKnock(context, view.knock);
+
+  // **The SOS, last of the world layers and over the craft** — spec 07 §6 puts it
+  // *"at the craft"*, and a distress call under the thing it is about would be
+  // the one cue in the game the player cannot see.
+  if (view.sos !== null) drawSos(context, view.sos, view.craft);
 
   // The craft's own bloom is drawn round, and the dart inside it is what
   // stretches: spec 00 §5 puts every streak parallel to velocity, and a glow

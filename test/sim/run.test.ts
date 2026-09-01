@@ -16,6 +16,7 @@ import { clearedAbove } from '../../src/sim/run.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { NO_INPUT } from '../../src/sim/types.ts';
 import type { Field, SimState } from '../../src/sim/types.ts';
+import type { PresentationState } from '../../src/state/types.ts';
 import { CORRIDOR_GRACE, FELL_BEHIND_GAP, SCALE } from '../../src/sim/units.ts';
 import type { Body } from '../../src/sim/body.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
@@ -276,25 +277,48 @@ describe('over a corpus of flown runs', () => {
 /**
  * The layer criterion [AGENTS.md](../../AGENTS.md) §6 asks every step to write.
  *
- * **M1.4 builds nothing that is drawn.** The unravelling craft, the `SOS` strobe
- * and the debrief card are spec [07 · §6](../../docs/spec/07-boundary.md)'s and
- * are M3's and M6's, so death reaches the picture in a later milestone and not
- * this one. What must not happen in the meantime is presentation state quietly
- * learning about it — a derivation that read the ending would be a decay the
- * renderer could see and no test could name.
+ * M1.4 built nothing that was drawn, and this asserted that death reached the
+ * picture **nowhere at all** — a derivation that read the ending would have been a
+ * decay the renderer could see and no test could name.
  *
- * When death *does* reach the picture, the fix is never to relax this: it is a
- * field on [`PresentationState`](../../src/state/types.ts), derived deliberately,
- * and this test is where that becomes visible.
+ * ⚠ **Death reaches the picture now, and this file predicted how**: *"the fix is
+ * never to relax this: it is a field on `PresentationState`, derived
+ * deliberately, and this test is where that becomes visible."* The **deadline**
+ * and the **SOS** (2026-09-01) are those fields. So the criterion is unchanged in
+ * force and only its shape moved: death may reach exactly the three fields named
+ * below, and everything else in the picture must still not be able to tell.
+ *
+ * The list is deliberately a literal rather than a filter over what differs — a
+ * test that asked *which fields changed* would pass whatever changed.
  */
 describe('the layer boundary', () => {
-  it('keeps death out of the picture until it is put there on purpose', () => {
+  it('lets death reach the picture only through the fields built for it', () => {
     const alive = createInitialState(field, fixtureCraft(), 1);
     const ended = createInitialState(field, fixtureCraft(), 1);
     ended.ending = 'IMPACT';
 
-    expect(derive(createPresentation(alive), ended)).toEqual(
-      derive(createPresentation(alive), alive),
+    const without = (view: PresentationState): Partial<PresentationState> => {
+      const { deadline, sos, rescue, ...rest } = view;
+      void deadline;
+      void sos;
+      void rescue;
+      return rest;
+    };
+    expect(without(derive(createPresentation(alive), ended))).toEqual(
+      without(derive(createPresentation(alive), alive)),
     );
+  });
+
+  /**
+   * And those three go **quiet** at an ending rather than carrying on: spec 07 §6
+   * stops the strobe at the line, and the prototype's own reason is that *"a
+   * warning that outlives the thing it was warning about is noise."*
+   */
+  it('says nothing once the run is over', () => {
+    const ended = createInitialState(field, fixtureCraft(), 1);
+    ended.ending = 'OUT_OF_BOUNDS';
+    const view = derive(createPresentation(ended), ended);
+    expect(view.deadline).toBeNull();
+    expect(view.sos).toBeNull();
   });
 });

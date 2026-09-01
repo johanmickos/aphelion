@@ -572,8 +572,19 @@ is returned by flying well rather than by collecting anything.
 **Deadline**:
 The ION window drawn on the craft's own projected line when it is leaving the field. Its
 dot is the last press that can still save the run — the compass inverted, saying *press
-here* rather than *release here*.
+here* rather than *release here*. There may be **more than one window**: the stretch a
+press works from has gaps in it, because what a press does depends on what is in reach.
+It is a **prediction and not a fact** — it asks whether one press-and-hold turns the craft
+away, and never whether releasing and grabbing something else would.
 _Avoid_: point of no return, warning, last chance
+
+**SOS**:
+The strobe that says the craft is in trouble and no press is going to change it — drifting
+past the **deadline**'s dot, or holding a body the press was already too late to take. The
+word is chosen for what it does **not** claim: at 95% accuracy neither *doomed* nor *lost*
+is entitled to a claim about the outcome, and this asserts only that the craft is in
+trouble, which is what is known.
+_Avoid_: doomed, lost, death mark, skull (the prototype's glyph; this game has a word)
 
 **Save**:
 A press inside the deadline window.

@@ -137,7 +137,70 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
-#### The deadline, re-based on the **grab** — a design conversation, 2026-09-01, not built
+#### ⚠ The deadline and the SOS are built, 2026-09-01 — scoped in a grilling session
+
+The conversation below is closed. What was built is the shape it arrived at, plus the prototype's,
+which the author asked for once the options were on the table (*"let's draw a bit of inspiration from
+the original prototype here. It does it fairly well"*) — and it did, better than the three options it
+replaced.
+
+**One predicate, two presentations.** *Is a rescue still available?* Yes → the windows and the dot.
+No → the SOS. That covers both flight states from one rule, which is the prototype's own resolution:
+*"one meaning in two states rather than a priority between two opinions."*
+
+**A rescue is having stopped closing on the wall** — press and hold, and the velocity toward that
+wall goes non-positive before the run ends. Deliberately not *the swing is safe*: a bar that judged
+the swing would refuse to mark a grab that saves a life and then swings wide.
+
+**The marker**, drifting only (`null` while held — the escape from a capture is a release, not a
+grab): a closed-form refusal first, one projection of the drift, a scan at **stride 3** with the
+stride widening so a scan never exceeds **40 samples**, then the last saving sample refined **to the
+tick** so the dot does not hop by a stride as the craft advances into it. **Every** window is drawn,
+dot on the far end of the last.
+
+**The SOS**, at the craft and offset **toward** the wall — which avoids the prototype's own recorded
+defect by construction (*"that is the same direction as the wake for every wall — so it was drawn
+over the ship's trail every single time"*). While held it is armed at the grab, from the deadline the
+drift was already carrying: **the press you just made was already too late.** That is cheaper and
+more honest than searching release points, and it fixes a defect the prototype names — *"dropping the
+captured half would make the skull vanish on the very press that sealed the run, which reads as a
+save."*
+
+**What the numbers say, and they are all measured here rather than carried:**
+
+| | |
+|---|---|
+| doomed drifts holding one window / several / none | 58% / **8%** / 34% |
+| a successful rescue turns away in | p50 **37** ticks, p90 63, p99 158, max 349 |
+| a coasting heading is unchanged tick to tick | **99.92%** of ticks |
+| drift length from the start of a coast | p50 95 ticks, p90 433, max **541** |
+
+The 8% with gaps is why every window is drawn rather than the last. The 349 is why `RESCUE_BUDGET`
+stays at the prototype's 360 rather than being cut for speed — at 120 the top 1% of real rescues
+would be reclassified as none, moving the dot earlier and strobing at a craft that could still be
+saved, which is the direction a distress signal must never be wrong in. The 99.92% is what makes the
+scan a property of the **coast** rather than of the frame, and `RESTATE_TICKS` re-runs it every half
+second anyway so ADR-0015's convergence rule stays literally true.
+
+**⚠ What it costs, and one decision is not implemented.** The scan's worst tick is about **1 ms**
+against `pnpm profile`'s stated 2.8 ms per-tick budget, 8 – 10 times in a 42-second run, and every one
+lands on the tick a coast opens — a press-**up** edge, which is the one the phone does *not* already
+drop a frame on. Two exact short-circuits are in (a press with nothing in reach, and a press whose
+grab is refused) and neither moved it: the cost is genuine work.
+
+**The author chose to spread that across spec 03 §5's own 300 ms fade-in, and it is not spread.** The
+scan runs on one tick. It is recorded here rather than quietly skipped: the measurement came in under
+the stated budget on a laptop, and the phone is where that has to be settled — `pnpm profile` says on
+every line that absolute numbers are the phone's. If it shows, the remedy is the one already ruled,
+and `MAX_SAMPLES` is the number it is made of. The horizon is on the bench; `MAX_SAMPLES` deliberately
+is not, because nobody can judge a cost knob by eye and the bench is capped at sixty.
+
+**Three spec rows are not built as written**, all recorded in the specs themselves: spec 03 §5's
+dashed line past the dot (refused with the band dashes), its singular window (plural now), and the
+rescue path the prototype draws — which is a predicted orbit for a press nobody has made, and the
+author refused exactly that shape one instrument along on the same day.
+
+#### The deadline, re-based on the **grab** — the conversation that scoped it
 
 The author asked whether it was time to discuss spec 07 §6's `SOS`, and described it as *"flash SOS
 next to the ship when it's on an out-of-bounds path while grabbing... there's no turning back

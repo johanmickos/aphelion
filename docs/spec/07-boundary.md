@@ -98,6 +98,31 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 > more tightly than the criterion it replaces. `bandAt` is kept as spec 08's multiplier and is spent
 > by nothing.
 
+> ### ⚠ §6's `SOS` is built, with a second trigger and a predicate (2026-09-01)
+>
+> §6 strobes `SOS` *"from the moment the last press is missed"*, which needs the deadline, which
+> needed fuel. Re-based on the **grab** (spec [03 · §5](./03-hud.md)'s notice) it comes forward, and
+> it gains a second trigger the author asked for — the **held** case, which `VISION.md` names as the
+> commonest death and the biggest hole in pillar 3: *"of 199 out-of-bounds deaths, 95 were captured
+> on the final tick... the rescue cue is silent while captured."*
+>
+> **One meaning in two states**: drifting past the dot, and held when the press that took the body was
+> already too late. They cannot both be true, so it is not a priority between two opinions.
+>
+> **And it answers VISION's open call rather than stepping past it.** That call warns that a cue in
+> the captured case *"would have to say keep holding and you die — whose answer is to let go. That is
+> a prompt, and pillar 4 says this game builds dials."* Measured, a cue that fires whenever the orbit
+> exits **is** that prompt and is wrong three times in four — 74% of held swings that leave the
+> corridor can still be escaped by releasing. The trigger built fires only when the grab was already
+> too late, which has **no verb**: there is nothing to prompt, because there is nothing to do.
+>
+> Where it sits is *"at the craft"* as §6 says, offset **toward** the wall — the prototype put its own
+> on the away axis and found *"that is the same direction as the wake for every wall, so it was drawn
+> over the ship's trail every single time."*
+>
+> The rest of §6 — the unravelling, `BANK` snapping to DUSK, the world dimming, the card — is still
+> M6's, and the 70ms hitstop is still refused.
+
 > ### ⚠ §2's dashed band edges are refused (author, 2026-09-01)
 >
 > > *"Let's remove the dashed vertical ion lines indicating the hot zones. The colour glow and border
