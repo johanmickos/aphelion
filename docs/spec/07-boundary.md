@@ -62,6 +62,28 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 > the formula this section states, not of anything tuned. It is asserted where it can hold and
 > recorded where it cannot; **the ruling is the author's.**
 >
+> ### ⚠ The boundary is **absent** until the craft goes out to the wall (author, 2026-09-01)
+>
+> *"The boundary SHOULD be off screen for majority of play, and the warning ion glow should only
+> activate when they approach and then learn that it's a danger zone. I don't want to signal danger
+> during normal gameplay, only when the ship is along the edge (outside of the default viewport)."*
+>
+> This is a **second channel beside `heat`**, and §3 does not have it: `heat` says how hard the craft
+> is diving at a line, and **presence** says whether the line is part of the conversation at all.
+> Zero while the craft is inside spec [00 · §7](./00-tokens.md)'s default viewport, ramping up over a
+> fire band's depth of travel beyond it, per side. At zero **nothing is drawn** — not a dimmed
+> gradient, not a faint dash.
+>
+> The same ruling closes the *"the boundary is off screen on a phone"* question the other way round:
+> the corridor being wider than the picture is deliberate, and *"opens up the room for ambiguity and
+> exploration"* — racing one wall costs you sight of the other. §2's geometry is unchanged.
+>
+> **What was actually signalling was §2's dashed band edge**, not §3's gradient. At the picture's edge
+> the gradient is at α 0.0095 and invisible; the dash at `line − 220 m` sits inside the picture at
+> α 0.25 and, by §2's own rule, does not scale with heat — so it drew down both sides of the screen
+> for the whole of every run. Measured after: the boundary draws on **3.4% of frames** across the
+> author's replayable dispatches.
+
 > ### ⚠ Two wordings taken a particular way
 >
 > - §2's label anchor says *"~14 **design** px"* where the row above says the type is *"9px"*. Read

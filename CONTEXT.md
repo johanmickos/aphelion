@@ -195,6 +195,14 @@ the other in the same frame.
 _Avoid_: intensity, alarm, danger, proximity (that is the thing it is deliberately not),
 threat level
 
+**Presence**:
+Whether the **boundary** is part of the conversation at all, and a channel of its own beside
+**heat**: heat says how hard the craft is diving at a **line**, this says whether that line is
+drawn. Absent while the craft flies the field — *"the boundary SHOULD be off screen for
+majority of play"* — and arriving as the craft goes out past the picture's own edge, per
+side. Absent means nothing is drawn, not a dimmed layer: what is over is absent.
+_Avoid_: visibility (that is the camera's question), opacity, fade-in
+
 **Closing speed**:
 How fast the craft is closing on one **line**, and zero when it is receding. Not the
 **craft**'s speed and not **world speed** — a third quantity, and the three are nowhere near

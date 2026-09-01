@@ -28,6 +28,8 @@ import { FIRE_BAND, HEAT_CAP, OUTER_BAND, heatOf } from '../../src/state/boundar
 import type { BoundarySideView, CameraView } from '../../src/state/types.ts';
 import { AURORA, ION } from '../../src/render/palette.ts';
 import { boundaryMotes, drawBoundary } from '../../src/render/boundary.ts';
+import { boundaryOf } from '../../src/state/boundary.ts';
+import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 
 const CENTRELINE = 585;
 const HALF_WIDTH = 1111.5;
@@ -54,6 +56,10 @@ function side(over: Partial<BoundarySideView> = {}): BoundarySideView {
     away,
     closing,
     heat: heatOf(closing, away),
+    // Fully up unless a test says otherwise. Every assertion below except the
+    // presence ones is about what the boundary draws **once it is drawn at all**,
+    // which is the craft out at the wall — see `describe('presence')`.
+    presence: 1,
     sheltered: false,
     ...over,
   };
@@ -496,6 +502,89 @@ describe('what a phone actually sees', () => {
     const it = drawn([side(), leftSide()], PHONE);
     expect(it.gradients).toHaveLength(2);
     expect(it.gradients[0]!.x1).not.toBeCloseTo(it.gradients[1]!.x1, 0);
+  });
+});
+
+describe('presence — what normal play actually shows', () => {
+  /**
+   * **The author's ruling, 2026-09-01**: *"I don't want to signal danger during
+   * normal gameplay, only when the ship is along the edge."*
+   *
+   * The strongest form of that is the one asserted: at zero presence the renderer
+   * is not asked for **anything at all** — not a dimmed gradient, not a faint
+   * dash. `CONTEXT.md`'s decay rule, and the reason the cost of the layer goes
+   * with the layer.
+   */
+  it('draws nothing whatever while the craft is in the field', () => {
+    for (const closing of [0, 200 * METRE, 600 * METRE]) {
+      const it = drawn([side({ closing, presence: 0 }), leftSide({ closing, presence: 0 })]);
+      expect(it.gradients).toHaveLength(0);
+      expect(it.lines).toHaveLength(0);
+      expect(it.rects).toHaveLength(0);
+      expect(it.dots).toHaveLength(0);
+      expect(it.words).toHaveLength(0);
+    }
+  });
+
+  /**
+   * ⚠ **The dashed band edge is what was actually signalling**, and it is the
+   * reason this gate had to reach the whole layer rather than the glow alone.
+   *
+   * Spec 07 §2 fixes the dashes at α 0.25 and 0.40 and says they *"do not scale
+   * with heat"* — so before the ruling they drew a pink dashed line down both
+   * sides of the screen for the whole of every run, at full strength, while the
+   * gradient beside them was down at α 0.0095 and invisible. Presence is a
+   * different channel from heat and it reaches them.
+   */
+  it('brings the dashes up with presence, though heat never touches them', () => {
+    const at = (presence: number) =>
+      drawn([side({ presence })]).lines.filter((l) => l.dash.length > 0);
+    expect(at(0)).toHaveLength(0);
+    const half = at(0.5);
+    const full = at(1);
+    expect(half).toHaveLength(2);
+    expect(full).toHaveLength(2);
+    for (let i = 0; i < 2; i++) {
+      expect(alphaOf(half[i]!.stroke)).toBeGreaterThan(0);
+      expect(alphaOf(half[i]!.stroke)).toBeLessThan(alphaOf(full[i]!.stroke));
+      // And they still do not move.
+      expect(half[i]!.from.x).toBeCloseTo(full[i]!.from.x, 6);
+    }
+  });
+
+  /** Everything else comes up with it too: the wash, the line, the motes, the label. */
+  it('brings the whole layer up together', () => {
+    const half = drawn([side({ closing: 300 * METRE, presence: 0.5 })]);
+    const full = drawn([side({ closing: 300 * METRE, presence: 1 })]);
+    const solid = (it: typeof half) => it.lines.filter((l) => l.dash.length === 0)[0]!;
+    expect(alphaOf(solid(half).stroke)).toBeLessThan(alphaOf(solid(full).stroke));
+    expect(Math.max(...half.dots.map((d) => d.alpha))).toBeLessThan(
+      Math.max(...full.dots.map((d) => d.alpha)),
+    );
+    expect(half.words[0]!.alpha).toBeLessThan(full.words[0]!.alpha);
+    const lit = (it: typeof half) => alphaOf(it.gradients[0]!.stops[2]!.colour);
+    expect(lit(half)).toBeLessThan(lit(full));
+  });
+
+  /**
+   * And it is driven by where the **craft** is, over a real run — the picture and
+   * the ruling agreeing rather than the renderer being told a number by hand.
+   */
+  it('is absent for the majority of a real run', () => {
+    const field = fixtureField();
+    const craft = fixtureCraft();
+    const { centreline, halfWidth } = field.corridor;
+    let absent = 0;
+    let total = 0;
+    // Walk the craft across the whole corridor and count.
+    for (let x = centreline - halfWidth; x <= centreline + halfWidth; x += 10) {
+      craft.x = x;
+      for (const s of boundaryOf(field, craft)) {
+        total++;
+        if (s.presence === 0) absent++;
+      }
+    }
+    expect(absent / total).toBeGreaterThan(0.7);
   });
 });
 

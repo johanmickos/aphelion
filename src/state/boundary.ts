@@ -33,6 +33,7 @@
 import { METRE } from '../sim/units.ts';
 import type { Craft } from '../sim/craft.ts';
 import type { Field } from '../sim/types.ts';
+import { DESIGN_WIDTH } from './design.ts';
 import type { BoundarySideView } from './types.ts';
 
 /**
@@ -182,6 +183,90 @@ export const HEAT_EPSILON = 8 * METRE;
 export const CLOSING_CONSTANT = 640 * METRE;
 
 /**
+ * How far the craft has to be from the centreline before this side's boundary is
+ * drawn at all — **the default viewport's own edge**, and it is the author's
+ * ruling of 2026-09-01.
+ *
+ * ## The boundary being off screen is the design, not a defect
+ *
+ * M3.4 built the bands and measured that a phone shows 35% of the outer band,
+ * none of the fire band, and no line — and raised it. The author closed it the
+ * other way round:
+ *
+ * > *"I personally think it's a good thing to have the field wider than the
+ * > viewport. It opens up the room for ambiguity and exploration, so if a player
+ * > is zooming up the right hand side in the hot zone (because they're going fast
+ * > and there are no planets there), they might miss out on powerups or anomalies
+ * > on the other side. **The boundary SHOULD be off screen for majority of
+ * > play**, and the warning ion glow should only activate when they approach and
+ * > then learn that it's a danger zone. I don't want to signal danger during
+ * > normal gameplay, only when the ship is along the edge (outside of the default
+ * > viewport)."*
+ *
+ * So the corridor being wider than the picture is a **feature with a price** —
+ * what you give up by racing one wall is seeing the other — and it is spec 17's
+ * powerups and M8's anomaly that will make that price real. What had to change is
+ * that the boundary was drawing on every tick of every run: the gradient at the
+ * picture's edge is already down at α 0.0095 and invisible, but the **dashed band
+ * edge** sits 133 design units inside the picture and drew a pink dashed line
+ * down both sides of the screen for the whole of every run. That is signalling
+ * danger during normal gameplay, in the one channel spec 07 §2 says must not
+ * scale with heat.
+ *
+ * ## The number is the author's own words
+ *
+ * *"Outside of the default viewport"* is [`DESIGN_WIDTH`](./design.ts) — spec
+ * [00 · §7](../../docs/spec/00-tokens.md)'s contract, 1170 design units across,
+ * always — so half of it from the centreline. It is measured from the
+ * **centreline** and not from the camera on purpose: the camera does not pan
+ * today and the author has said it *"will need the camera shifts soon"*, and a
+ * gate written against the camera would silently change meaning the day it moves.
+ * This one does not.
+ */
+export const SHOWS_BEYOND = DESIGN_WIDTH / 2;
+
+/**
+ * How far past that the boundary takes to come fully up, in design units — **a
+ * fire band's depth**, and it is an opening position (`docs/spec/README.md`).
+ *
+ * A gate needs a ramp or it is a pop in the middle of the picture, which is the
+ * thing [`rungs.ts`](../render/rungs.ts)'s label fade exists to avoid one layer
+ * down. The author's ruling fixes where it *starts* and says nothing about how
+ * long it takes, so the length is anchored to the one piece of geometry spec 07
+ * already owns: the boundary comes up over [`FIRE_BAND`](#fire_band) of travel.
+ *
+ * In this corridor that puts it fully lit at 855 design units off the centreline,
+ * which is **257 from the line** against the fire band's own 270 — so the glow
+ * finishes arriving just as the craft enters the band it is warning about. That
+ * is a consequence of the two numbers rather than a third number chosen to make
+ * it happen, and in a narrower corridor it would land differently.
+ *
+ * It is on the bench, because *"only when the ship is along the edge"* is a
+ * judgement about a moving picture and this is the number that decides how
+ * abruptly it arrives.
+ */
+export const SHOWS_OVER = FIRE_BAND;
+
+/**
+ * How far up this side's boundary has come, 0 to 1.
+ *
+ * **Zero is a real absence and not a small presence** — `CONTEXT.md`'s **decay**
+ * rules that *"a thing that is over is absent"*, and the renderer draws nothing
+ * at all at zero, so the cost of the layer goes with the layer exactly as the
+ * rungs' switched-off bow does.
+ *
+ * Measured **toward this side from the centreline**, so the two sides come up
+ * independently: a craft racing the right wall lights the right boundary and
+ * leaves the left one absent, which is the author's own picture of it.
+ */
+export function presenceOf(craftX: number, centreline: number, inward: 1 | -1): number {
+  const toward = (craftX - centreline) * -inward;
+  if (toward <= SHOWS_BEYOND) return 0;
+  if (toward >= SHOWS_BEYOND + SHOWS_OVER) return 1;
+  return (toward - SHOWS_BEYOND) / SHOWS_OVER;
+}
+
+/**
  * Spec 07 §3's heat, from a closing speed and a distance to the line.
  *
  * ```
@@ -297,7 +382,10 @@ export function shelters(at: readonly Shelter[], x: number, y: number): boolean 
 export function boundaryOf(field: Field, craft: Craft): readonly BoundarySideView[] {
   const { centreline, halfWidth } = field.corridor;
   if (!hasBoundary(halfWidth)) return [];
-  return [sideOf(centreline - halfWidth, 1, craft), sideOf(centreline + halfWidth, -1, craft)];
+  return [
+    sideOf(centreline - halfWidth, 1, centreline, craft),
+    sideOf(centreline + halfWidth, -1, centreline, craft),
+  ];
 }
 
 /**
@@ -308,7 +396,7 @@ export function boundaryOf(field: Field, craft: Craft): readonly BoundarySideVie
  * displacement from the line measured inward, and the closing speed is the rate
  * that distance is **falling** at, clamped at ≥ 0 by spec 07 §3.
  */
-function sideOf(line: number, inward: 1 | -1, craft: Craft): BoundarySideView {
+function sideOf(line: number, inward: 1 | -1, centreline: number, craft: Craft): BoundarySideView {
   const away = (craft.x - line) * inward;
   const closing = Math.max(0, -craft.vx * inward);
   return {
@@ -317,6 +405,9 @@ function sideOf(line: number, inward: 1 | -1, craft: Craft): BoundarySideView {
     away,
     closing,
     heat: heatOf(closing, away),
+    // How far up the boundary has come — the author's ruling of 2026-09-01, and
+    // a channel of its own beside the heat. See [`SHOWS_BEYOND`](#shows_beyond).
+    presence: presenceOf(craft.x, centreline, inward),
     // False everywhere today — see [`SHELTERS`](#shelters). It is read here
     // rather than in the renderer so that the colour is a fact the picture is
     // handed, like every other one (ADR-0006).

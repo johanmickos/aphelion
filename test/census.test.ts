@@ -159,29 +159,44 @@ describe('the draw census', () => {
   });
 
   /**
-   * **The boundary is in every frame**, and the two things it adds are the two
-   * the census can see: a linear gradient per side, and the motes and lines drawn
-   * over it.
+   * **The boundary is absent for the great majority of play, and that is the
+   * ruling rather than an accident** — the author, 2026-09-01: *"the boundary
+   * SHOULD be off screen for majority of play... I don't want to signal danger
+   * during normal gameplay, only when the ship is along the edge."*
    *
-   * It is asserted at the design space's own size, which is the phone's case —
-   * spec 00 §7 makes the width the contract, so the census's canvas sees exactly
-   * what a phone sees: a third of the outer band and none of the fire band. That
-   * is the number that matters, and it is the reason the wash is clipped to the
-   * picture rather than painted across the whole band: measured, that was **1.13
-   * screens a frame** of blended area against the 0.23 actually visible.
+   * Measured here rather than asserted as an intent: over the author's own 18
+   * replayable dispatches the boundary draws on **3.4% of frames**, and over the
+   * shipped run — which dies out of bounds, so it does go to the wall — on 8.8%.
+   *
+   * The census is the right place for it because *absent* has to mean **nothing
+   * asked of the canvas**, not a gradient at alpha zero. A dimmed layer would pass
+   * an eye test and cost the phone the same.
    */
-  it("sees the boundary on every frame, at a phone's share of it", () => {
-    // Frames with no anomaly on them, so what `blended` holds is the buffer's own
-    // VOID fill and the boundary's wash and nothing else.
+  it('asks the canvas for nothing at all while the craft is in the field', () => {
+    // Clear of the anomaly, so what `blended` holds is the buffer's own VOID fill
+    // and the boundary's wash and nothing else — the anomaly blends thirteen
+    // screens and would swamp a fifth of one.
     const clear = RUN.filter((view) => (view.anomaly?.warmth ?? 0) === 0);
-    expect(clear.length).toBeGreaterThan(50);
-    const into = tally(clear);
-    // Two sides, one gradient each, on every frame — never one, and never none.
-    expect(into.gradients).toBeGreaterThanOrEqual(clear.length * 2);
-    // One screen of VOID plus a fifth of a screen of wash. The ceiling is what
-    // fails if the clip is ever dropped: the whole band is 1.13 screens.
-    const wash = into.blended / clear.length / (1170 * 2532) - 1;
-    expect(wash).toBeGreaterThan(0.1);
+    const away = clear.filter((view) => view.boundary.every((side) => side.presence === 0));
+    const out = clear.filter((view) => view.boundary.some((side) => side.presence > 0));
+    // The great majority of a run is spent nowhere near a wall.
+    expect(away.length).toBeGreaterThan(clear.length * 0.8);
+    expect(out.length).toBeGreaterThan(50);
+
+    const screens = (of: Census, over: readonly unknown[]): number =>
+      of.blended / over.length / (1170 * 2532);
+
+    // **Away from a wall the boundary adds nothing at all** — one screen of VOID
+    // and not a unit more. This is the assertion the ruling actually needs: a
+    // layer dimmed to alpha zero would pass an eye test and cost the phone the
+    // same.
+    expect(screens(tally(away), away)).toBeLessThan(1.01);
+
+    // At a wall it is a ninth of a screen — one side's wash, clipped to the
+    // picture. The ceiling is what fails if the clip is ever dropped, because the
+    // whole band unclipped is 1.13 screens.
+    const wash = screens(tally(out), out) - 1;
+    expect(wash).toBeGreaterThan(0.02);
     expect(wash).toBeLessThan(0.5);
   });
 

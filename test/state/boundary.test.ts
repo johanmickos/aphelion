@@ -19,6 +19,7 @@ import { openRun, replayRun } from '../../src/sim/replay.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import { parseDispatch } from '../../tools/dispatch.ts';
+import { DESIGN_WIDTH } from '../../src/state/design.ts';
 import {
   CLOSING_CONSTANT,
   FIRE_BAND,
@@ -26,10 +27,13 @@ import {
   HEAT_FLOOR,
   OUTER_BAND,
   SHELTERS,
+  SHOWS_BEYOND,
+  SHOWS_OVER,
   bandAt,
   boundaryOf,
   hasBoundary,
   heatOf,
+  presenceOf,
   shelters,
 } from '../../src/state/boundary.ts';
 
@@ -233,6 +237,78 @@ describe('both sides, always', () => {
     expect(boundaryOf(unbounded, craft)).toHaveLength(0);
   });
 });
+
+describe('presence — the boundary is absent during normal play', () => {
+  /**
+   * **The author's ruling, 2026-09-01**: *"The boundary SHOULD be off screen for
+   * majority of play, and the warning ion glow should only activate when they
+   * approach... I don't want to signal danger during normal gameplay, only when
+   * the ship is along the edge (outside of the default viewport)."*
+   *
+   * The default viewport is spec 00 §7's contract — 1170 design units across,
+   * always — so the gate is half of it from the centreline, and it is a **real
+   * absence**: the renderer draws nothing at zero.
+   */
+  it('is absent anywhere inside the default viewport', () => {
+    for (const inward of [1, -1] as const) {
+      for (const at of [0, 100, 400, SHOWS_BEYOND - 1, SHOWS_BEYOND]) {
+        expect(presenceOf(CENTRELINE + at, CENTRELINE, inward)).toBe(0);
+        expect(presenceOf(CENTRELINE - at, CENTRELINE, inward)).toBe(0);
+      }
+    }
+    expect(SHOWS_BEYOND).toBe(DESIGN_WIDTH / 2);
+  });
+
+  it('comes up as the craft goes out past it, and stops at one', () => {
+    // The right line, with the craft going right.
+    const right = (at: number) => presenceOf(CENTRELINE + at, CENTRELINE, -1);
+    expect(right(SHOWS_BEYOND)).toBe(0);
+    expect(right(SHOWS_BEYOND + SHOWS_OVER / 2)).toBeCloseTo(0.5, 6);
+    expect(right(SHOWS_BEYOND + SHOWS_OVER)).toBe(1);
+    expect(right(SHOWS_BEYOND + SHOWS_OVER * 10)).toBe(1);
+    // Monotone all the way out, so it never dips back on the approach.
+    let last = -1;
+    for (let at = 0; at < SHOWS_BEYOND + SHOWS_OVER * 2; at += 10) {
+      const now = right(at);
+      expect(now).toBeGreaterThanOrEqual(last);
+      last = now;
+    }
+  });
+
+  /**
+   * *"If a player is zooming up the right hand side... they might miss out on
+   * powerups or anomalies on the other side."* The two sides come up
+   * independently, so racing one wall lights that one and leaves the other
+   * absent — which is the picture the ruling describes.
+   */
+  it('lights the side the craft is on and not the other', () => {
+    const out = SHOWS_BEYOND + SHOWS_OVER;
+    expect(presenceOf(CENTRELINE + out, CENTRELINE, -1)).toBe(1);
+    expect(presenceOf(CENTRELINE + out, CENTRELINE, 1)).toBe(0);
+    expect(presenceOf(CENTRELINE - out, CENTRELINE, 1)).toBe(1);
+    expect(presenceOf(CENTRELINE - out, CENTRELINE, -1)).toBe(0);
+  });
+
+  /**
+   * The gate is measured from the **centreline** and not from the camera, which
+   * is what makes it survive the camera panning — the author has said that is
+   * coming. A gate written against the camera would silently change meaning on
+   * the day it moves.
+   */
+  it('is fully up about where the fire band starts', () => {
+    const field = fixtureField();
+    const { centreline, halfWidth } = field.corridor;
+    const full = centreline + SHOWS_BEYOND + SHOWS_OVER;
+    const away = halfWidth - (full - centreline);
+    // 257 design units from the line against the fire band's own 270 — the glow
+    // finishes arriving just as the craft enters the band it warns about.
+    expect(away).toBeLessThan(FIRE_BAND);
+    expect(away).toBeGreaterThan(FIRE_BAND * 0.9);
+  });
+});
+
+/** Where the fixture field's centreline stands, which the gate is measured from. */
+const CENTRELINE = fixtureField().corridor.centreline;
 
 describe('the shelter', () => {
   /**

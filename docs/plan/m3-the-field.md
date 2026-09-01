@@ -1006,11 +1006,23 @@ everything the canvas is actually asked for is asserted in `test/render/bands.te
 **Nothing here moved `SIM_VERSION` or `FIXTURE_FIELD_VERSION`.** The line has killed since M1.4;
 this is the picture of it.
 
-#### **The one that needs the author: on a phone the boundary is nearly all off screen**
+#### **Ruled, 2026-09-01: the boundary is off screen on purpose, and it stays absent until you go out**
 
-Spec [00 · §7](../spec/00-tokens.md) rules that **the width is the contract** — 1170 design units
-across, always — so a phone in portrait gets the design space's exact width and no horizontal bleed.
-The corridor is 1.9× that. Measured against the fixture field, off the centreline:
+M3.4 measured that a phone shows 35% of the outer band, none of the fire band, and no line, and
+raised it as the author's. **The author closed it the other way round** — the geometry is right and
+what was wrong was that the boundary drew at all:
+
+> *"I personally think it's a good thing to have the field wider than the viewport. It opens up the
+> room for ambiguity and exploration, so if a player is zooming up the right hand side in the hot
+> zone (because they're going fast and there are no planets there), they might miss out on powerups
+> or anomalies on the other side. **The boundary SHOULD be off screen for majority of play**, and the
+> warning ion glow should only activate when they approach and then learn that it's a danger zone. I
+> don't want to signal danger during normal gameplay, only when the ship is along the edge (outside
+> of the default viewport)."*
+
+So the corridor being wider than the picture is a **feature with a price** — what you give up by
+racing one wall is seeing the other — and spec 17's powerups and M8's anomaly are what will make that
+price real. The geometry stands exactly as spec 07 states it:
 
 | | design units | metres |
 |---|---|---|
@@ -1019,21 +1031,29 @@ The corridor is 1.9× that. Measured against the fixture field, off the centreli
 | fire band starts (line − 90 m) | 842 | 281 |
 | **the line** | **1112** | 370 |
 
-So **34% of the outer band is visible, 0% of the fire band is, and the line sits 527 design units —
-176 m — outside the picture**, on every tick of every run, because the camera does not pan sideways.
-A desktop window at 1440 × 900 shows all of it, **which is why the bench has never shown this.**
+**What was actually signalling was the dashed band edge, not the glow.** At the picture's edge the
+gradient is down at **α 0.0095** and invisible; the dash at `line − 220 m` sits 133 design units
+inside the picture at **α 0.25**, does not scale with heat by spec 07 §2's own rule, and therefore
+drew a pink dashed line down both sides of the screen for the whole of every run. That is why the
+gate reaches the whole layer and not the gradient alone.
 
-**Nothing was moved to compensate**, because every candidate answer spends something that belongs to
-somebody else: widening the bands is spec 07 §2's geometry and spec 17 §4's corridor against a metre
-spec 05 §3's notice settled by argument; panning the camera is parked and is M8's dependency;
-narrowing the corridor has a written argument for why it is the narrowest this field can be flown in;
-and drawing at the screen edge is what §2 refuses in the same sentence it states the bands.
+**The gate is `presenceOf`**, and it is the author's own words as arithmetic: zero while the craft is
+inside the default viewport (spec 00 §7's 1170, so 585 from the centreline), ramping up over a fire
+band's depth of travel. It is measured from the **centreline and not from the camera**, deliberately
+— the author has said *"we'll need the camera shifts soon"*, and a gate written against the camera
+would silently change meaning the day it pans. The two sides come up independently, so racing the
+right wall lights the right boundary and leaves the left absent.
 
-What a phone *does* get is the outer band's inner edge and the first third of its gradient — which is
-the *"warning that there is more"* reading, delivered for free by building at the spec's own
-geometry. **Whether that is the whole answer is the author's**, and building it unchanged is the only
-answer that leaves every door open. `test/render/bands.test.ts` holds the table, so whatever is ruled
-fails there first.
+Measured: the boundary now draws on **3.4% of frames** over the author's own 18 replayable
+dispatches, and on 8.8% of the shipped run — which dies out of bounds, so it does go to the wall.
+Fully lit lands at 257 design units from the line against the fire band's own 270, so the glow
+finishes arriving just as the craft enters the band it is warning about.
+
+**And absent means nothing asked of the canvas**, not a layer at alpha zero — `CONTEXT.md`'s decay
+rule, and the difference the phone actually pays. Clear of the anomaly, a frame away from a wall
+blends **1.0009 screens**, which is the buffer's own VOID fill and not a unit more; at a wall it is
+1.115. `test/census.test.ts` holds both, because a dimmed layer would pass an eye test and cost the
+same.
 
 #### `K` is 640 m/s, and the board's own 120 could not cross
 

@@ -310,6 +310,14 @@ export function drawBoundary(
   const bottom = seen.bottom + camera.y - DESIGN_HEIGHT / 2;
 
   for (const side of boundary) {
+    // **Absent until the craft goes out to the wall** — the author's ruling of
+    // 2026-09-01, and `CONTEXT.md`'s decay rule that *"a thing that is over is
+    // absent"*. Nothing is drawn at all, so the cost of the layer goes with the
+    // layer, which is the same shape the rungs' switched-off bow is in. It is the
+    // first test rather than an alpha of zero for exactly that reason: on a phone
+    // this is the state for the majority of every run.
+    if (side.presence <= 0) continue;
+
     // The band the craft is not near is still drawn, and still at its own heat —
     // but a side whose whole boundary is off the picture is nothing to draw at
     // all. On a phone this is never true and on a wide window it is never true;
@@ -356,9 +364,9 @@ function wash(
   // within eight board pixels — see [`WASH_AT_FIRE`](#wash_at_fire).
   gradient.addColorStop(
     (OUTER_BAND - FIRE_BAND) / OUTER_BAND,
-    dim(token, side.heat * WASH_AT_FIRE),
+    dim(token, side.heat * WASH_AT_FIRE * side.presence),
   );
-  gradient.addColorStop(1, dim(token, side.heat * WASH_AT_LINE));
+  gradient.addColorStop(1, dim(token, side.heat * WASH_AT_LINE * side.presence));
   context.save();
   context.fillStyle = gradient;
   // **The ramp is pinned to the line and the paint is clipped to the picture**,
@@ -397,7 +405,7 @@ function edges(
     [FIRE_BAND, EDGE_AT_FIRE],
   ] as const) {
     const x = side.line + depth * side.inward;
-    context.strokeStyle = dim(token, alpha);
+    context.strokeStyle = dim(token, alpha * side.presence);
     context.beginPath();
     context.moveTo(x, top);
     context.lineTo(x, bottom);
@@ -417,7 +425,10 @@ function stroke(
 ): void {
   context.save();
   context.lineWidth = LINE_WIDTH;
-  context.strokeStyle = dim(token, LINE_AT_REST + LINE_AT_HEAT * (side.heat / HEAT_CAP));
+  context.strokeStyle = dim(
+    token,
+    (LINE_AT_REST + LINE_AT_HEAT * (side.heat / HEAT_CAP)) * side.presence,
+  );
   context.beginPath();
   context.moveTo(side.line, top);
   context.lineTo(side.line, bottom);
@@ -445,7 +456,7 @@ function scatter(
   right: number,
 ): void {
   // Lit from a floor rather than from nothing — see [`MOTE_AT_REST`](#mote_at_rest).
-  const lit = MOTE_AT_REST + (1 - MOTE_AT_REST) * (side.heat / HEAT_CAP);
+  const lit = (MOTE_AT_REST + (1 - MOTE_AT_REST) * (side.heat / HEAT_CAP)) * side.presence;
   context.save();
   for (const band of [2, 3] as const) {
     const field = band === 3 ? motes.fire : motes.outer;

@@ -1017,6 +1017,21 @@ export interface BoundarySideView {
    */
   readonly heat: number;
   /**
+   * How far up this side's boundary has come, 0 to 1 — **a channel of its own,
+   * beside the heat**, and the author's ruling of 2026-09-01.
+   *
+   * *"The boundary SHOULD be off screen for majority of play, and the warning ion
+   * glow should only activate when they approach... I don't want to signal danger
+   * during normal gameplay, only when the ship is along the edge (outside of the
+   * default viewport)."* So the **heat** says how hard the craft is diving at this
+   * line and this says whether the line is part of the conversation at all —
+   * absent while the craft flies the field, arriving as it goes out to the wall.
+   *
+   * **Zero is a real absence**: the renderer draws nothing at all, so the cost of
+   * the layer goes with the layer. See [`presenceOf`](./boundary.ts).
+   */
+  readonly presence: number;
+  /**
    * Whether a **shelter** suspends the line here — **false everywhere today.**
    *
    * Spec [05 · §5](../../docs/spec/05-field.md), ruled 2026-09-01: inside one

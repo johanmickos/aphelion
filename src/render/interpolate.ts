@@ -230,6 +230,9 @@ function boundaryBetween(
       away: between(before.away, side.away, alpha),
       closing: between(before.closing, side.closing, alpha),
       heat: between(before.heat, side.heat, alpha),
+      // Crossed for the same reason `heat` is: it multiplies everything the edge
+      // draws, so a step in it at the tick rate is a step across the whole layer.
+      presence: between(before.presence, side.presence, alpha),
     };
   });
 }
