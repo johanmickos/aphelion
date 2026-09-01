@@ -137,6 +137,54 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
+#### ⚠ Flown and corrected the same day — the drawing was invented and should not have been
+
+The author flew the first build and sent three:
+
+> *"The warning line seems to draw, disappear, and draw again as I'm traveling. It's also really long,
+> impacting my normal playing field. I feel like it should only appear, and NOT MOVE, along my
+> trajectory and closer to the boundary. Within the main playfield I almost always have an
+> opportunity to save myself, so the bright red line is not helpful. This is again something the
+> original prototype gets right."*
+
+**The cause of all three is one mistake**: the prototype's `src/sim/rescue.ts` was carried and its
+`src/render/deadline.ts` — 437 lines of exactly this problem — was never opened. The prediction was
+right and the drawing was invented.
+
+**1 · The flicker was a bug of mine.** The scan is re-run every `RESTATE_TICKS` for ADR-0015's
+convergence, and the first build reset the mark's fade on *every* re-run — so the cue faded out and
+back in twice a second whether or not anything had changed. A re-scan that finds the same mark is not
+a new mark. Measured over the shipped run after: **4 episodes, 8 on/off transitions**, where before
+an episode of 78 ticks flickered through two or three of its own.
+
+**2 · The length is answered by weight, not by a shorter line.** The prototype's track also reaches
+the craft, and it records why it stopped clamping instead: *"the cross first appears a median 375px
+away and 772px at p75, so a 150px clamp drew a segment sitting a quarter of a screen ahead of the
+ship, touching nothing."* What it does is put the weight where the decision is — a **hairline** until
+`ARM` (150 of its units) from the cross, swelling to the track and then to a lead-in over the last
+46. *"The far end carries the connection and nothing else; the weight is all in the stretch with a
+decision in it."* Measured, a track here runs **p50 732 and up to 2 277 design units** against a
+1 170-wide picture, and all but the last 450 of it is now 1.3 units wide at α 0.12.
+
+**3 · And the cue is ramped on the *lead*** — invisible past 2.63 s, full inside 1.35 s — so it is a
+property of how close the decision is rather than of whether a wall is findable at all. ⚠ With a 6 s
+horizon that ramp **rarely binds**, because the cross is the *last* saving point and so sits near the
+wall: measured, the lead reaches only **2.03 s at most** over the shipped run. It is built because it
+is the rule, and it is the thing that would bind if the horizon were raised.
+
+Also carried: the **birth gate** (`MIN_LEAD_SECONDS` 0.25 — *"a cross that appears with less lead than
+a person can react in… would be a red blink and nothing else"*, and a birth gate rather than a live
+one, because re-testing it *"would blink it out at the moment the player is closest to it"*), and
+`DEAD` 0.18 for the stretches that do not save — present, because the gaps are part of the shape, and
+faint, because they are not the offer.
+
+The whole cue is behind one `OVERALL` alpha, which is the prototype's own arrangement: *"all three are
+fractions of `deadlineAlpha`, so the cue has ONE overall."* Turning the deadline down is one edit.
+
+**Measured after**: the deadline is drawn on **3.1% of ticks** of the shipped run, which matches the
+prototype's own finding that the cue is short-lived *"because it works, not because it flickers"* —
+74% of its episodes end because the player pressed.
+
 #### ⚠ The deadline and the SOS are built, 2026-09-01 — scoped in a grilling session
 
 The conversation below is closed. What was built is the shape it arrived at, plus the prototype's,

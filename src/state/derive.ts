@@ -286,7 +286,7 @@ function present(
     // The **deadline**, re-scanned only when the drift changes — a coasting
     // craft's heading is constant on 99.92% of ticks, so the scan belongs to the
     // coast rather than to the frame ([`deadline.ts`](./deadline.ts)).
-    deadline: deadlineView(rescue),
+    deadline: deadlineView(rescue, sim),
     sos: sosOf(rescue, sim),
     rescue,
   };

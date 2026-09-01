@@ -111,6 +111,19 @@ export const MAX_SAMPLES = 40;
  */
 export const RESCUE_BUDGET = 360;
 
+/**
+ * How much lead a mark must have to be born at all, in seconds — the prototype's
+ * **0.25**.
+ *
+ * *"A cross that appears with less lead than a person can react in cannot inform
+ * the press it is asking for... so it would be a red blink and nothing else."*
+ *
+ * **A birth gate and not a live one**, which is the half that matters: once a mark
+ * exists it stays through its own arrival, because *"re-testing every observation
+ * would blink it out at the moment the player is closest to it."*
+ */
+export const MIN_LEAD_SECONDS = 0.25;
+
 /** One sample of the scan: a place on the drift, and whether a press there saves. */
 export interface DeadlineSample {
   readonly x: number;
@@ -140,6 +153,15 @@ export interface Deadline {
    * [`rescueDeadline`](#rescuedeadline).
    */
   readonly cross: { readonly x: number; readonly y: number } | null;
+  /**
+   * How many ticks from the craft to the cross, at the moment of the scan.
+   *
+   * The whole of what decides whether the mark is **drawn**: the prototype ramps
+   * its alpha on the *lead* rather than on distance, so a cross four seconds ahead
+   * is invisible and one a second ahead is at full strength. That is what keeps
+   * the cue out of the middle of the field — see `deadline.ts`.
+   */
+  readonly leadTicks: number;
 }
 
 /**
@@ -300,6 +322,7 @@ export function rescueDeadline(state: SimState): Deadline | null {
   // Walked forward rather than bisected, because the gap is one stride and a
   // bisection would need a clone of every tick to index into.
   let cross: Deadline['cross'] = null;
+  let leadTicks = 0;
   if (lastSaving !== null) {
     let best = lastSaving;
     const probe = clone(lastSaving);
@@ -309,6 +332,15 @@ export function rescueDeadline(state: SimState): Deadline | null {
       best = clone(probe);
     }
     cross = { x: best.craft.x, y: best.craft.y };
+    leadTicks = best.tick - state.tick;
   }
-  return { wall, path, cross };
+  // **The birth gate.** A mark with less lead than a person can react in is a
+  // blink rather than a cue, and with nothing left behind it says nothing at all.
+  // It is refused as a *cross* rather than as a whole deadline, because the drift
+  // is still heading out and the SOS still has to know.
+  if (cross !== null && leadTicks < MIN_LEAD_SECONDS / SECONDS_PER_TICK) {
+    cross = null;
+    leadTicks = 0;
+  }
+  return { wall, path, cross, leadTicks };
 }

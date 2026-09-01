@@ -10,7 +10,6 @@
  * `test/sim/rescue.test.ts` and `test/state/deadline.test.ts`, without a canvas.
  */
 import { describe, expect, it } from 'vitest';
-import { BOARD_PIXEL } from '../../src/state/design.ts';
 import type { CraftView, DeadlineView, SosView } from '../../src/state/types.ts';
 import { UNDEFORMED } from '../../src/state/deformation.ts';
 import { ION } from '../../src/render/palette.ts';
@@ -112,9 +111,14 @@ function recorder() {
 
 /** A track with `saves` laid out along a straight line, for readability. */
 function track(saves: readonly boolean[], over: Partial<DeadlineView> = {}): DeadlineView {
+  const last = Math.max(0, saves.lastIndexOf(true));
   return {
-    path: saves.map((s, at) => ({ x: 100 + at * 50, y: 200, saves: s })),
-    cross: saves.lastIndexOf(true) < 0 ? null : { x: 100 + saves.lastIndexOf(true) * 50, y: 200 },
+    // Laid out inside the lead-in, so the samples are all in the loud stretch and
+    // a test can see what it is asserting about. The profile itself is asserted
+    // over a long track further down.
+    path: saves.map((s, at) => ({ x: 100 + at * 20, y: 200, saves: s })),
+    cross: { x: 100 + last * 20, y: 200 },
+    lead: 0.5,
     presence: 1,
     affordable: 1,
     ...over,
@@ -141,78 +145,90 @@ function drawn(view: DeadlineView) {
 const alphaOf = (colour: string): number => parseInt(colour.slice(7, 9), 16) / 255;
 const tokenOf = (colour: string): string => colour.slice(0, 7).toUpperCase();
 
-describe('the windows', () => {
+describe('the track', () => {
   /**
-   * **Every window, which is the author's ruling of 2026-09-01.** The saveable
-   * stretch has gaps in it — measured, 8% of doomed drifts hold more than one as a
-   * second body comes into range — and drawing only the last would tell a player
-   * who *can* save that the chance is still ahead of them.
+   * ⚠ **The weight goes where the decision is** (author, 2026-09-01): *"it's
+   * really long, impacting my normal playing field... it should only appear
+   * closer to the boundary."*
+   *
+   * The prototype's answer, and it is not a shorter line: the track still reaches
+   * the craft, because *"a 150px clamp drew a segment sitting a quarter of a
+   * screen ahead of the ship, touching nothing"* — but it is a **hairline** until
+   * it is near the cross. Asserted as the profile, over a track long enough to
+   * have both ends in it.
    */
-  it('draws one thick stretch per saveable run, not one for the lot', () => {
-    const thick = (saves: boolean[]) =>
-      drawn(track(saves)).lines.filter((l) => l.width > 2 * BOARD_PIXEL);
-    expect(thick([true, true, false, false])).toHaveLength(1);
-    expect(thick([true, true, false, true, true])).toHaveLength(2);
-    expect(thick([true, false, true, false, true])).toHaveLength(3);
-    expect(thick([false, false, false])).toHaveLength(0);
+  it('is a hairline far from the dot and thickens into it', () => {
+    const far = track(new Array<boolean>(40).fill(true));
+    // Spread the samples so the track is much longer than the arm.
+    const long: DeadlineView = {
+      ...far,
+      path: far.path.map((p, at) => ({ ...p, x: 100 + at * 60 })),
+      cross: { x: 100 + 39 * 60, y: 200 },
+    };
+    const it = drawn(long);
+    const first = it.lines[0]!;
+    const last = it.lines[it.lines.length - 1]!;
+    expect(last.width).toBeGreaterThan(first.width * 1.5);
+    expect(alphaOf(last.stroke)).toBeGreaterThan(alphaOf(first.stroke) * 1.5);
+    // And the far end is still drawn — it is the connection to the craft.
+    expect(first.width).toBeGreaterThan(0);
+    expect(alphaOf(first.stroke)).toBeGreaterThan(0);
   });
 
-  it('draws each window across the stretch that actually saves', () => {
-    const it = drawn(track([false, true, true, false]));
-    const thick = it.lines.filter((l) => l.width > 2 * BOARD_PIXEL);
-    expect(thick).toHaveLength(1);
-    // The samples at index 1 and 2, which is x 150 to 200.
-    expect(thick[0]!.from.x).toBeCloseTo(150, 6);
-    expect(thick[0]!.to.x).toBeCloseTo(200, 6);
+  /**
+   * The gaps are drawn, faintly. They are part of the shape — the saveable stretch
+   * has holes in it — but they are not the offer.
+   */
+  it('draws the stretches that save brighter than the gaps between them', () => {
+    const it = drawn(track([true, true, false, false, true, true]));
+    const bright = it.lines.filter((l) => alphaOf(l.stroke) > 0.1);
+    const faint = it.lines.filter((l) => alphaOf(l.stroke) <= 0.1);
+    expect(bright.length).toBeGreaterThan(0);
+    expect(faint.length).toBeGreaterThan(0);
+    expect(Math.min(...bright.map((l) => alphaOf(l.stroke)))).toBeGreaterThan(
+      Math.max(...faint.map((l) => alphaOf(l.stroke))),
+    );
   });
 
-  /**
-   * ⚠ **Nothing is dashed** (author, 2026-09-01). Spec 03 §5 puts a dashed line
-   * past the dot — *"the future thins out"* — and it is refused with the dashes
-   * that were on the bands. Past the dot the track goes out and the SOS takes
-   * over.
-   */
-  it('draws nothing dashed, and nothing past the dot', () => {
+  /** It stops at the dot: the stretch past the last saving press is not a decision. */
+  it('draws nothing past the dot', () => {
     const it = drawn(track([true, true, false, false, false]));
-    for (const line of it.lines) expect(line.dash).toHaveLength(0);
-    const dot = it.dots[0]!;
     for (const line of it.lines) {
-      expect(Math.max(line.from.x, line.to.x)).toBeLessThanOrEqual(dot.x + 1e-6);
+      expect(Math.max(line.from.x, line.to.x)).toBeLessThanOrEqual(it.dots[0]!.x + 1e-6);
     }
   });
 
   /**
-   * And **no rescue path**. The prototype draws the escape swing its mark is
-   * offering; the author refused the same shape one instrument along on the same
-   * day — *"we should not show the oval orbit like this when it's not the true
-   * ship trajectory."* A rescue path is a predicted orbit for a press nobody has
-   * made.
+   * ⚠ **Nothing is dashed** (author, 2026-09-01). Spec 03 §5 puts a dashed line
+   * past the dot — refused with the dashes that were on the bands.
+   */
+  it('draws nothing dashed', () => {
+    for (const line of drawn(track([true, true, false])).lines) {
+      expect(line.dash).toHaveLength(0);
+    }
+  });
+
+  /**
+   * And **no rescue path**. The prototype draws the escape swing its mark offers;
+   * the author refused the same shape one instrument along on the same day.
    */
   it('draws no predicted orbit of any kind', () => {
-    const it = drawn(track([true, true, false]));
-    // One dot and nothing else curved; no gradients, which is what a bloom or a
-    // halo would need.
-    expect(it.dots).toHaveLength(1);
-    expect(it.gradients).toHaveLength(0);
+    expect(drawn(track([true, true, false])).gradients).toHaveLength(0);
   });
 });
 
 describe('the dot', () => {
-  it('sits at the far end of the last window', () => {
+  it('sits at the far end of the last saving stretch', () => {
     const it = drawn(track([true, false, true, true, false]));
-    expect(it.dots).toHaveLength(1);
-    expect(it.dots[0]!.x).toBeCloseTo(100 + 3 * 50, 6);
+    // A filled core inside a ring, so it reads as a place rather than a blob.
+    expect(it.dots.length).toBeGreaterThan(0);
+    for (const dot of it.dots) expect(dot.x).toBeCloseTo(100 + 3 * 20, 6);
     expect(tokenOf(it.dots[0]!.fill)).toBe(ION.toUpperCase());
-  });
-
-  it('is absent when nothing saves', () => {
-    expect(drawn(track([false, false, false])).dots).toHaveLength(0);
   });
 });
 
 describe('the fade', () => {
-  /** Spec 03 §5's 300ms, and nothing at all at zero. */
-  it('draws nothing at all before it has faded in', () => {
+  it('draws nothing at all before it has come up', () => {
     const it = drawn(track([true, true, false], { presence: 0 }));
     expect(it.lines).toHaveLength(0);
     expect(it.dots).toHaveLength(0);
@@ -221,8 +237,7 @@ describe('the fade', () => {
   it('brings the whole track up together', () => {
     const half = drawn(track([true, true, false], { presence: 0.5 }));
     const full = drawn(track([true, true, false], { presence: 1 }));
-    const thick = (it: typeof half) => it.lines.filter((l) => l.width > 2 * BOARD_PIXEL)[0]!;
-    expect(alphaOf(thick(half).stroke)).toBeLessThan(alphaOf(thick(full).stroke));
+    expect(alphaOf(half.lines[0]!.stroke)).toBeLessThan(alphaOf(full.lines[0]!.stroke));
     expect(half.dots[0]!.alpha).toBeLessThan(full.dots[0]!.alpha);
   });
 });
@@ -234,16 +249,20 @@ describe('the fuel coupling', () => {
    * ([`affordable`](../../src/state/types.ts) is 1), so it is asserted against a
    * hand-set value: what M4.4 changes must be a number, not this file.
    */
-  it('dims the part of a window the tank cannot afford, and moves nothing', () => {
-    const full = drawn(track([true, true, false]));
-    const empty = drawn(track([true, true, false], { affordable: 0 }));
-    const thick = (it: typeof full) => it.lines.filter((l) => l.width > 2 * BOARD_PIXEL);
-    expect(thick(full)).toHaveLength(1);
-    expect(thick(empty)).toHaveLength(1);
-    // Same geometry, dimmer ink.
-    expect(thick(empty)[0]!.from.x).toBeCloseTo(thick(full)[0]!.from.x, 6);
-    expect(thick(empty)[0]!.to.x).toBeCloseTo(thick(full)[0]!.to.x, 6);
-    expect(alphaOf(thick(empty)[0]!.stroke)).toBeLessThan(alphaOf(thick(full)[0]!.stroke));
+  it('dims what the tank cannot afford, and moves nothing', () => {
+    const full = drawn(track([true, true, true, true]));
+    const empty = drawn(track([true, true, true, true], { affordable: 0 }));
+    expect(empty.lines).toHaveLength(full.lines.length);
+    for (let at = 0; at < full.lines.length; at++) {
+      // Same geometry, dimmer ink.
+      expect(empty.lines[at]!.from.x).toBeCloseTo(full.lines[at]!.from.x, 6);
+      expect(empty.lines[at]!.width).toBeCloseTo(full.lines[at]!.width, 6);
+      expect(alphaOf(empty.lines[at]!.stroke)).toBeLessThanOrEqual(alphaOf(full.lines[at]!.stroke));
+    }
+    const dimmed = full.lines.filter(
+      (l, at) => alphaOf(empty.lines[at]!.stroke) < alphaOf(l.stroke),
+    );
+    expect(dimmed.length).toBeGreaterThan(0);
   });
 });
 

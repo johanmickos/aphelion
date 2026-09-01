@@ -25,11 +25,35 @@
 import { rescueDeadline, turnedAway } from '../sim/rescue.ts';
 import type { Deadline, Wall } from '../sim/rescue.ts';
 import type { SimState } from '../sim/types.ts';
+import { SECONDS_PER_TICK } from '../sim/units.ts';
 import { ticksIn } from './decay.ts';
 import type { DeadlineView, SosView } from './types.ts';
 
-/** Spec [03 · §5](../../docs/spec/03-hud.md)'s **300ms** fade-in, in ticks. */
-export const FADE_TICKS = ticksIn(300);
+/**
+ * How much lead the mark needs before it is drawn at all, in seconds, and how
+ * much before it is at full strength — the prototype's **2.63** and **1.35**.
+ *
+ * ## ⚠ This is what the author flew and refused, 2026-09-01
+ *
+ * > *"It's really long, impacting my normal playing field. I feel like it should
+ * > only appear... closer to the boundary. Within the main playfield I almost
+ * > always have an opportunity to save myself, so the bright red line is not
+ * > helpful."*
+ *
+ * The first build ramped only on spec 03 §5's 300 ms fade and then drew at full
+ * strength for as long as the projection could see a wall — six seconds of it,
+ * across the whole field. **The prototype ramps on the *lead* instead**, which is
+ * the thing the complaint is about: a cross more than 2.63 s ahead is invisible,
+ * one 1.35 s ahead is at full strength, and between them it comes up. So the cue
+ * is a property of *how close the decision is* rather than of whether a wall is
+ * findable at all, and the middle of the field stays empty because that is where
+ * a rescue is never in doubt.
+ *
+ * It replaces the 300 ms fade rather than joining it: two ramps on one alpha is
+ * two things that can disagree about whether the cue is up.
+ */
+export const FADE_IN_SECONDS = 2.63;
+export const FULL_SECONDS = 1.35;
 
 /**
  * How long a carried scan may go without being re-run, in ticks.
@@ -64,7 +88,16 @@ export interface DeadlineMemo {
   readonly vy: number;
   /** The tick it was run on, for [`RESTATE_TICKS`](#restate_ticks). */
   readonly at: number;
-  /** How many ticks it has been fading in for — spec 03 §5's 300ms. */
+  /**
+   * How many ticks the mark has existed for, so nothing pops into being.
+   *
+   * ⚠ It counts the **mark's own life** and not the scan's. The first build reset
+   * it on every re-scan, and since the scan is re-run every
+   * [`RESTATE_TICKS`](#restate_ticks) whether or not anything changed, the cue
+   * faded out and back in twice a second — *"the warning line seems to draw,
+   * disappear, and draw again as I'm traveling"* (author, 2026-09-01). A re-scan
+   * that finds the same mark is not a new mark.
+   */
   readonly shown: number;
   /**
    * The wall a **grab** armed the SOS about, or `null`.
@@ -115,12 +148,9 @@ export function deadlineOf(previous: DeadlineMemo, sim: SimState): DeadlineMemo 
   const stale = previous.at < 0 || sim.tick - previous.at >= RESTATE_TICKS;
   if (!stale && sameLine(previous, sim)) {
     // Carried. The scan's points are world points, so the craft advancing into
-    // them changes nothing about them — what moves is only how far in the fade is.
-    return {
-      ...previous,
-      shown: previous.deadline === null ? 0 : Math.min(FADE_TICKS, previous.shown + 1),
-      doomed,
-    };
+    // them changes nothing at all — which is what the author asked for: *"it
+    // should only appear, and NOT MOVE, along my trajectory."*
+    return { ...previous, shown: previous.shown + 1, doomed };
   }
   const deadline = rescueDeadline(sim);
   return {
@@ -128,13 +158,34 @@ export function deadlineOf(previous: DeadlineMemo, sim: SimState): DeadlineMemo 
     vx: sim.craft.vx,
     vy: sim.craft.vy,
     at: sim.tick,
-    // A fresh scan starts its fade from nothing, which is spec 03 §5's *"it fades
-    // in over 300ms"* — and is what stops a line that changes mid-drift snapping
-    // a new window onto the screen.
-    shown: 0,
+    // **The age survives a re-scan that finds the same mark**, and that is the
+    // whole of the flicker fix: the scan is re-run twice a second for convergence
+    // and a mark that started its life again each time faded out and back in.
+    // A mark is new when there was none, or when the one there has been passed —
+    // *"a mark that has been passed is not moved, it is replaced"*, which is the
+    // prototype's own note against a cross that jumped forward.
+    shown: sameMark(previous, deadline) ? previous.shown + 1 : 0,
     doomed,
   };
 }
+
+/**
+ * Whether this scan found the mark the last one did.
+ *
+ * By **place**, because that is what the player is looking at: a cross that has
+ * not moved is the same cross however many times it has been re-derived. The
+ * tolerance is a tick of drift at the fastest speed anything is flown at, so a
+ * refinement landing one tick either way does not restart a life.
+ */
+function sameMark(previous: DeadlineMemo, found: Deadline | null): boolean {
+  const was = previous.deadline?.cross ?? null;
+  const now = found?.cross ?? null;
+  if (was === null || now === null) return was === now;
+  return Math.abs(was.x - now.x) < SAME_MARK && Math.abs(was.y - now.y) < SAME_MARK;
+}
+
+/** How far a re-derived cross may land from the last one and still be the same one. */
+const SAME_MARK = 40;
 
 /**
  * Whether a **grab** has armed the SOS, and whether it still holds.
@@ -162,13 +213,17 @@ function doomOf(previous: DeadlineMemo, sim: SimState): Wall | null {
 }
 
 /** The deadline as the renderer is handed it, or `null` when there is none. */
-export function deadlineView(memo: DeadlineMemo): DeadlineView | null {
+export function deadlineView(memo: DeadlineMemo, sim: SimState): DeadlineView | null {
   const found = memo.deadline;
-  if (found === null) return null;
+  if (found === null || found.cross === null) return null;
+  // How long until the craft reaches the mark. The scan measured it once; what
+  // has happened since is simply that the craft has flown some of it.
+  const lead = (found.leadTicks - (sim.tick - memo.at)) * SECONDS_PER_TICK;
   return {
     path: found.path,
     cross: found.cross,
-    presence: FADE_TICKS <= 0 ? 1 : Math.min(1, memo.shown / FADE_TICKS),
+    lead,
+    presence: presenceAt(lead, memo.shown),
     // **A full tank, and it is a named zero in that shape.** Spec 03 §5 couples
     // fuel to this *"by luminance, never geometry"*, so M4.4 changes this number
     // and nothing else about the picture. Its neutral value is 1 rather than 0
@@ -176,6 +231,29 @@ export function deadlineView(memo: DeadlineMemo): DeadlineView | null {
     affordable: 1,
   };
 }
+
+/**
+ * How lit the cue is: **the lead decides it, and the mark's own age only stops it
+ * popping into being.**
+ *
+ * Full strength inside [`FULL_SECONDS`](#full_seconds), nothing beyond
+ * [`FADE_IN_SECONDS`](#fade_in_seconds), and the birth eased over the same rate so
+ * that a mark that appears already close does not arrive as a step. Past the mark
+ * the lead goes negative and the cue holds at full rather than climbing further —
+ * it is answering a question that is still being asked right up to the moment it
+ * is not.
+ */
+export function presenceAt(lead: number, shown: number): number {
+  const ramp =
+    lead <= FULL_SECONDS
+      ? 1
+      : Math.max(0, 1 - (lead - FULL_SECONDS) / (FADE_IN_SECONDS - FULL_SECONDS));
+  const born = Math.min(1, shown / BIRTH_TICKS);
+  return ramp * born;
+}
+
+/** How long a mark takes to arrive once it exists, in ticks — spec 03 §5's 300ms. */
+const BIRTH_TICKS = ticksIn(300);
 
 /**
  * The SOS as the renderer is handed it, or `null`.

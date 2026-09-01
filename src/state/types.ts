@@ -1088,9 +1088,22 @@ export interface DeadlineView {
    * second body comes into range.
    */
   readonly path: readonly { readonly x: number; readonly y: number; readonly saves: boolean }[];
-  /** The **dot**: the last place a press still saves, or `null` when none does. */
-  readonly cross: { readonly x: number; readonly y: number } | null;
-  /** How far in, 0 to 1 — spec [03 · §5](../../docs/spec/03-hud.md)'s 300ms fade. */
+  /**
+   * The **dot**: the last place a press still saves.
+   *
+   * Never `null` — a deadline with no cross is not drawn at all, it is the **SOS**.
+   */
+  readonly cross: { readonly x: number; readonly y: number };
+  /**
+   * How long until the craft reaches the dot, in seconds. Negative once past it.
+   *
+   * **The thing that decides whether any of this is on screen**, and the author's
+   * ruling of 2026-09-01: *"it should only appear... closer to the boundary.
+   * Within the main playfield I almost always have an opportunity to save myself,
+   * so the bright red line is not helpful."* See `deadline.ts`.
+   */
+  readonly lead: number;
+  /** How lit the cue is, 0 to 1 — the lead, eased over its own birth. */
   readonly presence: number;
   /**
    * How much of the window the tank can afford — **1, and it is a named zero in

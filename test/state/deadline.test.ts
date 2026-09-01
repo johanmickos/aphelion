@@ -12,7 +12,13 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { scatterField } from '../../src/sim/scatter-field.ts';
 import { SCALE } from '../../src/sim/units.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
-import { RESTATE_TICKS, SOS_FLOOR } from '../../src/state/deadline.ts';
+import {
+  FADE_IN_SECONDS,
+  FULL_SECONDS,
+  RESTATE_TICKS,
+  SOS_FLOOR,
+  presenceAt,
+} from '../../src/state/deadline.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import type { SimState } from '../../src/sim/types.ts';
 
@@ -82,16 +88,56 @@ describe('the scan is a property of the coast', () => {
     }
   });
 
-  /** Spec 03 §5's *"it fades in over 300ms"* — from nothing, and only upward. */
-  it('fades in rather than snapping on', () => {
-    const views = fly(drifting(60, 300), 30).filter((view) => view.deadline !== null);
-    expect(views[0]!.deadline!.presence).toBe(0);
+  /**
+   * ⚠ **The cue is ramped on the *lead*, not on whether a wall is findable** —
+   * the author's ruling of 2026-09-01: *"it should only appear... closer to the
+   * boundary. Within the main playfield I almost always have an opportunity to
+   * save myself, so the bright red line is not helpful."*
+   *
+   * So a mark far ahead is drawn at nothing even once it is fully born, and it
+   * comes up as the craft closes on it.
+   */
+  it('is dark while the mark is far ahead and lit as it closes', () => {
+    // The rule itself, because the horizon rarely produces a lead past the fade:
+    // the cross is the LAST saving point, so it sits near the wall and arrives
+    // already close. What the ramp guarantees is the shape, and that is what a
+    // longer horizon or a slower drift would meet.
+    const born = 60;
+    expect(presenceAt(FADE_IN_SECONDS + 0.01, born)).toBe(0);
+    expect(presenceAt(FULL_SECONDS, born)).toBe(1);
+    expect(presenceAt(0, born)).toBe(1);
+    // Past the mark it holds rather than climbing further.
+    expect(presenceAt(-1, born)).toBe(1);
+    const middle = presenceAt((FADE_IN_SECONDS + FULL_SECONDS) / 2, born);
+    expect(middle).toBeGreaterThan(0);
+    expect(middle).toBeLessThan(1);
+  });
+
+  /** And over a real drift it only ever goes up as the craft closes. */
+  it('comes up as the craft closes on the mark', () => {
+    const views = fly(drifting(-100, 200, 2500), 90).filter((view) => view.deadline !== null);
+    expect(views.length).toBeGreaterThan(20);
+    expect(views[0]!.deadline!.lead).toBeGreaterThan(views[views.length - 1]!.deadline!.lead);
     expect(views[views.length - 1]!.deadline!.presence).toBe(1);
+  });
+
+  /**
+   * ⚠ **And it does not flicker**, which is the defect this replaced: *"the
+   * warning line seems to draw, disappear, and draw again as I'm traveling."*
+   *
+   * The scan is re-run twice a second for convergence, and the first build
+   * restarted the mark's life on every re-run — so the cue faded out and back in
+   * whether or not anything had changed. A re-scan that finds the same mark is
+   * not a new mark.
+   */
+  it('does not restart its life when the scan is merely re-run', () => {
+    const views = fly(drifting(-100, 200, 2500), RESTATE_TICKS * 2 + 10);
+    // More than one scan happened over this stretch — otherwise the test proves
+    // nothing about re-scanning.
+    expect(new Set(views.map((view) => view.rescue.at)).size).toBeGreaterThan(1);
+    // And the mark's age only ever went up.
     for (let at = 1; at < views.length; at++) {
-      if (views[at]!.rescue.at !== views[at - 1]!.rescue.at) continue;
-      expect(views[at]!.deadline!.presence).toBeGreaterThanOrEqual(
-        views[at - 1]!.deadline!.presence,
-      );
+      expect(views[at]!.rescue.shown).toBeGreaterThan(views[at - 1]!.rescue.shown - 1);
     }
   });
 });

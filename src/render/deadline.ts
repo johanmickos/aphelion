@@ -36,33 +36,71 @@ import type { CraftView, DeadlineView, SosView } from '../state/types.ts';
 import { ION, VOID, dim } from './palette.ts';
 
 /**
- * How thick the window is drawn, in design units — spec
- * [00 · §6](../../docs/spec/00-tokens.md)'s window weight, which the compass's
- * own rings already wear.
+ * ## ⚠ The first build drew it at one weight all the way, and that was refused
  *
- * The same width as a compass window on purpose: the two are one grammar, and a
- * player who has learned *the thick bit is where the press goes* should not have
- * to learn it twice.
+ * > *"It's really long, impacting my normal playing field... it should only
+ * > appear, and NOT MOVE, along my trajectory and closer to the boundary. Within
+ * > the main playfield I almost always have an opportunity to save myself, so the
+ * > bright red line is not helpful."* — author, 2026-09-01
+ *
+ * The prototype's own track *does* reach the craft, and it records why it stopped
+ * clamping the length instead: *"the cross first appears a median 375px away and
+ * 772px at p75, so a 150px clamp drew a segment sitting a quarter of a screen
+ * ahead of the ship, touching nothing."* What it does instead is **put the weight
+ * where the decision is** — a hairline for most of its length, thickening into the
+ * track inside [`ARM`](#arm) of the cross and into a lead-in inside
+ * [`LEAD_LENGTH`](#lead_length). *"The far end carries the connection and nothing
+ * else; the weight is all in the stretch with a decision in it."*
+ *
+ * The other half of the answer is not here at all: **the whole cue is ramped on
+ * the lead** rather than on whether a wall is findable, so in the middle of the
+ * field there is nothing to see. That is `deadline.ts`'s `FADE_IN_SECONDS`.
  */
-const WINDOW_WIDTH = 4.5 * BOARD_PIXEL;
-
-/** How faint the projected line is between the windows — it is a path, not a promise. */
-const LINE_WIDTH = 1.25 * BOARD_PIXEL;
-const LINE_STRENGTH = 0.3;
-
-/** The dot at the far end of the last window — spec 03 §5's *"the last press that can save"*. */
-const DOT_RADIUS = 4 * BOARD_PIXEL;
 
 /**
- * How dim the unaffordable part of a window is drawn.
+ * How far from the cross the track stops being a hairline, in design units — the
+ * prototype's **150** of its own, converted.
+ */
+const ARM = 150 * BOARD_PIXEL;
+
+/** And where it swells into the lead-in — the prototype's **46**. */
+const LEAD_LENGTH = 46 * BOARD_PIXEL;
+
+/**
+ * The three weights and the three alphas, all the prototype's own.
  *
- * Spec 03 §5 couples fuel to the deadline **by luminance, never geometry**:
- * *"only the fraction of the window the tank can afford stays lit... an empty
- * tank shows the whole window in DUSK."* Today
- * [`affordable`](../state/types.ts) is 1 and nothing takes this path — it is
- * built so that M4.4 changes a number rather than this file.
+ * `HAIR` is what is left of a width at the far end, so the track never vanishes —
+ * it is a connection to the craft rather than a floating segment. `DEAD` is what a
+ * stretch that does **not** save is drawn at: present, because the gaps are part
+ * of the shape, and faint, because they are not the offer.
+ */
+const HAIR = 0.55;
+const DEAD = 0.18;
+const TRACK_WIDTH = 0.8 * BOARD_PIXEL;
+const LEAD_WIDTH = 1.3 * BOARD_PIXEL;
+const TRACK_ALPHA = 0.45;
+const LEAD_ALPHA = 1;
+
+/**
+ * How loud the whole cue is — the prototype's `deadlineAlpha`, and it is one
+ * number on purpose.
+ *
+ * Everything above is a fraction of it, *"so the cue has ONE overall"*. Turning
+ * the deadline down is one edit rather than six.
+ */
+const OVERALL = 0.5;
+
+/**
+ * How dim the part of the track the tank cannot afford is drawn.
+ *
+ * Spec 03 §5's fuel coupling is *"by luminance, never geometry"* — the geometry is
+ * the same either way and only the ink moves. Nothing takes this path today.
  */
 const UNAFFORDABLE = 0.22;
+
+/** The dot — the prototype's marker radius and ring, converted. */
+const DOT_RADIUS = 5 * BOARD_PIXEL;
+const DOT_RING = 1.6 * BOARD_PIXEL;
 
 /** Spec 07 §6's `SOS`, in Direction 03's utility face. */
 const SOS_FACE = "'Archivo', system-ui, sans-serif";
@@ -93,75 +131,86 @@ const SOS_OFFSET = 34 * BOARD_PIXEL;
 export function drawDeadline(context: CanvasRenderingContext2D, track: DeadlineView): void {
   if (track.presence <= 0 || track.path.length < 2) return;
 
+  // Only as far as the cross. The projection runs on to the wall, and the stretch
+  // past the last press that can save is not a decision anyone can make.
+  const upto = track.path.slice(0, lastSaving(track) + 1);
+  if (upto.length < 2) return;
+
+  // Distance to the cross **per sample**, so the profile is a property of the
+  // shape rather than of how fast the craft happens to be going.
+  const toCross: number[] = new Array<number>(upto.length);
+  toCross[upto.length - 1] = Math.hypot(
+    track.cross.x - upto[upto.length - 1]!.x,
+    track.cross.y - upto[upto.length - 1]!.y,
+  );
+  for (let at = upto.length - 2; at >= 0; at--) {
+    const one = upto[at]!;
+    const two = upto[at + 1]!;
+    toCross[at] = toCross[at + 1]! + Math.hypot(two.x - one.x, two.y - one.y);
+  }
+
   context.save();
   context.lineCap = 'round';
-
-  // The line first, faint, from the craft to the last thing worth marking. It is
-  // the path, and the windows are laid on top of it.
-  const last = track.cross ?? track.path[track.path.length - 1]!;
-  context.lineWidth = LINE_WIDTH;
-  context.strokeStyle = dim(ION, LINE_STRENGTH * track.presence);
-  context.beginPath();
-  context.moveTo(track.path[0]!.x, track.path[0]!.y);
-  context.lineTo(last.x, last.y);
-  context.stroke();
-
-  // **Every window**, which is the author's ruling — the saveable stretch has
-  // gaps in it and drawing only the last would under-claim, telling a player who
-  // *can* save that the chance is still ahead of them.
-  context.lineWidth = WINDOW_WIDTH;
-  let from: { x: number; y: number } | null = null;
-  for (let at = 0; at < track.path.length; at++) {
-    const here = track.path[at]!;
-    if (here.saves && from === null) from = here;
-    if (here.saves && at < track.path.length - 1) continue;
-    if (from === null) continue;
-    const to = here.saves ? here : track.path[at - 1]!;
-    window(context, from, to, track);
-    from = null;
-  }
-
-  // And the dot: the last press that can still save the run.
-  if (track.cross !== null) {
-    context.globalAlpha = track.presence;
-    context.fillStyle = ION;
+  // One stroke per segment, because every segment has its own weight and its own
+  // alpha — which is the whole point of the profile.
+  for (let at = 0; at + 1 < upto.length; at++) {
+    const one = upto[at]!;
+    const two = upto[at + 1]!;
+    const away = (toCross[at]! + toCross[at + 1]!) / 2;
+    // Hairline to track over the stretch between the two lengths, then track to
+    // lead-in over the final one.
+    const swell = smoothstep((ARM - away) / (ARM - LEAD_LENGTH));
+    const body = HAIR + (1 - HAIR) * swell;
+    const nose = away < LEAD_LENGTH ? 1 - away / LEAD_LENGTH : 0;
+    const lit = one.saves && two.saves ? 1 : DEAD;
+    // **Fuel, by luminance and never geometry** (spec 03 §5): the part of the
+    // track the tank can afford stays lit and the rest goes faint, measured from
+    // the craft — *"half a tank lights the early half."* Nothing takes this path
+    // today; it is here so M4.4 changes a number rather than this file.
+    const along = 1 - away / Math.max(1e-6, toCross[0]!);
+    const afford = along <= track.affordable ? 1 : UNAFFORDABLE;
+    context.lineWidth = (TRACK_WIDTH + LEAD_WIDTH * nose) * body;
+    context.strokeStyle = dim(
+      ION,
+      OVERALL *
+        track.presence *
+        (TRACK_ALPHA + (LEAD_ALPHA - TRACK_ALPHA) * nose) *
+        body *
+        lit *
+        afford,
+    );
     context.beginPath();
-    context.arc(track.cross.x, track.cross.y, DOT_RADIUS, 0, Math.PI * 2);
-    context.fill();
+    context.moveTo(one.x, one.y);
+    context.lineTo(two.x, two.y);
+    context.stroke();
   }
+
+  // The dot: a filled core inside a ring, so it reads as a place rather than a
+  // blob — and it lands **on** the end of the track.
+  const at = track.cross;
+  context.globalAlpha = track.presence * OVERALL * LEAD_ALPHA;
+  context.fillStyle = ION;
+  context.beginPath();
+  context.arc(at.x, at.y, DOT_RADIUS - DOT_RING, 0, Math.PI * 2);
+  context.fill();
+  context.lineWidth = DOT_RING;
+  context.strokeStyle = ION;
+  context.beginPath();
+  context.arc(at.x, at.y, DOT_RADIUS, 0, Math.PI * 2);
+  context.stroke();
   context.restore();
 }
 
-/**
- * One window, lit as far as the tank can afford it.
- *
- * Two strokes rather than a gradient, because what the design asks for is a
- * **fraction** and not a ramp: spec 03 §5's empty tank shows *the whole window*
- * dim, not a window that fades out along its length. Today the split never falls
- * anywhere but the far end — see [`UNAFFORDABLE`](#unaffordable).
- */
-function window(
-  context: CanvasRenderingContext2D,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-  track: DeadlineView,
-): void {
-  const at = Math.max(0, Math.min(1, track.affordable));
-  const mid = { x: from.x + (to.x - from.x) * at, y: from.y + (to.y - from.y) * at };
-  if (at < 1) {
-    context.strokeStyle = dim(ION, UNAFFORDABLE * track.presence);
-    context.beginPath();
-    context.moveTo(mid.x, mid.y);
-    context.lineTo(to.x, to.y);
-    context.stroke();
-  }
-  if (at > 0) {
-    context.strokeStyle = dim(ION, track.presence);
-    context.beginPath();
-    context.moveTo(from.x, from.y);
-    context.lineTo(mid.x, mid.y);
-    context.stroke();
-  }
+/** The last sample that saves — where the track stops. */
+function lastSaving(track: DeadlineView): number {
+  for (let at = track.path.length - 1; at >= 0; at--) if (track.path[at]!.saves) return at;
+  return -1;
+}
+
+/** The prototype's own easing between two ends, and the one `decay.ts` uses. */
+function smoothstep(at: number): number {
+  const x = Math.max(0, Math.min(1, at));
+  return x * x * (3 - 2 * x);
 }
 
 /**
