@@ -719,18 +719,29 @@ component **is** the knock (`knock.ts`: *"the radial speed it removes is the kin
 arrives at the floor rather than into it. Two thirds of the dives that would have slammed are lifted
 first, by a mechanism built to stop exactly that.
 
-**So this is not a threshold question and no number will fix it.** What is left for the author:
+### ⚠ Ruled by the author, 2026-09-01: the knock stays exactly as it is
 
-1. **Retire the knock.** It is a word for an event the physics no longer produces. Spec 06 §1's law
-   is that *"a word that never repeats never becomes a signal"*; one in seventy-five, contradicting
-   an arrival, is past that line in the other direction.
-2. **Keep it as a rarity** and accept that it will fire roughly never, and that when it does it may
-   fire on a good capture.
-3. **Give it a different event.** Collisions do still happen — `dive.ts` bounces off bodies that were
-   *not* grabbed (`bounceOffOthers`), and spec 01 §10 has a graze. Neither has been measured for
-   this, and *"a knock is a property of the moment"* (`knock.ts`) fits an unintended collision at
-   least as well as it fits a landing. **This is a new mechanism and is the author's**, not a
-   re-tune.
+*"That feature is one of the best hidden gems. We definitely want to keep it. It happens rarely, and
+it's really fun to see your 'pilot' comment and complain. If anything we should extend the words to
+make it even funnier."*
 
-⚠ The one thing not to do is move `KNOCK_BAND` down: every band low enough to fire at all fires on
-the single capture that earns the arrival, which is the contradiction `knock.ts` exists to prevent.
+**So `KNOCK_BAND` is not to be moved and the word is not to be retired.** Rarity is the point, and
+the measurements above are recorded as context rather than as a case for changing anything. Two
+things follow from them that a future session should know rather than rediscover:
+
+- **Nothing in the repo tests that the knock can still be earned**, and nothing can: the shipped
+  pilot fixture produces exactly one, at a share of 0.1548, and no `KNOCK_BAND` between 0.001 and
+  0.155 changes what that fixture says. `test/state/goldens.test.ts` says so in place. A change to
+  the dive or the clearance can take the word to zero without failing anything.
+- **The word has not in fact been heard since `SIM_VERSION` 7.** Over all thirteen dispatches that
+  replay, the presentation layer strikes **0** knocks against 9 arrivals. Recorded as a fact about
+  the corpus, not as a complaint: the author has ruled the behaviour good and rare, and one in
+  seventy-five captures is what the current physics offers.
+
+**Extending `KNOCK_WORDS` is wanted** — *"we should extend the words to make it even funnier"* — and
+is a small change with one rule attached: `knock.ts` chooses by `tick % KNOCK_WORDS.length`, so the
+list's length is part of the run's determinism and the goldens pin the word a given tick says.
+
+⚠ And the one thing not to do is move `KNOCK_BAND` **down**: every band low enough to fire more often
+fires on the single capture in the corpus that earns the *arrival*, which is the contradiction
+`knock.ts` exists to prevent.
