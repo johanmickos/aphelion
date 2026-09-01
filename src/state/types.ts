@@ -951,4 +951,80 @@ export interface PresentationState {
    * the weather is would eventually have two answers.
    */
   readonly anomaly: AnomalyView | null;
+  /**
+   * The **boundary**, one entry per side of the corridor — or empty in a field
+   * with no line.
+   *
+   * Beside the anomaly and for the same reason: it is a property of the field
+   * and of this tick rather than something that decays, and deriving it here
+   * keeps one answer to *where the edge is and how hot it is* rather than two.
+   * See [`boundaryOf`](./boundary.ts).
+   */
+  readonly boundary: readonly BoundarySideView[];
+}
+
+/**
+ * One side of the **boundary** (`CONTEXT.md`): where its **line** stands, how
+ * fast the craft is closing on it, and how hot that makes it.
+ *
+ * There is one of these per side of the corridor and there are always two, or
+ * none at all in a field with no line — [`boundaryOf`](./boundary.ts) argues why
+ * both rather than only the near one, and it is the first law: a craft diving
+ * right flares the right line and calms the left in the same frame, and on a
+ * phone both are on screen at once.
+ *
+ * **Everything here is a fact about this tick.** Nothing on this view decays, so
+ * the boundary is not presentation state in
+ * [ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)'s
+ * sense at all — it is derived beside the things that are, for the reason
+ * [`AnomalyView`](#anomalyview) is: a picture assembled from two sources of truth
+ * about where the edge is would eventually have two answers.
+ */
+export interface BoundarySideView {
+  /** Where this side's line stands, in design `x`. */
+  readonly line: number;
+  /** Which way the field lies from it: `1` for the left line, `-1` for the right. */
+  readonly inward: 1 | -1;
+  /**
+   * How far the craft is from this line, in design units, measured inward.
+   *
+   * **Negative past it**, which is a reachable state and not a guard: the run
+   * ends on the tick `outOfBounds` sees, and spec 01 §10's four units of grace
+   * mean the craft is briefly outside the line and still alive.
+   */
+  readonly away: number;
+  /**
+   * How fast the craft is closing on this line, in design units per second,
+   * clamped at ≥ 0 — spec [07 · §3](../../docs/spec/07-boundary.md).
+   *
+   * **A third speed, and the other two are already spoken for.**
+   * [`worldSpeed`](#presentationstate) is how fast the picture moves and
+   * [`CraftView.speed`](#craftview) is how fast the craft moves; this is the
+   * component of the craft's velocity toward *this line*. Measured over the
+   * corpus the three are nowhere near each other, and confusing them is the
+   * failure `worldSpeed`'s own note records.
+   */
+  readonly closing: number;
+  /**
+   * Spec 07 §3's **heat**, `HEAT_FLOOR` to `HEAT_CAP`.
+   *
+   * What the gradient, the line's own stroke and the motes are all drawn at, and
+   * the one number the whole of spec 07's first law lives in. It is derived here
+   * rather than in the renderer because *"skimming parallel is calm and diving
+   * flares"* is a claim a test should be able to make without a canvas
+   * ([AGENTS.md](../../AGENTS.md) §4), and `test/state/boundary.test.ts` makes
+   * it that way.
+   */
+  readonly heat: number;
+  /**
+   * Whether a **shelter** suspends the line here — **false everywhere today.**
+   *
+   * Spec [05 · §5](../../docs/spec/05-field.md), ruled 2026-09-01: inside one
+   * the bands keep their geometry and their closing-speed law and are drawn in
+   * **AURORA instead of ION** — *"the edge still says how hard you are diving at
+   * it, and says strange where it would say risk."* Only the **anomaly**
+   * projects one and the anomaly is M8's, so this is a named zero and
+   * [`SHELTERS`](./boundary.ts) is where it stops being one.
+   */
+  readonly sheltered: boolean;
 }

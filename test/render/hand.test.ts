@@ -58,6 +58,12 @@ function recorder(): {
     measureText: () => ({ width: 0 }),
     arc: () => {},
     createRadialGradient: () => ({ addColorStop: () => {} }),
+    // The boundary's wash, which draws on every frame — a stand-in for a browser
+    // API rots in one direction, and this is that direction (`test/census.test.ts`).
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    letterSpacing: '0px',
+    lineJoin: 'miter',
+    globalAlpha: 1,
     stroke: () => {},
   } as unknown as CanvasRenderingContext2D;
   return { context, lines };

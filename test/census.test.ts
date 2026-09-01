@@ -159,6 +159,33 @@ describe('the draw census', () => {
   });
 
   /**
+   * **The boundary is in every frame**, and the two things it adds are the two
+   * the census can see: a linear gradient per side, and the motes and lines drawn
+   * over it.
+   *
+   * It is asserted at the design space's own size, which is the phone's case —
+   * spec 00 §7 makes the width the contract, so the census's canvas sees exactly
+   * what a phone sees: a third of the outer band and none of the fire band. That
+   * is the number that matters, and it is the reason the wash is clipped to the
+   * picture rather than painted across the whole band: measured, that was **1.13
+   * screens a frame** of blended area against the 0.23 actually visible.
+   */
+  it("sees the boundary on every frame, at a phone's share of it", () => {
+    // Frames with no anomaly on them, so what `blended` holds is the buffer's own
+    // VOID fill and the boundary's wash and nothing else.
+    const clear = RUN.filter((view) => (view.anomaly?.warmth ?? 0) === 0);
+    expect(clear.length).toBeGreaterThan(50);
+    const into = tally(clear);
+    // Two sides, one gradient each, on every frame — never one, and never none.
+    expect(into.gradients).toBeGreaterThanOrEqual(clear.length * 2);
+    // One screen of VOID plus a fifth of a screen of wash. The ceiling is what
+    // fails if the clip is ever dropped: the whole band is 1.13 screens.
+    const wash = into.blended / clear.length / (1170 * 2532) - 1;
+    expect(wash).toBeGreaterThan(0.1);
+    expect(wash).toBeLessThan(0.5);
+  });
+
+  /**
    * The frames that carry the release's own choreography cost more than the
    * quiet ones, which is the sense in which the census answers *what did this
    * choreography cost* at all.

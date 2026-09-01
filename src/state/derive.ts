@@ -81,6 +81,7 @@ import { hueOf } from './identity.ts';
 import { sightingsOf } from './sighting.ts';
 import { bowOf, wakeOf } from './rung.ts';
 import { anomalyOf } from './anomaly.ts';
+import { boundaryOf } from './boundary.ts';
 import type {
   ArrivalView,
   BodyState,
@@ -275,6 +276,10 @@ function present(
     knock,
     wake,
     anomaly: anomalyOf(sim.field, sim.craft.y),
+    // The **boundary**, both sides, every tick. It is a pure function of the
+    // field and this tick's craft — nothing about it decays — so it is derived
+    // here beside the anomaly rather than remembered.
+    boundary: boundaryOf(sim.field, sim.craft),
   };
 }
 

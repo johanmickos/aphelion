@@ -59,6 +59,7 @@ import { drawStarfield, starfield } from './starfield.ts';
 import { drawDust, dust } from './dust.ts';
 import { drawAnomaly } from './anomaly.ts';
 import { drawRungs } from './rungs.ts';
+import { boundaryMotes, drawBoundary } from './boundary.ts';
 import {
   BODY_FILL,
   CORE,
@@ -93,6 +94,17 @@ const SKY = starfield(0x5eed);
  * generator run twice from one seed would put a mote wherever the 321st star was.
  */
 const DUST = dust(0xd057);
+
+/**
+ * And the **boundary's** motes, from a third render seed for the third time the
+ * same argument applies ([`boundary.ts`](./boundary.ts)).
+ *
+ * Distinct from the dust's, so the edge's motes and the field's cannot line up:
+ * one generator run twice from one seed would put a boundary mote at the same
+ * altitude as every dust mote, and the two layers are supposed to read as two
+ * things.
+ */
+const BOUNDARY = boundaryMotes(0xed6e);
 
 /**
  * How far above a body's surface its floor sits, in design units.
@@ -1278,6 +1290,12 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   // picture is drawn on top of. Unlike the sky above it, it moves at world speed,
   // which is why it is inside this transform and the sky is not.
   drawRungs(context, view.camera, view.corridor, view.bodies, view.wake, seen);
+
+  // **The boundary, over the field and under the bodies** — Direction 07's own
+  // order, which lays down rungs and then the edge. It is inside this transform
+  // because spec 07 §2 requires it *"in world space, never on the screen
+  // edges"*: the edge is geography, and a vignette is what it must not be.
+  drawBoundary(context, BOUNDARY, view.boundary, view.camera, seen);
 
   // A body is drawn if any of it can be seen. There is no horizontal test: the
   // field is no wider than the design space, which is the same fact the camera

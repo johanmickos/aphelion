@@ -17,6 +17,7 @@
 import type {
   AnomalyView,
   ArrivalView,
+  BoundarySideView,
   CalloutView,
   DeformationView,
   FlashView,
@@ -202,6 +203,38 @@ function anomalyBetween(
 }
 
 /**
+ * The boundary between two ticks: its lines held, its heat crossed.
+ *
+ * The line does not move — it is the corridor's, and `corridor` itself is taken
+ * whole one screen down for the same reason. What moves is the craft's relation
+ * to it, and **`heat` is the one that has to be crossed**: it is spent on a
+ * gradient over a whole side of the picture, which is the same largest-flat-area
+ * argument [`anomalyBetween`](#anomalybetween) makes about `warmth`. A step in it
+ * at the tick rate under a picture gliding at the frame rate is a 60Hz shimmer
+ * across the edge of the screen.
+ *
+ * `sheltered` is a predicate and predicates do not interpolate — half way into a
+ * shelter is still outside it, and half a colour between ION and AURORA is a
+ * ninth hue the palette does not have (spec 00 §1).
+ */
+function boundaryBetween(
+  previous: readonly BoundarySideView[],
+  current: readonly BoundarySideView[],
+  alpha: number,
+): readonly BoundarySideView[] {
+  if (previous.length !== current.length) return current;
+  return current.map((side, at) => {
+    const before = previous[at]!;
+    return {
+      ...side,
+      away: between(before.away, side.away, alpha),
+      closing: between(before.closing, side.closing, alpha),
+      heat: between(before.heat, side.heat, alpha),
+    };
+  });
+}
+
+/**
  * A view `alpha` of the way from one tick to the next.
  *
  * Bodies are taken from the later tick whole rather than interpolated: they do
@@ -271,5 +304,6 @@ export function interpolate(
     knock: knockBetween(previous.knock, current.knock, alpha),
     wake: wakeBetween(previous.wake, current.wake, alpha),
     anomaly: anomalyBetween(previous.anomaly, current.anomaly, alpha),
+    boundary: boundaryBetween(previous.boundary, current.boundary, alpha),
   };
 }

@@ -21,6 +21,7 @@ function view(x: number, y: number, heading: number): PresentationState {
     worldSpeed: 0,
     chain: 0,
     anomaly: null,
+    boundary: [],
     craft: {
       x,
       y,

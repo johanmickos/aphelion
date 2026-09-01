@@ -39,6 +39,8 @@ import * as view from './src/render/index.ts';
 import * as rung from './src/state/rung.ts';
 import * as sky from './src/render/starfield.ts';
 import * as motes from './src/render/dust.ts';
+import * as edge from './src/state/boundary.ts';
+import * as bands from './src/render/boundary.ts';
 import * as weather from './src/state/anomaly.ts';
 import * as strata from './src/render/rungs.ts';
 import * as fit from './src/render/letterbox.ts';
@@ -702,6 +704,58 @@ const KNOBS: Knob[] = [
     step: 1,
     base: motes.DUST_PER_SCREEN,
     apply: motes.set_DUST_PER_SCREEN,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'closingconstant',
+    label: 'Boundary · what counts as a dive',
+    what: 'K in heat = min(.85, (.10 + closing/K) × (1 + 60/d)), in design units per second. Spec 07 §3 states the law and says only “tuned on the phone”, so this is the number the FIRST LAW lives in — intensity is closing speed, not proximity. **The board’s own 120 could not cross**: board pixels are metres here, and at 120 m/s every dive this game flies is already past the cap before proximity is applied, so the edge becomes a switch. 640 carries the board’s RATIO instead — its fastest dive lands at 0.69 K — applied to the fastest closing ever flown here (442 m/s). Lower is louder. Above 807 the spec’s own acceptance stops holding',
+    min: 300 * SCALE,
+    max: 1400 * SCALE,
+    step: 20 * SCALE,
+    base: edge.CLOSING_CONSTANT,
+    apply: edge.set_CLOSING_CONSTANT,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'moteatrest',
+    label: 'Boundary · price tag when calm',
+    what: 'how lit a band’s motes are at zero heat, as a fraction of their own alpha. Spec 07 §2 says the motes “rise with heat exactly as the gradient does”, and the gradient rises from NOTHING — so read literally the price tag goes out whenever the edge is calm, which is the one moment the player is deciding whether to come in. Direction 07’s own motes do not scale with heat at all. **0 is the spec read literally and 1 is the board**; 0.55 is the opening position between them',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    base: bands.MOTE_AT_REST,
+    apply: bands.set_MOTE_AT_REST,
+    restarts: false,
+    group: 'field',
+    places: 2,
+  },
+  {
+    id: 'outermotes',
+    label: 'Boundary · outer band motes',
+    what: 'motes in the outer band, per picture and per side. Direction 07 scatters 22 over a band 96 × 550 board pixels, which is 6.6× the density of its own dust; carried at BOARD_PIXEL and split so the fire band is twice as dense, that is 32 here. Spec 07’s acceptance asks that “mote density is a pure function of band”, which is why it is two numbers and not one',
+    min: 0,
+    max: 64,
+    step: 1,
+    base: bands.OUTER_MOTES,
+    apply: bands.set_OUTER_MOTES,
+    restarts: false,
+    group: 'field',
+    places: 0,
+  },
+  {
+    id: 'firemotes',
+    label: 'Boundary · fire band motes',
+    what: 'and the fire band’s half of the same density, at twice it over less width — spec 07 §2’s “dense and bright” against the outer band’s “sparse”. **On a phone none of this band is on screen**: the fire band starts 842 design units off the centreline against a picture edge at 585',
+    min: 0,
+    max: 90,
+    step: 1,
+    base: bands.FIRE_MOTES,
+    apply: bands.set_FIRE_MOTES,
     restarts: false,
     group: 'field',
     places: 0,

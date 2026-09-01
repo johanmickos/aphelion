@@ -387,6 +387,30 @@ export function lockOf(sim: SimState): number {
     'how loud the dust is against the rungs — the sky’s own knob, one layer forward',
   ),
 
+  // **Spec 07 §3 states the law and says only that `K` is "tuned on the phone"**,
+  // so this is the one constant on the boundary the spec itself sends to a bench.
+  // 640 m/s is derived from Direction 07's own ratio of `K` to its fastest dive,
+  // and the acceptance criterion caps it independently at 807.
+  settable(
+    'src/state/boundary.ts',
+    'CLOSING_CONSTANT',
+    'spec 07 §3 says only “tuned on the phone” — the number the first law lives in',
+  ),
+  // Which of two readings of spec 07 §2 is right — the motes rise with heat from
+  // nothing, or from a floor — is a judgement about a moving picture, and this is
+  // the number that decides it.
+  settable(
+    'src/render/boundary.ts',
+    'MOTE_AT_REST',
+    'how lit a price tag is when the edge is calm — 0 is the spec read literally',
+  ),
+  settable(
+    'src/render/boundary.ts',
+    'OUTER_MOTES',
+    'Direction 07’s own density, split so the fire band is the denser of the two',
+  ),
+  settable('src/render/boundary.ts', 'FIRE_MOTES', 'and the fire band’s half of it'),
+
   // The author's answer to the question `starfield.ts` said to ask once the
   // rungs landed: it keeps its place and comes down. How far down is taste, and
   // it came down twice — again on 2026-09-01, once dust arrived between the sky
