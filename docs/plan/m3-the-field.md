@@ -797,14 +797,23 @@ calls that mostly return early.
 **Acceptance**: a command that reports p99 and max frame time for a replayed recipe, and a
 recorded baseline on the author's phone. **Verify**: run it on the phone.
 
-⚠ **And the bench owes a meter**, found on 2026-09-01 when the author reported lag on the bench page
-and asked whether to use it or the game page for reports. The answer today is **the game page**:
-`app/main.ts` builds a dispatch carrying `tools/meter.ts`'s histogram, its worst frames and its
-sixteen-segment timeline, and `tools/bench/entry.ts` builds a dispatch with none of it. So the one
-page with every open question on a slider is the one page that cannot say what a slider costs, which
-is the wrong way round — moving `RUNG_STEP` or the anomaly's span is exactly the kind of decision a
-frame time should be attached to. The meter is already written to be handed its timestamps rather
-than to read a clock, so wiring it in is a shell change and not a design one.
+⚠ **The bench has a meter now** (2026-09-01), and it was owed. The author reported lag on the bench,
+asked whether to use it or the game page for reports, and then sent a second bench run — which could
+not answer the question either, because `tools/bench/entry.ts` built a dispatch with no timing in it
+while `app/main.ts` had carried one since the performance session. **The one page with every open
+question on a slider was the one page that could not say what a slider costs**, which is the wrong
+way round: moving `RUNG_STEP` or the anomaly's span is exactly the kind of decision a frame time
+should be attached to.
+
+It is the same meter and the same shape on the wire, so `pnpm replay` reads a bench dispatch exactly
+as it reads a phone's — a second timing format would be a second thing to teach `tools/trail.ts`.
+And the bench shows **p99, the worst frame and the fitted per-frame cost live in its own HUD**, so a
+slider's cost is visible while it is being moved rather than only after a dispatch is copied out.
+`VISION.md`'s standing rule holds: p99 and max, never a mean — a rendering-induced hitch is precisely
+what an average of frames that mostly return early hides.
+
+**What is still M3.6's**: a *command* that reports p99 and max for a replayed recipe without a
+browser, and the recorded phone baseline. What this closes is only that the bench can now be asked.
 
 ---
 

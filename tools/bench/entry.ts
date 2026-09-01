@@ -52,7 +52,16 @@ import { attachCanvas, sizeToDisplay } from './src/render/canvas.ts';
 import { draw } from './src/render/index.ts';
 import { interpolate } from './src/render/interpolate.ts';
 import { buildDispatch } from './tools/dispatch.ts';
-import { envelopeBand, walkRun } from './tools/trail.ts';
+import {
+  bucketAt,
+  bucketCount,
+  createMeter,
+  frameBegan,
+  frameEnded,
+  timingOf,
+} from './tools/meter.ts';
+import type { DispatchTiming } from './tools/meter.ts';
+import { envelopeBand, frameCost, walkRun } from './tools/trail.ts';
 
 const SEED = 1;
 
@@ -1077,6 +1086,26 @@ let flagged: number[] = [];
 const clock = createClock();
 let observed = performance.now();
 
+/**
+ * What a frame costs, on this machine, in this browser.
+ *
+ * **The bench had no meter until 2026-09-01 and that was the wrong way round.**
+ * `app/main.ts` has carried one since the performance session, so the *game*
+ * page can say what a frame cost and the page with every open question on a
+ * slider could not — and the author flew the bench, reported *"noticeable lag
+ * when playing"*, and sent a dispatch that had no way to say so. A slider whose
+ * cost is invisible is a slider that gets ruled on by feel alone.
+ *
+ * It is the same meter and the same shape on the wire, deliberately: a second
+ * timing format would be a second thing to teach `tools/trail.ts` to read, and
+ * the whole argument for one dispatch shape is that both ends import it.
+ *
+ * Unlike the shell's, this one is **not** behind `import.meta.env.DEV` — the
+ * bench is a development tool in its entirety and there is no production build
+ * of it to keep the module out of.
+ */
+let meter = createMeter();
+
 /** Counted here rather than read out of the simulation, exactly as the trail is. */
 let sinceGrab = 0;
 let sinceFreeze: number | null = null;
@@ -1092,6 +1121,10 @@ function start(): void {
   sinceFreeze = null;
   heldBefore = null;
   clock.unspentSeconds = 0;
+  // A fresh meter with the run, for the reason `app/main.ts` gives: every frame
+  // of the previous run measured a different game, and a distribution that
+  // spanned a knob change is a distribution about nothing.
+  meter = createMeter();
   redrawTrail();
 }
 
@@ -1150,6 +1183,12 @@ function redrawTrail(): void {
       at: new Date().toISOString(),
       recipe: recipe(),
       observed: { ticks: flagged, note: noteFor() },
+      device: {
+        ua: navigator.userAgent,
+        dpr: window.devicePixelRatio,
+        css: { w: window.innerWidth, h: window.innerHeight },
+      },
+      timing: timingOf(meter),
     }),
   );
 }
@@ -1212,6 +1251,42 @@ function sayFit(): void {
       : '');
 }
 
+/**
+ * What the meter has to say, short enough to sit in the HUD.
+ *
+ * **p99 and the worst frame, never a mean**, which is
+ * `docs/plan/m3-the-field.md`'s standing rule for this: a rendering-induced
+ * hitch is exactly the thing an average of frames that mostly return early
+ * hides. The mean is here too, but as the *fitted* one — what a frame costs
+ * before any tick runs — because that is the number a budget is made of and it
+ * is a different question from *did anything stall*.
+ *
+ * The clock is clamped to a whole millisecond in some browsers, so p99 and the
+ * worst are integers and say so by being printed as integers. The fit recovers
+ * fractions from the noise, which is [`meter.ts`](../meter.ts)'s own argument.
+ */
+function cost(): string {
+  const timing = timingOf(meter);
+  if (timing === null || bucketCount(timing.cpu) < 60) return '';
+  const fit = frameCost(timing);
+  const drawn = fit === null ? '' : ` · ${fit.perFrame.toFixed(2)}ms a frame`;
+  return (
+    ` · cpu p99 ${bucketAt(timing.cpu, 0.99)}ms, worst ${timing.cpu.max}ms` +
+    drawn +
+    // `byTicks` is indexed *by* how many ticks the frame ran, so a jump is any
+    // frame at index two or above: it advanced the simulation further than it
+    // displayed. A jump and a slowdown are different bugs with different fixes.
+    jumps(timing.byTicks)
+  );
+}
+
+/** Frames that ran two or more ticks, said only when there are any. */
+function jumps(byTicks: DispatchTiming['byTicks']): string {
+  let count = 0;
+  for (let ran = 2; ran < byTicks.length; ran++) count += byTicks[ran]?.frames ?? 0;
+  return count === 0 ? '' : ` · ${count} jumps`;
+}
+
 function hud(): void {
   const held = sim.heldBody;
   const phase = held === null ? 'coasting' : sim.orbit !== null ? 'orbiting' : 'diving';
@@ -1219,7 +1294,8 @@ function hud(): void {
   byId('hud').textContent =
     `tick ${current.tick} · ${fmt(current.craft.speed)}/s · ${phase}` +
     (held === null ? '' : ` #${held + 1} · +${sinceGrab} in`) +
-    (sinceFreeze === null ? '' : ` · +${sinceFreeze} since freeze${band}`);
+    (sinceFreeze === null ? '' : ` · +${sinceFreeze} since freeze${band}`) +
+    cost();
 
   const ending = byId('ending');
   ending.textContent = sim.ending === null ? '' : sim.ending.replace(/_/g, ' ');
@@ -1228,15 +1304,30 @@ function hud(): void {
 }
 
 function frame(now: number): void {
+  // `now` is the display's own timestamp for this frame, so it is what a frame
+  // *period* is measured between; the cost is measured from the clock as it is
+  // right now, which is later. Keeping the two apart keeps the browser's
+  // scheduling delay out of a number that is supposed to be ours — `app/main.ts`
+  // says the same thing at more length.
+  frameBegan(meter, now, performance.now());
+
   const elapsedSeconds = (now - observed) / 1000;
   observed = now;
 
   let released = false;
+  let ran = 0;
   const ticks = ticksDue(clock, elapsedSeconds);
   for (let i = 0; i < ticks; i++) {
     previous = current;
     const pressed = isPressed(press);
-    if (sim.ending === null) recordPress(recorder, sim.tick, pressed);
+    if (sim.ending === null) {
+      recordPress(recorder, sim.tick, pressed);
+      // Ticks that *happened*, not ticks the clock bought: `stepSim` does
+      // nothing once there is an ending, so counting those would tell the meter
+      // a tick is cheaper than it is and stamp them all with the tick the run
+      // stopped on.
+      ran += 1;
+    }
     const wasEnding = sim.ending;
     stepSim(sim, { pressed });
     current = derive(previous, sim);
@@ -1264,6 +1355,12 @@ function frame(now: number): void {
   hud();
   sayFit();
   if (released) redrawTrail();
+  // **Last, and after the trail.** What the author is trying to find out on this
+  // page is what the *game* costs at a given set of knobs, and the trail rebuild
+  // is the bench's own overhead — but it lands inside the frame either way, so
+  // measuring after it is the honest reading: this is what the page actually
+  // delivered, which is what the eye judged.
+  frameEnded(meter, performance.now(), current.tick, ran);
   requestAnimationFrame(frame);
 }
 
