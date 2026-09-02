@@ -345,8 +345,9 @@ How good a release is, as one number. **There is deliberately only one definitio
 one that never froze is graded on how hard the body is bending its heading at the instant
 the button comes up. The same skill wearing different clothes, and a second definition is a
 pair that agrees until it quietly does not.
-_Avoid_: grade (that is the **tier**, which prices a release rather than describing it),
-accuracy, rating
+_Avoid_: grade (that is the **tier**, which prices a release rather than describing it —
+and, in *Light*, the **grade** that paints the frame, which is a third thing again and
+never this one), accuracy, rating
 
 **Compass**:
 The signature instrument — the coloured windows drawn on the orbit path around a body,
@@ -706,6 +707,19 @@ What something is, expressed as hue. A body keeps its hue forever.
 Eight names, each with one meaning: VOID (the sky), DUSK (structure, unlit), AURORA
 (strange), ION (risk), CORE (the player), LUMEN (mid quality, and sanctuary), SOLAR
 (top quality), INK (utility text).
+
+**Grade**:
+The full-screen coat laid over the finished frame, and the last thing drawn: a lift of the
+blacks toward VOID's violet, an ordered **dither**, an animated **grain**, and a comb of
+**scanlines**. It is one master knob with the stages ganged behind it, and it goes to
+nothing — the game is exactly as legible with it off, because the retro register is earned
+structurally and **a grade that is carrying the register means the register is not there**.
+It is a coat and never a channel: nothing may become readable, rankable or true because of
+it. The **bloom** shares the pass and is not part of it — bloom is **energy**, which is
+meaning, and this is paint.
+_Avoid_: post-processing (that is the mechanism, and this is the thing), filter, look, LUT,
+CRT effect, tint. And **grade** in this sense is not the **tier** — see **quality**: one
+prices a release and one paints the frame, and neither ever describes the other.
 
 **Design space**:
 The rectangle the game is composed in — a phone held in portrait — and the coordinates

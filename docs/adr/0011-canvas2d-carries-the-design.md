@@ -80,6 +80,19 @@ that trade is deliberate — the grade is a coat, and spec 14 §2 requires the g
 legible with the whole pass off. But it is a gap between a decision and a spec, and it is
 recorded rather than papered over.
 
+> **⚠ And a third thing it cannot do, found when the pass was built (M3.5, 2026-09-02).** A
+> full-screen composite has **no way to exclude a colour**, and spec 14 §3.5 requires exactly
+> that: *"the grade's black lift must not raise"* the anomaly's cloud gaps and the black-hole
+> discs. The anomaly's bed is drawn in `TRUE_BLACK` today, so this is live rather than
+> hypothetical, and it is not only the lift — every additive stage hits it. Measured, the gaps
+> sample to `rgb(14, 12, 24)` at the top of the master's travel and to `#000000` at the bottom,
+> which is where the grade ships. (b) has no such problem: a shader can mask.
+>
+> **This sharpens the open note below rather than adding a second one.** Applying the curve to
+> the nine authored colours at authoring time is the only candidate that keeps §3.5 *and* buys
+> gamma and per-channel gain, and the cost of the alternative is now a measured number rather
+> than a guess. It still needs the author.
+
 > **Open — how gamma reaches the frame.** Not ruled here. The likely answer is that the
 > grade's static per-channel curve is applied to the nine colours the game actually draws
 > from — the eight palette tokens and the body fill — at authoring time rather than at draw
@@ -94,6 +107,13 @@ recorded rather than papered over.
 [ADR-0006](./0006-three-layers-sim-presentation-renderer.md) is unchanged by that — the
 renderer still owns nothing but pixels and the interpolation between ticks. The bloom chain
 and the grade are the shape [M3](../plan/m3-the-field.md) inherits.
+
+**M3.5 built it, and the shape held.** `src/render/grade.ts` is spec 14 §2's five stages in
+**two** `fillRect`s — one `lighter` carrying the lift, the dither and the grain, and one
+`source-over` carrying the scanlines — because a sum of additions is one addition. A read-back
+was refused on this decision's own arithmetic: a per-pixel walk of 1170 × 2532 is the same
+~11.8 MB of synchronous main-thread traffic that cost (b) five times what it bought, and it
+costs 4.09 ms on the laptop before either copy.
 
 The measurement is not repeatable from the repo: the harness was throwaway by construction
 and is deleted along with this decision landing, which is

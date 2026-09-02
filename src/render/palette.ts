@@ -192,3 +192,24 @@ export function dim(token: string, strength: number): string {
   const alpha = Math.round(clamped * 255).toString(16);
   return token + alpha.padStart(2, '0');
 }
+
+/**
+ * A token's three channels, 0 – 255.
+ *
+ * For the **grade** ([`grade.ts`](./grade.ts)), which is the one thing in the
+ * game that paints by writing bytes into an `ImageData` rather than by handing
+ * the canvas a colour string. A tile of ordered dither and grain has a different
+ * value in every texel and there is no string for that.
+ *
+ * It is here and not there for the reason the header gives: **one file writes
+ * colour down.** What crosses the boundary is the eight tokens' own numbers,
+ * which is the same fact `dim` already spends, read as arithmetic instead of as
+ * text — so the grade still cannot invent a colour, only spend one at a strength.
+ */
+export function channels(token: string): [number, number, number] {
+  return [
+    parseInt(token.slice(1, 3), 16),
+    parseInt(token.slice(3, 5), 16),
+    parseInt(token.slice(5, 7), 16),
+  ];
+}

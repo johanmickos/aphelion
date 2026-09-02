@@ -39,6 +39,7 @@ import * as mark from './src/state/sighting.ts';
 import * as view from './src/render/index.ts';
 import * as rung from './src/state/rung.ts';
 import * as sky from './src/render/starfield.ts';
+import * as coat from './src/render/grade.ts';
 import * as motes from './src/render/dust.ts';
 import * as edge from './src/state/boundary.ts';
 import * as bands from './src/render/boundary.ts';
@@ -278,6 +279,19 @@ const KNOBS: Knob[] = [
     restarts: false,
     group: 'bodies',
     places: 0,
+  },
+  {
+    id: 'grade',
+    label: 'Retro grade',
+    what: 'spec 14 §2’s whole post-process, on one knob — **0 is off and the game is exactly as it is on main**, 1 is every stage at the ceiling the spec states for it: the blacks lifted by VOID’s own violet, a 4×4 ordered dither at one code value, grain at 3% and, over the last two fifths of the travel, scanlines to 6% at a 2-design-px pitch. Nine or ten sliders would not fit a bench capped at sixty, so they are ganged in `grade.ts`, which spec 14 §4 asks for anyway. **It is a coat**: §1 rules that if the grade is carrying the retro register the register is not there, so the question this answers is how much of one the game wants and not whether it needs one. Costs one full-screen fill below 0.6 and two above it, and nothing at all at 0',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    base: coat.GRADE,
+    apply: coat.set_GRADE,
+    restarts: false,
+    group: 'light',
+    places: 2,
   },
   {
     id: 'e1alpha',

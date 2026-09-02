@@ -69,7 +69,44 @@ describe('the bench', () => {
 
     expect([...named].filter((name) => !driven.has(name))).toEqual([]);
     expect([...driven].filter((name) => !named.has(name))).toEqual([]);
-    // And the count is the thing the author asked to come down, so it is stated.
-    expect(named.size).toBeLessThanOrEqual(60);
+  });
+
+  /**
+   * **And the count is the thing the author asked to come down** — *"there are a
+   * LOT of knobs on the bench page right now"* (2026-09-01) — so it is stated
+   * rather than left to drift.
+   *
+   * ## ⚠ What is counted moved, 2026-09-02, and the cap did not
+   *
+   * This asserted the number of **patched constants**, which is not the number
+   * the author capped. The plan's own figures are controls on a page — 74 → 50,
+   * then 58 → 57 — and the two quantities came apart the day one slider started
+   * driving two setters. `EXIT_BY` is `1 - ENTER_FROM`, its own slider came off
+   * for exactly that reason (*"Click out was not a knob at all"*), and it is
+   * still a patched constant: the mirror has to be applied or the bench's two
+   * ends disagree on purpose. Counting it charged the author for a control they
+   * had already had removed.
+   *
+   * So what is counted is **controls** — an entry in the `KNOBS` table, or a
+   * setter driven by one of the two hand-written switches — which is what a
+   * tuning session actually has to read. The cap is untouched at sixty and is
+   * the author's; this is the gate being made to measure it.
+   */
+  it('keeps the bench inside sixty controls', () => {
+    const entry = source('tools/bench/entry.ts');
+    const table = entry.slice(entry.indexOf('const KNOBS: Knob[] = ['));
+    const sliders = table.slice(0, table.indexOf('\n];'));
+    // A knob is one `apply:`, which is also how `tools/bench/build.ts` counts
+    // them when it checks that every slider can reach the value `main` has.
+    const knobs = [...sliders.matchAll(/^ {4}apply: /gm)].length;
+    // The switches: a setter named anywhere but the table. Two today — the
+    // camera's lock and the letterbox's whole fit — and each is one control.
+    const inTable = new Set([...sliders.matchAll(/set_([A-Z_0-9]+)/g)].map((m) => m[1]!));
+    const switches = new Set(
+      [...entry.matchAll(/set_([A-Z_0-9]+)/g)].map((m) => m[1]!).filter((n) => !inTable.has(n)),
+    );
+
+    expect(knobs).toBeGreaterThan(0);
+    expect(knobs + switches.size).toBeLessThanOrEqual(60);
   });
 });

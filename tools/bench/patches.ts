@@ -446,6 +446,22 @@ export function lockOf(sim: SimState): number {
     '“much less noticeable… only as background noise”, and halved again once dust arrived',
   ),
 
+  // **The retro grade, and it is one patch for a pass with five stages.**
+  // Spec 14 §2's table is bloom (radius, threshold, intensity), grade (lift,
+  // gamma, gain), dither, grain and scanlines (strength, pitch) — ten or so
+  // knobs, against a bench capped at sixty that has fifty-seven. So the stages
+  // are ganged behind one master inside `grade.ts` (§4: *"every knob above is
+  // exposed in one place so that a tuning session is a single file's worth of
+  // numbers"*), and what reaches the bench is the one number M3.5's acceptance
+  // actually asks for: *"dialled from off to heavy at runtime."* The arithmetic
+  // for the other nine, and what a second slider would buy, is in
+  // `docs/plan/m3-the-field.md` for the author to rule.
+  settable(
+    'src/render/grade.ts',
+    'GRADE',
+    'spec 14 §2’s whole pass, ganged — 0 is off and 1 is every stage at its own stated ceiling',
+  ),
+
   {
     // The trail reader is the same one `pnpm replay` prints, which is the point
     // — the bench must not grow a second opinion about where on the envelope a

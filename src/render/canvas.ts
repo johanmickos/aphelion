@@ -6,11 +6,17 @@
  * scene spec [05](../../docs/spec/05-field.md) asks for, and it held on the
  * first rung with five of the eight-millisecond budget unspent.
  *
- * **It has one offscreen buffer now**, and exactly one — see
- * [`offscreen`](#offscreen). It arrived with the anomaly in M3.3 and it is here
- * rather than in [`anomaly.ts`](./anomaly.ts) because this is the file that owns
- * surfaces: a second module reaching for `document.createElement` would be a
- * second place the game's relationship with the DOM is decided.
+ * **It hands out offscreen buffers now** — see [`offscreen`](#offscreen). The
+ * first arrived with the anomaly in M3.3 and the grade's tiles followed it in
+ * M3.5, and they are asked for here rather than in
+ * [`anomaly.ts`](./anomaly.ts) or [`grade.ts`](./grade.ts) because this is the
+ * file that owns surfaces: a second module reaching for `document.createElement`
+ * would be a second place the game's relationship with the DOM is decided.
+ *
+ * How many exist is each caller's business and deliberately not this file's: the
+ * anomaly holds one it resizes to the picture every frame, and the grade holds
+ * seventeen 64-pixel tiles it re-cuts only when a knob moves. What they share is
+ * the `null` below, which is the contract.
  */
 
 /**

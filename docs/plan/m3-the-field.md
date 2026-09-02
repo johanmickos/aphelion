@@ -1866,8 +1866,8 @@ ceiling that fails if the clip is ever dropped.
 
 ## M3.5 · The retro grade
 
-Spec `14-retro-grade`. Weighted to post-processing — scanlines, grain, bloom, slight chromatic
-aberration — over the pass the energy channel already needs. Plus the authoring rules the other
+Spec `14-retro-grade`. Weighted to post-processing — scanlines, grain, bloom, ~~slight chromatic
+aberration~~ — over the pass the energy channel already needs. Plus the authoring rules the other
 specs inherit: a minimum stroke weight, dither in preference to smooth gradients, display type
 only from the arcade face.
 
@@ -1876,6 +1876,178 @@ judgement made against the running game, not decided in advance.
 
 **Acceptance**: the grade can be dialled from off to heavy at runtime, and the game is legible
 at both ends. **Verify**: fly it with the knob.
+
+⚠ **Superseded in place, 2026-09-02: there is no chromatic aberration.** Spec 14 §2's last
+paragraph forbids it by name, along with the vignette, barrel distortion and CRT curvature, and
+[ADR-0002](../adr/0002-specs-are-canonical-for-behaviour.md) makes the spec canonical for
+behaviour. The line above is struck rather than deleted so that the next reader finds the
+disagreement and its ruling rather than an edited summary. The vignette's reason is the
+load-bearing one: *the boundary is a place in world space, and a screen-edge darkening would read
+as a boundary that is not there.*
+
+### ⚠ Built, 2026-09-02 — five stages, two composites, and it ships **off**
+
+`src/render/grade.ts` is spec 14 §4's *"one place"*, `pnpm bench`'s **Retro grade** is the knob,
+and the value on `main` is **0**. That is the milestone's answer and not a placeholder: the
+instruction was *"build it as a knob, not a look"*, every number in the file is a **ceiling the
+spec states** rather than a value anybody has flown, and every acceptance criterion spec 14
+already had holds exactly at zero and is argued about at any other setting.
+
+**The cost question came before the taste question, and it answered itself.**
+
+#### The mechanism, priced first
+
+There is no shader, so every stage is a composite, a pattern and a second canvas. The one
+mechanism that could have cost the whole frame — `getImageData` / `putImageData` on the frame
+itself — was **refused on a measurement rather than tried**:
+
+| | |
+|---|---|
+| a per-pixel walk of 1170 × 2532, laptop, **before either copy** | **4.09 ms** |
+| the same laptop's p99 **tick**, whole | 0.114 ms |
+| ADR-0011's phone, the same ~11.8 MB of synchronous main-thread traffic | **17 – 18 ms against 3** |
+| the grade's own per-pixel work — sixteen 64-px tiles, cut when a knob moves | **0.089 ms**, 46× cheaper |
+
+Nothing in the pass reads a pixel. ⚠ The 4.09 ms is arithmetic alone on a `Uint8ClampedArray`;
+a real read-back adds the copy out and the copy back, so it is a **floor**.
+
+#### What the census says, and it is exactly what a full-screen pass should say
+
+`pnpm profile`'s census over `diagnostics/2026-09-02T21-05-45-584Z` — the run the author cleared,
+1 869 frames — with the master patched the way the bench patches it:
+
+| grade | blended, mean | p50 | p95 | p99 | max | overdraw, mean |
+|---|---|---|---|---|---|---|
+| **0 · `main`** | **3.621** | 1.493 | 12.531 | 13.347 | 13.477 | 1.615 |
+| 0.5 | 4.621 | 2.493 | 13.531 | 14.347 | 14.477 | 1.615 |
+| 1 · the top | **5.621** | 3.493 | 14.531 | 15.347 | 15.477 | 1.615 |
+
+**Exactly +1 and +2 screens at every percentile**, which is the shape a full-screen pass has and
+the reason a count was the right instrument: it does not vary with the run. **Overdraw does not
+move at all** — a `fillRect` paints no arcs, which is the deadline plate's own finding one
+milestone along. Read the p50 rather than the mean: away from the anomaly the game blends about
+1.5 screens and the grade at full **more than doubles** the median frame; at the worst frames,
+which are inside the anomaly, it is +15%. **The anomaly still costs four times what the whole
+grade would.**
+
+Five stages naively stacked would have been five screens. They are two because **lift, dither and
+grain are all additions to every pixel and a sum of additions is one addition** — one `lighter`
+composite carries all three, and only the scanlines, which take light away, need their own. Below
+0.6 on the master the comb is absent and the pass is **one** fill; at 0 it asks the canvas for
+nothing at all, which is the rule the boundary is already held to: absent means nothing asked, not
+a fill at alpha zero.
+
+**`pnpm budget` reports the pass at zero, and that is the right answer rather than a gap.** It
+does not time the draw and says so on its own output; what it can price is a read-back, and the
+read-back is refused above. The tick and the interpolation are untouched — p99 0.114 ms here →
+0.90 ms there, worst 0.500 → 3.97, both unchanged — which is the statement that a renderer pass
+stayed in the renderer.
+
+#### And the count was confirmed on a real canvas, which the census cannot do
+
+The census draws through a stand-in with no document, so it walks the pass's **flat** fallback and
+not its tiles. Driven on the bench in Chrome at 900 × 1494, with every `fillRect` counted by its
+composite and by whether its paint was a colour or a pattern:
+
+| master | full-screen fills a frame | what they were | the sky, sampled over 40 × 40 |
+|---|---|---|---|
+| **0** | **1** | the VOID clear the game already did — **not one pattern** | `rgb(10.8, 8.8, 21.3)` |
+| 0.5 | 2 | clear, then one `lighter` pattern; **no comb** | `rgb(18.0, 15.0, 33.5)` |
+| 1 | 3 | clear, `lighter` pattern, `source-over` comb | `rgb(24.9, 20.5, 44.7)` |
+
+The predicted sky at the top of the travel was `rgb(24, 20, 44)`. The red channel spread over that
+patch is 20 – 43, which is the dither and the grain being there rather than a flat lift. `main`'s
+row is the one that matters: **at 0 the pass asks a real canvas for nothing at all**, which is what
+the census asserts and what an eye test could not tell from a fill at alpha zero.
+
+#### The knob arithmetic, and one number the gate was counting wrong
+
+Spec 14 §2's table is bloom (radius, threshold, intensity), grade (lift, gamma, gain), dither,
+grain, scanlines (strength, pitch) — **ten**. Three of them are bloom's and bloom is not this
+pass; two of them, gamma and per-channel gain, **cannot be built in Canvas2D at all**
+(ADR-0011). That leaves five, against a bench the author capped at sixty.
+
+So they are ganged: **one master, `GRADE`, 0 to 1**, with each stage a fixed fraction of it, which
+is what spec 14 §4 asks for independently — *"every knob above is exposed in one place so that a
+tuning session is a single file's worth of numbers"* — and what M3.5's acceptance literally asks
+for: *dialled from off to heavy.*
+
+⚠ **And the cap turned out to be enforced on the wrong quantity.** `test/bench.test.ts` asserted
+the number of **patched constants** ≤ 60, and it was at 60 exactly. But the author's cap is on
+controls — the plan's own figures are 74 → 50 and 58 → 57, which are sliders on a page — and the
+two came apart the day one slider started driving two setters. `EXIT_BY` is `1 - ENTER_FROM`, its
+own slider came off on 2026-09-02 for exactly that reason, and it is still a patched constant
+because the mirror has to be applied. The gate was charging the author for a control they had
+already had removed. **The cap is untouched at sixty and what is counted is now controls**:
+
+| | before | after |
+|---|---|---|
+| sliders | 57 | **58** |
+| switches (the camera's lock, the whole fit) | 2 | 2 |
+| **controls, against a cap of 60** | 59 | **60** |
+| patched constants (what the gate used to count) | 60 | 61 |
+
+**So the bench is now exactly full**, and the next knob costs one. That is the author's to spend:
+the rule at the top of `tools/bench/patches.ts` is that a knob whose question has been answered
+comes off, and nothing was taken off here because deciding which is not this session's call.
+
+**What a second slider would buy, if the author wants to spend one.** The scanlines. Spec 14 §2
+stage 5 is the only stage with a stated default — *"off by default until the phone says
+otherwise"* — and ganging them behind a **threshold** at 0.6 of the master's travel is the one
+part of this that is a guess rather than a number the spec states. It reads *"off by default"* and
+*"to heavy"* together: the coat below 0.6 has no comb and heavy is the setting that brings one. If
+that is the wrong shape in the hand, the fix is a slider of their own.
+
+#### Three things spec 14 says that could not all be true, all recorded and none ruled
+
+Full detail is in spec 14's own ⚠ notices; the short form:
+
+1. **§2 stage 2 against §3.5 and the acceptance.** *"The grade's black lift must not raise"* the
+   anomaly's cloud gaps, and they must *"sample to `#000000` after the grade"* — but the anomaly's
+   bed is drawn in `TRUE_BLACK` **today**, and a full-screen composite cannot exclude a colour.
+   Every additive stage hits it, not only the lift. At the top of the travel the gaps sample to
+   `rgb(14, 12, 24)`; at 0 they sample to `#000000` exactly, which is where it ships. Four
+   candidates are tabled there and **(a) — the grade applied to the nine authored colours at
+   authoring time — is ADR-0011's own prediction and the only one that also buys gamma and
+   per-channel gain.**
+2. **§3.4 forbids texture; §2 stage 5 requires a pattern.** There is no way to draw a comb across
+   a phone-sized frame in Canvas2D except as a pattern fill — one `fillRect` per row is 1 266
+   calls a frame. §3.4 is **read as binding the world**, since it sits under *"authoring rules the
+   other specs inherit"* and its examples are fills that give a shape a material. If the author
+   reads it as binding the pass too, the scanline stage comes out.
+3. **The plan against §2 on chromatic aberration** — struck above, spec wins.
+
+#### And the stroke lint exists, with one name on its list
+
+Spec 14's acceptance has always included *"a lint over the render layer finds"* no stroke below
+1 px, and there was none. `test/render/strokes.test.ts` is it, and it is **two halves that check
+each other**, because seven of the twenty-three widths the renderer sets are expressions over
+presentation state and a parser can only skip those:
+
+- the **enumeration** is static — every `…lineWidth = …` in `src/render/` found by parsing, so a
+  new one cannot appear unnoticed;
+- the **widths** are observed — the real renderer driven over a real run through the census's own
+  recording context, reading what actually reached the canvas.
+
+Each half is asserted against the other: every static site must be reached by the corpus, and
+every recorded width must belong to a static site. A path nobody flies fails rather than passing
+quietly. ⚠ What it cannot prove is that a width is at its own minimum; the corpus bounds each site
+from above, and the one that matters is bounded by arithmetic as well.
+
+**Nothing in the game is below the 1 px structure floor.** Exactly one stroke sits between that
+and §3.1's 1.5 px readable floor — the deadline's hairline at `TRACK_WIDTH × HAIR` = **1.32**
+design units — and §3.1 does not say which of its two floors a **track** is. Read as a line,
+`HAIR` goes 0.55 → 0.63 and the far end widens 14%; read as structure, nothing moves. **The test
+asserts the list rather than picking**, so the ruling moves a number on purpose.
+
+#### What is owed
+
+- **Fly the master.** It is at `/bench` on the dev server, so the QR that puts the game on the
+  phone puts the knob on the same phone. The opening value is the whole point and nobody has one.
+- **Rule the true-black conflict**, ideally as ADR-0011's (a), which closes that ADR's open note
+  at the same time.
+- **Rule the hairline**: is a track read as a line, or is it structure?
+- **Rule the scanline threshold**, or spend the bench's last control on it.
 
 ---
 

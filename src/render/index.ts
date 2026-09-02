@@ -61,6 +61,7 @@ import { drawAnomaly } from './anomaly.ts';
 import { drawRungs } from './rungs.ts';
 import { boundaryMotes, drawBoundary } from './boundary.ts';
 import { drawDeadline, drawSos } from './deadline.ts';
+import { applyGrade } from './grade.ts';
 import {
   BODY_FILL,
   CORE,
@@ -1445,4 +1446,16 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   for (const mark of view.sightings) drawSighting(context, mark);
 
   context.restore();
+
+  // **The retro grade, last and over everything** — spec 14 §2's *"one
+  // full-screen post-process, applied after everything else."* It is outside the
+  // letterbox transform because it is the only thing in the game that is not
+  // drawn in design units: a dither cell and a scanline pitch are statements
+  // about the frame buffer, and resampling either one is what makes it a moiré
+  // rather than a texture ([`grade.ts`](./grade.ts)).
+  //
+  // It is **off on `main`** and asks the canvas for nothing at all in that state,
+  // which is the same rule the boundary is held to: absent means nothing asked,
+  // not a fill at alpha zero.
+  applyGrade(context, fit.scale, view.tick);
 }
