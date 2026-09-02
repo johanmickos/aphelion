@@ -105,6 +105,111 @@ try {
   process.exit(1);
 }
 
+/**
+ * ⚠ **A slider you cannot put back where `main` has it is a slider that lies.**
+ *
+ * `Back to defaults` is all-or-nothing, so restoring **one** knob means dragging
+ * it back — and that needs `main`'s value to be inside the slider's range *and* on
+ * one of its steps. Nothing checked either, and both had drifted: `BOW_CAP` sat at
+ * 135 against a slider written 30 – 90, because the slider is in board pixels and
+ * the constant is in design units, so the number the author dragged to was a third
+ * of the number they read.
+ *
+ * **It runs here rather than in `test/bench.test.ts`** because six of the
+ * constants are module-private on `main` and only the patched tree exports them —
+ * which is the same reason the entry is typechecked here. A bench whose sliders
+ * are wired to nothing is refused above; one whose sliders cannot reach the game
+ * is the same defect a step further on.
+ */
+async function checkKnobsReachMain(): Promise<void> {
+  const entry = readFileSync(join(HERE, 'entry.ts'), 'utf8');
+  const where = new Map<string, string>();
+  for (const match of entry.matchAll(/import \* as (\w+) from '\.\/(src\/[^']+)'/g)) {
+    where.set(match[1]!, match[2]!);
+  }
+  const modules = new Map<string, Record<string, unknown>>();
+  for (const [alias, path] of where) {
+    modules.set(alias, (await import(join(WORK, path))) as Record<string, unknown>);
+  }
+
+  // **Split into entries first and read fields inside one.** One pattern swept
+  // over sixty objects will take an `id` from one knob and a `min` from the next
+  // and call it a parse; every knob has an `apply`, so counting those is what says
+  // whether anything was skipped.
+  const table = entry.slice(entry.indexOf('const KNOBS: Knob[] = ['));
+  const entries = table
+    .slice(0, table.indexOf('\n];'))
+    .split(/\n {2}\{\n/)
+    .slice(1);
+  const applies = [...entry.matchAll(/^ {4}apply: /gm)].length;
+  if (entries.length !== applies) {
+    console.error(
+      `\n  ${entries.length} knobs read out of ${applies} — the reader below is stale\n`,
+    );
+    process.exit(1);
+  }
+
+  // **Ranges are written in the constant's own units and some of them say so** —
+  // `min: 300 * SCALE` rather than `900` — so a bound is a small expression rather
+  // than a literal. Products of numbers and imported constants, and nothing else:
+  // anything richer than that belongs in a variable, not in a slider's bound.
+  const known = new Map<string, number>();
+  // Every `src/` module the entry imports from, by either form — a bound may name
+  // a constant the entry took by name (`BOARD_PIXEL`) as readily as one it reached
+  // through a namespace.
+  for (const match of entry.matchAll(/from '\.\/(src\/[^']+)'/g)) {
+    const module = (await import(join(WORK, match[1]!))) as Record<string, unknown>;
+    for (const [name, value] of Object.entries(module)) {
+      if (typeof value === 'number') known.set(name, value);
+    }
+  }
+  const number = (text: string, name: string): number => {
+    const found = new RegExp(`^ {4}${name}: (.+?),$`, 'm').exec(text)?.[1];
+    if (found === undefined) return NaN;
+    let product = 1;
+    for (const token of found.split('*').map((part) => part.trim())) {
+      // The underscore is a numeric separator in `10_000` and a letter in
+      // `BOARD_PIXEL`, so it is only stripped where the token is a number.
+      const value = /^-?[\d._]+$/.test(token)
+        ? Number(token.replaceAll('_', ''))
+        : known.get(token);
+      if (value === undefined || !Number.isFinite(value)) return NaN;
+      product *= value;
+    }
+    return product;
+  };
+  const broken: string[] = [];
+  for (const text of entries) {
+    const id = /^ {4}id: '([^']+)',$/m.exec(text)?.[1] ?? '?';
+    const min = number(text, 'min');
+    const max = number(text, 'max');
+    const step = number(text, 'step');
+    const from = /^\s*base: (\w+)\.(\w+),$/m.exec(text);
+    if (from === null || !Number.isFinite(min) || !Number.isFinite(max) || !(step > 0)) {
+      broken.push(`${id}: could not be read — min ${min}, max ${max}, step ${step}`);
+      continue;
+    }
+    const base = modules.get(from[1]!)?.[from[2]!];
+    if (typeof base !== 'number') {
+      broken.push(`${id}: ${from[1]}.${from[2]} is not a number`);
+    } else if (base < min || base > max) {
+      broken.push(`${id}: main has ${base}, outside the slider's ${min} – ${max}`);
+    } else if (Math.abs((base - min) / step - Math.round((base - min) / step)) > 1e-6) {
+      broken.push(`${id}: main has ${base}, not on a step of ${step} from ${min}`);
+    }
+  }
+  if (broken.length > 0) {
+    console.error('\n  sliders that cannot reach the value main has:\n');
+    for (const line of broken) console.error(`    ${line}`);
+    console.error(
+      '\n  Fix the range, the step, or the units — a slider whose default is unreachable\n' +
+        '  cannot be put back one knob at a time, and Back to defaults is all-or-nothing.\n',
+    );
+    process.exit(1);
+  }
+}
+await checkKnobsReachMain();
+
 await build({
   root: WORK,
   logLevel: 'warn',

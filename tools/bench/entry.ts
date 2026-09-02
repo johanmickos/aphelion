@@ -45,7 +45,7 @@ import * as bands from './src/render/boundary.ts';
 import * as weather from './src/state/anomaly.ts';
 import * as strata from './src/render/rungs.ts';
 import * as fit from './src/render/letterbox.ts';
-import { DESIGN_HEIGHT, DESIGN_WIDTH } from './src/state/design.ts';
+import { BOARD_PIXEL, DESIGN_HEIGHT, DESIGN_WIDTH } from './src/state/design.ts';
 import { SCALE } from './src/sim/units.ts';
 import { createPresentation, derive } from './src/state/derive.ts';
 import type { PresentationState } from './src/state/types.ts';
@@ -168,7 +168,7 @@ const KNOBS: Knob[] = [
     what: 'how brightly a body out of reach is drawn — spec 04 §3 answers it at 40%. Brightness is the only ordinal channel (spec 00 §3) and this moves the alpha `dim()` already sanctions',
     min: 0.1,
     max: 1,
-    step: 0.05,
+    step: 0.01,
     base: view.RIM_AT_REST,
     apply: view.set_RIM_AT_REST,
     restarts: false,
@@ -272,7 +272,7 @@ const KNOBS: Knob[] = [
     what: 'design units past which a body is not marked at all. Spec 03 §6 records “reach is not yet a number” and defers it to spec 17; this is the prototype’s, carried',
     min: 1000,
     max: 12000,
-    step: 200,
+    step: 100,
     base: mark.SIGHTING_RANGE,
     apply: mark.set_SIGHTING_RANGE,
     restarts: false,
@@ -468,7 +468,7 @@ const KNOBS: Knob[] = [
     what: 'how vibrant an arc is before any aim has closed. It heats in place from here to full as the hand comes in, and thickens on the same ramp — the one surface in the game that does not take the energy table’s alpha, because it is the instrument rather than the world',
     min: 0.05,
     max: 1,
-    step: 0.05,
+    step: 0.01,
     base: view.WINDOW_AT_REST,
     apply: view.set_WINDOW_AT_REST,
     restarts: false,
@@ -481,7 +481,7 @@ const KNOBS: Knob[] = [
     what: 'the A/B. At 0 the tide’s width is mass alone — spec 04 §2 as written, and what shipped yesterday. At 1 it is mass × grip, which is the prototype’s reading: it bubbles in as a bead and stretches along the limb as you close. Nothing is deleted at either end',
     min: 0,
     max: 1,
-    step: 0.05,
+    step: 0.01,
     base: lamp.TIDE_GROWTH,
     apply: lamp.set_TIDE_GROWTH,
     restarts: false,
@@ -530,25 +530,22 @@ const KNOBS: Knob[] = [
   {
     id: 'enterfrom',
     label: 'Instrument entrance',
-    what: 'spec 00 §5’s ENTER, applied to the compass: how small it starts before popping to full with one overshoot when the rings arrive at the freeze. At 1 there is no pop. It scales the instrument and never the orbit path',
+    what: 'how far in the instrument pops from as it arrives — and, by the same amount, how far in it collapses as it leaves. `EXIT_BY` is `1 - ENTER_FROM` on main, so the two ends are one gesture and this slider moves both. At 1 it arrives and leaves at full size, with only the light doing the work',
     min: 0.6,
     max: 1,
     step: 0.01,
     base: instrument.ENTER_FROM,
-    apply: instrument.set_ENTER_FROM,
-    restarts: false,
-    group: 'compass',
-    places: 2,
-  },
-  {
-    id: 'exitby',
-    label: 'Click out',
-    what: 'how far in the instrument collapses as it leaves. It leaves on the curve it arrives on, reversed — so it swells about a tenth of this away from rest first, then comes back through and shuts. At 0 it just fades',
-    min: 0,
-    max: 1,
-    step: 0.05,
-    base: instrument.EXIT_BY,
-    apply: instrument.set_EXIT_BY,
+    // ⚠ **Both ends, because on `main` they are one number.** `EXIT_BY` is
+    // `1 - ENTER_FROM` — ruled 2026-08-29, *"the instrument leaves by exactly the
+    // amount it arrived by and the two ends stay one gesture"* — and a derived
+    // constant evaluates once at module load, so the bench was flying an entrance
+    // the author had moved against an exit still mirroring the old one. It had its
+    // own slider until 2026-09-02; that slider let the two disagree on purpose,
+    // which is the one thing the ruling says they must not do.
+    apply: (value: number) => {
+      instrument.set_ENTER_FROM(value);
+      instrument.set_EXIT_BY(1 - value);
+    },
     restarts: false,
     group: 'compass',
     places: 2,
@@ -580,12 +577,17 @@ const KNOBS: Knob[] = [
     places: 0,
   },
   {
+    // ⚠ **In design units, because `BOW_CAP` is.** It read 30 – 90 against a
+    // constant of 135, so the default was off the end of its own slider and every
+    // value the author could drag to was a third of what `main` has. Spec 05 talks
+    // in board pixels and the constant is `45 * BOARD_PIXEL`, so the bounds carry
+    // the conversion rather than dropping it. `pnpm bench` refuses this now.
     id: 'bowcap',
     label: 'Gravity bow · ceiling',
     what: 'spec 05 says 30px in three places, and at 30 the clamp bites at the rim of any body above radius 44 — so the biggest body in the field bent less than the median one. 45 is the smallest value that clears the field’s own range',
-    min: 30,
-    max: 90,
-    step: 3,
+    min: 30 * BOARD_PIXEL,
+    max: 90 * BOARD_PIXEL,
+    step: BOARD_PIXEL,
     base: rung.BOW_CAP,
     apply: rung.set_BOW_CAP,
     restarts: false,
@@ -728,7 +730,7 @@ const KNOBS: Knob[] = [
     what: 'how far the craft drifts sideways before the view follows, in design units either side. **328 is the prototype\u2019s own**: its cameraMarginFrac is 0.22 of the window width and it keeps the ship between the margins, which is a half-band of 0.28\u00d7W. The first build shared the vertical band (168) and flew as \u201cfollows the ship laterally a bit too much\u201d. Wider is lazier AND smoother \u2014 at 328 the view is still on 69% of ticks against 49%, and its jerk p95 falls from 0.55 to 0.41. The follow RATE is not the lever: the prototype\u2019s is 3, which this already uses',
     min: 60,
     max: 520,
-    step: 4,
+    step: 2,
     base: cameraKnobs.SIDEWAYS_BAND,
     apply: cameraKnobs.set_SIDEWAYS_BAND,
     restarts: false,
@@ -832,7 +834,7 @@ const KNOBS: Knob[] = [
     what: 'in design units, spent on a squared ramp capped at spec 05 §2’s 6%. 2 532 is one picture: derived rather than ruled, from a floor (the tint must be visible before the anomaly’s foot can appear at the top of the frame) and a ceiling (a sky that is always warming is not warming)',
     min: 0,
     max: 10_000,
-    step: 100,
+    step: 4,
     base: weather.SKY_LEAD,
     apply: weather.set_SKY_LEAD,
     restarts: false,

@@ -2045,6 +2045,44 @@ slider whose constant is still `const` answers a question confidently and wrongl
 **Nothing in the game moved.** A patch is applied at bench-build time only, so removing one leaves
 the constant exactly where its ruling left it.
 
+### ⚠ The bench audited itself, 2026-09-02 — nine sliders could not reach `main`
+
+> *"Does the bench page have 100% valid knobs? I see e.g. 'Click out' — is that still valid?"*
+> — author
+
+**It did not, and the check is now part of `pnpm bench`.** `Back to defaults` is all-or-nothing, so
+restoring **one** knob means dragging it back — which needs `main`'s value to be inside the slider's
+range *and* on one of its steps. Nothing checked either.
+
+| what was wrong | which |
+|---|---|
+| **default outside the slider's own range** | `BOW_CAP` |
+| default not on any step, so it could not be dragged back to | `RIM_AT_REST`, `SIGHTING_RANGE`, `WINDOW_AT_REST`, `TIDE_GROWTH`, `EXIT_BY`, `SIDEWAYS_BAND`, `SKY_LEAD` |
+
+**`BOW_CAP` is the one that mattered and it is a units bug.** The constant is `45 * BOARD_PIXEL` —
+**135** design units — and the slider was written **30 – 90**, in board pixels, because spec 05 talks
+in pixels. So the default sat off the end of its own slider and every value the author could drag to
+was a third of what the game has. It has been that way since M3.2 and nobody saw it, because
+`BOW_GAIN` is zero and the bow is switched off.
+
+**The check lives in `tools/bench/build.ts` rather than in `test/bench.test.ts`**, because six of the
+constants are module-private on `main` and only the patched tree exports them — the same reason the
+bench's entry is typechecked there. A bench whose sliders are wired to nothing is refused already;
+one whose sliders cannot reach the game is that defect a step further on.
+
+### ⚠ And *Click out* was not a knob at all
+
+`EXIT_BY` is **`1 - ENTER_FROM`** — ruled 2026-08-29, *"the instrument leaves by exactly the amount it
+arrived by and the two ends stay one gesture"* — and `m2-the-instrument.md` says it in as many words:
+*"`EXIT_BY` is no longer a taste."* A derived constant evaluates **once**, at module load, so the
+bench was worse than stale in two directions at the same time: its own slider let the two ends
+disagree on purpose, and moving *Instrument entrance* left the exit still mirroring the value the
+entrance used to have.
+
+So the slider comes off — **58 → 57** — and *Instrument entrance* drives both setters, which is what
+keeps the shipped relation true on the bench. The pairing test still holds in both directions,
+because a slider that names two setters drives two patches.
+
 ---
 
 ### ⚠ The unbound hold — investigated 2026-09-02, dropped by the author the same day
