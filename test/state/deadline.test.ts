@@ -17,6 +17,7 @@ import {
   FULL_SECONDS,
   RESTATE_TICKS,
   SOS_FLOOR,
+  deadlineOf,
   presenceAt,
 } from '../../src/state/deadline.ts';
 import type { PresentationState } from '../../src/state/types.ts';
@@ -63,13 +64,17 @@ describe('the scan is a property of the coast', () => {
   });
 
   /**
-   * **And it converges anyway**, which is
+   * **And there is a backstop**, which is
    * [ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)'s
-   * third rule and the only thing that makes a carried value safe. Nothing here
-   * can hold a disagreement longer than half a second, whatever it was about.
+   * third rule kept honest. ⚠ It was half a second and is two, because measured
+   * over the author's own run **6 of the 10 expensive ticks were convergence
+   * re-scans finding the answer already in hand** — and a memo of a pure function
+   * whose key is checked directly is not a decay.
    */
-  it('is re-run at least every half second regardless', () => {
-    const views = fly(drifting(60, 300), RESTATE_TICKS * 2 + 4);
+  it('is re-run on a backstop regardless', () => {
+    // A long climb, so the coast outlives the backstop. It needs no deadline on
+    // it: what is asserted is that the scan is re-run, not what it finds.
+    const views = fly(drifting(0, 40), RESTATE_TICKS * 2 + 10);
     const scans = [...new Set(views.map((view) => view.rescue.at))].sort((a, b) => a - b);
     expect(scans.length).toBeGreaterThan(2);
     for (let at = 1; at < scans.length; at++) {
@@ -77,15 +82,48 @@ describe('the scan is a property of the coast', () => {
     }
   });
 
-  /** The points are world points, so the craft advancing into them moves nothing. */
-  it('holds its window still as the craft flies into it', () => {
+  /**
+   * **The dot is a world point and does not move** — which is what the player is
+   * looking at, and what *"it should only appear, and NOT MOVE"* asks for.
+   */
+  it('holds the dot still as the craft flies into it', () => {
     const views = fly(drifting(60, 300), 20).filter((view) => view.deadline !== null);
     expect(views.length).toBeGreaterThan(5);
     const first = views[0]!.deadline!;
     for (const view of views) {
       if (view.rescue.at !== views[0]!.rescue.at) break;
-      expect(view.deadline!.path[0]!.x).toBeCloseTo(first.path[0]!.x, 6);
+      expect(view.deadline!.cross.x).toBeCloseTo(first.cross.x, 6);
+      expect(view.deadline!.cross.y).toBeCloseTo(first.cross.y, 6);
     }
+  });
+
+  /**
+   * ⚠ **And the track starts at the craft, not where the craft was.**
+   *
+   * The scan is cached, so its first sample is where the craft stood when it ran.
+   * Measured over the author's reference run before this, the drawn track began
+   * **177 design units behind the craft at p50 and 647 at worst** — over half a
+   * picture of it trailing the ship, and part of what *"it's really long"* was
+   * about.
+   */
+  it('starts the track at the craft rather than where the craft was', () => {
+    const sim = drifting(60, 300);
+    let view = createPresentation(sim);
+    let worst = 0;
+    for (let tick = 0; tick < 40; tick++) {
+      stepSim(sim, { pressed: false });
+      view = derive(view, sim);
+      const track = view.deadline;
+      if (track === null) continue;
+      const head = track.path[0]!;
+      // Behind is against the craft's own travel.
+      const behind = -(
+        (head.x - view.craft.x) * sim.craft.vx +
+        (head.y - view.craft.y) * sim.craft.vy
+      );
+      worst = Math.max(worst, behind);
+    }
+    expect(worst).toBeLessThanOrEqual(1e-6);
   });
 
   /**
@@ -125,20 +163,32 @@ describe('the scan is a property of the coast', () => {
    * ⚠ **And it does not flicker**, which is the defect this replaced: *"the
    * warning line seems to draw, disappear, and draw again as I'm traveling."*
    *
-   * The scan is re-run twice a second for convergence, and the first build
-   * restarted the mark's life on every re-run — so the cue faded out and back in
-   * whether or not anything had changed. A re-scan that finds the same mark is
-   * not a new mark.
+   * The scan is re-run on a backstop, and the first build restarted the mark's
+   * life on every re-run — so the cue faded out and back in whether or not
+   * anything had changed. A re-scan that finds the same mark is not a new mark.
+   *
+   * Asserted at the seam rather than by waiting for a backstop to come round: a
+   * memo with a stale `at` is exactly what a re-scan sees, and the age has to
+   * survive it.
    */
   it('does not restart its life when the scan is merely re-run', () => {
-    const views = fly(drifting(-100, 200, 2500), RESTATE_TICKS * 2 + 10);
-    // More than one scan happened over this stretch — otherwise the test proves
-    // nothing about re-scanning.
-    expect(new Set(views.map((view) => view.rescue.at)).size).toBeGreaterThan(1);
-    // And the mark's age only ever went up.
-    for (let at = 1; at < views.length; at++) {
-      expect(views[at]!.rescue.shown).toBeGreaterThan(views[at - 1]!.rescue.shown - 1);
+    const sim = drifting(60, 300);
+    let view = createPresentation(sim);
+    // Stopped while the dot is still ahead — past it there is genuinely no rescue
+    // left and a re-scan is *right* to find none, which is a different claim.
+    for (let tick = 0; tick < 10; tick++) {
+      stepSim(sim, { pressed: false });
+      view = derive(view, sim);
     }
+    const memo = view.rescue;
+    expect(memo.deadline?.cross).toBeTruthy();
+    expect(memo.shown).toBeGreaterThan(3);
+
+    // Force the re-scan a backstop would do, and the mark must keep its age.
+    const forced = deadlineOf({ ...memo, at: sim.tick - RESTATE_TICKS }, sim);
+    expect(forced.at).toBe(sim.tick);
+    expect(forced.shown).toBeGreaterThanOrEqual(memo.shown);
+    expect(forced.drawable).toBe(memo.drawable);
   });
 });
 
@@ -212,6 +262,32 @@ describe('the SOS', () => {
     }
     expect(sawDrifting).toBe(true);
     expect(sawHeld).toBe(true);
+  });
+
+  /**
+   * ⚠ **A craft past its own dot has no rescue left, and the SOS reads that off
+   * the lead** rather than waiting for the next scan to report it.
+   *
+   * It used to be learned only when a convergence re-scan came round, which is up
+   * to [`RESTATE_TICKS`](../../src/state/deadline.ts) late — and that timer is two
+   * seconds now, so the old arrangement would have made the strobe arrive after the
+   * craft was already gone.
+   */
+  it('strobes as soon as the dot is behind the craft', () => {
+    const sim = drifting(60, 300);
+    let view = createPresentation(sim);
+    let sawDot = false;
+    for (let tick = 0; tick < 120; tick++) {
+      stepSim(sim, { pressed: false });
+      view = derive(view, sim);
+      if (view.deadline !== null && view.deadline.lead > 0) sawDot = true;
+      // The moment the lead goes negative there is nothing left to press for.
+      if (sawDot && view.deadline === null && view.rescue.deadline !== null) {
+        expect(view.sos).not.toBeNull();
+        return;
+      }
+      if (sim.ending !== null) break;
+    }
   });
 
   /**

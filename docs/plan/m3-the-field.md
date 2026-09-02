@@ -137,6 +137,45 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
+#### ⚠ Two defects found by asking where the cost was, 2026-09-02
+
+The author, on being shown the cost: *"Hold on, is there anything actionable here? Are we talking
+about computations run per tick, and that we added a lot more?"*
+
+**No, and the honest answer needed a before-and-after.** Over the shipped run, session start against
+now: `derive` mean **0.0108 → 0.0160 ms**, which at the phone's 10.8× is +0.06 ms on a 16.7 ms frame.
+It is a **spike**, once per coast, not a per-tick cost. But looking for where the spike was found two
+things that are defects rather than tuning.
+
+**1 · The track was drawn from where the craft *was*.** The scan is cached, so its first sample is
+the craft's position at scan time — and measured over the author's reference run the drawn track
+began **177 design units behind the craft at p50 and 647 at worst**, over half a picture of it
+trailing the ship. That is part of what *"it's really long"* was about, and the hairline profile only
+made the wrong end faint. The path is trimmed to the craft now, with the craft prepended so it still
+*reaches* the ship — the prototype is emphatic that clamping the near end *"drew a segment sitting a
+quarter of a screen ahead of the ship, touching nothing."*
+
+**2 · The convergence re-scan was the majority of the cost, and it was insurance.** Over the author's
+run, **6 of the 10 expensive ticks were re-scans finding the answer already in hand.** ADR-0015's
+third rule is written about **decays**; a memo of a pure function whose key is checked directly is
+not one, and what this scan depends on is the *ray*, which `sameLine` checks. So the timer is a
+backstop against a wrong cache key rather than the thing keeping the value true, and it is **two
+seconds** instead of half of one.
+
+**And it was quietly doing one real job, which is now done better.** A craft that passes its own dot
+has no rescue left, and that used to be learned when the next re-scan reported no cross — up to half
+a second late, and up to two seconds late after this change. It is read off the **lead** now, which
+is immediate, cheaper, and sooner than the arrangement it replaces.
+
+| the author's reference run | before | after |
+|---|---|---|
+| ticks over 0.3 ms | 15 | **6** |
+| `derive` p99 | 0.610 ms | **0.106** |
+| track starts behind the craft | up to 647 units | **0** |
+
+The single worst tick is roughly unchanged — that is a genuine scan at a new coast, and it is what
+the ruled spreading would still address. What has gone is the *count* of them.
+
 #### ⚠ The phone answered the deadline's cost question, 2026-09-02
 
 A reference playthrough (`diagnostics/2026-09-02T06-02-56-828Z`, 1 040 ticks, out of bounds) carries

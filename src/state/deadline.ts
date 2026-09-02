@@ -57,15 +57,30 @@ export const FADE_IN_SECONDS = 2.63;
 export const FULL_SECONDS = 1.35;
 
 /**
- * How long a carried scan may go without being re-run, in ticks.
+ * How long a carried scan may go without being re-run, in ticks — **two seconds,
+ * and it is a backstop rather than a mechanism.**
  *
- * Half a second. It is a **convergence bound rather than a refresh rate**: the
- * scan is already re-run whenever the drift changes, so this only exists to make
- * ADR-0015's third rule literally true — nothing here can carry a disagreement
- * for longer than this, whatever the disagreement was about. At 0.019 ms a scan
- * it costs a run about 0.04 ms a second.
+ * ## ⚠ It was half a second, and it was the majority of the cost on real play
+ *
+ * Measured over the author's own reference run, **6 of the 10 ticks that cost over
+ * 0.3 ms were convergence re-scans** — full scans that found the answer already in
+ * hand. On the shipped pilot it is 4 scans; on a run that spends its time coasting
+ * at walls it is 8, and they dominate.
+ *
+ * **A memo of a pure function is not a decay**, which is the distinction
+ * [ADR-0015](../../docs/adr/0015-presentation-state-carries-what-decays.md)'s third
+ * rule is written about. What the scan depends on is the **ray**, and the ray is
+ * checked directly ([`sameLine`](#sameline)) — the craft advancing along it changes
+ * none of the answer, because every point in it is a world point. So this is
+ * insurance against a cache key that is wrong, not the thing that keeps the value
+ * true.
+ *
+ * **And the one job it was quietly doing has been taken off it.** A craft that
+ * passes its own dot has no rescue left, and that used to be learned by the next
+ * re-scan reporting no cross — up to half a second late. It is read off the lead
+ * now ([`hasRescue`](#hasrescue)), immediately, which is both cheaper and sooner.
  */
-export const RESTATE_TICKS = ticksIn(500);
+export const RESTATE_TICKS = ticksIn(2000);
 
 /**
  * How much of its own brightness the SOS carries at the bottom of its strobe.
@@ -273,15 +288,41 @@ function doomOf(previous: DeadlineMemo, sim: SimState): { doomed: Wall | null; c
  */
 const STRAND_TICKS = 6;
 
+/**
+ * How long until the craft reaches the mark, in seconds — negative once past it.
+ *
+ * The scan measured it once; what has happened since is simply that the craft has
+ * flown some of it. **Shared with [`sosOf`](#sosof)**, and that is the point: a
+ * craft past its own dot has no rescue left, and reading that off the lead is
+ * immediate where waiting for the next scan to report no cross is up to
+ * [`RESTATE_TICKS`](#restate_ticks) late.
+ */
+function leadOf(memo: DeadlineMemo, sim: SimState): number {
+  const found = memo.deadline;
+  if (found === null || found.cross === null) return 0;
+  return (found.leadTicks - (sim.tick - memo.at)) * SECONDS_PER_TICK;
+}
+
+/** Whether this drift still has a press left that saves it. */
+function hasRescue(memo: DeadlineMemo, sim: SimState): boolean {
+  const found = memo.deadline;
+  if (found === null) return true;
+  return found.cross !== null && leadOf(memo, sim) > 0;
+}
+
 /** The deadline as the renderer is handed it, or `null` when there is none. */
 export function deadlineView(memo: DeadlineMemo, sim: SimState): DeadlineView | null {
   const found = memo.deadline;
   if (found === null || found.cross === null || !memo.drawable) return null;
-  // How long until the craft reaches the mark. The scan measured it once; what
-  // has happened since is simply that the craft has flown some of it.
-  const lead = (found.leadTicks - (sim.tick - memo.at)) * SECONDS_PER_TICK;
+  const lead = leadOf(memo, sim);
   return {
-    path: found.path,
+    // **Trimmed to the craft**, which is the other half of *"it's really long"*.
+    // The scan is cached, so its first sample is where the craft *was* when it
+    // ran — measured over the author's own run, the drawn track started **177
+    // design units behind the craft at p50 and 647 at worst**, which is over half
+    // a picture of it trailing the ship. The prototype's track *"always reaches
+    // the ship"*; this is that, once the cache is taken into account.
+    path: ahead(found.path, sim),
     cross: found.cross,
     lead,
     presence: presenceAt(lead, memo.shown),
@@ -291,6 +332,29 @@ export function deadlineView(memo: DeadlineMemo, sim: SimState): DeadlineView | 
     // because a constraint that does not exist yet is one that does not bind.
     affordable: 1,
   };
+}
+
+/**
+ * The samples still in front of the craft, with the craft itself at the head of
+ * them.
+ *
+ * A sample is behind when its offset from the craft points against the craft's own
+ * travel — one dot product, and no need for the ray's direction to be stored.
+ * The craft is prepended so the track still reaches it: the prototype is emphatic
+ * that clamping the near end *"drew a segment sitting a quarter of a screen ahead
+ * of the ship, touching nothing."*
+ */
+function ahead(
+  path: readonly { readonly x: number; readonly y: number; readonly saves: boolean }[],
+  sim: SimState,
+): readonly { readonly x: number; readonly y: number; readonly saves: boolean }[] {
+  const { x, y, vx, vy } = sim.craft;
+  let from = 0;
+  while (from < path.length && (path[from]!.x - x) * vx + (path[from]!.y - y) * vy < 0) from++;
+  if (from >= path.length) return path.slice(-1);
+  // The head carries the sample it replaces' own answer: the craft is standing on
+  // that stretch, so whether a press works here is what that sample measured.
+  return [{ x, y, saves: path[from]!.saves }, ...path.slice(from)];
 }
 
 /**
@@ -326,8 +390,7 @@ const BIRTH_TICKS = ticksIn(300);
  */
 export function sosOf(memo: DeadlineMemo, sim: SimState): SosView | null {
   const wall =
-    memo.doomed ??
-    (memo.deadline !== null && memo.deadline.cross === null ? memo.deadline.wall : null);
+    memo.doomed ?? (memo.deadline !== null && !hasRescue(memo, sim) ? memo.deadline.wall : null);
   if (wall === null || sim.ending !== null) return null;
   // The strobe, as a triangle rather than a sine: ADR-0014 keeps `sin` out of
   // anything the simulation has to agree about across two engines, and this is
