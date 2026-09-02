@@ -1049,9 +1049,19 @@ function sayFit(): void {
  * **p99 and the worst frame, never a mean**, which is
  * `docs/plan/m3-the-field.md`'s standing rule for this: a rendering-induced
  * hitch is exactly the thing an average of frames that mostly return early
- * hides. The mean is here too, but as the *fitted* one — what a frame costs
- * before any tick runs — because that is the number a budget is made of and it
- * is a different question from *did anything stall*.
+ * hides. A fitted cost is here too, because that is the number a budget is made
+ * of and it is a different question from *did anything stall*.
+ *
+ * ## ⚠ It shows the **sum** and not the split, 2026-09-02
+ *
+ * It showed `perFrame` — what a frame costs before any tick runs — and that is
+ * the half of the fit a short sitting cannot determine. Measured over the whole
+ * dispatch corpus by `pnpm budget --corpus`: the sum spans 0.65 – 1.15 ms across
+ * 71 runs while the split spans −0.22 – 0.48, with **nine runs fitting a negative
+ * tick cost**. A slider moved for a minute produces frames that nearly all ran
+ * exactly one tick, which is precisely the case with no second point to put a
+ * line through — so the number on the HUD would have wandered while the slider
+ * did nothing.
  *
  * The clock is clamped to a whole millisecond in some browsers, so p99 and the
  * worst are integers and say so by being printed as integers. The fit recovers
@@ -1061,7 +1071,8 @@ function cost(): string {
   const timing = timingOf(meter);
   if (timing === null || bucketCount(timing.cpu) < 60) return '';
   const fit = frameCost(timing);
-  const drawn = fit === null ? '' : ` · ${fit.perFrame.toFixed(2)}ms a frame`;
+  const drawn =
+    fit === null ? '' : ` · ${(fit.perFrame + fit.perTick).toFixed(2)}ms a 1-tick frame`;
   return (
     `cpu p99 ${bucketAt(timing.cpu, 0.99)}ms · worst ${timing.cpu.max}ms` +
     drawn +

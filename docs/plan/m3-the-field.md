@@ -2016,6 +2016,33 @@ the constant exactly where its ruling left it.
 
 ---
 
+### ⚠ The unbound hold — investigated 2026-09-02, dropped by the author the same day
+
+> *"I feel like the last grab/capture should've force-released at some point. I shouldn't be able to
+> hold on to a planet outside its grab distance"* — author, on
+> `diagnostics/2026-09-02T17-23-27-399Z-run-dispatch.json`
+
+Carried here in full because the investigation is finished and what is left is a **ruling nobody has
+made**. The evidence, the cost and the three candidate predicates are in spec
+[00 · §6](../spec/00-tokens.md)'s own ⚠ notice, beside the standing ruling they bear on — *"the hold
+ends on a release and on nothing else"*, 2026-08-29, which chose **legibility** over a mechanism and
+put the answer in the filament's dying brightness.
+
+**The finding is that the legibility answer was tried and did not land.** The filament was burning at
+exactly its `FILAMENT_FLOOR` for four straight seconds of the hold the author is describing, and the
+message did not arrive.
+
+**The cause is not an orbit that grew too large.** The press at tick 1160 landed with the craft
+already **receding at 892 design units/s where escape at that radius is 791** — unbound from its
+first tick, so it never froze, and the whole five seconds is one dive receding from **0.28× to 1.53×**
+the grab range. Across the 26 replayable dispatches and 222 captures, **5 (2.3%)** ever leave the
+reach, **1.6%** of held ticks are spent outside it, and the furthest any capture reaches is p50 0.27×,
+p90 0.54×, p99 1.17×, **max 1.95×**.
+
+**Do not build it.** A force-release moves `SIM_VERSION` 9 → 10 and every replayable dispatch refuses
+— including the ones the parked camera session is waiting on and the ones `K = 640` was derived from.
+Spec 05 §5's ordering exists to defer exactly that cost.
+
 ## Exit
 
 The field looks like Aphelion for the whole run rather than a quarter of it. Next:

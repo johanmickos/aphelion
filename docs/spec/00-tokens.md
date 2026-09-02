@@ -129,6 +129,46 @@ footer uses obsolete numbering and is void.
 > measured against the **reach** rather than against grip, which falls as 1/r² and would put the
 > line at 0.009 exactly when the player catches something at range.
 >
+> > ### ⚠ The legibility answer was tried and did not land in flight, 2026-09-02
+> >
+> > The same feeling came back, about the same thing: *"I feel like the last grab/capture should've
+> > force-released at some point. I shouldn't be able to hold on to a planet outside its grab
+> > distance"* (author, on `diagnostics/2026-09-02T17-23-27-399Z`). **The cue was doing exactly what
+> > this ruling asks** — burning at its floor for four straight seconds of that hold — and it did not
+> > carry the message. Choosing legibility over a mechanism was a real decision and this is the
+> > evidence against it; it is recorded here rather than reversed, because reversing it is the
+> > author's.
+> >
+> > **And the cause was not an orbit that grew.** Measured: the press at tick 1160 landed with the
+> > craft at **0.28 ×** that body's reach and already **receding at 892 design units/s where escape at
+> > that radius is 791** — so the grab was *unbound from its first tick*, never froze, and the whole
+> > five seconds is one dive receding to **1.53 ×** the reach. `src/sim/dive.ts` names precisely that
+> > case: *"an unbound one never freezes at all."* (The speed collapse at the end is two bounces off
+> > other bodies at spec [01 · §10](./01-swing.md)'s 0.2 restitution, not the tether.)
+> >
+> > **How common, over the 26 dispatches that replay** — 222 captures, re-measured 2026-09-02:
+> >
+> > | | |
+> > |---|---|
+> > | captures that ever leave the grab range | **5 — 2.3%** |
+> > | held ticks spent outside it | **1.6%** of 21 076 |
+> > | furthest reached, as a fraction of the reach | p50 0.27 · p90 0.54 · p99 1.17 · **max 1.95** |
+> >
+> > **Nothing rules a maximum hold distance and this spec should not invent one.** Spec 01's physics
+> > tolerance is scoped *"at every radius from the floor to the grab range"*, so past the reach the
+> > behaviour is **undefined rather than permitted**; the **Cleared** ending already treats grab range
+> > as the edge of a body's influence; and 2026-09-01's *"an unbound grab draws no predicted path…
+> > they're rewarded for quick fly-bys and speed"* sharpens rather than contradicts this — a
+> > five-second unbound hold is not a quick fly-by, it is a stall.
+> >
+> > **The cost of reopening it is stated, because it is what makes this a ruling and not a fix**: a
+> > force-release changes what a tick does, `SIM_VERSION` 9 → 10, and all 26 replayable dispatches
+> > refuse — including the ones the parked camera session is waiting on and the ones `K = 640` was
+> > derived from. The three candidate predicates are release at `r > grabRange` flat, release only
+> > when *also* receding, or refuse the press when the grab is unbound at the outset. The last is
+> > cleanest physically and collides with spec [01 · §3](./01-swing.md)'s *"the choice is a fact
+> > rather than a threshold."*
+>
 > **§6 · The hand is dimmer, starts at the body's surface, and its crossings ramp.** Three notes on
 > one screenshot (author, 2026-08-29). This section brightens the hand *"as aim closes"* and states
 > neither end: it ran 0.35 → full CORE, which read as a bright bar across the middle of the
