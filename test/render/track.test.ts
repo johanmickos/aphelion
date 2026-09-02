@@ -12,7 +12,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CraftView, DeadlineView, SosView } from '../../src/state/types.ts';
 import { UNDEFORMED } from '../../src/state/deformation.ts';
-import { ION } from '../../src/render/palette.ts';
+import { ION, VOID } from '../../src/render/palette.ts';
 import { drawDeadline, drawSos } from '../../src/render/deadline.ts';
 
 interface Line {
@@ -42,6 +42,8 @@ function recorder() {
   const lines: Line[] = [];
   const dots: Dot[] = [];
   const words: Word[] = [];
+  const plates: { left: number; right: number; fill: string; alpha: number }[] = [];
+  let traced: { x: number; y: number }[] = [];
   const gradients: unknown[] = [];
   let pending: { x: number; y: number }[] = [];
   let arcs: { x: number; y: number; radius: number }[] = [];
@@ -67,11 +69,16 @@ function recorder() {
     beginPath: () => {
       pending = [];
       arcs = [];
+      traced = [];
     },
-    moveTo: (x: number, y: number) => pending.push({ x, y }),
+    moveTo: (x: number, y: number) => {
+      pending.push({ x, y });
+      traced.push({ x, y });
+    },
     lineTo(x: number, y: number) {
+      traced.push({ x, y });
       const from = pending.pop();
-      if (from === undefined) throw new Error('a lineTo with no moveTo before it');
+      if (from === undefined) return;
       lines.push({
         from,
         to: { x, y },
@@ -80,12 +87,27 @@ function recorder() {
         dash: [...context.dash],
       });
     },
-    arc: (x: number, y: number, radius: number) => arcs.push({ x, y, radius }),
+    arc: (x: number, y: number, radius: number) => {
+      arcs.push({ x, y, radius });
+      traced.push({ x, y });
+    },
     fill() {
-      for (const arc of arcs) {
-        dots.push({ ...arc, fill: String(context.fillStyle), alpha: context.globalAlpha });
+      // A plate is a traced path — corners and edges — rather than a lone circle,
+      // which is how it is told from the dot.
+      if (traced.length > 2) {
+        plates.push({
+          left: Math.min(...traced.map((p) => p.x)),
+          right: Math.max(...traced.map((p) => p.x)),
+          fill: String(context.fillStyle),
+          alpha: context.globalAlpha,
+        });
+      } else {
+        for (const arc of arcs) {
+          dots.push({ ...arc, fill: String(context.fillStyle), alpha: context.globalAlpha });
+        }
       }
       arcs = [];
+      traced = [];
     },
     stroke: () => {},
     fillRect: () => {},
@@ -97,16 +119,24 @@ function recorder() {
       gradients.push(1);
       return { addColorStop: () => {} };
     },
-    measureText: () => ({ width: 0 }),
+    measureText: (says: string) => ({ width: says.length * 20 }),
     strokeText: (says: string) => {
       rimmed = says;
     },
+    closePath: () => {},
     fillText(says: string, x: number, y: number) {
       words.push({ says, x, y, alpha: context.globalAlpha, rimmed: rimmed === says });
       rimmed = null;
     },
   };
-  return { context: context as unknown as CanvasRenderingContext2D, lines, dots, words, gradients };
+  return {
+    context: context as unknown as CanvasRenderingContext2D,
+    lines,
+    dots,
+    words,
+    gradients,
+    plates,
+  };
 }
 
 /** A track with `saves` laid out along a straight line, for readability. */
@@ -279,26 +309,64 @@ describe('the SOS', () => {
     return it;
   }
 
-  it('says SOS at the craft, rimmed rather than bloomed', () => {
+  it('says SOS at the craft', () => {
     const it = strobed(sos());
     expect(it.words).toHaveLength(1);
     expect(it.words[0]!.says).toBe('SOS');
     expect(it.words[0]!.y).toBeCloseTo(CRAFT.y, 6);
-    // Rimmed, because it is read over the boundary's own brightest ground and the
-    // author refused a glow behind moving text on 2026-08-29.
-    expect(it.words[0]!.rimmed).toBe(true);
+    // No bloom: the author refused a glow behind moving text on 2026-08-29,
+    // *"it's blurring the legibility"*.
     expect(it.gradients).toHaveLength(0);
   });
 
   /**
-   * **Offset toward the wall it is about**, which avoids the prototype's own
-   * recorded defect by construction: it put its mark on the away-from-the-boundary
-   * axis and found *"that is the same direction as the wake for every wall — so it
-   * was drawn over the ship's trail every single time."*
+   * ⚠ **On a dark plate, not a rim** (author, 2026-09-02): *"sometimes the SOS
+   * gets blended with the ion background."*
+   *
+   * It was ION over a VOID rim — the callout's treatment, which is right for a
+   * word over the field. The SOS fires **at the wall**, where the ground is ION
+   * too: at full heat the wash is (135, 52, 92) against the word's (255, 95, 162),
+   * the same hue, separated only by lightness. Spec 00 §6's own formula for a
+   * readable that must hold is a plate — *"INK on VOID at 88%"* — and spec 05 §5
+   * uses it against the anomaly's curtains.
    */
-  it('sits between the craft and the wall it is about', () => {
-    expect(strobed(sos({ toward: 1 })).words[0]!.x).toBeGreaterThan(CRAFT.x);
-    expect(strobed(sos({ toward: -1 })).words[0]!.x).toBeLessThan(CRAFT.x);
+  it('sits on a dark plate wide enough to hold it', () => {
+    const it = strobed(sos());
+    // The plate is a filled path, drawn before the word and centred on it.
+    expect(it.plates).toHaveLength(1);
+    const plate = it.plates[0]!;
+    expect(plate.fill.slice(0, 7).toUpperCase()).toBe(VOID.toUpperCase());
+    // Dark, and translucent rather than opaque.
+    const alpha = parseInt(plate.fill.slice(7, 9), 16) / 255;
+    expect(alpha).toBeGreaterThan(0.5);
+    expect(alpha).toBeLessThan(1);
+    // And it covers the word with room either side.
+    expect(plate.left).toBeLessThan(it.words[0]!.x);
+    expect(plate.right).toBeGreaterThan(it.words[0]!.x);
+    expect(plate.right - plate.left).toBeGreaterThan(60);
+  });
+
+  /** The plate strobes with the word rather than sitting at a constant. */
+  it('strobes the plate with the word', () => {
+    const dim = strobed(sos({ strength: 0.45 }));
+    const bright = strobed(sos({ strength: 1 }));
+    expect(dim.plates[0]!.alpha).toBeLessThan(bright.plates[0]!.alpha);
+  });
+
+  /**
+   * ⚠ **On the inside — the opposite side from the wall** (author, 2026-09-02):
+   * *"can we render the SOS signal on the inside of the ship, opposite side from
+   * the wall? I noticed it gets clipped."*
+   *
+   * It was offset toward the wall, to dodge the prototype's recorded collision
+   * with its ship's trail. But the SOS fires **at** the wall, so that offset
+   * pushed it past the line and into the clip — measured over the corpus's 346 SOS
+   * ticks against the author's phone, clipped on **30%** of them toward the wall
+   * and **0%** away.
+   */
+  it('sits on the far side of the craft from the wall', () => {
+    expect(strobed(sos({ toward: 1 })).words[0]!.x).toBeLessThan(CRAFT.x);
+    expect(strobed(sos({ toward: -1 })).words[0]!.x).toBeGreaterThan(CRAFT.x);
   });
 
   it('strobes by brightness and never moves', () => {

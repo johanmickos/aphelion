@@ -121,9 +121,22 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 > corridor can still be escaped by releasing. The trigger built fires only when the grab was already
 > too late, which has **no verb**: there is nothing to prompt, because there is nothing to do.
 >
-> Where it sits is *"at the craft"* as §6 says, offset **toward** the wall — the prototype put its own
-> on the away axis and found *"that is the same direction as the wake for every wall, so it was drawn
-> over the ship's trail every single time."*
+> Where it sits is *"at the craft"* as §6 says, offset to the **inside** — the far side from the wall.
+> It went toward the wall first, to dodge the prototype's recorded collision with its ship's trail,
+> and the author flew it: *"can we render the SOS signal on the inside of the ship, opposite side from
+> the wall? I noticed it gets clipped."* Obvious once said — the SOS fires **at** the wall, so an
+> offset toward it lands past the line, where the drawing is clipped. Measured over the corpus's 346
+> SOS ticks on the author's own phone: clipped on **30%** toward the wall and **0%** away. ⚠ The
+> collision it was dodging is not live — there is no craft trail yet and the rungs' wake is switched
+> off — so this is the constant to revisit when the trail lands.
+>
+> ⚠ **And it sits on a dark plate** (author, 2026-09-02: *"sometimes the SOS gets blended with the ion
+> background"*). It was ION over a VOID rim, which is the callout's treatment and is right for a word
+> over the field; the SOS is over the **boundary**, whose ground is ION too. At full heat the wash is
+> (135, 52, 92) against the word's (255, 95, 162) — the same hue, separated only by lightness. Spec
+> [00 · §6](./00-tokens.md)'s own formula for a readable that has to hold is a plate (*"INK on VOID at
+> 88%"*), and spec [05 · §5](./05-field.md) reaches for it against the anomaly's curtains. The ground
+> darkens; the word stays ION, as §6 asks.
 >
 > The rest of §6 — the unravelling, `BANK` snapping to DUSK, the world dimming, the card — is still
 > M6's, and the 70ms hitstop is still refused.

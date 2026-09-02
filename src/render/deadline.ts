@@ -106,19 +106,67 @@ const DOT_RING = 1.6 * BOARD_PIXEL;
 const SOS_FACE = "'Archivo', system-ui, sans-serif";
 const SOS_SIZE = 11 * BOARD_PIXEL;
 const SOS_TRACKING = 0.12;
-const SOS_RIM = 2 * BOARD_PIXEL;
-const SOS_RIM_STRENGTH = 0.38;
 
 /**
- * How far from the craft the `SOS` sits, in design units, **toward the wall it is
- * about**.
+ * The plate the word sits on, and how dark it is.
  *
- * Spec 07 §6 puts it *"at the craft"* and says no more. Toward rather than away,
- * and that is the prototype's own recorded defect avoided by construction: it put
- * its mark on the away-from-the-boundary axis and found *"that is the same
- * direction as the wake for every wall — so it was drawn over the ship's trail
- * every single time."* The trail is behind; the wall is ahead. It also points at
- * the thing it is about, which is what every other cue in this game does.
+ * ## ⚠ A rim was not enough against the boundary's own ground
+ *
+ * > *"Sometimes the SOS gets blended with the ion background."* — author,
+ * > 2026-09-02
+ *
+ * It was ION text over a VOID rim, which is the callout's treatment and is right
+ * *there* — a word over the field. The SOS is not over the field: it fires **at
+ * the wall**, where the gradient is at its hottest, and that ground is
+ * [`ION`](./palette.ts) too. At full heat the wash reaches α 0.51, which over VOID
+ * is (135, 52, 92) against the word's own (255, 95, 162) — the **same hue**, so
+ * the only thing separating them is lightness, and a rim two pixels wide is not
+ * enough of it.
+ *
+ * **The design already answers this and the answer is a plate.** Spec
+ * [00 · §6](../../docs/spec/00-tokens.md)'s label row is *"INK on VOID at 88%"*,
+ * and spec [05 · §5](../../docs/spec/05-field.md) meets the same problem inside an
+ * anomaly — *"only the chip backgrounds go true black, so labels hold against the
+ * curtains."* Darken the ground; do not change the text. So the word stays ION,
+ * which is what spec 07 §6 asks for.
+ *
+ * **VOID rather than true black**, which spec 00 §1 permits in exactly two places
+ * and this is not one of them — and `CONTEXT.md` carries the reason from the
+ * callout's own rim: *"a heavy black outline under pale text reads as a sticker."*
+ */
+const PLATE_STRENGTH = 0.82;
+const PLATE_PAD_X = 7 * BOARD_PIXEL;
+const PLATE_PAD_Y = 5 * BOARD_PIXEL;
+const PLATE_RADIUS = 3 * BOARD_PIXEL;
+
+/**
+ * How far from the craft the `SOS` sits, in design units, on the **inside** — the
+ * opposite side from the wall it is about.
+ *
+ * Spec 07 §6 puts it *"at the craft"* and says no more.
+ *
+ * ## ⚠ It was on the other side, and the author flew it into the clip
+ *
+ * The first build offset it **toward** the wall, to avoid the prototype's own
+ * recorded defect: it put its mark on the away-from-the-boundary axis and found
+ * *"that is the same direction as the wake for every wall — so it was drawn over
+ * the ship's trail every single time."*
+ *
+ * That reasoning had a hole in it that the author found on the first flight —
+ * *"can we render the SOS signal on the inside of the ship, opposite side from the
+ * wall? I noticed it gets clipped"* — and it is obvious once said: **the SOS fires
+ * at the wall**, so an offset toward the wall pushes it past the line, where
+ * [`visible`](./letterbox.ts) clips the drawing. Measured over the 346 SOS ticks
+ * in the corpus, against the author's own phone geometry: **clipped on 30% of
+ * them toward the wall, and on 0% away from it.**
+ *
+ * ⚠ **And the collision it was avoiding is not live.** The prototype's was with
+ * its ship's trail; this game has no craft trail built (`CONTEXT.md`'s **carry**
+ * is spec 08's and M4's) and the rungs' wake is switched off
+ * ([`WAKE_AMPLITUDE`](../state/rung.ts)). When the trail lands, this is the
+ * constant that has to be looked at again — and the prototype's own answer was to
+ * stop drawing it at the craft at all and make it a row in a warnings panel, which
+ * is M4.5's HUD.
  */
 const SOS_OFFSET = 34 * BOARD_PIXEL;
 
@@ -228,12 +276,51 @@ export function drawSos(context: CanvasRenderingContext2D, sos: SosView, craft: 
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.letterSpacing = `${SOS_SIZE * SOS_TRACKING}px`;
-  const x = craft.x + SOS_OFFSET * sos.toward;
-  context.lineWidth = SOS_RIM;
-  context.lineJoin = 'round';
-  context.strokeStyle = dim(VOID, SOS_RIM_STRENGTH);
-  context.strokeText('SOS', x, craft.y);
+  // `toward` names where the **wall** is — a fact about the world, and presentation
+  // state's to state. Which side of the craft the word goes is the picture's
+  // decision, and it is the far side. See [`SOS_OFFSET`](#sos_offset).
+  const x = craft.x - SOS_OFFSET * sos.toward;
+
+  // The plate first, so the word is read off it rather than off the boundary.
+  const wide = context.measureText('SOS').width || SOS_SIZE * 2.4;
+  const half = wide / 2 + PLATE_PAD_X;
+  const tall = SOS_SIZE / 2 + PLATE_PAD_Y;
+  context.fillStyle = dim(VOID, PLATE_STRENGTH);
+  plate(context, x - half, craft.y - tall, half * 2, tall * 2, PLATE_RADIUS);
+  context.fill();
+
   context.fillStyle = ION;
   context.fillText('SOS', x, craft.y);
   context.restore();
+}
+
+/**
+ * A rounded rectangle, traced by hand.
+ *
+ * `roundRect` would do it in one call and is not used: it is the one Canvas2D
+ * path method the census's stand-in would have to grow for, and
+ * `test/census.test.ts` exists because a stand-in that lacks a call the renderer
+ * makes throws where nothing is watching. Four arcs and four lines are things this
+ * layer already draws everywhere.
+ */
+function plate(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  wide: number,
+  tall: number,
+  radius: number,
+): void {
+  const r = Math.min(radius, wide / 2, tall / 2);
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.lineTo(x + wide - r, y);
+  context.arc(x + wide - r, y + r, r, -Math.PI / 2, 0);
+  context.lineTo(x + wide, y + tall - r);
+  context.arc(x + wide - r, y + tall - r, r, 0, Math.PI / 2);
+  context.lineTo(x + r, y + tall);
+  context.arc(x + r, y + tall - r, r, Math.PI / 2, Math.PI);
+  context.lineTo(x, y + r);
+  context.arc(x + r, y + r, r, Math.PI, (3 * Math.PI) / 2);
+  context.closePath();
 }
