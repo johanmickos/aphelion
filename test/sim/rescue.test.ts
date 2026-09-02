@@ -22,7 +22,14 @@ import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { scatterField } from '../../src/sim/scatter-field.ts';
 import { fixtureCraft, fixtureField } from '../../src/sim/fixture-field.ts';
 import { SCALE } from '../../src/sim/units.ts';
-import { MAX_SAMPLES, SAMPLE_STRIDE, rescueDeadline, turnedAway } from '../../src/sim/rescue.ts';
+import {
+  MAX_SAMPLES,
+  SAMPLE_STRIDE,
+  advanceScan,
+  openScan,
+  rescueDeadline,
+  turnedAway,
+} from '../../src/sim/rescue.ts';
 import type { SimState } from '../../src/sim/types.ts';
 
 const field = scatterField();
@@ -236,5 +243,63 @@ describe('the SOS case', () => {
     // answered one way everywhere would pass every other test in this file.
     expect(doomed).toBeGreaterThan(0);
     expect(marked).toBeGreaterThan(0);
+  });
+});
+
+describe('a spread scan and a whole one are the same scan', () => {
+  /**
+   * ⚠ **The claim the spreading rests on, and the reason there is one scan rather
+   * than two.**
+   *
+   * `src/state/deadline.ts` spends the scan a few presses a tick — the author's
+   * ruling of 2026-09-01, *"every 3rd tick, spread over the fade-in"*, earned by
+   * the phone on 2026-09-02. A second implementation of the scan for the spread
+   * case would be two things that drift apart, which is a defect the prototype
+   * records happening to this exact predicate. So `rescueDeadline` **is**
+   * `openScan` plus `advanceScan` run to the end, and this asserts that a scan
+   * paid for one press at a time reaches the identical answer — every sample, the
+   * dot, and the lead.
+   */
+  it('reaches the identical answer one press at a time', () => {
+    let compared = 0;
+    for (let off = -190; off <= 190; off += 20) {
+      for (const across of [400, 700, 1000, 1300]) {
+        const whole = rescueDeadline(drifting(off, off >= 0 ? across : -across));
+        let scan = openScan(drifting(off, off >= 0 ? across : -across));
+        if (scan === null) {
+          expect(whole).toBeNull();
+          continue;
+        }
+        // One press a call, which is the slowest the picture could ever spend it.
+        let spins = 0;
+        while (!scan.done) {
+          scan = advanceScan(scan, 1);
+          spins += 1;
+          expect(spins).toBeLessThanOrEqual(MAX_SAMPLES * 4);
+        }
+        expect(scan.found).toEqual(whole);
+        compared += 1;
+      }
+    }
+    expect(compared).toBeGreaterThan(10);
+  });
+
+  /**
+   * **And advancing it is a value, not a job.** The scan is carried on presentation
+   * state and `derive` is a pure function of *(previous, sim)* — so a scan asked
+   * twice must answer twice the same, which is what the bench, `walkRun` and every
+   * test that re-derives a memo all depend on.
+   */
+  it('does not move when it is advanced', () => {
+    const opened = openScan(drifting(120, 900));
+    expect(opened).not.toBeNull();
+    const once = advanceScan(opened!, 2);
+    const again = advanceScan(opened!, 2);
+    expect(again.path).toEqual(once.path);
+    expect(opened!.path.length).toBe(0);
+    // And the two carry on to the same place.
+    expect(advanceScan(once, Number.POSITIVE_INFINITY).found).toEqual(
+      advanceScan(again, Number.POSITIVE_INFINITY).found,
+    );
   });
 });

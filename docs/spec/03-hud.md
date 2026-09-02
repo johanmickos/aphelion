@@ -150,6 +150,21 @@ that the press is steering, before the first orbit ever forms.
 > *no single press-and-hold from here turns the craft away*, and it does not consider releasing and
 > grabbing a different body. The prototype measured its own at **95%** and named it `SOS` rather than
 > `DOOMED` for exactly that reason.
+>
+> ### ⚠ *When it appears* is later than this row says, 2026-09-02
+>
+> The scan that finds the mark is now **spread across ticks** — the author's ruling from the
+> grilling, *"every 3rd tick, spread over the fade-in"*, earned when the phone showed it as the most
+> expensive thing in a tick. So the mark appears **11 ticks after the trajectory leaves the field at
+> p50 and 14 at worst** (measured, 82 scans over the 26 replayable dispatches), and then fades in
+> over the 300 ms this row states.
+>
+> **The fade-in is the bound rather than a coincidence**: the scan is at most 50 presses and a tick
+> pays three, so it lands in 17 ticks against the 18 the 300 ms is. Nothing was ever drawn during
+> those ticks — the mark was being eased in from nothing — but its **life is 37% shorter**, because a
+> dot lands with a median 58 ticks of lead where full strength begins at 81, so the ticks lost at the
+> front would have been fully lit ones. `docs/plan/m3-the-field.md` carries the table and the
+> alternatives; the cost bought the run's worst tick, 1.06 ms to 0.37 ms.
 
 Nothing on the track tells the player what to do. It states four facts and lets the player price
 the trade.

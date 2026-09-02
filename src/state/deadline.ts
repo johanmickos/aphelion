@@ -22,8 +22,14 @@
  * so a deadline that somehow disagreed with the simulation cannot survive half a
  * second of it.
  */
-import { MIN_LEAD_SECONDS, rescueDeadline, strandedWhileHeld, turnedAway } from '../sim/rescue.ts';
-import type { Deadline, Wall } from '../sim/rescue.ts';
+import {
+  MIN_LEAD_SECONDS,
+  advanceScan,
+  openScan,
+  strandedWhileHeld,
+  turnedAway,
+} from '../sim/rescue.ts';
+import type { Deadline, Scan, Wall } from '../sim/rescue.ts';
 import type { SimState } from '../sim/types.ts';
 import { SECONDS_PER_TICK } from '../sim/units.ts';
 import { OUTER_BAND } from './boundary.ts';
@@ -116,6 +122,20 @@ export interface DeadlineMemo {
    */
   readonly shown: number;
   /**
+   * A scan that has begun and is still being paid for, a few probes a tick.
+   *
+   * **This is where the spreading lives, and the side of the line it lives on is
+   * the decision this field records.** The scan itself is
+   * [`src/sim/rescue.ts`](../sim/rescue.ts)'s because it forward-simulates and
+   * needs `stepSim`. *When it runs* is the picture's, because nothing in a tick
+   * asks: `stepSim` never calls the scan, so spreading changes when work happens
+   * and not what a tick does, and **`SIM_VERSION` does not move.**
+   * `test/state/deadline.test.ts` proves it by stepping two runs side by side
+   * rather than by reading a fingerprint, which is
+   * `test/sim/version.test.ts`'s own *picture, not flight* case.
+   */
+  readonly pending: Scan | null;
+  /**
    * The wall a **grab** armed the SOS about, or `null`.
    *
    * The one thing here that is genuinely remembered rather than re-derived. See
@@ -146,13 +166,40 @@ export const NO_DEADLINE: DeadlineMemo = {
   vy: 0,
   at: -1,
   shown: 0,
+  pending: null,
   doomed: null,
   checked: -1,
   drawable: false,
 };
 
 /**
- * Whether the drift this scan was run for is still the drift the craft is on.
+ * How many of the scan's presses one tick may pay for — **three**, and the
+ * arithmetic is the author's own ruling made into a number.
+ *
+ * ## ⚠ The spreading, ruled 2026-09-01 and earned 2026-09-02
+ *
+ * The scan was chosen in the grilling as *"every 3rd tick, spread over the
+ * fade-in"* and only the stride half was built. It was deferred with the reason
+ * written down — *"the measurement came in under the stated budget on a laptop,
+ * and the phone is where that has to be settled"* — and the phone settled it: on
+ * the author's reference run the scan is **the most expensive thing in a tick by
+ * a wide margin**, ~1.4 ms warm on this laptop against a run whose own worst
+ * frame was 10 ms of a 16.7 ms budget.
+ *
+ * **Three is what makes the scan land inside the mark's own birth.** A scan is at
+ * most [`MAX_SAMPLES`](../sim/rescue.ts) samples plus one refinement of at most a
+ * stride, and the stride is at most `ceil(361 / 40)` = 10 — so 50 presses at
+ * worst, which at three a tick is **17 ticks**, inside the
+ * [`BIRTH_TICKS`](#birth_ticks) 18 the mark takes to come up anyway. The player
+ * waits for nothing that was not already being eased in.
+ *
+ * It is not on the bench. The grilling ruled the same of `MAX_SAMPLES` and for
+ * the same reason: *"nobody can judge a cost knob by eye."*
+ */
+export const SCAN_PROBES = 3;
+
+/**
+ * Whether the drift a scan was run for is still the drift the craft is on.
  *
  * **Direction, not speed.** A release leaves a decaying burst behind it that
  * changes how fast the craft covers its line without changing the line — spec
@@ -161,38 +208,104 @@ export const NO_DEADLINE: DeadlineMemo = {
  * for no change in the answer. The cross product is zero exactly when the two are
  * parallel, and it needs no `atan2` (ADR-0014 bans it here anyway).
  */
-function sameLine(memo: DeadlineMemo, sim: SimState): boolean {
-  const cross = memo.vx * sim.craft.vy - memo.vy * sim.craft.vx;
-  const scale = Math.abs(memo.vx) + Math.abs(memo.vy) + Math.abs(sim.craft.vx) + 1;
+function sameLine(vx: number, vy: number, sim: SimState): boolean {
+  const cross = vx * sim.craft.vy - vy * sim.craft.vx;
+  const scale = Math.abs(vx) + Math.abs(vy) + Math.abs(sim.craft.vx) + 1;
   return Math.abs(cross) < scale * scale * 1e-12;
 }
 
 /**
- * The deadline one tick on: re-scanned if the drift has changed, carried if not.
+ * The deadline one tick on: carried while the drift is unchanged, and otherwise
+ * **paid for a few presses at a time** — see [`SCAN_PROBES`](#scan_probes).
  *
  * A held craft has no grab deadline — the escape from a capture is a release, not
  * a grab, which is the author's ruling of 2026-09-01 and the prototype's own
  * split. What covers that case is the SOS below, armed on the press.
+ *
+ * ## What a scan in flight does to the picture
+ *
+ * **A backstop re-scan keeps the answer it is re-deriving**, so the mark stays on
+ * screen and does not flicker: the scan running is the one whose whole purpose is
+ * to confirm what is already there (ADR-0015's convergence rule), and dropping the
+ * mark for seventeen ticks twice a second to re-learn it would be the *"draw,
+ * disappear, and draw again"* defect built on purpose.
+ *
+ * **A drift that has genuinely changed keeps nothing.** A mark drawn on a line the
+ * craft has left is worse than no mark, so the picture says nothing until the new
+ * scan lands. Measured, that case is the tick a coast opens — where there was no
+ * mark to lose, because a held craft has none — and the four contacts in the whole
+ * dispatch corpus.
  */
 export function deadlineOf(previous: DeadlineMemo, sim: SimState): DeadlineMemo {
   const doomed = doomOf(previous, sim);
   if (sim.heldBody !== null || sim.ending !== null) {
     return { ...NO_DEADLINE, ...doomed };
   }
+
+  // A scan already begun and still owed presses. It takes precedence over the
+  // carried answer below: while it is in flight the memo's own `at` is the tick
+  // that scan is *about*, so the staleness test would otherwise start it again.
+  const pending = previous.pending;
+  if (pending !== null && sameLine(pending.vx, pending.vy, sim)) {
+    const advanced = advanceScan(pending, SCAN_PROBES);
+    if (!advanced.done)
+      return { ...previous, shown: previous.shown + 1, pending: advanced, ...doomed };
+    return { ...land(previous, advanced.found, pending.vx, pending.vy, pending.from), ...doomed };
+  }
+
+  // Whether the answer in hand is about the line the craft is on. It is a
+  // different question from the staleness below: a scan that comes due keeps its
+  // answer on screen while it re-derives it, and a craft that has turned keeps
+  // nothing — see the header.
+  const onLine = sameLine(previous.vx, previous.vy, sim);
   const stale = previous.at < 0 || sim.tick - previous.at >= RESTATE_TICKS;
-  if (!stale && sameLine(previous, sim)) {
+  if (pending === null && !stale && onLine) {
     // Carried. The scan's points are world points, so the craft advancing into
     // them changes nothing at all — which is what the author asked for: *"it
     // should only appear, and NOT MOVE, along my trajectory."*
     return { ...previous, shown: previous.shown + 1, ...doomed };
   }
-  const deadline = rescueDeadline(sim);
-  const same = sameMark(previous, deadline);
+
+  const opened = openScan(sim);
+  const started = opened === null ? null : advanceScan(opened, SCAN_PROBES);
+  if (started !== null && !started.done) {
+    return onLine
+      ? { ...previous, shown: previous.shown + 1, pending: started, ...doomed }
+      : { ...NO_DEADLINE, pending: started, ...doomed };
+  }
+  // Nothing to scan, or a scan short enough to have finished inside one tick's
+  // presses — a drift with a handful of samples on it, which is most of them.
   return {
-    deadline,
-    vx: sim.craft.vx,
-    vy: sim.craft.vy,
-    at: sim.tick,
+    ...land(
+      previous,
+      started === null ? null : started.found,
+      sim.craft.vx,
+      sim.craft.vy,
+      sim.tick,
+    ),
+    ...doomed,
+  };
+}
+
+/** A finished scan becoming the answer the picture carries. */
+function land(
+  previous: DeadlineMemo,
+  found: Deadline | null,
+  vx: number,
+  vy: number,
+  at: number,
+): Omit<DeadlineMemo, 'doomed' | 'checked'> {
+  const same = sameMark(previous, found);
+  return {
+    deadline: found,
+    vx,
+    vy,
+    // **The tick the scan was *about*, not the tick it finished on.** Every offset
+    // in the answer — `leadTicks` above all — is measured from where the drift was
+    // when the scan opened, and `leadOf` subtracts the elapsed ticks from it. A
+    // spread scan that stamped itself with its landing tick would hand the mark
+    // back the seventeen ticks it took to work out.
+    at,
     // **The age survives a re-scan that finds the same mark**, and that is the
     // whole of the flicker fix: the scan is re-run twice a second for convergence
     // and a mark that started its life again each time faded out and back in.
@@ -200,9 +313,9 @@ export function deadlineOf(previous: DeadlineMemo, sim: SimState): DeadlineMemo 
     // *"a mark that has been passed is not moved, it is replaced"*, which is the
     // prototype's own note against a cross that jumped forward.
     shown: same ? previous.shown + 1 : 0,
+    pending: null,
     // Decided once, when the mark is new — see [`drawable`](#deadlinememo).
-    drawable: same ? previous.drawable : bornDrawable(deadline),
-    ...doomed,
+    drawable: same ? previous.drawable : bornDrawable(found),
   };
 }
 
@@ -378,7 +491,7 @@ export function presenceAt(lead: number, shown: number): number {
 }
 
 /** How long a mark takes to arrive once it exists, in ticks — spec 03 §5's 300ms. */
-const BIRTH_TICKS = ticksIn(300);
+export const BIRTH_TICKS = ticksIn(300);
 
 /**
  * The SOS as the renderer is handed it, or `null`.

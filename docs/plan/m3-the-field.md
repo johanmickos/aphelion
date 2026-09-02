@@ -203,6 +203,96 @@ tick, spread over the fade-in"* — and only half built: the stride is there and
 recorded at the time as *"the measurement came in under the stated budget on a laptop, and the phone
 is where that has to be settled."* The phone has settled it.
 
+#### ⚠ The scan is spread now, 2026-09-02 — and the picture pays for it
+
+Built, against the ruling above. **Where the money was, measured before anything moved**, over the
+author's own reference run (`2026-09-02T06-02-56`, 1 040 ticks, six scans):
+
+| a whole scan, worst | 1.449 ms |
+|---|---|
+| of it, the **samples** | **1.340 ms — 92%** |
+| the drift projection | 0.034 ms (0.152 at worst) |
+| the refinement | 0.065 ms (0.211 at worst) |
+| the 171 samples themselves | p50 0.019, p95 0.063, max 0.155 ms |
+
+So the unit that costs is one `rescues` call — one **press** — and that is what a tick now budgets.
+`SCAN_PROBES = 3`, and the number is the ruling's own arithmetic rather than a taste:
+`MAX_SAMPLES` 40 samples plus a refinement of at most a stride (`ceil(361 / 40)` = 10) is **50
+presses at worst, which at three a tick is 17** — inside the **18** ticks of spec 03 §5's 300 ms
+birth the mark was already being eased in over. *"Spread over the fade-in"*, as a bound.
+
+**Measured, no scan in the corpus ever reached that bound**: 82 spread scans across the 26
+replayable dispatches land in **p50 11 ticks, p90 13, max 14.**
+
+**Which side of the line it lives on, because that was the trap.** The scan is
+`src/sim/rescue.ts`'s — it forward-simulates and needs `stepSim`. **When it runs is the picture's**,
+and the spread scan is carried on `DeadlineMemo.pending` in `src/state/deadline.ts`: nothing in a
+tick asks the scan anything, so spreading moves *when* work happens and not *what a tick does*.
+`SIM_VERSION` stays at **9** and all 26 dispatches go on replaying. It is proved the way
+`test/state/rungs.test.ts` proves the rungs — two runs stepped side by side, one deriving and one
+not, byte-identical at every tick — rather than by reading a fingerprint, which is
+`test/sim/version.test.ts`'s own *picture, not flight* case.
+
+**And there is one scan, not two.** `rescueDeadline` is now `openScan` plus `advanceScan` run to the
+end, so the whole-scan form the held SOS still uses and the spread form the drift uses are the same
+code; `test/sim/rescue.test.ts` asserts that a scan paid for **one press at a time** reaches the
+identical answer — every sample, the dot and the lead. A second implementation of this predicate is
+the defect the prototype records against this exact predicate.
+
+**What it bought, on the author's reference run** (`pnpm profile`, warm, best of three — a laptop,
+and the absolute numbers are the phone's):
+
+| | before | after |
+|---|---|---|
+| worst tick | **1.058 ms** | **0.371 ms** |
+| ticks over 0.3 ms | 6 | **1** |
+| tick p99 | 0.102 ms | 0.105 ms |
+| tick mean | 0.018 ms | 0.018 ms |
+
+The mean does not move and neither does the p99, which is the whole point: the same work is done and
+nothing is now done all at once. At the 10.8× factor that worst tick goes from **11.4 ms to 4.0 ms**,
+against the 10 ms frame the phone actually recorded on this run.
+
+**And the worst tick is no longer the drift scan.** It is 858, *diving at #6, 0 ticks in* — the grab,
+where `strandedWhileHeld` asks its two whole projections. That call is still whole, gated to the
+outer band and to one ask every 6 ticks, and it is **6 of the 15 ticks over 0.3 ms** left in the
+corpus. It is the next thing here if the phone asks for one.
+
+#### ⚠ The price, stated, because the mark arrives later
+
+**The mark is drawn for 37% fewer ticks.** Over the 26 replayable dispatches, 28 315 ticks:
+
+| presses a tick | ticks over 0.3 ms | worst tick | mark ticks | presence-weighted | SOS ticks | SOS gaps |
+|---|---|---|---|---|---|---|
+| **3 — shipped** | **14** | **0.85 ms** | **1 336** | **689** | **649** | **3** |
+| 6 | 25 | 0.98 ms | 1 734 | 866 | 657 | 3 |
+| 10 | 52 | 1.42 ms | 1 902 | 955 | 660 | 2 |
+| 40 | 87 | 1.74 ms | 2 108 | 1 076 | 662 | 2 |
+| whole, as it was | 90 | 2.91 ms | 2 122 | 1 079 | 662 | 2 |
+
+*(a single cold flight of each dispatch rather than `pnpm profile`'s best of three, so the
+milliseconds are higher than the table above and only the column is comparable)*
+
+**The presence-weighted column is the honest one and it falls as far as the raw count**, which is
+worth saying plainly: a dot lands with **p50 58 ticks of lead** and `FULL_SECONDS` is 81, so a mark
+usually arrives already at full ramp and the eleven ticks lost at the front are eleven fully-lit
+ticks. The instrument is 0.18 s later at p50 and still arrives about 0.8 s before its own deadline.
+
+**What did not move**: the held SOS (356 ticks, unchanged), and every one of the **5** armings across
+the corpus — the *"the press you just made was already too late"* half reads a deadline the drift was
+already carrying, and measured, no grab in the corpus lands inside a scan's window.
+
+**One SOS gap appeared and it is 2 ticks.** On `2026-09-01T06-00-36` at tick 2400 the author releases
+a stranded swing: `doomOf` correctly drops the held arming on the release, and the new drift's scan
+had not landed. 33 ms, once in 28 315 ticks, in a cue that strobes at 2 Hz — recorded rather than
+fixed, because the only fix is not spreading the scan that opens a coast, which is the expensive one.
+
+**It is not on the bench**, and that is a decision rather than an oversight: this trades a cost
+against *how late the mark arrives*, which is a taste the author could judge — but the bench is at
+its cap of **60** by the author's own request, so putting it on means taking one off, and that is the
+author's call. The table above is what a flight would produce, and moving `SCAN_PROBES` is a
+one-line change.
+
 #### ⚠ A false SOS, and the cause was a drawing rule applied to a predicate
 
 > *"I THINK the SOS light went on during my last capture. When I kept holding I survived and ended up

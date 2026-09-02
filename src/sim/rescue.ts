@@ -324,15 +324,82 @@ export function strandedWhileHeld(state: SimState): Wall | null {
 }
 
 /**
- * Where a press still saves this drift, and where it stops — or `null` when there
- * is nothing to mark.
+ * A scan that has begun and may not have finished — the deadline's work as a
+ * **value** rather than as a call.
  *
- * **Null while a body is held**, which is the author's ruling of 2026-09-01 and
- * the prototype's own split: the escape from a capture is a release, not a grab,
- * so a *grab* deadline has nothing to say about one. What covers the held case is
- * the SOS, armed at the grab — see `docs/plan/m3-the-field.md`.
+ * ## Why this shape exists
+ *
+ * Measured over the author's reference run (`2026-09-02T06-02-56`, 1 040 ticks,
+ * six scans), a whole scan costs **1.45 ms at worst on a laptop** and
+ * [`rescues`](#rescues) is **92%** of it — 1.34 ms of samples against 0.03 ms of
+ * projection and 0.07 ms of refinement. At the phone factor that single tick is
+ * over half a frame, and it lands on the tick a coast opens.
+ *
+ * The author ruled the remedy in the grilling that scoped this instrument —
+ * *"every 3rd tick, spread over the fade-in"* — and only the stride half was
+ * built, deferred at the time because *"the measurement came in under the stated
+ * budget on a laptop, and the phone is where that has to be settled."* The phone
+ * settled it.
+ *
+ * ## ⚠ It is a value, and it has to be
+ *
+ * Every field below is read-only and [`advanceScan`](#advancescan) returns a new
+ * scan rather than moving this one on. That is not tidiness: the scan is carried
+ * on presentation state, `derive` is a pure function of *(previous, sim)*, and a
+ * job that advanced when it was looked at would make deriving the same tick twice
+ * give two answers — which the bench, `walkRun` and every test that re-derives a
+ * memo all do.
+ *
+ * ## What is **not** spread, and the measurement that says so
+ *
+ * The **projection** is whole. It is one drift of up to
+ * [`HORIZON_SECONDS`](#horizon_seconds), it costs 0.035 ms at p50 and 0.152 ms at
+ * worst on that same run, and nothing about the scan — not the wall, not the
+ * stride, not how many samples there are — is knowable until it has run. Spreading
+ * a tenth of the cost at the price of a second carried state is the wrong trade.
  */
-export function rescueDeadline(state: SimState): Deadline | null {
+export interface Scan {
+  readonly wall: Wall;
+  /**
+   * The velocity the drift was opened on.
+   *
+   * Carried so the reader can tell a scan that is still about the line the craft
+   * is flying from one that is not — a scan takes ticks now, and an answer about a
+   * drift nobody is on is worse than no answer. See `src/state/deadline.ts`.
+   */
+  readonly vx: number;
+  readonly vy: number;
+  /** The tick the scan is about. Every offset here, and `leadTicks`, is from it. */
+  readonly from: number;
+  readonly stride: number;
+  /** How many ticks past `from` the drift leaves the corridor. */
+  readonly leaves: number;
+  /** The next sample's offset; past `leaves` once the samples are all spent. */
+  readonly next: number;
+  /** The drift, walked `walked` ticks past `from`. */
+  readonly walk: SimState;
+  readonly walked: number;
+  readonly path: readonly DeadlineSample[];
+  /** The last sample that saved, so the refinement knows where to start. */
+  readonly lastSaving: SimState | null;
+  /** The refinement's own walk, and the best tick it has reached. */
+  readonly probe: SimState | null;
+  readonly best: SimState | null;
+  readonly refined: number;
+  /** The answer. Non-null exactly when `done` and the drift has a mark. */
+  readonly found: Deadline | null;
+  readonly done: boolean;
+}
+
+/**
+ * Open a scan on this drift — the cheap refusal and the one projection — or
+ * `null` when there is nothing to mark.
+ *
+ * **Null here means exactly what `rescueDeadline` returning null means**, and for
+ * the same three reasons: a held or finished craft, a corridor with no walls, and
+ * a drift that cannot reach one inside the horizon.
+ */
+export function openScan(state: SimState): Scan | null {
   if (state.heldBody !== null || state.ending !== null) return null;
   if (!Number.isFinite(state.field.corridor.halfWidth)) return null;
 
@@ -366,26 +433,65 @@ export function rescueDeadline(state: SimState): Deadline | null {
   // is a backstop nobody reaches (`fixture-field.ts`).
   if (Math.abs(drift.craft.x - centreline) < halfWidth - CORRIDOR_GRACE) return null;
 
-  // **The stride widens so the whole approach fits in `MAX_SAMPLES`** — see there.
-  const stride = Math.max(SAMPLE_STRIDE, Math.ceil((leaves + 1) / MAX_SAMPLES));
-  const path: DeadlineSample[] = [];
-  const walk = clone(state);
-  let at = 0;
-  let lastSaving: SimState | null = null;
-  let firstFailingAfter = -1;
-  for (let tick = 0; tick <= leaves; tick += stride) {
-    while (at < tick) {
+  return {
+    wall,
+    vx: state.craft.vx,
+    vy: state.craft.vy,
+    from: state.tick,
+    // **The stride widens so the whole approach fits in `MAX_SAMPLES`** — see there.
+    stride: Math.max(SAMPLE_STRIDE, Math.ceil((leaves + 1) / MAX_SAMPLES)),
+    leaves,
+    next: 0,
+    walk: clone(state),
+    walked: 0,
+    path: [],
+    lastSaving: null,
+    probe: null,
+    best: null,
+    refined: 0,
+    found: null,
+    done: false,
+  };
+}
+
+/**
+ * Spend at most `probes` presses on this scan and hand back where it got to.
+ *
+ * A **probe** is one [`rescues`](#rescues) call, and it is the unit because it is
+ * the cost: samples and refinement steps are the same work asked at different
+ * places, so budgeting them together is the only way a caller can bound a tick
+ * without knowing which half it is in. The walk between samples rides along
+ * inside the sample it is walking to — it is `stepSim` on a drift, three orders
+ * of magnitude under a probe.
+ *
+ * The scan is finished when `done` is set, and `found` is the answer then —
+ * including `null`, which is a real answer about a drift that no press saves.
+ */
+export function advanceScan(scan: Scan, probes: number): Scan {
+  if (scan.done) return scan;
+
+  // Working copies, because `stepSim` writes: nothing reached from the scan handed
+  // in is touched. See the header.
+  const walk = clone(scan.walk);
+  let walked = scan.walked;
+  let next = scan.next;
+  const path = [...scan.path];
+  let lastSaving = scan.lastSaving;
+  let spent = 0;
+
+  while (next <= scan.leaves && spent < probes) {
+    while (walked < next) {
       stepSim(walk, { pressed: false });
-      at++;
+      walked += 1;
     }
-    const saves = rescues(walk, wall);
+    const saves = rescues(walk, scan.wall);
+    spent += 1;
     path.push({ x: walk.craft.x, y: walk.craft.y, saves });
-    if (saves) {
-      lastSaving = clone(walk);
-      firstFailingAfter = -1;
-    } else if (firstFailingAfter < 0) {
-      firstFailingAfter = tick;
-    }
+    if (saves) lastSaving = clone(walk);
+    next += scan.stride;
+  }
+  if (next <= scan.leaves) {
+    return { ...scan, next, walk, walked, path, lastSaving };
   }
 
   // **Refine the last saving sample to the tick.** Without this the dot hops by a
@@ -395,18 +501,64 @@ export function rescueDeadline(state: SimState): Deadline | null {
   //
   // Walked forward rather than bisected, because the gap is one stride and a
   // bisection would need a clone of every tick to index into.
-  let cross: Deadline['cross'] = null;
-  let leadTicks = 0;
-  if (lastSaving !== null) {
-    let best = lastSaving;
-    const probe = clone(lastSaving);
-    for (let step = 0; step < stride; step++) {
-      stepSim(probe, { pressed: false });
-      if (probe.ending !== null || !rescues(probe, wall)) break;
-      best = clone(probe);
+  let best = scan.best ?? lastSaving;
+  let probe =
+    scan.probe !== null ? clone(scan.probe) : lastSaving === null ? null : clone(lastSaving);
+  let refined = scan.refined;
+  while (probe !== null && refined < scan.stride && spent < probes) {
+    stepSim(probe, { pressed: false });
+    spent += 1;
+    refined += 1;
+    if (probe.ending !== null || !rescues(probe, scan.wall)) {
+      probe = null;
+      break;
     }
-    cross = { x: best.craft.x, y: best.craft.y };
-    leadTicks = best.tick - state.tick;
+    best = clone(probe);
   }
-  return { wall, path, cross, leadTicks };
+  if (probe !== null && refined < scan.stride) {
+    return { ...scan, next, walk, walked, path, lastSaving, probe, best, refined };
+  }
+
+  return {
+    ...scan,
+    next,
+    walk,
+    walked,
+    path,
+    lastSaving,
+    probe: null,
+    best,
+    refined,
+    done: true,
+    found: {
+      wall: scan.wall,
+      path,
+      cross: best === null ? null : { x: best.craft.x, y: best.craft.y },
+      leadTicks: best === null ? 0 : best.tick - scan.from,
+    },
+  };
+}
+
+/**
+ * Where a press still saves this drift, and where it stops — or `null` when there
+ * is nothing to mark.
+ *
+ * **Null while a body is held**, which is the author's ruling of 2026-09-01 and
+ * the prototype's own split: the escape from a capture is a release, not a grab,
+ * so a *grab* deadline has nothing to say about one. What covers the held case is
+ * the SOS, armed at the grab — see `docs/plan/m3-the-field.md`.
+ *
+ * ⚠ **This is the whole scan on one tick, and the picture no longer asks for it
+ * that way.** `src/state/deadline.ts` spends the scan a few probes at a time; what
+ * is left here is the same scan run to the end in one call, kept because
+ * [`strandedWhileHeld`](#strandedwhileheld) genuinely wants one answer now and
+ * because a spread scan and a whole one being **the same scan** is what
+ * `test/sim/rescue.test.ts` asserts. Two implementations of this would be two
+ * things that drift apart, which is the defect the prototype records against this
+ * exact predicate.
+ */
+export function rescueDeadline(state: SimState): Deadline | null {
+  const scan = openScan(state);
+  if (scan === null) return null;
+  return advanceScan(scan, Number.POSITIVE_INFINITY).found;
 }

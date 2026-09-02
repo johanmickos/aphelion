@@ -9,13 +9,16 @@
 import { describe, expect, it } from 'vitest';
 import { createCraft } from '../../src/sim/craft.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
+import { snapshot } from '../../src/sim/snapshot.ts';
 import { scatterField } from '../../src/sim/scatter-field.ts';
 import { SCALE } from '../../src/sim/units.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import {
+  BIRTH_TICKS,
   FADE_IN_SECONDS,
   FULL_SECONDS,
   RESTATE_TICKS,
+  SCAN_PROBES,
   SOS_FLOOR,
   deadlineOf,
   presenceAt,
@@ -172,11 +175,14 @@ describe('the scan is a property of the coast', () => {
    * survive it.
    */
   it('does not restart its life when the scan is merely re-run', () => {
-    const sim = drifting(60, 300);
-    let view = createPresentation(sim);
     // Stopped while the dot is still ahead — past it there is genuinely no rescue
-    // left and a re-scan is *right* to find none, which is a different claim.
-    for (let tick = 0; tick < 10; tick++) {
+    // left and a re-scan is *right* to find none, which is a different claim. ⚠ The
+    // drift and the count both changed with the **spread** scan: the mark does not
+    // exist until the scan lands, measured over the corpus at 11 ticks p50 and 14
+    // at worst, so this needs a longer approach and a run past the landing.
+    const sim = drifting(-100, 200, 2500);
+    let view = createPresentation(sim);
+    for (let tick = 0; tick < 24; tick++) {
       stepSim(sim, { pressed: false });
       view = derive(view, sim);
     }
@@ -184,8 +190,15 @@ describe('the scan is a property of the coast', () => {
     expect(memo.deadline?.cross).toBeTruthy();
     expect(memo.shown).toBeGreaterThan(3);
 
-    // Force the re-scan a backstop would do, and the mark must keep its age.
-    const forced = deadlineOf({ ...memo, at: sim.tick - RESTATE_TICKS }, sim);
+    // Force the re-scan a backstop would do, and the mark must keep its age. ⚠ The
+    // scan is spread now, so a forced re-scan *starts* rather than landing — it is
+    // driven to the end here against the same tick, which is what the ticks after
+    // it would have done.
+    let forced = deadlineOf({ ...memo, at: sim.tick - RESTATE_TICKS }, sim);
+    for (let spin = 0; spin < BIRTH_TICKS && forced.pending !== null; spin++) {
+      forced = deadlineOf(forced, sim);
+    }
+    expect(forced.pending).toBeNull();
     expect(forced.at).toBe(sim.tick);
     expect(forced.shown).toBeGreaterThanOrEqual(memo.shown);
     expect(forced.drawable).toBe(memo.drawable);
@@ -358,5 +371,118 @@ describe('the SOS', () => {
       expect(view.sos).toBeNull();
       expect(view.deadline).toBeNull();
     }
+  });
+});
+
+describe('the scan is spread across ticks', () => {
+  /**
+   * ⚠ **The whole reason this exists**, and it is the author's own ruling from the
+   * grilling — *"every 3rd tick, spread over the fade-in"* — earned by the phone on
+   * 2026-09-02: the scan had become the most expensive thing in a tick by a wide
+   * margin, at ~1.4 ms warm on a laptop against a run whose worst phone frame was
+   * 10 ms of a 16.7 ms budget.
+   *
+   * Asserted as the thing that was wrong rather than as a duration, because a test
+   * that timed a laptop would be measuring the wrong machine (`pnpm profile` says
+   * so on every line). What a tick pays is **presses**, and the scan's own path is
+   * where they are counted: one sample is one press.
+   */
+  it('spends at most SCAN_PROBES presses on any one tick', () => {
+    const sim = drifting(60, 300, 2500);
+    let view = createPresentation(sim);
+    let was = 0;
+    let sawGrowth = false;
+    for (let tick = 0; tick < 200; tick++) {
+      stepSim(sim, { pressed: false });
+      view = derive(view, sim);
+      const now = view.rescue.pending?.path.length ?? 0;
+      if (now > was) {
+        expect(now - was).toBeLessThanOrEqual(SCAN_PROBES);
+        sawGrowth = true;
+      }
+      was = now;
+      if (sim.ending !== null) break;
+    }
+    expect(sawGrowth).toBe(true);
+  });
+
+  /**
+   * **And it always finishes**, inside the 300 ms the mark was already being faded
+   * in over — which is what makes the spreading free to the player rather than a
+   * slower instrument. `MAX_SAMPLES` samples plus a refinement of at most a stride
+   * is 50 presses at worst, which at `SCAN_PROBES` a tick is 17.
+   *
+   * ADR-0015's convergence rule needs this literally: a carried value that could
+   * stay half-derived would be memory that cannot be shed.
+   */
+  it('always lands inside the mark own birth', () => {
+    const sim = drifting(60, 300, 2500);
+    let view = createPresentation(sim);
+    let pendingFor = 0;
+    let worst = 0;
+    for (let tick = 0; tick < 400; tick++) {
+      stepSim(sim, { pressed: false });
+      view = derive(view, sim);
+      pendingFor = view.rescue.pending === null ? 0 : pendingFor + 1;
+      worst = Math.max(worst, pendingFor);
+      if (sim.ending !== null) break;
+    }
+    expect(worst).toBeGreaterThan(0);
+    expect(worst).toBeLessThanOrEqual(BIRTH_TICKS);
+  });
+
+  /**
+   * ⚠ **A backstop re-scan keeps the mark it is re-deriving.**
+   *
+   * The scan takes ticks now, and dropping the mark for each of them twice a second
+   * would be *"the warning line seems to draw, disappear, and draw again as I'm
+   * traveling"* (author, 2026-09-01) rebuilt on purpose. What the backstop is *for*
+   * is confirming an answer already in hand, so the answer stays on screen while it
+   * is confirmed.
+   */
+  it('keeps the mark on screen while a backstop re-scan runs', () => {
+    // Asserted at the seam rather than by waiting two seconds for a backstop, for
+    // the same reason the flicker test above is: a memo with a stale `at` is
+    // exactly what a re-scan sees.
+    const sim = drifting(-100, 200, 2500);
+    let view = createPresentation(sim);
+    for (let tick = 0; tick < 24; tick++) {
+      stepSim(sim, { pressed: false });
+      view = derive(view, sim);
+    }
+    expect(view.deadline).not.toBeNull();
+
+    const forced = deadlineOf({ ...view.rescue, at: sim.tick - RESTATE_TICKS }, sim);
+    expect(forced.pending).not.toBeNull();
+    expect(forced.deadline).toEqual(view.rescue.deadline);
+  });
+
+  /**
+   * **The layer criterion, and it is the one this whole change turns on.**
+   *
+   * Spreading moves *when* the scan runs. It must not move *what a tick does* —
+   * `SIM_VERSION` may not move, because 26 dispatches replay at 9 and 56 already
+   * refuse. Proved by stepping two runs side by side, one with the picture derived
+   * beside it and one without, rather than by reading a fingerprint: that is
+   * `test/sim/version.test.ts`'s own *picture, not flight* case and
+   * `test/state/rungs.test.ts` makes the same argument for the rungs.
+   */
+  it('moves nothing in the simulation', () => {
+    const withPictures = drifting(60, 300, 2500);
+    const alone = drifting(60, 300, 2500);
+    let view = createPresentation(withPictures);
+    let scanned = false;
+    for (let tick = 0; tick < 300; tick++) {
+      // Held for a stretch, so the SOS's own projections run too.
+      const input = { pressed: tick > 120 && tick < 200 };
+      stepSim(withPictures, input);
+      view = derive(view, withPictures);
+      stepSim(alone, input);
+      expect(snapshot(withPictures)).toEqual(snapshot(alone));
+      if (view.rescue.pending !== null || view.rescue.deadline !== null) scanned = true;
+      if (withPictures.ending !== null) break;
+    }
+    // And the picture really was scanning, so the comparison means something.
+    expect(scanned).toBe(true);
   });
 });
