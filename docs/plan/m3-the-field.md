@@ -137,6 +137,33 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
+#### ⚠ The phone answered the deadline's cost question, 2026-09-02
+
+A reference playthrough (`diagnostics/2026-09-02T06-02-56-828Z`, 1 040 ticks, out of bounds) carries
+the number this milestone kept deferring — `pnpm profile` says on every line that it is a laptop and
+that *"the absolute numbers come from the phone"*, and the meter's own least-squares fit now says:
+
+> **a tick costs 0.14 ms; the rest of a frame costs 1.01 ms**
+
+Against this laptop's 0.013 ms mean that is a **10.8× factor**, which is the conversion the project
+has never had. It is the first thing to reach for whenever a laptop measurement in these notes needs
+turning into a phone one.
+
+**And it settles the deadline scan.** Frame cpu on that run: p50 1 ms, p95 2 ms, p99 2 ms, and **one
+frame at 10 ms**, with about ten more between 3 and 6. Replayed here, 15 ticks of that run cost over
+0.3 ms of `derive` and the warm worst is ~1.4 ms — which at 10.8× is 15 ms, and the phone's own 10 ms
+frame is the same event. The scan is now **the most expensive thing in a tick**, by a wide margin.
+
+It did not drop a frame: 10 ms still fits inside 16.7, and the run's five 25 – 26 ms intervals all
+land on a press-**down** edge with 0 – 2 ms of cpu, which is the *touch* stall this plan already
+records and not this. But the margin is thin and the run is not unusual — the deadline was up on
+**19.9%** of its ticks against 3.1% of the shipped pilot's.
+
+**So the spreading the author ruled for is earned now.** It was chosen in the grilling — *"every 3rd
+tick, spread over the fade-in"* — and only half built: the stride is there and the spread is not,
+recorded at the time as *"the measurement came in under the stated budget on a laptop, and the phone
+is where that has to be settled."* The phone has settled it.
+
 #### ⚠ A false SOS, and the cause was a drawing rule applied to a predicate
 
 > *"I THINK the SOS light went on during my last capture. When I kept holding I survived and ended up
