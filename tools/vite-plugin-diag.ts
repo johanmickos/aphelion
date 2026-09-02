@@ -48,11 +48,19 @@
  *
  * Do not carry this pattern into anything user-facing.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Connect, Plugin, ViteDevServer } from 'vite';
-import { DIAG_ENDPOINT, DISPATCH_KIND, MAX_DISPATCH_BYTES, parseDispatch } from './dispatch.ts';
+import {
+  BUILD_STAMP_LENGTH,
+  DIAG_ENDPOINT,
+  DISPATCH_KIND,
+  MAX_DISPATCH_BYTES,
+  buildDispatch,
+  parseDispatch,
+} from './dispatch.ts';
 import { formatDispatch } from './trail.ts';
 
 const OUT_DIR = fileURLToPath(new URL('../diagnostics', import.meta.url));
@@ -66,6 +74,49 @@ const MAX_BYTES = MAX_DISPATCH_BYTES;
  * the file is.
  */
 const SUFFIX = { spike: 'renderer-spike', dispatch: 'run-dispatch' } as const;
+
+/** The directories whose contents decide what a run does and what it costs. */
+const SOURCE_DIRS = ['../src', '../app'] as const;
+
+/**
+ * A short hash of the source this server is serving — the dispatch's
+ * [`build`](./dispatch.ts#build).
+ *
+ * **Computed when a dispatch arrives rather than when the server started**, and
+ * that is the whole of why it can be trusted: Vite full-reloads the page on any
+ * change under `src/`, so a run begins after the last edit and the source here
+ * now is the source the page loaded. A stamp fixed at start-up would name a build
+ * that had been hot-replaced under it hours ago.
+ *
+ * Only `.ts` under `src/` and `app/`. Not `tools/`, which cannot reach a phone;
+ * not `docs/`, which cannot reach anything; not the page's own HTML, which
+ * changes what the shell looks like and not what a frame costs.
+ *
+ * It is an **identity and not a signature**. Reading files the author owns, on
+ * the author's own machine, to label the author's own measurement — there is
+ * nothing here to defend against and the hash is short for that reason.
+ */
+export function sourceStamp(): string {
+  const digest = createHash('sha256');
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+      a.name < b.name ? -1 : 1,
+    )) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith('.ts')) files.push(path);
+    }
+  };
+  for (const dir of SOURCE_DIRS) walk(fileURLToPath(new URL(dir, import.meta.url)));
+  for (const path of files.sort()) {
+    // The path rides along with the contents, so moving a file is a change even
+    // when nothing inside it moved.
+    digest.update(path);
+    digest.update(readFileSync(path));
+  }
+  return digest.digest('hex').slice(0, BUILD_STAMP_LENGTH);
+}
 
 /** The timing summary for one candidate, in milliseconds. */
 export interface DiagStats {
@@ -226,12 +277,20 @@ export interface Accepted {
  * claim to be a dispatch is held to the timing report's own validator exactly as
  * it was before this file learned a second shape.
  */
-export function receive(body: string): Accepted {
+export function receive(body: string, build?: string): Accepted {
   const raw: unknown = JSON.parse(body);
   const kind =
     typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>).kind : undefined;
   if (kind === DISPATCH_KIND) {
-    const dispatch = parseDispatch(raw);
+    // **Stamped here and not read off the request.** The page does not know what
+    // it was built from and could only be told, and a claim the sender makes about
+    // its own build is the one thing a build stamp must not be. It goes on after
+    // validation and through `buildDispatch`, so what reaches the disk is still
+    // only what this file assembled.
+    const dispatch = buildDispatch({
+      ...parseDispatch(raw),
+      ...(build === undefined ? {} : { build }),
+    });
     return {
       suffix: SUFFIX.dispatch,
       body: JSON.stringify(dispatch),
@@ -256,7 +315,7 @@ export function diagPlugin(): Plugin {
             return;
           }
           try {
-            const accepted = receive(await readBody(req));
+            const accepted = receive(await readBody(req), sourceStamp());
 
             mkdirSync(OUT_DIR, { recursive: true });
             // Generated here, never taken from the request.

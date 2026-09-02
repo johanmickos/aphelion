@@ -185,4 +185,9 @@ The stated deliverable is **a technical architecture that is easy to maintain an
 - **`tools/vite-plugin-diag.ts`** receives what the author's phone has to say — a timing
   report or a dispatch — and writes it to `diagnostics/`. Read its header before extending
   it: it writes files on a server bound to all interfaces and it is narrow on purpose.
-  **Extending its validator is the change; loosening it is not.**
+  **Extending its validator is the change; loosening it is not.** It also **stamps every dispatch with the
+  source it was serving** — a short hash of `src/` and `app/`, computed as the dispatch arrives.
+  A measurement's cohort is not optional (§3), and `recipe.sim` cannot stand in: `SIM_VERSION`
+  moves only when a _tick_ moves, so work that changes what a frame costs and deliberately
+  leaves the swing alone is invisible in it. The server stamps it rather than the page, because
+  a sender's account of its own build is the one thing a build stamp must not be.

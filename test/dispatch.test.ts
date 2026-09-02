@@ -21,7 +21,7 @@ import {
 } from '../tools/dispatch.ts';
 import { MAX_WORST_FRAMES, TIMING_BUCKETS } from '../tools/meter.ts';
 import { MAX_CATCH_UP_TICKS } from '../src/sim/units.ts';
-import { receive } from '../tools/vite-plugin-diag.ts';
+import { receive, sourceStamp } from '../tools/vite-plugin-diag.ts';
 import { FIXTURE_FIELD_VERSION } from '../src/sim/fixture-field.ts';
 import { RECIPE_VERSION } from '../src/sim/recipe.ts';
 import { SIM_VERSION } from '../src/sim/version.ts';
@@ -310,5 +310,61 @@ describe('the endpoint', () => {
     expect(lines).toMatch(/fixture field v1/);
     expect(lines).toMatch(/the grab feels late/);
     expect(lines).toMatch(/tick 240/);
+  });
+});
+
+/**
+ * ⚠ **Which build a measurement is about**, which `at` could not say and was
+ * documented as saying.
+ *
+ * AGENTS.md §3 asks every measurement for its cohort. On 2026-09-02 the question
+ * *"was this run flown before or after the deadline scan was spread?"* had to be
+ * answered by comparing a file's modification time against the commit log —
+ * guesswork about the thing a cost measurement rests on. `SIM_VERSION` cannot
+ * stand in: it moves only when a **tick** moves, and performance work
+ * deliberately leaves the swing alone.
+ */
+describe('the build stamp', () => {
+  /**
+   * **The server stamps it, so it is a fact rather than a claim.** A sender's own
+   * account of what it was built from is the one thing a build stamp must not be,
+   * and the endpoint already refuses to take any part of a filename from a
+   * request for the same reason.
+   */
+  it('is put on by the endpoint and never taken from the request', () => {
+    const stamped = JSON.parse(receive(JSON.stringify(dispatch), 'abc123def456').body);
+    expect(stamped.build).toBe('abc123def456');
+
+    const lied = JSON.parse(
+      receive(JSON.stringify({ ...dispatch, build: 'ffffffffffff' }), 'abc123def456').body,
+    );
+    expect(lied.build).toBe('abc123def456');
+  });
+
+  /** And a dispatch that arrived before the field existed is still evidence. */
+  it('is optional, because the whole corpus predates it', () => {
+    const plain = JSON.parse(receive(JSON.stringify(dispatch)).body);
+    expect(plain.build).toBeUndefined();
+    expect(parseDispatch(structuredClone(dispatch)).build).toBeUndefined();
+  });
+
+  /** Validated into the shape this file writes, like everything else here. */
+  it('is refused when it is not what the stamp function produces', () => {
+    for (const bad of ['not-hex', 'ABCDEF012345', 'a'.repeat(13), 42, null]) {
+      expect(() => parseDispatch({ ...structuredClone(dispatch), build: bad })).toThrow();
+    }
+  });
+
+  /**
+   * **It has to move when `src/` moves and not otherwise**, which is the whole
+   * contract. Asserted against the real tree rather than a fixture: a stamp that
+   * hashed nothing would be stable too, so stability alone proves nothing — what
+   * is checked here is that it is stable *and* the shape the validator accepts.
+   */
+  it('is a short hex digest of the source, and is stable while the source is', () => {
+    const stamp = sourceStamp();
+    expect(stamp).toMatch(/^[0-9a-f]{12}$/);
+    expect(sourceStamp()).toBe(stamp);
+    expect(parseDispatch({ ...structuredClone(dispatch), build: stamp }).build).toBe(stamp);
   });
 });

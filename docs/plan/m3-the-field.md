@@ -203,6 +203,27 @@ frame at 10 ms**, with about ten more between 3 and 6. Replayed here, 15 ticks o
 0.3 ms of `derive` and the warm worst is ~1.4 ms — which at 10.8× is 15 ms, and the phone's own 10 ms
 frame is the same event. The scan is now **the most expensive thing in a tick**, by a wide margin.
 
+> ⚠ **The last sentence of that paragraph is wrong, and it took a fourth flight to see it
+> (2026-09-02).** *"The phone's own 10 ms frame is the same event"* was an identification nobody
+> checked, and the corpus refuses it. Over the eight dispatches flown with the deadline in them:
+>
+> | dispatch | worst laptop tick | what it was | the phone's whole cpu distribution |
+> |---|---|---|---|
+> | `05-42-27` | 1.11 ms | tick 150, coasting — a scan | tops out at **3 ms** |
+> | `17-23-27` | 0.93 ms | tick 1113, coasting — a scan | tops out at **3 ms** |
+> | `23-30-08` | 0.14 ms | **no scan at all** | frames at **5 and 6 ms** |
+> | `23-27-58` | 0.91 ms | a scan | its 12 ms max is a **9 ms frame on tick 1** |
+>
+> A 1.1 ms laptop tick has to land in *some* frame, and on `05-42-27` no frame in the whole run
+> exceeded 4 ms — so the scan cost that phone **at most ~3 ms**, a factor nearer **×2** than the ×7.9
+> an average tick converts at. The likely reason is that the scan is `stepSim` in a tight loop, the
+> most JIT-friendly code in the game, where an average tick is `derive` and allocates. And
+> `23-30-08` closes it from the other side: 5 and 6 ms frames with no expensive tick anywhere.
+>
+> **The scan is still the most expensive thing in a tick and that half stands.** What does not is the
+> size of it on the phone, and the spreading was scoped against the wrong number — see
+> [`SCAN_PROBES`](../../src/state/deadline.ts) and the correction below.
+
 It did not drop a frame: 10 ms still fits inside 16.7, and the run's five 25 – 26 ms intervals all
 land on a press-**down** edge with 0 – 2 ms of cpu, which is the *touch* stall this plan already
 records and not this. But the margin is thin and the run is not unusual — the deadline was up on
@@ -226,13 +247,14 @@ author's own reference run (`2026-09-02T06-02-56`, 1 040 ticks, six scans):
 | the 171 samples themselves | p50 0.019, p95 0.063, max 0.155 ms |
 
 So the unit that costs is one `rescues` call — one **press** — and that is what a tick now budgets.
-`SCAN_PROBES = 3`, and the number is the ruling's own arithmetic rather than a taste:
-`MAX_SAMPLES` 40 samples plus a refinement of at most a stride (`ceil(361 / 40)` = 10) is **50
-presses at worst, which at three a tick is 17** — inside the **18** ticks of spec 03 §5's 300 ms
+A scan is `MAX_SAMPLES` 40 samples plus a refinement of at most a stride (`ceil(361 / 40)` = 10), so
+**50 presses at worst**, and what it has to land inside is the **18** ticks of spec 03 §5's 300 ms
 birth the mark was already being eased in over. *"Spread over the fade-in"*, as a bound.
 
-**Measured, no scan in the corpus ever reached that bound**: 82 spread scans across the 26
-replayable dispatches land in **p50 11 ticks, p90 13, max 14.**
+⚠ **`SCAN_PROBES` is 10, and it was 3 for a day** — see the correction two headings down. Three is
+the arithmetic that makes the worst case land in 17 ticks and it cost a third of the instrument; ten
+lands in **p50 3 ticks and 4 at worst**, measured over 89 spread scans across the 27 replayable
+dispatches.
 
 **Which side of the line it lives on, because that was the trap.** The scan is
 `src/sim/rescue.ts`'s — it forward-simulates and needs `stepSim`. **When it runs is the picture's**,
@@ -252,50 +274,59 @@ the defect the prototype records against this exact predicate.
 **What it bought, on the author's reference run** (`pnpm profile`, warm, best of three — a laptop,
 and the absolute numbers are the phone's):
 
-| | before | after |
-|---|---|---|
-| worst tick | **1.058 ms** | **0.371 ms** |
-| ticks over 0.3 ms | 6 | **1** |
-| tick p99 | 0.102 ms | 0.105 ms |
-| tick mean | 0.018 ms | 0.018 ms |
+| | before | at 10 | at 3 |
+|---|---|---|---|
+| worst tick | **1.058 ms** | **0.554 ms** | 0.371 ms |
+| tick p99 | 0.102 ms | 0.158 ms | 0.105 ms |
+| tick mean | 0.018 ms | 0.018 ms | 0.018 ms |
 
-The mean does not move and neither does the p99, which is the whole point: the same work is done and
-nothing is now done all at once. At the 10.8× factor that worst tick goes from **11.4 ms to 4.0 ms**,
-against the 10 ms frame the phone actually recorded on this run.
+The mean does not move, which is the whole point: the same work is done and nothing is now done all
+at once. ⚠ The **p99 rises** at ten, and that is the trade made visible — the scan's work is spread
+across more ticks, so more ticks carry a little of it. It is the right direction: a budget is decided
+by the worst frame and not by the ninety-ninth percentile of ticks.
 
-**And the worst tick is no longer the drift scan.** It is 858, *diving at #6, 0 ticks in* — the grab,
-where `strandedWhileHeld` asks its two whole projections. That call is still whole, gated to the
-outer band and to one ask every 6 ticks, and it is **6 of the 15 ticks over 0.3 ms** left in the
-corpus. It is the next thing here if the phone asks for one.
+**And the drift scan no longer owns the worst tick alone.** `strandedWhileHeld` — the held SOS's two
+whole projections, gated to the outer band and to one ask every 6 ticks — is now a comparable share
+of what is left over 0.3 ms. It is still whole, and it is the next thing here if the phone asks for
+one.
 
-#### ⚠ The price, stated, because the mark arrives later
+#### ⚠ The price, and the correction — `SCAN_PROBES` is **ten**, not three
 
-**The mark is drawn for 37% fewer ticks.** Over the 26 replayable dispatches, 28 315 ticks:
+**Three cost 34% of the mark's drawn life, and it was scoped against a phone number that turned out
+to be wrong.** Over the 27 replayable dispatches, 30 725 ticks:
 
-| presses a tick | ticks over 0.3 ms | worst tick | mark ticks | presence-weighted | SOS ticks | SOS gaps |
-|---|---|---|---|---|---|---|
-| **3 — shipped** | **14** | **0.85 ms** | **1 336** | **689** | **649** | **3** |
-| 6 | 25 | 0.98 ms | 1 734 | 866 | 657 | 3 |
-| 10 | 52 | 1.42 ms | 1 902 | 955 | 660 | 2 |
-| 40 | 87 | 1.74 ms | 2 108 | 1 076 | 662 | 2 |
-| whole, as it was | 90 | 2.91 ms | 2 122 | 1 079 | 662 | 2 |
+| presses a tick | scan lands in | ticks over 0.3 ms | mark ticks | presence-weighted | SOS gaps |
+|---|---|---|---|---|---|
+| 3 — as first built | p50 11, max 14 | 9 – 14 | 1 653 (66%) | 900 (67%) | **4** |
+| 8 | p50 4, max 5 | 36 | 2 199 (88%) | 1 167 (87%) | 3 |
+| **10 — shipped** | **p50 3, max 4** | **52 – 60** | **2 266 (90%)** | **1 203 (90%)** | **3** |
+| 12 | p50 2, max 3 | 77 | 2 313 (92%) | 1 229 (92%) | 3 |
+| whole, as it was | — | 95 – 99 | 2 505 | 1 342 | 3 |
 
-*(a single cold flight of each dispatch rather than `pnpm profile`'s best of three, so the
-milliseconds are higher than the table above and only the column is comparable)*
+*(single cold flights rather than `pnpm profile`'s best of three, so the millisecond columns are
+noisy and only the counts are comparable between rows. Warm, on the author's reference run, the worst
+tick runs 1.058 ms whole → 0.554 at ten → 0.371 at three.)*
 
-**The presence-weighted column is the honest one and it falls as far as the raw count**, which is
-worth saying plainly: a dot lands with **p50 58 ticks of lead** and `FULL_SECONDS` is 81, so a mark
-usually arrives already at full ramp and the eleven ticks lost at the front are eleven fully-lit
-ticks. The instrument is 0.18 s later at p50 and still arrives about 0.8 s before its own deadline.
+**The ruling bounds when the scan finishes, not how many presses a tick buys.** *"Every 3rd tick,
+spread over the fade-in"* asks the scan to land inside spec 03 §5's 300 ms, which is 18 ticks. Three
+is the arithmetic that makes the **worst case** land in 17 of them; ten lands in **4 at worst and 3
+at p50**, meeting the ruling with a wide margin instead of exactly, and giving the mark back nearly
+all of its life.
 
-**What did not move**: the held SOS (356 ticks, unchanged), and every one of the **5** armings across
-the corpus — the *"the press you just made was already too late"* half reads a deadline the drift was
-already carrying, and measured, no grab in the corpus lands inside a scan's window.
+**And ten takes back the regression three had introduced.** At three the corpus carries a **fourth**
+SOS gap — 2 ticks, 33 ms, on `2026-09-01T06-00-36` at tick 2400, where the author releases a stranded
+swing and the new drift's scan has not landed. At ten it is back to the three the whole scan has.
 
-**One SOS gap appeared and it is 2 ticks.** On `2026-09-01T06-00-36` at tick 2400 the author releases
-a stranded swing: `doomOf` correctly drops the held arming on the release, and the new drift's scan
-had not landed. 33 ms, once in 28 315 ticks, in a cue that strobes at 2 Hz — recorded rather than
-fixed, because the only fix is not spreading the scan that opens a coast, which is the expensive one.
+**What never moved at either setting**: the held SOS (356 ticks) and every one of the **360** armed
+ticks across the corpus, because *"the press you just made was already too late"* reads a deadline the
+drift was already carrying.
+
+**Why three was chosen and why that was wrong** is the ⚠ note above: the spreading was scoped against
+*"the phone's own 10 ms frame is the same event"*, and it is not. The scan's cost converts to the
+phone nearer **×2** than the ×7.9 an average tick does, so the un-spread worst tick was costing about
+**3 ms** of a 16.7 ms frame rather than eleven. **The tail is still worth bounding** — it is the
+largest single-tick cost in the game and it lands on the tick a coast opens — but it was never worth a
+third of the instrument.
 
 **It is not on the bench**, and that is a decision rather than an oversight: this trades a cost
 against *how late the mark arrives*, which is a taste the author could judge — but the bench is at

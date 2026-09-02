@@ -173,30 +173,42 @@ export const NO_DEADLINE: DeadlineMemo = {
 };
 
 /**
- * How many of the scan's presses one tick may pay for — **three**, and the
- * arithmetic is the author's own ruling made into a number.
+ * How many of the scan's presses one tick may pay for — **ten**.
  *
  * ## ⚠ The spreading, ruled 2026-09-01 and earned 2026-09-02
  *
  * The scan was chosen in the grilling as *"every 3rd tick, spread over the
- * fade-in"* and only the stride half was built. It was deferred with the reason
- * written down — *"the measurement came in under the stated budget on a laptop,
- * and the phone is where that has to be settled"* — and the phone settled it: on
- * the author's reference run the scan is **the most expensive thing in a tick by
- * a wide margin**, ~1.4 ms warm on this laptop against a run whose own worst
- * frame was 10 ms of a 16.7 ms budget.
+ * fade-in"* and only the stride half was built, deferred with the reason written
+ * down: *"the measurement came in under the stated budget on a laptop, and the
+ * phone is where that has to be settled."*
  *
- * **Three is what makes the scan land inside the mark's own birth.** A scan is at
- * most [`MAX_SAMPLES`](../sim/rescue.ts) samples plus one refinement of at most a
- * stride, and the stride is at most `ceil(361 / 40)` = 10 — so 50 presses at
- * worst, which at three a tick is **17 ticks**, inside the
- * [`BIRTH_TICKS`](#birth_ticks) 18 the mark takes to come up anyway. The player
- * waits for nothing that was not already being eased in.
+ * **The ruling bounds when the scan finishes, not how many presses a tick buys.**
+ * A scan is at most [`MAX_SAMPLES`](../sim/rescue.ts) samples plus a refinement of
+ * at most a stride — 50 presses at worst — and what it has to fit inside is the
+ * [`BIRTH_TICKS`](#birth_ticks) 18 the mark takes to come up anyway. At ten it
+ * lands in **3 ticks at p50 and 4 at worst**, measured over the 27 replayable
+ * dispatches; the fade-in is met with a wide margin rather than exactly.
+ *
+ * ## ⚠ It was three, and three was too dear — corrected 2026-09-02
+ *
+ * Three is the arithmetic that makes the *worst case* land in 17 ticks, and it
+ * bought that bound with **34% of the mark's drawn life** (2 505 → 1 653 ticks
+ * over the corpus, and the same fall presence-weighted). Ten costs 10%. The
+ * author's own dispatches settled it: see the ⚠ note in
+ * `docs/plan/m3-the-field.md` — the deadline scan's cost does **not** convert to
+ * the phone at the factor an average tick does, because it is `stepSim` in a
+ * tight loop rather than the allocating work of a normal `derive`. Measured, its
+ * worst tick landed inside a phone frame that cost **3 ms in total** on two
+ * separate runs, so the tail is worth bounding and was never worth that price.
+ *
+ * It also takes back the one regression three had introduced: at three the corpus
+ * carries a **fourth** SOS gap that the whole scan does not, and at ten it is back
+ * to three.
  *
  * It is not on the bench. The grilling ruled the same of `MAX_SAMPLES` and for
  * the same reason: *"nobody can judge a cost knob by eye."*
  */
-export const SCAN_PROBES = 3;
+export const SCAN_PROBES = 10;
 
 /**
  * Whether the drift a scan was run for is still the drift the craft is on.

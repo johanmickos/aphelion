@@ -244,7 +244,10 @@ function baselineLines(dispatch: Dispatch, timing: DispatchTiming): string[] {
     bold('  ▼ the phone baseline'),
     dim(
       `  ${dispatch.at} · ${device ? `${device.css.w}×${device.css.h} css · dpr ${device.dpr}` : 'no device'}` +
-        ` · ${timing.frames} frames over ${dispatch.recipe.ticks} ticks`,
+        ` · ${timing.frames} frames over ${dispatch.recipe.ticks} ticks` +
+        // Which build this measurement is about, which `at` cannot say — see
+        // `Dispatch.build`. Every dispatch before 2026-09-02 has none.
+        (dispatch.build === undefined ? dim(' · build unrecorded') : ` · build ${dispatch.build}`),
     ),
     '',
     '  ms                        p50     p95     p99     max',
@@ -344,6 +347,20 @@ function timedDispatches(): Timed[] {
  * cost on today's. That is unavoidable — there is no way to re-run a phone — and
  * it is small here because the flyable cohort is two days old. It is the reason
  * the factor is re-derived on every invocation rather than written down.
+ *
+ * ## ⚠ It is an average over a tick's work, and it does not apply to every part
+ *
+ * Measured 2026-09-02, and it is the strongest caveat on this whole command. The
+ * deadline scan's worst tick costs ~1.1 ms here, which at this factor would be
+ * ~8 ms there — and on two separate runs that carried exactly such a tick
+ * (`05-42-27` and `17-23-27`) **no frame on the phone exceeded 3 ms at all**. So
+ * the scan's own factor is nearer ×2 than ×8. The likely reason is that it is
+ * `stepSim` in a tight loop, the most JIT-friendly code in the game, where an
+ * average tick is `derive` and allocates.
+ *
+ * The factor is therefore honest about a tick's *mean* and must not be spent on a
+ * single tick whose work is unusual — which is the one thing the budget lines
+ * below are tempted to do, and they say so.
  */
 function conversion(
   pool: readonly Timed[],
@@ -747,6 +764,14 @@ if (baseline === null) {
       dim(
         '  The worst line is deliberately pessimistic: three worst ticks have never landed in one frame.\n' +
           '  It is the ceiling a budget is supposed to be argued against, not a prediction.',
+      ),
+    );
+    console.log(
+      dim(
+        '  ⚠ And the factor is an average over a tick’s work. A worst tick is worst because it is doing\n' +
+          '  something unusual, and the unusual thing may not convert at the average rate — measured, the\n' +
+          '  deadline scan converts nearer ×2. Read the p99 line; treat the worst line as an upper bound\n' +
+          '  on an upper bound.',
       ),
     );
   }

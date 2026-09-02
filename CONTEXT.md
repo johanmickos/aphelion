@@ -564,6 +564,15 @@ costs, which only the device can say. `pnpm budget` joins them.
 _Avoid_: performance, frame time (that is one measurement; the budget is what it is spent
 against), FPS
 
+**Build**:
+The state of `src/` and `app/` a run was flown under, as a short hash the dev server stamps
+onto a **dispatch** when it arrives. Development's word. It is what a **recipe**'s `sim`
+cannot say: `SIM_VERSION` moves only when a *tick* moves, so a change that alters what a
+frame **costs** and deliberately leaves the swing alone is invisible in it — which is most
+performance work. A measurement without one has no cohort.
+_Avoid_: version (a recipe's `sim` and a field's version are versions and mean something
+narrower), commit, revision
+
 **Ghost**:
 A recipe played back alongside a live run.
 _Avoid_: using it for the compass's mark where the hand cuts a ring — that is a **crossing**

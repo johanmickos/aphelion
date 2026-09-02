@@ -87,6 +87,15 @@ export const MAX_DISPATCH_BYTES = 64 * 1024;
 export const MAX_NOTE_LENGTH = 2000;
 
 /**
+ * How long the source stamp is, in hex characters — **twelve**.
+ *
+ * Forty-eight bits, against a corpus that will hold hundreds of dispatches rather
+ * than billions. It is an identity for a build and never a signature: two builds
+ * colliding here would mislead a reader, and nothing about it is a defence.
+ */
+export const BUILD_STAMP_LENGTH = 12;
+
+/**
  * How many ticks the author may flag in one run.
  *
  * A flag is a tap, and a run is a couple of minutes; five hundred of them is
@@ -124,7 +133,11 @@ export interface Dispatch {
    * Evidence about the *session* and never about the *run*: nothing inside a
    * recipe is measured in wall-clock time, because the same session on a
    * stuttering phone and a smooth one produces the same ticks and different
-   * milliseconds. This is here to answer "which build was that" and nothing else.
+   * milliseconds.
+   *
+   * ⚠ It used to say it was here to answer *"which build was that"*, and it
+   * cannot: dating a run against the commit log is guesswork, and on 2026-09-02 a
+   * cost question turned on exactly that guess. [`build`](#build) answers it.
    */
   readonly at: string;
   readonly recipe: Recipe;
@@ -145,6 +158,34 @@ export interface Dispatch {
    * already has.
    */
   readonly timing?: DispatchTiming;
+  /**
+   * The source the dev server was serving when this arrived — a short hash of
+   * `src/` and `app/`.
+   *
+   * ## ⚠ Why this exists, and it is a measurement rule rather than a nicety
+   *
+   * AGENTS.md §3 asks every measurement for its **cohort**: which build, how many
+   * samples, what was excluded. A dispatch carried the first two and not the
+   * third. `recipe.sim` is close and is not it — `SIM_VERSION` moves only when a
+   * *tick* moves, so a change that alters what a frame **costs** and deliberately
+   * leaves the swing alone is invisible in it. That is most performance work,
+   * including the deadline scan's spreading.
+   *
+   * On 2026-09-02 the question *"was this flown before or after the scan was
+   * spread?"* had to be answered by comparing the file's modification time against
+   * the commit log, which is guesswork about the thing a cost measurement rests
+   * on.
+   *
+   * **The server stamps it, not the page**, so it is a fact rather than a claim —
+   * and it is the right fact: Vite full-reloads the page on any change under
+   * `src/`, so the source the server is serving when a dispatch arrives is the
+   * source the page loaded. ⚠ The one hole is a page that slept through a reload;
+   * the stamp then names a build newer than the one flown.
+   *
+   * Optional, because the corpus that already exists has none and refusing it
+   * would refuse the evidence this project has.
+   */
+  readonly build?: string;
 }
 
 /** Stamp a dispatch, trimming what the author wrote to what may be sent. */
@@ -154,6 +195,7 @@ export function buildDispatch(args: {
   observed: Observed;
   device?: DispatchDevice;
   timing?: DispatchTiming | null;
+  build?: string;
 }): Dispatch {
   return {
     kind: DISPATCH_KIND,
@@ -165,6 +207,7 @@ export function buildDispatch(args: {
     },
     ...(args.device ? { device: args.device } : {}),
     ...(args.timing ? { timing: args.timing } : {}),
+    ...(args.build ? { build: args.build } : {}),
   };
 }
 
@@ -441,5 +484,20 @@ export function parseDispatch(raw: unknown): Dispatch {
     observed: parseObserved(d.observed, recipe.ticks),
     ...(d.device === undefined ? {} : { device: parseDevice(d.device) }),
     ...(d.timing === undefined ? {} : { timing: parseTiming(d.timing, recipe.ticks) }),
+    ...(d.build === undefined ? {} : { build: parseBuild(d.build) }),
   };
+}
+
+/**
+ * The source stamp, checked into the shape this file writes rather than trusted.
+ *
+ * Hex and short, because that is all [`sourceStamp`](./vite-plugin-diag.ts)
+ * produces — and because this is a value that reaches a terminal and a filename's
+ * neighbourhood, so *"a caller cannot choose part of a path either"* wants the
+ * alphabet closed rather than the length capped.
+ */
+function parseBuild(raw: unknown): string {
+  const build = boundedString(raw, 'build stamp', BUILD_STAMP_LENGTH);
+  if (!/^[0-9a-f]+$/.test(build)) throw new Error('build stamp is not hex');
+  return build;
 }

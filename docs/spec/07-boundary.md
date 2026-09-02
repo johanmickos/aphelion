@@ -141,19 +141,19 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 > The rest of §6 — the unravelling, `BANK` snapping to DUSK, the world dimming, the card — is still
 > M6's, and the 70ms hitstop is still refused.
 >
-> ⚠ **The drifting half arrives later, and once in the corpus it blinks, 2026-09-02.** The scan the
-> cue reads is spread across ticks now (spec [03 · §5](./03-hud.md)'s notice), so a drift that opens
-> already past its own dot strobes **11 ticks later at p50, 14 at worst**. What did **not** move is
-> the held half: over the whole corpus the held SOS is unchanged at 356 ticks and every one of the 5
-> armings still fires, because *the press you just made was already too late* reads a deadline the
-> drift had been carrying all along.
+> ⚠ **The drifting half arrives a little later, 2026-09-02.** The scan the cue reads is spread across
+> ticks now (spec [03 · §5](./03-hud.md)'s notice), so a drift that opens already past its own dot
+> strobes **3 ticks later at p50, 4 at worst**. What did **not** move is the held half: over the whole
+> corpus the held SOS is unchanged at 356 ticks and every one of the 360 armed ticks still fires,
+> because *the press you just made was already too late* reads a deadline the drift had been carrying
+> all along.
 >
-> **One gap appeared and it is stated rather than fixed**: on `2026-09-01T06-00-36` at tick 2400 the
-> author releases a stranded swing, the held arming is correctly dropped on the release, and the new
-> drift's scan lands two ticks later — **33 ms of silence, once in 28 315 ticks.** §6 asks for *"a
-> signal, not a scream"* and the strobe is written never to reach zero for exactly this reason, so
-> this is the one place it does. The only fix is not spreading the scan that opens a coast, which is
-> the expensive one.
+> ⚠ **At the first setting of the spread it also blinked, and that is why the setting moved.** With
+> the scan paid three presses a tick the corpus grew a **fourth** SOS gap the whole scan does not
+> have — 2 ticks, 33 ms, where the author releases a stranded swing and the new drift's scan has not
+> landed. §6 asks for *"a signal, not a scream"* and the strobe is written never to reach zero for
+> exactly that reason, so a cue that goes out at a release is the one thing it must not do. At ten
+> presses it is back to the three gaps the un-spread scan has.
 
 > ### ⚠ §2's dashed band edges are refused (author, 2026-09-01)
 >

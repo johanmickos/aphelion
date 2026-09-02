@@ -739,11 +739,15 @@ export function formatTiming(timing: DispatchTiming, recipe: Recipe): string[] {
  */
 export function formatDispatch(dispatch: Dispatch, describe: readonly Tick[] = []): string[] {
   const device = dispatch.device;
+  // The build is what turns *when* into *which*, and its absence is meaningful:
+  // every dispatch recorded before 2026-09-02 has none, and dating those against
+  // the commit log is the guesswork the field exists to end.
+  const build = dispatch.build === undefined ? '' : ` · build ${dispatch.build}`;
   const out: string[] = [
     '',
     device
-      ? `  \x1b[2mflown ${dispatch.at} · ${device.css.w}×${device.css.h} css · dpr ${device.dpr}\x1b[0m`
-      : `  \x1b[2mrecorded ${dispatch.at}, not on a device\x1b[0m`,
+      ? `  \x1b[2mflown ${dispatch.at} · ${device.css.w}×${device.css.h} css · dpr ${device.dpr}${build}\x1b[0m`
+      : `  \x1b[2mrecorded ${dispatch.at}, not on a device${build}\x1b[0m`,
   ];
   if (device) out.push(`  \x1b[2m${device.ua}\x1b[0m`);
   if (dispatch.observed.note) out.push(`  \x1b[1m“${dispatch.observed.note}”\x1b[0m`);
