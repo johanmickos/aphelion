@@ -188,6 +188,16 @@ Against this laptop's 0.013 ms mean that is a **10.8× factor**, which is the co
 has never had. It is the first thing to reach for whenever a laptop measurement in these notes needs
 turning into a phone one.
 
+> ⚠ **The 10.8× is superseded, 2026-09-02 — it compared two different runs.** The numerator is one
+> run's fit and the denominator is `line 363`'s **before** number, measured on a different dispatch
+> under the build the stranded swing was about to change (0.013 → 0.015 there, and 0.019 on this run
+> today). AGENTS.md §3 asks a measurement for its cohort for exactly this reason.
+>
+> `pnpm budget --corpus` measures both halves over the **same** runs — the 25 dispatches that carry
+> timing *and* still replay — and gets **×7.1** (95% ×3.8 to ×10.4): a tick costs 0.0190 ms on this
+> laptop and 0.135 ms on the phone over those runs. The prose above is left as it was written; the
+> factor to reach for is the one the command derives, because it cannot go stale.
+
 **And it settles the deadline scan.** Frame cpu on that run: p50 1 ms, p95 2 ms, p99 2 ms, and **one
 frame at 10 ms**, with about ten more between 3 and 6. Replayed here, 15 ticks of that run cost over
 0.3 ms of `derive` and the warm worst is ~1.4 ms — which at 10.8× is 15 ms, and the phone's own 10 ms
@@ -1865,6 +1875,113 @@ what an average of frames that mostly return early hides.
 
 **What is still M3.6's**: a *command* that reports p99 and max for a replayed recipe without a
 browser, and the recorded phone baseline. What this closes is only that the bench can now be asked.
+
+### ⚠ Built, 2026-09-02 — `pnpm budget`, and the two fits were not disagreeing
+
+```
+pnpm budget                      the recipe this repo ships
+pnpm budget diagnostics/….json   a dispatch, with its own phone timing beside it
+pnpm budget --corpus             pool every timed dispatch and settle what a tick costs
+pnpm budget … --hz 120           at a different display rate
+```
+
+**It is the fourth reader of the meter's block and writes no fifth format.** The one piece of
+arithmetic that has to agree across `tools/meter.ts`, `tools/trail.ts`, the bench HUD and this — the
+line through the tick groups — is `fitGroups` in `trail.ts` and is called rather than copied.
+
+**What it times, and what it refuses to.** `app/main.ts`'s own frame loop with the canvas taken out:
+the real `ticksDue`, the real 1 ms clock grain, the real three-tick cap. Per frame it reports
+**p50 / p95 / p99 / max** — never a mean as a verdict, which is `VISION.md`'s rule — for the ticks and
+the interpolation. **The draw is deliberately absent**: a Canvas2D millisecond off a laptop says
+nothing about a phone's, which is why `pnpm profile`'s census counts it instead. So the laptop
+measures the **shape** and the phone measures the **scale**, and the report joins them.
+
+⚠ **At a nominal 60 Hz every frame runs exactly one tick**, which is `src/sim/clock.ts`'s grain
+rounding working exactly as its header says. The phone's own 0/2-tick frames come from a display that
+is not nominal — `--hz 90` builds them here, a third of frames running none.
+
+#### The phone baseline, and it is a dispatch rather than a number
+
+`diagnostics/2026-09-02T06-02-56-828Z-run-dispatch.json`, iPhone, Firefox iOS, 393×651 at dpr 3.
+Named as a constant in `tools/budget.ts` and re-read on every run, so it carries its own provenance
+and cannot go stale the way a transcribed figure can.
+
+| | p50 | p95 | p99 | max |
+|---|---|---|---|---|
+| frame cpu | 1 ms | 2 ms | 2 ms | **10 ms** |
+| frame interval | 17 ms | 17 ms | 18 ms | 26 ms |
+
+**A frame with one tick in it costs 1.15 ms**, and **388 of its 1 412 frames (27.5%) ran a different
+number of ticks** — the most of any recent run, which is why this one and not another.
+
+#### The two fits, reconciled — and it is the *estimator* that was loose
+
+`pnpm budget --corpus` fits all **71** timed dispatches (⚠ including the 56 whose recipes this build
+refuses: the meter has not changed, and a frame timing is evidence about the *phone* rather than about
+the swing — `parseTimingOnly` is a door with the identical validator on it, and `vite-plugin-diag.ts`
+still uses `parseDispatch` and nothing else).
+
+| | the sum — a frame with one tick | the split — what of it is the tick |
+|---|---|---|
+| across 71 runs, p05 – p95 | **0.65 – 1.15 ms** | **−0.22 – 0.48 ms** |
+
+**Nine of the 71 runs fit a negative tick cost**, which is not a thing a tick can do. That is the
+measurement of how loose one run's split is and it needs no model to make it.
+
+| cohort | runs | frames | a tick | 95% |
+|---|---|---|---|---|
+| all | 71 | 93 647 | 0.229 ± 0.037 | 0.16 – 0.30 |
+| 2026-08-29 | 7 | 10 612 | 0.199 ± 0.052 | 0.10 – 0.30 |
+| 2026-08-30 | 34 | 48 537 | 0.265 ± 0.054 | 0.16 – 0.37 |
+| 2026-08-31 | 16 | 14 755 | 0.213 ± 0.033 | 0.15 – 0.28 |
+| 2026-09-01 | 10 | 13 832 | 0.186 ± 0.050 | 0.09 – 0.28 |
+| 2026-09-02 | 4 | 5 911 | 0.085 ± 0.044 | −0.00 – 0.17 |
+
+Pooled with **each run keeping its own frame cost** — a fixed-effects fit, because a tick is the same
+work on one device and the *draw* is not: the corpus's mean frame cpu climbs **0.75 → 1.06 ms** over
+the four days M3 added the sky, the rungs and the boundary. The interval is **clustered by run**,
+because the frames inside one run are not independent of each other and pretending otherwise is
+precisely what makes one run's error bars look tight enough to contradict the run beside it.
+
+**So: not a contradiction.**
+
+| | a tick | the rest | their sum | frames that can speak to the split |
+|---|---|---|---|---|
+| `2026-09-01T06-00-36` | 0.264 | 0.811 | **1.08 ms** | 54 of 2 452 (2.2%) |
+| `2026-09-02T06-02-56` | 0.138 | 1.009 | **1.15 ms** | 388 of 1 412 (27.5%) |
+
+They agree on everything either run can see — the sums are **6%** apart. They differ only on the
+split, which neither run pins: 0.26 rests on 54 frames and 0.14 on 388. **Prefer the 09-02 fit of the
+two**, and prefer the pooled number to either, stating its cohort. `formatTiming` now prints the
+off-diagonal count beside every fit it reports, so a single-run split never reads as precise again.
+
+#### And the conversion is corrected: **×7.1**, not 10.8
+
+Measured on both machines over the **25 dispatches that carry timing and still replay**: a tick costs
+**0.0190 ms here** and **0.135 ms there**, so **×7.1** with a 95% band of ×3.8 to ×10.4. The 10.8×
+above divided one run's fit by the laptop's mean on a *different* run under a *previous* build; a
+third of it was the mismatch. It is re-derived on every invocation for the reason `VISION.md`'s
+seventh pillar gives — a number measured under tuning that has since moved is worse than an
+unmeasured one.
+
+⚠ One asymmetry is left and cannot be removed: the phone side is what those runs cost on the build
+they were flown under and the laptop side is what they cost today. There is no way to re-run a phone.
+
+#### The budget itself, on the reference run, after the spread scan
+
+| | here | there, at ×7.1 | three caught up in one frame, plus the phone's 1.01 ms |
+|---|---|---|---|
+| a p99 tick | 0.101 ms | 0.72 ms | **3.2 ms** of 16.7 — fits |
+| the worst tick | 0.350 ms | 2.50 ms | **8.5 ms** of 16.7 — fits |
+
+The worst line is deliberately pessimistic — three worst ticks have never landed in one frame — and
+is the ceiling a budget is meant to be argued against rather than a prediction.
+
+**It is a command and not a gate**, deliberately. `pnpm check` stays a correctness gate: a threshold
+on a laptop's milliseconds would fail on a busy machine and pass on a fast one, which teaches people
+to re-run the suite. What is in the suite is the *arithmetic* — `test/budget.test.ts` holds the pooled
+fit, the leverage count and the refused-recipe door — plus one run of the command itself, asserting it
+reports p99 and max and still says it is not a phone.
 
 ### ⚠ The bench lost a third of its sliders, 2026-09-01
 

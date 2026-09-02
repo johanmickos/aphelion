@@ -294,6 +294,13 @@ inside 20 seconds. Measure before assuming it is a skill issue.
 rendering-induced slowdown reached a phone with nothing in the repo able to catch
 it. The units that matter are p99 and max, not mean — that class of bug hides
 behind an average of calls that mostly return early.
+⚠ **Built as `pnpm budget`, 2026-09-02** (M3.6). It reports p99 and max for a
+replayed recipe with no browser, against a recorded phone baseline, and it carries
+the laptop-to-phone conversion the project never had — measured on both machines
+over the same runs rather than written down. What stays open is the part this
+paragraph is careful about: it is a **command**, not a gate, because a threshold on
+a laptop's milliseconds would fail on a busy machine and teach people to re-run the
+suite. The catching is still done by somebody choosing to look.
 
 ---
 

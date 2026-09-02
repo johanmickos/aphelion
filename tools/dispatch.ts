@@ -323,6 +323,48 @@ function parseWorst(raw: unknown, ticks: Tick): WorstFrame[] {
  * does is not evidence about a run — and evidence is the only thing this
  * endpoint exists to keep.
  */
+/**
+ * The timing block of a dispatch whose **recipe** this build refuses.
+ *
+ * ## ⚠ Why this is a door and not a hole in the wall
+ *
+ * A recipe recorded under an older `SIM_VERSION` is refused rather than replayed,
+ * which is the corpus rule working: 26 dispatches replay at 9 and 56 do not. But
+ * the **meter has not changed**, and a run's frame timings are evidence about the
+ * *device* rather than about the swing — so a refused recipe leaves a perfectly
+ * good measurement of what a phone costs sitting on disk, and `pnpm budget
+ * --corpus` needs all 71 of them to say anything about what a tick costs.
+ *
+ * Nothing is loosened. The timing block goes through the identical validator, and
+ * what this skips is the recipe, whose refusal is about a *different* question. It
+ * is also read-only and terminal-side: `vite-plugin-diag.ts`, which writes files
+ * on a server bound to every interface, still uses `parseDispatch` and nothing
+ * else. The tick count the block is checked against is taken from the envelope and
+ * validated here rather than trusted.
+ *
+ * `null` when the dispatch carries no timing at all.
+ */
+export function parseTimingOnly(raw: unknown): { at: string; timing: DispatchTiming } | null {
+  if (typeof raw !== 'object' || raw === null) throw new Error('dispatch is not an object');
+  const d = raw as Record<string, unknown>;
+  if (d.kind !== DISPATCH_KIND) throw new Error(`not a dispatch: kind ${String(d.kind)}`);
+  if (d.timing === undefined) return null;
+  const recipe = d.recipe;
+  if (typeof recipe !== 'object' || recipe === null) throw new Error('dispatch has no recipe');
+  const ticks = counting((recipe as Record<string, unknown>).ticks, 'run length');
+  return {
+    at: boundedString(d.at, 'timestamp', 40),
+    timing: parseTiming(d.timing, ticks),
+  };
+}
+
+/** What the device that flew it says about itself, or `null` where it said nothing. */
+export function parseDeviceOnly(raw: unknown): DispatchDevice | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const device = (raw as Record<string, unknown>).device;
+  return device === undefined ? null : parseDevice(device);
+}
+
 function parseTiming(raw: unknown, ticks: Tick): DispatchTiming {
   if (typeof raw !== 'object' || raw === null) throw new Error('timing is not an object');
   const t = raw as Record<string, unknown>;

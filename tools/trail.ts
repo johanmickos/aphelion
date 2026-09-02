@@ -31,7 +31,7 @@
 import { createHash } from 'node:crypto';
 import type { Dispatch, DispatchTiming } from './dispatch.ts';
 import { bucketAt, bucketCount } from './meter.ts';
-import type { Bucketed } from './meter.ts';
+import type { Bucketed, TickGroup } from './meter.ts';
 import { floorRadius } from '../src/sim/body.ts';
 import { speedOf } from '../src/sim/craft.ts';
 import { distance, magnitude } from '../src/sim/math.ts';
@@ -433,23 +433,139 @@ function histogramRows(bucketed: Bucketed, label: string): string[] {
  * has no slope.
  */
 export function frameCost(timing: DispatchTiming): { perFrame: number; perTick: number } | null {
+  return fitGroups(timing.byTicks);
+}
+
+/**
+ * The same line, fitted from the tick groups alone.
+ *
+ * Split out because the groups are the **only** part of a timing block that is
+ * exact: `TickGroup.cpu` is an untruncated sum, where the histograms beside it
+ * are whole milliseconds. So this is the one piece of arithmetic every reader of
+ * the block shares — `formatTiming` below, the bench's live HUD, and
+ * `pnpm budget`, which fits a laptop's nanosecond frames with the identical
+ * function rather than writing a second one that would drift from it.
+ */
+export function fitGroups(
+  groups: readonly TickGroup[],
+): { perFrame: number; perTick: number } | null {
+  const sums = spreadOf(groups);
+  if (sums === null) return null;
+  const { n, sumX, sumY, sumXY, sumXX } = sums;
+  const denominator = n * sumXX - sumX * sumX;
+  if (denominator === 0) return null;
+  const perTick = (n * sumXY - sumX * sumY) / denominator;
+  return { perFrame: (sumY - perTick * sumX) / n, perTick };
+}
+
+/** The five sums a straight line needs, over frames grouped by ticks run. */
+interface Spread {
+  readonly n: number;
+  readonly sumX: number;
+  readonly sumXX: number;
+  readonly sumY: number;
+  readonly sumXY: number;
+  /** `Σ(x − x̄)²` — see [`leverageOf`](#leverageof). */
+  readonly sxx: number;
+  /** `Σ(x − x̄)(y − ȳ)`. */
+  readonly sxy: number;
+}
+
+function spreadOf(groups: readonly TickGroup[]): Spread | null {
   let n = 0;
   let sumX = 0;
   let sumXX = 0;
   let sumY = 0;
   let sumXY = 0;
-  for (let ticks = 0; ticks < timing.byTicks.length; ticks++) {
-    const group = timing.byTicks[ticks]!;
+  for (let ticks = 0; ticks < groups.length; ticks++) {
+    const group = groups[ticks]!;
     n += group.frames;
     sumX += ticks * group.frames;
     sumXX += ticks * ticks * group.frames;
     sumY += group.cpu;
     sumXY += ticks * group.cpu;
   }
-  const denominator = n * sumXX - sumX * sumX;
-  if (n === 0 || denominator === 0) return null;
-  const perTick = (n * sumXY - sumX * sumY) / denominator;
-  return { perFrame: (sumY - perTick * sumX) / n, perTick };
+  if (n === 0) return null;
+  return {
+    n,
+    sumX,
+    sumXX,
+    sumY,
+    sumXY,
+    sxx: sumXX - (sumX * sumX) / n,
+    sxy: sumXY - (sumX * sumY) / n,
+  };
+}
+
+/**
+ * How much this run can actually say about the **split** between a tick and a
+ * frame, as against about their sum.
+ *
+ * ## ⚠ Two fits on one phone disagreed and this is why
+ *
+ * `2026-09-01T06-00-36` fits 0.26 ms a tick and 0.81 a frame;
+ * `2026-09-02T06-02-56` fits 0.14 and 1.01 on the same device four days apart, and
+ * the plan recorded that nobody had checked whether that was a contradiction.
+ * **It is not one.** A run where nearly every frame ran exactly one tick has no
+ * second point to put a line through: it pins `perFrame + perTick` and leaves the
+ * two terms free to trade off against each other. Both runs agree that a frame
+ * with one tick in it costs **1.07 and 1.15 ms** — a 7% spread — while their
+ * splits differ by a factor of two.
+ *
+ * The proof that this estimator is that loose at one run's scale is in the corpus
+ * itself: **four of the 71 timed iPhone runs fit a negative tick cost**, which is
+ * not a thing a tick can do.
+ *
+ * `off` is the count that matters and it needs no model: frames that ran a number
+ * of ticks other than the run's usual one. `sxx` is what the standard error of the
+ * slope divides by. `pnpm budget --corpus` pools the whole corpus over it.
+ */
+export function leverageOf(timing: DispatchTiming): { off: number; share: number; sxx: number } {
+  const groups = timing.byTicks;
+  const sums = spreadOf(groups);
+  if (sums === null) return { off: 0, share: 0, sxx: 0 };
+  const usual = groups.reduce(
+    (most, group, at) => (group.frames > groups[most]!.frames ? at : most),
+    0,
+  );
+  const off = sums.n - groups[usual]!.frames;
+  return { off, share: off / sums.n, sxx: sums.sxx };
+}
+
+/**
+ * What a tick costs, pooled over many runs, **each keeping its own frame cost**.
+ *
+ * The model is the one the evidence supports: a tick is the same work on the same
+ * device, and the *draw* is not — the corpus's mean frame cpu climbs 0.75 → 1.06 ms
+ * over the four days M3 added the sky, the rungs and the boundary, which is exactly
+ * a per-run intercept. So the slope is fitted **within** each run and the runs are
+ * added up, which is a fixed-effects fit and is why one run's cheap draw cannot
+ * masquerade as a cheap tick.
+ *
+ * The interval is **clustered by run** rather than by frame: the frames inside one
+ * run are not independent of each other, and treating them as if they were is what
+ * makes a single run's own error bars look tight enough to contradict the run next
+ * to it. `null` when fewer than two runs carry any spread at all.
+ */
+export function fitAcross(
+  timings: readonly DispatchTiming[],
+): { perTick: number; error: number; runs: number; frames: number; sxx: number } | null {
+  const spreads = timings
+    .map((timing) => spreadOf(timing.byTicks))
+    .filter((s): s is Spread => s !== null && s.sxx > 0);
+  if (spreads.length < 2) return null;
+  const sxx = spreads.reduce((sum, s) => sum + s.sxx, 0);
+  const sxy = spreads.reduce((sum, s) => sum + s.sxy, 0);
+  const perTick = sxy / sxx;
+  const scatter = spreads.reduce((sum, s) => sum + (s.sxy - perTick * s.sxx) ** 2, 0);
+  const runs = spreads.length;
+  return {
+    perTick,
+    error: Math.sqrt((scatter * runs) / (runs - 1)) / sxx,
+    runs,
+    frames: spreads.reduce((sum, s) => sum + s.n, 0),
+    sxx,
+  };
 }
 
 /**
@@ -518,6 +634,22 @@ export function formatTiming(timing: DispatchTiming, recipe: Recipe): string[] {
       : `    \x1b[1m→ a tick costs ${fit.perTick.toFixed(2)}ms; the rest of a frame costs ` +
           `${fit.perFrame.toFixed(2)}ms\x1b[0m \x1b[2m(least squares, weighted)\x1b[0m`,
   );
+  // ⚠ **And how much this run is entitled to say about that split**, which is the
+  // half that was missing when two runs on one phone fitted 0.26/0.81 and
+  // 0.14/1.01 and nobody could tell whether they disagreed. The sum is what a run
+  // like this pins down; the split is what it barely constrains. See `leverageOf`.
+  if (fit !== null) {
+    const lever = leverageOf(timing);
+    out.push(
+      `    \x1b[2mtheir sum — what a frame with one tick in it costs — is ` +
+        `${(fit.perFrame + fit.perTick).toFixed(2)}ms, and it is the well-determined half:\x1b[0m`,
+    );
+    out.push(
+      `    \x1b[2monly ${lever.off} of ${frames} frames (${(lever.share * 100).toFixed(1)}%) ran a ` +
+        `different number of ticks, and the split rests on those alone.` +
+        `${lever.share < 0.05 ? ' Read it as the sum.' : ''}\x1b[0m`,
+    );
+  }
 
   if (timing.timeline.length > 1) {
     // **Where in the run**, which a distribution cannot say and a report about

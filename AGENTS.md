@@ -143,6 +143,17 @@ The stated deliverable is **a technical architecture that is easy to maintain an
   for rather than timing it, because a count travels to a phone and a millisecond does not.
   **It is a laptop and it says so on every line.** What it produces are ratios and slopes;
   the absolute numbers come from the phone, through the meter below.
+- **`pnpm budget`** answers _what does a frame of this run cost, and does it fit_ — **p99 and max,
+  never a mean**, which is `VISION.md`'s rule and the whole reason it exists. It builds frames the
+  way `app/main.ts` does (the real `ticksDue`, the real clock grain, the real three-tick cap), times
+  the tick and the interpolation, and **does not time the draw** — a Canvas2D millisecond off a
+  laptop says nothing about a phone's, which is what `pnpm profile`'s census is for. So the laptop
+  measures the shape and the **phone measures the scale**: it reads a recorded baseline dispatch and
+  derives the laptop-to-phone factor from both machines over the same runs, on every invocation
+  rather than from a number in a note. `--corpus` pools every timed dispatch — including the ones
+  whose recipes this build refuses, because the meter did not change when the swing did — and is what
+  settled two fits that looked like they disagreed. It is the **fourth reader** of the meter's block
+  and writes no fifth format.
 - **`tools/meter.ts`** is what counts frames on the device, and it rides in the dispatch. It
   is handed its timestamps rather than reading a clock — the same rule `ticksDue` is written
   under, and the only reason its arithmetic can be tested. The phone's `performance.now()` is

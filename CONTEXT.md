@@ -554,6 +554,16 @@ wrong; one it holds none of fails, naming itself. Development's word, like **rec
 _Avoid_: golden (a golden is the assertion, a moment is what it is about), named tick,
 checkpoint, marker
 
+**Budget**:
+What one frame of the game has to spend, and what the harness is about. Development's word,
+like **recipe** and **dispatch**. It is always **p99 and max** and never a mean — an
+intermittent hitch is the one thing an average of frames that mostly return early hides —
+and it has two halves that are measured on different machines: what a **tick** costs, which
+a laptop can time honestly because the simulation is pure, and what the rest of a frame
+costs, which only the device can say. `pnpm budget` joins them.
+_Avoid_: performance, frame time (that is one measurement; the budget is what it is spent
+against), FPS
+
 **Ghost**:
 A recipe played back alongside a live run.
 _Avoid_: using it for the compass's mark where the hand cuts a ring — that is a **crossing**
