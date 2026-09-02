@@ -22,7 +22,7 @@
  * so a deadline that somehow disagreed with the simulation cannot survive half a
  * second of it.
  */
-import { rescueDeadline, strandedWhileHeld, turnedAway } from '../sim/rescue.ts';
+import { MIN_LEAD_SECONDS, rescueDeadline, strandedWhileHeld, turnedAway } from '../sim/rescue.ts';
 import type { Deadline, Wall } from '../sim/rescue.ts';
 import type { SimState } from '../sim/types.ts';
 import { SECONDS_PER_TICK } from '../sim/units.ts';
@@ -109,6 +109,20 @@ export interface DeadlineMemo {
   readonly doomed: Wall | null;
   /** The last tick the held craft was asked whether it is stranded — see `doomOf`. */
   readonly checked: number;
+  /**
+   * Whether the mark is worth **drawing**, decided once when it is born.
+   *
+   * The prototype's birth gate: a cross that appears with less lead than a person
+   * can react in *"would be a red blink and nothing else."* ⚠ It is a rule about
+   * the picture and it lives here rather than in the scan, because the scan's
+   * `cross` is also what says whether a rescue **exists** — and conflating the two
+   * told the author a press that worked was too late.
+   *
+   * Decided at birth and carried, so a mark that is drawn stays drawn through its
+   * own arrival: re-testing it every tick *"would blink it out at the moment the
+   * player is closest to it."*
+   */
+  readonly drawable: boolean;
 }
 
 export const NO_DEADLINE: DeadlineMemo = {
@@ -119,6 +133,7 @@ export const NO_DEADLINE: DeadlineMemo = {
   shown: 0,
   doomed: null,
   checked: -1,
+  drawable: false,
 };
 
 /**
@@ -157,6 +172,7 @@ export function deadlineOf(previous: DeadlineMemo, sim: SimState): DeadlineMemo 
     return { ...previous, shown: previous.shown + 1, ...doomed };
   }
   const deadline = rescueDeadline(sim);
+  const same = sameMark(previous, deadline);
   return {
     deadline,
     vx: sim.craft.vx,
@@ -168,9 +184,16 @@ export function deadlineOf(previous: DeadlineMemo, sim: SimState): DeadlineMemo 
     // A mark is new when there was none, or when the one there has been passed —
     // *"a mark that has been passed is not moved, it is replaced"*, which is the
     // prototype's own note against a cross that jumped forward.
-    shown: sameMark(previous, deadline) ? previous.shown + 1 : 0,
+    shown: same ? previous.shown + 1 : 0,
+    // Decided once, when the mark is new — see [`drawable`](#deadlinememo).
+    drawable: same ? previous.drawable : bornDrawable(deadline),
     ...doomed,
   };
+}
+
+/** Whether a newly-found mark had enough lead to be worth showing. */
+function bornDrawable(found: Deadline | null): boolean {
+  return found?.cross != null && found.leadTicks >= MIN_LEAD_SECONDS / SECONDS_PER_TICK;
 }
 
 /**
@@ -253,7 +276,7 @@ const STRAND_TICKS = 6;
 /** The deadline as the renderer is handed it, or `null` when there is none. */
 export function deadlineView(memo: DeadlineMemo, sim: SimState): DeadlineView | null {
   const found = memo.deadline;
-  if (found === null || found.cross === null) return null;
+  if (found === null || found.cross === null || !memo.drawable) return null;
   // How long until the craft reaches the mark. The scan measured it once; what
   // has happened since is simply that the craft has flown some of it.
   const lead = (found.leadTicks - (sim.tick - memo.at)) * SECONDS_PER_TICK;

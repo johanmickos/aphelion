@@ -112,8 +112,8 @@ export const MAX_SAMPLES = 40;
 export const RESCUE_BUDGET = 360;
 
 /**
- * How much lead a mark must have to be born at all, in seconds — the prototype's
- * **0.25**.
+ * How much lead a mark must have to be **drawn** at all, in seconds — the
+ * prototype's **0.25**.
  *
  * *"A cross that appears with less lead than a person can react in cannot inform
  * the press it is asking for... so it would be a red blink and nothing else."*
@@ -121,6 +121,20 @@ export const RESCUE_BUDGET = 360;
  * **A birth gate and not a live one**, which is the half that matters: once a mark
  * exists it stays through its own arrival, because *"re-testing every observation
  * would blink it out at the moment the player is closest to it."*
+ *
+ * ## ⚠ It is a rule about drawing, and applying it to the predicate was a bug
+ *
+ * The first build nulled the `cross` here when the lead was short, which made a
+ * real-but-late rescue indistinguishable from **no rescue at all** — and the SOS
+ * reads exactly that distinction. The author flew it: *"the SOS light went on
+ * during my last capture. When I kept holding I survived and ended up orbiting.
+ * That shouldn't happen."* Traced, the scan at that grab had found **one saving
+ * sample out of seven** and reported no cross, so the press that worked was
+ * marked as too late.
+ *
+ * So `cross` is truthful now and the gate lives in
+ * [`deadlineView`](../state/deadline.ts), where it can suppress a *mark* without
+ * lying about whether a rescue exists.
  */
 export const MIN_LEAD_SECONDS = 0.25;
 
@@ -393,14 +407,6 @@ export function rescueDeadline(state: SimState): Deadline | null {
     }
     cross = { x: best.craft.x, y: best.craft.y };
     leadTicks = best.tick - state.tick;
-  }
-  // **The birth gate.** A mark with less lead than a person can react in is a
-  // blink rather than a cue, and with nothing left behind it says nothing at all.
-  // It is refused as a *cross* rather than as a whole deadline, because the drift
-  // is still heading out and the SOS still has to know.
-  if (cross !== null && leadTicks < MIN_LEAD_SECONDS / SECONDS_PER_TICK) {
-    cross = null;
-    leadTicks = 0;
   }
   return { wall, path, cross, leadTicks };
 }

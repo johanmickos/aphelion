@@ -184,6 +184,37 @@ describe('the scan', () => {
   });
 });
 
+describe('a late rescue is still a rescue', () => {
+  /**
+   * ⚠ **The regression this exists for.** The first build applied the *drawing*
+   * birth gate to the scan itself, nulling the `cross` when its lead was under a
+   * quarter of a second. That made a real-but-late rescue indistinguishable from
+   * **no rescue at all** — and the SOS reads exactly that distinction, so it
+   * strobed at a craft that could still save itself, and did.
+   *
+   * The author flew it: *"the SOS light went on during my last capture. When I
+   * kept holding I survived and ended up orbiting. That shouldn't happen."*
+   * Traced, the scan at that grab had found **one saving sample out of seven** and
+   * reported no cross.
+   *
+   * So the invariant is stated as the thing that was broken: **if any sample
+   * saves, there is a cross.** Whether the mark is worth *drawing* is a separate
+   * question and lives with the picture.
+   */
+  it('reports a cross whenever any sample saves, however little lead it has', () => {
+    for (let off = -190; off <= 190; off += 10) {
+      for (const across of [200, 400, 700, 1000, 1300]) {
+        for (const up of [1200, 2000, 2800, 3600]) {
+          const scan = rescueDeadline(drifting(off, off >= 0 ? across : -across, up));
+          if (scan === null) continue;
+          const saves = scan.path.some((sample) => sample.saves);
+          expect(saves === (scan.cross !== null)).toBe(true);
+        }
+      }
+    }
+  });
+});
+
 describe('the SOS case', () => {
   /**
    * **A drift with no window at all is the 34%**, and it is what the SOS is for:

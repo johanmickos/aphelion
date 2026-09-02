@@ -137,6 +137,42 @@ that worth naming: the array is sized for the **widest** corridor spec 17 §4 de
 coordinates and left `acrossX` written as a conversion *"so that only one of the two stays right if
 that ever changes."* It did.
 
+#### ⚠ A false SOS, and the cause was a drawing rule applied to a predicate
+
+> *"I THINK the SOS light went on during my last capture. When I kept holding I survived and ended up
+> orbiting. That shouldn't happen, the SOS should only show where if I keep holding I'll die."*
+> — author, 2026-09-02, `diagnostics/2026-09-02T05-42-27-479Z`
+
+**Traced to the tick.** The grab at 441 armed the held SOS because the drift's own scan reported *no
+cross*. Re-scanned, that same drift had **one saving sample out of seven** — a real rescue, with a
+short lead. The press that worked was being marked as too late.
+
+**The cause was `MIN_LEAD_SECONDS`.** It is the prototype's birth gate — *"a cross that appears with
+less lead than a person can react in… would be a red blink and nothing else"* — and it is a rule
+about **drawing**. The first build implemented it by nulling the `cross` inside `rescueDeadline`,
+which is also the field that says whether a rescue **exists**. Two different questions through one
+value, and the SOS reads the one that was overwritten.
+
+Now `cross` is truthful and the gate lives on the memo as `drawable`, decided once at the mark's
+birth and carried — so it still cannot blink out *"at the moment the player is closest to it"*, and
+it no longer lies about whether a press would work.
+
+`test/sim/rescue.test.ts` states the invariant that was broken: **if any sample saves, there is a
+cross.**
+
+**Measured after, over all 23 dispatches:**
+
+| | |
+|---|---|
+| runs that end out of bounds inside their log | **4 — all 4 warned** (0.18, 0.53, 0.87, 1.65 s) |
+| runs that show the SOS and survive | **0** |
+| the author's run | **0 SOS ticks**, against 100 before |
+
+Four runs *look* like false alarms and are not: each ends with `ending: null`, which means the
+**recording** stopped rather than the run. All four were coasting with the SOS up at the last
+recorded tick, and flown on — with the button up, which is what they were already doing — every one
+dies out of bounds within 21 – 45 ticks.
+
 #### ⚠ A stranded swing is warned, 2026-09-01 — the author overruled the grilling, and was right
 
 The grilling settled that a held craft gets the SOS only when *the press that took the body was
