@@ -2085,6 +2085,48 @@ because a slider that names two setters drives two patches.
 
 ---
 
+### ⚠ The deadline gets a plate, 2026-09-02 — the ground had caught up with the ink
+
+> *"The deadline is hard to see against the ion background along the edge. How can we increase the
+> contrast of it?"* — author, on `diagnostics/2026-09-02T21-05-45-584Z` (1 868 ticks, 14 swings,
+> **CLEARED**)
+
+**The cue's own token is what does it, and the arithmetic is short.** Spec 07 §3's wash is ION over
+VOID rising to α 0.6 at the line; spec 03 §5's track is ION. At the line, full heat:
+
+| | |
+|---|---|
+| the ground | `rgb(157, 60, 105)` |
+| the track's lead-in, composited on it | `rgb(159, 61, 107)` |
+
+The same three numbers. As a contrast ratio:
+
+| | open field | at the line, full heat |
+|---|---|---|
+| hairline | 1.14:1 | **1.12:1** |
+| track | 1.36:1 | **1.22:1** |
+| lead-in and dot | 2.48:1 | **1.53:1** |
+
+So the instrument loses 40% of its contrast exactly where the decision it marks is.
+
+**The answer is the SOS's own, two days old**: spec 00 §6's plate — *darken the ground, do not change
+the ink.* A VOID plate under the track and under the dot, at the SOS plate's **0.82**, following the
+ink's width and its fading. At the line the lead-in goes back to **2.50:1** and the open field does
+not move at all, which is the shape a fix for this should have.
+
+**Raising the alpha was measured and refused**: at `OVERALL` 1 the lead-in reaches **7.01:1** in the
+open field — the *"bright red line is not helpful"* the author already refused once — and still only
+2.25:1 at the line. Louder in the wrong place and still quiet in the right one.
+
+**Cost**, `pnpm profile`'s census on that same run: strokes 50.2 → **52.0** a frame at the mean, 87 →
+**115** at the worst, and **overdraw does not move at all** — 1.613 / 3.075, identical to three
+decimals. A 1px stroke paints no area, which is the rungs' own argument.
+
+⚠ **One artefact is stated rather than fixed**: consecutive segments share round caps, so the plate
+double-composites at each joint — 0.82 becoming 0.97 over a few pixels, under a bright line. It is
+the same shape of thing the ink already does and nobody has reported it; if it reads as beading, the
+fix is one path for the plate at a single width rather than one per segment.
+
 ### ⚠ The unbound hold — investigated 2026-09-02, dropped by the author the same day
 
 > *"I feel like the last grab/capture should've force-released at some point. I shouldn't be able to

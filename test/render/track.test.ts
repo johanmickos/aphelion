@@ -175,6 +175,20 @@ function drawn(view: DeadlineView) {
 const alphaOf = (colour: string): number => parseInt(colour.slice(7, 9), 16) / 255;
 const tokenOf = (colour: string): string => colour.slice(0, 7).toUpperCase();
 
+/**
+ * ⚠ **The track is two strokes a segment now**, so every assertion about *the
+ * cue* has to say which of them it is about.
+ *
+ * A VOID plate goes down under the ink, because the wash the track is drawn over
+ * is the same token the track is — at the line the ground reaches `rgb(157, 60,
+ * 105)` and the lead-in composited to `rgb(159, 61, 107)`. Splitting by token
+ * rather than by index keeps these tests about the ink whatever the plate does.
+ */
+const ink = (lines: readonly Line[]): Line[] =>
+  lines.filter((line) => tokenOf(line.stroke) === ION.toUpperCase());
+const plate = (lines: readonly Line[]): Line[] =>
+  lines.filter((line) => tokenOf(line.stroke) === VOID.toUpperCase());
+
 describe('the track', () => {
   /**
    * ⚠ **The weight goes where the decision is** (author, 2026-09-01): *"it's
@@ -195,9 +209,9 @@ describe('the track', () => {
       path: far.path.map((p, at) => ({ ...p, x: 100 + at * 60 })),
       cross: { x: 100 + 39 * 60, y: 200 },
     };
-    const it = drawn(long);
-    const first = it.lines[0]!;
-    const last = it.lines[it.lines.length - 1]!;
+    const lines = ink(drawn(long).lines);
+    const first = lines[0]!;
+    const last = lines[lines.length - 1]!;
     expect(last.width).toBeGreaterThan(first.width * 1.5);
     expect(alphaOf(last.stroke)).toBeGreaterThan(alphaOf(first.stroke) * 1.5);
     // And the far end is still drawn — it is the connection to the craft.
@@ -210,9 +224,9 @@ describe('the track', () => {
    * has holes in it — but they are not the offer.
    */
   it('draws the stretches that save brighter than the gaps between them', () => {
-    const it = drawn(track([true, true, false, false, true, true]));
-    const bright = it.lines.filter((l) => alphaOf(l.stroke) > 0.1);
-    const faint = it.lines.filter((l) => alphaOf(l.stroke) <= 0.1);
+    const lines = ink(drawn(track([true, true, false, false, true, true])).lines);
+    const bright = lines.filter((l) => alphaOf(l.stroke) > 0.1);
+    const faint = lines.filter((l) => alphaOf(l.stroke) <= 0.1);
     expect(bright.length).toBeGreaterThan(0);
     expect(faint.length).toBeGreaterThan(0);
     expect(Math.min(...bright.map((l) => alphaOf(l.stroke)))).toBeGreaterThan(
@@ -247,13 +261,76 @@ describe('the track', () => {
   });
 });
 
+/**
+ * ⚠ **The ground the track is drawn on is the same token the track is.**
+ *
+ * > *"The deadline is hard to see against the ion background along the edge."*
+ * > — author, 2026-09-02
+ *
+ * The boundary's wash is ION over VOID rising to α 0.6 at the line, and at full
+ * heat the ground is `rgb(157, 60, 105)` where the track's lead-in composites to
+ * `rgb(159, 61, 107)` — the same three numbers. As a ratio the lead-in falls from
+ * 2.48:1 in the open field to 1.53:1 at the line, so the instrument is faintest
+ * exactly where the decision it marks is. Spec 00 §6's answer, and the SOS's:
+ * darken the ground, do not change the ink.
+ */
+describe('the plate under the track', () => {
+  it('lays VOID under every stretch of ink, and wider than it', () => {
+    const it = drawn(track([true, true, false, true]));
+    const under = plate(it.lines);
+    const over = ink(it.lines);
+    expect(under).toHaveLength(over.length);
+    for (let at = 0; at < over.length; at++) {
+      // The same stretch of line, so the plate cannot drift off the ink.
+      expect(under[at]!.from.x).toBeCloseTo(over[at]!.from.x, 6);
+      expect(under[at]!.to.x).toBeCloseTo(over[at]!.to.x, 6);
+      expect(under[at]!.width).toBeGreaterThan(over[at]!.width);
+    }
+  });
+
+  /**
+   * **It follows the ink's own fading.** A stretch the track draws faintly because
+   * no press there saves would otherwise get a full-strength dark line under it,
+   * which is a shadow with nothing in it.
+   */
+  it('goes as faint as the stretch it is under', () => {
+    const it = drawn(track([true, true, false, false, true, true]));
+    const under = plate(it.lines);
+    const over = ink(it.lines);
+    const dim = over
+      .map((line, at) => (alphaOf(line.stroke) <= 0.1 ? at : -1))
+      .filter((at) => at >= 0);
+    const lit = over
+      .map((line, at) => (alphaOf(line.stroke) > 0.1 ? at : -1))
+      .filter((at) => at >= 0);
+    expect(dim.length).toBeGreaterThan(0);
+    expect(lit.length).toBeGreaterThan(0);
+    expect(Math.max(...dim.map((at) => alphaOf(under[at]!.stroke)))).toBeLessThan(
+      Math.min(...lit.map((at) => alphaOf(under[at]!.stroke))),
+    );
+  });
+
+  /** And it is under the dot too, which is the one place the eye is sent. */
+  it('is under the dot as well', () => {
+    const it = drawn(track([true, true, false]));
+    const under = it.dots.filter((d) => tokenOf(d.fill) === VOID.toUpperCase());
+    const over = it.dots.filter((d) => tokenOf(d.fill) === ION.toUpperCase());
+    expect(under).toHaveLength(1);
+    expect(over.length).toBeGreaterThan(0);
+    expect(under[0]!.radius).toBeGreaterThan(Math.max(...over.map((d) => d.radius)));
+    expect(under[0]!.x).toBeCloseTo(over[0]!.x, 6);
+  });
+});
+
 describe('the dot', () => {
   it('sits at the far end of the last saving stretch', () => {
     const it = drawn(track([true, false, true, true, false]));
     // A filled core inside a ring, so it reads as a place rather than a blob.
     expect(it.dots.length).toBeGreaterThan(0);
     for (const dot of it.dots) expect(dot.x).toBeCloseTo(100 + 3 * 20, 6);
-    expect(tokenOf(it.dots[0]!.fill)).toBe(ION.toUpperCase());
+    // The plate first, then the ink inside it.
+    expect(tokenOf(it.dots[0]!.fill)).toBe(VOID.toUpperCase());
+    expect(it.dots.filter((d) => tokenOf(d.fill) === ION.toUpperCase()).length).toBeGreaterThan(0);
   });
 });
 
@@ -267,8 +344,14 @@ describe('the fade', () => {
   it('brings the whole track up together', () => {
     const half = drawn(track([true, true, false], { presence: 0.5 }));
     const full = drawn(track([true, true, false], { presence: 1 }));
-    expect(alphaOf(half.lines[0]!.stroke)).toBeLessThan(alphaOf(full.lines[0]!.stroke));
-    expect(half.dots[0]!.alpha).toBeLessThan(full.dots[0]!.alpha);
+    expect(alphaOf(ink(half.lines)[0]!.stroke)).toBeLessThan(alphaOf(ink(full.lines)[0]!.stroke));
+    // The plate comes up with it, or a faint track would arrive on a hard shadow.
+    expect(alphaOf(plate(half.lines)[0]!.stroke)).toBeLessThan(
+      alphaOf(plate(full.lines)[0]!.stroke),
+    );
+    const lit = (dots: readonly Dot[]): Dot =>
+      dots.filter((d) => tokenOf(d.fill) === ION.toUpperCase())[0]!;
+    expect(lit(half.dots).alpha).toBeLessThan(lit(full.dots).alpha);
   });
 });
 
@@ -280,18 +363,16 @@ describe('the fuel coupling', () => {
    * hand-set value: what M4.4 changes must be a number, not this file.
    */
   it('dims what the tank cannot afford, and moves nothing', () => {
-    const full = drawn(track([true, true, true, true]));
-    const empty = drawn(track([true, true, true, true], { affordable: 0 }));
-    expect(empty.lines).toHaveLength(full.lines.length);
-    for (let at = 0; at < full.lines.length; at++) {
+    const full = ink(drawn(track([true, true, true, true])).lines);
+    const empty = ink(drawn(track([true, true, true, true], { affordable: 0 })).lines);
+    expect(empty).toHaveLength(full.length);
+    for (let at = 0; at < full.length; at++) {
       // Same geometry, dimmer ink.
-      expect(empty.lines[at]!.from.x).toBeCloseTo(full.lines[at]!.from.x, 6);
-      expect(empty.lines[at]!.width).toBeCloseTo(full.lines[at]!.width, 6);
-      expect(alphaOf(empty.lines[at]!.stroke)).toBeLessThanOrEqual(alphaOf(full.lines[at]!.stroke));
+      expect(empty[at]!.from.x).toBeCloseTo(full[at]!.from.x, 6);
+      expect(empty[at]!.width).toBeCloseTo(full[at]!.width, 6);
+      expect(alphaOf(empty[at]!.stroke)).toBeLessThanOrEqual(alphaOf(full[at]!.stroke));
     }
-    const dimmed = full.lines.filter(
-      (l, at) => alphaOf(empty.lines[at]!.stroke) < alphaOf(l.stroke),
-    );
+    const dimmed = full.filter((l, at) => alphaOf(empty[at]!.stroke) < alphaOf(l.stroke));
     expect(dimmed.length).toBeGreaterThan(0);
   });
 });

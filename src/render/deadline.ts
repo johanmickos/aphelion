@@ -91,6 +91,46 @@ const LEAD_ALPHA = 1;
 const OVERALL = 0.5;
 
 /**
+ * How dark the ground under the track is made, and how far the dark reaches past
+ * the ink — **spec [00 · §6](../../docs/spec/00-tokens.md)'s plate, drawn along a
+ * line instead of behind a word.**
+ *
+ * ## ⚠ The ground caught up with the ink, 2026-09-02
+ *
+ * > *"The deadline is hard to see against the ion background along the edge."*
+ * > — author
+ *
+ * **Measured, and the cue's own token is what does it.** The boundary's wash is
+ * ION over VOID rising to α 0.6 at the line ([`boundary.ts`](./boundary.ts)), and
+ * the track is ION. At the line, full heat, the ground is `rgb(157, 60, 105)` and
+ * the track's brightest part — the lead-in — composites to `rgb(159, 61, 107)`.
+ * **The same three numbers.** As a contrast ratio the lead-in falls from 2.48:1 in
+ * the open field to **1.53:1** at the line, and the track behind it from 1.36:1 to
+ * **1.22:1**, so the instrument is faintest exactly where the decision it marks
+ * is.
+ *
+ * This is [`SOS_PLATE`](#plate_strength)'s problem one instrument along and it
+ * takes the same answer, for the reason spec 00 §6 gives: *darken the ground, do
+ * not change the ink.* Raising the track's own alpha was measured against this and
+ * refused — at `OVERALL` 1 the lead-in reaches 7.01:1 in the open field, which is
+ * the *"bright red line is not helpful"* the author already refused, and still
+ * only 2.25:1 at the line. The plate restores **2.50:1 at the line and changes
+ * nothing in the open field**, which is the shape a fix for this should have: it
+ * removes the ground's influence rather than shouting over it.
+ *
+ * At the SOS plate's own **0.82** — [`PLATE_STRENGTH`](#plate_strength) below,
+ * stated twice rather than shared because they are the same *ruling* and not the
+ * same *number*: one is behind a word and one is along a line, and the day one of
+ * them moves the other should not follow it silently. And it fades with everything
+ * else, because a plate under a stretch of track that is dim from having no press
+ * that saves would be a dark line with nothing in it.
+ */
+const CASING = 0.82;
+
+/** How far the plate reaches past the ink, each side. Enough to read as an edge. */
+const CASING_EDGE = 1 * BOARD_PIXEL;
+
+/**
  * How dim the part of the track the tank cannot afford is drawn.
  *
  * Spec 03 §5's fuel coupling is *"by luminance, never geometry"* — the geometry is
@@ -217,7 +257,20 @@ export function drawDeadline(context: CanvasRenderingContext2D, track: DeadlineV
     // today; it is here so M4.4 changes a number rather than this file.
     const along = 1 - away / Math.max(1e-6, toCross[0]!);
     const afford = along <= track.affordable ? 1 : UNAFFORDABLE;
-    context.lineWidth = (TRACK_WIDTH + LEAD_WIDTH * nose) * body;
+    const width = (TRACK_WIDTH + LEAD_WIDTH * nose) * body;
+    const segment = (): void => {
+      context.beginPath();
+      context.moveTo(one.x, one.y);
+      context.lineTo(two.x, two.y);
+      context.stroke();
+    };
+    // **The plate first**, following the ink's own shape and its own fading, so a
+    // stretch that is dim because no press there saves does not get a full-strength
+    // dark line under it. See [`CASING`](#casing).
+    context.lineWidth = width + 2 * CASING_EDGE;
+    context.strokeStyle = dim(VOID, CASING * track.presence * body * lit * afford);
+    segment();
+    context.lineWidth = width;
     context.strokeStyle = dim(
       ION,
       OVERALL *
@@ -227,15 +280,17 @@ export function drawDeadline(context: CanvasRenderingContext2D, track: DeadlineV
         lit *
         afford,
     );
-    context.beginPath();
-    context.moveTo(one.x, one.y);
-    context.lineTo(two.x, two.y);
-    context.stroke();
+    segment();
   }
 
   // The dot: a filled core inside a ring, so it reads as a place rather than a
   // blob — and it lands **on** the end of the track.
   const at = track.cross;
+  context.globalAlpha = 1;
+  context.fillStyle = dim(VOID, CASING * track.presence);
+  context.beginPath();
+  context.arc(at.x, at.y, DOT_RADIUS + CASING_EDGE, 0, Math.PI * 2);
+  context.fill();
   context.globalAlpha = track.presence * OVERALL * LEAD_ALPHA;
   context.fillStyle = ION;
   context.beginPath();

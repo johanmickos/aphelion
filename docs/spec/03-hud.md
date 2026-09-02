@@ -168,6 +168,33 @@ that the press is steering, before the first orbit ever forms.
 > ⚠ **It was three presses a tick for a day and that cost 34% of the mark's life**, against a phone
 > cost that turned out to have been over-read by about four times. `docs/plan/m3-the-field.md` carries
 > the correction, the table and the alternatives.
+>
+> ### ⚠ The track sits on a plate now, 2026-09-02 — the ground was the same token
+>
+> > *"The deadline is hard to see against the ion background along the edge."* — author
+>
+> **Measured, and the cue's own token is what does it.** Spec [07 · §3](./07-boundary.md)'s wash is
+> ION over VOID rising to α 0.6 at the line; this section's track is ION. At the line, full heat, the
+> ground composites to `rgb(157, 60, 105)` and the track's lead-in to `rgb(159, 61, 107)` — **the same
+> three numbers**. As a contrast ratio the lead-in falls from **2.48:1** in the open field to
+> **1.53:1** at the line, and the track behind it from 1.36:1 to **1.22:1**. The instrument is
+> faintest exactly where the decision it marks is.
+>
+> The answer is spec [00 · §6](./00-tokens.md)'s and it is the one §6's own `SOS` already took two
+> days earlier: **darken the ground, do not change the ink.** A VOID plate is drawn under the track
+> and under the dot, at the SOS plate's 0.82, following the ink's own width and its own fading — so a
+> stretch drawn faintly because no press there saves does not get a full-strength shadow under it.
+> **At the line the lead-in goes back to 2.50:1, and nothing changes in the open field.**
+>
+> **Raising the track's own alpha was measured against this and refused.** At `OVERALL` 1 the lead-in
+> reaches 7.01:1 in the open field — which is the *"bright red line is not helpful"* this section's
+> first notice already records the author refusing — and still only 2.25:1 at the line. A fix for this
+> should remove the ground's influence rather than shout over it.
+>
+> **What it costs**, from `pnpm profile`'s census over the author's own cleared run: strokes go 50.2
+> → **52.0** a frame at the mean and 87 → **115** at the worst, and **overdraw does not move at all**
+> — 1.613 mean and 3.075 max, to three decimals, before and after. A 1px stroke paints no area, which
+> is the same argument the rungs' own note makes: what grew is command volume and not fill.
 
 Nothing on the track tells the player what to do. It states four facts and lets the player price
 the trade.
