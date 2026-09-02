@@ -1213,8 +1213,20 @@ function renderKnobs(): void {
 function showKnob(knob: Knob): void {
   const at = value(knob);
   const out = byId(`v-${knob.id}`);
+  const moved = at !== knob.base;
+  // **A moved knob says what it was moved from.** `Back to defaults` is
+  // all-or-nothing by design — a run flown off the defaults is off them as a
+  // whole — but that made putting *one* knob back mean resetting every knob,
+  // because the value it had on `main` was the one thing the page stopped
+  // showing the moment you touched it.
   out.textContent = fmt(at, knob.places);
-  out.className = at === knob.base ? '' : 'moved';
+  if (moved) {
+    const was = document.createElement('span');
+    was.className = 'was';
+    was.textContent = `main ${fmt(knob.base, knob.places)}`;
+    out.append(was);
+  }
+  out.className = moved ? 'moved' : '';
 }
 
 function showDefaults(): void {

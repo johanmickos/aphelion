@@ -237,6 +237,7 @@
     display: flex;
     gap: 8px;
     margin-top: 14px;
+    flex-wrap: wrap;
   }
   button {
     font: inherit;
@@ -347,6 +348,15 @@
   .knob output.moved {
     color: var(--ion);
   }
+  /* **What main has, beside what you have set.** A slider that has been moved
+     shows both, because the number you want back is the one you can no longer
+     see — and "back to defaults" is all-or-nothing, so without this the only way
+     to restore one knob was to reset every knob. */
+  .knob output .was {
+    font-weight: 500;
+    color: var(--quiet);
+    padding-left: 6px;
+  }
   .knob-what {
     display: block;
     font-size: 11px;
@@ -452,13 +462,8 @@
   .state.moved {
     color: var(--ion);
   }
-  .statebar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-top: 16px;
+  p.state {
+    margin: 6px 0 0;
   }
 
   /* ---- the trail ---- */
@@ -592,7 +597,16 @@
       <div class="controls">
         <button id="reset" type="button">Reset</button>
         <button id="flag" type="button">Flag</button>
+        <!-- **Back to defaults sits with the other two, not at the foot of the
+             options.** It was in the panel beside its own state line, which meant
+             it scrolled away with the cards and the one control you reach for
+             after moving a slider was the one you had to go looking for. The
+             state line follows it, because a button that says "back to defaults"
+             is not much use without the sentence saying how far off them you
+             are. -->
+        <button id="defaults" type="button">Back to defaults</button>
       </div>
+      <p id="defaults-state" class="state"></p>
       <input id="note" type="text" autocomplete="off" placeholder="what happened" />
       <p class="fine">
         <b>Click the field or hold the space bar</b> to be caught by the body you are arriving at;
@@ -701,11 +715,6 @@
           </p>
           <div id="knobs-field"></div>
         </section>
-      </div>
-
-      <div class="statebar">
-        <span id="defaults-state" class="state"></span>
-        <button id="defaults" type="button">Back to defaults</button>
       </div>
 
       <section class="card">
