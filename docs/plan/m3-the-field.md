@@ -2127,6 +2127,24 @@ double-composites at each joint — 0.82 becoming 0.97 over a few pixels, under 
 the same shape of thing the ink already does and nobody has reported it; if it reads as beading, the
 fix is one path for the plate at a single width rather than one per segment.
 
+### ⚠ The held SOS cries wolf, 2026-09-02 — and it is the arm nobody expected
+
+> *"I saw the SOS warning light after grabbing but I did not die. Either the SOS shouldn't have
+> shown, or I should've died."* — author, on `diagnostics/2026-09-02T21-16-26-860Z`
+
+Traced to the tick and then measured over the whole corpus — **30 replayable dispatches, 9 held
+warnings**. The full table and the reasoning are in spec [07 · §6](../spec/07-boundary.md)'s notice.
+The short of it: **`armDoom` is 0 right and 2 wrong; the stranded arm is 5 right and 2 wrong**, which
+is the grilling's own conclusion inverted — it kept `armDoom` and rejected the stranded predicate, and
+the corpus says the arm the author overruled it for is the one doing the work.
+
+Neither duration nor the held projection's lead separates the false from the true, so there is no
+threshold to reach for. The reason is structural: the cue asks *hold forever?* and *release now?*, and
+the player's move is *hold a little longer, then release* — which neither branch tries.
+
+**It is not the spreading**: replayed on the pre-spread build the table is identical. Waiting on the
+author.
+
 ### ⚠ The unbound hold — investigated 2026-09-02, dropped by the author the same day
 
 > *"I feel like the last grab/capture should've force-released at some point. I shouldn't be able to

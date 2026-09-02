@@ -148,6 +148,46 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 > because *the press you just made was already too late* reads a deadline the drift had been carrying
 > all along.
 >
+> ### ⚠ The held half cries wolf, 2026-09-02 — and the two arms have swapped places
+>
+> > *"I saw the SOS warning light after grabbing but I did not die. Either the SOS shouldn't have
+> > shown, or I should've died."* — author, on `diagnostics/2026-09-02T21-16-26-860Z`
+>
+> **Measured over the 30 replayable dispatches, 9 held warnings.** The predicate is unchanged since
+> 2026-09-01; what has changed is the evidence.
+>
+> | arm | died with it up | survived it |
+> |---|---|---|
+> | *the press you just made was already too late* — the prototype's `armDoom` | **0** | **2** |
+> | *stranded while held* — the author's own overrule | **5** | **2** |
+>
+> **That is the grilling's conclusion inverted.** The grilling kept `armDoom` and rejected the
+> stranded predicate as a prompt; the author overruled it after dying unwarned; and the corpus now
+> says the overrule is the arm that works and `armDoom` **has never once been right in it**.
+>
+> ⚠ The measurement is *"fires once and never turns off"* no longer holding: 2026-09-01 measured 3
+> episodes and 3 transitions. There are 9 episodes now and 4 of them turn off.
+>
+> **Nothing separates the false from the true**, which is why this is a ruling and not a threshold.
+> Duration does not: the false ones run 0.15 – 1.03 s and the true ones 0.47 – 3.02 s. Neither does
+> how soon the held projection says the craft leaves — 21, 40 and 88 ticks on the false, 25, 31, 50,
+> 58 and 174 on the true.
+>
+> **The reason is structural.** The cue asks two questions — *does holding forever carry you out*, and
+> *does releasing right now leave a rescuable drift* — and the player's actual move is **hold a little
+> longer, then release**, which neither branch tries. It is the same shape as the honesty limit the
+> prototype already records for the drifting scan: *"it does not consider releasing and grabbing a
+> DIFFERENT body, which is a real escape the player has and the projection never tries."*
+>
+> **Unchanged on the pre-spread build**, so it is the predicate meeting new evidence rather than
+> anything M3.6 did. ⚠ One of the nine (`2026-09-01T06-00-36`) predates the deadline, so replaying it
+> applies today's predicate to an input log flown without it — a different run, and it is one of
+> `armDoom`'s two.
+>
+> **Not ruled here.** The candidates are: drop `armDoom` and keep the stranded arm; search release
+> points, which the grilling refused on a cost nobody could measure and `pnpm budget` now can; or
+> accept the rate, against the 95% the word `SOS` was chosen for.
+
 > ⚠ **At the first setting of the spread it also blinked, and that is why the setting moved.** With
 > the scan paid three presses a tick the corpus grew a **fourth** SOS gap the whole scan does not
 > have — 2 ticks, 33 ms, where the author releases a stranded swing and the new drift's scan has not
