@@ -118,7 +118,7 @@ export function bounce(craft: Craft, body: Body, gap: number, restitution: numbe
 
 /**
  * Bounce off every body except the one being held — spec 01 §10's `R + 6` at
- * 0.6, which never kills.
+ * **0.2**, which never kills.
  *
  * Called from the dive, where the craft's position is the integrator's and a
  * bounce therefore means something. **It is deliberately not called from the
@@ -126,6 +126,18 @@ export function bounce(craft: Craft, body: Body, gap: number, restitution: numbe
  * ([`orbit.ts`](./orbit.ts)) and would be rewritten on the next tick; the
  * prototype draws the same line in the same place, resolving these contacts only
  * in its integrated phases.
+ *
+ * ## ⚠ Spec 01 §10 states the rule unconditionally, and the author flew into the gap
+ *
+ * *"I orbit a planet, but I seem to go THROUGH the one next to it rather than
+ * bounce against it"* (2026-09-03). The spec's sentence does not distinguish the
+ * dive from the orbit, so this paragraph is a deviation from it rather than a
+ * reading of it — recorded in spec 01 §10's own ⚠ notice with the four candidate
+ * fixes and their costs, and **none of them is picked**: every one moves
+ * `SIM_VERSION` to 10 and refuses the whole replayable corpus.
+ *
+ * Measured over the 37 replayable dispatches: **3 runs (8%), 41 ticks (0.088%)**,
+ * worst case 48 design units into a 150-unit body for 17 ticks.
  */
 export function bounceOffOthers(craft: Craft, field: Field, held: Body): void {
   for (const body of field.bodies) {

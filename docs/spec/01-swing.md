@@ -735,7 +735,39 @@ grab is a promise that you will not be killed by the thing you grabbed.
 > reads and not what the game is. There is a symmetry under it: the **floor** slides at 0, and a
 > body you are *not* holding should not push back harder than the one you are.
 
-**The graze exemption exists to preserve a real manoeuvre.** Flinging tangentially past a body you
+> ### ⚠ It does not bounce on the frozen orbit, and the author flew into it (2026-09-03)
+>
+> > *"I orbit a planet, but I seem to go THROUGH the one next to it rather than bounce against
+> > it."* — author, on `diagnostics/2026-09-03T19-21-50-528Z`
+>
+> **The sentence above is unconditional and the implementation is not.** `bounceOffOthers`
+> (`src/sim/contact.ts`) is exactly this rule and it is called from the **dive** and from nowhere
+> else. The **frozen orbit** — the half of a hold that runs after the freeze — resolves no contacts
+> at all, so the craft passes through any body its orbit crosses.
+>
+> It is deliberate rather than an oversight, and `contact.ts` says so: on the frozen orbit the
+> craft's position is authored by the phase clock and rewritten every tick, so a bounce applied
+> there would be overwritten before it meant anything. The prototype draws the same line in the
+> same place. **What is missing is this spec's agreement**, and this notice is that gap recorded
+> rather than either side being quietly bent.
+>
+> **Measured over the 37 replayable dispatches**: it happens in **3 runs (8%)** and on **41 ticks
+> (0.088%)** of all play. The author's run is the worst in the corpus by a factor of four — twice
+> through body #4, 12 ticks then 17, reaching **48 design units past the surface of a 150-unit
+> body, 31% of the way through it**. So it is rare, and when it happens it is unmistakable.
+>
+> **Four ways out, none of them picked, and all four move `SIM_VERSION` to 10** — which refuses
+> all 29 replayable dispatches, a cost `docs/plan/m3-the-field.md` deliberately schedules for after
+> M4's fuel:
+>
+> | | what it does | what it costs |
+> |---|---|---|
+> | **a** · re-freeze on contact | the orbit is recomputed from the contact, so the craft leaves along a real path | a grab silently becomes a different orbit; the compass the player was reading is gone mid-swing |
+> | **b** · the hold breaks on contact | you hit something, the promise ends, and the craft coasts and bounces as §10 already says | the biggest gameplay change of the four, and it can end a run the player thought was safe |
+> | **c** · push the craft out along the normal after `placeOnOrbit` | the clipping stops and the orbit is untouched | the craft leaves its own drawn path, which is the one thing the compass promises it will not do |
+> | **d** · refuse a freeze whose orbit crosses another body | the geometry never arises | the settle decays the orbit, so an orbit that cleared at the freeze can cross later |
+>
+> **The graze exemption exists to preserve a real manoeuvre.** Flinging tangentially past a body you
 have just left is legitimate flying, and at 0.18 the exemption covers it without covering anything
 that reads as a crash.
 

@@ -73,8 +73,30 @@ export const RING_INNER = 26 * SCALE;
  * The prototype's `compassRingSpread`, converted. A body at
  * [`AIM_RANGE`](../sim/compass.ts) gets the whole of it and a body on top of you
  * gets none, so the gap between two rings **is** the gap between two bodies.
+ *
+ * ## ⚠ Two thirds as well, 2026-09-03 — the half the first cut missed
+ *
+ * [`RING_MIN_GAP`](#ring_min_gap) went to two thirds first, because 80.5% of
+ * adjacent gaps sit on it. **That left the other fifth where it was**, and the
+ * author found it the same day:
+ *
+ * > *"I noticed that the FIRST planet capture has a much larger ring distance,
+ * > and other captures have the smaller one."*
+ *
+ * Measured on that run, and it is this term exactly. The first grab has two
+ * bodies at 996 and 1 707 away — far enough apart that the proportional term
+ * governs and the gap is **55**. The second has three at 996, 1 317 and 1 652,
+ * whose natural gaps are 25 and 26, so both are pushed to the floor at **33**.
+ * Two captures in one run, 1.7× apart.
+ *
+ * **The cut made the inconsistency visible rather than causing it**: at the old
+ * floor of 48 the same run read 55 against 48, which is 1.15× and reads as
+ * nothing. Taking the floor alone to two thirds without this widened the ratio
+ * instead of closing it, which is what a single knob does to a two-knob quantity.
+ *
+ * 62 board pixels → **41**, so the same run now reads 36 against 33.
  */
-export const RING_SPREAD = 62 * SCALE;
+export const RING_SPREAD = 41 * SCALE;
 
 /**
  * How far apart two rings are pushed when their windows sit on top of each other.
@@ -95,8 +117,24 @@ export const RING_SPREAD = 62 * SCALE;
  * The radius stops being exactly proportional to distance when this bites, and
  * that is the trade: the **order** still says which body is nearer, and two
  * legible arcs beat one unreadable pair.
+ *
+ * ## ⚠ Two thirds, 2026-09-03 — the third of the three, and the loudest
+ *
+ * It went with [`RING_MIN_GAP`](#ring_min_gap) and [`RING_SPREAD`](#ring_spread)
+ * under the author's *"reduce the distance between the compass rings, maybe 2/3
+ * of what it is now"*, and it is the one that was doing the most damage to the
+ * *evenness* of the stack. Measured after the other two moved, the gaps were
+ * trimodal — **81.4% at the floor's 33, 1.2% at the proportional term, and 17.4%
+ * at this constant's 60** — so nearly a fifth of every pair the author saw sat at
+ * 1.8× the rest for a reason that is about two *arcs* colliding rather than about
+ * two bodies being far apart.
+ *
+ * 20 board pixels → **13**, so that mode lands at 39 and the three sit at 33, 36
+ * and 39 — a stack that steps rather than jumps. **Its own job survives**: two
+ * windows at full aim are 18 design units across, so 39 clears a colliding pair
+ * with more than twice the room it needs.
  */
-export const STACK_GAP = 20 * BOARD_PIXEL;
+export const STACK_GAP = 13 * BOARD_PIXEL;
 
 /**
  * How far apart two rings are held **whatever** their windows are doing.
