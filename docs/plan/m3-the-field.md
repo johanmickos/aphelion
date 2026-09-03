@@ -1816,6 +1816,56 @@ whatever `K` is. The fire band starts at 90 m, so the criterion holds over its o
 over its inner 40 m from the proximity term alone. Asserted where it holds, recorded where it does
 not; **the ruling is the author's.**
 
+#### ⚠ The feel gate, measured 2026-09-03 — and the author deferred the ruling
+
+The gate spec 07 states is a *feel* one — **does skimming the fire band feel like held nerve and a
+quiet screen, and does diving at it flare?** — and it had never been given. It is still not given;
+the author deferred it to a session of its own on 2026-09-03. **What was measured before they did is
+recorded here so the next session starts from it rather than from nothing.**
+
+Over the **31 dispatches that replay at `SIM_VERSION` 9**, every tick where a boundary side was
+present — 5 787 side-samples:
+
+**The quiet half passes, and it is not close.** Skimming, taken as closing ≤ 7 m/s:
+
+| | samples | over the spec's 0.25 |
+|---|---|---|
+| **beyond 40 m** | 2 090 | **1** — and its heat is 0.256 |
+| inside 40 m | 532 | **532, every one** |
+
+The inner failure is exactly the defect recorded above, confirmed rather than discovered: at zero
+closing the proximity term alone passes 0.25 at 40 m. **And it proves `K` is not implicated in the
+quiet half at all** — at closing zero the `K` term vanishes, so skim heat is 0.17 at 90 m for
+*every* value of `K`. Nothing the author can move on the bench changes the calm screen.
+
+**So the gate is one question and not two: does a dive flare hard enough?** That half is entirely
+`K`'s, and today a **median dive does not reach the spec's 0.6**. At the fire band's edge, with the
+corpus's own closing speeds:
+
+| `K` | skimming | p50 dive · 114 m/s | p95 dive · 221 m/s | fastest flown · 393 m/s |
+|---|---|---|---|---|
+| 320 | 0.17 | **0.76** | 0.85 | 0.85 |
+| 480 | 0.17 | 0.56 | 0.85 | 0.85 |
+| **640 · today** | 0.17 | **0.46** | 0.74 | 0.85 |
+| 807 · the spec's own cap | 0.17 | 0.40 | 0.62 | 0.85 |
+
+And what a dive has to be doing to clear 0.6 at all:
+
+| `K` | at 220 m, the outer band | at 90 m, the fire band | at 40 m |
+|---|---|---|---|
+| 320 | 119 m/s | 84 m/s | 45 m/s |
+| **640 · today** | 238 m/s | **167 m/s** | 90 m/s |
+| 807 | 300 m/s | 210 m/s | 113 m/s |
+
+Measured over the corpus, **30.3%** of dives above 33 m/s reach 0.6 today. **Lower `K` is louder**,
+and it is on the bench as *Closing constant*.
+
+⚠ Two cautions for whoever picks this up. The corpus is 31 replayable dispatches and the boundary is
+absent for the great majority of play by the author's own 2026-09-01 ruling, so these samples are
+the minority of ticks spent out at a wall — which is the right cohort for this question and a small
+one. And `K` was derived from Direction 07's own ratio rather than flown; the spec says only *"tuned
+on the phone"*, and the phone has still not tuned it.
+
 #### What is not built, and why it is an ordering rather than an omission
 
 - **The save and the burn** (§5). A save is a press that carves the craft back into the field, so it

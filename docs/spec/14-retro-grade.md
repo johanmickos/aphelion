@@ -61,6 +61,22 @@ renderer spike — the grade is a full-screen pass and is part of what that spik
 > (2026-09-02). The author ruled the *look*; the conflict is untouched by that ruling and is still
 > the one thing in this spec that cannot be satisfied as written.
 >
+> **But what is lost is the absolute floor and not the contrast**, and the first version of this
+> notice did not say so. The lift is **additive**, so it preserves differences exactly:
+>
+> | | the sky | a cloud gap | the gap between them |
+> |---|---|---|---|
+> | grade 0 | `10, 8, 20` | `0, 0, 0` | **`10, 8, 20`** |
+> | grade 0.45 | `16, 14, 31` | `6, 6, 11` | **`10, 8, 20`** |
+>
+> The gaps are still exactly as much darker than the sky as they ever were — the difference *is*
+> VOID, before and after. What §3.5 buys that this loses is **absolute** black, and on the OLED
+> phone the gate happens on that is a physical difference rather than a colorimetric one: at
+> `#000000` the pixel is off and the gap reads as a hole in the screen, and at `rgb(6, 6, 11)` it
+> is faintly lit. Whether that reads as a loss in a dark room is a judgement nobody has made, and
+> it is cheaper to make than any of the four candidates above: fly the anomaly at grade 0 and at
+> 0.45 and look.
+>
 > Four candidates, none of them picked:
 >
 > | | what it costs | what it keeps |

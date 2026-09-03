@@ -145,9 +145,17 @@ export const GRADE = 0.45;
  * mean and the dither's, 9.4% of full scale in its loudest channel — and at the
  * shipped **0.45** they sample to `rgb(6, 6, 11)`. Only at 0 do they sample to
  * `#000000`, and 0 is no longer where this ships: as of 2026-09-02 the criterion
- * is failed by a value the author **flew** rather than by a hypothetical one. The
- * candidates are set out in spec 14's own ⚠ notice and none of them is picked
- * here.
+ * is failed by a value the author **flew** rather than by a hypothetical one.
+ *
+ * **What is lost is the absolute floor and not the contrast.** The lift is
+ * additive, so it preserves differences exactly: the sky goes `10, 8, 20` →
+ * `16, 14, 31` and a gap goes `0, 0, 0` → `6, 6, 11`, and the difference is
+ * `10, 8, 20` — which is VOID — at both settings. A gap is still precisely as
+ * much darker than the sky as it was. What §3.5 buys that this does not is
+ * **absolute** black, and on an OLED phone that is physical rather than
+ * colorimetric: at `#000000` the pixel is off. Whether that reads as a loss is a
+ * judgement nobody has made. The candidates are in spec 14's own ⚠ notice and
+ * none of them is picked here.
  */
 const LIFT = 1;
 
