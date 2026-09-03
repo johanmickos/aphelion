@@ -362,10 +362,14 @@ const KNOBS: Knob[] = [
   {
     id: 'ringgap',
     label: 'Rings · minimum separation',
-    what: 'design units two neighbouring rings are held apart whatever their windows do. Measured over 12 280 pairs, half sat under 5 units apart on screen while their bodies were a median of 32 units apart in the world — the radii are proportional to distance at one unit per 12.9, which is finer than a stroke. Zero is the old behaviour',
+    what: 'design units two neighbouring rings are held apart whatever their windows do. Measured over 12 280 pairs, half sat under 5 units apart on screen while their bodies were a median of 32 units apart in the world — the radii are proportional to distance at one unit per 12.9, which is finer than a stroke. Zero is the old behaviour. **Ruled to two thirds on 2026-09-03** — 16 board pixels to 11 — along with the other two constants that space the stack',
     min: 0,
+    // One board pixel a notch, which is the unit the constant itself is written
+    // in: it was a step of 2 and `main` moved to 33 — an odd number of design
+    // units — so `Back to defaults` could not be dragged back to one knob at a
+    // time. `tools/bench/build.ts` refused the build, which is what it is for.
     max: 120,
-    step: 2,
+    step: 3,
     base: instrument.RING_MIN_GAP,
     apply: instrument.set_RING_MIN_GAP,
     restarts: false,
