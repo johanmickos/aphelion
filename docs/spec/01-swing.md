@@ -756,7 +756,44 @@ grab is a promise that you will not be killed by the thing you grabbed.
 > through body #4, 12 ticks then 17, reaching **48 design units past the surface of a 150-unit
 > body, 31% of the way through it**. So it is rare, and when it happens it is unmistakable.
 >
-> **Four ways out, none of them picked, and all four move `SIM_VERSION` to 10** — which refuses
+> ### ⚠ And the cause is the **field**, not the physics (measured 2026-09-03)
+>
+> > *"Is the reason that there are planets so close to each other? I haven't encountered this in the
+> > original prototype, but its planetary spacing is different."* — author
+>
+> **Yes, and the prototype's mechanism is identical to ours.** Its `stepCapture` runs
+> `stepPhysical` — which holds its `capture-other` contact loop — only while the phase is `clear`
+> or `flyby`, and hands off to `stepPhase`, its phase clock, at the freeze. So neither game bounces
+> on a frozen orbit. The comment in `contact.ts` was right and this is what it was right about.
+>
+> **What differs is the geometry, by an order of magnitude.**
+>
+> | | closest rim-to-rim pair |
+> |---|---|
+> | the prototype's authored eight | **1 721** design units |
+> | this field, scatter v1 | **162** design units |
+>
+> A frozen orbit reaches **p50 300 and p95 708** design units. In the prototype an orbit
+> **physically cannot reach** the next body; here **16% of all 241 frozen orbits in the corpus are
+> wider than the room to their nearest neighbour**, and three of them actually crossed one.
+>
+> **All three were on a fork.** A fork is two bodies at one altitude, and this field draws four of
+> them at rim gaps of 162, 223, 270 and 646 — the prototype's authored eight has none, its sides
+> strictly alternating one body to a row. The two clipping bodies, #5 and #10, are the 162 and the
+> 223. **Even the widest fork drawn does not clear a p95 orbit**, and the corridor is not wide
+> enough for one that would: the bodies span 1 026 units of it and the largest radius is 168.
+>
+> So `RIM_GAP` — spec [17 · §5](./17-daily-field.md)'s invariant 3, 40 m — is doing the job it was
+> written for, which is stopping two bodies from *overlapping*. **Nothing in either spec asks the
+> field to leave room for an orbit**, and that is the gap.
+>
+> **A fifth way out, and it is the cheapest and the only one that matches the prototype:**
+>
+> | | what it does | what it costs |
+> |---|---|---|
+> | **e** · the field's clearance accounts for the orbit, not just the rims | the geometry stops arising, which is exactly why the prototype never shows this | `SCATTER_FIELD_VERSION` → 2, refusing the **18** dispatches flown in it; the 69 fixture ones are untouched. Sparser rows, or no forks, or a wider corridor — a real design decision about the field's density |
+>
+> **Four more, and all four move `SIM_VERSION` to 10** — which refuses
 > all 29 replayable dispatches, a cost `docs/plan/m3-the-field.md` deliberately schedules for after
 > M4's fuel:
 >
@@ -766,6 +803,11 @@ grab is a promise that you will not be killed by the thing you grabbed.
 > | **b** · the hold breaks on contact | you hit something, the promise ends, and the craft coasts and bounces as §10 already says | the biggest gameplay change of the four, and it can end a run the player thought was safe |
 > | **c** · push the craft out along the normal after `placeOnOrbit` | the clipping stops and the orbit is untouched | the craft leaves its own drawn path, which is the one thing the compass promises it will not do |
 > | **d** · refuse a freeze whose orbit crosses another body | the geometry never arises | the settle decays the orbit, so an orbit that cleared at the freeze can cross later |
+>
+> ⚠ **(e) is now the recommendation** and (a) – (d) are what to reach for only if the field's
+> density is not negotiable. It is the cheapest in corpus terms, it touches no physics at all, and
+> the author's own evidence — *"I haven't encountered this in the prototype"* — is evidence about a
+> **field**, because the prototype's code does the same thing ours does.
 >
 > **The graze exemption exists to preserve a real manoeuvre.** Flinging tangentially past a body you
 have just left is legitimate flying, and at 0.18 the exemption covers it without covering anything

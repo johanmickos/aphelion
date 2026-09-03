@@ -174,6 +174,30 @@ const BAND_CLEARANCE = 60;
 const RIM_GAP = 40;
 
 /**
+ * ## ⚠ It is not enough to keep an **orbit** clear, 2026-09-03
+ *
+ * The invariant above stops two bodies overlapping and nothing more, and nothing
+ * in spec 17 asks this generator for anything else. But a grab puts the craft on
+ * a **frozen orbit** around one of them, and that orbit reaches **p50 300 and p95
+ * 708 design units** across the recorded corpus — against a floor here of 40
+ * prototype units, which is **120**.
+ *
+ * Measured: **16% of the corpus's 241 frozen orbits are wider than the room to
+ * their nearest neighbour**, and three crossed one. All three were on a **fork** —
+ * two bodies at one altitude, which this ladder draws four of, at rim gaps of
+ * 162, 223, 270 and 646. The prototype's authored eight has no forks at all and
+ * its closest pair is **1 721** design units apart, so an orbit there cannot
+ * reach the next body; that, and not a difference in physics, is why the
+ * behaviour never appears in it.
+ *
+ * The consequence is spec [01 · §10](../../docs/spec/01-swing.md)'s ⚠ notice —
+ * the craft passing through a body it is not holding — and this constant is the
+ * recommended place to answer it. **Not changed here**: it needs the author,
+ * because leaving room for an orbit means a sparser field, no forks, or a wider
+ * corridor, and all three are decisions about what the game *is*.
+ */
+
+/**
  * The ladder this field hangs its bodies on — **the fixture's altitudes and
  * radii, copied rather than imported.**
  *
