@@ -235,7 +235,32 @@ function groupsOf(frames: readonly Frame[]): TickGroup[] {
 }
 
 /** Everything the phone baseline says, as lines. */
-function baselineLines(dispatch: Dispatch, timing: DispatchTiming): string[] {
+/**
+ * What the baseline block needs to know about the run it came from — and it is
+ * deliberately **not** a `Dispatch`.
+ *
+ * ## ⚠ The baseline outlived its own recipe, 2026-09-03
+ *
+ * `2026-09-02T06-02-56` was flown in the **scatter** field, and that field's
+ * version moved when the author ruled its forks closer to the prototype's. Read
+ * through `parseDispatch` the baseline then vanished entirely and this command
+ * lost the phone half of every number it reports — from a change to where the
+ * planets are, which a frame timing knows nothing about.
+ *
+ * That is the same argument `--corpus` was already built on: *the meter did not
+ * change when the swing did*, so `parseTimingOnly` is a door with the identical
+ * validator on it and no recipe behind it. **The baseline is evidence about a
+ * phone**, and it stays evidence after the field it happened to be flown in has
+ * been redrawn.
+ */
+interface BaselineHead {
+  readonly at: string;
+  readonly device: DispatchDevice | null;
+  readonly ticks: number;
+  readonly build: string | undefined;
+}
+
+function baselineLines(dispatch: BaselineHead, timing: DispatchTiming): string[] {
   const device = dispatch.device;
   const fit = fitGroups(timing.byTicks);
   const lever = leverageOf(timing);
@@ -244,7 +269,7 @@ function baselineLines(dispatch: Dispatch, timing: DispatchTiming): string[] {
     bold('  ▼ the phone baseline'),
     dim(
       `  ${dispatch.at} · ${device ? `${device.css.w}×${device.css.h} css · dpr ${device.dpr}` : 'no device'}` +
-        ` · ${timing.frames} frames over ${dispatch.recipe.ticks} ticks` +
+        ` · ${timing.frames} frames over ${dispatch.ticks} ticks` +
         // Which build this measurement is about, which `at` cannot say — see
         // `Dispatch.build`. Every dispatch before 2026-09-02 has none.
         (dispatch.build === undefined ? dim(' · build unrecorded') : ` · build ${dispatch.build}`),
@@ -273,6 +298,13 @@ function baselineLines(dispatch: Dispatch, timing: DispatchTiming): string[] {
     );
   }
   return out;
+}
+
+/** The build stamp a dispatch carries, or `undefined` where it predates them. */
+function buildOf(raw: unknown): string | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const build = (raw as Record<string, unknown>).build;
+  return typeof build === 'string' ? build : undefined;
 }
 
 /** One dispatch's timing block, and enough of its envelope to place it. */
@@ -722,13 +754,36 @@ for (const frame of worst) {
 // The baseline: the run's own phone timing when it has one, and the recorded
 // baseline otherwise. A dispatch that carries its own is the better evidence,
 // because then both halves are about the same flight.
-let baseline: { dispatch: Dispatch; timing: DispatchTiming; own: boolean } | null = null;
-if (flying.dispatch?.timing) {
-  baseline = { dispatch: flying.dispatch, timing: flying.dispatch.timing, own: true };
+let baseline: { dispatch: BaselineHead; timing: DispatchTiming; own: boolean } | null = null;
+const ownTiming = flying.dispatch?.timing;
+if (flying.dispatch !== null && flying.dispatch !== undefined && ownTiming !== undefined) {
+  const own = flying.dispatch;
+  baseline = {
+    dispatch: { at: own.at, device: own.device ?? null, ticks: own.recipe.ticks, build: own.build },
+    timing: ownTiming,
+    own: true,
+  };
 } else {
   try {
-    const recorded = parseDispatch(JSON.parse(readFileSync(BASELINE, 'utf8')));
-    if (recorded.timing) baseline = { dispatch: recorded, timing: recorded.timing, own: false };
+    // **Read for its timing and its envelope, never for its recipe** — see
+    // `BaselineHead`. `parseTimingOnly` carries the same validator and does not
+    // ask whether this build would still fly the run underneath it.
+    const raw: unknown = JSON.parse(readFileSync(BASELINE, 'utf8'));
+    const carried = parseTimingOnly(raw);
+    const ticks = (((raw as Record<string, unknown>).recipe ?? {}) as Record<string, unknown>)
+      .ticks;
+    if (carried !== null) {
+      baseline = {
+        dispatch: {
+          at: carried.at,
+          device: parseDeviceOnly(raw),
+          ticks: typeof ticks === 'number' ? ticks : 0,
+          build: buildOf(raw),
+        },
+        timing: carried.timing,
+        own: false,
+      };
+    }
   } catch {
     baseline = null;
   }

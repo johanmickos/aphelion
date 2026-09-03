@@ -804,7 +804,28 @@ grab is a promise that you will not be killed by the thing you grabbed.
 > | **c** · push the craft out along the normal after `placeOnOrbit` | the clipping stops and the orbit is untouched | the craft leaves its own drawn path, which is the one thing the compass promises it will not do |
 > | **d** · refuse a freeze whose orbit crosses another body | the geometry never arises | the settle decays the orbit, so an orbit that cleared at the freeze can cross later |
 >
-> ⚠ **(e) is now the recommendation** and (a) – (d) are what to reach for only if the field's
+> ### ⚠ (e) is what was built, 2026-09-03 — *"closer to the original prototype"*
+>
+> The author ruled it: **the generator places a fork the way the prototype does.** Both lanes are
+> pushed out to `bodySpread × (0.6 … 1.0)` instead of one being drawn free and the other floored by
+> a rim gap, which is what allowed a lane at `|dx| = 20` beside a partner at 485. `SCATTER_FIELD_VERSION`
+> is **2** and the 18 dispatches flown in v1 no longer replay; the 69 fixture ones are untouched,
+> and **no physics moved** — `SIM_VERSION` is still 9.
+>
+> | design units | scatter v1 | **scatter v2** | the prototype |
+> |---|---|---|---|
+> | closest rim-to-rim pair | 162 | **437** | 357 |
+> | orbits wider than the room to the nearest neighbour | 16% | **8%** | — |
+>
+> **Re-flying all 18 scatter input logs in the new field: zero clips**, against three before — and
+> ⚠ that is *a different run*, because the field they were flown in no longer exists. What it says
+> is what those presses do now, not what the author saw.
+>
+> **(a) – (d) are not needed for this and are left standing**, because the underlying asymmetry is
+> unchanged: a frozen orbit still resolves no contacts, and a field drawn some other way could put
+> the geometry back. What has changed is that nothing in the corpus reaches it.
+>
+> ⚠ **(e) was the recommendation** and (a) – (d) are what to reach for only if the field's
 > density is not negotiable. It is the cheapest in corpus terms, it touches no physics at all, and
 > the author's own evidence — *"I haven't encountered this in the prototype"* — is evidence about a
 > **field**, because the prototype's code does the same thing ours does.

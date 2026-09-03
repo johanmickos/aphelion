@@ -64,7 +64,7 @@ import { SCALE } from './units.ts';
  * `test/sim/scatter-field.test.ts` holds this number against a fingerprint of
  * the field it produces and fails until the two agree again.
  */
-export const SCATTER_FIELD_VERSION = 1;
+export const SCATTER_FIELD_VERSION = 2;
 
 /**
  * The seed the lateral placement is drawn from.
@@ -261,24 +261,53 @@ function lateralOf(radius: number, side: 1 | -1, draw: number, least: number): n
 }
 
 /**
- * How far out the second body of a **fork** has to sit, given the first.
+ * How far out a **fork's** two lanes are pushed — the prototype's own rule, and
+ * the author's ruling of 2026-09-03.
  *
- * A fork is two bodies at one altitude on opposite sides, so the only thing
- * holding them apart is their lateral placement: the gap between their rims is
- * `|dx₁| + |dx₂| − r₁ − r₂`. Requiring [`RIM_GAP`](#rim_gap) of it is a floor on
- * the second draw, and it is applied **at the draw** rather than by rejecting the
- * field afterwards.
+ * ## ⚠ A fork used to be allowed to hug the centreline on one side
  *
- * **That distinction turned out to matter to the picture.** Rejecting a whole
- * field for a fork conflict throws away all twenty-four placements, so the seeds
- * that survive are the ones where *everything* happened to land wide — measured,
- * that pushed the mean `|dx|` from 97 to 119 and put nine bodies in the outer
- * band instead of six. The bias was real and it was an artefact of the mechanism
- * rather than anything anybody chose. Constraining the one draw that is actually
- * constrained leaves the other twenty-two uniform.
+ * > *"I orbit a planet, but I seem to go THROUGH the one next to it."* … *"Is the
+ * > reason that there are planets so close to each other? I haven't encountered
+ * > this in the original prototype, but its planetary spacing is different."*
+ * > — author
+ *
+ * It was, and it is. The old rule drew the first lane uniformly from
+ * [`SPREAD_FLOOR`](#spread_floor) and then only required of the second that the
+ * pair clear [`RIM_GAP`](#rim_gap) between their rims — so one lane could sit at
+ * `|dx| = 20` while its partner was at 485, and the pair's rims came within
+ * **162 design units** of each other. A frozen orbit is p50 **300** design units
+ * across and p95 **708**, so it reaches straight through the neighbour, which is
+ * spec [01 · §10](../../docs/spec/01-swing.md)'s ⚠ notice.
+ *
+ * **The prototype does not do this and that is the whole difference.** Its
+ * generator pushes *both* lanes of a fork out to `bodySpread × (0.6 … 1.0)`, so
+ * they are separated by 1.2 to 2.0 spreads and neither can be near the middle.
+ * Driven at its own shipped configuration — `bodySpacing` 280, `bodySpread` 160,
+ * `rowPairChance` 0.4, 60 bodies — its closest rim-to-rim pair anywhere is **357
+ * design units** against this field's 162, and its *nearest-neighbour* gap has a
+ * floor rather than a tail: min 357, p05 364.
+ *
+ * So this carries the behaviour and re-derives nothing else
+ * ([AGENTS.md](../../AGENTS.md) §3): the prototype's `bodySpread` is 160 of its
+ * units against this generator's [`SPREAD_CAP`](#spread_cap) of 195, and its
+ * corridor is 390 × 1.9 = 741 wide against this one's 741. **The two fields are
+ * the same size and were placing forks differently.**
  */
-function forkFloor(first: number, firstRadius: number, radius: number): number {
-  return firstRadius + radius + RIM_GAP - Math.abs(first);
+const FORK_SPREAD = 160;
+
+/** The narrowest of that spread a lane may be pushed to — the prototype's 0.6. */
+const FORK_NEAREST = 0.6;
+
+/**
+ * Where a fork's lane sits, given its draw: out at `FORK_SPREAD × (0.6 … 1.0)`.
+ *
+ * **Both lanes take it**, which is what the old floor-on-the-second-draw could
+ * not express: a floor makes a pair *wide enough on aggregate* and says nothing
+ * about either one being near the middle, and near the middle is where an orbit
+ * finds it.
+ */
+function forkLateral(side: 1 | -1, draw: number): number {
+  return side * FORK_SPREAD * (FORK_NEAREST + draw * (1 - FORK_NEAREST));
 }
 
 /**
@@ -320,11 +349,24 @@ function placeFrom(seed: number): Field | null {
     // them on opposite sides — which is what a fork has to be, and is what the
     // fixture's hand-typed signs do.
     side = -side as 1 | -1;
-    // What a fork does need is room, and it needs it at the draw — see
-    // [`forkFloor`](#forkfloor).
+    // **A fork's lanes are placed by their own rule** — the prototype's, both
+    // pushed out rather than one drawn free and the other floored. See
+    // [`forkLateral`](#forklateral). The *first* lane of a fork is the body
+    // before it in the ladder and was already laid by the general rule, so it is
+    // re-laid here: a fork is a property of the pair and cannot be seen until
+    // the second of them arrives.
     const fork = before !== null && before.up === rung.up;
-    const least = fork ? forkFloor(laid[at - 1]!, before.radius, rung.radius) : 0;
-    const dx = lateralOf(rung.radius, side, nextFraction(rng), least);
+    const draw = nextFraction(rng);
+    if (fork) {
+      const partner = forkLateral(-side as 1 | -1, nextFraction(rng));
+      laid[at - 1] = partner;
+      bodies[at - 1] = createBody(
+        (CENTRELINE + partner) * SCALE,
+        -before.up * SCALE,
+        before.radius * SCALE,
+      );
+    }
+    const dx = fork ? forkLateral(side, draw) : lateralOf(rung.radius, side, draw, 0);
     laid.push(dx);
     bodies.push(createBody((CENTRELINE + dx) * SCALE, -rung.up * SCALE, rung.radius * SCALE));
   }

@@ -65,14 +65,17 @@ describe('the scatter field', () => {
       ...bodies.map((body) => `${body.x} ${body.y} ${body.radius} ${body.mass} ${body.type}`),
     ].join('\n');
     const fingerprint = createHash('sha256').update(written).digest('hex').slice(0, 16);
-    expect(SCATTER_FIELD_VERSION).toBe(1);
+    // ⚠ **2 since 2026-09-03**: the author ruled a fork's two lanes out to the
+    // prototype's own placement, which redrew every fork in the field. The 18
+    // dispatches flown in v1 no longer replay, which is what this version is for.
+    expect(SCATTER_FIELD_VERSION).toBe(2);
     expect(
       fingerprint,
       'the scatter field changed: bump SCATTER_FIELD_VERSION and this fingerprint together',
       // A **literal**, and it has to be: a fingerprint computed from the field it
       // is checking can never fail, which is the shape of test this repo has
       // already been caught by once.
-    ).toBe('8cf4291cb5851640');
+    ).toBe('3214fcabc67c889f');
   });
 
   /** A pure function of its seed, so two machines build one field. */

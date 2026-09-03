@@ -90,7 +90,12 @@ describe('the scan is a property of the coast', () => {
    * looking at, and what *"it should only appear, and NOT MOVE"* asks for.
    */
   it('holds the dot still as the craft flies into it', () => {
-    const views = fly(drifting(60, 300), 20).filter((view) => view.deadline !== null);
+    // ⚠ 2 000 rather than the default 1 500 since the field was redrawn to
+    // scatter v2 (2026-09-03): a deadline needs a rescue to still be *possible*,
+    // so it needs a body in reach, and the fork that was in reach at 1 500 moved
+    // when its lanes were pushed out to the prototype's placement. The altitude
+    // is the geometry this file already uses elsewhere for the same reason.
+    const views = fly(drifting(60, 300, 2000), 20).filter((view) => view.deadline !== null);
     expect(views.length).toBeGreaterThan(5);
     const first = views[0]!.deadline!;
     for (const view of views) {
@@ -213,7 +218,8 @@ describe('the fuel coupling', () => {
    * because a constraint that does not exist yet is one that does not bind.
    */
   it('lights the whole window while there is no fuel to spend', () => {
-    const views = fly(drifting(60, 300), 30).filter((view) => view.deadline !== null);
+    // 2 000 for the reason the scan's own test gives — see above.
+    const views = fly(drifting(60, 300, 2000), 30).filter((view) => view.deadline !== null);
     expect(views.length).toBeGreaterThan(0);
     for (const view of views) expect(view.deadline!.affordable).toBe(1);
   });
