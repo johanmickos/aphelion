@@ -98,6 +98,37 @@ player is obvious. Direction 03 wins this one against the higher-number conventi
 > more tightly than the criterion it replaces. `bandAt` is kept as spec 08's multiplier and is spent
 > by nothing.
 
+> ### ⚠ A blink is not a warning — a hold gate, 2026-09-03
+>
+> > *"Odd, in `diagnostics/2026-09-03T23-05-20-140Z` I saw the SOS warning despite successfully
+> > saving myself."* — author, on a run where the cue was up for **one tick**
+>
+> Measured over the **14** SOS episodes the replayable corpus holds, **nine of which the player
+> survived**:
+>
+> | length | episodes | the run ended on it | survived |
+> |---|---|---|---|
+> | 1 – 2 ticks | 4 | 0 | **4** |
+> | 10 – 18 ticks | 2 | 0 | **2** |
+> | 40 – 97 ticks | 8 | 5 | 3 |
+>
+> **Every episode of 18 ticks or fewer was false, six of six**, and the shortest one a run actually
+> ended on is 40. So `SOS_HOLD_TICKS` is **12** — 200 ms, around the floor of what can be read —
+> and the cue is not drawn until its own predicate has held that long. It swallows the four blinks
+> and cannot reach the shortest true warning, which has more than three times the gate to spare.
+> It is the deadline's own birth gate one instrument along, for the reason that one already gives:
+> *"a red blink and nothing else."*
+>
+> ⚠ **This does not answer the ruling below and is not meant to.** That one is about *which
+> predicate* arms the cue, and it stands untouched: five of the nine false episodes run 10 to 60
+> ticks and pass this gate unchanged. **The blink is fixed; the cry of wolf is not.**
+>
+> ⚠ And one correction to how it was found. The first measurement of this was taken with the gate
+> already in the code, so it was reading the gate's own effect and disagreed with itself — 14
+> episodes became 9, and the difference *was* the four blinks being swallowed. The numbers above are
+> the ungated behaviour, taken by putting the constant back to zero and re-flying. **Measure the
+> thing the sentence is about**, which this file has had to say before.
+>
 > ### ⚠ §6's `SOS` is built, with a second trigger and a predicate (2026-09-01)
 >
 > §6 strobes `SOS` *"from the moment the last press is missed"*, which needs the deadline, which

@@ -145,6 +145,14 @@ export interface DeadlineMemo {
   /** The last tick the held craft was asked whether it is stranded — see `doomOf`. */
   readonly checked: number;
   /**
+   * How many consecutive ticks the SOS's own predicate has held for.
+   *
+   * The cue is not drawn until this reaches [`SOS_HOLD_TICKS`](#sos_hold_ticks),
+   * which is the deadline's own birth gate one instrument along — and for the
+   * same reason its note gives: *"a red blink and nothing else."*
+   */
+  readonly armed: number;
+  /**
    * Whether the mark is worth **drawing**, decided once when it is born.
    *
    * The prototype's birth gate: a cross that appears with less lead than a person
@@ -170,6 +178,7 @@ export const NO_DEADLINE: DeadlineMemo = {
   doomed: null,
   checked: -1,
   drawable: false,
+  armed: 0,
 };
 
 /**
@@ -249,6 +258,16 @@ function sameLine(vx: number, vy: number, sim: SimState): boolean {
  * dispatch corpus.
  */
 export function deadlineOf(previous: DeadlineMemo, sim: SimState): DeadlineMemo {
+  const next = scanned(previous, sim);
+  // **How long the SOS's own predicate has held**, counted here because this is
+  // the one function a tick passes through. See [`SOS_HOLD_TICKS`](#sos_hold_ticks).
+  return {
+    ...next,
+    armed: armedWall(next, sim) === null ? 0 : previous.armed + 1,
+  };
+}
+
+function scanned(previous: DeadlineMemo, sim: SimState): Omit<DeadlineMemo, 'armed'> {
   const doomed = doomOf(previous, sim);
   if (sim.heldBody !== null || sim.ending !== null) {
     return { ...NO_DEADLINE, ...doomed };
@@ -306,7 +325,7 @@ function land(
   vx: number,
   vy: number,
   at: number,
-): Omit<DeadlineMemo, 'doomed' | 'checked'> {
+): Omit<DeadlineMemo, 'doomed' | 'checked' | 'armed'> {
   const same = sameMark(previous, found);
   return {
     deadline: found,
@@ -422,14 +441,14 @@ const STRAND_TICKS = 6;
  * immediate where waiting for the next scan to report no cross is up to
  * [`RESTATE_TICKS`](#restate_ticks) late.
  */
-function leadOf(memo: DeadlineMemo, sim: SimState): number {
+function leadOf(memo: Omit<DeadlineMemo, 'armed'>, sim: SimState): number {
   const found = memo.deadline;
   if (found === null || found.cross === null) return 0;
   return (found.leadTicks - (sim.tick - memo.at)) * SECONDS_PER_TICK;
 }
 
 /** Whether this drift still has a press left that saves it. */
-function hasRescue(memo: DeadlineMemo, sim: SimState): boolean {
+function hasRescue(memo: Omit<DeadlineMemo, 'armed'>, sim: SimState): boolean {
   const found = memo.deadline;
   if (found === null) return true;
   return found.cross !== null && leadOf(memo, sim) > 0;
@@ -513,10 +532,59 @@ export const BIRTH_TICKS = ticksIn(300);
  * priority over the other because they cannot both be true — a held craft has no
  * deadline and a drifting one has not grabbed.
  */
+/**
+ * The wall the SOS is about, or `null` — **one predicate, read twice.**
+ *
+ * [`sosOf`](#sosof) draws it and [`deadlineOf`](#deadlineof) counts how long it
+ * has held; a second copy of this expression is a second thing that can drift
+ * from the first, which is the failure `test/bench.test.ts` exists for one layer
+ * along.
+ */
+function armedWall(memo: Omit<DeadlineMemo, 'armed'>, sim: SimState): Wall | null {
+  if (sim.ending !== null) return null;
+  return (
+    memo.doomed ?? (memo.deadline !== null && !hasRescue(memo, sim) ? memo.deadline.wall : null)
+  );
+}
+
+/**
+ * How long the SOS's predicate must hold before the cue is drawn, in ticks.
+ *
+ * ## ⚠ Measured 2026-09-03 — every short arm in the corpus was false
+ *
+ * > *"I saw the SOS warning despite successfully saving myself."* — author, on a
+ * > run where the cue was up for **one tick**
+ *
+ * Over the 14 SOS episodes the replayable corpus holds, sorted by how long they
+ * lasted:
+ *
+ * | length | episodes | the run ended on it | survived |
+ * |---|---|---|---|
+ * | 1 tick | 3 | 0 | **3** |
+ * | 2 – 6 ticks | 1 | 0 | **1** |
+ * | 7 – 30 ticks | 2 | 0 | **2** |
+ * | 31+ ticks | 8 | 5 | 3 |
+ *
+ * **Every episode under half a second was false — six of six — and five of the
+ * eight long ones were true.** So a hold gate removes the whole false population
+ * here at the cost of delaying a true warning by its own length, against true
+ * episodes that run 0.5 s and up.
+ *
+ * ⚠ **This is not the ruling spec [07 · §6](../../docs/spec/07-boundary.md) is
+ * waiting for.** That one is about *which predicate* arms a **held** SOS —
+ * `armDoom` against stranded-while-held — and the 2026-09-02 measurement found
+ * duration does **not** separate false from true inside that cohort. This is
+ * orthogonal: it is about how long any arm must persist before it is shown, and
+ * it leaves every candidate in §6's notice exactly where it was.
+ *
+ * Twelve ticks is 200 ms — long enough that nothing which resolves in a blink is
+ * drawn, short enough to be inside a `BIRTH_TICKS` fade of the true ones.
+ */
+export const SOS_HOLD_TICKS = 12;
+
 export function sosOf(memo: DeadlineMemo, sim: SimState): SosView | null {
-  const wall =
-    memo.doomed ?? (memo.deadline !== null && !hasRescue(memo, sim) ? memo.deadline.wall : null);
-  if (wall === null || sim.ending !== null) return null;
+  const wall = armedWall(memo, sim);
+  if (wall === null || memo.armed < SOS_HOLD_TICKS) return null;
   // The strobe, as a triangle rather than a sine: ADR-0014 keeps `sin` out of
   // anything the simulation has to agree about across two engines, and this is
   // derived beside it under the same rule. What the eye reads at 2Hz is the rate

@@ -101,6 +101,42 @@ const WINDOW_WIDTH = 3 * BOARD_PIXEL;
 const LINE_ALPHA = 0.35;
 const WINDOW_ALPHA = 1;
 
+/**
+ * How far back from the cross the window keeps its full weight, in design units
+ * — **the prototype's 150 of its own, and the answer to a complaint that came
+ * back.**
+ *
+ * ## ⚠ The window is long because saving is easy, 2026-09-03
+ *
+ * > *"Now the deadline is too long and crosses into the normal playfield. I feel
+ * > like we should cap it to only appear when closer to the edge."* — author
+ *
+ * This is the same complaint as 2026-09-01 — *"it's really long, impacting my
+ * normal playing field… within the main playfield I almost always have an
+ * opportunity to save myself, so the bright red line is not helpful"* — and that
+ * sentence turns out to be the measurement. Over the corpus the **window itself**
+ * runs **p50 838 and p95 2 623** design units and reaches **p50 2 492** back from
+ * the cross, against a picture 1 170 wide. The saveable stretch is long because
+ * a press nearly anywhere on it still works, so the far end of it is a band
+ * saying a thing that is almost always true.
+ *
+ * **Three levers were measured and two are wrong.** Tightening the lead ramp
+ * ([`FADE_IN_SECONDS`](../state/deadline.ts)) from 2.63 s to 1 s shortens the
+ * drawn track by 15% and costs **36% of the presses the author actually makes** —
+ * the length is `distance / speed` and the lead is not, so gating on lead does
+ * not bound length. Clamping the drawn length outright is what the prototype
+ * already refused: *"a 150px clamp drew a segment sitting a quarter of a screen
+ * ahead of the ship, touching nothing."*
+ *
+ * **What is left is weight, which is what 2026-09-01 ruled and M3.5 removed by
+ * accident.** The window keeps its full width and strength over this distance
+ * back from the cross and eases to the line's own weight beyond it — so the
+ * decision is a compass window, and the stretch that merely says *"still
+ * saveable"* is a thread. The connection to the craft survives, which is the
+ * thing the clamp broke.
+ */
+const ARM = 150 * BOARD_PIXEL;
+
 const OVERALL = 0.5;
 
 /**
@@ -294,17 +330,32 @@ export function drawDeadline(context: CanvasRenderingContext2D, track: DeadlineV
   context.lineWidth = LINE_WIDTH;
   runs((at) => OVERALL * track.presence * LINE_ALPHA * alphaAt(at));
 
-  context.lineWidth = WINDOW_WIDTH;
   // **A window is where a press saves**, and the gaps between them are not drawn
   // at all rather than drawn faint. Spec 03 §5's own notice rules the window
   // **plural** — 8% of doomed drifts hold more than one — so what the gaps have
   // to do is separate two windows, which absence does better than a dimmer copy
   // of the same band.
-  runs((at) =>
-    upto[at]!.saves && upto[at + 1]!.saves
-      ? OVERALL * track.presence * WINDOW_ALPHA * alphaAt(at)
-      : 0,
-  );
+  //
+  // The weight rides [`ARM`](#arm): full at the cross, the line's own beyond it.
+  // Width has to be a property of the *run* rather than of each segment, because
+  // one `lineWidth` covers a whole path — so a run is cut where the weight has
+  // moved by a step the eye could find, and `near` is that step.
+  const near = (at: number): number => {
+    const away = (toCross[at]! + toCross[at + 1]!) / 2;
+    const held = Math.max(0, Math.min(1, 1 - away / ARM));
+    // Quantised so a smooth ramp does not become one path per segment, which is
+    // what beaded before. Eight steps over the arm is finer than the eye.
+    return Math.round(held * 8) / 8;
+  };
+  for (let step = 0; step <= 8; step++) {
+    const at = step / 8;
+    context.lineWidth = LINE_WIDTH + (WINDOW_WIDTH - LINE_WIDTH) * at;
+    runs((seg) =>
+      upto[seg]!.saves && upto[seg + 1]!.saves && near(seg) === at
+        ? OVERALL * track.presence * (LINE_ALPHA + (WINDOW_ALPHA - LINE_ALPHA) * at) * alphaAt(seg)
+        : 0,
+    );
+  }
 
   // The dot: a filled core inside a ring, so it reads as a place rather than a
   // blob — and it lands **on** the end of the track.

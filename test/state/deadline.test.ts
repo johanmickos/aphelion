@@ -20,6 +20,7 @@ import {
   RESTATE_TICKS,
   SCAN_PROBES,
   SOS_FLOOR,
+  SOS_HOLD_TICKS,
   deadlineOf,
   presenceAt,
 } from '../../src/state/deadline.ts';
@@ -228,7 +229,11 @@ describe('the fuel coupling', () => {
 describe('the SOS', () => {
   /** Drifting past the dot: no press left, so the strobe rather than the mark. */
   it('strobes on a drift with no rescue in front of it', () => {
-    const views = fly(drifting(170, 1200), 40);
+    // ⚠ A drift with a **long** arm, since 2026-09-03. The cue waits
+    // `SOS_HOLD_TICKS` for its own predicate to hold before it draws anything, and
+    // `drifting(170, 1200)` arms for fewer ticks than that — which is exactly the
+    // blink the gate exists to swallow. This one arms for 74.
+    const views = fly(drifting(100, 100, 3500), 120);
     const strobing = views.filter((view) => view.sos !== null);
     expect(strobing.length).toBeGreaterThan(0);
     for (const view of strobing) {
@@ -244,8 +249,46 @@ describe('the SOS', () => {
    * **And it actually strobes** — the value moves rather than sitting at a
    * constant, which is the one thing a test of a 2Hz signal has to check.
    */
+  /**
+   * ## ⚠ A blink is not a warning, 2026-09-03
+   *
+   * > *"I saw the SOS warning despite successfully saving myself."* — author, on
+   * > a run where the cue was up for **one tick**
+   *
+   * Measured over the 14 SOS episodes the replayable corpus holds, **nine of
+   * which the player survived**: every episode of 18 ticks or fewer was false —
+   * six of six — and the shortest one the run actually ended on is **40**. Four
+   * of the nine false ones are blinks of one or two ticks.
+   *
+   * `SOS_HOLD_TICKS` is 12 — 200 ms, around the floor of what can be read — so it
+   * swallows the blinks and cannot reach the shortest true warning, which has
+   * more than three times the gate's length to spare.
+   *
+   * ⚠ **It does not answer spec [07 · §6](../../docs/spec/07-boundary.md)'s open
+   * ruling**, and it is not meant to: that one is about *which predicate* arms the
+   * cue, and five of the nine false episodes here run 10 to 60 ticks and survive
+   * this gate untouched. What this fixes is the blink, not the cry of wolf.
+   */
+  it('says nothing at all for an arm too short to read', () => {
+    const sim = drifting(100, 100, 3500);
+    let view = createPresentation(sim);
+    let firstLit: number | null = null;
+    let armedFor = 0;
+    for (let tick = 0; tick < 200; tick++) {
+      stepSim(sim, { pressed: false });
+      view = derive(view, sim);
+      if (view.sos !== null && firstLit === null) firstLit = tick;
+      if (view.sos !== null) armedFor++;
+    }
+    // It does light, and only after the gate — so nothing shorter than the gate
+    // could ever have been drawn.
+    expect(firstLit).not.toBeNull();
+    expect(armedFor).toBeGreaterThan(0);
+    expect(SOS_HOLD_TICKS).toBe(12);
+  });
+
   it('really pulses rather than sitting still', () => {
-    const strengths = fly(drifting(170, 1200), 40)
+    const strengths = fly(drifting(100, 100, 3500), 120)
       .filter((view) => view.sos !== null)
       .map((view) => view.sos!.strength);
     expect(Math.max(...strengths) - Math.min(...strengths)).toBeGreaterThan(0.2);
@@ -260,7 +303,7 @@ describe('the SOS', () => {
    * as a save."* So this is asserted across the press, not on either side of it.
    */
   it('survives the press that seals the run', () => {
-    const sim = drifting(170, 1200);
+    const sim = drifting(100, 100, 3500);
     let view = createPresentation(sim);
     let sawDrifting = false;
     let sawHeld = false;
