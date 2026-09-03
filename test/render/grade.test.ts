@@ -79,17 +79,32 @@ function addedTo(channel: number, strength: number): number {
 
 describe('the retro grade', () => {
   /**
-   * **It ships off**, which is M3.5's own answer: *"build it as a knob, not a
-   * look."* Every number in the file is a ceiling the spec states and none is a
-   * value anybody has flown, so the value on `main` is the author's to rule from
-   * the bench.
+   * **0.45, the author's, flown on the bench on 2026-09-02** — *"it looks real
+   * nice… 0.45 seems like a nice balance."*
    *
-   * It is asserted rather than left implicit because the whole of spec 14's
-   * existing acceptance — true black, palette tokens, legibility — holds exactly
-   * at this setting and is argued about at any other.
+   * It is asserted rather than left implicit because two things follow from
+   * *this* value and not from a nearby one: it sits below the scanline threshold,
+   * so the pass is one composite rather than two and spec 14 §2 stage 5's *"off
+   * by default"* is literally true; and it is not zero, so spec 14's true-black
+   * criterion is now failed by a shipped value. Both are checked below, and the
+   * day the number moves they move with it rather than quietly.
    */
-  it('is off on main', () => {
-    expect(GRADE).toBe(0);
+  it('ships at the value the author flew', () => {
+    expect(GRADE).toBe(0.45);
+  });
+
+  /**
+   * And **the shipped coat costs one composite, not two**, because 0.45 is below
+   * the scanline threshold. That is the cost sentence for the value the game
+   * actually ships, which is the one worth pinning: the two-composite figure is a
+   * ceiling nobody is flying.
+   */
+  it('costs one full-screen fill at the shipped value, with no comb', () => {
+    expect(coatAt(GRADE).scanline).toBe(0);
+    const shipped = ask(GRADE);
+    expect(shipped.fills).toBe(1);
+    expect(shipped.screens).toBe(1);
+    expect(shipped.composites).toEqual(['lighter']);
   });
 
   /**
@@ -97,7 +112,8 @@ describe('the retro grade', () => {
    *
    * The same rule `test/census.test.ts` holds the boundary to, and for the same
    * reason: a layer dimmed to nothing passes an eye test and costs the phone the
-   * whole screen anyway.
+   * whole screen anyway. Zero is no longer where the game ships, but it is still
+   * where the slider's bottom end is and where the dev panel can put it.
    */
   it('asks the canvas for nothing at all when it is off', () => {
     expect(ask(0)).toEqual({ screens: 0, fills: 0, composites: [] });
@@ -214,9 +230,14 @@ describe('the retro grade', () => {
    * rather than left to be discovered. The ruling is the author's; this test is
    * what makes the number move on purpose when it is made.
    */
-  it('leaves true black alone at the setting it ships at, and states what it costs at the top', () => {
+  it('states what true black costs at the shipped value and at the top', () => {
+    // ⚠ **The criterion is failed by a shipped value now**, not by a
+    // hypothetical one: the author ruled the look on 2026-09-02 and the spec
+    // conflict is still open. Only at 0 do the gaps sample to `#000000`.
+    const shipped = [0, 1, 2].map((channel) => Math.round(addedTo(channel, GRADE)));
+    expect(shipped).toEqual([6, 6, 11]);
     for (let channel = 0; channel < 3; channel++) {
-      expect(addedTo(channel, GRADE)).toBe(0);
+      expect(addedTo(channel, 0)).toBe(0);
     }
     const raised = [0, 1, 2].map((channel) => Math.round(addedTo(channel, 1)));
     expect(raised).toEqual([14, 12, 24]);

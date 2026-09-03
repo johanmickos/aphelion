@@ -9,14 +9,25 @@ workstream.
 **Depends on**: [00 · Tokens](./00-tokens.md). Constrained by [M0.5](../plan/m0-foundations.md), the
 renderer spike — the grade is a full-screen pass and is part of what that spike measures.
 
-> ## ⚠ Built, 2026-09-02 — the pass is two composites and it ships **off**
+> ## ⚠ Built and ruled, 2026-09-02 — the pass is two composites and it ships at **0.45**
 >
 > [M3.5](../plan/m3-the-field.md). `src/render/grade.ts` is §4's *"one place"*, and what reached
 > the bench is **one master** with the stages ganged behind it: 0 is off and 1 is every stage at
-> the ceiling §2 states for it. It is off on `main` because M3.5's own instruction is *"build it
-> as a **knob**, not a look — 'a touch more retro' is a judgement made against the running game,
-> not decided in advance"*, and because every acceptance criterion in this spec holds exactly at
-> that setting and is argued about at any other. **The opening value is the author's to fly.**
+> the ceiling §2 states for it. It shipped at 0 for a day — M3.5's instruction is *"build it as a
+> **knob**, not a look"* — and the author then flew it: *"it looks real nice. In the bench I'm
+> running it at 0.45 which seems like a nice balance."*
+>
+> **0.45 is below the scanline threshold**, so two things about §2 follow from the ruled value: the
+> pass costs **one** full-screen composite rather than two, and stage 5's *"off by default until
+> the phone says otherwise"* is now literally satisfied — the phone has said, and it said no. The
+> same knob is on the game page behind a dev-only panel, because a coat is judged over a
+> playthrough and the bench is not one, and **a dispatch now carries the coat it was flown under**.
+>
+> ⚠ **Measured on the phone at grade 1** — `diagnostics/2026-09-03T02-35-03-175Z`, 1 882 frames,
+> the top of the travel with the comb on — a frame with one tick costs **1.18 ms** against the
+> pre-grade baseline's **1.15 ms** on the same device, and the worst frame is **7 ms against 10**.
+> The pass at its ceiling does not show above the difference between two runs. That is ADR-0011's
+> *"the post-processing is free"* reproduced on the shipped renderer.
 >
 > **The five stages cost two full-screen fills, not five.** Lift, dither and grain are all
 > *additions* to every pixel and a sum of additions is one addition, so they share one `lighter`
@@ -43,7 +54,12 @@ renderer spike — the grade is a full-screen pass and is part of what that spik
 > and a full-screen composite has no way to exclude a colour. Every additive stage hits it, not
 > only the lift: at grade 1 the gaps sample to **`rgb(14, 12, 24)`**, which is the lift (10, 8, 20)
 > plus the grain's mean (3.83) and the dither's (0.47) — 9.4% of full scale in its loudest
-> channel. At grade 0 they sample to `#000000` exactly.
+> channel — and at the **shipped 0.45** they sample to `rgb(6, 6, 11)`. Only at grade 0 do they
+> sample to `#000000`.
+>
+> ⚠ **So this criterion is now failed by a shipped value rather than by a hypothetical one**
+> (2026-09-02). The author ruled the *look*; the conflict is untouched by that ruling and is still
+> the one thing in this spec that cannot be satisfied as written.
 >
 > Four candidates, none of them picked:
 >

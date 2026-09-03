@@ -743,11 +743,18 @@ export function formatDispatch(dispatch: Dispatch, describe: readonly Tick[] = [
   // every dispatch recorded before 2026-09-02 has none, and dating those against
   // the commit log is the guesswork the field exists to end.
   const build = dispatch.build === undefined ? '' : ` · build ${dispatch.build}`;
+  // **The coat, whenever the dispatch carries one.** Printed always rather than
+  // only when it differs from the shipped value, because absence has to mean one
+  // thing: a dispatch flown before the pass existed. A reader who saw nothing
+  // could not tell that from a run flown at the default, and the two are not the
+  // same claim. The build stamp cannot stand in — the grade is a session setting,
+  // so two runs on one build can carry different ones.
+  const coat = dispatch.grade === undefined ? '' : ` · grade ${dispatch.grade.toFixed(2)}`;
   const out: string[] = [
     '',
     device
-      ? `  \x1b[2mflown ${dispatch.at} · ${device.css.w}×${device.css.h} css · dpr ${device.dpr}${build}\x1b[0m`
-      : `  \x1b[2mrecorded ${dispatch.at}, not on a device${build}\x1b[0m`,
+      ? `  \x1b[2mflown ${dispatch.at} · ${device.css.w}×${device.css.h} css · dpr ${device.dpr}${build}${coat}\x1b[0m`
+      : `  \x1b[2mrecorded ${dispatch.at}, not on a device${build}${coat}\x1b[0m`,
   ];
   if (device) out.push(`  \x1b[2m${device.ua}\x1b[0m`);
   if (dispatch.observed.note) out.push(`  \x1b[1m“${dispatch.observed.note}”\x1b[0m`);

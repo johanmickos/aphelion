@@ -77,22 +77,46 @@ import { rng } from './seed.ts';
  * **The master, and the only knob this puts on the bench** — 0 is off, 1 is every
  * stage at the ceiling spec 14 §2 states for it.
  *
- * ## It ships at zero, and that is the milestone's answer rather than a placeholder
+ * ## ⚠ 0.45, ruled by the author on the bench, 2026-09-02
  *
- * [M3.5](../../docs/plan/m3-the-field.md)'s instruction is *"build it as a
- * **knob**, not a look — the author tunes it on a phone; 'a touch more retro' is a
- * judgement made against the running game, not decided in advance."* Every number
- * in this file is a **ceiling the spec states** and none of them is a value
- * anybody has flown, so the pass is off on `main` until the author dials it and
- * rules one. With it off, every acceptance criterion spec 14 already had still
- * holds unchanged — including the one about true black that this file cannot keep
- * at any other setting. See [`LIFT`](#lift).
+ * > *"It looks real nice. In the bench I'm running it at 0.45 which seems like a
+ * > nice balance."*
+ *
+ * It shipped at **0** for one day, which was M3.5's own instruction — *"build it
+ * as a **knob**, not a look; 'a touch more retro' is a judgement made against the
+ * running game, not decided in advance"* — and the judgement has now been made
+ * against the running game, which is the only way this number was ever going to
+ * arrive.
+ *
+ * **What 0.45 is**, since every stage is a fraction of it:
+ *
+ * | | at 0.45 | the ceiling spec 14 §2 states |
+ * |---|---|---|
+ * | lift | `rgb(4.5, 3.6, 9)`, so the sky reads `rgb(16, 14, 31)` | VOID added once |
+ * | dither | 0.45 of a code value | ~1/255 |
+ * | grain | **1.35%** peak | ≤ 3% |
+ * | scanlines | **none** — 0.45 is below [`SCANLINE_FROM`](#scanline_from) | ≤ 6% |
+ *
+ * Two things follow that are worth having in one place. It costs **one**
+ * full-screen composite rather than two, because the comb is absent. And spec 14
+ * §2 stage 5's *"off by default until the phone says otherwise"* is satisfied
+ * **literally** at the shipped value: the phone has now said, and it said no.
+ *
+ * ⚠ **What it does not settle is the true-black conflict** — see [`LIFT`](#lift).
+ * At 0.45 the anomaly's gaps sample to `rgb(6, 6, 11)` rather than to `#000000`,
+ * so spec 14's own acceptance criterion is failed by a **shipped** value now
+ * rather than by a hypothetical one. The author ruled the look; the spec conflict
+ * is still open.
  *
  * The travel is 0 → 1 rather than 0 → *heavy* past it, because those numbers are
  * ceilings — *"≤ 3%"*, *"≤ 6%"*, *"~1/255"* — and a slider that ran beyond them
  * would be a slider whose top end the spec forbids.
+ *
+ * It stays on the bench, and it is now also on the **game page** behind a dev-only
+ * panel ([`app/main.ts`](../../app/main.ts)), because a coat is judged over a
+ * playthrough and the bench is not one.
  */
-export const GRADE = 0;
+export const GRADE = 0.45;
 
 /**
  * How far the blacks come up, as a multiple of VOID, at [`GRADE`](#grade) 1.
@@ -118,10 +142,12 @@ export const GRADE = 0;
  * already the most expensive in the game.
  *
  * At `GRADE` 1 those gaps sample to `rgb(14, 12, 24)` — the lift, plus the grain's
- * mean and the dither's — which is 9.4% of full scale in its loudest channel. At
- * `GRADE` 0 they sample to `#000000` and the criterion holds exactly, which is
- * where this ships. The candidates are set out in spec 14's own ⚠ notice and none
- * of them is picked here.
+ * mean and the dither's, 9.4% of full scale in its loudest channel — and at the
+ * shipped **0.45** they sample to `rgb(6, 6, 11)`. Only at 0 do they sample to
+ * `#000000`, and 0 is no longer where this ships: as of 2026-09-02 the criterion
+ * is failed by a value the author **flew** rather than by a hypothetical one. The
+ * candidates are set out in spec 14's own ⚠ notice and none of them is picked
+ * here.
  */
 const LIFT = 1;
 

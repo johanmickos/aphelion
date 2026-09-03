@@ -324,6 +324,54 @@ describe('the endpoint', () => {
  * stand in: it moves only when a **tick** moves, and performance work
  * deliberately leaves the swing alone.
  */
+/**
+ * The coat a run was flown under — spec [14 · §2](../docs/spec/14-retro-grade.md)'s
+ * grade, moved onto the game page behind a dev panel on 2026-09-02.
+ *
+ * It rides for `build`'s reason one step further on. `build` exists because
+ * `recipe.sim` is blind to work that changes what a frame **costs** and leaves
+ * the swing alone; the grade is a **session setting**, so two dispatches carrying
+ * the identical build stamp can cost different frames depending on where the
+ * author left the slider. Nothing else on the wire can say which.
+ */
+describe('the grade a dispatch was flown under', () => {
+  it('survives the round trip', () => {
+    expect(parseDispatch({ ...structuredClone(dispatch), grade: 0.45 }).grade).toBe(0.45);
+    expect(JSON.parse(receive(JSON.stringify({ ...dispatch, grade: 0.45 })).body).grade).toBe(0.45);
+  });
+
+  /**
+   * **Zero is a grade** — the pass switched off — so it cannot be tested for
+   * truthiness the way the other three optional fields are. This is the one that
+   * would have gone wrong silently: a run flown with the coat off would have
+   * arrived claiming nothing, and *nothing* means something else here.
+   */
+  it('keeps a grade of zero, which is the pass switched off and not an absence', () => {
+    expect(parseDispatch({ ...structuredClone(dispatch), grade: 0 }).grade).toBe(0);
+    expect(buildDispatch({ ...parseDispatch(structuredClone(dispatch)), grade: 0 }).grade).toBe(0);
+  });
+
+  /**
+   * And absence means the run predates the pass. It is deliberately not filled in
+   * with the shipped value: an inferred number that looks measured is exactly the
+   * staleness `VISION.md`'s seventh pillar names.
+   */
+  it('is optional, because the whole corpus predates the pass', () => {
+    expect(parseDispatch(structuredClone(dispatch)).grade).toBeUndefined();
+    expect(JSON.parse(receive(JSON.stringify(dispatch)).body).grade).toBeUndefined();
+  });
+
+  /**
+   * The page is allowed to claim this where it may not claim `build`, so the
+   * claim is bounded here like every other one: spec 14 §2's travel is 0 – 1.
+   */
+  it('is held to the travel spec 14 states', () => {
+    for (const bad of [-0.01, 1.01, 42, NaN, Infinity, '0.5', null]) {
+      expect(() => parseDispatch({ ...structuredClone(dispatch), grade: bad })).toThrow();
+    }
+  });
+});
+
 describe('the build stamp', () => {
   /**
    * **The server stamps it, so it is a fact rather than a claim.** A sender's own

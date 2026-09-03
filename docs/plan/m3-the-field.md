@@ -2040,14 +2040,88 @@ design units — and §3.1 does not say which of its two floors a **track** is. 
 `HAIR` goes 0.55 → 0.63 and the far end widens 14%; read as structure, nothing moves. **The test
 asserts the list rather than picking**, so the ruling moves a number on purpose.
 
+### ⚠ Flown and ruled: **0.45**, and the pass is free on the phone (2026-09-02 / 09-03)
+
+> *"It looks real nice. In the bench I'm running it at 0.45 which seems like a nice balance."*
+> — author, on the bench
+
+`GRADE` is **0.45** on `main`. What that is, since every stage is a fraction of the master:
+
+| | at 0.45 | the ceiling spec 14 §2 states |
+|---|---|---|
+| lift | `rgb(4.5, 3.6, 9)` — the sky reads `rgb(16, 14, 31)` | VOID added once |
+| dither | 0.45 of a code value | ~1/255 |
+| grain | **1.35%** peak | ≤ 3% |
+| scanlines | **none** | ≤ 6% |
+
+Two things fall out of *this* value rather than a nearby one, and both are pinned by
+`test/render/grade.test.ts` so that moving it moves them on purpose. It costs **one** full-screen
+composite and not two, because 0.45 is below the scanline threshold — measured on the game page in
+Chrome: one `lighter` pattern a frame, no comb, sky `rgb(16.5, 13.5, 30.9)` against a predicted
+`rgb(16, 14, 31)`. And spec 14 §2 stage 5's *"off by default until the phone says otherwise"* is now
+**literally** satisfied: the phone has said, and it said no.
+
+#### The tuning panel, because a coat is judged over a playthrough
+
+The bench answers *what does this value look like* against a run flying itself on a desktop. It
+cannot answer *is this the right amount of retro while I am flying*, which is the question spec 14 §4
+actually asks and the one this milestone's acceptance turns on. So the same knob is on the **game
+page**, behind a dev-only `TUNE` button beside `FLAG` / `SEND`.
+
+- **A panel and not a modal.** A dialog would take focus and cover the field, and the game's entire
+  input is pressing and holding the field — the one control that exists to be moved mid-run would be
+  the one control that stops the run. It sits in `#chrome` above the thumb's third (spec 00 §7).
+- **It does not persist.** A coat quietly different from `main`'s across a reload is precisely the
+  staleness `VISION.md`'s seventh pillar names. The readout says `· grade 0.90` whenever the session
+  differs from the shipped value, and says nothing when it does not.
+- **`draw` takes it as an argument**, defaulting to the constant. AGENTS.md §6 keeps knobs out of
+  `src/`: a `setGrade` would be a setting in the game reachable from anywhere and still in the
+  production bundle, where a defaulted parameter is reachable only by whoever calls `draw`.
+
+**And a dispatch carries the coat it was flown under.** This is [`build`](#)'s argument one step
+further on: `build` exists because `recipe.sim` is blind to work that changes what a frame *costs*
+and leaves the swing alone, and the grade is worse — a **session setting**, so two dispatches
+carrying the *identical* build stamp can cost different frames. `pnpm budget --corpus` now names the
+coats in its pool rather than averaging over pictures silently.
+
+#### The first phone measurement of the pass, and it is free
+
+`diagnostics/2026-09-03T02-35-03-175Z` — iPhone, Firefox iOS, 393 × 651 at dpr 3, 1 702 ticks,
+1 882 frames, **flown at grade 1.00**: the top of the travel, two composites, scanlines on. Against
+the recorded pre-grade baseline on the same device:
+
+| | the baseline · no pass | this run · **grade 1** |
+|---|---|---|
+| frame cpu p50 / p95 / p99 | 1 / 2 / 2 ms | 1 / 2 / 2 ms |
+| frame cpu **max** | **10 ms** | **7 ms** |
+| a frame with one tick | **1.15 ms** | **1.18 ms** |
+| interval p50 | 17 ms | 17 ms |
+
+**The pass at its ceiling does not show.** The sums are 2.6% apart, which is inside what two runs of
+this game differ by anyway, and the worst frame is *lower* with the whole pass on. That is
+ADR-0011's original finding — *"the post-processing is free"* — reproduced on the shipped renderer
+rather than on a deleted spike harness, and it is the answer to the question this milestone was
+built around.
+
+⚠ **Stated as what it is: two different runs on two different builds**, so the difference is not
+attributable to the grade alone and neither is the agreement. The clean experiment is now one
+button away — two runs on one build, panel at 0 and at 1 — and it is worth ten minutes if the
+number ever matters.
+
+⚠ **And the press stall is in this run too, unchanged**: 20 frames of 25 ms or longer against 16
+presses, and the long ones land on button-down. It is open item 2 below and nothing here touched it.
+
 #### What is owed
 
-- **Fly the master.** It is at `/bench` on the dev server, so the QR that puts the game on the
-  phone puts the knob on the same phone. The opening value is the whole point and nobody has one.
-- **Rule the true-black conflict**, ideally as ADR-0011's (a), which closes that ADR's open note
-  at the same time.
+- ~~**Fly the master.**~~ Done: **0.45**, 2026-09-02.
+- **Rule the true-black conflict**, ideally as ADR-0011's (a), which closes that ADR's open note at
+  the same time. ⚠ It is sharper now than when it was recorded: at 0.45 the anomaly's gaps sample to
+  `rgb(6, 6, 11)`, so spec 14's own acceptance criterion is failed by a **shipped** value rather
+  than by a hypothetical one.
 - **Rule the hairline**: is a track read as a line, or is it structure?
-- **Rule the scanline threshold**, or spend the bench's last control on it.
+- **Rule the scanline threshold**, or spend the bench's last control on it. ⚠ The author flew a
+  whole run at 1.00, which is the only setting that brings the comb — so the threshold has been
+  crossed in anger once and not yet judged.
 
 ---
 

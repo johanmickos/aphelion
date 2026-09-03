@@ -51,6 +51,7 @@ import { createPresentation, derive } from '../src/state/derive.ts';
 import { attachCanvas, sizeToDisplay } from '../src/render/canvas.ts';
 import { interpolate } from '../src/render/interpolate.ts';
 import { draw } from '../src/render/index.ts';
+import { GRADE } from '../src/render/grade.ts';
 import { DIAG_ENDPOINT, buildDispatch } from '../tools/dispatch.ts';
 import { createMeter, frameBegan, frameEnded, timingOf } from '../tools/meter.ts';
 import { bindPress, suppressBrowserGestures, typing } from './input.ts';
@@ -98,6 +99,11 @@ const dev = document.getElementById('dev');
 const flag = document.getElementById('flag');
 const send = document.getElementById('send');
 const note = document.getElementById('note');
+const tuner = document.getElementById('tuner');
+const tune = document.getElementById('tune');
+const grade = document.getElementById('grade');
+const gradeValue = document.getElementById('gradeValue');
+const gradeMain = document.getElementById('gradeMain');
 
 if (target) {
   const context = attachCanvas(target);
@@ -141,6 +147,20 @@ if (target) {
   // Dev-only, like the dispatch it rides in: `import.meta.env.DEV` is replaced
   // by `false` when the build is made, so the meter and its module go with it.
   let meter = import.meta.env.DEV ? createMeter() : null;
+
+  // **The coat this sitting is being flown under**, and it starts at the value
+  // the game ships (`src/render/grade.ts`). Spec 14 §4 puts the judgement on the
+  // phone and a coat is judged over a **playthrough**, which the bench is not —
+  // so the panel below is the same knob one surface along, and this is the one
+  // number it moves.
+  //
+  // It is a variable here rather than a setter in `src/` because AGENTS.md §6
+  // keeps knobs out of the game: `draw` takes it as an argument, so nothing but
+  // this shell can reach it and a production build passes nothing and gets the
+  // shipped value. It deliberately does **not** persist — a coat quietly
+  // different from `main`'s across a reload is the staleness `VISION.md`'s
+  // seventh pillar is about, and the readout says so whenever it differs.
+  let coat = GRADE;
 
   // **Coming back from the background is not elapsed time.** A phone that slept,
   // a tab switched away from and a screen locked all leave `observed` at the
@@ -238,7 +258,7 @@ if (target) {
     }
 
     sizeToDisplay(context);
-    draw(interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK), context);
+    draw(interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK), context, coat);
 
     if (readout) {
       // The ending is read off the simulation rather than off presentation
@@ -252,6 +272,11 @@ if (target) {
         `${current.craft.speed.toFixed(0)}/s` +
         (sim.ending === null ? '' : ` · ${sim.ending.replace(/_/g, ' ')}`) +
         (flagged.length === 0 ? '' : ` · ${flagged.length} flagged`) +
+        // **Only when it differs**, which is the whole of why it is here: a
+        // session flown under a coat that is not the game's is a session whose
+        // frame timings are not the game's either, and the one way that goes
+        // wrong is silently. At the shipped value it says nothing.
+        (coat === GRADE ? '' : ` · grade ${coat.toFixed(2)}`) +
         sent;
     }
 
@@ -267,6 +292,38 @@ if (target) {
   // dispatch module it reaches — leaves the bundle with it.
   if (import.meta.env.DEV) {
     dev?.removeAttribute('hidden');
+
+    // **The tuning panel: spec 14 §4's judgement, moved onto the thing being
+    // judged.** The bench has the same knob and answers a different question —
+    // *what does this value look like* against a run flying itself on a desktop.
+    // A coat is judged over a playthrough, so this is the surface that can
+    // actually answer *is this the right amount of retro while I am flying*.
+    //
+    // It is a **panel and not a dialog**. A modal would take focus and cover the
+    // field, and the game's entire input is pressing and holding the field — so
+    // the one control that exists to be moved mid-run would be the one control
+    // that stops the run. It sits in `#chrome` at the top, above the thumb's
+    // third (spec 00 §7), and `pointer-events` are granted to it alone.
+    if (grade instanceof HTMLInputElement) {
+      const show = (): void => {
+        coat = grade.valueAsNumber;
+        if (gradeValue) gradeValue.textContent = coat.toFixed(2);
+      };
+      // Written from the constant rather than from the markup, so this page
+      // cannot state a default that has drifted from the game's.
+      grade.value = String(GRADE);
+      if (gradeMain) gradeMain.textContent = `main ${GRADE.toFixed(2)}`;
+      show();
+      // `input` and not `change`: the coat has to move under the thumb, because
+      // what is being judged is the picture and not the number.
+      grade.addEventListener('input', show);
+    }
+    tuner?.addEventListener('click', () => {
+      const open = tune?.hasAttribute('hidden') === true;
+      if (open) tune?.removeAttribute('hidden');
+      else tune?.setAttribute('hidden', '');
+      tuner.setAttribute('aria-expanded', String(open));
+    });
 
     // A flag is a tap and nothing else. It costs no attention, it needs no
     // keyboard, and it lands on the tick the feeling did — which is the half of
@@ -289,6 +346,14 @@ if (target) {
           dpr: window.devicePixelRatio,
           css: { w: window.innerWidth, h: window.innerHeight },
         },
+        // **What coat it was flown under**, which the build stamp cannot say.
+        // `build` exists because `recipe.sim` is blind to work that changes what
+        // a frame costs and leaves the swing alone; the panel above is that
+        // exact problem one step further on, because two dispatches from the
+        // *same* build now cost different amounts depending on where the thumb
+        // left this slider. A frame timing pooled by `pnpm budget --corpus`
+        // without it would be a measurement of a picture nobody can name.
+        grade: coat,
         timing: meter && timingOf(meter),
       });
       // The verdict lands in the terminal in front of the laptop, which is where

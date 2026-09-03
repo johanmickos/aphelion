@@ -37,6 +37,7 @@ import { openRun, replayRun } from '../src/sim/replay.ts';
 import { createPresentation, derive } from '../src/state/derive.ts';
 import type { PresentationState } from '../src/state/types.ts';
 import { draw } from '../src/render/index.ts';
+import { applyGrade } from '../src/render/grade.ts';
 import { counter } from '../tools/profile.ts';
 import type { Census } from '../tools/profile.ts';
 import { parseDispatch } from '../tools/dispatch.ts';
@@ -58,8 +59,25 @@ function shippedRun(): PresentationState[] {
 
 const RUN = shippedRun();
 
-function tally(views: readonly PresentationState[]): Census {
-  const into: Census = {
+/**
+ * What the retro grade costs a frame, in screens, at the value the game ships —
+ * asked of the pass itself rather than stated.
+ *
+ * It is a full-screen composite or two ([`grade.ts`](../src/render/grade.ts)), so
+ * it is part of what every frame pays and has to come out of any figure that is
+ * about some *other* layer. Measured here so that moving the knob moves the
+ * baseline with it.
+ */
+function gradeScreens(): number {
+  const into = blankCensus();
+  const context = counter(into);
+  Object.defineProperty(context, 'canvas', { value: { width: 1170, height: 2532 } });
+  applyGrade(context, 1, 0);
+  return into.blended / (1170 * 2532);
+}
+
+function blankCensus(): Census {
+  return {
     gradients: 0,
     arcs: 0,
     fills: 0,
@@ -69,6 +87,10 @@ function tally(views: readonly PresentationState[]): Census {
     gradientFilled: 0,
     blended: 0,
   };
+}
+
+function tally(views: readonly PresentationState[]): Census {
+  const into = blankCensus();
   const context = counter(into);
   // The canvas the census pretends to have, at the design space's own size.
   Object.defineProperty(context, 'canvas', { value: { width: 1170, height: 2532 } });
@@ -186,16 +208,26 @@ describe('the draw census', () => {
     const screens = (of: Census, over: readonly unknown[]): number =>
       of.blended / over.length / (1170 * 2532);
 
-    // **Away from a wall the boundary adds nothing at all** — one screen of VOID
+    // **What every frame pays whatever is happening**: the buffer's own VOID
+    // fill, plus the retro grade's composites at the value the game ships
+    // (`src/render/grade.ts`, one below the scanline threshold and two above it).
+    //
+    // ⚠ **Measured rather than written down.** The grade's share was one screen
+    // the day it landed and is a knob the author moves, so a literal here would
+    // be a number that goes stale the next time they rule one — and it would go
+    // stale by making *this* assertion pass while the boundary was drawing.
+    const constant = 1 + gradeScreens();
+
+    // **Away from a wall the boundary adds nothing at all** — the constant cost
     // and not a unit more. This is the assertion the ruling actually needs: a
     // layer dimmed to alpha zero would pass an eye test and cost the phone the
     // same.
-    expect(screens(tally(away), away)).toBeLessThan(1.01);
+    expect(screens(tally(away), away)).toBeLessThan(constant + 0.01);
 
     // At a wall it is a ninth of a screen — one side's wash, clipped to the
     // picture. The ceiling is what fails if the clip is ever dropped, because the
     // whole band unclipped is 1.13 screens.
-    const wash = screens(tally(out), out) - 1;
+    const wash = screens(tally(out), out) - constant;
     expect(wash).toBeGreaterThan(0.02);
     expect(wash).toBeLessThan(0.5);
   });

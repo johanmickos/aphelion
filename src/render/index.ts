@@ -61,7 +61,7 @@ import { drawAnomaly } from './anomaly.ts';
 import { drawRungs } from './rungs.ts';
 import { boundaryMotes, drawBoundary } from './boundary.ts';
 import { drawDeadline, drawSos } from './deadline.ts';
-import { applyGrade } from './grade.ts';
+import { applyGrade, GRADE } from './grade.ts';
 import {
   BODY_FILL,
   CORE,
@@ -1309,8 +1309,26 @@ const LABEL_OFFSET = 22 * BOARD_PIXEL;
  * visible beside it. Everything after the clip is in design units, and
  * everything after the second translate is in world units — which is what lets
  * every number in this file be one the design set states.
+ *
+ * ## `grade` is the one thing here a caller may override, and it is dev-only
+ *
+ * It defaults to [`GRADE`](./grade.ts), which is the value the game ships at, so
+ * a caller that says nothing gets the shipped coat and cannot get anything else
+ * by accident. What the parameter is *for* is the dev panel on the game page
+ * ([`app/main.ts`](../../app/main.ts)): a coat is judged over a playthrough, the
+ * bench is not one, and spec 14 §4 puts the judgement on the phone.
+ *
+ * **It is a parameter rather than a setter** because [AGENTS.md](../../AGENTS.md)
+ * §6 keeps knobs off `src/` — a module that exposed `setGrade` would be a setting
+ * in the game, reachable from anywhere, and the production bundle would still
+ * carry it. A defaulted argument is reachable only by whoever calls `draw`, which
+ * is the shell and the bench and nothing else.
  */
-export function draw(view: PresentationState, context: CanvasRenderingContext2D): void {
+export function draw(
+  view: PresentationState,
+  context: CanvasRenderingContext2D,
+  grade: number = GRADE,
+): void {
   const { canvas } = context;
   const fit = letterbox(canvas.width, canvas.height);
 
@@ -1457,5 +1475,5 @@ export function draw(view: PresentationState, context: CanvasRenderingContext2D)
   // It is **off on `main`** and asks the canvas for nothing at all in that state,
   // which is the same rule the boundary is held to: absent means nothing asked,
   // not a fill at alpha zero.
-  applyGrade(context, fit.scale, view.tick);
+  applyGrade(context, fit.scale, view.tick, grade);
 }

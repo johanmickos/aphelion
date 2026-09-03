@@ -63,7 +63,7 @@ import { MAX_CATCH_UP_TICKS, SECONDS_PER_TICK } from '../src/sim/units.ts';
 import { createPresentation, derive } from '../src/state/derive.ts';
 import type { PresentationState } from '../src/state/types.ts';
 import { interpolate } from '../src/render/interpolate.ts';
-import { parseDeviceOnly, parseDispatch, parseTimingOnly } from './dispatch.ts';
+import { parseDeviceOnly, parseDispatch, parseGradeOnly, parseTimingOnly } from './dispatch.ts';
 import type { Dispatch, DispatchDevice, DispatchTiming } from './dispatch.ts';
 import { bucketAt } from './meter.ts';
 import { fitAcross, fitGroups, leverageOf, walkRun } from './trail.ts';
@@ -282,6 +282,18 @@ interface Timed {
   readonly device: DispatchDevice | null;
   /** Whether this build would still replay the run underneath it. */
   readonly replays: boolean;
+  /**
+   * The **retro grade** it was flown under, or `null` where it did not say.
+   *
+   * It is read for the same reason the build stamp is: a frame's cost belongs to
+   * a cohort. The grade is a full-screen composite or two on top of the scene
+   * (spec 14 §2), so it lands in the *rest of a frame* term this file fits — and
+   * unlike every other thing that moves that term, it is a **session setting**
+   * rather than a build, so two runs from the identical build can differ in it.
+   * Pooling across coats without saying so is exactly the mismatch M3.6 exists to
+   * have caught.
+   */
+  readonly grade: number | null;
 }
 
 /**
@@ -318,7 +330,13 @@ function timedDispatches(): Timed[] {
     } catch {
       replays = false;
     }
-    out.push({ file, timing: carried.timing, device: parseDeviceOnly(raw), replays });
+    out.push({
+      file,
+      timing: carried.timing,
+      device: parseDeviceOnly(raw),
+      replays,
+      grade: parseGradeOnly(raw),
+    });
   }
   return out;
 }
@@ -482,6 +500,32 @@ function corpus(): void {
       day,
       phone.filter((one) => one.file.startsWith(day)),
     );
+
+  // **What coats are in the pool**, because from 2026-09-02 they are not all the
+  // same one. The grade is one or two full-screen composites and it lands in the
+  // *rest of a frame* term above, so a pool that mixes them is a pool whose
+  // frame cost is an average over pictures. It is stated rather than corrected:
+  // there are too few graded runs to fit a coat term, and inventing one would be
+  // worse than naming the hazard.
+  const coats = new Map<string, number>();
+  for (const one of phone) coats.set(one.grade === null ? 'unstated' : one.grade.toFixed(2), 0);
+  for (const one of phone) {
+    const key = one.grade === null ? 'unstated' : one.grade.toFixed(2);
+    coats.set(key, (coats.get(key) ?? 0) + 1);
+  }
+  if (coats.size > 1) {
+    const said = [...coats].map(([at, runs]) => `${runs} at ${at}`).join(', ');
+    lines.push('');
+    lines.push(
+      dim(
+        `    ⚠ The pool mixes retro grades — ${said}. The pass is a full-screen composite and lands
+` +
+          `    in the rest-of-a-frame term above, so this cohort is an average over pictures as well as
+` +
+          `    over runs. "unstated" is a run flown before the pass existed, which is a grade of 0.`,
+      ),
+    );
+  }
 
   if (pooled !== null) {
     lines.push('');

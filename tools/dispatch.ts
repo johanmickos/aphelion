@@ -186,6 +186,35 @@ export interface Dispatch {
    * would refuse the evidence this project has.
    */
   readonly build?: string;
+  /**
+   * The **retro grade** this run was flown under, 0 – 1 (spec
+   * [14 · §2](../docs/spec/14-retro-grade.md)).
+   *
+   * ## ⚠ It exists for [`build`](#build)'s reason, one step further on
+   *
+   * `build` is here because `recipe.sim` is blind to work that changes what a
+   * frame **costs** and deliberately leaves the swing alone. The grade is that
+   * problem again and worse: it is a **session setting**, so two dispatches
+   * carrying the *identical* build stamp can cost different amounts per frame
+   * depending on where the author left the game page's tuning panel. The stamp
+   * cannot see it, and neither can anything else on the wire.
+   *
+   * What it costs is not a rounding error — the pass is one full-screen composite
+   * below 0.6 and two above it, against a game that blends about 1.5 screens away
+   * from the anomaly. A timing dispatch pooled into `pnpm budget --corpus`
+   * without this would be a frame cost attributed to a picture nobody can name.
+   *
+   * **The page is allowed to claim this and not `build`**, and the difference is
+   * real: a build stamp is a fact about the server's own files, which is why the
+   * server stamps it. The grade is a number the author moved on that page, so the
+   * page is the only thing that knows it and its claim is the evidence.
+   *
+   * Optional, and its absence means the same as everywhere else here: every
+   * dispatch recorded before 2026-09-02 was flown before the pass existed, which
+   * is a grade of 0 and is deliberately **not** filled in for them — an inferred
+   * value that looks measured is the staleness `VISION.md`'s seventh pillar names.
+   */
+  readonly grade?: number;
 }
 
 /** Stamp a dispatch, trimming what the author wrote to what may be sent. */
@@ -196,6 +225,7 @@ export function buildDispatch(args: {
   device?: DispatchDevice;
   timing?: DispatchTiming | null;
   build?: string;
+  grade?: number;
 }): Dispatch {
   return {
     kind: DISPATCH_KIND,
@@ -208,7 +238,21 @@ export function buildDispatch(args: {
     ...(args.device ? { device: args.device } : {}),
     ...(args.timing ? { timing: args.timing } : {}),
     ...(args.build ? { build: args.build } : {}),
+    // Tested against `undefined` rather than for truthiness, because **zero is a
+    // grade** — the pass switched off — and the other three fields here have no
+    // falsy value that means anything.
+    ...(args.grade === undefined ? {} : { grade: gradeOf(args.grade) }),
   };
+}
+
+/**
+ * A grade, or a refusal. Spec 14 §2's travel is 0 – 1 and the page is the only
+ * thing that can claim it, so the claim is bounded here like every other one.
+ */
+function gradeOf(value: unknown): number {
+  const n = finite(value, 'grade');
+  if (n < 0 || n > 1) throw new Error(`grade ${n} is outside 0 – 1`);
+  return n;
 }
 
 function boundedString(value: unknown, what: string, most: number): string {
@@ -401,6 +445,20 @@ export function parseTimingOnly(raw: unknown): { at: string; timing: DispatchTim
   };
 }
 
+/**
+ * The retro grade a dispatch claims, or `null` where it claims none.
+ *
+ * Beside [`parseDeviceOnly`](#) and for the same reason: `pnpm budget` reads
+ * every timed dispatch on disk, **including the ones whose recipes this build
+ * refuses**, and needs the envelope without the run. A grade is part of that
+ * envelope now — see [`Dispatch.grade`](#grade).
+ */
+export function parseGradeOnly(raw: unknown): number | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const grade = (raw as Record<string, unknown>).grade;
+  return grade === undefined ? null : gradeOf(grade);
+}
+
 /** What the device that flew it says about itself, or `null` where it said nothing. */
 export function parseDeviceOnly(raw: unknown): DispatchDevice | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -483,6 +541,7 @@ export function parseDispatch(raw: unknown): Dispatch {
     recipe,
     observed: parseObserved(d.observed, recipe.ticks),
     ...(d.device === undefined ? {} : { device: parseDevice(d.device) }),
+    ...(d.grade === undefined ? {} : { grade: gradeOf(d.grade) }),
     ...(d.timing === undefined ? {} : { timing: parseTiming(d.timing, recipe.ticks) }),
     ...(d.build === undefined ? {} : { build: parseBuild(d.build) }),
   };

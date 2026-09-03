@@ -115,6 +115,88 @@
         flex: 1;
         min-width: 0;
       }
+      /* The tuning panel, and it is dev chrome like everything else in #chrome:
+         `main.ts` un-hides it only under `import.meta.env.DEV`. It sits under the
+         dev row and above the thumb's third, and it is a panel rather than a
+         dialog on purpose — a modal that took focus would swallow the presses the
+         game is made of, and the whole point is to watch the coat move while the
+         run is still being flown. */
+      #tune {
+        margin-top: 6px;
+        padding: 10px 12px 12px;
+        border: 1px solid #2a2740;
+        border-radius: 3px;
+        background: #0a0814e6;
+        pointer-events: auto;
+        max-width: 420px;
+      }
+      #tune[hidden] {
+        display: none;
+      }
+      #tune .row {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      #tune .what {
+        margin: 6px 0 0;
+        color: #3a4258;
+        letter-spacing: 0.06em;
+        line-height: 1.5;
+      }
+      /* Wide enough to drag accurately with a thumb, and its own row, because a
+         slider sharing a row with a label is a slider that is hard to grab.
+
+         The track is styled rather than left to `accent-color` because a default
+         range control paints a white track, and white is the loudest thing a
+         browser has: dropped on this page it is brighter than the craft, which
+         Direction 01 makes the brightest thing on screen always. Chrome is
+         developer furniture and still may not out-shout the game it is furniture
+         for — so the track is DUSK at a low strength and the thumb is DUSK. */
+      #tune input[type='range'] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        margin: 10px 0 0;
+        background: transparent;
+        border: 0;
+        padding: 0;
+        touch-action: pan-y;
+      }
+      #tune input[type='range']::-webkit-slider-runnable-track {
+        height: 3px;
+        border-radius: 2px;
+        background: #2a2740;
+      }
+      #tune input[type='range']::-moz-range-track {
+        height: 3px;
+        border-radius: 2px;
+        background: #2a2740;
+      }
+      #tune input[type='range']::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 22px;
+        height: 22px;
+        margin-top: -10px;
+        border-radius: 50%;
+        border: 0;
+        background: #6c64a6;
+      }
+      #tune input[type='range']::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 0;
+        background: #6c64a6;
+      }
+      #tune .value {
+        color: #edeaf7;
+      }
+      #tune .main {
+        color: #3a4258;
+      }
     </style>
   </head>
   <body>
@@ -125,6 +207,26 @@
         <button id="flag" type="button">FLAG</button>
         <input id="note" type="text" autocomplete="off" placeholder="what happened" />
         <button id="send" type="button">SEND</button>
+        <button id="tuner" type="button" aria-expanded="false" aria-controls="tune">TUNE</button>
+      </div>
+      <div id="tune" hidden>
+        <div class="row">
+          <span>RETRO GRADE</span>
+          <!-- Both numbers are written by `main.ts` from the constant itself, so
+               this file cannot state a default that has drifted from the game's. -->
+          <span
+            ><span id="gradeValue" class="value"></span> <span id="gradeMain" class="main"></span
+          ></span>
+        </div>
+        <!-- 0 to 1 is the whole of the pass's travel and is spec 14 §2's, not a
+             choice made here: 1 is every stage at the ceiling the spec states for
+             it. The step is the bench's. -->
+        <input id="grade" type="range" min="0" max="1" step="0.05" aria-label="Retro grade" />
+        <p class="what">
+          spec 14 §2's whole pass on one knob. 0 is off; 1 is every stage at the ceiling the spec
+          states. Scanlines arrive above 0.60. This session only &mdash; a reload comes back to
+          main, and a dispatch carries whatever it was flown at.
+        </p>
       </div>
     </div>
     <script type="module" src="./main.ts"></script>
