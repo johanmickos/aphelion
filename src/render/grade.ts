@@ -220,7 +220,30 @@ const GRAIN_SEED = 0x9e15;
  * strength, and a scanline is the sky showing between the rows. Toward black it
  * would be a ninth colour, and the one §3.5 reserves.
  */
-export const SCANLINE = 0.06;
+/**
+ * How much of the picture a scanline row takes away.
+ *
+ * ## ⚠ Halved to 0.03 on the author's second flight, 2026-09-03
+ *
+ * > *"Nice, it's noticeable. A bit TOO strong now; it distracts from the UX."*
+ *
+ * The same 6% in the same day: **invisible before the pitch was fixed, too loud
+ * after it.** Nothing about the ink changed between those two reports — only
+ * whether the eye could resolve the bands it was spread across
+ * ([`SCANLINE_PITCH`](#scanline_pitch)) — which is the clearest possible evidence
+ * that a strength and a spatial frequency are not two names for one knob.
+ *
+ * Spec 14 §2 states *"≤ 6%"*, a **ceiling and not a target**, so shipping under
+ * it needs no overrule: this is the spec being honoured rather than corrected,
+ * and it is the opposite of the pitch below.
+ *
+ * **Halved rather than nudged**, which is this game's own pattern with every
+ * layer that has been reported too loud: the stars came down twice and E1 and E2
+ * ship at 18% and 30% against spec 00 §3's 35% and 60%. *"If the grade is
+ * carrying the register, the register is not there"* (§1) is the sentence a
+ * distracting coat fails, and the failure is loudness rather than presence.
+ */
+export const SCANLINE = 0.03;
 
 /**
  * How far apart the rows are, in design px.
@@ -247,9 +270,21 @@ export const SCANLINE = 0.06;
  * rather than texture it averages.
  *
  * This overrules the spec's stated 2 and the notice in spec 14 says so. What is
- * *not* overruled is the 6%: see [`SCANLINE_DUTY`](#scanline_duty) — the ink is
- * unchanged and only its spatial frequency moved, so this is the same amount of
- * darkening, spread into bands that can be seen.
+ * *not* overruled is the *"≤ 6%"*: see [`SCANLINE_DUTY`](#scanline_duty) — the
+ * ink was unchanged by this and only its spatial frequency moved.
+ *
+ * ⚠ **And then the ink came down anyway**, on the flight that followed: made
+ * resolvable, 6% read as too strong and [`SCANLINE`](#scanline) is 0.03. The two
+ * changes are separable and were separated, which is why both reports are worth
+ * having — the first says the comb was at the wrong *frequency* and the second
+ * says it is now at the wrong *depth*.
+ *
+ * ⚠ **The pitch itself is unjudged in the other direction.** A coarser comb is
+ * harder on small type — the rung labels and the sighting distances are the
+ * smallest things drawn — and 10 design px puts about three dark bands across a
+ * label. If the distraction turns out to be the *bands* rather than their depth,
+ * this is the knob, and 6 is the value that keeps the comb resolvable (4.2
+ * arcminutes) at three fifths of the chunk.
  */
 export const SCANLINE_PITCH = 10;
 

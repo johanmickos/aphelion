@@ -124,10 +124,32 @@ renderer spike — the grade is a full-screen pass and is part of what that spik
 > | **10** · built | 10 | 3.33 | 253 | 7.0 |
 > | 16 | 16 | 5.33 | 158 | 11.2 |
 >
-> **§2's 6% is untouched, and the ink is unchanged.** The dark band used to be one *device* row
-> whatever the pitch was — a 50% duty at a pitch of 2, and a thin scratch at any larger pitch — so
-> it is now half the pitch, which is the same mean darkening at a spatial frequency that can be
-> seen. This is not a louder comb; it is the same comb made visible.
+> **§2's 6% was untouched by this and the ink was unchanged.** The dark band used to be one
+> *device* row whatever the pitch was — a 50% duty at a pitch of 2, and a thin scratch at any
+> larger pitch — so it is now half the pitch, which is the same mean darkening at a spatial
+> frequency that can be seen. This was not a louder comb; it was the same comb made visible.
+>
+> ### ⚠ And then the ink came down — **0.03**, the same day
+>
+> > *"Nice, it's noticeable. A bit TOO strong now; it distracts from the UX."* — author, on the
+> > pitch fix above
+>
+> **The same 6% was invisible in the morning and too loud in the afternoon**, with nothing about
+> the ink changed in between — only whether the eye could resolve the bands it was spread across.
+> That is the clearest evidence this spec is likely to get that a strength and a spatial frequency
+> are not two names for one knob, and it is why §2's row lists both.
+>
+> §2 states *"≤ 6%"*, which is a **ceiling and not a target**, so shipping at **0.03** needs no
+> overrule — this is the spec honoured rather than corrected, and it is the opposite of the pitch
+> above. Halved rather than nudged, which is this game's own pattern with every layer reported too
+> loud: the stars came down twice and E1 and E2 ship at 18% and 30% against spec 00 §3's 35% and
+> 60%. §1's *"if the grade is carrying the register, the register is not there"* is the sentence a
+> distracting coat fails.
+>
+> ⚠ **The pitch is unjudged in the other direction.** A coarser comb is harder on small type — the
+> rung labels and the sighting distances are the smallest things drawn, and 10 design px puts about
+> three dark bands across a label. If the distraction is the *bands* rather than their depth, the
+> pitch is the knob and 6 keeps the comb resolvable at three fifths of the chunk.
 >
 > ⚠ **Two consequences, both stated rather than smuggled.** The scanlines came **off the master's
 > gang**: ganged, at the shipped 0.45 they would sit at 45% of a strength already called too weak
@@ -195,7 +217,7 @@ One full-screen post-process, applied after everything else, in this order:
 | 2 | **Grade** | lift / gamma / gain, per channel | Lift the blacks toward VOID's violet rather than to neutral grey; leave CORE at 1.0 so the craft stays the brightest value |
 | 3 | **Dither** | strength | Ordered 4×4 Bayer, ~1/255 amplitude, applied to the whole frame |
 | 4 | **Grain** | strength, animated | ≤ 3% luminance, resampled per frame. It must not read as noise on a still |
-| 5 | **Scanlines** | strength, pitch | ≤ 6% at a 2-design-px pitch. Off by default until the phone says otherwise. ⚠ **The pitch is overruled — 10, not 2** (2026-09-03), and the phone has now said it wants them |
+| 5 | **Scanlines** | strength, pitch | ≤ 6% at a 2-design-px pitch. Off by default until the phone says otherwise. ⚠ 2026-09-03: **the pitch is overruled — 10, not 2** — and the strength ships at **0.03**, half this ceiling. The phone has said it wants them, and said so twice in opposite directions |
 
 Every stage is switchable to zero independently, and the game must be fully legible with the whole
 pass off. The grade is a coat; nothing may depend on it to be readable.

@@ -173,8 +173,12 @@ describe('the retro grade', () => {
     // Stage 4: ≤ 3% luminance, as a peak.
     expect(full.grain).toBeCloseTo(0.03 * 255, 10);
     expect(full.grain / 255).toBeLessThanOrEqual(0.03);
-    // Stage 5: ≤ 6%.
-    expect(full.scanline).toBeCloseTo(0.06, 10);
+    // Stage 5: **≤ 6%, and it is a ceiling rather than a target** — the comb
+    // ships at half of it since 2026-09-03, when the author reported that a 6%
+    // comb distracts once the pitch makes it resolvable. What this asserts is the
+    // spec's bound, not the shipped value, which `SCANLINE` states.
+    expect(full.scanline).toBeLessThanOrEqual(0.06);
+    expect(full.scanline).toBeGreaterThan(0);
   });
 
   /**

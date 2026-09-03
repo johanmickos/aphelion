@@ -2189,6 +2189,27 @@ its spatial frequency moved.** This is not a louder comb; it is the same comb ma
 Measured on the shipped renderer, the sky now carries a period-9-device-px modulation of about
 4.5% where before it carried none at all.
 
+#### ⚠ And then the ink came down — **0.03**, the same day
+
+> *"Nice, it's noticeable. A bit TOO strong now; it distracts from the UX."*
+
+**The same 6% was invisible in the morning and too loud in the afternoon**, with nothing about the
+ink changed in between — only whether the eye could resolve the bands it was spread across. It is
+the cleanest demonstration this milestone produced that a strength and a spatial frequency are not
+two names for one knob.
+
+Spec 14 §2 states *"≤ 6%"*, a **ceiling and not a target**, so 0.03 needs no overrule — the spec is
+honoured rather than corrected, which is the opposite of what the pitch needed. **Halved rather
+than nudged**, following this game's own pattern with every layer reported too loud: the stars came
+down twice, and E1 and E2 ship at 18% and 30% against spec 00 §3's 35% and 60%. The mean dimming
+over a pitch is now **1.5%**.
+
+⚠ **The pitch is unjudged in the other direction.** A coarser comb is harder on small type — the
+rung labels and the sighting distances are the smallest things drawn, and 10 design px puts about
+three dark bands across a label. If what distracts turns out to be the *bands* rather than their
+depth, the pitch is the knob and **6** keeps the comb resolvable (4.2 arcminutes) at three fifths of
+the chunk. Both are on the panel.
+
 **Two consequences, stated rather than smuggled.** The comb came **off the master's gang**: ganged,
 at the shipped 0.45 it would sit at 45% of a strength already called too weak at 100%. It has its
 own knob now, `SCANLINE_FROM` — the one number in `grade.ts` nobody had ruled and I had flagged as
@@ -2204,8 +2225,10 @@ are right. The final numbers are the author's.
 #### What is owed
 
 - ~~**Fly the master.**~~ Done: **0.45**, 2026-09-02.
-- **Fly the comb.** The pitch is a derivation from a 240p CRT and an acuity limit, not a judgement;
-  10 may be too coarse or still too fine, and the 6% may want to move now that it can be seen.
+- **Fly the comb again.** Its *depth* has now been ruled twice in a day — 0.06 unseen, 0.06 too
+  loud, 0.03 shipped — and its **pitch** has been ruled once and only in one direction. 10 is a
+  derivation from a 240p CRT and an acuity limit rather than a judgement, and the question it has
+  not been asked is whether it is too coarse over the rung labels.
 - **Rule the true-black conflict**, ideally as ADR-0011's (a), which closes that ADR's open note at
   the same time. ⚠ It is sharper now than when it was recorded: at 0.45 the anomaly's gaps sample to
   `rgb(6, 6, 11)`, so spec 14's own acceptance criterion is failed by a **shipped** value rather
