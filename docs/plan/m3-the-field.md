@@ -2104,12 +2104,12 @@ asserts the list rather than picking**, so the ruling moves a number on purpose.
 | grain | **1.35%** peak | ≤ 3% |
 | scanlines | **none** | ≤ 6% |
 
-Two things fall out of *this* value rather than a nearby one, and both are pinned by
-`test/render/grade.test.ts` so that moving it moves them on purpose. It costs **one** full-screen
-composite and not two, because 0.45 is below the scanline threshold — measured on the game page in
-Chrome: one `lighter` pattern a frame, no comb, sky `rgb(16.5, 13.5, 30.9)` against a predicted
-`rgb(16, 14, 31)`. And spec 14 §2 stage 5's *"off by default until the phone says otherwise"* is now
-**literally** satisfied: the phone has said, and it said no.
+Measured on the game page in Chrome at that setting: sky `rgb(16.5, 13.5, 30.9)` against a
+predicted `rgb(16, 14, 31)`.
+
+⚠ **The scanline half of this was superseded a day later** — see the notice below. It said the
+ruled value costs one composite because 0.45 sat under the comb's threshold, and the comb no longer
+has one.
 
 #### The tuning panel, because a coat is judged over a playthrough
 
@@ -2161,17 +2161,57 @@ number ever matters.
 ⚠ **And the press stall is in this run too, unchanged**: 20 frames of 25 ms or longer against 16
 presses, and the long ones land on button-down. It is open item 2 below and nothing here touched it.
 
+### ⚠ *"The scanline effect is too weak"* — and it was the **pitch**, 2026-09-03
+
+The author flew the run above at grade 1.00, where the comb is at spec 14 §2's full 6%, and
+reported it too weak. **Raising the strength would not have fixed it and would have made the game
+darker for nothing.**
+
+A 2-design-px pitch is 2 device px on the author's phone and therefore **0.67 CSS px**, with a dark
+row of 0.33. At that phone's pixel pitch the comb subtends **1.39 arcminutes at 30 cm** against a
+resolution limit of about one, so the eye integrates it: what lands is not a comb but a **flat 3%
+dimming of the whole picture**. That is the report, exactly.
+
+**And the register it is imitating is five times coarser.** A 240p arcade CRT drew 240 lines down
+the screen; §2's 2 px draws **1 266** over the design height.
+
+| pitch, design px | device px | CSS px | lines down the design height | arcmin at 30 cm |
+|---|---|---|---|---|
+| **2** · the spec as written | 2 | 0.67 | 1 266 | **1.4** — at the eye's limit |
+| 6 | 6 | 2.00 | 422 | 4.2 |
+| **10** · built | 10 | 3.33 | 253 | **7.0** |
+| 16 | 16 | 5.33 | 158 | 11.2 |
+
+So the pitch is **10** — 240 lines wants 10.6 — and **§2's 6% is untouched**. A second bug went with
+it: the dark band was one *device* row whatever the pitch was, which is a 50% duty at a pitch of 2
+and a thin scratch at anything larger, so it is now half the pitch. **The ink is unchanged and only
+its spatial frequency moved.** This is not a louder comb; it is the same comb made visible.
+Measured on the shipped renderer, the sky now carries a period-9-device-px modulation of about
+4.5% where before it carried none at all.
+
+**Two consequences, stated rather than smuggled.** The comb came **off the master's gang**: ganged,
+at the shipped 0.45 it would sit at 45% of a strength already called too weak at 100%. It has its
+own knob now, `SCANLINE_FROM` — the one number in `grade.ts` nobody had ruled and I had flagged as
+a guess — is gone, and spec 14 §2's *"every stage is switchable to zero independently"* is better
+served by two knobs than by one with a threshold in it. And with the comb no longer gated, **the
+shipped pass is two full-screen composites rather than one**, which the phone measurement above
+already covers because that run was flown with both.
+
+**The panel has three knobs now** — grade, scanline strength and comb pitch, the last two ranging
+past §2's stated 6% and 2 px deliberately, because what is being tested is whether those ceilings
+are right. The final numbers are the author's.
+
 #### What is owed
 
 - ~~**Fly the master.**~~ Done: **0.45**, 2026-09-02.
+- **Fly the comb.** The pitch is a derivation from a 240p CRT and an acuity limit, not a judgement;
+  10 may be too coarse or still too fine, and the 6% may want to move now that it can be seen.
 - **Rule the true-black conflict**, ideally as ADR-0011's (a), which closes that ADR's open note at
   the same time. ⚠ It is sharper now than when it was recorded: at 0.45 the anomaly's gaps sample to
   `rgb(6, 6, 11)`, so spec 14's own acceptance criterion is failed by a **shipped** value rather
   than by a hypothetical one.
 - **Rule the hairline**: is a track read as a line, or is it structure?
-- **Rule the scanline threshold**, or spend the bench's last control on it. ⚠ The author flew a
-  whole run at 1.00, which is the only setting that brings the comb — so the threshold has been
-  crossed in anger once and not yet judged.
+- ~~**Rule the scanline threshold.**~~ Gone: the comb is off the gang and the threshold with it.
 
 ---
 

@@ -134,6 +134,7 @@
         display: none;
       }
       #tune .row {
+        margin-top: 12px;
         display: flex;
         gap: 10px;
         align-items: baseline;
@@ -223,9 +224,37 @@
              it. The step is the bench's. -->
         <input id="grade" type="range" min="0" max="1" step="0.05" aria-label="Retro grade" />
         <p class="what">
-          spec 14 §2's whole pass on one knob. 0 is off; 1 is every stage at the ceiling the spec
-          states. Scanlines arrive above 0.60. This session only &mdash; a reload comes back to
-          main, and a dispatch carries whatever it was flown at.
+          spec 14 §2's lift, dither and grain on one knob. 0 is off; 1 is every stage at the ceiling
+          the spec states.
+        </p>
+        <div class="row">
+          <span>SCANLINES</span>
+          <span
+            ><span id="combValue" class="value"></span> <span id="combMain" class="main"></span
+          ></span>
+        </div>
+        <!-- Past spec 14 §2 stage 5's stated 0.06 on purpose: the ceiling is what
+             is being tested, and this panel is dev chrome. -->
+        <input
+          id="comb"
+          type="range"
+          min="0"
+          max="0.3"
+          step="0.01"
+          aria-label="Scanline strength"
+        />
+        <div class="row">
+          <span>COMB PITCH</span>
+          <span
+            ><span id="pitchValue" class="value"></span> <span id="pitchMain" class="main"></span
+          ></span>
+        </div>
+        <!-- Design px between rows. §2 says 2, which is 0.67 CSS px on the phone
+             and below what the eye resolves; a 240p arcade CRT wants about 10. -->
+        <input id="pitch" type="range" min="2" max="24" step="1" aria-label="Scanline pitch" />
+        <p class="what">
+          This session only &mdash; a reload comes back to main, and a dispatch carries whatever it
+          was flown at.
         </p>
       </div>
     </div>

@@ -51,7 +51,7 @@ import { createPresentation, derive } from '../src/state/derive.ts';
 import { attachCanvas, sizeToDisplay } from '../src/render/canvas.ts';
 import { interpolate } from '../src/render/interpolate.ts';
 import { draw } from '../src/render/index.ts';
-import { GRADE } from '../src/render/grade.ts';
+import { GRADE, SCANLINE, SCANLINE_PITCH } from '../src/render/grade.ts';
 import { DIAG_ENDPOINT, buildDispatch } from '../tools/dispatch.ts';
 import { createMeter, frameBegan, frameEnded, timingOf } from '../tools/meter.ts';
 import { bindPress, suppressBrowserGestures, typing } from './input.ts';
@@ -104,6 +104,12 @@ const tune = document.getElementById('tune');
 const grade = document.getElementById('grade');
 const gradeValue = document.getElementById('gradeValue');
 const gradeMain = document.getElementById('gradeMain');
+const comb = document.getElementById('comb');
+const combValue = document.getElementById('combValue');
+const combMain = document.getElementById('combMain');
+const pitch = document.getElementById('pitch');
+const pitchValue = document.getElementById('pitchValue');
+const pitchMain = document.getElementById('pitchMain');
 
 if (target) {
   const context = attachCanvas(target);
@@ -160,7 +166,11 @@ if (target) {
   // shipped value. It deliberately does **not** persist — a coat quietly
   // different from `main`'s across a reload is the staleness `VISION.md`'s
   // seventh pillar is about, and the readout says so whenever it differs.
-  let coat = GRADE;
+  const look: { strength: number; scanline: number; pitch: number } = {
+    strength: GRADE,
+    scanline: SCANLINE,
+    pitch: SCANLINE_PITCH,
+  };
 
   // **Coming back from the background is not elapsed time.** A phone that slept,
   // a tab switched away from and a screen locked all leave `observed` at the
@@ -258,7 +268,7 @@ if (target) {
     }
 
     sizeToDisplay(context);
-    draw(interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK), context, coat);
+    draw(interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK), context, look);
 
     if (readout) {
       // The ending is read off the simulation rather than off presentation
@@ -276,7 +286,9 @@ if (target) {
         // session flown under a coat that is not the game's is a session whose
         // frame timings are not the game's either, and the one way that goes
         // wrong is silently. At the shipped value it says nothing.
-        (coat === GRADE ? '' : ` · grade ${coat.toFixed(2)}`) +
+        (look.strength === GRADE && look.scanline === SCANLINE && look.pitch === SCANLINE_PITCH
+          ? ''
+          : ` · grade ${look.strength.toFixed(2)} · comb ${look.scanline.toFixed(2)}/${look.pitch}`) +
         sent;
     }
 
@@ -304,20 +316,37 @@ if (target) {
     // the one control that exists to be moved mid-run would be the one control
     // that stops the run. It sits in `#chrome` at the top, above the thumb's
     // third (spec 00 §7), and `pointer-events` are granted to it alone.
-    if (grade instanceof HTMLInputElement) {
+    //
+    // **Three knobs and not one**, since 2026-09-03: *"the scanline effect is too
+    // weak"* turned out to be the comb's **pitch** rather than its strength, and
+    // both of those are now the author's to move against a running game rather
+    // than mine to pick. See `SCANLINE_PITCH` in `src/render/grade.ts`.
+    const wire = (
+      input: HTMLElement | null,
+      readout: HTMLElement | null,
+      base: number,
+      places: number,
+      set: (value: number) => void,
+    ): void => {
+      if (!(input instanceof HTMLInputElement)) return;
       const show = (): void => {
-        coat = grade.valueAsNumber;
-        if (gradeValue) gradeValue.textContent = coat.toFixed(2);
+        set(input.valueAsNumber);
+        if (readout) readout.textContent = input.valueAsNumber.toFixed(places);
       };
       // Written from the constant rather than from the markup, so this page
       // cannot state a default that has drifted from the game's.
-      grade.value = String(GRADE);
-      if (gradeMain) gradeMain.textContent = `main ${GRADE.toFixed(2)}`;
+      input.value = String(base);
       show();
       // `input` and not `change`: the coat has to move under the thumb, because
       // what is being judged is the picture and not the number.
-      grade.addEventListener('input', show);
-    }
+      input.addEventListener('input', show);
+    };
+    wire(grade, gradeValue, GRADE, 2, (v) => (look.strength = v));
+    wire(comb, combValue, SCANLINE, 2, (v) => (look.scanline = v));
+    wire(pitch, pitchValue, SCANLINE_PITCH, 0, (v) => (look.pitch = v));
+    if (gradeMain) gradeMain.textContent = `main ${GRADE.toFixed(2)}`;
+    if (combMain) combMain.textContent = `main ${SCANLINE.toFixed(2)}`;
+    if (pitchMain) pitchMain.textContent = `main ${SCANLINE_PITCH}`;
     tuner?.addEventListener('click', () => {
       const open = tune?.hasAttribute('hidden') === true;
       if (open) tune?.removeAttribute('hidden');
@@ -353,7 +382,7 @@ if (target) {
         // *same* build now cost different amounts depending on where the thumb
         // left this slider. A frame timing pooled by `pnpm budget --corpus`
         // without it would be a measurement of a picture nobody can name.
-        grade: coat,
+        grade: look.strength,
         timing: meter && timingOf(meter),
       });
       // The verdict lands in the terminal in front of the laptop, which is where

@@ -61,7 +61,8 @@ import { drawAnomaly } from './anomaly.ts';
 import { drawRungs } from './rungs.ts';
 import { boundaryMotes, drawBoundary } from './boundary.ts';
 import { drawDeadline, drawSos } from './deadline.ts';
-import { applyGrade, GRADE } from './grade.ts';
+import { applyGrade } from './grade.ts';
+import type { GradeLook } from './grade.ts';
 import {
   BODY_FILL,
   CORE,
@@ -1310,11 +1311,12 @@ const LABEL_OFFSET = 22 * BOARD_PIXEL;
  * everything after the second translate is in world units — which is what lets
  * every number in this file be one the design set states.
  *
- * ## `grade` is the one thing here a caller may override, and it is dev-only
+ * ## `look` is the one thing here a caller may override, and it is dev-only
  *
- * It defaults to [`GRADE`](./grade.ts), which is the value the game ships at, so
- * a caller that says nothing gets the shipped coat and cannot get anything else
- * by accident. What the parameter is *for* is the dev panel on the game page
+ * Every field of it defaults to the value the game ships at
+ * ([`grade.ts`](./grade.ts)), so a caller that says nothing — which is what a
+ * production build does — gets the shipped coat and cannot get anything else by
+ * accident. What it is *for* is the dev panel on the game page
  * ([`app/main.ts`](../../app/main.ts)): a coat is judged over a playthrough, the
  * bench is not one, and spec 14 §4 puts the judgement on the phone.
  *
@@ -1327,7 +1329,7 @@ const LABEL_OFFSET = 22 * BOARD_PIXEL;
 export function draw(
   view: PresentationState,
   context: CanvasRenderingContext2D,
-  grade: number = GRADE,
+  look: GradeLook = {},
 ): void {
   const { canvas } = context;
   const fit = letterbox(canvas.width, canvas.height);
@@ -1475,5 +1477,5 @@ export function draw(
   // It is **off on `main`** and asks the canvas for nothing at all in that state,
   // which is the same rule the boundary is held to: absent means nothing asked,
   // not a fill at alpha zero.
-  applyGrade(context, fit.scale, view.tick, grade);
+  applyGrade(context, fit.scale, view.tick, look);
 }

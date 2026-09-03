@@ -17,11 +17,11 @@ renderer spike — the grade is a full-screen pass and is part of what that spik
 > **knob**, not a look"* — and the author then flew it: *"it looks real nice. In the bench I'm
 > running it at 0.45 which seems like a nice balance."*
 >
-> **0.45 is below the scanline threshold**, so two things about §2 follow from the ruled value: the
-> pass costs **one** full-screen composite rather than two, and stage 5's *"off by default until
-> the phone says otherwise"* is now literally satisfied — the phone has said, and it said no. The
-> same knob is on the game page behind a dev-only panel, because a coat is judged over a
+> The same knob is on the game page behind a dev-only panel, because a coat is judged over a
 > playthrough and the bench is not one, and **a dispatch now carries the coat it was flown under**.
+>
+> ⚠ **The comb came off the master on 2026-09-03** and the shipped pass is two composites again;
+> see the scanline notice below.
 >
 > ⚠ **Measured on the phone at grade 1** — `diagnostics/2026-09-03T02-35-03-175Z`, 1 882 frames,
 > the top of the travel with the comb on — a frame with one tick costs **1.18 ms** against the
@@ -100,6 +100,46 @@ renderer spike — the grade is a full-screen pass and is part of what that spik
 > boundary is a place in world space, and a screen-edge darkening would read as a boundary that is
 > not there.
 >
+> ### ⚠ §2 stage 5's **pitch** is overruled, 2026-09-03 — 2 design px is not resolvable
+>
+> > *"I think the scanline effect is too weak right now."* — author, having flown a run at the top
+> > of the master's travel, where the comb was already at §2's full 6%
+>
+> **The strength was not the problem and raising it would not have fixed it.** A 2-design-px pitch
+> is 2 device px on the author's phone (393 css, dpr 3) and so **0.67 CSS px**, with a dark row of
+> 0.33. At that phone's pixel pitch the comb subtends **1.39 arcminutes at 30 cm** against a
+> resolution limit of about one — so the eye integrates it and what lands is a **flat 3% dimming of
+> the whole picture**. That is exactly the *"too weak"* being reported, and more ink at that pitch
+> buys a darker picture and still no scanlines.
+>
+> **And the number the register is imitating is five times larger.** A 240p arcade CRT drew 240
+> visible lines down the screen; §2's 2 px draws **1 266** over the design height. 240 lines wants
+> **10.6**, and the pitch is now **10** — 253 lines, 3.33 CSS px on the author's phone, and 7
+> arcminutes, which is structure the eye resolves rather than texture it averages.
+>
+> | pitch | device px | CSS px | lines | arcmin at 30 cm |
+> |---|---|---|---|---|
+> | **2** · §2 as written | 2 | 0.67 | 1 266 | **1.4** — at the limit |
+> | 6 | 6 | 2.00 | 422 | 4.2 |
+> | **10** · built | 10 | 3.33 | 253 | 7.0 |
+> | 16 | 16 | 5.33 | 158 | 11.2 |
+>
+> **§2's 6% is untouched, and the ink is unchanged.** The dark band used to be one *device* row
+> whatever the pitch was — a 50% duty at a pitch of 2, and a thin scratch at any larger pitch — so
+> it is now half the pitch, which is the same mean darkening at a spatial frequency that can be
+> seen. This is not a louder comb; it is the same comb made visible.
+>
+> ⚠ **Two consequences, both stated rather than smuggled.** The scanlines came **off the master's
+> gang**: ganged, at the shipped 0.45 they would sit at 45% of a strength already called too weak
+> at 100%, so they have their own knob and §2's *"every stage is switchable to zero
+> independently"* is better served than it was by a threshold. And with the comb no longer gated,
+> **the shipped pass is two full-screen composites rather than one** — which the phone measurement
+> above already covers, since that run was flown with both.
+>
+> The pitch and the strength are both on the game page's panel, past §2's 6% deliberately, because
+> what is being tested is whether the ceiling is right. **The final numbers are still the
+> author's.**
+>
 > ### ⚠ §3.4 forbids texture and §2 stage 5 requires a pattern — the reading taken
 >
 > *"No texture except the checker"* (§3.4) and *"scanlines … at a 2-design-px pitch"* (§2 stage 5)
@@ -155,7 +195,7 @@ One full-screen post-process, applied after everything else, in this order:
 | 2 | **Grade** | lift / gamma / gain, per channel | Lift the blacks toward VOID's violet rather than to neutral grey; leave CORE at 1.0 so the craft stays the brightest value |
 | 3 | **Dither** | strength | Ordered 4×4 Bayer, ~1/255 amplitude, applied to the whole frame |
 | 4 | **Grain** | strength, animated | ≤ 3% luminance, resampled per frame. It must not read as noise on a still |
-| 5 | **Scanlines** | strength, pitch | ≤ 6% at a 2-design-px pitch. Off by default until the phone says otherwise |
+| 5 | **Scanlines** | strength, pitch | ≤ 6% at a 2-design-px pitch. Off by default until the phone says otherwise. ⚠ **The pitch is overruled — 10, not 2** (2026-09-03), and the phone has now said it wants them |
 
 Every stage is switchable to zero independently, and the game must be fully legible with the whole
 pass off. The grade is a coat; nothing may depend on it to be readable.

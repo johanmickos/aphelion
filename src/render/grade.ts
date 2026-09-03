@@ -220,29 +220,82 @@ const GRAIN_SEED = 0x9e15;
  * strength, and a scanline is the sky showing between the rows. Toward black it
  * would be a ninth colour, and the one §3.5 reserves.
  */
-const SCANLINE = 0.06;
-const SCANLINE_PITCH = 2;
+export const SCANLINE = 0.06;
 
 /**
- * Where in the master's travel the scanlines start, and it is **an opening
- * position the author should rule**.
+ * How far apart the rows are, in design px.
  *
- * Spec 14 §2 stage 5 is the one stage with a stated default — *"off by default
- * until the phone says otherwise"* — and M3.5's acceptance is *"dialled from off
- * to heavy."* Ganging them behind the master at a threshold is the reading that
- * satisfies both: below this the pass asks the canvas for nothing on their
- * account; above it they ramp to §2's 6% at the top of the travel. So *heavy* is
- * the setting that brings them and the coat below it is the one that does not.
+ * ## ⚠ Spec 14 §2 stage 5 says **2** and 2 is not resolvable, 2026-09-03
  *
- * The alternative is a second slider, which the bench has room for — 58 of 60
- * after this one — and it is what to spend the room on if the threshold turns out
- * to be the wrong shape in the hand. It is the one part of the ganging that is a
- * guess rather than a number the spec states.
+ * > *"I think the scanline effect is too weak right now."* — author, having flown
+ * > a run at the top of the master's travel where the comb is at §2's full 6%
+ *
+ * **The strength was not the problem and raising it would not have fixed it.** A
+ * 2-design-px pitch is 2 device px on the author's phone (dpr 3, 393 css) and
+ * therefore 0.67 CSS px — a dark row 0.33 CSS px wide. At that phone's pixel
+ * pitch the comb subtends **1.39 arcminutes at 30 cm**, against a resolution
+ * limit of about one. So it is not a comb at all: the eye integrates it and what
+ * lands is a **flat 3% dimming of the whole picture**, which is precisely the
+ * *"too weak"* being reported. More ink at that pitch buys a darker picture and
+ * still no scanlines.
+ *
+ * **And the number the register is imitating is five times larger.** A 240p
+ * arcade CRT drew 240 visible lines down the screen; §2's 2 px draws **1 266**
+ * over the design height. 240 lines wants a pitch of **10.6**, and this is that
+ * number rounded — it lands at 253 lines over the design space, 3.33 CSS px on
+ * the author's phone, and **7 arcminutes**, which is structure the eye resolves
+ * rather than texture it averages.
+ *
+ * This overrules the spec's stated 2 and the notice in spec 14 says so. What is
+ * *not* overruled is the 6%: see [`SCANLINE_DUTY`](#scanline_duty) — the ink is
+ * unchanged and only its spatial frequency moved, so this is the same amount of
+ * darkening, spread into bands that can be seen.
  */
-const SCANLINE_FROM = 0.6;
+export const SCANLINE_PITCH = 10;
+
+/**
+ * How much of a pitch the dark band takes — **half**, and it is what keeps the
+ * ink constant while the pitch moves.
+ *
+ * The comb used to be one **device** row dark per pitch, whatever the pitch was.
+ * At a pitch of 2 that is a 50% duty and it is where the *"≤ 6%"* mean dimming
+ * comes from; at a pitch of 10 it would have been 10%, which is a thin scratch
+ * every ten pixels rather than a scanline. So the band is a fraction of the pitch
+ * and not a fixed width, and at 0.5 the frame receives exactly the ink it
+ * received before this changed — `SCANLINE / 2` averaged over the pitch.
+ *
+ * **That is the whole of the fix**: not more darkening, the same darkening at a
+ * spatial frequency the eye can resolve.
+ */
+const SCANLINE_DUTY = 0.5;
 
 /** Nothing is drawn below this: a fill this faint is a screen of paint for no picture. */
 const FLOOR = 0.004;
+
+/**
+ * What a caller may override, and it is **dev-only in practice**.
+ *
+ * Everything here defaults to the value the game ships, so a caller that passes
+ * nothing — which is what a production build does — gets exactly `main`'s coat
+ * and cannot get anything else by accident. What it is *for* is the tuning panel
+ * on the game page ([`app/main.ts`](../../app/main.ts)), because spec 14 §4 puts
+ * the judgement on the phone and a coat is judged over a playthrough.
+ *
+ * **The scanlines are here separately from the master on purpose.** They were
+ * ganged behind it until 2026-09-03 and the author's report is what took them
+ * off: at the shipped 0.45 a ganged comb would sit at 45% of a strength they had
+ * already called too weak at 100%. Spec 14 §2's *"every stage is switchable to
+ * zero independently"* is better served by two knobs than by one with a threshold
+ * in it, and the threshold was the only number in this file nobody had ruled.
+ */
+export interface GradeLook {
+  /** The master — lift, dither and grain. Defaults to [`GRADE`](#grade). */
+  readonly strength?: number;
+  /** The comb's own strength, 0 – 1. Defaults to [`SCANLINE`](#scanline). */
+  readonly scanline?: number;
+  /** The comb's pitch in design px. Defaults to [`SCANLINE_PITCH`](#scanline_pitch). */
+  readonly pitch?: number;
+}
 
 /** What every stage is worth at one master setting. */
 export interface Coat {
@@ -263,15 +316,14 @@ export interface Coat {
  * which holds each stage to its own ceiling, and for the arithmetic in the plan:
  * what a stage **costs** is a census count and what it **is** is this table.
  */
-export function coatAt(strength: number): Coat {
+export function coatAt(strength: number, scanline: number = SCANLINE): Coat {
   const at = Math.max(0, Math.min(1, strength));
   const [r, g, b] = channels(VOID);
-  const comb = (at - SCANLINE_FROM) / (1 - SCANLINE_FROM);
   return {
     lift: [r * LIFT * at, g * LIFT * at, b * LIFT * at],
     dither: DITHER * at,
     grain: GRAIN * 255 * at,
-    scanline: SCANLINE * Math.max(0, Math.min(1, comb)),
+    scanline: Math.max(0, Math.min(1, scanline)),
   };
 }
 
@@ -290,7 +342,7 @@ function adds(coat: Coat): number {
  * frame.
  */
 let additive: CanvasPattern[] = [];
-let comb: CanvasPattern | null = null;
+let combTile: CanvasPattern | null = null;
 /** What the held tiles were cut for, so a frame that changed nothing re-cuts nothing. */
 let cutFor = '';
 
@@ -355,10 +407,17 @@ function cutComb(coat: Coat, pitch: number): CanvasPattern | null {
   if (into === null) return null;
   const [r, g, b] = channels(VOID);
   const image = into.createImageData(1, pitch);
-  image.data[0] = r;
-  image.data[1] = g;
-  image.data[2] = b;
-  image.data[3] = Math.round(coat.scanline * 255);
+  // At least one row dark and at least one row clear, whatever the pitch and the
+  // duty are between them: a comb with no gap is a flat dimming and a comb with
+  // no band is nothing at all, and both are states a slider can otherwise reach.
+  const dark = Math.max(1, Math.min(pitch - 1, Math.round(pitch * SCANLINE_DUTY)));
+  for (let row = 0; row < dark; row++) {
+    const at = row * 4;
+    image.data[at] = r;
+    image.data[at + 1] = g;
+    image.data[at + 2] = b;
+    image.data[at + 3] = Math.round(coat.scanline * 255);
+  }
   into.putImageData(image, 0, 0);
   return into.createPattern(into.canvas, 'repeat');
 }
@@ -380,22 +439,24 @@ export function applyGrade(
   context: CanvasRenderingContext2D,
   scale: number,
   tick: number,
-  strength: number = GRADE,
+  look: GradeLook = {},
 ): void {
   const { canvas } = context;
   if (canvas.width <= 0 || canvas.height <= 0) return;
 
-  const coat = coatAt(strength);
+  const strength = look.strength ?? GRADE;
+  const comb = look.scanline ?? SCANLINE;
+  const coat = coatAt(strength, comb);
   const light = adds(coat);
   const dark = coat.scanline;
   if (light < FLOOR && dark < FLOOR) return;
 
-  const pitch = Math.max(2, Math.round(SCANLINE_PITCH * scale));
-  const wanted = `${strength}:${pitch}`;
+  const pitch = Math.max(2, Math.round((look.pitch ?? SCANLINE_PITCH) * scale));
+  const wanted = `${strength}:${comb}:${pitch}`;
   if (wanted !== cutFor) {
     cutFor = wanted;
     additive = light < FLOOR ? [] : cutAdditive(coat);
-    comb = dark < FLOOR ? null : cutComb(coat, pitch);
+    combTile = dark < FLOOR ? null : cutComb(coat, pitch);
   }
 
   context.save();
@@ -417,9 +478,10 @@ export function applyGrade(
 
   if (dark >= FLOOR) {
     context.globalCompositeOperation = 'source-over';
-    // One row in `pitch` at `scanline`, so the flat stand-in is the same ink
-    // spread over the whole tile — the mean the comb takes away.
-    context.fillStyle = comb === null ? dim(VOID, coat.scanline / pitch) : comb;
+    // The flat stand-in is the same ink spread over the whole tile — the mean the
+    // comb takes away, which is the strength times the duty and is what makes the
+    // pitch change cost-neutral rather than a darkening.
+    context.fillStyle = combTile === null ? dim(VOID, coat.scanline * SCANLINE_DUTY) : combTile;
     context.fillRect(0, 0, canvas.width, canvas.height);
   }
 

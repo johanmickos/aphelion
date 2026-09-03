@@ -19,7 +19,7 @@
  * to paint. Two composites is the number this file pins.
  */
 import { describe, expect, it } from 'vitest';
-import { applyGrade, coatAt, GRADE } from '../../src/render/grade.ts';
+import { applyGrade, coatAt, GRADE, SCANLINE, SCANLINE_PITCH } from '../../src/render/grade.ts';
 import { CORE, VOID, channels } from '../../src/render/palette.ts';
 import { counter } from '../../tools/profile.ts';
 import type { Census } from '../../tools/profile.ts';
@@ -34,7 +34,7 @@ interface Asked {
   readonly composites: string[];
 }
 
-function ask(strength: number, tick = 0): Asked {
+function ask(strength: number, tick = 0, scanline?: number): Asked {
   const into: Census = {
     gradients: 0,
     arcs: 0,
@@ -65,7 +65,7 @@ function ask(strength: number, tick = 0): Asked {
       into.blended += Math.abs(w * h);
     },
   });
-  applyGrade(context, 1, tick, strength);
+  applyGrade(context, 1, tick, scanline === undefined ? { strength } : { strength, scanline });
   return { screens: into.blended / SCREEN, fills, composites };
 }
 
@@ -99,12 +99,11 @@ describe('the retro grade', () => {
    * actually ships, which is the one worth pinning: the two-composite figure is a
    * ceiling nobody is flying.
    */
-  it('costs one full-screen fill at the shipped value, with no comb', () => {
-    expect(coatAt(GRADE).scanline).toBe(0);
+  it('costs two full-screen fills at the shipped value', () => {
     const shipped = ask(GRADE);
-    expect(shipped.fills).toBe(1);
-    expect(shipped.screens).toBe(1);
-    expect(shipped.composites).toEqual(['lighter']);
+    expect(shipped.fills).toBe(2);
+    expect(shipped.screens).toBe(2);
+    expect(shipped.composites).toEqual(['lighter', 'source-over']);
   });
 
   /**
@@ -116,7 +115,18 @@ describe('the retro grade', () => {
    * where the slider's bottom end is and where the dev panel can put it.
    */
   it('asks the canvas for nothing at all when it is off', () => {
-    expect(ask(0)).toEqual({ screens: 0, fills: 0, composites: [] });
+    // **Off is both knobs**, since 2026-09-03: the comb came off the master's
+    // gang when the author reported it too weak, so the master alone no longer
+    // silences it. Spec 14 §2's *"every stage is switchable to zero
+    // independently"* is what this is, and it is better served by two knobs than
+    // by one with a threshold in it.
+    expect(ask(0, 0, 0)).toEqual({ screens: 0, fills: 0, composites: [] });
+  });
+
+  /** And each knob silences its own composite and leaves the other one alone. */
+  it('lets either half go to zero without the other', () => {
+    expect(ask(0).composites).toEqual(['source-over']);
+    expect(ask(1, 0, 0).composites).toEqual(['lighter']);
   });
 
   /**
@@ -134,17 +144,15 @@ describe('the retro grade', () => {
   });
 
   /**
-   * And **one** below the scanline threshold, which is most of the travel. The
-   * comb is the only stage that takes light away, so it is the only one that
-   * cannot share the additive pass.
+   * The comb is the only stage that takes light **away**, so it is the only one
+   * that cannot share the additive pass — which is why the ceiling is two
+   * composites and not one, and why silencing it is what buys the frame back.
    */
-  it('costs one below the scanline threshold', () => {
-    const coat = coatAt(0.5);
-    expect(coat.scanline).toBe(0);
-    const half = ask(0.5);
-    expect(half.fills).toBe(1);
-    expect(half.screens).toBe(1);
-    expect(half.composites).toEqual(['lighter']);
+  it('costs one when the comb is silenced', () => {
+    const quiet = ask(0.5, 0, 0);
+    expect(quiet.fills).toBe(1);
+    expect(quiet.screens).toBe(1);
+    expect(quiet.composites).toEqual(['lighter']);
   });
 
   /**
@@ -153,6 +161,9 @@ describe('the retro grade', () => {
    */
   it('holds every stage to the ceiling spec 14 §2 states for it', () => {
     const full = coatAt(1);
+    // ⚠ Stage 5's *pitch* is the one number here that overrules the spec rather
+    // than honouring it — see `SCANLINE_PITCH`. Its *strength* is untouched.
+    expect(SCANLINE_PITCH).toBeGreaterThan(2);
     // Stage 2: the blacks come up to VOID's violet, which is the sky's own token
     // added to itself. Never to neutral grey — the three channels stay in VOID's
     // own ratio.
@@ -176,18 +187,19 @@ describe('the retro grade', () => {
    * that is a guess rather than a number the spec states, and it is `grade.ts`'s
    * `SCANLINE_FROM`.
    */
-  it('takes every stage to zero, and the scanlines first', () => {
-    const off = coatAt(0);
+  it('takes every stage to zero, on two knobs', () => {
+    const off = coatAt(0, 0);
     expect(off.lift).toEqual([0, 0, 0]);
     expect(off.dither).toBe(0);
     expect(off.grain).toBe(0);
     expect(off.scanline).toBe(0);
-    // The comb is absent for the first three fifths of the travel and arrives
-    // over the last two, so the coat below it is the one without scanlines and
-    // *heavy* is the setting that brings them.
-    expect(coatAt(0.6).scanline).toBe(0);
-    expect(coatAt(0.8).scanline).toBeGreaterThan(0);
-    expect(coatAt(0.8).scanline).toBeLessThan(coatAt(1).scanline);
+    // ⚠ **The comb is not on the master**, since the author reported it too weak
+    // on 2026-09-03. Ganged, at the shipped 0.45 it would have sat at 45% of a
+    // strength they had already called too weak at 100% — so the master drives
+    // the three additive stages and the comb answers to itself.
+    expect(coatAt(0).scanline).toBe(SCANLINE);
+    expect(coatAt(1).scanline).toBe(SCANLINE);
+    expect(coatAt(1, 0).scanline).toBe(0);
   });
 
   /**
