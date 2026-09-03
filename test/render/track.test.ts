@@ -75,6 +75,11 @@ function recorder() {
       pending.push({ x, y });
       traced.push({ x, y });
     },
+    // ⚠ **A polyline records as its segments.** This used to `pop` the pending
+    // point, so `moveTo, lineTo, lineTo` recorded one line and dropped the rest —
+    // invisible while the deadline stroked one segment at a time, and wrong the
+    // moment it stopped, which it did on 2026-09-03 to stop the round caps
+    // beading at every joint. The last point is carried instead.
     lineTo(x: number, y: number) {
       traced.push({ x, y });
       const from = pending.pop();
@@ -86,6 +91,7 @@ function recorder() {
         width: context.lineWidth,
         dash: [...context.dash],
       });
+      pending.push({ x, y });
     },
     arc: (x: number, y: number, radius: number) => {
       arcs.push({ x, y, radius });
@@ -191,47 +197,54 @@ const plate = (lines: readonly Line[]): Line[] =>
 
 describe('the track', () => {
   /**
-   * ⚠ **The weight goes where the decision is** (author, 2026-09-01): *"it's
-   * really long, impacting my normal playing field... it should only appear
-   * closer to the boundary."*
+   * ## ⚠ Rebuilt as a window, 2026-09-03
    *
-   * The prototype's answer, and it is not a shorter line: the track still reaches
-   * the craft, because *"a 150px clamp drew a segment sitting a quarter of a
-   * screen ahead of the ship, touching nothing"* — but it is a **hairline** until
-   * it is near the cross. Asserted as the profile, over a track long enough to
-   * have both ends in it.
+   * > *"I want the deadline to look like the compass windows, because that's a
+   * > familiar pattern."* — author
+   *
+   * Spec 03 §5 asked for this from the start — *"the deadline is the compass
+   * inverted… same window-and-dot grammar"* — and what M3.4 built was one stroke
+   * tapering from a hairline to a lead-in, which has no window in it. So the
+   * assertion is the compass's two marks: **a thin line the whole way, and a fat
+   * band over the stretches where a press still saves.**
    */
-  it('is a hairline far from the dot and thickens into it', () => {
-    const far = track(new Array<boolean>(40).fill(true));
-    // Spread the samples so the track is much longer than the arm.
-    const long: DeadlineView = {
-      ...far,
-      path: far.path.map((p, at) => ({ ...p, x: 100 + at * 60 })),
-      cross: { x: 100 + 39 * 60, y: 200 },
-    };
-    const lines = ink(drawn(long).lines);
-    const first = lines[0]!;
-    const last = lines[lines.length - 1]!;
-    expect(last.width).toBeGreaterThan(first.width * 1.5);
-    expect(alphaOf(last.stroke)).toBeGreaterThan(alphaOf(first.stroke) * 1.5);
-    // And the far end is still drawn — it is the connection to the craft.
-    expect(first.width).toBeGreaterThan(0);
-    expect(alphaOf(first.stroke)).toBeGreaterThan(0);
+  it('draws a thin line the whole way and a fat window on the part that saves', () => {
+    const it = drawn(track([true, true, false, false, true, true]));
+    const lines = ink(it.lines);
+    const widths = [...new Set(lines.map((l) => l.width))].sort((a, b) => a - b);
+    // Exactly two weights, and they are the compass's — `RING_WIDTH` and
+    // `WINDOW_WIDTH`, one board pixel and three.
+    expect(widths).toHaveLength(2);
+    expect(widths[1]! / widths[0]!).toBe(3);
+
+    const line = lines.filter((l) => l.width === widths[0]!);
+    const window = lines.filter((l) => l.width === widths[1]!);
+    // The line is drawn over every segment; the window only over segments whose
+    // **both** ends save — here the first pair and the last, with the two-sample
+    // gap between them taking three segments out.
+    expect(line).toHaveLength(5);
+    expect(window).toHaveLength(2);
+    // And the window is the brighter of the two, as a compass window is against
+    // its ring.
+    expect(alphaOf(window[0]!.stroke)).toBeGreaterThan(alphaOf(line[0]!.stroke));
   });
 
   /**
-   * The gaps are drawn, faintly. They are part of the shape — the saveable stretch
-   * has holes in it — but they are not the offer.
+   * **A gap is absence, not a dimmer copy.** Spec 03 §5's own notice rules the
+   * window plural — 8% of doomed drifts hold more than one — so what a gap has to
+   * do is separate two windows, and nothing separates better than nothing.
    */
-  it('draws the stretches that save brighter than the gaps between them', () => {
-    const lines = ink(drawn(track([true, true, false, false, true, true])).lines);
-    const bright = lines.filter((l) => alphaOf(l.stroke) > 0.1);
-    const faint = lines.filter((l) => alphaOf(l.stroke) <= 0.1);
-    expect(bright.length).toBeGreaterThan(0);
-    expect(faint.length).toBeGreaterThan(0);
-    expect(Math.min(...bright.map((l) => alphaOf(l.stroke)))).toBeGreaterThan(
-      Math.max(...faint.map((l) => alphaOf(l.stroke))),
-    );
+  it('draws no window where a press does not save, and keeps the line there', () => {
+    const it = drawn(track([true, true, false, false, true, true]));
+    const lines = ink(it.lines);
+    const widths = [...new Set(lines.map((l) => l.width))].sort((a, b) => a - b);
+    const window = lines.filter((l) => l.width === widths[1]!);
+    const line = lines.filter((l) => l.width === widths[0]!);
+    // Segment 2 is the gap — sample 2 does not save — so no window covers it and
+    // the line still does.
+    const gapAt = 100 + 2 * 20;
+    expect(window.some((l) => l.from.x === gapAt)).toBe(false);
+    expect(line.some((l) => l.from.x === gapAt)).toBe(true);
   });
 
   /** It stops at the dot: the stretch past the last saving press is not a decision. */
@@ -274,51 +287,32 @@ describe('the track', () => {
  * exactly where the decision it marks is. Spec 00 §6's answer, and the SOS's:
  * darken the ground, do not change the ink.
  */
-describe('the plate under the track', () => {
-  it('lays VOID under every stretch of ink, and wider than it', () => {
+/**
+ * ## ⚠ There is no plate, 2026-09-03
+ *
+ * > *"I also don't love our dark background for the deadline, it's even harder to
+ * > see what it is."* — author
+ *
+ * A VOID plate went under the track on 2026-09-02 against a real measurement —
+ * the cue loses 40% of its contrast at the line, where the decision is. It
+ * answered the contrast and cost the shape: a dark edging either side of a
+ * 2.4-unit ink makes the *casing* the widest part of the mark, so *hard to see*
+ * became *hard to see what it is*.
+ *
+ * What replaces it is width — the window is 9 design units where the track was
+ * 2.4. These assertions are the ruling's inverse, so a plate cannot come back
+ * without this file being edited on purpose.
+ */
+describe('the plate the track no longer has', () => {
+  it('lays no VOID under the ink anywhere', () => {
     const it = drawn(track([true, true, false, true]));
-    const under = plate(it.lines);
-    const over = ink(it.lines);
-    expect(under).toHaveLength(over.length);
-    for (let at = 0; at < over.length; at++) {
-      // The same stretch of line, so the plate cannot drift off the ink.
-      expect(under[at]!.from.x).toBeCloseTo(over[at]!.from.x, 6);
-      expect(under[at]!.to.x).toBeCloseTo(over[at]!.to.x, 6);
-      expect(under[at]!.width).toBeGreaterThan(over[at]!.width);
-    }
+    expect(plate(it.lines)).toHaveLength(0);
   });
 
-  /**
-   * **It follows the ink's own fading.** A stretch the track draws faintly because
-   * no press there saves would otherwise get a full-strength dark line under it,
-   * which is a shadow with nothing in it.
-   */
-  it('goes as faint as the stretch it is under', () => {
-    const it = drawn(track([true, true, false, false, true, true]));
-    const under = plate(it.lines);
-    const over = ink(it.lines);
-    const dim = over
-      .map((line, at) => (alphaOf(line.stroke) <= 0.1 ? at : -1))
-      .filter((at) => at >= 0);
-    const lit = over
-      .map((line, at) => (alphaOf(line.stroke) > 0.1 ? at : -1))
-      .filter((at) => at >= 0);
-    expect(dim.length).toBeGreaterThan(0);
-    expect(lit.length).toBeGreaterThan(0);
-    expect(Math.max(...dim.map((at) => alphaOf(under[at]!.stroke)))).toBeLessThan(
-      Math.min(...lit.map((at) => alphaOf(under[at]!.stroke))),
-    );
-  });
-
-  /** And it is under the dot too, which is the one place the eye is sent. */
-  it('is under the dot as well', () => {
+  it('lays none under the dot either', () => {
     const it = drawn(track([true, true, false]));
-    const under = it.dots.filter((d) => tokenOf(d.fill) === VOID.toUpperCase());
-    const over = it.dots.filter((d) => tokenOf(d.fill) === ION.toUpperCase());
-    expect(under).toHaveLength(1);
-    expect(over.length).toBeGreaterThan(0);
-    expect(under[0]!.radius).toBeGreaterThan(Math.max(...over.map((d) => d.radius)));
-    expect(under[0]!.x).toBeCloseTo(over[0]!.x, 6);
+    expect(it.dots.filter((d) => tokenOf(d.fill) === VOID.toUpperCase())).toHaveLength(0);
+    expect(it.dots.filter((d) => tokenOf(d.fill) === ION.toUpperCase()).length).toBeGreaterThan(0);
   });
 });
 
@@ -328,9 +322,8 @@ describe('the dot', () => {
     // A filled core inside a ring, so it reads as a place rather than a blob.
     expect(it.dots.length).toBeGreaterThan(0);
     for (const dot of it.dots) expect(dot.x).toBeCloseTo(100 + 3 * 20, 6);
-    // The plate first, then the ink inside it.
-    expect(tokenOf(it.dots[0]!.fill)).toBe(VOID.toUpperCase());
-    expect(it.dots.filter((d) => tokenOf(d.fill) === ION.toUpperCase()).length).toBeGreaterThan(0);
+    // ION throughout: the plate that used to sit under it is gone.
+    for (const dot of it.dots) expect(tokenOf(dot.fill)).toBe(ION.toUpperCase());
   });
 });
 
@@ -345,10 +338,6 @@ describe('the fade', () => {
     const half = drawn(track([true, true, false], { presence: 0.5 }));
     const full = drawn(track([true, true, false], { presence: 1 }));
     expect(alphaOf(ink(half.lines)[0]!.stroke)).toBeLessThan(alphaOf(ink(full.lines)[0]!.stroke));
-    // The plate comes up with it, or a faint track would arrive on a hard shadow.
-    expect(alphaOf(plate(half.lines)[0]!.stroke)).toBeLessThan(
-      alphaOf(plate(full.lines)[0]!.stroke),
-    );
     const lit = (dots: readonly Dot[]): Dot =>
       dots.filter((d) => tokenOf(d.fill) === ION.toUpperCase())[0]!;
     expect(lit(half.dots).alpha).toBeLessThan(lit(full.dots).alpha);

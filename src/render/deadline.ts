@@ -58,77 +58,82 @@ import { ION, VOID, dim } from './palette.ts';
  */
 
 /**
- * How far from the cross the track stops being a hairline, in design units — the
- * prototype's **150** of its own, converted.
+ * The projected line and the window on it — **spec 03 §5's own grammar, and the
+ * compass's**, in the compass's own two weights.
+ *
+ * ## ⚠ Rebuilt as a window, 2026-09-03
+ *
+ * > *"I want the deadline to look like the compass windows, because that's a
+ * > familiar pattern. Take a look at the original prototype."* — author
+ *
+ * **The spec asked for this and what was built was a taper.** §5's first sentence
+ * is *"the deadline is the compass inverted… same window-and-dot grammar the
+ * player already reads"*, and its table has a **window** row and a **dot** row.
+ * What M3.4 built instead was one continuous stroke swelling from a hairline at
+ * the far end to a lead-in at the cross — a shape with no window in it, so the
+ * one thing the player was meant to recognise was the one thing missing.
+ *
+ * So there are two marks now and they are [`drawRing`](./index.ts)'s two:
+ *
+ * | the compass | the deadline |
+ * |---|---|
+ * | the ring — the whole orbit, thin and even | the line — the whole projected path |
+ * | the window — where a release arrives well | the window — where a press still saves |
+ * | the dot — the best release | the dot — the last press that can |
+ *
+ * The widths are the compass's, so the resemblance is literal rather than
+ * approximate: `RING_WIDTH` is 1 board pixel and `WINDOW_WIDTH` 3, and these are
+ * those. **The prototype draws its own the same way** — a variable-width ribbon
+ * in its hazard colour with the width carrying the meaning, and no casing under
+ * it at all.
  */
-const ARM = 150 * BOARD_PIXEL;
-
-/** And where it swells into the lead-in — the prototype's **46**. */
-const LEAD_LENGTH = 46 * BOARD_PIXEL;
+const LINE_WIDTH = 1 * BOARD_PIXEL;
+const WINDOW_WIDTH = 3 * BOARD_PIXEL;
 
 /**
- * The three weights and the three alphas, all the prototype's own.
+ * How loud the line is against the window — the compass's own ratio.
  *
- * `HAIR` is what is left of a width at the far end, so the track never vanishes —
- * it is a connection to the craft rather than a floating segment. `DEAD` is what a
- * stretch that does **not** save is drawn at: present, because the gaps are part
- * of the shape, and faint, because they are not the offer.
+ * `drawRing` puts its ring at E1 and its window at `WINDOW_AT_REST` rising to 1,
+ * which is roughly a third against most of the way up. These are that, and the
+ * line stays visible where no window is drawn so the path is never a broken
+ * thing with gaps of nothing between its pieces.
  */
-const HAIR = 0.55;
-const DEAD = 0.18;
-const TRACK_WIDTH = 0.8 * BOARD_PIXEL;
-const LEAD_WIDTH = 1.3 * BOARD_PIXEL;
-const TRACK_ALPHA = 0.45;
-const LEAD_ALPHA = 1;
+const LINE_ALPHA = 0.35;
+const WINDOW_ALPHA = 1;
 
-/**
- * How loud the whole cue is — the prototype's `deadlineAlpha`, and it is one
- * number on purpose.
- *
- * Everything above is a fraction of it, *"so the cue has ONE overall"*. Turning
- * the deadline down is one edit rather than six.
- */
 const OVERALL = 0.5;
 
 /**
- * How dark the ground under the track is made, and how far the dark reaches past
- * the ink — **spec [00 · §6](../../docs/spec/00-tokens.md)'s plate, drawn along a
- * line instead of behind a word.**
+ * ## ⚠ The plate is gone, 2026-09-03 — it was hiding the thing it lit
  *
- * ## ⚠ The ground caught up with the ink, 2026-09-02
+ * > *"I also don't love our dark background for the deadline, it's even harder to
+ * > see what it is."* — author
  *
- * > *"The deadline is hard to see against the ion background along the edge."*
- * > — author
+ * A VOID plate went under the track on 2026-09-02, and the measurement behind it
+ * was right: at the line the wash composites to `rgb(157, 60, 105)` and the
+ * track's lead-in to `rgb(159, 61, 107)`, the same three numbers, so the cue lost
+ * 40% of its contrast exactly where the decision it marks is. The plate restored
+ * the lead-in to 2.50:1 and moved nothing in the open field.
  *
- * **Measured, and the cue's own token is what does it.** The boundary's wash is
- * ION over VOID rising to α 0.6 at the line ([`boundary.ts`](./boundary.ts)), and
- * the track is ION. At the line, full heat, the ground is `rgb(157, 60, 105)` and
- * the track's brightest part — the lead-in — composites to `rgb(159, 61, 107)`.
- * **The same three numbers.** As a contrast ratio the lead-in falls from 2.48:1 in
- * the open field to **1.53:1** at the line, and the track behind it from 1.36:1 to
- * **1.22:1**, so the instrument is faintest exactly where the decision it marks
- * is.
+ * **It answered the contrast and cost the shape.** A dark edging either side of a
+ * 2.4-unit ink is a mark whose *widest* part is the casing, so what the eye finds
+ * first is a dark line with something in it — and the complaint it caused is a
+ * sharper one than the complaint it fixed: *hard to see* became *hard to see what
+ * it is*.
  *
- * This is [`SOS_PLATE`](#plate_strength)'s problem one instrument along and it
- * takes the same answer, for the reason spec 00 §6 gives: *darken the ground, do
- * not change the ink.* Raising the track's own alpha was measured against this and
- * refused — at `OVERALL` 1 the lead-in reaches 7.01:1 in the open field, which is
- * the *"bright red line is not helpful"* the author already refused, and still
- * only 2.25:1 at the line. The plate restores **2.50:1 at the line and changes
- * nothing in the open field**, which is the shape a fix for this should have: it
- * removes the ground's influence rather than shouting over it.
+ * **What replaces it is width.** The window above is **9 design units** where the
+ * track it replaces was 2.4 — nearly four times the ink, at the compass's own
+ * weight. Contrast ratio is a property of two colours and is unchanged by that;
+ * legibility is not, and a band four times wider is readable at a ratio a
+ * hairline is not. ⚠ **Stated rather than assumed**: nobody has measured the wide
+ * band against the wash the way the hairline was measured, and the honest test is
+ * a flight along the edge. If it is still lost there, the answer is more likely
+ * §5's own *luminance* row than a casing.
  *
- * At the SOS plate's own **0.82** — [`PLATE_STRENGTH`](#plate_strength) below,
- * stated twice rather than shared because they are the same *ruling* and not the
- * same *number*: one is behind a word and one is along a line, and the day one of
- * them moves the other should not follow it silently. And it fades with everything
- * else, because a plate under a stretch of track that is dim from having no press
- * that saves would be a dark line with nothing in it.
+ * The **SOS** keeps its plate. It is a word on a busy field and spec 00 §6's
+ * ruling is about type; this was that ruling borrowed for a line, and the borrow
+ * is what did not hold.
  */
-const CASING = 0.82;
-
-/** How far the plate reaches past the ink, each side. Enough to read as an edge. */
-const CASING_EDGE = 1 * BOARD_PIXEL;
 
 /**
  * How dim the part of the track the tank cannot afford is drawn.
@@ -239,59 +244,72 @@ export function drawDeadline(context: CanvasRenderingContext2D, track: DeadlineV
 
   context.save();
   context.lineCap = 'round';
-  // One stroke per segment, because every segment has its own weight and its own
-  // alpha — which is the whole point of the profile.
-  for (let at = 0; at + 1 < upto.length; at++) {
-    const one = upto[at]!;
-    const two = upto[at + 1]!;
+  // **Two passes, and they are the compass's two.** The line is the ring — the
+  // path you are on, thin and even the whole way — and the windows are the
+  // windows, fat and bright over the stretches where a press still saves. See
+  // [`WINDOW_WIDTH`](#window_width).
+  //
+  // The line goes down first so a window is drawn *over* its own stretch of it,
+  // which is the order `drawRing` uses for exactly the same two marks.
+  const alphaAt = (at: number): number => {
     const away = (toCross[at]! + toCross[at + 1]!) / 2;
-    // Hairline to track over the stretch between the two lengths, then track to
-    // lead-in over the final one.
-    const swell = smoothstep((ARM - away) / (ARM - LEAD_LENGTH));
-    const body = HAIR + (1 - HAIR) * swell;
-    const nose = away < LEAD_LENGTH ? 1 - away / LEAD_LENGTH : 0;
-    const lit = one.saves && two.saves ? 1 : DEAD;
     // **Fuel, by luminance and never geometry** (spec 03 §5): the part of the
     // track the tank can afford stays lit and the rest goes faint, measured from
     // the craft — *"half a tank lights the early half."* Nothing takes this path
     // today; it is here so M4.4 changes a number rather than this file.
     const along = 1 - away / Math.max(1e-6, toCross[0]!);
-    const afford = along <= track.affordable ? 1 : UNAFFORDABLE;
-    const width = (TRACK_WIDTH + LEAD_WIDTH * nose) * body;
-    const segment = (): void => {
-      context.beginPath();
-      context.moveTo(one.x, one.y);
-      context.lineTo(two.x, two.y);
-      context.stroke();
-    };
-    // **The plate first**, following the ink's own shape and its own fading, so a
-    // stretch that is dim because no press there saves does not get a full-strength
-    // dark line under it. See [`CASING`](#casing).
-    context.lineWidth = width + 2 * CASING_EDGE;
-    context.strokeStyle = dim(VOID, CASING * track.presence * body * lit * afford);
-    segment();
-    context.lineWidth = width;
-    context.strokeStyle = dim(
-      ION,
-      OVERALL *
-        track.presence *
-        (TRACK_ALPHA + (LEAD_ALPHA - TRACK_ALPHA) * nose) *
-        body *
-        lit *
-        afford,
-    );
-    segment();
-  }
+    return along <= track.affordable ? 1 : UNAFFORDABLE;
+  };
+  /**
+   * One path per **run** of segments that share a strength, not one per segment.
+   *
+   * ⚠ **Per-segment strokes bead.** Consecutive segments share a round cap, so
+   * every joint composites twice and a 9-unit window at alpha 0.5 reads as a
+   * chain of dots rather than a band. The plate's own notice predicted exactly
+   * this a day before the ink inherited it — *"if it reads as beading, the fix is
+   * one path at a single width rather than one per segment"* — and at the
+   * compass's window weight it is unmissable.
+   *
+   * A run ends where the strength changes, which is at a `saves` boundary or at
+   * the fuel threshold, so the two things that vary along the track still do.
+   */
+  const runs = (want: (at: number) => number): void => {
+    let from = 0;
+    while (from + 1 < upto.length) {
+      const strength = want(from);
+      let to = from + 1;
+      while (to + 1 < upto.length && want(to) === strength) to++;
+      if (strength > 0) {
+        context.strokeStyle = dim(ION, strength);
+        context.beginPath();
+        context.moveTo(upto[from]!.x, upto[from]!.y);
+        for (let at = from + 1; at <= to; at++) context.lineTo(upto[at]!.x, upto[at]!.y);
+        context.stroke();
+      }
+      from = to;
+    }
+  };
+
+  context.lineJoin = 'round';
+  context.lineWidth = LINE_WIDTH;
+  runs((at) => OVERALL * track.presence * LINE_ALPHA * alphaAt(at));
+
+  context.lineWidth = WINDOW_WIDTH;
+  // **A window is where a press saves**, and the gaps between them are not drawn
+  // at all rather than drawn faint. Spec 03 §5's own notice rules the window
+  // **plural** — 8% of doomed drifts hold more than one — so what the gaps have
+  // to do is separate two windows, which absence does better than a dimmer copy
+  // of the same band.
+  runs((at) =>
+    upto[at]!.saves && upto[at + 1]!.saves
+      ? OVERALL * track.presence * WINDOW_ALPHA * alphaAt(at)
+      : 0,
+  );
 
   // The dot: a filled core inside a ring, so it reads as a place rather than a
   // blob — and it lands **on** the end of the track.
   const at = track.cross;
-  context.globalAlpha = 1;
-  context.fillStyle = dim(VOID, CASING * track.presence);
-  context.beginPath();
-  context.arc(at.x, at.y, DOT_RADIUS + CASING_EDGE, 0, Math.PI * 2);
-  context.fill();
-  context.globalAlpha = track.presence * OVERALL * LEAD_ALPHA;
+  context.globalAlpha = track.presence * OVERALL;
   context.fillStyle = ION;
   context.beginPath();
   context.arc(at.x, at.y, DOT_RADIUS - DOT_RING, 0, Math.PI * 2);
@@ -308,12 +326,6 @@ export function drawDeadline(context: CanvasRenderingContext2D, track: DeadlineV
 function lastSaving(track: DeadlineView): number {
   for (let at = track.path.length - 1; at >= 0; at--) if (track.path[at]!.saves) return at;
   return -1;
-}
-
-/** The prototype's own easing between two ends, and the one `decay.ts` uses. */
-function smoothstep(at: number): number {
-  const x = Math.max(0, Math.min(1, at));
-  return x * x * (3 - 2 * x);
 }
 
 /**

@@ -275,53 +275,45 @@ describe('spec 14 §3’s stroke-weight rule', () => {
   });
 
   /**
-   * ## ⚠ And the list between the two floors, which is the author's to rule
+   * ## ⚠ The list between the two floors is empty, and it closed twice
    *
    * Spec 14 §3.1 has **two** floors — 1.5 design px for *"anything the player is
-   * expected to read as a line"* and 1 px for *"structure (rungs, rings at
-   * rest)"* — and it does not say which of the two a **track** is.
+   * expected to read as a line"* and 1 px for *"structure"* — and it does not say
+   * which a **track** is. For a day the deadline's hairline sat between them at
+   * `TRACK_WIDTH × HAIR` = 1.32, and this test named it rather than picking.
    *
-   * The deadline's hairline is `TRACK_WIDTH × HAIR` = `0.8 × BOARD_PIXEL × 0.55`
-   * = **1.32 design units**, which is above the structure floor and below the
-   * readable one. It is the far end of the track, where the width has thinned to
-   * `HAIR` *"so the track never vanishes — it is a connection to the craft rather
-   * than a floating segment"* ([`deadline.ts`](../../src/render/deadline.ts)).
+   * It closed twice on 2026-09-03, in the same sitting:
    *
-   * The two readings give opposite answers and neither is obviously wrong:
+   * 1. **The author ruled it** — *"the hairline is not really noticeable, but I
+   *    think that's OK."* A track is **structure**, so 1 px binds and 1.32 was
+   *    always inside the rule.
+   * 2. **And then it stopped existing.** The deadline was rebuilt to spec 03 §5's
+   *    window-and-dot grammar in the same sitting, which replaced the taper with
+   *    the compass's own two weights — 3 and 9 design units — so the render layer
+   *    now has nothing at all between the floors.
    *
-   *   - a track is **read as a line** — it is spec 03 §5's instrument, the thing
-   *     the player is deciding against — so 1.5 binds and `HAIR` rises to 0.63,
-   *     which widens the far end by 14%;
-   *   - a track is **structure** — the hairline is deliberately the part that is
-   *     *not* the offer, and the lead-in at 6.3 design px is what is read — so 1
-   *     binds and nothing moves.
-   *
-   * **This test asserts the list rather than picking**, so the day it is ruled
-   * the number moves on purpose. A *new* stroke arriving in this band fails here
-   * and gets the same question asked of it.
+   * The assertion is the empty list rather than the ruling, because the ruling is
+   * what makes an empty list *correct* rather than merely current: a new stroke
+   * arriving in this band is a thing to look at, and it fails here.
    */
   it('names every width between the structure floor and the readable one', () => {
     const between = [...SEEN.values()]
       .filter((seen) => seen.narrowest >= STRUCTURE && seen.narrowest < READABLE)
-      // Rounded to hundredths, because a width is a design-unit measurement and
-      // `0.8 * 3 * 0.55` lands on 1.3200000000000003. The floor either side of
-      // it is checked against the unrounded number above and below.
       .map((seen) => `${seen.site.file} ${seen.what} at ${seen.narrowest.toFixed(2)}`)
       .sort();
-    expect(between).toEqual(['src/render/deadline.ts drawDeadline at 1.32']);
+    expect(between).toEqual([]);
   });
 
   /**
-   * And the hairline is bounded by arithmetic as well as by the run, because the
-   * corpus can only ever say *this narrow was asked for* and never *no narrower
-   * is possible*. `width = (TRACK_WIDTH + LEAD_WIDTH × nose) × body` with `nose`
-   * at zero and `body` at `HAIR` is the floor of that expression, and the run
-   * reaches it.
+   * And the deadline's own thinnest stroke is now the compass's **ring** weight,
+   * which is what it was rebuilt to resemble — a board pixel, above both floors.
    */
-  it('reaches the hairline’s own floor', () => {
-    const track = [...SEEN.values()].find(
-      (seen) => seen.site.file === 'src/render/deadline.ts' && seen.narrowest < READABLE,
-    );
-    expect(track?.narrowest).toBeCloseTo(0.8 * 3 * 0.55, 10);
+  it('draws the deadline at the compass’s own two weights', () => {
+    const widths = [...SEEN.values()]
+      .filter((seen) => seen.site.file === 'src/render/deadline.ts')
+      .map((seen) => seen.narrowest)
+      .sort((a, b) => a - b);
+    expect(widths.length).toBeGreaterThan(0);
+    expect(Math.min(...widths)).toBeGreaterThanOrEqual(READABLE);
   });
 });

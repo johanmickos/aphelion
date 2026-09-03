@@ -140,6 +140,44 @@ that the press is steering, before the first orbit ever forms.
 >   58% hold one window, **8% hold more than one** as a second body comes into range, and 34% hold
 >   none. Every one is drawn (author) — drawing only the last would tell a player who *can* save that
 >   the chance is still ahead of them.
+> ### ⚠ Rebuilt as the window it always said it was, 2026-09-03
+>
+> > *"I want the deadline to look like the compass windows, because that's a familiar pattern. Take
+> > a look at the original prototype."* … *"I also don't love our dark background for the deadline,
+> > it's even harder to see what it is."* — author
+>
+> **This section asked for a window and what M3.4 built was a taper.** The first sentence above is
+> *"same window-and-dot grammar the player already reads"* and the table has a **window** row; what
+> shipped was one continuous stroke swelling from a 1.32-unit hairline at the far end to a lead-in
+> at the cross, which has no window in it — so the one thing the player was meant to recognise was
+> the one thing missing.
+>
+> It is now [`drawRing`](../../src/render/index.ts)'s two marks, at `drawRing`'s own two weights:
+>
+> | the compass | the deadline |
+> |---|---|
+> | the ring — the whole orbit, thin and even, 1 board px | the **line** — the whole projected path, 1 board px |
+> | the window — where a release arrives well, 3 board px | the **window** — where a press still saves, 3 board px |
+> | the dot — the best release | the dot — the last press that can |
+>
+> A **gap is absence** rather than a dimmer copy of the band, which is what makes the plural window
+> read as plural. The prototype draws its own the same way — a variable-width ribbon in its hazard
+> colour, with width carrying the meaning and no casing under it.
+>
+> **The plate is gone with it.** It went in on 2026-09-02 against a real measurement — at the line
+> the cue loses 40% of its contrast — and it answered the contrast and cost the shape: dark edging
+> either side of a 2.4-unit ink makes the *casing* the widest part of the mark, so *hard to see*
+> became *hard to see what it is*. What replaces it is width: the window is 9 design units where the
+> track was 2.4. ⚠ **Contrast ratio is a property of two colours and is unchanged by that** — a
+> wider band is legible at a ratio a hairline is not, but nobody has measured the wide band against
+> the wash the way the hairline was measured, and the test is a flight along the edge. If it is
+> still lost there, the answer is more likely this table's own **luminance** row than a casing.
+>
+> **And spec 14 §3.1's open question closed with it.** The author ruled the hairline acceptable —
+> *"not really noticeable, but I think that's OK"*, so a track is **structure** and 1 px binds — and
+> the rework then removed the hairline entirely. `test/render/strokes.test.ts` now finds nothing at
+> all between the two floors.
+>
 > - **Past the dot is not dashed.** Refused with the dashes that were on spec 07's bands. The track
 >   goes out and the SOS takes over: one predicate, two presentations. The spent part of the line is
 >   history, and spec 05 §6 rules there are no breadcrumbs anywhere in this game.

@@ -190,6 +190,16 @@ renderer spike — the grade is a full-screen pass and is part of what that spik
 > as structure**, 1 binds and nothing moves. The test asserts the list rather than picking, so the
 > day it is ruled the number moves on purpose — and a *new* stroke arriving in that band fails and
 > gets the same question asked of it.
+>
+> #### ⚠ Ruled, 2026-09-03 — a track is **structure**, and then it stopped mattering
+>
+> > *"The hairline is not really noticeable, but I think that's OK."* — author
+>
+> So 1 px binds and 1.32 was always inside the rule. **And the same sitting removed it**: the
+> deadline was rebuilt to spec [03 · §5](./03-hud.md)'s window-and-dot grammar, which replaced the
+> taper with the compass's own two weights — 3 and 9 design units — so the render layer now has
+> **nothing at all** between the two floors. `test/render/strokes.test.ts` asserts the empty list,
+> and the ruling is what makes empty *correct* rather than merely current.
 
 ---
 
