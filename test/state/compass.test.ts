@@ -134,7 +134,12 @@ describe('the five states of one swing', () => {
     for (const ring of armed.rings) {
       expect(ring.radius - armed.anchor).toBeGreaterThanOrEqual(RING_INNER - 1e-9);
     }
-    expect(armed.reach).toBeGreaterThan(armed.rings.at(-1)!.radius);
+    // ⚠ **The hand ends ON the outermost ring**, where its last crossing sits —
+    // the author's overrule of spec 00 §6's *"extended outward past the outermost
+    // ring"*, 2026-09-03: *"it extends past the last orb and looks a bit odd."*
+    // Equality rather than a bound, because what was removed was a 36-unit tail
+    // with nothing drawn on it, and a bound would let it come back.
+    expect(armed.reach).toBe(armed.rings.at(-1)!.radius);
   });
 
   /** States 3 and 4 · CLOSING and MATCHED. A window heats **in place**. */

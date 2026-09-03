@@ -124,25 +124,35 @@ export const STACK_GAP = 20 * BOARD_PIXEL;
  * ring is the nearer hop — and that is the reading spec 00 §6 asks the stack for.
  * Two rings the eye can separate beat one pair it cannot.
  *
- * **Sixteen board pixels, and it is derived rather than chosen** — *"the minimum
- * distance between compass orbit rings should be slightly larger, they're a bit
- * crowded"* (author, 2026-08-29), against an eight that was a guess. What has to
- * fit between two rings is the widest either is ever drawn: a window is
- * `WINDOW_WIDTH × (1 + aim)`, so **18 design units** at full aim, and a crossing
- * dot is **15** across. Sixteen board pixels is 48 units — a window's full width
- * clear of a window, or two dots and a half — so two neighbouring rings never
- * touch even when both are lit and both are being aimed at, which is exactly the
- * moment they are hardest to tell apart.
+ * **It is derived rather than chosen** — *"the minimum distance between compass
+ * orbit rings should be slightly larger, they're a bit crowded"* (author,
+ * 2026-08-29), against an eight that was a guess. What has to fit between two
+ * rings is the widest either is ever drawn: a window is `WINDOW_WIDTH × (1 +
+ * aim)`, so **18 design units** at full aim, and a crossing dot is **15** across.
+ * Two neighbouring rings must not touch even when both are lit and both are being
+ * aimed at, which is exactly the moment they are hardest to tell apart.
  *
- * **It costs the stack very little**, and that is measured: a three-ring stack is
- * now at least 96 design units tall before distance says anything, against an
- * outermost ring that sits at p50 **384** and never past **940**, in a picture
- * with 1 266 units above the craft. The room was there.
+ * ## ⚠ Two thirds, ruled by the author 2026-09-03
+ *
+ * > *"Let's also reduce the distance between the compass rings, maybe 2/3 of what
+ * > it is now."*
+ *
+ * **This is the number that number is about.** Measured over the 31 replayable
+ * dispatches — 15 099 frames carrying a compass, 29 127 adjacent ring pairs —
+ * **80.5% of gaps sit exactly on this floor**, so what the author is looking at
+ * when they say the rings are too far apart is this constant and almost nothing
+ * else. The proportional term above only speaks for the other fifth.
+ *
+ * 16 board pixels was 48 units and **11 is 33**, which is 0.69 — two thirds
+ * landed on a whole board pixel, which is the idiom every other width in the
+ * instrument is written in.
+ *
+ * **What is given up is clearance and not the rule.** The derivation's own floor
+ * is 18 — two windows at full aim, touching — and 48 cleared that by a whole
+ * further window. 33 clears it by **15 units**, and two crossing dots by 18. So
+ * neighbouring rings still never touch at full aim; there is simply less air.
  */
-export const RING_MIN_GAP = 16 * BOARD_PIXEL;
-
-/** How far past the outermost ring the hand is drawn — spec 00 §6's *"extended outward"*. */
-export const HAND_OVERSHOOT = 12 * BOARD_PIXEL;
+export const RING_MIN_GAP = 11 * BOARD_PIXEL;
 
 /**
  * How many points the orbit path is drawn through.
@@ -481,7 +491,21 @@ export function compassOf(previous: CompassView | null, sim: SimState): CompassV
     hand,
     anchor,
     path,
-    reach: rings.reduce((most, ring) => Math.max(most, ring.radius), anchor) + HAND_OVERSHOOT,
+    // **The hand stops on the outermost crossing**, and it used to run past it.
+    //
+    // ## ⚠ Spec 00 §6 says *"extended outward past the outermost ring"* and the
+    // author overruled it, 2026-09-03
+    //
+    // > *"The white arm coming from the planet while orbiting should end on an
+    // > orb. Right now it extends past the last orb and looks a bit odd."*
+    //
+    // The overshoot was 12 board pixels — 36 design units of line with nothing on
+    // it, past the last thing the hand is *for*. Every other mark on the hand is a
+    // crossing, so the tail was the one stretch of it that said nothing, and a
+    // line that ends on the mark reads as a hand pointing at a value rather than
+    // as a radius that ran out. `HAND_OVERSHOOT` is gone rather than zeroed: it is
+    // ruled, not parked.
+    reach: rings.reduce((most, ring) => Math.max(most, ring.radius), anchor),
     rings,
     // How much of the orbit has been flown. **Asked rather than read**: after the
     // settle `orbit.phase` is the datum the closed form is measured from and

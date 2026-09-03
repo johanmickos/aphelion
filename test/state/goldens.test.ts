@@ -174,7 +174,11 @@ describe('the numbers the choreography is built from', () => {
     expect(TAKEN_WINDOW_TICKS).toBe(25); // spec 02 §6's 420ms, a quarter of the word's
     // Spec 00 §6's ring count, ruled to three on 2026-08-29.
     expect(RINGS).toBe(3);
-    expect(RING_MIN_GAP).toBe(48); // a window's full width at full aim, clear
+    // ⚠ Two thirds on 2026-09-03 — *"reduce the distance between the compass
+    // rings, maybe 2/3 of what it is now"* — and this is the constant that number
+    // is about: 80.5% of adjacent gaps sit exactly on it. Two windows at full aim
+    // are 18 across, so 33 still clears them by 15 and the derivation holds.
+    expect(RING_MIN_GAP).toBe(33);
     // M2.3's ruling, and the length the instrument's departure is measured over.
     expect(EXIT_TICKS).toBe(6); // 100ms
     // The other two words' lives, added 2026-08-31. **They were a gap**: the

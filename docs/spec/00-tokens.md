@@ -169,6 +169,23 @@ footer uses obsolete numbering and is void.
 > > cleanest physically and collides with spec [01 · §3](./01-swing.md)'s *"the choice is a fact
 > > rather than a threshold."*
 >
+> **§6 · The hand ends on the outermost ring, not past it** (author, 2026-09-03). *"The white arm
+> coming from the planet while orbiting should end on an orb. Right now it extends past the last orb
+> and looks a bit odd."* The table's *"extended outward past the outermost ring"* is overruled: the
+> overshoot was 12 board pixels — **36 design units of line with nothing drawn on it**, past the
+> last thing the hand is *for*. Every other mark on the hand is a crossing, so the tail was the one
+> stretch that said nothing, and a hand that stops on its last mark reads as pointing at a value
+> rather than as a radius that ran out. `HAND_OVERSHOOT` is gone rather than zeroed, because it is
+> ruled and not parked.
+>
+> **§6 · The rings sit two thirds as far apart** (author, 2026-09-03). *"Let's also reduce the
+> distance between the compass rings, maybe 2/3 of what it is now."* `RING_MIN_GAP` is the constant
+> that request is about and almost nothing else: measured over the 31 replayable dispatches — 15 099
+> frames carrying a compass, 29 127 adjacent pairs — **80.5% of gaps sit exactly on it**, and the
+> distance-proportional term speaks only for the other fifth. 16 board pixels → **11**, so the p50
+> gap goes 48 → 33 design units. **The derivation survives**: two windows at full aim are 18 across
+> and two crossing dots 15, so 33 still clears both — what is given up is air, not the rule.
+>
 > **§6 · The hand is dimmer, starts at the body's surface, and its crossings ramp.** Three notes on
 > one screenshot (author, 2026-08-29). This section brightens the hand *"as aim closes"* and states
 > neither end: it ran 0.35 → full CORE, which read as a bright bar across the middle of the
@@ -484,7 +501,7 @@ go if it releases now, and how good that aim is before it does.
 | Rings at rest | One concentric ring per reachable body, centred on the held body | E0, DUSK |
 | Window | An arc on the ring belonging to one reachable body, in that body's identity hue | E1 at rest, heating to E2 under live aim |
 | Dot | The point at the centre of a window — a perfect release | E1 at rest, CORE white when matched |
-| Hand | The radius through the craft, extended outward past the outermost ring | E1, thickening and brightening as aim closes |
+| Hand | The radius through the craft, extended outward past the outermost ring ⚠ **overruled 2026-09-03 — it ends *on* the outermost ring, where its last crossing is** | E1, thickening and brightening as aim closes |
 | Ghost | One dot per ring crossed by the hand; the active ring's is the brightest | E1–E2 |
 | Trail | The arc of orbit already flown, on the orbit path | E2 |
 | Label | A chip at its window's tip, on its own ring | INK on VOID at 88% |

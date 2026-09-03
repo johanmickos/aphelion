@@ -491,7 +491,15 @@ export interface CompassView {
    * formula to get wrong.
    */
   readonly path: readonly number[];
-  /** How far out the hand is drawn — past the outermost ring, as §6 asks. */
+  /**
+   * How far out the hand is drawn — **to the outermost ring**, where its last
+   * crossing sits.
+   *
+   * ⚠ Spec 00 §6 says *"extended outward past the outermost ring"* and the author
+   * overruled it on 2026-09-03: *"the white arm… should end on an orb. Right now
+   * it extends past the last orb and looks a bit odd."* See
+   * [`compassOf`](./compass.ts).
+   */
   readonly reach: number;
   /** One per reachable body, innermost nearest. */
   readonly rings: readonly RingView[];
