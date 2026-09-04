@@ -255,16 +255,28 @@ describe('the gate at the edge', () => {
 
 describe('the fuel coupling', () => {
   /**
-   * **A named zero in the shape of a full tank.** Spec 03 §5 couples fuel to the
-   * deadline *"by luminance, never geometry"*, so M4.4 changes this number and
-   * nothing else about the picture — and its neutral value is **1** rather than 0,
-   * because a constraint that does not exist yet is one that does not bind.
+   * ⚠ **The fraction moved off this view in M4.4 and the closing speed took its
+   * place.** Spec 03 §5 couples fuel to the deadline *"by luminance, never
+   * geometry"*, and the luminance is the **tank**'s — which is the economy's, and
+   * the economy is composed beside this layer rather than inside it. What the
+   * picture owes is the geometry and the one quantity a save's price is a
+   * function of, which is how fast the craft is closing on the wall.
+   *
+   * So this asserts the half that is still here: the number is a real closing
+   * speed, on the wall the cue is about, and it is never negative — a craft that
+   * is receding is not buying anything.
    */
-  it('lights the whole window while there is no fuel to spend', () => {
+  it('carries the speed a save would be bought at', () => {
     // 2 000 for the reason the scan's own test gives — see above.
     const views = fly(drifting(60, 300, 2000), 30).filter((view) => view.deadline !== null);
     expect(views.length).toBeGreaterThan(0);
-    for (const view of views) expect(view.deadline!.affordable).toBe(1);
+    for (const view of views) {
+      expect(view.deadline!.closing).toBeGreaterThanOrEqual(0);
+      expect(Number.isFinite(view.deadline!.closing)).toBe(true);
+    }
+    // A drift that is leaving the field is closing on the wall it is leaving
+    // through, so at least one of these is a real speed rather than a floor.
+    expect(views.some((view) => view.deadline!.closing > 0)).toBe(true);
   });
 });
 

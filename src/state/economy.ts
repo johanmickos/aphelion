@@ -34,8 +34,11 @@
  * than a wall.
  */
 import type { SimState } from '../sim/types.ts';
+import { struckNow } from './callout.ts';
 import type { Ledger } from './ledger.ts';
 import { openLedger, tally } from './ledger.ts';
+import type { Tank } from './fuel.ts';
+import { openTank, refuelled } from './fuel.ts';
 import type { Mode } from './mode.ts';
 import type { PresentationState } from './types.ts';
 
@@ -49,14 +52,18 @@ import type { PresentationState } from './types.ts';
  */
 export interface Economy {
   readonly ledger: Ledger | null;
+  readonly tank: Tank | null;
 }
 
 /** A run with no economy at all — what ZEN flies, and what a tool that wants none passes. */
-export const NO_ECONOMY: Economy = { ledger: null };
+export const NO_ECONOMY: Economy = { ledger: null, tank: null };
 
 /** The economy this mode opens a run with (ADR-0015's second rule, one system along). */
 export function openEconomy(mode: Mode): Economy {
-  return { ledger: mode.currency === null ? null : openLedger() };
+  return {
+    ledger: mode.currency === null ? null : openLedger(),
+    tank: mode.fuel ? openTank() : null,
+  };
 }
 
 /**
@@ -74,7 +81,17 @@ export function stepEconomy(
   sim: SimState,
   mode: Mode,
 ): Economy {
+  // **One reading of *"a swing was just graded"*, shared by both systems.** The
+  // ledger prices it and the tank is refilled by it, and ADR-0009's whole ruling
+  // is that those two must answer to different things — the ledger to the metres,
+  // the tank to the tier alone. What they must not do is disagree about whether a
+  // release happened at all ([`struckNow`](./callout.ts)).
+  const struck = struckNow(view.callout);
   return {
     ledger: previous.ledger === null ? null : tally(previous.ledger, view, sim, mode),
+    // **Fuel is returned by tier and by nothing else** (ADR-0009): the carry, the
+    // band, the streak, the chain and the velocity are all in scope here and none
+    // of them is passed. `test/state/fuel.test.ts` asserts that as a property.
+    tank: previous.tank === null ? null : refuelled(previous.tank, struck),
   };
 }

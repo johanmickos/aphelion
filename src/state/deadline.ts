@@ -504,6 +504,21 @@ function nearTheEdge(
   return keep.length >= 2 ? keep : path.slice(-2);
 }
 
+/**
+ * How fast the craft is closing on the nearer wall, in design units per second.
+ *
+ * The same reading [`boundaryOf`](./boundary.ts) makes — the rate the distance to
+ * a line is falling at, clamped at ≥ 0 — taken on the wall the craft is actually
+ * leaving through. A deadline exists because the craft is on its way out of the
+ * field, so the wall it is closing on is the one this is about.
+ */
+function closingOnWall(sim: SimState): number {
+  const { centreline, halfWidth } = sim.field.corridor;
+  if (!Number.isFinite(halfWidth)) return 0;
+  const toward = sim.craft.x >= centreline ? 1 : -1;
+  return Math.max(0, sim.craft.vx * toward);
+}
+
 /** Whether this drift still has a press left that saves it. */
 function hasRescue(memo: Omit<DeadlineMemo, 'armed'>, sim: SimState): boolean {
   const found = memo.deadline;
@@ -527,11 +542,12 @@ export function deadlineView(memo: DeadlineMemo, sim: SimState): DeadlineView | 
     cross: found.cross,
     lead,
     presence: presenceAt(lead, memo.shown),
-    // **A full tank, and it is a named zero in that shape.** Spec 03 §5 couples
-    // fuel to this *"by luminance, never geometry"*, so M4.4 changes this number
-    // and nothing else about the picture. Its neutral value is 1 rather than 0
-    // because a constraint that does not exist yet is one that does not bind.
-    affordable: 1,
+    // **The speed the save would be bought at**, which is the one thing spec 13
+    // §2's cost is a function of besides where along the window the press lands.
+    // The *fraction* it buys is the tank's and the tank is the economy's, so the
+    // two meet in the renderer and this layer stays unable to name a ledger
+    // ([`types.ts`](./types.ts) carries the argument).
+    closing: closingOnWall(sim),
   };
 }
 

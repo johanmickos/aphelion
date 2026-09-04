@@ -36,6 +36,7 @@ import { describe, expect, it } from 'vitest';
 import { openRun, replayRun } from '../src/sim/replay.ts';
 import { createPresentation, derive } from '../src/state/derive.ts';
 import type { PresentationState } from '../src/state/types.ts';
+import type { Economy } from '../src/state/economy.ts';
 import { draw } from '../src/render/index.ts';
 import { applyGrade } from '../src/render/grade.ts';
 import { counter } from '../tools/profile.ts';
@@ -89,12 +90,15 @@ function blankCensus(): Census {
   };
 }
 
-function tally(views: readonly PresentationState[]): Census {
+function tally(views: readonly PresentationState[], economies?: readonly Economy[]): Census {
   const into = blankCensus();
   const context = counter(into);
   // The canvas the census pretends to have, at the design space's own size.
   Object.defineProperty(context, 'canvas', { value: { width: 1170, height: 2532 } });
-  for (const view of views) draw(view, context);
+  // **The economy, where there is one.** The trail's brightness and the fuel halo
+  // are drawn from it, so a census of the game the author flies has to fold it —
+  // see `tools/profile.ts`, which does the same for the same reason.
+  for (const [at, view] of views.entries()) draw(view, context, {}, economies?.[at]);
   return into;
 }
 

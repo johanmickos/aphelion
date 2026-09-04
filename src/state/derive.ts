@@ -71,7 +71,7 @@ import { arrivedTight, struckHard } from '../sim/tier.ts';
 import { closingOf, energyOf, gripOf, spendingOf, stateOf, tideOf } from './body.ts';
 import { arrived, fadeArrival } from './arrival.ts';
 import { fadeKnock, knocked } from './knock.ts';
-import { linger, struck } from './callout.ts';
+import { linger, struck, struckNow } from './callout.ts';
 import { followCamera, openCamera } from './camera.ts';
 import { compassOf, takenRing } from './compass.ts';
 import { advance, fade } from './decay.ts';
@@ -438,11 +438,9 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
   // being kept inside, which is visible exactly where it matters — at the edge.
   const camera = followCamera(previous.camera, sim);
   const callout = calloutOf(previous, event, camera);
-  // **The streak is struck by the word and not beside it.** A fresh callout is a
-  // graded release — `struck` returns `null` for a miss — so reading its age is
-  // reading the pixel that announced the grade rather than grading a second time
-  // from the same geometry, which is spec 08's axiom 5 one system along.
-  const struckTier = callout !== null && callout.life.age === 0 ? callout.tier : null;
+  // **The streak is struck by the word and not beside it** — one reading of the
+  // event, shared with the ledger and the tank ([`struckNow`](./callout.ts)).
+  const struckTier = struckNow(callout);
   return present(
     sim,
     camera,

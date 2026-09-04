@@ -45,13 +45,12 @@ import { fileURLToPath } from 'node:url';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { openRun, replayRun } from '../../src/sim/replay.ts';
-import { createPresentation, derive } from '../../src/state/derive.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import { draw } from '../../src/render/index.ts';
 import { counter } from '../../tools/profile.ts';
 import type { Census } from '../../tools/profile.ts';
-import { parseDispatch } from '../../tools/dispatch.ts';
+import type { Economy } from '../../src/state/economy.ts';
+import { pricedRun, shippedRecipe } from '../moments.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const RENDER = join(ROOT, 'src', 'render');
@@ -202,21 +201,6 @@ function watch(): { widths: Map<string, Observed>; context: CanvasRenderingConte
   return { widths, context };
 }
 
-/** Every tick of the shipped run, as the picture — the run `pnpm profile` walks. */
-function shippedRun(): PresentationState[] {
-  const text = readFileSync(new URL('../recipes/pilot-60s.json', import.meta.url), 'utf8');
-  const { recipe } = parseDispatch(JSON.parse(text));
-  let view = createPresentation(openRun(recipe));
-  const views = [view];
-  replayRun(recipe, {
-    onTick: (state) => {
-      view = derive(view, state);
-      views.push(view);
-    },
-  });
-  return views;
-}
-
 /**
  * The corpus: the shipped run, plus the one state it never reaches.
  *
@@ -226,21 +210,29 @@ function shippedRun(): PresentationState[] {
  * the offer set — which is a state the game reaches, expressed the only way a
  * renderer test is allowed to express one: as presentation state.
  */
-function corpus(): PresentationState[] {
-  const run = shippedRun();
-  const offered = run
-    .filter((view) => view.sightings.length > 0)
+function corpus(): { view: PresentationState; economy: Economy }[] {
+  // **Priced as well as pictured.** The trail's brightness and the fuel halo are
+  // drawn from the economy, so a run flown without one leaves two width sites
+  // unreached — and an unreached site fails here rather than passing quietly,
+  // which is the whole design of this lint.
+  const run = pricedRun(shippedRecipe());
+  const frames = run.views.map((view, at) => ({ view, economy: run.economies[at]! }));
+  const offered = frames
+    .filter(({ view }) => view.sightings.length > 0)
     .slice(0, 8)
-    .map((view) => ({
-      ...view,
-      sightings: view.sightings.map((mark) => ({ ...mark, offered: true })),
+    .map(({ view, economy }) => ({
+      view: {
+        ...view,
+        sightings: view.sightings.map((mark) => ({ ...mark, offered: true })),
+      },
+      economy,
     }));
-  return [...run, ...offered];
+  return [...frames, ...offered];
 }
 
 const SEEN = ((): Map<string, Observed> => {
   const { widths, context } = watch();
-  for (const view of corpus()) draw(view, context);
+  for (const { view, economy } of corpus()) draw(view, context, {}, economy);
   return widths;
 })();
 

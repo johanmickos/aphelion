@@ -257,7 +257,11 @@ const SOS_OFFSET = 34 * BOARD_PIXEL;
  * The caller is expected to have translated into the world already — the same
  * state [`draw`](./index.ts) is in when it draws the compass.
  */
-export function drawDeadline(context: CanvasRenderingContext2D, track: DeadlineView): void {
+export function drawDeadline(
+  context: CanvasRenderingContext2D,
+  track: DeadlineView,
+  affordable = 1,
+): void {
   if (track.presence <= 0 || track.path.length < 2) return;
 
   // Only as far as the cross. The projection runs on to the wall, and the stretch
@@ -291,10 +295,15 @@ export function drawDeadline(context: CanvasRenderingContext2D, track: DeadlineV
     const away = (toCross[at]! + toCross[at + 1]!) / 2;
     // **Fuel, by luminance and never geometry** (spec 03 §5): the part of the
     // track the tank can afford stays lit and the rest goes faint, measured from
-    // the craft — *"half a tank lights the early half."* Nothing takes this path
-    // today; it is here so M4.4 changes a number rather than this file.
+    // the craft — *"half a tank lights the early half."*
+    //
+    // ⚠ The fraction comes from the **tank**, which is the economy's and not the
+    // picture's ([`fuel.ts`](../state/fuel.ts)), and it defaults to a whole
+    // window so a caller with no economy — ZEN, and every test about the
+    // geometry — draws the same shape. Nothing spends the tank on this build, so
+    // this is 1 in play; see `fuel.ts`'s header for what it waits on.
     const along = 1 - away / Math.max(1e-6, toCross[0]!);
-    return along <= track.affordable ? 1 : UNAFFORDABLE;
+    return along <= affordable ? 1 : UNAFFORDABLE;
   };
   /**
    * One path per **run** of segments that share a strength, not one per segment.

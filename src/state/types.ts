@@ -1143,16 +1143,23 @@ export interface DeadlineView {
   /** How lit the cue is, 0 to 1 — the lead, eased over its own birth. */
   readonly presence: number;
   /**
-   * How much of the window the tank can afford — **1, and it is a named zero in
-   * the shape of a full tank.**
+   * The craft's closing speed on the wall this deadline is about, in design
+   * units per second.
    *
-   * Spec 03 §5 couples fuel to the deadline *"by luminance, never geometry"*, so
-   * what M4.4 changes is this number and nothing else about the picture. Its
-   * neutral value is **1** rather than 0: unlike [`chain`](#presentationstate),
-   * where nothing-yet means none, a fuel constraint that does not exist yet is
-   * one that does not bind.
+   * ⚠ **It replaced `affordable`, which was a named zero in the shape of a full
+   * tank, when M4.4 gave fuel a home.** Spec 03 §5 couples fuel to the deadline
+   * *"by luminance, never geometry"* — so the *fraction* is the tank's answer and
+   * the tank is the **economy**'s, which is composed beside this layer rather
+   * than inside it ([`economy.ts`](./economy.ts)). What the picture owes is the
+   * geometry and the one quantity the price is a function of, which is this;
+   * [`affordableAt`](./fuel.ts) turns the two into the lit fraction where they
+   * meet, in the renderer.
+   *
+   * Keeping the fraction here would have needed `derive` to read the tank, which
+   * is the import the seam forbids — and the coupling would then have been by
+   * geometry's own layer rather than by luminance.
    */
-  readonly affordable: number;
+  readonly closing: number;
 }
 
 /**

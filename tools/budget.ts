@@ -61,6 +61,8 @@ import { stepSim } from '../src/sim/step.ts';
 import type { SimState, Tick } from '../src/sim/types.ts';
 import { MAX_CATCH_UP_TICKS, SECONDS_PER_TICK } from '../src/sim/units.ts';
 import { createPresentation, derive } from '../src/state/derive.ts';
+import { openEconomy, stepEconomy } from '../src/state/economy.ts';
+import { DAILY } from '../src/state/mode.ts';
 import type { PresentationState } from '../src/state/types.ts';
 import { interpolate } from '../src/render/interpolate.ts';
 import { parseDeviceOnly, parseDispatch, parseGradeOnly, parseTimingOnly } from './dispatch.ts';
@@ -153,6 +155,7 @@ function flyFrames(recipe: Recipe, hz: number, timed: boolean): Frame[] {
   const clock = createClock();
   let previous: PresentationState = createPresentation(sim);
   let current = previous;
+  let economy = openEconomy(DAILY);
   let observedMs = 0;
   const frames: Frame[] = [];
   for (let f = 1; sim.tick < recipe.ticks && sim.ending === null; f++) {
@@ -175,6 +178,10 @@ function flyFrames(recipe: Recipe, hz: number, timed: boolean): Frame[] {
       if (sim.ending === null) ran += 1;
       stepSim(sim, { pressed: pressAt(recipe.log, sim.tick) });
       current = derive(previous, sim);
+      // **And the economy, because the shell runs it in this loop too.** A frame
+      // built without it would be a frame the game does not build — see
+      // `app/main.ts`, which this function exists to imitate exactly.
+      economy = stepEconomy(economy, current, sim, DAILY);
     }
     const stepped = timed ? now() : 0;
     interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK);

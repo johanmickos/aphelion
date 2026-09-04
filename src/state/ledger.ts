@@ -56,6 +56,7 @@ import { METRE } from '../sim/units.ts';
 import type { Ending, SimState } from '../sim/types.ts';
 import type { Tier } from '../sim/tier.ts';
 import { bandAt } from './boundary.ts';
+import { struckNow } from './callout.ts';
 import { takenBy } from './compass.ts';
 import { struckStreak } from './streak.ts';
 import type { Mode } from './mode.ts';
@@ -246,25 +247,6 @@ function died(ending: Ending | null): boolean {
 }
 
 /**
- * The word this tick's release earned, or `null` — read off the **callout**.
- *
- * A fresh callout is a graded release: [`struck`](./callout.ts) returns `null`
- * for a miss and `place` gives a new word `age === 0`, so a word one tick old is
- * a word from a release this tick. Nothing is recorded in the simulation for the
- * ledger's benefit and `SIM_VERSION` does not move, which is the same reading
- * `derive.ts` makes of a grab and a release.
- *
- * **It is also axiom 5 made structural.** *"Every multiplier has a pixel"*, and
- * the tier's pixel is the dot — so the cash is triggered by the very thing that
- * announced it rather than by a parallel reading of the same geometry that could
- * one day disagree with it.
- */
-function cashedThisTick(view: PresentationState): Tier | null {
-  const callout = view.callout;
-  return callout !== null && callout.life.age === 0 ? callout.tier : null;
-}
-
-/**
  * The ledger one tick on. Call once per tick, after `derive`.
  *
  * The order below is the loop's own order and each step depends on the one above
@@ -312,7 +294,11 @@ export function tally(
       ? bandNow(view)
       : (Math.max(previous.band, bandNow(view)) as 1 | 2 | 3);
 
-  const struck = cashedThisTick(view);
+  // **The cash is triggered by the pixel that announced the grade**, not by a
+  // second reading of the same geometry — [`struckNow`](./callout.ts), which the
+  // streak and the tank read too. Nothing is recorded in the simulation for the
+  // ledger's benefit and `SIM_VERSION` does not move.
+  const struck = struckNow(view.callout);
   let bank = previous.bank;
   if (struck !== null) {
     bank += cashFor(carry, TIER_MULTIPLIER[struck], previous.band, view.streak.multiplier);

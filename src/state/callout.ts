@@ -248,6 +248,22 @@ export function struck(
   return shapeOf(ring, ring.tier, aboutX, aboutY, bornX, bornY, life, camera);
 }
 
+/**
+ * The word a release earned **on this tick**, or `null` — the one reading of
+ * *"was a swing just graded"* that everything downstream shares.
+ *
+ * A fresh callout is a graded release: [`struck`](#struck) returns `null` for a
+ * miss and [`place`](./decay.ts) gives a new word `age === 0`, so a word no ticks
+ * old is a word from a release this tick. It is one function rather than four
+ * because four readings of one event are four things that can come apart — the
+ * streak, the chain's own link, the cash and the fuel all turn on it, and spec
+ * 08's fifth axiom is that a rule which cannot point at the pixel that announced
+ * it is wrong. This is that pixel, asked once.
+ */
+export function struckNow(callout: CalloutView | null): Tier | null {
+  return callout !== null && callout.life.age === 0 ? callout.tier : null;
+}
+
 /** The same word one tick on, or `null` once it is gone. */
 export function linger(previous: CalloutView | null): CalloutView | null {
   if (previous === null) return null;

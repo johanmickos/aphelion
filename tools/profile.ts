@@ -55,6 +55,8 @@ import { MAX_CATCH_UP_TICKS, SCALE, SECONDS_PER_TICK } from '../src/sim/units.ts
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../src/state/design.ts';
 import { compassOf } from '../src/state/compass.ts';
 import { createPresentation, derive } from '../src/state/derive.ts';
+import { openEconomy, stepEconomy } from '../src/state/economy.ts';
+import { DAILY } from '../src/state/mode.ts';
 import { ANOMALY_SPAN } from '../src/state/anomaly.ts';
 import { sightingsOf } from '../src/state/sighting.ts';
 import type { PresentationState } from '../src/state/types.ts';
@@ -381,6 +383,11 @@ function fly(recipe: Recipe, field: Field | null): Flight {
   const sim = openRun(recipe);
   const state: SimState = field === null ? sim : { ...sim, field };
   let view: PresentationState = createPresentation(state);
+  // **The economy, folded beside the picture exactly as the shell folds it.** The
+  // trail's brightness and the fuel halo are drawn from it, so a census taken
+  // without one counts a game nobody flies — and the whole point of this file is
+  // that its counts travel to a phone.
+  let economy = openEconomy(DAILY);
 
   const step: number[] = [];
   const derived: number[] = [];
@@ -396,6 +403,11 @@ function fly(recipe: Recipe, field: Field | null): Flight {
     stepSim(state, { pressed });
     const t1 = now();
     view = derive(previous, state);
+    // **Inside `derive`'s reading, because the shell does the two together.** The
+    // economy is one more per-tick pass beside the picture, so a timing that
+    // stopped before it would be a timing of a loop nobody runs
+    // ([`economy.ts`](../src/state/economy.ts)).
+    economy = stepEconomy(economy, view, state, DAILY);
     const t2 = now();
 
     // Re-timed on the inputs the real call had, and warm — see the header.
@@ -657,6 +669,11 @@ function drawCensus(
   const sim = openRun(recipe);
   const state: SimState = field === null ? sim : { ...sim, field };
   let view: PresentationState = createPresentation(state);
+  // **The economy, folded beside the picture exactly as the shell folds it.** The
+  // trail's brightness and the fuel halo are drawn from it, so a census taken
+  // without one counts a game nobody flies — and the whole point of this file is
+  // that its counts travel to a phone.
+  let economy = openEconomy(DAILY);
   const per: Record<string, number[]> = {
     'bodies drawn': [],
     gradients: [],
@@ -671,13 +688,14 @@ function drawCensus(
     const previous = view;
     stepSim(state, { pressed: pressAt(recipe.log, tick) });
     view = derive(previous, state);
+    economy = stepEconomy(economy, view, state, DAILY);
     const frame = weather
       ? inWeather(interpolate(previous, view, 0.5))
       : interpolate(previous, view, 0.5);
     // One frame's worth, counted on its own, because the whole discipline of
     // this session is that a mean hides the frame that hurt.
     const one = census();
-    draw(frame, counter(one));
+    draw(frame, counter(one), {}, economy);
     per['bodies drawn']!.push(drawn(frame));
     per.gradients!.push(one.gradients);
     per.arcs!.push(one.arcs);

@@ -156,7 +156,7 @@ function track(saves: readonly boolean[], over: Partial<DeadlineView> = {}): Dea
     cross: { x: 100 + last * 20, y: 200 },
     lead: 0.5,
     presence: 1,
-    affordable: 1,
+    closing: 0,
     ...over,
   };
 }
@@ -171,9 +171,9 @@ const CRAFT: CraftView = {
   deformation: UNDEFORMED,
 };
 
-function drawn(view: DeadlineView) {
+function drawn(view: DeadlineView, affordable = 1) {
   const it = recorder();
-  drawDeadline(it.context, view);
+  drawDeadline(it.context, view, affordable);
   return it;
 }
 
@@ -348,13 +348,18 @@ describe('the fade', () => {
 describe('the fuel coupling', () => {
   /**
    * Spec 03 §5: *"by luminance, never geometry — only the fraction of the window
-   * the tank can afford stays lit."* Nothing takes this path today
-   * ([`affordable`](../../src/state/types.ts) is 1), so it is asserted against a
-   * hand-set value: what M4.4 changes must be a number, not this file.
+   * the tank can afford stays lit."*
+   *
+   * ⚠ Since M4.4 the fraction arrives as an **argument** rather than as a field
+   * on the view: it is the tank's answer and the tank is the economy's
+   * ([`fuel.ts`](../../src/state/fuel.ts)), so the two halves meet in `draw` and
+   * this file can set it by hand. Nothing spends the tank on this build, so the
+   * value in play is 1 — spec 13's acceptance is what this asserts, which is that
+   * the **geometry does not move when the number does**.
    */
   it('dims what the tank cannot afford, and moves nothing', () => {
     const full = ink(drawn(track([true, true, true, true])).lines);
-    const empty = ink(drawn(track([true, true, true, true], { affordable: 0 })).lines);
+    const empty = ink(drawn(track([true, true, true, true]), 0).lines);
     expect(empty).toHaveLength(full.length);
     for (let at = 0; at < full.length; at++) {
       // Same geometry, dimmer ink.

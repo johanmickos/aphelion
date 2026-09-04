@@ -63,6 +63,8 @@ import { boundaryMotes, drawBoundary } from './boundary.ts';
 import { drawDeadline, drawSos } from './deadline.ts';
 import { drawTrail } from './trail.ts';
 import { NO_ECONOMY } from '../state/economy.ts';
+import { affordableAt, haloOf } from '../state/fuel.ts';
+import { drawHalo } from './halo.ts';
 import type { Economy } from '../state/economy.ts';
 import { applyGrade } from './grade.ts';
 import type { GradeLook } from './grade.ts';
@@ -1429,7 +1431,17 @@ export function draw(
   // **The deadline, with the compass and in the same grammar** — spec 03 §5's
   // *"the compass inverted"*. They are never both drawn: the compass needs a held
   // body and the deadline is null while one is held.
-  if (view.deadline !== null) drawDeadline(context, view.deadline);
+  if (view.deadline !== null) {
+    // **The fuel coupling, and the only place the two halves of it meet.** The
+    // window's geometry is the picture's and its lit fraction is the tank's, so
+    // spec 03 §5's *"by luminance, never geometry"* is a fact about which layer
+    // owns which — a caller with no tank lights the whole window.
+    drawDeadline(
+      context,
+      view.deadline,
+      economy.tank === null ? 1 : affordableAt(economy.tank, view.deadline.closing),
+    );
+  }
 
   if (view.compass !== null) drawCompass(context, view.compass);
 
@@ -1476,6 +1488,13 @@ export function draw(
     inToken(CORE),
     STRENGTH[view.craft.energy],
   );
+
+  // **The fuel halo, on the craft and inside its own bloom** — spec 03 §2's
+  // *"not a corner gauge"*. Before the translate below, because the gauge does
+  // not turn with the dart: it is the one thing drawn on the craft that is about
+  // a number rather than about a heading ([`halo.ts`](./halo.ts)).
+  if (economy.tank !== null)
+    drawHalo(context, haloOf(economy.tank, view.tick), view.craft.x, view.craft.y);
 
   context.translate(view.craft.x, view.craft.y);
   context.rotate(view.craft.heading);
