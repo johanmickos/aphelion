@@ -1,13 +1,19 @@
 # Builds the game and publishes it to GitHub Pages.
 #
-# The site is served from a subpath (/aphelion-2/), which is why vite.config.ts
+# The site is served from a subpath (/aphelion/), which is why vite.config.ts
 # sets a relative `base` (ADR-0010). There is no backend and no service worker:
 # this publishes a static bundle and nothing else (ADR-0003, ADR-0010).
 name: Deploy to Pages
 
+# `v2`, not `main`. A repository has exactly one Pages site, and this history
+# shares no ancestor with the `main` that used to publish it: the two are
+# separate games wearing the same repository. Pointing the trigger here is what
+# makes the published site this one. Leaving `main`'s own deploy workflow armed
+# would let a push there silently take the site back, so nothing should land on
+# `main` while v2 is the version being played.
 on:
   push:
-    branches: [main]
+    branches: [v2]
   workflow_dispatch:
 
 # Pages deploys need these; the default GITHUB_TOKEN has neither.
