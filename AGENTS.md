@@ -12,7 +12,7 @@ agent would otherwise break. Every rule here exists because it was broken once.
 ## 1 · Non-negotiable
 
 1. **`pnpm check` is green before any merge.** Typecheck, lint, format, `pnpm portable`,
-   and the full test suite.
+   `pnpm scenarios`, and the full test suite.
 2. **No remote, no push, no PR, no `gh`.** Deliberate and deferred. Branch off `main`, and
    when the step is done merge back with `git merge --ff-only` and delete the branch.
    `main` is the only branch.
@@ -105,6 +105,15 @@ The stated deliverable is **a technical architecture that is easy to maintain an
   substitute for keeping the boundary meaningful.
 - **Each spec's acceptance includes at least one criterion that fails if a layer boundary
   is crossed.** Keep writing them.
+- **The economy is composed beside the picture, never inside it.** `src/state/derive.ts` may
+  not import `ledger.ts`, `fuel.ts` or `economy.ts`, and neither may anything it imports —
+  the app shell, the tools and the bench fold `stepEconomy` in the same loop, after `derive`.
+  That is spec 08's own acceptance (_"deleting the economy module leaves grading, callouts,
+  streaks and every timing intact"_) and it is what makes ZEN a `null` currency instead of a
+  branch (ADR-0005). `test/state/seam.test.ts` walks the import graph, and also holds the
+  rule spec 08 §7 states about modes: **only the ledger and the composition that opens it may
+  name a `Mode`.** When this fails, the fix is never to relax it — what the picture needs is
+  a field it can derive, and what the economy needs is to read the picture.
 - **Prefer a module that hides a decision to one that exposes a setting.** The prototype's
   seventy-eight-key config is the thing this rewrite exists to not become. A new knob wants
   an argument for why the decision cannot be made once, inside.
@@ -161,6 +170,17 @@ The stated deliverable is **a technical architecture that is easy to maintain an
   terminal computes the percentiles, and grouping frames by how many ticks each ran recovers
   what a tick costs and what a frame costs to a tenth of a millisecond out of a clock that
   cannot tell them apart. Read its header before changing what it carries.
+- **`pnpm scenarios`** answers _is a score still a pure function of a recipe_ — a fixed set of named
+  runs with the outcomes they must produce, re-flown on every `pnpm check`. It is the economy's half
+  of what the goldens are to the picture: a golden fails when the picture moves and this fails when
+  the **wage** does, and a change that moves one and not the other is worth being told about
+  precisely. Every run in it is one the **author actually flew**, chosen for the sentence it
+  demonstrates rather than authored to demonstrate it, and the list is fixed so that a dispatch
+  arriving from the phone cannot fail the build it arrived on. `--record` writes down what they do
+  now; doing that without saying why in the commit is how a suite stops meaning anything. Its second
+  half is `COVERS`, which names the sentences about the constitution the suite has to go on being
+  about — a set of pinned numbers passes for the wrong reason the day a run stops showing the rule it
+  was chosen for.
 - **`tools/fixture.ts`** answers _which pilot seed still carries everything the goldens are
   written about_. The goldens address their subjects by sentence rather than by tick number
   (`test/moments.ts`), so a physics change no longer re-pins them — but the fixture still has

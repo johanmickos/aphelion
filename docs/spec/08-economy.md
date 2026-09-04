@@ -15,6 +15,67 @@ for band.
 
 ---
 
+> ## ⚠ Built, 2026-09-04 — the arithmetic stands; three of its sentences want an author
+>
+> **Everything in §3 is built exactly as written**, and the board's worked example recomputes to
+> **1 634** from the formula rather than from a restatement of it. Multipliers multiply: there is
+> one product in the code and no sum anywhere near it, so §3's legible maximum of ×9 is a property
+> rather than a claim. §5's deferred carry is built and its acceptance passes as a **property over
+> 120 runs of random pressing** — the bank never falls, and neither does `bank + round(carry)`.
+>
+> **The ledger is deletable and that is a fact about the import graph.** `src/state/derive.ts` does
+> not import it and nothing it imports does either, so deleting the economy leaves grading, the
+> callouts, the streak, the chain and every timing untouched — which makes §7's ZEN a `null`
+> currency rather than a branch. `test/state/seam.test.ts` walks it, and also finds that the only
+> two files in `src/` that can name a **mode** at all are the ledger and the composition that opens
+> it.
+>
+> **§3's accrual is read as `net`, and §6 is what settles it.** *"For each metre of altitude
+> gained"* has two readings: per tick, every upward tick pays and holding an orbit is paid for the
+> near side of every lap — which §6 denies in as many words, *"altitude gained while orbiting is ≈
+> 0, so the formula already says so."* That is only true of a net reading. So a swing carries a
+> high-water mark of its own and only ground above it pays, which is the same distinction
+> `markHighWater` makes one layer down and paid to learn. Measured over the 26 dispatches this build
+> replays, the carry at a cash runs **p50 224** against the board's own example of 142 m × 1.6 =
+> 227: the worked example is a typical swing.
+>
+> **⚠ Where that mark resets is derived, not ruled.** It resets at each **grab**, so a craft that
+> falls back and re-climbs the same ground is paid for it again. One mark for the whole run is the
+> stricter reading of *progress* and would pay a recovery nothing, which sits badly beside axiom 3.
+> §3 writes the accrual under *"while engaged"*, so per-engagement is what the sentence says.
+> Recorded here exactly as §3's band aggregation is, and one line to change.
+>
+> **⚠ §4's break is unreachable in this field.** §4 says *"one full rung — 25 m of altitude"*; a
+> rung has been **50 m** since the author refused 25 on 2026-08-30, so what ships is the sentence's
+> subject and not its stale gloss, and this section's acceptance moves with it — **49 m preserves
+> the chain and 51 m breaks it**, where it says 24 and 26. Then it was measured: over the 222
+> release-to-grab transitions in the corpus the coast runs **p50 128 m**, so **10.8%** of links
+> survive one rung and the chain reaches **4** across the whole corpus. §4's milestones at ×5, ×10
+> and ×15 are unreachable, *"uncapped in v1"* prices nothing, and the accrual's multiplier is ×1.0 or
+> ×1.1 and nothing else. The prototype's own counter has **no distance term at all** and ran at ×5 –
+> ×7. The number is not moved; it is on the bench, in **rungs**, and
+> `docs/plan/m4-the-economy.md` carries the table.
+>
+> **⚠ Axiom 5 is false for the band, by two rulings rather than by a defect.** The axiom gives the
+> band *"the motes **and the band's own `×N` label in the world**"*; the author withdrew the label on
+> 2026-09-01 (*"I don't want the 2x 3x text in the hot zone"*), and on the same day ruled that the
+> boundary *"SHOULD be off screen for majority of play"*. So the ×2 band starts paying **133.5 design
+> units** before anything is drawn to announce it, and **27 of the 60 outer-band cashes in the corpus
+> — 45% — were priced by a boundary that was never on screen during the swing**. The fire band's five
+> were all announced. Asserted in `test/state/band.test.ts` so it cannot move quietly; the three ways
+> out are in the plan and none is taken here.
+>
+> **§8's carry finally has its pixel.** The **trail** is built (spec [02 · §6](./02-release.md)), and
+> its brightness is `carry / (carry + 214)` — 214 measured as the median of live carry. §5's
+> *"legible at values a single swing could never reach"* is the requirement the curve is chosen
+> against, and it is not hypothetical: **36.8% of cashes carry more than one swing**, up to ten.
+>
+> **And §7's ZEN is built and flies**, behind `?mode=zen` on the dev server, producing a picture
+> identical to DAILY's tick for tick. What it does not have is *"no death, only drifting back"* —
+> that is a change to the simulation, so it is behind the `SIM_VERSION` wall M4 may not touch, and
+> *drifting back* has no specified behaviour. DRIFT is not built at all, because §7's own open call
+> about what death takes in it is the one value a mode carries.
+
 ## 1 · The five axioms
 
 1. **Progress is the only base currency.** Metres climbed while engaged. Not time, not kills, not
@@ -236,6 +297,11 @@ what death takes — from the start.
 
 ## Open
 
-- Band aggregation across a swing that crosses bands (§3) — derived here, not ruled.
-- The chain ceiling and the bank-spark behaviour (§4).
-- What death takes in DRIFT (§7).
+- Band aggregation across a swing that crosses bands (§3) — derived here, not ruled. ⚠ Built as
+  derived, unchanged.
+- The chain ceiling and the bank-spark behaviour (§4). ⚠ **The ceiling is not the live question.**
+  Measured 2026-09-04, the chain reaches 4 across the whole corpus and its **break** is what stops
+  it — see the notice above.
+- What death takes in DRIFT (§7). ⚠ Still open, and it is why DRIFT is not built.
+- ⚠ **Where the carry's mark resets** (§3) — per engagement, derived 2026-09-04.
+- ⚠ **Axiom 5 against the band** — the price starts 133.5 design units before the pixel does.

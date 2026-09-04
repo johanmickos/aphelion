@@ -10,6 +10,44 @@ has no board.
 
 ---
 
+> ## ⚠ Built, 2026-09-04 — the whole law, and **nothing spends it**
+>
+> §1's tank, §2's cost curve and lit fraction, §4's tier returns and §5's three warning energies are
+> all built, and ADR-0009's law is asserted as the property §4 asks for: sweep carry, band, streak,
+> chain and velocity, hold the tier, and find **one value per tier**. The strongest form of that is
+> in the signature — `refuelled` takes a tank and a tier, and none of the five is in scope to be
+> read.
+>
+> §2's `referenceClosing` had no value and now has a measured one: over the **2 137 ticks the
+> deadline is up** across the 26 dispatches this build replays, the craft closes on the wall it is
+> leaving through at p05 230, **p50 543**, p95 934, max 1 031. The median is the anchor because the
+> table's numbers are about a *typical* press.
+>
+> **Then: nothing spends it.** A **save** is a press inside the deadline window, and on this build a
+> save is an ordinary **grab** — spec [03 · §5](./03-hud.md)'s notice re-based the cue off §3's burn
+> on the author's own instruction, *"a grab needs no fuel, so the instrument comes forward, and what
+> M4.4 adds is the luminance and nothing else."* So `f` is **1.0 on every tick of every run**, and
+> three things are built and unreachable in play:
+>
+> - §5's **LOW** and **EMPTY**, which need `f ≤ 0.25` and `f = 0`. They are asserted directly.
+> - §2's coupling. At a full tank the fraction only falls below 1 above **1 450** design units a
+>   second of closing, and the corpus maximum is 1 031 — so the window is fully lit, always.
+> - §1's *"`f = 0` removes the ability to save"*, which is the one part **not built at all**:
+>   refusing a press is a change to the simulation, and M4 may not move `SIM_VERSION`.
+>
+> All three land with §3's **burn**, which is spec [07 · §5](./07-boundary.md)'s. What is built is
+> the law, so that when the burn arrives it charges rather than invents.
+>
+> **⚠ §5's *"the percentage number is the label"* is not built either.** It is a *readable* element
+> riding the craft; spec 00 §7 forbids anything readable below the thumb line, and the camera holds
+> the craft above it by measurement rather than by construction — 182 design units below centre
+> against a 422 budget, over one run. Where it goes wants an author who can see fuel move.
+>
+> **The halo is the craft's own light with a level on it**, drawn inside the E2 bloom rather than
+> beside it: spec 00 §3 makes bloom the game's one ordinal channel, so a second glow around the craft
+> would be a second thing saying *more* about a different quantity. It does not turn with the dart —
+> a gauge read from a datum that rotates every tick is a gauge nobody reads.
+
 ## 1 · What fuel is
 
 **Fuel is what a save costs.** It is not a resource the player spends on movement, and there is no

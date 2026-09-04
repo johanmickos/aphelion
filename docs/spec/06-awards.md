@@ -15,6 +15,46 @@ release **defers** the carry rather than destroying it (ADR-0008), which amends 
 
 ---
 
+> ## ⚠ Built, 2026-09-04 — the make speaks, and §3's merge row is not built
+>
+> **§1's law finally has both halves.** *"Points for the make, words for the mastery"* has been
+> half a law since the file was written, and the notice below records why: *"a make is specified to
+> speak, in numbers. It is silent today because the economy is spec 08's and arrives in M4, so there
+> is no number to show yet."* M4 landed. The word, its `×N` and its points arrive as **one unit** at
+> the dot: the word in the tier's own colour at §4's sizes, the number under it at §4's make size of
+> 13px for **every** tier — because the word is the grade and scales with it, and the number is the
+> wage and is the same kind of thing whoever earned it.
+>
+> **The `×N` is on the callout rather than read live**, because §4 anchors the word to the world and
+> it drifts for 1.6s: what it says is what was true when it was struck. It is the count **including**
+> the release that struck it, which is what the board's worked example shows — `PERFECT ×3` over
+> `+1 634`, priced at the ×1.2 that third PERFECT earns.
+>
+> **A cash of zero draws nothing**, and in ZEN there is no ledger so nothing is drawn at all: §8's
+> register is *"one true number"*, and a swing that climbed no metres has no number to be true about.
+> That is also what keeps §2's *"deleting the economy leaves the tier, the word, the colour and every
+> timing unchanged"* literally true — asserted over a whole flown run.
+>
+> **⚠ §3's Merge row is not built, and §4's Collision row is what ships.** *"A repeat arriving within
+> the previous callout's linger merges in place: the counter ticks and re-pops smaller"* cannot hold
+> beside §4's world-anchored birth and the author's own ruling of 2026-08-29 — *"it should be a
+> marker left behind at the point of scoring"* — because merging ticks a counter at the **previous**
+> dot about a release that happened somewhere else. Measured over the corpus: **32.5%** of graded
+> releases land inside the previous word's linger and only **3.5%** are the same tier, so the row is
+> about 4 transitions in 114. The single callout slot is §4's *"queueing is structural"* already
+> built; nothing is invented here.
+>
+> **§3's streak is built exactly as its acceptance states it**, including the sentence that reads as
+> two rules and is one: SHARP, SHARP, PERFECT, SHARP yields `SHARP ×1`, `SHARP ×2`, `PERFECT ×1`,
+> `SHARP ×1`. A miss changes nothing, coasting cannot expire it — there is no clock in the function —
+> and death ends it. ⚠ What the debrief needs is the value the run died **holding** (§8's *"CHAIN ×11
+> WENT WITH YOU"*), and capturing that is spec [09](./09-debrief.md)'s and M6's: it will have to read
+> the tick before rather than the tick of.
+>
+> **§6's chain milestones are built and unreachable.** The masthead pulse and the bloom step are
+> there, and the chain reaches **4** across the author's whole corpus because spec 08 §4's break at
+> one rung survives 10.8% of links. See spec [08](./08-economy.md)'s notice.
+
 > ## ⚠ Flown, 2026-08-29 — the zones stand; what `W` means has moved
 >
 > **§2's four zones are built exactly as written** and are asserted at every boundary from both

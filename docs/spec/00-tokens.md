@@ -583,7 +583,11 @@ anywhere from **45% to 89%** of the time.
 - **A guaranteed band.** A height, measured from the shortest viewport the game supports, that
   every device shows in full. **Everything the player reads is composed inside it**, and the rule
   above is unchanged in force — only the rectangle it names is now the band rather than the whole
-  design space.
+  design space. ⚠ **This became load-bearing on 2026-09-04**, when M4.5's top band was composed
+  against the design space and the two things it holds — the velocity and the BANK chip — landed
+  inside the 291 design units a phone crops off the top. The band is **0.77**, it lives in
+  `src/state/design.ts` so a composition can read it, and the HUD and the callout's clamp are both
+  placed against it.
 - **A cap on the extra.** A device tall enough to show more than the band does not get unbounded
   extra field, so what a player can see is bounded above as well as below.
 

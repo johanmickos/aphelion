@@ -22,6 +22,56 @@ anything the field pays says what it pays, where it is.
 
 ---
 
+> ## ⚠ Built, 2026-09-04 — the top band exists, and it was composed where a phone cannot see it
+>
+> **§1, §2 and §3 are built.** The velocity masthead in Anton top-left, its subline, `CHAIN ×N`, and
+> the BANK chip top-right with the armed cash on a second line while a graded release is armed.
+> Nothing in the band moves between the five pressures: what changes is one line's **content** and
+> one chip's **brightness**, which is what makes §3's *"nothing moves between states"* a property of
+> the composition rather than of a test. The chip's opacity is a pure function of engagement and of
+> nothing else, which is this section's own acceptance criterion.
+>
+> **The layout is Direction 03's own, at its artboard's scale and not at the board pixel's.** That
+> board is **330 × 715** and draws the whole phone — its thumb line sits at `y = 477`, two thirds of
+> 715, which converts to within 0.2% of the thumb line this repo already has — so the factor is
+> `1170 / 330`. `BOARD_PIXEL` is 3 and turns a **css pixel on the phone** into a design unit; these
+> are two conversions of two different things and both are exact. Stated once in
+> `src/render/hud.ts` rather than rediscovered.
+>
+> #### ⚠ It hung from the design space's top edge, and 291 design units of that are cropped
+>
+> Spec [00 · §7](./00-tokens.md) fixes the **width** and lets the height flex, so the fit scales from
+> the width and any viewport shorter than the design space loses the same amount off both ends —
+> measured on the author's own phone, **291 design units**. Hung from zero, the velocity landed at
+> design `y` 184 and the BANK chip at 170: **neither was on screen**, and `CHAIN ×N` at 326 was the
+> only line of the masthead that survived. Found by looking at it rather than by a test, which is
+> worth recording as the reason.
+>
+> §7's own first guardrail is the fix and it is the sentence the rule was already written in: *"a
+> guaranteed band... everything the player reads is composed inside it."* The band now hangs from
+> the top of that rectangle with the board's offsets kept exactly. The **callout's clamp had the
+> same bug and it was older** — it slid a word born near the top of the picture into the same strip.
+> Both are asserted.
+>
+> #### The subline's three states, and one of them is a reading
+>
+> §2 names `M/S`, `M/S · RISING` and `M/S · TOWARD EDGE` and does not say when each is said.
+> **TOWARD EDGE** wins and is gated on the boundary being *drawn*, which is the author's ruling of
+> 2026-09-01 — a subline announcing the edge with nothing on screen would be the *"signal danger
+> during normal gameplay"* that ruling refuses. ⚠ **RISING is a latch and it is derived, not ruled**:
+> a coasting craft feels no gravity, so its speed is constant and the word is simply off, but a craft
+> on an eccentric frozen orbit gains and loses speed twice a swing — an unlatched reading blinks. It
+> holds for spec 00 §5's DECAY, 420ms, after the last tick that raised the speed.
+>
+> #### And the fuel coupling's number moved off this section's own view
+>
+> The *Fuel coupling* row's promise holds — *"by luminance, never geometry"* — and M4.4 turned out to
+> be a statement about **layers**: the window's geometry is the picture's and its lit fraction is the
+> **tank**'s, and the tank is the economy's, which is composed beside the picture rather than inside
+> it. So `DeadlineView` carries the **closing speed** the price is a function of, and the fraction is
+> computed where the two meet, in the renderer. ⚠ Nothing spends the tank on this build, so the
+> fraction is 1 in play — see spec [13](./13-fuel.md)'s notice.
+
 > ## ⚠ Flown, 2026-08-29 — the sighting points now
 >
 > **§6's central ruling is reversed by the author who made it.** On 2026-08-28: *"a sighting does

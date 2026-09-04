@@ -371,7 +371,14 @@ indistinguishable from no release at all.
   falls to its floor and is carried out with the instrument. It never goes dark, because it is
   still the orbit that was flown.
 - **The trail is a solid luminous line.** Its brightness is the carry (spec
-  [08](./08-economy.md)). There are no sampled breadcrumbs.
+  [08](./08-economy.md)). There are no sampled breadcrumbs. ⚠ **Built 2026-09-04**: one stroke in
+  CORE, sampled on the **tick** at a world spacing and bounded at sixteen samples, so it is a wake
+  and not a route — measured on the shipped run it spans p50 244 design units and p95 382. Its
+  brightness is `carry / (carry + 214)`, where 214 is the measured median of live carry, and the
+  curve is chosen against ADR-0008's requirement that it *"stay legible at values a single swing
+  could never reach"*: **36.8% of cashes in the corpus carry more than one swing**. The prototype's
+  own trail colours by **speed** and that does not cross — spec 00 §3 makes brightness the game's one
+  ordinal channel, and the carry is spending it.
 
 ## 7 · Grab
 
