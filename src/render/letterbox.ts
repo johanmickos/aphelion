@@ -90,8 +90,12 @@ export const GUARANTEED_BAND = 0.77;
  * is the one thing §7 makes absolute: *"1170 design units across, always."* It is
  * a statement about what is **drawn**, which is [`visible`](#visible)'s
  * business, and what to do with the space it would refuse — bleed, or a bar — is
- * a composition question. It stays [M3.1](../../docs/plan/m3-the-field.md)'s, and
- * it is named here so that it is unbuilt rather than forgotten.
+ * a composition question.
+ *
+ * **It was built there on 2026-09-04, and the answer was a bar.** The cap is
+ * zero: sideways, a device is shown the design space and nothing besides. See
+ * [`visible`](#visible), which carries the flown fault and the argument for why
+ * no other value holds still.
  */
 export function letterbox(width: number, height: number): Letterbox {
   const fromWidth = width / DESIGN_WIDTH;
@@ -124,7 +128,14 @@ export function letterbox(width: number, height: number): Letterbox {
  * clips to what is actually on screen — so nothing downstream has to know which
  * sign it got.
  *
- * ## Why the bars stopped being black
+ * ## Why the bars stopped being black — and why sideways they are again
+ *
+ * ⚠ **The horizontal half of this section is history as of 2026-09-04.**
+ * [`visible`](#visible) now caps sideways bleed at zero, so the side bars are
+ * black once more and this function's `x` is no longer what decides the picture's
+ * width — only its `y` still reaches the clip. What follows is why they were
+ * filled in the first place, and it is kept because the reasoning still explains
+ * the vertical axis and the trade that was re-taken to close it.
  *
  * They were, and it cost visibility for nothing. On the author's phone the fit
  * is bound by height — browser chrome takes a bite out of the viewport — so
@@ -168,10 +179,40 @@ export interface Seen {
 /**
  * What this buffer can show, in design coordinates.
  *
- * The design space, plus whatever the fit left over
- * ([`bleed`](./letterbox.ts)) — **and never more world than there is.** A
- * desktop window bound by height has more slack than the corridor is wide, and
- * showing past the line would draw a place a run is already over in.
+ * The design space, **and sideways that is all of it** — plus whatever the fit
+ * left over vertically ([`bleed`](./letterbox.ts)), and never more world than
+ * there is. A desktop window bound by height has more slack than the corridor is
+ * wide, and showing past the line would draw a place a run is already over in.
+ *
+ * ## Spec 00 §7's second guardrail, built 2026-09-04 — and why the cap is zero
+ *
+ * §7 named a *"cap on the extra"* and left it unbuilt, correctly refusing to
+ * implement it as a **scale** — that would zoom in on a tall device and crop the
+ * width, and *"1170 design units across, always"* is the one thing it does not
+ * bend. It is *"a statement about what is **drawn**"*, which is this function,
+ * and this is where it lands.
+ *
+ * **The author flew the fault it fixes** (2026-09-04, desktop Firefox at
+ * 2560×1297): the rung labels appeared to travel sideways when the ship did. They
+ * do not — a label is pinned to design `x` and is still to the pixel. What moved
+ * was **the world underneath it**. The window this returned was a constant 2223
+ * units wide but slid across the buffer as the camera panned, the unpainted
+ * margin swinging from 1339∶287 at one camera extreme to 287∶1339 at the other.
+ * A label 25 units from the field's left edge at one end of a pan was 1077 from
+ * it at the other, and that read as the label moving.
+ *
+ * **Zero is not a taste, it is the only value that holds still.** The camera may
+ * push the design space flush against a corridor wall, so at that extreme there
+ * is no world beyond it to show on that side; any positive cap therefore goes on
+ * being clamped by the corridor on one side and not the other, and goes on
+ * sliding. The no-slide condition solves to `cap <= 0`.
+ *
+ * **It costs the phone 3.5 design units and the desktop its periphery.** That is
+ * the trade the author took, and it is small on the device that matters because
+ * the width-fit already spent the phone's slack on magnification rather than on
+ * extra field — the 179 units the bars used to cost were gone before this. The
+ * bleed had quietly become a desktop-only artefact, and a composition that is
+ * *"identical on every device"* cannot be one the desktop sees sliding.
  *
  * The corridor arrives on presentation state rather than being read from the
  * simulation, which is the boundary this layer keeps: the renderer draws what it
@@ -193,8 +234,12 @@ export function visible(
   const toDesign = DESIGN_WIDTH / 2 - cameraX;
   const wall = corridor.halfWidth;
   return {
-    left: Math.max(-slack.x, corridor.centreline - wall + toDesign),
-    right: Math.min(DESIGN_WIDTH + slack.x, corridor.centreline + wall + toDesign),
+    // **Sideways bleed is capped at nothing** — see the section above. The
+    // corridor's line is still taken, because it is the stronger bound whenever
+    // the camera has been pushed right up against a wall and there is genuinely
+    // less world than the design space is asking for.
+    left: Math.max(0, corridor.centreline - wall + toDesign),
+    right: Math.min(DESIGN_WIDTH, corridor.centreline + wall + toDesign),
     top: -slack.y,
     bottom: DESIGN_HEIGHT + slack.y,
   };

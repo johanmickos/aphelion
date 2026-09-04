@@ -325,6 +325,31 @@ footer uses obsolete numbering and is void.
 > trade and it is the same slack spent differently — fitting whole left room across and spent it on
 > extra field; fitting to the width spends it on drawing the world 1.3× larger everywhere.
 
+> ## ⚠ Flown, 2026-09-04 — §7's second guardrail is built, and the cap is zero
+>
+> **The paragraph above that calls it "deliberately not built" is settled, not overturned.** Its
+> reasoning stands in full: the cap is not a scale, and *"1170 design units across, always"* did not
+> bend. It is *"a statement about what is drawn"*, and it landed in
+> [`visible`](../../src/render/letterbox.ts) exactly where that sentence said it belonged. What is
+> new is the value and the evidence for it.
+>
+> **The author flew the fault** on desktop Firefox at 2560 × 1297: the rung labels appeared to
+> travel sideways with the ship. They did not — a label is pinned to design `x` and was still to the
+> pixel. **The world slid underneath it.** The painted window was a constant 2 223 units wide but
+> moved across the buffer as the camera panned, its unpainted margin swinging **1 339∶287 → 287∶1 339**
+> between the camera's two extremes. A label 25 units from the field's left edge at one end of a pan
+> was 1 077 from it at the other.
+>
+> **Zero is the only value that holds still**, and that is arithmetic rather than taste. The camera
+> may push the design space flush against a corridor wall, so at that extreme there is no world
+> beyond it on that side to show; any positive cap is therefore clamped by the corridor on one side
+> and not the other, and slides. The no-slide condition solves to `cap ≤ 0`.
+>
+> **What it cost:** the 3.5 units above, and the desktop's periphery. Small on the device that
+> matters, because the width-fit had already spent the phone's slack on magnification — the bleed
+> had quietly become a desktop-only artefact, and *"identical on every device"* cannot mean a
+> composition the desktop alone sees sliding.
+
 > ## ⚠ Flown, 2026-08-30 — §5's orbit path waits for the turn it cannot predict
 >
 > **One oval, not two.** §5's *"as soon as an oval orbit is possible I want it to fade in"* was

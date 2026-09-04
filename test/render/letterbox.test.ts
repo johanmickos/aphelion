@@ -156,33 +156,50 @@ describe('what a frame paints into', () => {
   };
 
   /**
-   * **The bleed either side is 3.5 design units now, against 179 before.** That
-   * is the width-fit's own cost, and it is a cost worth having: the bars existed
-   * because the design space was being fitted whole and left slack across, and
-   * fitting to the width spends that slack on drawing the world **larger**
-   * instead of wider. What used to be 179 units of extra field either side is now
-   * 1.3× magnification everywhere.
+   * **Sideways there is no bleed at all** — spec 00 §7's second guardrail, built
+   * 2026-09-04. The 3.5 design units the width-fit had left over go the way the
+   * 179 before them went; what a device is shown across is the design space, and
+   * a device wide enough to show more gets a bar rather than more field.
    */
-  it('has almost no bleed left, because the width is now the fit', () => {
+  it('shows the design space exactly, and no more, across', () => {
     const seen = visible(393 * 3, 651 * 3, CORRIDOR, CORRIDOR.centreline);
-    expect(seen.left).toBeCloseTo(-3.5, 1);
-    expect(seen.right).toBeCloseTo(DESIGN_WIDTH + 3.5, 1);
+    expect(seen.left).toBeCloseTo(0, 6);
+    expect(seen.right).toBeCloseTo(DESIGN_WIDTH, 6);
   });
 
-  it('stops at the line where the window is wider than the world', () => {
+  it('gives a wide desktop window a bar rather than more world', () => {
     const seen = visible(2560, 1440, CORRIDOR, CORRIDOR.centreline);
-    expect(seen.right - seen.left).toBeCloseTo(2 * CORRIDOR.halfWidth, 6);
+    expect(seen.right - seen.left).toBeCloseTo(DESIGN_WIDTH, 6);
   });
 
   /**
-   * Written against the camera rather than against the centreline, so it is
-   * still the corridor's line and not a fixed rectangle once M3.1's camera pans.
+   * **The fault this closed** (author, 2026-09-04, desktop Firefox 2560×1297):
+   * the rung labels looked like they travelled sideways with the ship. A label is
+   * pinned to design `x` and never moved; the window slid underneath it, its
+   * unpainted margin swinging 1339∶287 → 287∶1339 across a pan. A window that
+   * does not move sideways is the whole of the fix, so it is asserted directly
+   * and across the camera's real range rather than at one offset.
    */
-  it('follows the camera rather than the centreline', () => {
+  it('does not slide sideways when the camera pans', () => {
     const still = visible(2560, 1440, CORRIDOR, CORRIDOR.centreline);
-    const panned = visible(2560, 1440, CORRIDOR, CORRIDOR.centreline + 200);
-    expect(panned.left).toBeCloseTo(still.left - 200, 6);
-    expect(panned.right).toBeCloseTo(still.right - 200, 6);
+    for (const pan of [-526, -200, 0, 200, 526]) {
+      const panned = visible(2560, 1440, CORRIDOR, CORRIDOR.centreline + pan);
+      expect(panned.left).toBeCloseTo(still.left, 6);
+      expect(panned.right).toBeCloseTo(still.right, 6);
+    }
+  });
+
+  /**
+   * The corridor's line is still taken, and still against the camera rather than
+   * the centreline — it is the stronger bound whenever there is genuinely less
+   * world than the design space asks for, which a corridor narrower than the
+   * design space is the clearest case of.
+   */
+  it('still stops at the corridor when there is less world than design space', () => {
+    const narrow: CorridorView = { ...CORRIDOR, halfWidth: 400 };
+    const seen = visible(2560, 1440, narrow, narrow.centreline + 100);
+    expect(seen.left).toBeCloseTo(DESIGN_WIDTH / 2 - 400 - 100, 6);
+    expect(seen.right).toBeCloseTo(DESIGN_WIDTH / 2 + 400 - 100, 6);
   });
 
   /** Never taller than the buffer, and never shorter: vertical bleed is symmetric. */
