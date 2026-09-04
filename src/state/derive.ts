@@ -76,8 +76,9 @@ import { followCamera, openCamera } from './camera.ts';
 import { compassOf, takenRing } from './compass.ts';
 import { advance, fade } from './decay.ts';
 import { NO_CHAIN, chainBloom, chainOf } from './chain.ts';
-import { NO_STREAK, streakOf } from './streak.ts';
+import { NO_STREAK, streakOf, struckStreak } from './streak.ts';
 import { NO_TRAIL, trailOf } from './trail.ts';
+import { NO_HUD, hudOf } from './hud.ts';
 import { relax, stretch, UNDEFORMED } from './deformation.ts';
 import { bloomOf, E3_BLOOM } from './energy.ts';
 import { hueOf } from './identity.ts';
@@ -99,6 +100,7 @@ import type {
   Energy,
   FlashView,
   KnockView,
+  HudView,
   PresentationState,
   StreakView,
   TrailPoint,
@@ -238,6 +240,7 @@ function present(
   chain: ChainView,
   streak: StreakView,
   trail: readonly TrailPoint[],
+  hud: HudView,
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
@@ -250,6 +253,7 @@ function present(
     chain,
     streak,
     trail,
+    hud,
     craft: {
       x: sim.craft.x,
       y: sim.craft.y,
@@ -329,6 +333,7 @@ export function createPresentation(sim: SimState): PresentationState {
     NO_CHAIN,
     NO_STREAK,
     NO_TRAIL,
+    NO_HUD,
   );
 }
 
@@ -372,7 +377,12 @@ function calloutOf(
       previous.compass.y,
       camera,
     );
-    if (word !== null) return word;
+    // **The `×N` the word is said with is the streak including this release** —
+    // the board's worked example reads `PERFECT ×3` over `+1 634` and prices at
+    // the ×1.2 that third PERFECT earns, so the word and the wage are counting
+    // the same thing. It is attached here rather than inside `struck` because the
+    // tier is not known until the ring is chosen.
+    if (word !== null) return { ...word, streak: struckStreak(previous.streak, word.tier).count };
   }
   return linger(previous.callout);
 }
@@ -438,6 +448,10 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
   // being kept inside, which is visible exactly where it matters — at the edge.
   const camera = followCamera(previous.camera, sim);
   const callout = calloutOf(previous, event, camera);
+  // The **boundary** is asked for once, because the top band's subline reads it
+  // as well as the picture does — and two readings of one edge are two things
+  // that can disagree about where the risk is.
+  const boundary = boundaryOf(sim.field, sim.craft);
   // **The streak is struck by the word and not beside it** — one reading of the
   // event, shared with the ledger and the tank ([`struckNow`](./callout.ts)).
   const struckTier = struckNow(callout);
@@ -464,5 +478,6 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
     chainOf(previous.chain, sim, event === 'RELEASE'),
     streakOf(previous.streak, struckTier, sim.ending !== null),
     trailOf(previous.trail, sim),
+    hudOf(previous.hud, { ...previous, boundary }, sim, event === 'RELEASE', previous.craft.speed),
   );
 }

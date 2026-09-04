@@ -53,7 +53,8 @@ import type {
   Tier,
 } from '../state/types.ts';
 import { fade } from '../state/decay.ts';
-import { SPEAKS } from '../state/callout.ts';
+import { POINTS_GAP, POINTS_SIZE, SPEAKS } from '../state/callout.ts';
+import { STREAK_SHOWN_AT } from '../state/streak.ts';
 import { letterbox, visible } from './letterbox.ts';
 import { drawStarfield, starfield } from './starfield.ts';
 import { drawDust, dust } from './dust.ts';
@@ -65,6 +66,7 @@ import { drawTrail } from './trail.ts';
 import { NO_ECONOMY } from '../state/economy.ts';
 import { affordableAt, haloOf } from '../state/fuel.ts';
 import { drawHalo } from './halo.ts';
+import { drawHud, spaced } from './hud.ts';
 import type { Economy } from '../state/economy.ts';
 import { applyGrade } from './grade.ts';
 import type { GradeLook } from './grade.ts';
@@ -1145,14 +1147,18 @@ const TIER_TOKEN: Readonly<Record<Tier, string>> = {
  * §4 bans Anton here outright, because *"moving text needs open counters"*
  * (Direction 06).
  */
-function drawCallout(context: CanvasRenderingContext2D, callout: CalloutView): void {
+function drawCallout(
+  context: CanvasRenderingContext2D,
+  callout: CalloutView,
+  cashed: number | null,
+): void {
   const token = TIER_TOKEN[callout.tier];
 
   // The window it was taken on, in that body's own hue — identity, not grade.
   // It decays where it was rather than following the craft, because what it marks
   // is the arc that paid — and **on its own clock**, spec 02 §6's 420ms, which is
   // a quarter of the word's. The two arrive together and do not leave together.
-  if (callout.windowStrength <= 0) return drawMark(context, callout, token);
+  if (callout.windowStrength <= 0) return drawMark(context, callout, token, cashed);
   context.save();
   context.lineCap = 'round';
   context.beginPath();
@@ -1168,34 +1174,78 @@ function drawCallout(context: CanvasRenderingContext2D, callout: CalloutView): v
   context.stroke();
   context.restore();
 
-  drawMark(context, callout, token);
+  drawMark(context, callout, token, cashed);
 }
 
 /**
- * What a **make** shows: its taken window, and nothing else.
+ * The word and its points, as one unit — and for a **make**, the points alone.
  *
  * Spec [06 · §1](../../docs/spec/06-awards.md)'s law is *"points for the make,
- * words for the mastery"*, and §2 gives it *"none — points only"*. **The points
- * are spec 08's and arrive in M4**, so until then a make is marked by the one
- * thing it does draw: the window it was taken on, lit in that body's hue and
- * decaying over 420ms with the rest of the instrument.
+ * words for the mastery"*, and §2 gives the make *"none — points only"*.
  *
- * **A dot was tried here and withdrawn the same evening.** *"I released what I
- * thought was within the planet window and I got no text accolade for it"*
- * (author) — measured on that run, four of its seven graded releases were makes,
- * so more than half of what the player got right said nothing. A CORE dot at
- * §2's own 70% was put at the release point to stand in for the missing number,
- * and flown it read as litter: *"there's some small white dot being left behind
- * at times. Can you identify it, and remove it?"* It was white in a world where
- * nothing else is, it was small, and it outlived every other part of the release
- * by more than a second.
+ * ## ⚠ The sequencing gap this closes, 2026-09-04
  *
- * **The gap it was covering is real and this is not the thing that closes it.**
- * What a make is owed is a number, the number is M4's, and a stand-in that reads
- * as debris is worse than the silence it was filling.
+ * Spec 06's own notice records it: *"a make is specified to speak, in numbers. It
+ * is silent today because the economy is spec 08's and arrives in M4, so there is
+ * no number to show yet"* — and that *"until M4, the most common successful
+ * release in the game says nothing."* The number is here now, so it does.
+ *
+ * **A dot was tried in its place and withdrawn the same evening.** A CORE dot at
+ * §2's own 70% stood in for the missing number and flown it read as litter:
+ * *"there's some small white dot being left behind at times. Can you identify it,
+ * and remove it?"* (author, 2026-08-29). What was wrong with it was that it was
+ * not a number; nothing about that argument objects to the number.
+ *
+ * **Nothing is drawn when there is nothing to say.** In ZEN there is no ledger,
+ * so `cashed` is `null` and a make draws exactly what it drew before M4 — its
+ * taken window and no more. A cash of zero is drawn as nothing for the same
+ * reason: spec 06 §8's register is *"one true number"*, and a swing that climbed
+ * no metres has no number to be true about.
  */
-function drawMark(context: CanvasRenderingContext2D, callout: CalloutView, token: string): void {
+function drawMark(
+  context: CanvasRenderingContext2D,
+  callout: CalloutView,
+  token: string,
+  cashed: number | null,
+): void {
   if (SPEAKS[callout.tier]) drawWord(context, callout, token);
+  if (cashed !== null && cashed > 0) drawPoints(context, callout, token, cashed);
+}
+
+/**
+ * The wage, under the word, centre-aligned with it — spec 06 §4's *"word over
+ * points, one unit"*.
+ *
+ * At one size for every tier ([`POINTS_SIZE`](../state/callout.ts)), because the
+ * word is the grade and the number is the wage: the grade scales with itself and
+ * the wage is the same kind of thing whoever earned it. Under the same rim as the
+ * word, because it is drawn over the same planets.
+ */
+function drawPoints(
+  context: CanvasRenderingContext2D,
+  callout: CalloutView,
+  token: string,
+  cashed: number,
+): void {
+  if (callout.strength <= 0) return;
+  const says = `+${spaced(cashed)}`;
+  // Below the word's own middle by half of each, plus the gap — the same drop
+  // the callout reserved space for, so the unit is where it said it would be.
+  const y =
+    callout.y + (SPEAKS[callout.tier] ? callout.size / 2 + POINTS_GAP : 0) + POINTS_SIZE / 2;
+
+  context.save();
+  context.font = `800 ${POINTS_SIZE}px ${UTILITY_FACE}`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.letterSpacing = `${POINTS_SIZE * CALLOUT_TRACKING}px`;
+  context.lineWidth = RIM_WIDTH;
+  context.lineJoin = 'round';
+  context.strokeStyle = dim(VOID, RIM_STRENGTH * callout.strength);
+  context.strokeText(says, callout.x, y);
+  context.fillStyle = dim(token, callout.strength);
+  context.fillText(says, callout.x, y);
+  context.restore();
 }
 
 /**
@@ -1225,11 +1275,17 @@ function drawWord(context: CanvasRenderingContext2D, callout: CalloutView, token
   // heavy black outline under pale text *"reads as a sticker."*
   context.lineWidth = RIM_WIDTH;
   context.lineJoin = 'round';
+  // **The word, and its `×N` when there is one.** Spec 06 §3 draws the counter
+  // from the second occurrence — *"streaks escalate by counting, never by
+  // inventing a synonym"* — so the escalation is the same word with a numeral
+  // after it and never a new one.
+  const says =
+    callout.streak >= STREAK_SHOWN_AT ? `${callout.tier} ×${callout.streak}` : callout.tier;
   context.strokeStyle = dim(VOID, RIM_STRENGTH * callout.strength);
-  context.strokeText(callout.tier, callout.x, callout.y);
+  context.strokeText(says, callout.x, callout.y);
 
   context.fillStyle = dim(token, callout.strength);
-  context.fillText(callout.tier, callout.x, callout.y);
+  context.fillText(says, callout.x, callout.y);
   context.restore();
 }
 
@@ -1447,7 +1503,10 @@ export function draw(
 
   if (view.flash !== null) drawFlash(context, view.flash);
 
-  if (view.callout !== null) drawCallout(context, view.callout);
+  // **The word, its `×N` and its points, as one unit** (spec 06 §4). The points
+  // are the ledger's and the word is the picture's, so this is the second and
+  // last place the two meet — ZEN draws the word and no number.
+  if (view.callout !== null) drawCallout(context, view.callout, economy.ledger?.cashed ?? null);
 
   if (view.arrival !== null) drawArrival(context, view.arrival);
   // Last, so the one word that means *something just went wrong* is never drawn
@@ -1512,6 +1571,12 @@ export function draw(
   // space's own edge on every device (spec 00 §7) rather than to a point the
   // camera happens to be looking at.
   for (const mark of view.sightings) drawSighting(context, mark);
+
+  // **The top band, last of the composition and always in the same place.** Spec
+  // 03 §1: one layout, five pressures, and the bottom third belongs to the thumb
+  // — so it is drawn in design space beside the sightings rather than in the
+  // world, and nothing about where it sits answers to the camera.
+  drawHud(context, view.hud, view.chain, view.craft.speed, economy.ledger);
 
   context.restore();
 

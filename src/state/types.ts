@@ -9,6 +9,7 @@
 import type { Tick } from '../sim/types.ts';
 import type { Tier } from '../sim/tier.ts';
 import type { ChainView } from './chain.ts';
+import type { HudView } from './hud.ts';
 import type { Decay } from './decay.ts';
 import type { DeadlineMemo } from './deadline.ts';
 import type { StreakView } from './streak.ts';
@@ -32,7 +33,7 @@ export type { Tier };
  * renderer may not name the module that computed them any more than it may name
  * the simulation.
  */
-export type { ChainView, StreakView, TrailPoint };
+export type { ChainView, HudView, StreakView, TrailPoint };
 
 /**
  * How committed or imminent something is, in four steps (`CONTEXT.md`: energy).
@@ -625,6 +626,20 @@ export interface CalloutView {
    * make produced no word rather than that nothing happened.
    */
   readonly tier: Tier;
+  /**
+   * How many consecutive releases have landed on this tier, **including this
+   * one** — spec [06 · §3](../../docs/spec/06-awards.md)'s counter, carried with
+   * the word it is said after.
+   *
+   * It is on the callout rather than read live off
+   * [`streak`](#presentationstate) because the word is **left behind**: it drifts
+   * past at world speed for 1.6s, and by then the run may have graded another
+   * release. What it says is what was true when it was struck.
+   *
+   * Spec 06 §3 draws it from the **second** occurrence, so a `1` here says
+   * nothing on screen.
+   */
+  readonly streak: number;
   /** Which body's window was taken — its address, and therefore its hue. */
   readonly body: number;
   /** That body's hue, so the arc still knows whose it is once the compass is gone. */
@@ -916,6 +931,15 @@ export interface PresentationState {
    * of the drawn line is wherever the craft is now ([`trail.ts`](./trail.ts)).
    */
   readonly trail: readonly TrailPoint[];
+  /**
+   * The top band's facts — spec [03 · §3](../../docs/spec/03-hud.md)'s *"one
+   * layout, five pressures"*, and only the pressure ([`hud.ts`](./hud.ts)).
+   *
+   * There is no geometry in it: where the readouts sit never changes between
+   * states, so the layout is the renderer's fixed composition and what varies is
+   * what the band says and how brightly.
+   */
+  readonly hud: HudView;
   readonly craft: CraftView;
   readonly bodies: readonly BodyView[];
   readonly corridor: CorridorView;

@@ -17,6 +17,7 @@ import { NO_DEADLINE } from '../../src/state/deadline.ts';
 import { NO_CHAIN } from '../../src/state/chain.ts';
 import { NO_STREAK } from '../../src/state/streak.ts';
 import { NO_TRAIL } from '../../src/state/trail.ts';
+import { NO_HUD } from '../../src/state/hud.ts';
 
 function view(x: number, y: number, heading: number): PresentationState {
   return {
@@ -26,6 +27,7 @@ function view(x: number, y: number, heading: number): PresentationState {
     chain: NO_CHAIN,
     streak: NO_STREAK,
     trail: NO_TRAIL,
+    hud: NO_HUD,
     anomaly: null,
     boundary: [],
     deadline: null,

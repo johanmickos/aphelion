@@ -180,6 +180,30 @@ const CHARACTER_WIDTH = 0.8;
 /** The longest word in the vocabulary — spec 06 §2's three, and PERFECT is seven. */
 const LONGEST_WORD = 7;
 
+/**
+ * How tall the **points** line under the word is set — spec 06 §4's *"a make
+ * shows points only, at 13px"*, converted.
+ *
+ * One size for every tier, where the word's size is four. Spec 06 §4 gives the
+ * number a size only in the make's row, and that is the right reading rather
+ * than an omission: the word is the grade and scales with it, and the number is
+ * the wage and is the same number whoever earned it.
+ */
+export const POINTS_SIZE = 13 * SCALE;
+
+/** And the gap between the two, so they read as one unit rather than as two lines. */
+export const POINTS_GAP = 3 * SCALE;
+
+/**
+ * How much taller a callout is than its word — the points line and its gap.
+ *
+ * **Reserved whether or not there is a ledger to fill it.** The word is held
+ * inside the picture by [`insideThePicture`](#), and a height that depended on
+ * the economy would make ZEN's picture differ from DAILY's by a few design units
+ * at the edges — which is exactly the thing spec 08 §7 says must not happen.
+ */
+export const POINTS_DROP = POINTS_GAP + POINTS_SIZE;
+
 /** And how tall a line of caps is, as a fraction of its size. */
 const CAP_HEIGHT = 0.75;
 
@@ -208,12 +232,13 @@ function insideThePicture(
   y: number,
   size: number,
   bloom: number,
-  speaks: boolean,
   camera: CameraView,
 ): { x: number; y: number } {
-  if (!speaks) return { x, y };
   const halfWide = (LONGEST_WORD * CHARACTER_WIDTH * size) / 2 + bloom;
-  const halfTall = (CAP_HEIGHT * size) / 2 + bloom;
+  // The unit is the word **and its points** (spec 06 §4), so the space kept for
+  // it is both lines. See [`POINTS_DROP`](#points_drop) for why it is reserved
+  // even when nothing fills it.
+  const halfTall = (CAP_HEIGHT * size) / 2 + POINTS_DROP + bloom;
   const left = camera.x - DESIGN_WIDTH / 2 + halfWide;
   const right = camera.x + DESIGN_WIDTH / 2 - halfWide;
   const top = camera.y - DESIGN_HEIGHT / 2 + halfTall;
@@ -295,16 +320,14 @@ function shapeOf(
   life: Decay,
   camera: CameraView,
 ): CalloutView {
-  const held = insideThePicture(
-    bornX,
-    bornY - POP_RISE * risen(life),
-    SIZE[tier],
-    MARGIN,
-    SPEAKS[tier],
-    camera,
-  );
+  const held = insideThePicture(bornX, bornY - POP_RISE * risen(life), SIZE[tier], MARGIN, camera);
   return {
     tier,
+    // **The streak this word is said with**, filled in by `derive.ts` on the tick
+    // it is struck: the count is the picture's ([`streak.ts`](./streak.ts)) and
+    // it is not known until the tier is, which is here. One is the value a word
+    // with no streak behind it says, and spec 06 §3 does not draw a `×1`.
+    streak: 1,
     body: ring.body,
     hue: hueOf(ring.body),
     x: held.x,

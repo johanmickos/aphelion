@@ -116,11 +116,22 @@ export interface Ledger {
    * 08 §3's derived aggregation.
    */
   readonly band: 1 | 2 | 3;
+  /**
+   * What the **last** graded release cashed, or `null` before the first one.
+   *
+   * Spec 06 §4 composes the word and its points as **one unit** at the dot, and
+   * the word lives 1.6s — so the number has to outlive the tick that earned it.
+   * It is kept until the next cash rather than tied to the callout's own clock,
+   * which is what makes a **miss** leave the previous word and its previous
+   * number standing together: spec 06 §5 gives a miss silence, and taking the
+   * number out from under a word still in the air would be a sting.
+   */
+  readonly cashed: number | null;
 }
 
 /** A run's ledger at tick zero: nothing carried, nothing banked, nothing armed. */
 export function openLedger(): Ledger {
-  return { carry: 0, bank: 0, armed: null, mark: null, band: 1 };
+  return { carry: 0, bank: 0, armed: null, mark: null, band: 1, cashed: null };
 }
 
 /**
@@ -269,6 +280,9 @@ export function tally(
       armed: null,
       mark: null,
       band: 1,
+      // The last word's number goes with the run. What the debrief reports is
+      // spec 09's and M6's, and it reads the tick before rather than the tick of.
+      cashed: null,
     };
   }
 
@@ -300,8 +314,10 @@ export function tally(
   // ledger's benefit and `SIM_VERSION` does not move.
   const struck = struckNow(view.callout);
   let bank = previous.bank;
+  let cashed = previous.cashed;
   if (struck !== null) {
-    bank += cashFor(carry, TIER_MULTIPLIER[struck], previous.band, view.streak.multiplier);
+    cashed = cashFor(carry, TIER_MULTIPLIER[struck], band, view.streak.multiplier);
+    bank += cashed;
     carry = 0;
   }
 
@@ -312,9 +328,10 @@ export function tally(
   return {
     carry,
     bank,
-    armed: armedCash(view, carry, held ? band : previous.band),
+    armed: armedCash(view, carry, band),
     mark: held ? Math.min(mark ?? sim.craft.y, sim.craft.y) : null,
     band,
+    cashed,
   };
 }
 

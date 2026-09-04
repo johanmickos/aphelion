@@ -269,6 +269,9 @@ export function interpolate(
     chain: current.chain,
     // Nor does the streak, for the same reason: it is a tier and a count.
     streak: current.streak,
+    // The top band's facts are taken whole: a subline is a word and a latch is a
+    // counter, and neither is part way between two of anything.
+    hud: current.hud,
     // And the **trail** is taken whole — its samples are world points laid down
     // on ticks, so there is nothing between two of them to be part way along.
     // What *is* crossed is its head, which is the craft, one field down.
