@@ -28,9 +28,9 @@
  * 3. The economy is reachable from exactly the places that are allowed to price a
  *    run: the shell, the renderer's trail, and the tools. Nothing in the picture.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
@@ -124,5 +124,40 @@ describe('the seam between grading a swing and pricing one', () => {
   it('is composed by the shell and read by the trail', () => {
     expect([...reachableFrom('app/main.ts')]).toContain('src/state/economy.ts');
     expect([...reachableFrom('src/render/index.ts')]).toContain('src/state/economy.ts');
+  });
+});
+
+/**
+ * **M4.7's other half: the grader has no mode-specific branch.**
+ *
+ * The plan asks for *"a reviewer confirming the grader has no mode-specific
+ * branch"*, which is a thing a reviewer forgets and a parser does not. Spec
+ * 08 §7's rule is that modes *"may never change how a swing is graded"*, and the
+ * strongest available form of that is: **the word `Mode` does not appear anywhere
+ * a swing is graded, and cannot.**
+ */
+describe('the grader', () => {
+  /** Nothing the simulation or the picture imports can name a mode. */
+  it.each(['src/sim/step.ts', 'src/sim/tier.ts', 'src/state/derive.ts'])(
+    'cannot reach a mode at all, from %s',
+    (entry) => {
+      expect([...reachableFrom(entry)]).not.toContain('src/state/mode.ts');
+    },
+  );
+
+  /**
+   * And the whole list of things that *can* is three files long — the two the
+   * economy is made of, and the mode itself. Everything else that knows a mode
+   * exists is outside `src/`: the shell, which opens a run, and the tools, which
+   * fly one.
+   */
+  it('is read by the economy and by nothing else in src/', () => {
+    const readers = readdirSync(resolve(ROOT, 'src'), { recursive: true, encoding: 'utf8' })
+      .filter((name) => name.endsWith('.ts'))
+      .filter((name) =>
+        importsOf(join(resolve(ROOT, 'src'), name)).some((one) => one.endsWith('mode.ts')),
+      )
+      .sort();
+    expect(readers).toEqual(['state/economy.ts', 'state/ledger.ts']);
   });
 });

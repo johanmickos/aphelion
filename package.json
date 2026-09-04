@@ -23,7 +23,8 @@
     "profile": "node tools/profile.ts",
     "budget": "node tools/budget.ts",
     "bench": "node tools/bench/build.ts",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm portable && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm portable && pnpm scenarios && pnpm test",
+    "scenarios": "node tools/scenarios.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

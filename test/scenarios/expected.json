@@ -1,0 +1,149 @@
+{
+  "the richest run in the corpus": {
+    "ending": "IMPACT",
+    "ticks": 3032,
+    "bank": 0,
+    "peak": 11140,
+    "carry": 0,
+    "cashes": 13,
+    "misses": 8,
+    "deferred": 6,
+    "chain": 3,
+    "streak": 3,
+    "tiers": {
+      "MAKE": 3,
+      "TRUE": 6,
+      "SHARP": 1,
+      "PERFECT": 3
+    },
+    "bands": [1, 11, 1],
+    "fuel": 1,
+    "ledger": true
+  },
+  "the longest chain in the corpus": {
+    "ending": "OUT_OF_BOUNDS",
+    "ticks": 1558,
+    "bank": 0,
+    "peak": 9040,
+    "carry": 0,
+    "cashes": 7,
+    "misses": 7,
+    "deferred": 3,
+    "chain": 4,
+    "streak": 2,
+    "tiers": {
+      "MAKE": 3,
+      "TRUE": 2,
+      "SHARP": 2,
+      "PERFECT": 0
+    },
+    "bands": [0, 5, 2],
+    "fuel": 1,
+    "ledger": true
+  },
+  "a run that misses far more than it makes": {
+    "ending": "CLEARED",
+    "ticks": 1141,
+    "bank": 2997,
+    "peak": 2997,
+    "carry": 286.814866,
+    "cashes": 3,
+    "misses": 19,
+    "deferred": 3,
+    "chain": 1,
+    "streak": 2,
+    "tiers": {
+      "MAKE": 2,
+      "TRUE": 0,
+      "SHARP": 1,
+      "PERFECT": 0
+    },
+    "bands": [2, 1, 0],
+    "fuel": 1,
+    "ledger": true
+  },
+  "a run that never lets go": {
+    "ending": null,
+    "ticks": 108,
+    "bank": 0,
+    "peak": 0,
+    "carry": 0,
+    "cashes": 0,
+    "misses": 0,
+    "deferred": 0,
+    "chain": 0,
+    "streak": 0,
+    "tiers": {
+      "MAKE": 0,
+      "TRUE": 0,
+      "SHARP": 0,
+      "PERFECT": 0
+    },
+    "bands": [0, 0, 0],
+    "fuel": 1,
+    "ledger": true
+  },
+  "the longest streak in the corpus": {
+    "ending": "OUT_OF_BOUNDS",
+    "ticks": 2422,
+    "bank": 0,
+    "peak": 8149,
+    "carry": 0,
+    "cashes": 19,
+    "misses": 4,
+    "deferred": 2,
+    "chain": 2,
+    "streak": 4,
+    "tiers": {
+      "MAKE": 3,
+      "TRUE": 8,
+      "SHARP": 6,
+      "PERFECT": 2
+    },
+    "bands": [9, 10, 0],
+    "fuel": 1,
+    "ledger": true
+  },
+  "the run this repo ships": {
+    "ending": "OUT_OF_BOUNDS",
+    "ticks": 2506,
+    "bank": 0,
+    "peak": 7899,
+    "carry": 0,
+    "cashes": 16,
+    "misses": 12,
+    "deferred": 6,
+    "chain": 5,
+    "streak": 2,
+    "tiers": {
+      "MAKE": 3,
+      "TRUE": 3,
+      "SHARP": 8,
+      "PERFECT": 2
+    },
+    "bands": [10, 6, 0],
+    "fuel": 1,
+    "ledger": true
+  },
+  "the run this repo ships, with the ledger deleted": {
+    "ending": "OUT_OF_BOUNDS",
+    "ticks": 2506,
+    "bank": 0,
+    "peak": 0,
+    "carry": 0,
+    "cashes": 16,
+    "misses": 12,
+    "deferred": 6,
+    "chain": 5,
+    "streak": 2,
+    "tiers": {
+      "MAKE": 3,
+      "TRUE": 3,
+      "SHARP": 8,
+      "PERFECT": 2
+    },
+    "bands": [0, 0, 0],
+    "fuel": null,
+    "ledger": false
+  }
+}
