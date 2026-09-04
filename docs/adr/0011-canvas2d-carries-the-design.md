@@ -128,3 +128,13 @@ One thing is measured and one is not. Sixty frames a second is measured, with 5 
 behind that is **not** measured: (a)'s blits are issued asynchronously and main-thread
 timing cannot see them, and the only evidence they keep up is that a 60 Hz display was
 never missed. On a 120 Hz target that evidence does not transfer, and the question reopens.
+
+> **⚠ It reopened on 2026-09-04, and is answered in
+> [ADR-0016](./0016-the-ceiling-is-the-rasteriser-not-the-language.md).** A 117 Hz desktop
+> holds 118 fps with 1.32% of frames missing a vsync, and our own code spends 0.41 ms of an
+> 8.47 ms budget — about 5%. The paragraph above is right that main-thread timing cannot see
+> the blits; what it can see is that the misses are not ours, and that the largest recovery
+> available came from drawing **less world** rather than from drawing it faster. Nothing in
+> this decision is overturned: (b) is still rejected on its upload cost, and ADR-0016 notes
+> that a glow drawn *as a shader* never makes that upload, which is a different candidate
+> from the one measured here.
