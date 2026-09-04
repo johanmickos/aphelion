@@ -178,6 +178,32 @@ that the press is steering, before the first orbit ever forms.
 > the rework then removed the hairline entirely. `test/render/strokes.test.ts` now finds nothing at
 > all between the two floors.
 >
+> ### ⚠ Gated to the edge on the third asking, 2026-09-04
+>
+> > *"The deadline is still a bit long. I kept seeing it in the playing field. Let's gate it so that
+> > it only renders closer to the edge."* — after *"it's really long, impacting my normal playing
+> > field"* (2026-09-01) and *"too long and crosses into the normal playfield"* (2026-09-03)
+>
+> **Twice this was answered with weight and twice it came back.** The hairline taper and then the
+> window taper both kept the whole path on screen and only made its far end quiet; the third answer
+> is the one that was asked for. A stretch of the path that is not within spec
+> [07 · §2](./07-boundary.md)'s **outer band** of a wall is not in the view at all.
+>
+> **The axis is the sample's own distance to a wall, and the obvious axis is wrong.** Gating on
+> where the *craft* is cuts **61% of the presses the author actually makes** at a 900-unit
+> threshold, because the corridor is 2 223 wide and a craft on a leaving trajectory is already near
+> a wall — measured, within 1 111 of one on every tick the cue is up, which is the centreline. What
+> is long is the **path**.
+>
+> Measured over the corpus, the drawn length goes **p50 1 665 → 1 055** and p95 3 732 → 3 163, and
+> **every live tick still draws something** — shortened and never silenced, which is the property
+> the prototype's refused length-clamp did not have. ⚠ The p95 barely moves, because a path running
+> nearly parallel to a wall stays inside the band for a long way; if that case is the one still
+> being seen, the band is the knob and `FIRE_BAND` takes p50 to 444.
+>
+> It is `OUTER_BAND` rather than a number of its own because the deadline is a fact *about* the
+> boundary, so the two instruments now agree about where risk starts.
+>
 > - **Past the dot is not dashed.** Refused with the dashes that were on spec 07's bands. The track
 >   goes out and the SOS takes over: one predicate, two presentations. The spent part of the line is
 >   history, and spec 05 §6 rules there are no breadcrumbs anywhere in this game.

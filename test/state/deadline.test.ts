@@ -11,6 +11,7 @@ import { createCraft } from '../../src/sim/craft.ts';
 import { createInitialState, stepSim } from '../../src/sim/step.ts';
 import { snapshot } from '../../src/sim/snapshot.ts';
 import { scatterField } from '../../src/sim/scatter-field.ts';
+import { OUTER_BAND } from '../../src/state/boundary.ts';
 import { SCALE } from '../../src/sim/units.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import {
@@ -208,6 +209,47 @@ describe('the scan is a property of the coast', () => {
     expect(forced.at).toBe(sim.tick);
     expect(forced.shown).toBeGreaterThanOrEqual(memo.shown);
     expect(forced.drawable).toBe(memo.drawable);
+  });
+});
+
+describe('the gate at the edge', () => {
+  /**
+   * ## ⚠ The third answer to the same complaint, 2026-09-04
+   *
+   * > *"The deadline is still a bit long. I kept seeing it in the playing field.
+   * > Let's gate it so that it only renders closer to the edge."*
+   *
+   * Twice this was answered with **weight** — the hairline taper of 2026-09-01
+   * and the window taper of 2026-09-03 — and twice it came back. The third answer
+   * is the one that was asked for: a stretch of path that is not near a wall is
+   * not in the view at all.
+   *
+   * **The axis is the sample's own distance to a wall, not the craft's.** Gating
+   * on where the craft is cuts 61% of the presses the author actually makes at a
+   * 900-unit threshold, because a craft on a leaving trajectory is already near a
+   * wall — measured, within 1 111 of one on every tick the cue is up, which is the
+   * centreline. What is long is the path.
+   */
+  it('drops the stretches that are nowhere near a wall', () => {
+    const views = fly(drifting(60, 300, 2000), 40).filter((view) => view.deadline !== null);
+    expect(views.length).toBeGreaterThan(0);
+    const { centreline, halfWidth } = field.corridor;
+    for (const view of views) {
+      for (const point of view.deadline!.path) {
+        // Every sample that survives is inside the band, or is the one segment
+        // that crosses it — so the line ends **on** the threshold rather than a
+        // sample short of it.
+        const near = halfWidth - Math.abs(point.x - centreline);
+        expect(near).toBeLessThan(OUTER_BAND * 3);
+      }
+    }
+  });
+
+  /** And it shortens the cue without ever silencing it, which a clamp would. */
+  it('never leaves a live deadline with nothing to draw', () => {
+    const views = fly(drifting(60, 300, 2000), 40).filter((view) => view.deadline !== null);
+    expect(views.length).toBeGreaterThan(0);
+    for (const view of views) expect(view.deadline!.path.length).toBeGreaterThanOrEqual(2);
   });
 });
 

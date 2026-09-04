@@ -447,6 +447,63 @@ function leadOf(memo: Omit<DeadlineMemo, 'armed'>, sim: SimState): number {
   return (found.leadTicks - (sim.tick - memo.at)) * SECONDS_PER_TICK;
 }
 
+/**
+ * How near a wall a stretch of the path has to be to be drawn at all, in design
+ * units — spec [07 · §2](../../docs/spec/07-boundary.md)'s **outer band**.
+ *
+ * ## ⚠ The third time the same complaint came back, 2026-09-04
+ *
+ * > *"The deadline is still a bit long. I kept seeing it in the playing field.
+ * > Let's gate it so that it only renders closer to the edge."* — author, after
+ * > *"it's really long, impacting my normal playing field"* (2026-09-01) and
+ * > *"too long and crosses into the normal playfield"* (2026-09-03)
+ *
+ * **Twice this was answered with weight and twice it came back**, so the third
+ * answer is the one that was asked for: the stretches of the path that are not
+ * near a wall are not drawn.
+ *
+ * **The axis matters and the obvious one is wrong.** Gating on where the *craft*
+ * is cuts 61% of the presses the author actually makes at a threshold of 900
+ * units, because the corridor is only 2 223 wide and a craft on a leaving
+ * trajectory is already near a wall — measured, it is within 1 111 of one on
+ * every tick the cue is up, which is the centreline. What is long is the
+ * **path**, not the distance. So the clip is per **sample**, on that sample's own
+ * distance to a wall.
+ *
+ * Measured over the corpus, the drawn length goes **p50 1 665 → 1 051** and p95
+ * 3 732 → 2 574 against a picture 1 170 wide, and **every live tick still draws
+ * something** — the cue is shortened and never silenced, which is the property
+ * the prototype's refused length-clamp did not have.
+ *
+ * It is `OUTER_BAND` rather than a number of its own because the deadline is a
+ * fact *about* the boundary: this is where spec 07 says risk starts, and the two
+ * instruments now agree about where that is. One band tighter is
+ * [`FIRE_BAND`](./boundary.ts), which would take it to p50 444.
+ */
+const DRAWN_WITHIN = OUTER_BAND;
+
+/**
+ * The stretches of a path that are near enough a wall to be worth drawing.
+ *
+ * A sample survives if it or its neighbour is inside [`DRAWN_WITHIN`](#), so a
+ * run that crosses the threshold keeps the segment that crosses it and the line
+ * ends on the band rather than a sample short of it.
+ */
+function nearTheEdge(
+  path: readonly { readonly x: number; readonly y: number; readonly saves: boolean }[],
+  sim: SimState,
+): readonly { readonly x: number; readonly y: number; readonly saves: boolean }[] {
+  const { centreline, halfWidth } = sim.field.corridor;
+  const near = (x: number): number => halfWidth - Math.abs(x - centreline);
+  const inside = path.map((p) => near(p.x) <= DRAWN_WITHIN);
+  const keep = path.filter(
+    (_, at) => inside[at] === true || inside[at - 1] === true || inside[at + 1] === true,
+  );
+  // Never fewer than two: a path of one point draws nothing, and the caller has
+  // already established that this drift has a cross to run to.
+  return keep.length >= 2 ? keep : path.slice(-2);
+}
+
 /** Whether this drift still has a press left that saves it. */
 function hasRescue(memo: Omit<DeadlineMemo, 'armed'>, sim: SimState): boolean {
   const found = memo.deadline;
@@ -466,7 +523,7 @@ export function deadlineView(memo: DeadlineMemo, sim: SimState): DeadlineView | 
     // design units behind the craft at p50 and 647 at worst**, which is over half
     // a picture of it trailing the ship. The prototype's track *"always reaches
     // the ship"*; this is that, once the cache is taken into account.
-    path: ahead(found.path, sim),
+    path: nearTheEdge(ahead(found.path, sim), sim),
     cross: found.cross,
     lead,
     presence: presenceAt(lead, memo.shown),
