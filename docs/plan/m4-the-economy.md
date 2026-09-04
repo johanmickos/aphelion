@@ -406,6 +406,9 @@ The subtraction M4.7 is *about* is complete: delete the ledger and the tiers sti
 **The author flies it.** The question is whether the wage feels like it matches the swing. Next:
 [M5](./m5-audio.md).
 
+**The state of the work, the merge and what a fresh session must not break are in
+[M4 · Handover](./m4-handover.md).**
+
 ### ⚠ What the gate is being handed, 2026-09-04
 
 **Built and flyable**: the ledger, the trail, the streak, the chain, the band, the tank and its
