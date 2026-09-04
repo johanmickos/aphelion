@@ -32,6 +32,7 @@ import { punchSpan } from '../../src/state/punch.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
 import { EMIT_AT } from '../../src/state/body.ts';
 import { bloomOf, E3_BLOOM, E3_TICKS } from '../../src/state/energy.ts';
+import { chainBloom } from '../../src/state/chain.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import {
   each,
@@ -143,11 +144,16 @@ describe('the one E3', () => {
 });
 
 describe('the craft', () => {
-  /** Spec 00 §3: *"E2 — craft baseline"*, and it never moves off it. */
+  /**
+   * Spec 00 §3: *"E2 — craft baseline"*, and it never moves off it.
+   *
+   * ⚠ The **radius** does move, since M4.2 counted the chain — spec 00 §3's own
+   * +4px per link. The step is what never moves, and that is what this is about.
+   */
   it('burns at E2 for the whole run', () => {
     for (const view of RUN) {
       expect(view.craft.energy).toBe(2);
-      expect(view.craft.bloom).toBe(bloomOf(2));
+      expect(view.craft.bloom).toBe(bloomOf(2) + chainBloom(view.chain));
     }
   });
 });

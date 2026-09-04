@@ -48,6 +48,8 @@ import { createInitialState, stepSim } from '../src/sim/step.ts';
 import { SECONDS_PER_TICK } from '../src/sim/units.ts';
 import { createPress, isPressed } from '../src/input/press.ts';
 import { createPresentation, derive } from '../src/state/derive.ts';
+import { openEconomy, stepEconomy } from '../src/state/economy.ts';
+import { DAILY, modeNamed } from '../src/state/mode.ts';
 import { attachCanvas, sizeToDisplay } from '../src/render/canvas.ts';
 import { interpolate } from '../src/render/interpolate.ts';
 import { draw } from '../src/render/index.ts';
@@ -127,9 +129,26 @@ if (target) {
     return createInitialState(field, craft, SEED);
   };
 
+  // **The mode, from the query string, and DAILY when there is none.**
+  //
+  // It is shell chrome and not a knob in `src/` ([AGENTS.md](../AGENTS.md) §6):
+  // the mode is a *run* configuration, so the thing that opens a run picks it.
+  // `?mode=zen` is how the author flies M4.7's subtraction proof without the game
+  // growing a menu — spec [11](../docs/spec/11-front-door.md)'s front door is
+  // where a mode is chosen for real, and that is M6's.
+  //
+  // An unknown name falls back to DAILY **and says so in the readout**, because a
+  // session flown believing it was in ZEN and priced as DAILY is a session whose
+  // verdict is about the wrong game.
+  const asked = new URLSearchParams(location.search).get('mode');
+  const mode = (asked === null ? null : modeNamed(asked)) ?? DAILY;
+
   let sim = start();
   let current = createPresentation(sim);
   let previous = current;
+  // The economy, opened beside the run and thrown away with it — one line, and
+  // ZEN's is a pair of nulls rather than a branch ([`economy.ts`](../src/state/economy.ts)).
+  let economy = openEconomy(mode);
   // Opened beside the run and thrown away with it. What it holds is the run's
   // own description, so it is as long-lived as the run and no longer.
   let recorder = createRecorder(SCATTER_FIELD, SEED);
@@ -206,6 +225,7 @@ if (target) {
     // `createPresentation` places rather than eases (ADR-0015): a recorder that
     // survived a restart would describe a run nobody flew.
     recorder = createRecorder(SCATTER_FIELD, SEED);
+    economy = openEconomy(mode);
     // And a new meter, for the same reason and a sharper one: every frame it
     // names carries the tick it happened on, and a tick number from a run that
     // has been thrown away points at a moment in a different flight. The
@@ -265,10 +285,19 @@ if (target) {
       }
       stepSim(sim, { pressed });
       current = derive(previous, sim);
+      // After the picture, and once per tick like it: the cash is triggered by
+      // the callout the picture struck, so the two cannot disagree about what a
+      // release earned.
+      economy = stepEconomy(economy, current, sim, mode);
     }
 
     sizeToDisplay(context);
-    draw(interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK), context, look);
+    draw(
+      interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK),
+      context,
+      look,
+      economy,
+    );
 
     if (readout) {
       // The ending is read off the simulation rather than off presentation
@@ -280,6 +309,9 @@ if (target) {
       readout.textContent =
         `APHELION · ${__BUILD_STAMP__} · tick ${current.tick} · ` +
         `${current.craft.speed.toFixed(0)}/s` +
+        // The mode, only when it is not the one the game ships — the same rule
+        // the coat below is stated under, and for the same reason.
+        (mode === DAILY ? '' : ` · ${mode.name}`) +
         (sim.ending === null ? '' : ` · ${sim.ending.replace(/_/g, ' ')}`) +
         (flagged.length === 0 ? '' : ` · ${flagged.length} flagged`) +
         // **Only when it differs**, which is the whole of why it is here: a

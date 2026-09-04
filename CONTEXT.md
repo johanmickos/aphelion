@@ -399,6 +399,14 @@ landed before the boost had armed (author, 2026-08-29).
 _Avoid_: trail (the **trail** is the craft's own line through the field and its brightness is the
 **carry**), history, tail, swept arc
 
+**Trail**:
+The craft's own line through the field: one solid luminous line in CORE, and the **carry**'s only
+pixel — its brightness is what the run has at stake, so the player can see what death would cost
+without reading a number. A wake and not a route: it is a bounded number of samples taken on the
+**tick**, so the world is still where motion is read from. It survives with the **ledger** deleted,
+at a floor, because the line is the craft's and only the brightness is the economy's.
+_Avoid_: breadcrumbs, path, wake (a **wake** is what the craft does to the rungs), route, history
+
 **Callout**:
 The word an event earned, arriving at the place that earned it — for a **release** at the **dot**,
 for an **arrival** at the closest approach. There is **one of each alive at a time** and never a
@@ -478,6 +486,12 @@ document knows it was decided against rather than forgotten.
 freeze follows: 30ms was refused at *every length tried*, 70 is longer, and stopping the step
 breaks the fixed timestep either way. So the loss opens at T0 like the release does.
 
+**Engaged**:
+Holding a body — from the **grab** to the **release**, dive and orbit alike. The only condition
+under which gravity acts, and the only condition under which **carry** accrues. Its opposite is
+**coasting**, and there is no third state.
+_Avoid_: attached, tethered, connected, active
+
 **Coasting**:
 Flying without being engaged with a body. Earns nothing and costs nothing.
 _Avoid_: drifting, idling
@@ -502,6 +516,15 @@ The conversion of carry into bank at release, priced by the grade of the swing.
 Points that are safe. What death takes from the bank is a property of the mode, not of
 the economy.
 _Avoid_: total, saved score
+
+**Ledger**:
+The whole of what a run is worth and everything that prices it — **carry**, **cash**, **bank** and
+the **fuel** tank. It is composed beside the picture rather than inside it, so a **mode** with no
+currency simply does not open one: **Zen** runs with the ledger *absent* rather than stubbed, and
+that absence is what proves the seam between **grading** a swing and pricing one is real. Nothing
+that grades a swing may import it.
+_Avoid_: score system, economy module (the economy is the rules; the ledger is what holds them),
+scoring engine
 
 **Make**:
 A release that lands inside the window but earns no word. The baseline grade: it pays
@@ -640,6 +663,13 @@ of bodies.
 A body's altitude number, assigned bottom-to-top within a day, so every player's "23" is
 the same body. Identity in the run is hue; the address belongs to the retelling.
 _Avoid_: P11-style labels, planet ID
+
+**Mode**:
+What a run's currency is and what death takes from it — and **nothing else**. A mode may never
+change how a swing is graded: the **tier**s, the zones, the **band**s and the **streak** rules are
+identical everywhere, so skill transfers and the **compass** never has to be relearned. It is a
+value read by the **ledger** and by nothing that grades.
+_Avoid_: game mode, difficulty, ruleset
 
 **Daily**:
 The mode that flies today's field. One run, no retry, and death takes both carry and

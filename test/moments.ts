@@ -76,6 +76,10 @@ import type { PresentationState } from '../src/state/types.ts';
 import type { Recipe } from '../src/sim/recipe.ts';
 import { SETTLE_TICKS } from '../src/sim/units.ts';
 import { calloutTicks } from '../src/state/callout.ts';
+import { openEconomy, stepEconomy } from '../src/state/economy.ts';
+import type { Economy } from '../src/state/economy.ts';
+import { DAILY } from '../src/state/mode.ts';
+import type { Mode } from '../src/state/mode.ts';
 import { parseDispatch } from '../tools/dispatch.ts';
 
 /** The recipe this repo ships and `pnpm replay` flies with no argument. */
@@ -106,6 +110,37 @@ export function presentRun(recipe: Recipe): PresentationState[] {
 /** Every tick of the shipped run, as the picture. */
 export function shippedRun(): PresentationState[] {
   return presentRun(shippedRecipe());
+}
+
+/**
+ * Every tick of a run, as the picture **and** as the ledger.
+ *
+ * The economy is composed beside the picture rather than inside it
+ * ([`economy.ts`](../src/state/economy.ts)), so a test that wants both has to
+ * fold both — in the same order the app shell does, which is what makes a number
+ * asserted here a number the author would have seen.
+ *
+ * Index `n` is the state **after** tick `n − 1` was flown, matching
+ * [`presentRun`](#presentrun): index zero is the run before anything happened.
+ */
+export function pricedRun(
+  recipe: Recipe,
+  mode: Mode = DAILY,
+): { readonly views: PresentationState[]; readonly economies: Economy[] } {
+  const opening = openRun(recipe);
+  let view = createPresentation(opening);
+  let economy = openEconomy(mode);
+  const views = [view];
+  const economies = [economy];
+  replayRun(recipe, {
+    onTick: (state) => {
+      view = derive(view, state);
+      economy = stepEconomy(economy, view, state, mode);
+      views.push(view);
+      economies.push(economy);
+    },
+  });
+  return { views, economies };
 }
 
 /** Whether the craft has hold of anything on this tick. */

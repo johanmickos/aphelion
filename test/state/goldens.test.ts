@@ -56,6 +56,7 @@ import { PERFECT_FLOOR } from '../../src/sim/tier.ts';
 import { KNOCK_WORDS, knockTicks } from '../../src/state/knock.ts';
 import { DESIGN_WIDTH } from '../../src/state/design.ts';
 import { bloomOf } from '../../src/state/energy.ts';
+import { chainBloom } from '../../src/state/chain.ts';
 import { PUNCH_FLOOR, PUNCH_STRETCH, PUNCH_TICKS, punchSpan } from '../../src/state/punch.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import {
@@ -1047,15 +1048,18 @@ describe('the camera, over the whole run', () => {
 describe('the craft', () => {
   /**
    * Spec 00 §3's acceptance: *"bloom radius is a pure function of energy step and
-   * chain length; no code path sets bloom from a hue."* The chain is spec 08's and
-   * arrives in M4, so today this is E2's radius exactly — and the term it
-   * multiplies is built, so when the chain exists it is a number to pass rather
-   * than a rule to invent.
+   * chain length; no code path sets bloom from a hue."*
+   *
+   * ⚠ **The chain is counted since M4.2**, so the second half of that sentence is
+   * now live and this run's craft does not sit at one radius. What is asserted is
+   * the function: the step never moves off E2, and the radius is E2's plus the
+   * chain's own — which is the only two things spec 00 §3 allows it to be made
+   * of.
    */
-  it('burns at E2 for the whole run, at the radius the chain will widen', () => {
+  it('burns at E2 for the whole run, at the radius the chain widens', () => {
     for (const view of RUN) {
       expect(view.craft.energy).toBe(2);
-      expect(view.craft.bloom).toBe(54);
+      expect(view.craft.bloom).toBe(54 + chainBloom(view.chain));
     }
     // Spec 00 §3's +4px a link, converted: chain 7 is 54 + 7 × 12.
     expect(bloomOf(2, 7)).toBe(138);

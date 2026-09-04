@@ -8,8 +8,11 @@
  */
 import type { Tick } from '../sim/types.ts';
 import type { Tier } from '../sim/tier.ts';
+import type { ChainView } from './chain.ts';
 import type { Decay } from './decay.ts';
 import type { DeadlineMemo } from './deadline.ts';
+import type { StreakView } from './streak.ts';
+import type { TrailPoint } from './trail.ts';
 
 /**
  * The grade of a release, re-exported because it is part of what the renderer
@@ -22,6 +25,14 @@ import type { DeadlineMemo } from './deadline.ts';
  * like every other one.
  */
 export type { Tier };
+
+/**
+ * The **chain**, the **streak** and the **trail**, re-exported for the same
+ * reason [`Tier`](#tier) is: they are facts the picture is handed, and the
+ * renderer may not name the module that computed them any more than it may name
+ * the simulation.
+ */
+export type { ChainView, StreakView, TrailPoint };
 
 /**
  * How committed or imminent something is, in four steps (`CONTEXT.md`: energy).
@@ -872,21 +883,39 @@ export interface PresentationState {
    */
   readonly worldSpeed: number;
   /**
-   * How long the chain is — **zero, and it is a named zero rather than an
-   * absence**.
+   * The **chain** — consecutive engaged swings, and what it is currently worth
+   * in light ([`chain.ts`](./chain.ts)).
    *
-   * The exact shape [`bloomOf`](./energy.ts) already uses for the same quantity:
-   * the term is built and only its value is missing. `CONTEXT.md` defines the
-   * chain as consecutive engaged swings and spec
-   * [08](../../docs/spec/08-economy.md) owns it, which is M4's — so nothing can
-   * count it yet, and spec 05 §2's *"dust density rises gently with chain level"*
-   * needs somewhere to read it from that is not the renderer inventing one.
-   *
-   * It is on the state rather than passed to `bloomOf`'s caller alone because
-   * two things now spend it — the craft's bloom radius and the dust's density —
-   * and M4 should wire it in one place rather than two.
+   * ⚠ **It was a named zero until M4.2 and is now counted.** Four things spend
+   * it and they are in four layers, which is why it is one field here rather
+   * than a number passed around: the craft's bloom radius (spec 00 §3's +4px per
+   * link), the **dust**'s density (spec 05 §2), the `CHAIN ×N` line under the
+   * velocity subline (spec 03 §2), and the carry's accrual rate (spec 08 §3) —
+   * the last of those through the **ledger**, which reads this and never writes
+   * it.
    */
-  readonly chain: number;
+  readonly chain: ChainView;
+  /**
+   * The **streak** — consecutive releases at the same tier, and the `×N` beside
+   * the word ([`streak.ts`](./streak.ts)).
+   *
+   * It is accuracy where the chain is engagement: spec
+   * [08 · §4](../../docs/spec/08-economy.md)'s *"two systems, two pixels, no
+   * overlap"*. It lives on the picture rather than in the ledger because spec
+   * 08 §7 keeps it alive in ZEN — *"words and `×N` remain — they are feedback,
+   * not price"*.
+   */
+  readonly streak: StreakView;
+  /**
+   * The craft's own line through the field, oldest sample first — `CONTEXT.md`'s
+   * **trail**.
+   *
+   * The geometry only. Its **brightness is the carry** (spec 02 §6, spec 08 §8)
+   * and the carry is the ledger's, so the two meet in the renderer and the line
+   * survives with the ledger deleted. The craft itself is not a sample; the head
+   * of the drawn line is wherever the craft is now ([`trail.ts`](./trail.ts)).
+   */
+  readonly trail: readonly TrailPoint[];
   readonly craft: CraftView;
   readonly bodies: readonly BodyView[];
   readonly corridor: CorridorView;

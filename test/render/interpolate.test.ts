@@ -14,13 +14,18 @@ import { hueOf } from '../../src/state/identity.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 import { interpolate } from '../../src/render/interpolate.ts';
 import { NO_DEADLINE } from '../../src/state/deadline.ts';
+import { NO_CHAIN } from '../../src/state/chain.ts';
+import { NO_STREAK } from '../../src/state/streak.ts';
+import { NO_TRAIL } from '../../src/state/trail.ts';
 
 function view(x: number, y: number, heading: number): PresentationState {
   return {
     tick: x,
     camera: { x: 585, y, lock: 0, offset: 0 },
     worldSpeed: 0,
-    chain: 0,
+    chain: NO_CHAIN,
+    streak: NO_STREAK,
+    trail: NO_TRAIL,
     anomaly: null,
     boundary: [],
     deadline: null,

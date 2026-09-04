@@ -61,6 +61,9 @@ import { drawAnomaly } from './anomaly.ts';
 import { drawRungs } from './rungs.ts';
 import { boundaryMotes, drawBoundary } from './boundary.ts';
 import { drawDeadline, drawSos } from './deadline.ts';
+import { drawTrail } from './trail.ts';
+import { NO_ECONOMY } from '../state/economy.ts';
+import type { Economy } from '../state/economy.ts';
 import { applyGrade } from './grade.ts';
 import type { GradeLook } from './grade.ts';
 import {
@@ -1325,11 +1328,22 @@ const LABEL_OFFSET = 22 * BOARD_PIXEL;
  * in the game, reachable from anywhere, and the production bundle would still
  * carry it. A defaulted argument is reachable only by whoever calls `draw`, which
  * is the shell and the bench and nothing else.
+ *
+ * ## `economy` is the other optional argument, and it is optional on purpose
+ *
+ * The **ledger** is composed beside the picture rather than inside it
+ * ([`economy.ts`](../state/economy.ts)), so the two meet here and only here. Its
+ * default is [`NO_ECONOMY`](../state/economy.ts) — which is what ZEN passes, and
+ * what a caller with no ledger to draw gets — so every element that spends it
+ * has to have an answer for its absence. There are two, and they are the two spec
+ * 08 §8 lists: the **trail**'s brightness, which falls to its floor, and the
+ * **BANK** chip, which is not drawn at all.
  */
 export function draw(
   view: PresentationState,
   context: CanvasRenderingContext2D,
   look: GradeLook = {},
+  economy: Economy = NO_ECONOMY,
 ): void {
   const { canvas } = context;
   const fit = letterbox(canvas.width, canvas.height);
@@ -1365,7 +1379,7 @@ export function draw(
   // stack is SKY, DUST, STRATA, BODIES, PLAYER. Unlike the sky it is inside this
   // transform, which is the whole of why it moves at world speed: a mote's
   // position has no camera term in it at all.
-  drawDust(context, DUST, view.camera, view.corridor, view.worldSpeed, view.chain, seen);
+  drawDust(context, DUST, view.camera, view.corridor, view.worldSpeed, view.chain.links, seen);
 
   // **The rungs, under everything else in the world.** Spec 05 §2's stack is SKY,
   // DUST, STRATA, BODIES, PLAYER, and this is STRATA — the medium the rest of the
@@ -1433,6 +1447,21 @@ export function draw(
   // *"at the craft"*, and a distress call under the thing it is about would be
   // the one cue in the game the player cannot see.
   if (view.sos !== null) drawSos(context, view.sos, view.craft);
+
+  // **The trail, under the craft and over everything else in the world.** Spec
+  // 05 §2's stack ends `PLAYER`, and the craft's line is the player — spec 00 §1
+  // puts the craft, the trail and the hand in one token. It is drawn before the
+  // bloom so the craft's own light lies over the head of its wake rather than
+  // under it.
+  drawTrail(
+    context,
+    view.trail,
+    view.craft.x,
+    view.craft.y,
+    // **The carry, and its floor when there is no ledger.** ZEN keeps the line
+    // and loses the meter, which is spec 08 §7's whole claim about the mode.
+    economy.ledger?.carry ?? 0,
+  );
 
   // The craft's own bloom is drawn round, and the dart inside it is what
   // stretches: spec 00 §5 puts every streak parallel to velocity, and a glow

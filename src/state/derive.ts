@@ -75,6 +75,9 @@ import { linger, struck } from './callout.ts';
 import { followCamera, openCamera } from './camera.ts';
 import { compassOf, takenRing } from './compass.ts';
 import { advance, fade } from './decay.ts';
+import { NO_CHAIN, chainBloom, chainOf } from './chain.ts';
+import { NO_STREAK, streakOf } from './streak.ts';
+import { NO_TRAIL, trailOf } from './trail.ts';
 import { relax, stretch, UNDEFORMED } from './deformation.ts';
 import { bloomOf, E3_BLOOM } from './energy.ts';
 import { hueOf } from './identity.ts';
@@ -90,31 +93,17 @@ import type {
   BodyView,
   CalloutView,
   CameraView,
+  ChainView,
   CompassView,
   DeformationView,
   Energy,
   FlashView,
   KnockView,
   PresentationState,
+  StreakView,
+  TrailPoint,
   WakeView,
 } from './types.ts';
-
-/**
- * How long the chain is, which is not a question anything can answer yet.
- *
- * Spec 00 §3 gives each chain link +4px of the craft's bloom and `CONTEXT.md`
- * defines the chain as *"consecutive engaged swings, broken by coasting past one
- * rung"* — so counting it needs rungs, which are spec 05's and M3's, and an
- * economy to spend it, which is spec 08's and M4's. Written as a named zero
- * rather than left out, because the term it multiplies is built and only its
- * value is missing.
- *
- * **Two things spend it now**, since M3.3: the craft's bloom radius, and the
- * **dust**'s density — spec 05 §2's *"density rises gently with chain level, a
- * hot run flies through a livelier field."* So it goes onto the state as well as
- * into `bloomOf`, and M4 wires it in one place rather than in two.
- */
-const CHAIN_UNBUILT = 0;
 
 /**
  * The craft's step, and it never moves.
@@ -246,6 +235,9 @@ function present(
   knock: KnockView | null,
   wake: readonly WakeView[],
   rescue: DeadlineMemo,
+  chain: ChainView,
+  streak: StreakView,
+  trail: readonly TrailPoint[],
 ): PresentationState {
   const bodies = bodiesOf(sim, previousBodies);
   const states: BodyState[] = bodies.map((body) => body.state);
@@ -255,14 +247,20 @@ function present(
     tick: sim.tick,
     camera,
     worldSpeed,
-    chain: CHAIN_UNBUILT,
+    chain,
+    streak,
+    trail,
     craft: {
       x: sim.craft.x,
       y: sim.craft.y,
       heading: headingOf(sim.craft),
       speed: speedOf(sim.craft),
       energy: CRAFT_ENERGY,
-      bloom: bloomOf(CRAFT_ENERGY, CHAIN_UNBUILT),
+      // **The chain is a radius and the milestone is one more of them.** Spec
+      // 00 §3's +4px per link, plus spec 06 §6's *"one bloom step"* while a
+      // milestone is alive — both through [`chainBloom`](./chain.ts), so there
+      // is one place the chain becomes light.
+      bloom: bloomOf(CRAFT_ENERGY) + chainBloom(chain),
       deformation,
     },
     bodies,
@@ -325,6 +323,12 @@ export function createPresentation(sim: SimState): PresentationState {
     null,
     [],
     NO_DEADLINE,
+    // The chain, the streak and the trail all open **empty**, for ADR-0015's
+    // second reason: a run that began holding the last one's chain would be
+    // showing a player a hot run they had not flown.
+    NO_CHAIN,
+    NO_STREAK,
+    NO_TRAIL,
   );
 }
 
@@ -434,6 +438,11 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
   // being kept inside, which is visible exactly where it matters — at the edge.
   const camera = followCamera(previous.camera, sim);
   const callout = calloutOf(previous, event, camera);
+  // **The streak is struck by the word and not beside it.** A fresh callout is a
+  // graded release — `struck` returns `null` for a miss — so reading its age is
+  // reading the pixel that announced the grade rather than grading a second time
+  // from the same geometry, which is spec 08's axiom 5 one system along.
+  const struckTier = callout !== null && callout.life.age === 0 ? callout.tier : null;
   return present(
     sim,
     camera,
@@ -454,5 +463,8 @@ export function derive(previous: PresentationState, sim: SimState): Presentation
     knockOf(previous, sim),
     wakeOf(previous.wake, sim),
     deadlineOf(previous.rescue, sim),
+    chainOf(previous.chain, sim, event === 'RELEASE'),
+    streakOf(previous.streak, struckTier, sim.ending !== null),
+    trailOf(previous.trail, sim),
   );
 }

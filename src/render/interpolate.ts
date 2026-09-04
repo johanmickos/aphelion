@@ -267,6 +267,12 @@ export function interpolate(
     worldSpeed: current.worldSpeed,
     // The chain is a count and counts do not interpolate.
     chain: current.chain,
+    // Nor does the streak, for the same reason: it is a tier and a count.
+    streak: current.streak,
+    // And the **trail** is taken whole — its samples are world points laid down
+    // on ticks, so there is nothing between two of them to be part way along.
+    // What *is* crossed is its head, which is the craft, one field down.
+    trail: current.trail,
     camera: {
       ...current.camera,
       x: between(previous.camera.x, current.camera.x, alpha),
