@@ -43,7 +43,7 @@ import type { Tier } from '../sim/tier.ts';
 import { cos, sin } from '../sim/trig.ts';
 import { advance, fade, place, progress, ticksIn } from './decay.ts';
 import type { Decay } from './decay.ts';
-import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from './design.ts';
+import { BAND_TOP, DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from './design.ts';
 import { hueOf } from './identity.ts';
 import type { CalloutView, CameraView, RingView } from './types.ts';
 
@@ -241,7 +241,14 @@ function insideThePicture(
   const halfTall = (CAP_HEIGHT * size) / 2 + POINTS_DROP + bloom;
   const left = camera.x - DESIGN_WIDTH / 2 + halfWide;
   const right = camera.x + DESIGN_WIDTH / 2 - halfWide;
-  const top = camera.y - DESIGN_HEIGHT / 2 + halfTall;
+  // ⚠ **The band's top and not the design space's**, since M4.5. Spec 00 §7's
+  // first guardrail is that everything the player reads is composed inside the
+  // **guaranteed band**, and the fit crops the design space equally at both ends
+  // on any viewport shorter than it — 291 design units on the author's own phone
+  // ([`BAND_TOP`](./design.ts)). Clamped to the design space, this slid a word
+  // born near the top of the picture into exactly the strip a phone does not
+  // show, which is the same defect it exists to fix, one rectangle out.
+  const top = camera.y - DESIGN_HEIGHT / 2 + BAND_TOP + halfTall;
   // The thumb line and not the foot of the design space: nothing readable lives
   // below it, ever, and spec 00 §7 names awards among the things that do not.
   const bottom = camera.y - DESIGN_HEIGHT / 2 + THUMB_LINE - halfTall;

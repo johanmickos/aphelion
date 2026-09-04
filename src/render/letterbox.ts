@@ -27,7 +27,7 @@
  * build that sized itself to the viewport instead, and the M1 gate is flying
  * this one against a prototype that does the latter.
  */
-import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../state/design.ts';
+import { DESIGN_HEIGHT, DESIGN_WIDTH, GUARANTEED_BAND } from '../state/design.ts';
 import type { CorridorView } from '../state/types.ts';
 
 export interface Letterbox {
@@ -39,17 +39,20 @@ export interface Letterbox {
 }
 
 /**
- * The shortest viewport the game supports, as a fraction of the design space's
- * height — and therefore the band every device shows in full.
+ * ⚠ **The band moved to [`design.ts`](../state/design.ts) in M4.5**, where the
+ * composition can read it.
  *
- * Measured from the author's own phone: **651 css of a 393-wide viewport**, which
- * against a design space of 1170 × 2532 scaled from the width is 1 938 design
- * units, or **0.77** of it. Spec 00 §7's first guardrail is that everything the
- * player reads is composed inside this, and the thumb line at 2/3 (1 688) sits
- * inside it with room to spare — which is what makes the rule survivable rather
- * than merely stated.
+ * It has two jobs. As a bound on the **scale** — every device shows the band in
+ * full, and a viewport too short for it at the width's scale is scaled down until
+ * it does — it is this file's, and [`letterbox`](#letterbox) below is still where
+ * that happens. As the rectangle *"everything the player reads is composed
+ * inside"* (spec 00 §7) it is a fact about the design space, and the two things
+ * that most need it — the top band and the callout's clamp — live where the
+ * renderer cannot be imported from.
+ *
+ * Re-exported so nothing that already reads it here has to move.
  */
-export const GUARANTEED_BAND = 0.77;
+export { GUARANTEED_BAND };
 
 /**
  * Fit the design space into a buffer of `width` × `height` device pixels.

@@ -22,7 +22,8 @@ import { BOOST_ARM_TICKS, BOOST_PLATEAU_TICKS, SETTLE_TICKS } from '../../src/si
 import { calloutTicks, POP_RISE } from '../../src/state/callout.ts';
 import { STRETCH_ACROSS, STRETCH_ALONG } from '../../src/state/deformation.ts';
 import { createPresentation, derive } from '../../src/state/derive.ts';
-import { DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
+import { BAND_TOP, DESIGN_HEIGHT, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
+import { POINTS_DROP } from '../../src/state/callout.ts';
 import { PUNCH_FLOOR, PUNCH_TICKS, punchSize, punchSpan } from '../../src/state/punch.ts';
 import type { PresentationState } from '../../src/state/types.ts';
 
@@ -208,12 +209,24 @@ describe('the word, held inside the picture', () => {
         // **At birth**, which is the only tick the clamp runs on. After that the
         // word is world-anchored and being left behind, so drifting out of the
         // picture is what is supposed to happen to it.
-        if (word === null || word.life.age !== 0 || word.tier === 'MAKE') continue;
+        if (word === null || word.life.age !== 0) continue;
         const halfWide = (7 * 0.8 * word.size) / 2 + word.bloom;
-        const halfTall = (0.75 * word.size) / 2 + word.bloom;
+        // ⚠ The unit is the word **and its points** since M4.5 (spec 06 §4), so
+        // the space kept for it is both lines — and a make is no longer exempt,
+        // because a make draws its number.
+        const halfTall = (0.75 * word.size) / 2 + POINTS_DROP + word.bloom;
         expect(word.x - halfWide).toBeGreaterThanOrEqual(view.camera.x - DESIGN_WIDTH / 2 - 1e-6);
         expect(word.x + halfWide).toBeLessThanOrEqual(view.camera.x + DESIGN_WIDTH / 2 + 1e-6);
-        expect(word.y - halfTall).toBeGreaterThanOrEqual(view.camera.y - DESIGN_HEIGHT / 2 - 1e-6);
+        // ⚠ **The guaranteed band's top, not the design space's.** Spec 00 §7's
+        // first guardrail is that everything the player reads is composed inside
+        // the band every device shows in full, and the fit crops the design space
+        // equally at both ends on any shorter viewport — 291 design units on the
+        // author's own phone. Clamped to the design space, a word born near the
+        // top of the picture was slid into exactly the strip a phone does not
+        // show, which is the defect this clamp exists to prevent.
+        expect(word.y - halfTall).toBeGreaterThanOrEqual(
+          view.camera.y - DESIGN_HEIGHT / 2 + BAND_TOP - 1e-6,
+        );
         // The thumb line, not the foot of the design space: nothing readable
         // lives below it, ever, and spec 00 §7 names awards among them.
         expect(word.y + halfTall).toBeLessThanOrEqual(

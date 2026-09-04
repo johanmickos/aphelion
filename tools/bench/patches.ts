@@ -446,20 +446,29 @@ export function lockOf(sim: SimState): number {
     '“much less noticeable… only as background noise”, and halved again once dust arrived',
   ),
 
-  // **The retro grade, and it is one patch for a pass with five stages.**
-  // Spec 14 §2's table is bloom (radius, threshold, intensity), grade (lift,
-  // gamma, gain), dither, grain and scanlines (strength, pitch) — ten or so
-  // knobs, against a bench capped at sixty that has fifty-seven. So the stages
-  // are ganged behind one master inside `grade.ts` (§4: *"every knob above is
-  // exposed in one place so that a tuning session is a single file's worth of
-  // numbers"*), and what reaches the bench is the one number M3.5's acceptance
-  // actually asks for: *"dialled from off to heavy at runtime."* The arithmetic
-  // for the other nine, and what a second slider would buy, is in
-  // `docs/plan/m3-the-field.md` for the author to rule.
+  // **The chain's break, and it cost the retro grade its slider.**
+  //
+  // The bench is capped at sixty controls and was full, so this is a trade and
+  // the rule at the top of this file is what decided which way round. The grade
+  // was **ruled on a dated flight with a measurement behind it** — 0.45,
+  // 2026-09-02, *"it looks real nice… 0.45 seems like a nice balance"* — which is
+  // this file's own first reason for taking a slider away, and the surface that
+  // can still ask the question it answers is the **tuning panel on the game
+  // page**: a coat is judged over a playthrough and the bench is not one, which
+  // is why that panel exists. So the bench's copy was a ruled value on the wrong
+  // surface.
+  //
+  // What replaces it is a question the corpus opened this milestone. Spec 08 §4
+  // breaks the chain on *"one full rung"*, and measured over the author's own 222
+  // release-to-grab transitions **10.8% of links survive it** — so the chain
+  // never passes 4, §4's milestones at ×5, ×10 and ×15 are unreachable, and the
+  // multiplier it prices is ×1.0 or ×1.1 and nothing else. It is a number in
+  // **rungs** so that moving it composes with `RUNG_SPACING` rather than
+  // disagreeing with it, and `docs/plan/m4-the-economy.md` carries the table.
   settable(
-    'src/render/grade.ts',
-    'GRADE',
-    'spec 14 §2’s whole pass, ganged — 0 is off and 1 is every stage at its own stated ceiling',
+    'src/state/chain.ts',
+    'CHAIN_BREAK_RUNGS',
+    'spec 08 §4 breaks the chain on one rung and the corpus says one rung breaks nine links in ten',
   ),
 
   {

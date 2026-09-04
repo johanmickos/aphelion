@@ -16,7 +16,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { COASTING, HUD_BOTTOM, drawHud, spaced } from '../../src/render/hud.ts';
-import { DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
+import { BAND_BOTTOM, BAND_TOP, DESIGN_WIDTH, THUMB_LINE } from '../../src/state/design.ts';
 import { NO_CHAIN } from '../../src/state/chain.ts';
 import type { ChainView } from '../../src/state/chain.ts';
 import type { HudView } from '../../src/state/hud.ts';
@@ -128,6 +128,25 @@ describe('one layout, five pressures', () => {
       }
     }
     expect(HUD_BOTTOM).toBeLessThan(THUMB_LINE);
+  });
+
+  /**
+   * ⚠ **And inside the guaranteed band, which is the half that was wrong.**
+   *
+   * Spec 00 §7: *"a guaranteed band... everything the player reads is composed
+   * inside it."* The fit comes from the **width**, so any viewport shorter than
+   * the design space crops it equally at both ends — 291 design units on the
+   * author's own phone. Hung from the design space's top edge, the velocity
+   * landed at 184 and the BANK chip at 170, and on the phone neither was on
+   * screen at all: only `CHAIN ×N` survived the crop. This is that, asserted.
+   */
+  it('composes the whole band inside the height every device shows', () => {
+    for (const [name, pressure] of Object.entries(PRESSURES)) {
+      for (const one of pressure()) {
+        expect(one.y, `${name}: ${one.says}`).toBeGreaterThan(BAND_TOP);
+        expect(one.y, `${name}: ${one.says}`).toBeLessThan(BAND_BOTTOM);
+      }
+    }
   });
 
   /** And inside the design space, on both sides. */

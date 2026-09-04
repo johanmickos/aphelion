@@ -103,10 +103,17 @@
       /* The dev row: the recorder's controls. Hidden unless `main.ts` un-hides
          it, which it does only under `import.meta.env.DEV` — a production build
          has no endpoint to send to (ADR-0003) and drops the code that would. */
+      /* The controls sit **below the game's own top band**, and `main.ts` is what
+         puts them there: the masthead and the BANK chip are composed at the top
+         of the guaranteed band (spec 00 §7) and how far down that lands in css
+         depends on the fit, which only the shell knows. `--hud` is the gap it
+         measures; the fallback is the row's own margin, for the moment before the
+         first frame. Chrome that covered the velocity would be developer chrome
+         standing on the one number the design calls the headline. */
       #dev {
         display: flex;
         gap: 8px;
-        margin-top: 6px;
+        margin-top: var(--hud, 6px);
       }
       #dev[hidden] {
         display: none;

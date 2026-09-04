@@ -53,6 +53,8 @@ import { DAILY, modeNamed } from '../src/state/mode.ts';
 import { attachCanvas, sizeToDisplay } from '../src/render/canvas.ts';
 import { interpolate } from '../src/render/interpolate.ts';
 import { draw } from '../src/render/index.ts';
+import { HUD_BOTTOM } from '../src/render/hud.ts';
+import { letterbox } from '../src/render/letterbox.ts';
 import { GRADE, SCANLINE, SCANLINE_PITCH } from '../src/render/grade.ts';
 import { DIAG_ENDPOINT, buildDispatch } from '../tools/dispatch.ts';
 import { createMeter, frameBegan, frameEnded, timingOf } from '../tools/meter.ts';
@@ -60,6 +62,17 @@ import { bindPress, suppressBrowserGestures, typing } from './input.ts';
 
 /** Replaced at build time by Vite's `define`; `dev` when the dev server serves it. */
 declare const __BUILD_STAMP__: string;
+
+/**
+ * How far down the page `#chrome` already starts, in css pixels — its own inset
+ * plus the readout row above the controls.
+ *
+ * A measurement of the stylesheet rather than a second copy of it would be
+ * better, and it is not worth a layout read every frame: what this is for is
+ * keeping developer chrome off the velocity, and being a few pixels generous is
+ * the safe direction.
+ */
+const CHROME_TOP = 34;
 
 /**
  * The finest interval this browser's clock will admit to, in seconds.
@@ -292,6 +305,19 @@ if (target) {
     }
 
     sizeToDisplay(context);
+    // **Keep the dev chrome off the game's top band.** The masthead and the BANK
+    // chip are composed at the top of the guaranteed band and where that lands in
+    // css depends on the fit, so the shell — which is the only thing that knows
+    // both — measures it and pushes the controls below. Dev-only, like everything
+    // else in `#chrome`.
+    if (dev !== null && !dev.hidden) {
+      const box = target.getBoundingClientRect();
+      const fit = letterbox(box.width, box.height);
+      dev.style.setProperty(
+        '--hud',
+        `${Math.max(6, fit.offsetY + HUD_BOTTOM * fit.scale - CHROME_TOP)}px`,
+      );
+    }
     draw(
       interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK),
       context,

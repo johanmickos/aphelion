@@ -39,7 +39,6 @@ import * as mark from './src/state/sighting.ts';
 import * as view from './src/render/index.ts';
 import * as rung from './src/state/rung.ts';
 import * as sky from './src/render/starfield.ts';
-import * as coat from './src/render/grade.ts';
 import * as motes from './src/render/dust.ts';
 import * as edge from './src/state/boundary.ts';
 import * as bands from './src/render/boundary.ts';
@@ -49,6 +48,9 @@ import * as fit from './src/render/letterbox.ts';
 import { BOARD_PIXEL, DESIGN_HEIGHT, DESIGN_WIDTH } from './src/state/design.ts';
 import { SCALE } from './src/sim/units.ts';
 import { createPresentation, derive } from './src/state/derive.ts';
+import { openEconomy, stepEconomy } from './src/state/economy.ts';
+import { DAILY } from './src/state/mode.ts';
+import * as links from './src/state/chain.ts';
 import type { PresentationState } from './src/state/types.ts';
 import { attachCanvas, sizeToDisplay } from './src/render/canvas.ts';
 import { draw } from './src/render/index.ts';
@@ -281,17 +283,17 @@ const KNOBS: Knob[] = [
     places: 0,
   },
   {
-    id: 'grade',
-    label: 'Retro grade',
-    what: 'spec 14 §2’s whole post-process, on one knob — **0 is off and the game is exactly as it is on main**, 1 is every stage at the ceiling the spec states for it: the blacks lifted by VOID’s own violet, a 4×4 ordered dither at one code value, grain at 3% and, over the last two fifths of the travel, scanlines to 6% at a 2-design-px pitch. Nine or ten sliders would not fit a bench capped at sixty, so they are ganged in `grade.ts`, which spec 14 §4 asks for anyway. **It is a coat**: §1 rules that if the grade is carrying the retro register the register is not there, so the question this answers is how much of one the game wants and not whether it needs one. Costs one full-screen fill below 0.6 and two above it, and nothing at all at 0',
-    min: 0,
-    max: 1,
-    step: 0.05,
-    base: coat.GRADE,
-    apply: coat.set_GRADE,
+    id: 'chainbreak',
+    label: 'Chain · rungs of coasting that break it',
+    what: 'spec 08 §4 breaks the chain on “one full rung” and **measured, one rung breaks nearly everything**: over the 222 release-to-grab transitions in the replayable corpus the coast runs p50 128 m — two and a half rungs — so 10.8% of links survive and the chain never reaches 4. §4’s milestones at ×5, ×10 and ×15 are unreachable and its “uncapped in v1” prices nothing. The prototype’s own counter has **no distance term at all** and ran at ×5–×7. In rungs rather than metres, so it composes with the spacing slider instead of quietly disagreeing with it: 2 rungs keeps 34%, 4 keeps 89%',
+    min: 1,
+    max: 8,
+    step: 1,
+    base: links.CHAIN_BREAK_RUNGS,
+    apply: links.set_CHAIN_BREAK_RUNGS,
     restarts: false,
-    group: 'light',
-    places: 2,
+    group: 'field',
+    places: 0,
   },
   {
     id: 'e1alpha',
@@ -893,6 +895,7 @@ suppressBrowserGestures(stage);
 let sim: SimState;
 let current: PresentationState;
 let previous: PresentationState;
+let economy = openEconomy(DAILY);
 let recorder = createRecorder(SCATTER_FIELD, SEED);
 let flagged: number[] = [];
 const clock = createClock();
@@ -927,6 +930,7 @@ function start(): void {
   sim = createInitialState(scatterField(), scatterCraft(), SEED);
   current = createPresentation(sim);
   previous = current;
+  economy = openEconomy(DAILY);
   recorder = createRecorder(SCATTER_FIELD, SEED);
   flagged = [];
   sinceGrab = 0;
@@ -1158,6 +1162,10 @@ function frame(now: number): void {
     const wasEnding = sim.ending;
     stepSim(sim, { pressed });
     current = derive(previous, sim);
+    // The economy, beside the picture exactly as the shell folds it — the bench
+    // runs the repo's own game and a bench drawing a trail with no carry behind
+    // it would be answering a question about a different one.
+    economy = stepEconomy(economy, current, sim, DAILY);
 
     // Counted here, exactly as the trail counts them: the freeze's own clock is
     // never read off the orbit (ADR-0013).
@@ -1178,7 +1186,12 @@ function frame(now: number): void {
   }
 
   sizeToDisplay(context);
-  draw(interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK), context);
+  draw(
+    interpolate(previous, current, clock.unspentSeconds / SECONDS_PER_TICK),
+    context,
+    {},
+    economy,
+  );
   hud();
   sayFit();
   if (released) redrawTrail();

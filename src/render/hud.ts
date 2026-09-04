@@ -34,7 +34,7 @@
  * in a renderer rather than as a branch anywhere that matters.
  */
 import { CORE, INK, ION, dim } from './palette.ts';
-import { DESIGN_WIDTH } from '../state/design.ts';
+import { BAND_TOP, DESIGN_WIDTH } from '../state/design.ts';
 import { fade, progress } from '../state/decay.ts';
 import { POP_SCALE } from '../state/hud.ts';
 import type { HudView } from '../state/hud.ts';
@@ -43,6 +43,27 @@ import type { Ledger } from '../state/ledger.ts';
 
 /** Direction 03's artboard is 330 units across and the design space is 1170. */
 const BOARD = DESIGN_WIDTH / 330;
+
+/**
+ * Where the top band hangs from — the top of the **guaranteed band**, not the
+ * top of the design space.
+ *
+ * ⚠ **This was the design space's own top edge for an afternoon and a phone
+ * cannot see it.** Spec [00 · §7](../../docs/spec/00-tokens.md) fixes the width
+ * and lets the height flex, so the fit is bound from the width and a short
+ * viewport crops the design space equally at both ends — measured on the
+ * author's own device, **291 design units off the top**
+ * ([`BAND_TOP`](../state/design.ts)). Hung from zero, the velocity and the BANK
+ * chip landed at 184 and 170, which is inside that crop: on the phone they were
+ * simply not there, and `CHAIN ×N` at 326 was the only line of the masthead that
+ * survived.
+ *
+ * §7's first guardrail is the fix and it is the sentence the rule was already
+ * written in: *"everything the player reads is composed inside"* the band. So the
+ * board's own offsets are kept exactly and the block they are measured from moves
+ * to the top of what every device shows.
+ */
+const BAND = BAND_TOP;
 
 /** Spec 00 §4's display face — *"velocity, mode titles, headline numbers"*, tracked 0.03em. */
 const DISPLAY_FACE = "'Anton', 'Archivo', system-ui, sans-serif";
@@ -54,26 +75,26 @@ const UTILITY_FACE = "'Archivo', system-ui, sans-serif";
 const MARGIN = 20 * BOARD;
 
 /** The velocity, at the board's `y = 52` and `font-size: 30`. */
-const SPEED_BASELINE = 52 * BOARD;
+const SPEED_BASELINE = BAND + 52 * BOARD;
 const SPEED_SIZE = 30 * BOARD;
 
 /** Its subline, at `y = 70`, `font-size: 9`, letter-spacing 2. */
-const SUBLINE_BASELINE = 70 * BOARD;
+const SUBLINE_BASELINE = BAND + 70 * BOARD;
 const SUBLINE_SIZE = 9 * BOARD;
 const SUBLINE_TRACKING = 2 * BOARD;
 
 /** `CHAIN ×N`, at `y = 92`, `font-size: 11`, weight 600, letter-spacing 1. */
-const CHAIN_BASELINE = 92 * BOARD;
+const CHAIN_BASELINE = BAND + 92 * BOARD;
 const CHAIN_SIZE = 11 * BOARD;
 const CHAIN_TRACKING = 1 * BOARD;
 
 /** The BANK chip, right-aligned at `x = 310`, `y = 48`, `font-size: 11`, weight 600. */
-const BANK_BASELINE = 48 * BOARD;
+const BANK_BASELINE = BAND + 48 * BOARD;
 const BANK_SIZE = 11 * BOARD;
 const BANK_TRACKING = 1 * BOARD;
 
 /** And the armed cash on its second line, `y = 66`, `font-size: 10`. */
-const ARMED_BASELINE = 66 * BOARD;
+const ARMED_BASELINE = BAND + 66 * BOARD;
 const ARMED_SIZE = 10 * BOARD;
 
 /**
